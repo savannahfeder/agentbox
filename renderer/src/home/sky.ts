@@ -21,7 +21,10 @@ export type SkyArt = {
 
 export type SkyId = string;
 /** A theme of its own: the window's light or dark look, with this sky on Home and the Inbox. */
-export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; frame?: string };
+export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; frame?: string; card?: string; inbox?: boolean };
+
+/** Dark skies all wear the Inbox's header; a light one only when its look was drawn for it. */
+export const wearsInboxSky = (sky: Sky | null): sky is Sky => !!sky && (sky.dark || !!sky.inbox);
 
 const DUSK: Palette = { core: [235, 85, 150], hot: [255, 195, 160], halo: [105, 60, 185], ember: [150, 40, 90] };
 const EMBER: Palette = { core: [250, 92, 28], hot: [140, 150, 90], halo: [30, 92, 175], ember: [170, 55, 20] };
@@ -36,20 +39,26 @@ const DARK_SKIES: Sky[] = [
   { id: 'aurora', name: 'Dark green sky', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: '#161a19', y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
 ];
 
-const light = (palette: Palette, glow: Glow[]): SkyArt => ({
+const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyArt => ({
   ...DARK_BASE, coreW: 0.03, haloW: 0.22, palette, glow,
-  bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165,
+  bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165, ...over,
 });
 
-// The card is white and the sky fades into it, the way dark fades to black.
-// `frame` tints the window around the card so the white stands off it.
+const LILAC = '#f7f5fc';
+
+// The sky fades into the card, the way dark fades to black. `frame` is the
+// window's background around the card, so the card stands off it.
 const LIGHT_SKIES: Sky[] = [
   { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  { id: 'dusk-light', name: 'Light purple sky', dark: false, frame: '#ebe5e9', art: light(
-    { core: [240, 90, 160], hot: [255, 150, 150], halo: [130, 100, 225], ember: [200, 80, 150] },
-    [['rgba(170,140,240,0.30)', 260, 90, -120], ['rgba(255,150,195,0.42)', 120, 50, -10], ['rgba(255,185,170,0.50)', 34, 18, 0]]) },
+  // Lilac (design w-bd2cd91875/2):the dark purple sky's dots in violet on a pale lilac card.
+  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, card: LILAC,
+    frame: 'radial-gradient(circle at 16px 16px, rgba(80,55,150,.14) 1.2px, transparent 1.6px) 0 0 / 32px 32px, #e4dff0',
+    art: light(
+      { core: [185, 90, 235], hot: [250, 130, 200], halo: [115, 95, 235], ember: [165, 70, 205] },
+      [['rgba(150,125,245,0.28)', 260, 90, -120], ['rgba(205,140,240,0.32)', 120, 50, -10], ['rgba(245,160,215,0.36)', 34, 18, 0]],
+      { bg: LILAC, lightBg: [247, 245, 252], grain: 0.08, lightDepth: 185 }) },
 ];
 
 /** Every sky theme, in the order Settings and Command-K show them. */

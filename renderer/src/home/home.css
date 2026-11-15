@@ -6,9 +6,10 @@
 .home-sky::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
 :root[data-theme="light"] .home-sky::after { box-shadow: inset 0 0 0 1px rgba(30, 22, 36, .08); }
 
-/* The light card is white and the window around it takes the sky's tint. */
+/* The window around the light card takes the sky's tint; a sky with a card colour tints the card too. */
 :root[data-theme="light"][data-sky-frame] body,
 :root[data-theme="light"][data-sky-frame] .app.workspace-layout { background: var(--sky-frame) !important; }
+:root[data-theme="light"][data-sky-frame] .app.workspace-layout::before { background: var(--sky-card, var(--skin-pane, var(--surface))); }
 
 .app.home-shown > .topbar { visibility: hidden; border-bottom-color: transparent; }
 .app.sky-shown .list-pane, .app.sky-shown .list-pane .th-table { background: transparent; }
