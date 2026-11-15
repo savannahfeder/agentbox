@@ -41,10 +41,19 @@ const JOBS = new Set<string>([
   'inventoryWorktrees', 'strayWorktrees', 'pruneMissingWorktrees',
 ]);
 
+/** A folder job that ran past its deadline and was given up on. */
+export class FolderJobTimedOut extends Error {
+  readonly timedOut = true;
+}
+
+/** From when a job is handed to the thread, not from when it was asked for: waiting in line is not being stuck. */
+const jobDeadline = () => Number(process.env.AGENTBOX_FOLDER_JOB_MS) || 5 * 60_000;
+
 let worker: Worker | null = null;
 let broken = false;
 let seq = 0;
-const waiting = new Map<number, FolderJobRequest>();
+const queue: FolderJobRequest[] = [];
+let current: { id: number; job: FolderJobRequest; timer: NodeJS.Timeout } | null = null;
 
 function runHere({ name, args, resolve, reject }: FolderJobRequest) {
   try { resolve((folders[name] as (...args: unknown[]) => unknown)(...args)); } catch (error) { reject(error); }
@@ -53,37 +62,73 @@ function runHere({ name, args, resolve, reject }: FolderJobRequest) {
 function giveUp() {
   broken = true;
   worker = null;
-  const left = [...waiting.values()];
-  waiting.clear();
+  const left = [...(current ? [current.job] : []), ...queue];
+  if (current) clearTimeout(current.timer);
+  current = null;
+  queue.length = 0;
   for (const job of left) runHere(job);
+}
+
+// The stuck thread cannot be interrupted while it sits in a child process; the
+// child's own deadline ends that. It is let go, and the line moves on without it.
+function abandon(stuck: Worker) {
+  if (worker === stuck) worker = null;
+  stuck.unref();
+  stuck.terminate().catch(() => {});
 }
 
 function thread(): Worker | null {
   if (worker || broken) return worker;
+  let w: Worker;
   try {
-    worker = new Worker(new URL('./task-folders-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
+    w = new Worker(new URL('./task-folders-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
   } catch (error) {
     console.warn('zero: task folders will be made on the main thread:', (error as Error).message);
     broken = true;
     return null;
   }
-  worker.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
-    const job = waiting.get(id);
-    if (!job) return;
-    waiting.delete(id);
-    if (!waiting.size) worker?.unref();
+  worker = w;
+  w.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
+    if (worker !== w || current?.id !== id) return;
+    const { job, timer } = current;
+    clearTimeout(timer);
+    current = null;
     if (ok) job.resolve(value); else job.reject(new Error(error));
+    next();
   });
-  worker.on('error', (error: Error) => {
+  w.on('error', (error: Error) => {
+    if (worker !== w) return;
     console.warn('zero: the task folder thread failed:', error.message);
     giveUp();
   });
-  worker.on('exit', () => { if (worker) giveUp(); });
+  w.on('exit', () => { if (worker === w) giveUp(); });
   // Holding the process open only while a job is out, so a finished job is never
   // the reason the app, or a test run, stays up. After the listeners, because
   // adding a 'message' listener refs the port again.
-  worker.unref();
-  return worker;
+  w.unref();
+  return w;
+}
+
+function next() {
+  if (current) return;
+  const job = queue.shift();
+  if (!job) { worker?.unref(); return; }
+  const w = thread();
+  if (!w) { runHere(job); next(); return; }
+  const id = ++seq;
+  const limit = jobDeadline();
+  const timer = setTimeout(() => {
+    if (current?.id !== id) return;
+    current = null;
+    const minutes = Math.max(1, Math.round(limit / 60_000));
+    console.warn(`zero: a ${job.name} folder job ran past ${limit} ms; starting a fresh folder thread`);
+    abandon(w);
+    job.reject(new FolderJobTimedOut(`making this thread's folder took more than ${minutes} minute${minutes === 1 ? '' : 's'}, so it was stopped`));
+    next();
+  }, limit);
+  current = { id, job, timer };
+  w.ref();
+  w.postMessage({ id, name: job.name, args: job.args });
 }
 
 /** Run one of task-folders.mts's exports without blocking this thread. */
@@ -91,11 +136,8 @@ export function folderJob<N extends FolderJobName>(name: N, ...args: Parameters<
   if (!JOBS.has(name)) return Promise.reject(new Error(`not a folder job: ${name}`));
   return new Promise<unknown>((resolve, reject) => {
     const job: FolderJobRequest = { name, args, resolve, reject };
-    const w = thread();
-    if (!w) { runHere(job); return; }
-    const id = ++seq;
-    waiting.set(id, job);
-    w.ref();
-    w.postMessage({ id, name, args });
+    if (!thread()) { runHere(job); return; }
+    queue.push(job);
+    next();
   }) as Promise<Awaited<ReturnType<(typeof folders)[N]>>>;
 }
