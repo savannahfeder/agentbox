@@ -152,6 +152,8 @@ export function focusFor(given, reached) {
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
+  // The phones this workday opens end with it, even if it is killed outright (cdp.mjs launchChrome).
+  process.env.AGENTBOX_TEST_RUN_PID = String(process.pid);
   const args = process.argv.slice(2);
   const opt = (n, f = null) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : f; };
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);
