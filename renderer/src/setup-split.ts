@@ -132,27 +132,23 @@ export function setUpLines({ chats, project, invited, teammates }: { chats: numb
   return out;
 }
 
-type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'urgent' | 'home' | 'files';
+type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'urgent';
 export interface ChecklistRow { label: string; keys: string[]; state: 'done' | 'now' | 'todo' }
 /** The tour's lessons as the list beside it. Answering is either a choice or a reply.
- *  `now` is the lesson the tour is pointing at; without one, the first not done is lit.
- *  With `pages` it names Home before the practice thread and Files after it. */
-export function tourChecklist(done: readonly Lesson[], cmd = '⌘', now: Lesson | null = null, pages = false): ChecklistRow[] {
+ *  `now` is the lesson the tour is pointing at; without one, the first not done is lit. */
+export function tourChecklist(done: readonly Lesson[], cmd = '⌘', now: Lesson | null = null): ChecklistRow[] {
   const has = (...l: Lesson[]) => l.some((x) => done.includes(x));
   // Each row: its words, its keys, the lessons that tick it, and the tips that point at it.
   const rows: Array<[string, string[], Lesson[], Lesson[]]> = [
-    ...(pages ? [['See Home', ['↵'], ['home'], ['home']] as [string, string[], Lesson[], Lesson[]]] : []),
     ['Send a thread', ['N'], ['start', 'compose'], ['start', 'compose']],
     // Writing back to a thread or closing it means it was opened, whatever opened it.
     ['Open one', ['↵'], ['open', 'choose', 'reply', 'close'], ['open', 'working']],
     ['Write back', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
     ['Mark it done', ['E'], ['close'], ['close']],
     ['Find anything', [cmd, 'K'], ['palette'], ['palette', 'urgent']],
-    ...(pages ? [['See Files', ['↵'], ['files'], ['files']] as [string, string[], Lesson[], Lesson[]]] : []),
   ];
   // A row already done keeps its tick; the tour pointing back at it lights the next one to do.
-  // The urgent tip comes after its row is ticked and still belongs to it, with a step still to come after it.
-  const at = now ? rows.findIndex(([, , ls, by]) => by.includes(now) && (!has(...ls) || now === 'urgent')) : -1;
+  const at = now ? rows.findIndex(([, , ls, by]) => by.includes(now) && !has(...ls)) : -1;
   const lit = at >= 0 ? at : rows.findIndex(([, , ls]) => !has(...ls));
   return rows.map(([label, keys, ls], i) => ({ label, keys, state: i === lit ? 'now' as const : has(...ls) ? 'done' as const : 'todo' as const }));
 }
@@ -185,7 +181,7 @@ export const tourPlace = (rows: ChecklistRow[]) => Math.min(Math.max(rows.filter
 export const tourCount = (rows: ChecklistRow[]) => `${tourPlace(rows)} of ${rows.length}`;
 
 /** How far through the walkthrough you are, for the bar above the framed app. */
-export function walkPlace(done: readonly Lesson[], now: Lesson | null, pages = false): { at: number; of: number } {
-  const rows = tourChecklist(done, '⌘', now, pages);
+export function walkPlace(done: readonly Lesson[], now: Lesson | null): { at: number; of: number } {
+  const rows = tourChecklist(done, '⌘', now);
   return { at: tourPlace(rows), of: rows.length };
 }

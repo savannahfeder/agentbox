@@ -357,7 +357,7 @@ describe('the end of the tutorial', () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).toContain('const ended = (t: TourState | null) => tourOver(t);');
-    expect(fs.readFileSync(new URL('../renderer/src/tour.ts', import.meta.url), 'utf8')).toContain("t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'))");
+    expect(fs.readFileSync(new URL('../renderer/src/tour.ts', import.meta.url), 'utf8')).toContain("!!t && !t.skipped && t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start'))");
     expect(tour).toContain('if (covered || hadEnded.current === ended(tour)) return;');
     expect(tour).toContain('{burst ? <ConfettiBurst key={burst} /> : null}');
   });

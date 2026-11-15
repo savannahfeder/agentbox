@@ -158,36 +158,27 @@ try {
   await see('all-set-once-more', /You’re set up.*Start the walkthrough/i);
   await key('Enter');
 
-  // It names Home before it asks for anything, and ↵ moves on without putting a new line in the box under it.
-  await see('walkthrough-home', /WALKTHROUGH 1 OF 7.*This is Home\. Start a thread here and see what needs you/i);
-  const boxBefore = await page.evaluate(`document.querySelector('.hm-start .tc-text')?.value ?? ''`);
-  await key('Enter');
-  await see('walkthrough-compose', /WALKTHROUGH 2 OF 7.*to send this practice thread/i);
-  if (await page.evaluate(`document.querySelector('.hm-start .tc-text')?.value ?? ''`) !== boxBefore) throw new Error('↵ on the Home tip changed what was in the box');  await key('Enter', [CHORD]);
-  await see('walkthrough-working', /WALKTHROUGH 3 OF 7.*Your agent is working/i);
-  await see('walkthrough-answered', /WALKTHROUGH 3 OF 7.*Your agent has answered/i);
+  await see('walkthrough-compose', /WALKTHROUGH 1 OF 5.*to send this practice thread/i);  await key('Enter', [CHORD]);
+  await see('walkthrough-working', /WALKTHROUGH 2 OF 5.*Your agent is working/i);
+  await see('walkthrough-answered', /WALKTHROUGH 2 OF 5.*Your agent has answered/i);
   await key('Tab', ['shift']);
-  await see('walkthrough-open', /WALKTHROUGH 3 OF 7.*Agents land here when they need you/i);
+  await see('walkthrough-open', /WALKTHROUGH 2 OF 5.*Agents land here when they need you/i);
   await key('Enter');
   // The practice answer ends in numbered options, so the tip asks for a number and nothing is typed.
-  await see('walkthrough-choose', /WALKTHROUGH 4 OF 7.*to choose the recommended option/i);
+  await see('walkthrough-choose', /WALKTHROUGH 3 OF 5.*to choose the recommended option/i);
   await key('1');
   // The pick is a reply: the thread shows its agent thinking, as a real one does, and then the answer to it.
   await page.until(`!!document.querySelector('.live-activity .live-word.is-shimmering')`, { ms: 1500, why: 'the practice thread to show its agent thinking once an option is picked' });
-  await see('walkthrough-thinking', /WALKTHROUGH \d OF 7/i);
+  await see('walkthrough-thinking', /WALKTHROUGH \d OF 5/i);
   await page.until(`/Shorter now/.test(document.querySelector('.focus-body')?.innerText ?? '')`, { ms: 8000, why: 'the practice thread to answer the option that was picked' });
-  await see('walkthrough-close', /WALKTHROUGH 5 OF 7.*to close it/i);
+  await see('walkthrough-close', /WALKTHROUGH 4 OF 5.*to close it/i);
   await key('e');
-  await see('walkthrough-palette', /WALKTHROUGH 6 OF 7.*to find anything/i);
+  await see('walkthrough-palette', /WALKTHROUGH 5 OF 5.*to find anything/i);
   await key('k', [CHORD]);
-  await see('walkthrough-in-palette', /WALKTHROUGH 6 OF 7.*Type urgent/i);
+  await see('walkthrough-in-palette', /WALKTHROUGH 5 OF 5.*Type urgent/i);
   await page.type('urgent');
   await key('Enter');
-  await see('walkthrough-urgent', /WALKTHROUGH 6 OF 7.*Urgent threads move up your list/i);
-  // Then it takes you to Files and says what the page is, with no file lit.
-  await see('walkthrough-files', /WALKTHROUGH 7 OF 7.*This is Files\. Everything your agents make is kept here/i);
-  if (!await page.evaluate(`!!document.querySelector('.fp-page') && document.querySelector('.workspace-tab[data-tab="files"]')?.classList.contains('active')`)) throw new Error('the Files tip is up, but the Files page is not what is on screen');
-  await key('Enter');
+  await see('walkthrough-urgent', /Urgent threads move up your list/i);
   // The last word is said on Home's box, under a bar that reads done.
   await see('walkthrough-done', /WALKTHROUGH DONE Close.*You finished the walkthrough\. Type your first real thread/i);
   if (!await page.evaluate(`!!document.querySelector('.hm-start .tc-card') && !!document.querySelector('.tour-glow')`)) throw new Error('the last tip is up, but not on Home with its box lit');

@@ -4,8 +4,8 @@ import type { Lesson } from '../tour';
 import { walkPlace } from '../setup-split';
 import './tour-frame.css';
 
-export function TourFrame({ done, now, pages = false, finished = false, onSkip }: { done: readonly Lesson[]; now: Lesson | null; pages?: boolean; finished?: boolean; onSkip: () => void }) {
-  const { at, of } = walkPlace(done, now, pages);
+export function TourFrame({ done, now, finished = false, onSkip }: { done: readonly Lesson[]; now: Lesson | null; finished?: boolean; onSkip: () => void }) {
+  const { at, of } = walkPlace(done, now);
   return (
     <div className={`tour-frame${finished ? ' tf-done' : ''}`} role="navigation" aria-label="Walkthrough">
       <div className="tf-steps">

@@ -44,8 +44,7 @@ describe("the walkthrough's practice thread", () => {
 describe('the end of the setup', () => {
   it('starts the gold walkthrough on Home with a practice project of its own', () => {
     const fn = body('finishFresh');
-    // With Home named first and Files last where there is a Home (tests/the-walkthrough-names-home-first-and-files-last).
-    expect(fn).toMatch(/setTour\(startTour\(\{ pages: homeOn \}\)\)/);
+    expect(fn).toMatch(/setTour\(startTour\(\)\)/);
     expect(fn).toMatch(/setHomeOpen\(homeOn\)/);
     expect(fn).toMatch(/api\.firstRunPractice\(\{ bare: true \}\)/);
     expect(fn).not.toMatch(/startTutorial/);
