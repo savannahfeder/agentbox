@@ -250,15 +250,15 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
   return (
     <>
       {list.map((a, i) => {
-        const live = picked && chosen(a);
         const signingIn = a.signedIn === false;
+        const live = picked && chosen(a) && !signingIn;
         const line = backAt(a.resetsAt, c.now) ?? a.note ?? (signingIn ? 'Finish signing in to use it' : a.plan ?? 'Signed in');
         return (
           <Row key={a.id} first={i === 0} label={loginLabel(a, engine, i, list.length)} badge={live ? 'In use' : undefined}
             desc={signingIn ? line : withPlaces(line, placesOf(w, engine, a.id))}
             below={<Meters meters={meterPair(newerUsage(w, engine, a.id, a.usage ?? null)?.limits, c.now)} />}
             reading={mine && live ? r : undefined}
-            control={!live && list.length > 1 ? <Button title={picked ? 'Use this one' : 'Use only this one'} onPress={() => void s.change({ scope: 'workspace', key: 'activeAccount', value: { engine, account: a.id } })} /> : undefined} />
+            control={!live && !signingIn && list.length > 1 ? <Button title={picked ? 'Use this one' : 'Use only this one'} onPress={() => void s.change({ scope: 'workspace', key: 'activeAccount', value: { engine, account: a.id } })} /> : undefined} />
         );
       })}
       {inCloud.map((a, i) => (
