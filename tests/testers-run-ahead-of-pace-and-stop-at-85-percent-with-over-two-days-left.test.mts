@@ -1,13 +1,13 @@
-// THE PRODUCT LOOP SPENDS A CODEX WEEK UP TO ITS LINE (w-e4d49a1539).
+// TESTERS RUN AHEAD OF PACE, AND STOP AT 85% WITH OVER TWO DAYS LEFT (w-a5db4e1f3e93).
 //
-// The synthetic testers that improve Agentbox run on a Codex plan, and the aim
-// is to have used about 90% of the week by the time it resets: less wastes the
-// plan, more leaves nothing for the person's own work. Nothing measured how far
-// through the week a run was, so a loop would either stop at an arbitrary hour
-// or run until Codex refused it. The pacer reads the week's and the 5-hour
-// window's used percent and reset times, as Codex logs them, and says whether
-// to run, hold, wait or stop. Measured against readings at the start, middle
-// and end of a week, with the 5-hour window full and with no reading at all.
+// The pacer held testers back whenever the Codex week was ahead of a straight
+// line from 0% to 90% across the week. Test days on Nov 10, 11, 12 and 13 ran
+// no testers or started late for it (r-00a452c588-20261111, -20261112,
+// -20261113, w-9f83a5ff20fd): at 57% on day 3 it held for a line at 45%. The
+// person said that was never their rule: run, and stop at 85% while more than
+// two days are left before the reset (w-40f996ee3de4, 2026-11-13). Measured
+// against readings either side of 85% and of the two-day mark, at the target,
+// with the 5-hour window full and with no reading at all.
 
 import { describe, expect, it } from 'vitest';
 import { paceFor, readingFromLimits } from '../.claude/skills/product-loop/scripts/pace.mjs';
@@ -23,31 +23,36 @@ const reading = (weekPercent, sessionPercent = 10, { sessionResets = at(1) + 2 *
 });
 
 describe('where the week stands', () => {
-  it('runs when it is behind the line', () => {
-    const p = paceFor(reading(20), { now: at(3.5) });
-    expect(p.verdict).toBe('run');
-    expect(p.line).toBeCloseTo(45, 0);
+  it('runs when the week is ahead of an even spread', () => {
+    expect(paceFor(reading(57), { now: at(3) }).verdict).toBe('run');
+    expect(paceFor(reading(55), { now: at(2.5) }).verdict).toBe('run');
+    expect(paceFor(reading(84), { now: at(1) }).verdict).toBe('run');
   });
 
-  it('holds when it is ahead, until the line catches up', () => {
-    const p = paceFor(reading(60), { now: at(3.5) });
+  it('stops at 85% while more than two days are left, until two days are left', () => {
+    const p = paceFor(reading(85), { now: at(4.9) });
     expect(p.verdict).toBe('hold');
-    expect(p.until).toBe(start + Math.round((60 / 90) * 7 * DAY));
+    expect(p.until).toBe(weekEnds - 2 * DAY);
+    expect(paceFor(reading(88), { now: at(1) }).verdict).toBe('hold');
+  });
+
+  it('runs past 85% in the last two days, up to the target', () => {
+    expect(paceFor(reading(85), { now: at(5) }).verdict).toBe('run');
+    expect(paceFor(reading(89), { now: at(6.5) }).verdict).toBe('run');
   });
 
   it('stops once the week reaches its target, however early', () => {
-    expect(paceFor(reading(90), { now: at(5) }).verdict).toBe('stop');
+    expect(paceFor(reading(90), { now: at(5.5) }).verdict).toBe('stop');
     expect(paceFor(reading(95), { now: at(1) }).verdict).toBe('stop');
   });
 
-  it('runs on the last day to close the gap, and stops at the reset', () => {
-    expect(paceFor(reading(70), { now: at(6.9) }).verdict).toBe('run');
-    expect(paceFor(reading(70), { now: weekEnds + H }).verdict).toBe('run');
+  it('runs on a reading from a week that has already reset', () => {
+    expect(paceFor(reading(95), { now: weekEnds + H }).verdict).toBe('run');
   });
 
-  it('takes its target from the person', () => {
-    expect(paceFor(reading(60), { now: at(3.5), target: 80 }).verdict).toBe('hold');
-    expect(paceFor(reading(60), { now: at(6), target: 80 }).verdict).toBe('run');
+  it('takes its target from the person, and never runs past it early in the week', () => {
+    expect(paceFor(reading(79), { now: at(1), target: 80 }).verdict).toBe('run');
+    expect(paceFor(reading(80), { now: at(1), target: 80 }).verdict).toBe('stop');
   });
 });
 

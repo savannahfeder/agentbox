@@ -189,12 +189,13 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
 
     {
       name: 'add_project_rule',
-      description: 'Keep a rule the person gave for one project (when its work ships, what needs their yes, how it is done) in that project\'s instructions, which every agent working there reads from its next run. Only once they have agreed to keep it, and one rule per call, in their words.',
+      description: 'Keep a rule the person gave for one project (when its work ships, what needs their yes, how it is done) in that project\'s instructions, which every agent working there reads from its next run. Only once they have agreed to keep it, and one rule per call, in their words. On a thread it needs the person\'s own words there giving or agreeing to the rule, quoted in askedBecause.',
       schema: {
         product: z.string(),
         rule: z.string().describe('one rule, a sentence or two'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it giving or agreeing to this rule, quoted exactly, such as "Yes, keep that for this project". Without them nothing is added'),
       },
-      run: ({ product, rule }: { product: string; rule: string }) => json(addRuleToProduct(product, rule)),
+      run: ({ product, rule, askedBecause }: { product: string; rule: string; askedBecause?: string }) => json(addRuleToProduct(product, rule, askedBecause, thisRun())),
     },
 
     /* ------------------------------ documents ------------------------------ */

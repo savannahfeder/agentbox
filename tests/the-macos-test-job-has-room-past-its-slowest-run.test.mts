@@ -31,6 +31,15 @@ describe('the test jobs', () => {
     expect(minutes(job('vitest'))).toBeLessThanOrEqual(60);
   });
 
+  // w-21deee25f1, 2026-11-14. vitest.config takes one worker per 4 GB, and
+  // GitHub's macOS runner has 7 GB, so the job ran one file at a time. On the
+  // 40 runs on main up to 2026-11-13 it got through half the suite in 30
+  // minutes and was cancelled every time.
+  it('run more than one test file at a time on the macOS runner', () => {
+    const workers = Number(job('vitest').match(/npx vitest run .*--maxWorkers[= ](\d+)/)?.[1]);
+    expect(workers).toBeGreaterThanOrEqual(2);
+  });
+
   it('leave the Linux job its own limit', () => {
     expect(job('vitest-linux')).toContain('runs-on: ubuntu-latest');
     expect(minutes(job('vitest-linux'))).toBeGreaterThanOrEqual(20);
