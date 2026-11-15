@@ -15,6 +15,8 @@ import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
 import { fileFamilyFor, notesBesideCount, notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
 import { noteBoxKey, noteSendWords, pinLabel, pinsToDraw, sentWithTheNote, whereANoteGoes, whoTalksOnFile } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
+import { LinkNotes, linkReplyWords, useLinkNotes, type LinkReplyTo } from './LinkNotes';
+import { canShareFile } from './ShareLink';
 import { NotePictureShown } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import { PinMarks, spotIn } from './PinMarks';
@@ -212,7 +214,11 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     highlights?.delete('av-quote'); highlights?.delete('av-quote-on');
   }, []);
 
-  const goTo = (note: FileNote) => {
+  // The file's words go to the agent; these came from the link page and are answered there.
+  const linkNotes = useLinkNotes(canShareFile(src) ? { product: item.product, thread: item.id, src } : null);
+  const [toLink, setToLink] = useState<LinkReplyTo | null>(null);
+
+  const goTo = (note: Pick<FileNote, 'id' | 'place'>) => {
     setActiveId(note.id);
     if (note.place.kind === 'pin' && pinsHere) {
       const box = pinsHere.parentElement;
@@ -223,6 +229,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
   };
   const pointAt = (q: Quote | null, s: { x: number; y: number } | null) => {
     setQuote(q); setSpot(s); setPinning(false);
+    if (q || s) setToLink(null);
     if (q || s) requestAnimationFrame(() => box.current?.focus());
   };
 
@@ -253,7 +260,18 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     if (got.length) setPictures((was) => [...was, ...got]);
   };
 
+  const sendToLink = async () => {
+    const typed = words.trim();
+    if (!toLink || !typed || sending) return;
+    setSending(true);
+    const ok = await linkNotes.reply(typed);
+    setSending(false);
+    if (!ok) { setTrouble('That reply did not reach the link page.'); return; }
+    setWords(''); setToLink(null); setTrouble(null);
+  };
+
   const add = async (now = false) => {
+    if (toLink) { void sendToLink(); return; }
     const typed = words.trim();
     if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     setSending(true);
@@ -274,7 +292,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     const pin = spot ? { pin: pinNotes.length + 1 } : {};
     setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions, owner: null, uid: null, wait: true, saving: true, ...pin }]);
     setWords(''); setQuote(null); setSpot(null); setPictures([]); setTrouble(null);
-    const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, place, text, wait: true, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) } })
+    const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, v: version.n, place, text, wait: true, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) } })
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
     // Kept, so Send can take it before the thread's own copy catches up.
@@ -312,6 +330,8 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
           <NotesSection word={canSend ? 'Sent' : 'Notes'} />
           {said.map(note)}
         </>}
+        <LinkNotes comments={linkNotes.comments} activeId={activeId} replyingTo={toLink?.id ?? null} onGo={(place, id) => goTo({ id, place })}
+          onReply={(to) => { setToLink(to); pointAt(null, null); requestAnimationFrame(() => box.current?.focus()); }} />
       </div>
       {trouble && <p className="sb-trouble" role="alert">{trouble}</p>}
       <form className="sb-foot" onSubmit={(e) => { e.preventDefault(); void add(); }}>
@@ -319,14 +339,20 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
           onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}
           onDragOver={canAttach ? (e) => e.preventDefault() : undefined}
           onDrop={canAttach ? (e) => { e.preventDefault(); void addFiles(e.dataTransfer.files); } : undefined}>
+          {toLink && (
+            <div className="sb-write-quote">
+              <span className="sb-quote">{linkReplyWords(toLink)}</span>
+              <button type="button" className="sb-icon" aria-label="Write a note instead" title="Write a note instead" onClick={() => { setToLink(null); box.current?.focus(); }}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
+            </div>
+          )}
           {(quote || spot) && (
             <div className="sb-write-quote">
               {spot ? <span className="sb-pin-draft"><span className="av-pin-tag sb-pin">{pinNotes.length + 1}</span></span> : quote && <Quoted quote={quote} />}
               <button type="button" className="sb-icon" aria-label={`Note the whole ${table ? 'table' : 'page'} instead`} title={`Note the whole ${table ? 'table' : 'page'} instead`} onClick={() => pointAt(null, null)}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
             </div>
           )}
-          <textarea ref={box} rows={1} value={words} aria-label="Note"
-            placeholder={spot ? 'Your note on this spot' : quote ? 'Your note on these words' : pinning ? 'Click a spot on the page'
+          <textarea ref={box} rows={1} value={words} aria-label={toLink ? linkReplyWords(toLink) : 'Note'}
+            placeholder={toLink ? 'Your reply' : spot ?'Your note on this spot' : quote ? 'Your note on these words' : pinning ? 'Click a spot on the page'
               : pinsHere ? 'Add a note, select words or pin a spot' : table ? 'Add a note, or right-click a cell'
               : page.current || points.words ? 'Add a note, or select words in the page' : 'Add a note'}
             onChange={(e) => setWords(e.target.value)}
@@ -337,6 +363,11 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
               if (got.length) setPictures((was) => [...was, ...got]);
             } : undefined}
             onKeyDown={(e) => {
+              if (toLink && (e.key === 'Enter' || e.key === 'Escape') && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                if (e.key === 'Enter') void sendToLink(); else setToLink(null);
+                return;
+              }
               const does = noteBoxKey({ key: e.key, chord: e.metaKey || e.ctrlKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, typed: !!words.trim() || !!pictures.length, waiting: canSend ? waiting.length : 0 });
               if (does !== 'leave') { e.preventDefault(); void (does === 'send waiting' ? send() : add(does === 'note and send')); }
               // The app ignores Escape inside a box, so letting go of it is what lets the next one leave full screen.
@@ -344,18 +375,18 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
             }} />
           <AttachRow attachments={pictures} attaching={attaching} onRemove={(i) => setPictures((was) => was.filter((_, j) => j !== i))} />
           <div className="sb-write-foot">
-            {canAttach && <>
+            {canAttach && !toLink && <>
               <button type="button" className="sb-icon" title="Attach files" aria-label="Attach files" onClick={() => fileInput.current?.click()}><Glyph d="M10.5 4.5 5.2 9.8a1.6 1.6 0 0 0 2.3 2.3l5.6-5.6a3 3 0 0 0-4.2-4.2L3.3 7.9a4.4 4.4 0 0 0 6.2 6.2l4-4" /></button>
               <input ref={fileInput} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />
             </>}
-            {pinsHere && (
+            {pinsHere && !toLink && (
               <button type="button" className={`sb-icon${pinning ? ' is-on' : ''}`} aria-pressed={pinning}
                 title={pinning ? 'Click a spot on the page' : 'Pin a spot'} aria-label="Pin a spot" onClick={() => setPinning(!pinning)}>
                 <Glyph d="M8 9.2V14M3.5 7a4.5 4.5 0 0 1 9 0M10.2 7a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0" />
               </button>
             )}
             <span className="sb-spring" />
-            <button type="submit" className="sb-add" title={`${sendWords} (return)`} aria-label={sendWords}
+            <button type="submit" className="sb-add" title={`${toLink ? 'Reply' : sendWords} (return)`} aria-label={toLink ? 'Reply' : sendWords}
               disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
               <ReturnGlyph />
             </button>

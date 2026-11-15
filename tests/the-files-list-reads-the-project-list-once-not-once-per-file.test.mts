@@ -99,11 +99,16 @@ describe('versions the cloud has not numbered', () => {
     expect(line.of('p\0f7\0image').map((v) => v.n)).toEqual([1, 2]);
   });
 
-  it('looking up every file once does not look through every waiting version each time', () => {
-    // The fastest of three, so a busy machine during the push's test run cannot fail it.
-    const pass = () => { const t = performance.now(); for (let i = 0; i < WAITING; i += 1) line.of(`p\0f${i}\0image`); return performance.now() - t; };
-    // Before: about 125 ms here, and 4 ms after.
-    expect(Math.min(pass(), pass(), pass())).toBeLessThan(40);
+  it('looking up every file once does not look through every waiting version each time', async () => {
+    // Timed against the same lookups on a line with few waiting versions, so a
+    // slow runner slows both alike. A fixed 40 ms failed on GitHub's Mac at 41 ms.
+    const FEW = 10;
+    const few = versionLine({ dir: fs.mkdtempSync(path.join(os.tmpdir(), 'waiting-few-')), cloud: () => ({ append: async () => { throw new Error('no'); }, read: async () => [] }) });
+    for (let i = 0; i < FEW; i += 1) await few.add({ file: `p\0f${i}\0image`, src: srcs[i], name: `f${i}.png` });
+    const pass = (l) => { const t = performance.now(); for (let i = 0; i < WAITING; i += 1) l.of(`p\0f${i % FEW}\0image`); return performance.now() - t; };
+    const fastest = (l) => Math.min(pass(l), pass(l), pass(l));
+    // Looking through every waiting version made this about 45 times slower.
+    expect(fastest(line) / fastest(few)).toBeLessThan(10);
   });
 });
 

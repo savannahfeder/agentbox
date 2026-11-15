@@ -94,7 +94,7 @@ describe('every note box takes its words and its addressee from the one rule', (
   it('the notes beside the chat', () => {
     const side = read('renderer/src/components/NotesSidebar.tsx');
     expect(side).toMatch(/whereANoteGoes\(/);
-    expect(side).toMatch(/aria-label=\{sendWords\}/);
+    expect(side).toMatch(/aria-label=\{(toLink \? 'Reply' : )?sendWords\}/);
   });
   it("a teammate's thread names its owner, and a conversation its people", () => {
     expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/ownerOfRow=\{personId\}/);

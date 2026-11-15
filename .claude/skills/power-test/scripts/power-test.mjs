@@ -69,6 +69,8 @@ const stop = (s) => { console.error(`power-test: ${s}`); process.exit(1); };
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const readJsonl = (file) => { try { return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch { return []; } };
 const node = process.execPath;
+// The browsers this test opens end with it, even if it is killed outright (cdp.mjs launchChrome).
+process.env.AGENTBOX_TEST_RUN_PID = String(process.pid);
 
 let people;
 try { people = pickPeople(opt('who', 'random:2'), readPeople(path.join(here, '..', 'people'))); } catch (err) { stop(err.message); }
