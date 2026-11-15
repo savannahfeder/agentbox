@@ -176,15 +176,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'update_product',
-      description: 'Change a product\'s name, one-liner, repo path, or archived flag.',
+      description: 'Change a product\'s name, one-liner, repo path, or archived flag. On a thread, a new repo path needs the person\'s own words there naming or agreeing to it, quoted in askedBecause.',
       schema: {
         product: z.string(),
         name: z.string().optional(),
         oneLiner: z.string().optional(),
         repoPath: z.string().optional(),
         archived: z.boolean().optional(),
+        askedBecause: z.string().optional().describe('for a new repoPath on a thread: the person\'s own words on it naming or agreeing to the folder, quoted exactly'),
       },
-      run: ({ product, ...patch }: { product: string } & ProductPatch) => json(updateProduct(product, patch)),
+      run: ({ product, askedBecause, ...patch }: { product: string; askedBecause?: string } & ProductPatch) => json(updateProduct(product, patch, askedBecause, thisRun())),
     },
 
     {
