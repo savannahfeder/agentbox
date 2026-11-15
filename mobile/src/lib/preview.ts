@@ -5,7 +5,7 @@ import { macAway, macSeenOf } from '../../../renderer/src/phone-rows';
 import type { PhoneRows } from '../../../renderer/src/phone-rows';
 import type { LedgerLine } from '../../../renderer/src/thread-history';
 import type { WorkItem } from '../../../renderer/src/types';
-import { PREVIEW_ATTACHED, previewLink } from './preview-files.mjs';
+import { PREVIEW_ATTACHED, PREVIEW_FILM_ATTACHED, PREVIEW_PLAN_ATTACHED, PREVIEW_SCRIPT_ATTACHED, PREVIEW_SITE_ATTACHED, previewLink } from './preview-files.mjs';
 
 const DEV = '0a1b2c3d4e5f';
 const MIN = 60_000;
@@ -42,7 +42,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(300), source: 'founder', patch: { body: planAsk } },
         { ts: at(120), source: 'agent', patch: { note: 'Read the phone site and the team messaging code. Checking what App Review asks of an app like this next.' } },
         { ts: at(6), source: 'agent', patch: { status: 'done', result: planResult } },
-      ], { attached }),
+      ], { attached: PREVIEW_PLAN_ATTACHED }),
       thread('agentbox', { id: 'w-2b3c4d5e6f', title: 'Stuck threads should land in Needs you', status: 'blocked', priority: 5, body: stuckAsk, note: stuckNote, createdAt: at(90), updatedAt: at(14), wrote: { body: her(at(90)), status: agent(at(14)), note: agent(at(14)) } }, [
         { ts: at(90), source: 'founder', patch: { body: stuckAsk } },
         { ts: at(14), source: 'agent', patch: { status: 'blocked', note: stuckNote } },
@@ -54,7 +54,7 @@ export function previewRows(now = Date.now()): PhoneRows {
       thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, engine: 'codex', body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
         { ts: at(200), source: 'founder', patch: { body: 'I need to see when my limits reset.' } },
         { ts: at(52), source: 'agent', patch: { status: 'done', result: meterResult } },
-      ]),
+      ], { attached: PREVIEW_SITE_ATTACHED }),
       thread('agentbox', { id: 'w-4d5e6f7a8b', title: 'Draw the sign-in screen', status: 'claimed', priority: 5, body: 'Draw five sign-in screens on the real app.', createdAt: at(40), updatedAt: at(2), wrote: { body: her(at(40)) } }, [
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
@@ -85,6 +85,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(60), source: 'agent', patch: { result: 'Here is a first draft.' } },
         { ts: at(25), source: 'founder', patch: { answer: 'Shorter, and open with the inbox.' } },
       ], {
+        attached: PREVIEW_SCRIPT_ATTACHED,
         approvals: [{ id: 'ap-preview-2', at: at(0.5), tool: 'Bash', input: { command: 'ffmpeg -i draft.mov -vf scale=1080:-2 draft-1080.mp4', description: 'Make a 1080p copy of the draft', cwd: '~/dev/launch-film' }, card: 'cHJldmlldy1jYXJkLTI' }],
       }),
       thread('site', { id: 'w-6f7a8b9c0d', title: 'Try a light theme for the phone', status: 'open', priority: 0, body: 'Try a light theme.', snoozedUntil: now + 20 * 60 * MIN, createdAt: at(800), updatedAt: at(700), wrote: { body: her(at(800)), snoozedUntil: her(at(700)) } }, [
@@ -104,7 +105,7 @@ export function previewRows(now = Date.now()): PhoneRows {
       ]),
       thread('film', { id: 'w-t1a2b3c4d5', title: 'Cut the launch film to 60 seconds', labels: ['founder', 'teammate:t-launch0001'], status: 'claimed', priority: 5, body: 'Cut the launch film to 60 seconds. Open on the inbox.', createdAt: at(21), updatedAt: at(1), wrote: { body: agent(at(21)) } }, [
         { ts: at(21), source: 'agent', patch: { body: 'Cut the launch film to 60 seconds. Open on the inbox.' } },
-      ], { live: { since: at(20), at: STILL_GOING, where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
+      ], { attached: PREVIEW_FILM_ATTACHED, live: { since: at(20), at: STILL_GOING, where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
       thread('agentbox', { id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', status: 'done', priority: 0, body: 'Rename it to View.', result: 'Renamed.', createdAt: at(3000), updatedAt: at(1500), wrote: { body: her(at(3000)), result: agent(at(1600)), status: her(at(1500)) } }, [
         { ts: at(3000), source: 'founder', patch: { body: 'Rename it to View.' } },
         { ts: at(1600), source: 'agent', patch: { result: 'Renamed.' } },

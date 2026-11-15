@@ -14,6 +14,7 @@ import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTa
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
 import { agentChoices, type Harness } from '../lib/agent-filter';
 import { EverythingPlace } from '../ui/Everything';
+import { FilesPlace } from '../ui/FilesPlace';
 import { bottomTabs, type PlaceId } from '../lib/groups';
 import { useGroups } from '../state/groups';
 import { GroupsPlace } from '../ui/Groups';
@@ -327,12 +328,13 @@ export default function Threads() {
   // Groups and teammates both off on the computer while open: back to the threads.
   const teamMode = !!c.team || groups.on;
   const onChats = teamMode && place === 'chats';
-  const onEverything = teamMode && place !== 'inbox' && place !== 'chats';
+  const onFiles = place === 'files';
+  const onEverything = teamMode && place !== 'inbox' && place !== 'chats' && !onFiles;
   // In progress, Later and Done are your own card's work on Everything else.
   const [mineTab, setMineTab] = useState<Exclude<TabId, 'inbox'>>('progress');
   const [evView, setEvViewRaw] = useState<EvView>(() => evViewOf(appStore));
   const setEvView = (v: EvView) => { setEvViewRaw(v); keepEvView(v, appStore); };
-  const tab: TabId = onEverything ? mineTab : place === 'everything' || place === 'chats' || teamMode ? 'inbox' : place;
+  const tab: TabId = onEverything ? mineTab : place === 'everything' || place === 'chats' || place === 'files' || teamMode ? 'inbox' : place;
   const openGroup = (id: string) => { groups.setLast(id); setChatGroup(place); setPlace('chats'); };
   // A command from Search (app/search.tsx).
   useEffect(() => {
@@ -341,7 +343,7 @@ export default function Threads() {
     c.takeWanted();
     setChatGroup(w.group ? 'chats' : null);
     if (w.menu) setMenu(true);
-    if (w.place !== 'inbox' && w.place !== 'chats' && w.place !== 'everything' && teamMode) { setMineTab(w.place); setPlace('everything'); } else setPlace(w.place);
+    if (w.place !== 'inbox' && w.place !== 'chats' && w.place !== 'everything' && w.place !== 'files' && teamMode) { setMineTab(w.place); setPlace('everything'); } else setPlace(w.place);
   }, [c.wanted]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pulling, setPulling] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -376,7 +378,7 @@ export default function Threads() {
     .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
     .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
-  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
+  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0), files: 0 };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
   const mentionsShown = tab === 'inbox' && (mentions.length > 0 || asks.length > 0);
   const hidden = shown.whole[tab] - shown.rows[tab].length;
@@ -422,6 +424,7 @@ export default function Threads() {
       </Wall>
     );
   }
+  if (onFiles) return <Wall><FilesPlace tabs={<Tabs on="files" counts={counts} pick={setPlace} team={teamMode} />} /></Wall>;
   // With a team on, List and Board in the View menu are Everything else's (App.tsx `headerDisplay`).
   // Needs you is always a list, so it lights List; Board there opens Everything else's board.
   const shownView = teamMode && !onEverything ? 'list' : evView;

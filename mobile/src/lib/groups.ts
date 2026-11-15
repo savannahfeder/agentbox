@@ -3,15 +3,16 @@
 import { TABS, type TabId } from './tabs';
 import type { Room, RoomCard, RoomMessage } from '../../../renderer/src/types';
 
-export type PlaceId = TabId | 'everything' | 'chats';
+export type PlaceId = TabId | 'everything' | 'chats' | 'files';
 
 /**
  * The tabs: the four, or with a team on (Groups or AI teammates) Needs you,
  * Everything else, which holds your In progress, Later and Done as your card's
- * work (threads/Pages.tsx `StateTabsRow`), and Chats.
+ * work (threads/Pages.tsx `StateTabsRow`), and Chats. Files is last in both.
  */
 export function bottomTabs(team: boolean): { id: PlaceId; label: string }[] {
-  return team ? [TABS[0], { id: 'everything', label: 'Everything else' }, { id: 'chats', label: 'Chats' }] : [...TABS];
+  const files = { id: 'files' as const, label: 'Files' };
+  return team ? [TABS[0], { id: 'everything', label: 'Everything else' }, { id: 'chats', label: 'Chats' }, files] : [...TABS, files];
 }
 
 export const LAST_GROUP_KEY = 'groups.last';
