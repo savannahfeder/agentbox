@@ -11,10 +11,11 @@
 // Now starts have a lane of their own, and a job that holds its lane past
 // STUCK_MS is left on its thread while the jobs behind it go to a fresh one.
 // Within a lane jobs still go one at a time, and two jobs for the same thread
-// never run at once in any lane.
+// never run at once in any lane. A job still out at its deadline is given up
+// on and its thread ended (w-7054e8638d).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { FolderLanes, STUCK_MS, MOST_LEFT_BEHIND, laneOf } from '../main/task-folders-offthread.mts';
+import { FolderLanes, STUCK_MS, MOST_LEFT_BEHIND, laneOf, jobDeadline } from '../main/task-folders-offthread.mts';
 
 class FakeThread extends EventEmitter {
   posted: { id: number; name: string; args: unknown[] }[] = [];
@@ -31,10 +32,12 @@ let threads: FakeThread[];
 let ranHere: string[];
 let lanes: FolderLanes;
 
-const make = () => new FolderLanes({
+const make = (jobMs = jobDeadline) => new FolderLanes({
   makeThread: () => { const t = new FakeThread(); threads.push(t); return t; },
   runHere: (name: string) => { ranHere.push(name); return 'here'; },
+  jobMs,
 });
+const longDeadline = () => 60 * 60_000;
 const posted = () => threads.flatMap((t) => t.posted.map((p) => `${p.name}:${String(p.args[1] ?? '')}`));
 const settle = () => new Promise((r) => setImmediate(r));
 
@@ -151,14 +154,15 @@ describe('a stuck job does not hold the lane', () => {
     expect(threads[0].refs).toBe(0);
   });
 
-  it('the stuck thread\'s own next start still waits for it', () => {
+  it('the stuck thread\'s own next start still waits for it, up to its deadline', () => {
     void lanes.run('restoreTaskFolder', ['/repo', 'w-stuck']);
     void lanes.run('parkTaskFolder', ['/repo', 'w-stuck']);
-    vi.advanceTimersByTime(STUCK_MS * 3);
+    vi.advanceTimersByTime(jobDeadline() - 1);
     expect(posted()).toEqual(['restoreTaskFolder:w-stuck']);
   });
 
   it(`at most ${MOST_LEFT_BEHIND} threads are left behind, then the lane waits`, () => {
+    lanes = make(longDeadline);
     for (let i = 0; i < MOST_LEFT_BEHIND + 2; i += 1) void lanes.run('restoreTaskFolder', ['/repo', `w-${i}`]);
     for (let i = 0; i < MOST_LEFT_BEHIND + 2; i += 1) vi.advanceTimersByTime(STUCK_MS);
     expect(threads).toHaveLength(MOST_LEFT_BEHIND + 1);
@@ -166,11 +170,53 @@ describe('a stuck job does not hold the lane', () => {
   });
 
   it('and moves on again once a thread left behind answers', () => {
+    lanes = make(longDeadline);
     for (let i = 0; i < MOST_LEFT_BEHIND + 2; i += 1) void lanes.run('restoreTaskFolder', ['/repo', `w-${i}`]);
     for (let i = 0; i < MOST_LEFT_BEHIND + 1; i += 1) vi.advanceTimersByTime(STUCK_MS);
     threads[0].answer(threads[0].posted[0].id);
     vi.advanceTimersByTime(STUCK_MS);
     expect(posted()).toContain(`restoreTaskFolder:w-${MOST_LEFT_BEHIND + 1}`);
+  });
+});
+
+describe('a job still out at its deadline', () => {
+  it('is refused as timed out, its thread is ended, and that thread\'s next job goes', async () => {
+    const stuck = lanes.run('restoreTaskFolder', ['/repo', 'w-stuck']).then(() => null, (e: Error) => e);
+    void lanes.run('parkTaskFolder', ['/repo', 'w-stuck']);
+    vi.advanceTimersByTime(jobDeadline());
+    expect(await stuck).toMatchObject({ timedOut: true });
+    expect(threads[0].terminated).toBe(true);
+    expect(posted()).toContain('parkTaskFolder:w-stuck');
+  });
+
+  it('counts from when it was sent, not while it waited in line', async () => {
+    const a = lanes.run('restoreTaskFolder', ['/repo', 'w-a']);
+    const b = lanes.run('restoreTaskFolder', ['/repo', 'w-b']).then((v) => v, (e: Error) => e);
+    vi.advanceTimersByTime(STUCK_MS - 1);
+    threads[0].answer(threads[0].posted[0].id, 'A');
+    await expect(a).resolves.toBe('A');
+    vi.advanceTimersByTime(jobDeadline() - STUCK_MS);
+    threads[0].answer(threads[0].posted[1].id, 'B');
+    expect(await b).toBe('B');
+  });
+
+  it('a late answer from an ended thread is not taken', async () => {
+    const stuck = lanes.run('restoreTaskFolder', ['/repo', 'w-stuck']).then(() => 'answered', () => 'timed out');
+    const id = threads[0].posted[0].id;
+    vi.advanceTimersByTime(jobDeadline());
+    threads[0].answer(id, 'late');
+    expect(await stuck).toBe('timed out');
+  });
+
+  it('a stuck tidy job is ended too, and a start never waited on it', async () => {
+    const park = lanes.run('parkTaskFolder', ['/repo', 'w-old']).then(() => null, (e: Error) => e);
+    void lanes.run('restoreTaskFolder', ['/repo', 'w-new']);
+    expect(posted()).toEqual(['parkTaskFolder:w-old', 'restoreTaskFolder:w-new']);
+    threads[1].answer(threads[1].posted[0].id);
+    vi.advanceTimersByTime(jobDeadline());
+    expect(await park).toMatchObject({ timedOut: true });
+    expect(threads[0].terminated).toBe(true);
+    expect(threads[1].terminated).toBe(false);
   });
 });
 

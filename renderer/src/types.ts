@@ -1969,7 +1969,7 @@ declare global {
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
-      fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null; product?: string; thread?: string; src?: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkAccess?(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }>;
       fileLinkPeople?(p: { token: string }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
       fileLinkPerson?(p: { token: string; email: string; can: LinkCan | null }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;

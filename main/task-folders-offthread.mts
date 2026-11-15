@@ -22,6 +22,8 @@
 // time. A job that holds its lane past STUCK_MS is left to finish on its thread
 // and the jobs behind it go to a fresh one. Two jobs for the same thread never
 // run at once, in either lane: a park and a start of one folder must not race.
+// A job still out at its deadline is given up on and its thread ended
+// (w-7054e8638d), so a thread left behind is never kept for good.
 //
 // IF A THREAD CANNOT START, THE JOB RUNS HERE, the old way. A packaged build
 // reads its code out of an asar archive, and a folder made slowly is better
@@ -50,6 +52,14 @@ export const STUCK_MS = 2 * 60_000;
 /** Threads left holding a stuck job, at most. Past this the lane waits, so a git that hangs every time cannot spawn threads without end. */
 export const MOST_LEFT_BEHIND = 2;
 
+/** A folder job that ran past its deadline and was given up on. */
+export class FolderJobTimedOut extends Error {
+  readonly timedOut = true;
+}
+
+/** From when a job is handed to a thread, not from when it was asked for: waiting in line is not being stuck. */
+export const jobDeadline = () => Number(process.env.AGENTBOX_FOLDER_JOB_MS) || 5 * 60_000;
+
 interface Answer { id: number; ok: boolean; value?: unknown; error?: string }
 
 export interface FolderThread {
@@ -69,6 +79,7 @@ interface Job {
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
   thread?: FolderThread;
+  deadline?: ReturnType<typeof setTimeout>;
 }
 
 interface Lane { thread: FolderThread | null; current: Job | null; queue: Job[]; timer: ReturnType<typeof setTimeout> | null }
@@ -86,15 +97,17 @@ function clash(a: Job, b: Job): boolean {
 export class FolderLanes {
   declare makeThread: () => FolderThread;
   declare runHere: (name: FolderJobName, args: unknown[]) => unknown;
+  declare jobMs: () => number;
   declare lanes: Record<FolderLaneName, Lane>;
   declare out: Map<number, Job>;
   declare leftBehind: Set<FolderThread>;
   declare broken: boolean;
   declare seq: number;
 
-  constructor({ makeThread, runHere }: { makeThread: () => FolderThread; runHere: (name: FolderJobName, args: unknown[]) => unknown }) {
+  constructor({ makeThread, runHere, jobMs = jobDeadline }: { makeThread: () => FolderThread; runHere: (name: FolderJobName, args: unknown[]) => unknown; jobMs?: () => number }) {
     this.makeThread = makeThread;
     this.runHere = runHere;
+    this.jobMs = jobMs;
     const lane = (): Lane => ({ thread: null, current: null, queue: [], timer: null });
     this.lanes = { start: lane(), tidy: lane() };
     this.out = new Map();
@@ -136,7 +149,34 @@ export class FolderLanes {
       thread.ref();
       thread.postMessage({ id: job.id, name: job.name, args: job.args });
       this._watch(lane, job);
+      this._deadline(job);
     }
+  }
+
+  // A thread cannot be interrupted while it sits in a child process; the
+  // child's own deadline (main/worktree-include.mts) ends that.
+  _deadline(job: Job) {
+    const limit = this.jobMs();
+    job.deadline = setTimeout(() => {
+      if (this.out.get(job.id) !== job) return;
+      this.out.delete(job.id);
+      const thread = job.thread!;
+      const lane = this._laneHolding(job);
+      if (lane) {
+        if (lane.timer) clearTimeout(lane.timer);
+        lane.timer = null;
+        lane.current = null;
+      }
+      for (const l of Object.values(this.lanes)) if (l.thread === thread) l.thread = null;
+      this.leftBehind.delete(thread);
+      thread.unref();
+      void Promise.resolve(thread.terminate()).catch(() => {});
+      console.warn(`zero: a ${job.name} folder job ran past ${limit} ms; its thread was ended`);
+      const minutes = Math.max(1, Math.round(limit / 60_000));
+      job.reject(new FolderJobTimedOut(`making this thread's folder took more than ${minutes} minute${minutes === 1 ? '' : 's'}, so it was stopped`));
+      this._pumpAll();
+    }, limit);
+    (job.deadline as { unref?: () => void }).unref?.();
   }
 
   _watch(lane: Lane, job: Job) {
@@ -187,6 +227,7 @@ export class FolderLanes {
     const job = this.out.get(id);
     if (!job || job.thread !== thread) return;
     this.out.delete(id);
+    clearTimeout(job.deadline);
     const lane = this._laneHolding(job);
     if (lane) {
       if (lane.timer) clearTimeout(lane.timer);
@@ -210,7 +251,7 @@ export class FolderLanes {
       lane.current = null;
     }
     this.leftBehind.delete(thread);
-    for (const job of stranded) { this.out.delete(job.id); this._here(job); }
+    for (const job of stranded) { this.out.delete(job.id); clearTimeout(job.deadline); this._here(job); }
     this._pumpAll();
   }
 }
