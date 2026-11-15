@@ -1427,6 +1427,8 @@ export class Supervisor {
   declare _crossModelSaid: Set<string> | undefined;
   declare _oldChoiceSaid: Set<string> | undefined;
   declare _folderRefused: Set<string> | undefined;
+  /** Rows whose last folder job ran out of time, so the next one that does is said on the row. */
+  declare _folderTimedOut: Set<string> | undefined;
   declare _countedNotStarting: Set<string> | undefined;
   declare _notStarting: Map<string, { why: string; engine: string | null; at: number }> | undefined;  declare _handedBack: Set<string> | undefined;
   declare _mergingHome: Map<string, Promise<void>> | undefined;
@@ -3192,7 +3194,7 @@ export class Supervisor {
    * it is told again. Only a repeat inside one unbroken run of failures is
    * swallowed, which is the tick asking over and over rather than news.
    */
-  _gotAFolderAfterAll(id: string) { this._folderRefused?.delete(id); }
+  _gotAFolderAfterAll(id: string) { this._folderRefused?.delete(id); this._folderTimedOut?.delete(id); }
 
   // WHERE THE SESSION ACTUALLY IS, checked rather than assumed. The CLI keeps
   // one transcript per session under its profile's home, in a directory named
@@ -3588,6 +3590,20 @@ export class Supervisor {
         if (this._preparing.get(item.id) !== entry) return;
         this._preparing.delete(item.id);
         if (!cwd) {
+          // A job that ran out of time was ended along with whatever hung under
+          // it, so the second try usually goes through. Only a second timeout
+          // reaches the person.
+          if ((failed as { timedOut?: boolean } | null)?.timedOut && !this._folderTimedOut?.has(item.id)) {
+            (this._folderTimedOut ??= new Set()).add(item.id);
+            try { this.spawnWorker(entry.item, entry.opts); }
+            catch (error) {
+              console.warn(`zero: could not start ${item.id}:`, (error as Error).message);
+              this._noteNotStarting(entry.item, 'error', entry.engine);
+            }
+            this.onChange?.();
+            return;
+          }
+          this._folderTimedOut?.delete(item.id);
           // A null with no error behind it is the folder thread answering that
           // the repoPath is not a repository at all.
           this._couldNotGetAFolder(entry.item, failed ?? Error('no folder could be made'));
@@ -9501,7 +9517,7 @@ export class Supervisor {
     // A SHUT MAC STARTS NOTHING (shared/cloud-carry.mts): what it would have
     // started is kept for the phone pass to hand to the cloud.
     const asleep = this.asleep();
-    // The git under a thread's folder has no deadline of its own (main/task-folders.mts).
+    // Said from two minutes; the folder job itself is ended at five (main/task-folders-offthread.mts).
     for (const entry of this._preparing?.values() ?? []) {
       if (entry.folderSince && now - entry.folderSince >= SLOW_FOLDER_MS) this._noteNotStarting(entry.item, 'slow-folder', entry.engine);
     }

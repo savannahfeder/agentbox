@@ -57,9 +57,10 @@ jobs:
   vitest:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-latest
-    # The same suite takes 5 to 20 minutes here, depending on how busy
-    # GitHub's macOS runners are.
-    timeout-minutes: 30
+    # The runner has 3 cores and 7 GB, and vitest.config's one worker per 4 GB
+    # would give it one. Two fit in 7 GB on a machine doing nothing else. With
+    # one, half the suite took 30 minutes by 2026-11-13.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -73,7 +74,7 @@ jobs:
       # green run against a tree nobody has.
       - run: npm ci
 
-      - run: npx vitest run --reporter=basic
+      - run: npx vitest run --reporter=basic --maxWorkers=2
 
   vitest-linux:
     runs-on: ubuntu-latest
