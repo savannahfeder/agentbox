@@ -10,7 +10,8 @@ import { activitySummary } from '../../../renderer/src/activity-summary';
 import type { ParsedOption } from '../../../renderer/src/format';
 import type { AgentWork } from '../../../renderer/src/types';
 import { stateWord } from '../../../renderer/src/threads-made';
-import type { FiledRow } from '../lib/thread';
+import { fileCount, signed } from '../../../renderer/src/change-figures';
+import type { FiledRow, Thread } from '../lib/thread';
 import { FILED_WORDS, waitingWords, type Live } from '../lib/thread-offers';
 import { Chevron as FoldArrow } from './icons';
 import { InlineMarkdown, type MessageFiles } from './Markdown';
@@ -257,6 +258,37 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
 }
 
 /** The options strip: the question, a row per option, and the close question's way out (OptionsOffer.tsx). */
+/** What the last run changed: its figures, then each file (the desktop's change figures and the file bar of its code pane). */
+export function ChangeCard({ change }: { change: NonNullable<Thread['change']> }) {
+  const [all, setAll] = useState(false);
+  const FIRST = 5;
+  const shown = all ? change.list : change.list.slice(0, FIRST);
+  const left = change.list.length + change.more - shown.length;
+  const figures = (c: { plus: number; minus: number }, size: number) => signed(c).map(({ sign, text }) => (
+    <T key={sign} style={{ fontFamily: font.mono, fontSize: size, color: sign === '+' ? color.plus : color.minus }}>{text}</T>
+  ));
+  return (
+    <View style={{ marginTop: 22, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, overflow: 'hidden' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingTop: 11, paddingHorizontal: 16, paddingBottom: 8 }}>
+        {figures(change, 12.5)}
+        <T style={{ fontSize: 12.5, color: color.faint }}>in {fileCount(change)}</T>
+      </View>
+      {shown.map((f) => (
+        <View key={f.path} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 6, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: color.rowLine }}>
+          <T numberOfLines={1} ellipsizeMode="head" style={{ flex: 1, fontFamily: font.mono, fontSize: 12.5, color: color.dim }}>{f.path}</T>
+          {figures(f, 12)}
+        </View>
+      ))}
+      {left > 0 && (
+        <Pressable disabled={all} onPress={() => setAll(true)} accessibilityRole="button"
+          style={({ pressed }) => ({ paddingVertical: 8, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: color.rowLine, backgroundColor: pressed ? color.fill : 'transparent' })}>
+          <T style={{ fontSize: 12.5, color: color.faint }}>{all ? `and ${left} more` : `Show ${left} more`}</T>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 export function OptionsCard({ ask, options, busy, pick, keep, dir, files, foot = false, onFold }: {
   ask: string; options: ParsedOption[]; busy: boolean; pick: (o: ParsedOption) => void;
   keep?: { label: string; onKeep: () => void }; dir?: string | null; files?: MessageFiles;

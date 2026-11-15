@@ -47,6 +47,53 @@ export type ThreadSnapshot = {
   olderLines: number;
 };
 
+/**
+ * What a finished run changed, as a thread's copy carries it: the counts, the
+ * files, and where its folder stands, which is what the desktop builds its
+ * figures and its Ship it offer from (renderer/src/ship-offer.ts). No rows of
+ * code and no absolute paths.
+ */
+export interface PhoneChange {
+  plus: number;
+  minus: number;
+  files: { path: string; plus: number; minus: number }[];
+  /** Files past PHONE_CHANGE_FILES, counted but not listed. */
+  more?: number;
+  committed: boolean | null;
+  uncommitted: boolean | null;
+  knowsYou: boolean | null;
+}
+export const PHONE_CHANGE_FILES = 40;
+
+interface ChangeSeen {
+  plus?: unknown;
+  minus?: unknown;
+  files?: unknown;
+  committed?: unknown;
+  uncommitted?: unknown;
+  knowsYou?: unknown;
+}
+
+/** A saved change (main/code-change.mts readChangeSummary) as the phone gets it, or null when it touched no files. */
+export function phoneChangeOf(summary: ChangeSeen | null | undefined, { home = null }: Ctx = {}): PhoneChange | null {
+  if (!summary || typeof summary !== 'object' || !Array.isArray(summary.files)) return null;
+  const count = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : 0);
+  const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
+  const files = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
+    .filter((f) => f && typeof f.path === 'string' && f.path)
+    .map((f) => ({ path: hideSecrets(f!.path, { home }), plus: count(f!.plus), minus: count(f!.minus) }));
+  if (!files.length) return null;
+  return {
+    plus: count(summary.plus),
+    minus: count(summary.minus),
+    files: files.slice(0, PHONE_CHANGE_FILES),
+    ...(files.length > PHONE_CHANGE_FILES ? { more: files.length - PHONE_CHANGE_FILES } : {}),
+    committed: flag(summary.committed),
+    uncommitted: flag(summary.uncommitted),
+    knowsYou: flag(summary.knowsYou),
+  };
+}
+
 /** A row's fields as this file reads them, before they are picked. */
 interface RowSeen {
   wrote?: Record<string, { source?: unknown; ts?: unknown } | undefined> | null;

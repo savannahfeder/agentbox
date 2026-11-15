@@ -11,7 +11,8 @@ import Svg, { Rect } from 'react-native-svg';
 import { isImageName } from '../../../../../renderer/src/attachments';
 import { type CloseOption } from '../../../../../renderer/src/close-asks-first';
 import { foldedReply } from '../../../../../renderer/src/folded-reply';
-import { closesTheTask, type ParsedOption } from '../../../../../renderer/src/format';
+import { closesTheTask, discardsTheChange, type ParsedOption } from '../../../../../renderer/src/format';
+import { discardAsk } from '../../../../../renderer/src/discard-asks-first';
 import { MODE_WORDS } from '../../../../../renderer/src/modes';
 import { priorityLabelOf, priorityValueOf } from '../../../../../renderer/src/priority';
 import { clock, dayHeading } from '../../../../../renderer/src/thread-history';
@@ -56,7 +57,7 @@ import { ChoiceButton, footRoom, IconButton, PriorityBars, RunningMark, Sheet, S
 import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
-import { ActLine, FiledList, FocusActions, LiveLine, OptionsCard, RunLine, WorkLine } from '../../../ui/ThreadParts';
+import { ActLine, ChangeCard, FiledList, FocusActions, LiveLine, OptionsCard, RunLine, WorkLine } from '../../../ui/ThreadParts';
 import { color, corner, font, size } from '../../../ui/theme';
 
 const when = (at: number) => (at ? `${dayHeading(at)} ${clock(at)}` : '');
@@ -359,6 +360,8 @@ export default function ThreadScreen() {
   const [whole, setWhole] = useState(false);
   // Close asked first while filed tasks wait (close-asks-first.ts).
   const [asking, setAsking] = useState(false);
+  // "Discard the change", held until it is asked again (discard-asks-first.ts).
+  const [discarding, setDiscarding] = useState<ParsedOption | null>(null);
   // Send now was pressed and her Mac has not taken her words yet.
   const [cutting, setCutting] = useState(false);
   const [typed, setTyped] = useState(false);
@@ -366,7 +369,7 @@ export default function ThreadScreen() {
   const [earlierOpen, setEarlierOpen] = useState(false);
   const [contextWhole, setContextWhole] = useState(false);
   const [foldedRounds, setFoldedRounds] = useState(() => foldedKeys(appStore.getItem(CHOICES_FOLDED)));
-  useEffect(() => { setWhole(false); setAsking(false); setCutting(false); setEarlierOpen(false); setContextWhole(false); }, [product, id]);
+  useEffect(() => { setWhole(false); setAsking(false); setDiscarding(null); setCutting(false); setEarlierOpen(false); setContextWhole(false); }, [product, id]);
   const me = c.signedIn ? c.cloud?.session()?.user.id ?? null : null;
   const thread = useMemo(() => threadOf(c.rows, c.view, String(product), String(id), { whole, tabs: c.tabs, me }), [c.rows, c.view, c.tabs, product, id, whole, me]);
   const { dir, files } = useMessageFiles(String(product), String(id));
@@ -456,7 +459,12 @@ export default function ThreadScreen() {
     }
     await press({ kind: 'close' }, item, back);
   };
-  const pick = (o: ParsedOption) => (closesTheTask(o.text) ? close() : void press({ kind: 'pick', option: o }));
+  const pick = (o: ParsedOption) => (closesTheTask(o.text) ? close() : discardsTheChange(o.text) ? setDiscarding(o) : void press({ kind: 'pick', option: o }));
+  const answerDiscard = (answer: CloseOption) => {
+    const option = discarding;
+    setDiscarding(null);
+    if (option && answer.act === 'discard') void press({ kind: 'pick', option });
+  };
   const filedPresses = {
     open: (r: FiledRow) => openThread(r.item),
     approve: (r: FiledRow) => void press({ kind: 'approve-filed' }, r.item),
@@ -593,6 +601,7 @@ export default function ThreadScreen() {
               <Markdown text={thread.outcome.text} dir={dir} files={files} />
             </View>
           )}
+          {thread.change && <ChangeCard change={thread.change} />}
           {thread.after.length > 0 && (
             <View style={{ marginTop: 22, gap: 9 }}>
               {thread.after.map((a, k: number) => <ActLine key={`${a.at}-${k}`} act={a} joined={k > 0} />)}
@@ -610,7 +619,12 @@ export default function ThreadScreen() {
           {error && <T style={{ fontSize: 13, color: color.dim, marginTop: 16 }}>{error}</T>}
         </ScrollView>
         {/* The choices sit over the reply box, where the thumb is, and fold away from their small arrow (Focus.tsx `one-choices`). */}
-        {thread.options.length > 0 && !asking && !choicesFolded && (
+        {discarding && !asking && (
+          <View style={{ marginHorizontal: 12, marginTop: 8 }}>
+            <OptionsCard foot ask={discardAsk().ask} options={discardAsk().options} busy={busy} pick={(o) => answerDiscard(o as CloseOption)} />
+          </View>
+        )}
+        {thread.options.length > 0 && !asking && !discarding && !choicesFolded && (
           <ScrollView style={{ flexGrow: 0, flexShrink: 0, maxHeight: 260, marginHorizontal: 12, marginTop: 8 }} keyboardShouldPersistTaps="handled">
             <OptionsCard foot onFold={foldChoices} ask={askUnderAnswer(thread.ask, page.answer?.headline ?? splitHeadline(thread.outcome?.text ?? '').headline)} options={thread.options} busy={busy} pick={pick} dir={dir} files={files} />
           </ScrollView>
