@@ -60,10 +60,8 @@ describe('a thread as one page', () => {
     expect(askUnderAnswer('Which one?', 'It is ready.')).toBe('Which one?');
     expect(askUnderAnswer('Which one?', null)).toBe('Which one?');
   });
-  it('the screen walks Needs you, folds the choices and opens at the top', () => {
+  it('the screen folds the choices and opens at the top', () => {
     const src = read('mobile/src/app/thread/[product]/[id].tsx');
-    expect(src).toMatch(/walkKeeping\(needsYouOrder\(asks, .*, inbox\), here, walked\.current\)/);
-    expect(src).toMatch(/label="Next thread"/);
     expect(src).toMatch(/foldedChoices=/);
     expect(src).toMatch(/resting\.current = !page\.answer && !thread\.outcome && page\.from === 0/);
     expect(read('mobile/src/ui/ThreadParts.tsx')).toMatch(/accessibilityLabel="Fold the choices"/);
