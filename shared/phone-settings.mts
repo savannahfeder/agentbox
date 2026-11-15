@@ -472,7 +472,8 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
       memoryGate: { on: !!gate.on, slots: gate.slots ?? null, slotsAuto: gate.slotsAuto ?? null, slotsMax: gate.slotsMax ?? null, now: gate.now ?? null, reading: memoryReadingOf(gate.reading) },
       leftovers: { on: !!w.leftovers?.on, now: w.leftovers?.now ?? null },
       accounts: (w.accounts ?? []).map((a) => ({
-        id: accountIdOf(a.profile), email: a.email ?? null, chosen: !!a.chosen, state: a.state,
+        // The desktop's rule (Settings.tsx agentStory): a Claude login is signed in once it has an address.
+        id: accountIdOf(a.profile), email: a.email ?? null, signedIn: !!a.email, chosen: !!a.chosen, state: a.state,
         note: a.trouble?.note ?? null, resetsAt: a.trouble?.resetsAt ?? null, plan: a.plan?.label ?? null, running: a.running ?? 0,
         usage: usageFor(model.usage?.claude, a.profile),
       })),
