@@ -58,6 +58,7 @@ const pictures = new Map<string, Promise<string | null>>();
 /** A picture a message carries, fetched once for each group and name (RoomChat.tsx `RoomPicture`). */
 function RoomPicture({ roomId, name, alt }: { roomId: string; name: string; alt: string }) {
   const g = useGroups();
+  const c = useCloud();
   const [data, setData] = useState<string | null | undefined>(undefined);
   const [shape, setShape] = useState(4 / 3);
   const uri = data ? `data:${pictureType(name)};base64,${data}` : null;
@@ -72,29 +73,35 @@ function RoomPicture({ roomId, name, alt }: { roomId: string; name: string; alt:
   useEffect(() => { if (uri) Image.getSize(uri, (w, h) => { if (w && h) setShape(w / h); }, () => {}); }, [uri]);
   if (data === null) return <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{alt || 'A picture that is not here any more'}</T>;
   return (
-    <View style={{ width: '100%', maxWidth: 280, aspectRatio: shape, marginVertical: 6, backgroundColor: color.film }}>
-      {!!uri && <Image source={{ uri }} accessibilityLabel={alt} resizeMode="contain" style={{ width: '100%', height: '100%' }} />}
-    </View>
+    <Pressable onPress={() => void openRoomFile(g.fileOf, c.say, roomId, name)} accessibilityRole="button" accessibilityLabel={`Open ${alt || name}`}
+      style={{ width: '100%', maxWidth: 280, aspectRatio: shape, marginVertical: 6, backgroundColor: color.film }}>
+      {!!uri && <Image source={{ uri }} resizeMode="contain" style={{ width: '100%', height: '100%' }} />}
+    </Pressable>
   );
 }
 
-/** A file a message carries, by its name. Tapped, it goes to the phone's own share sheet, or a new tab in the preview. */
+/** A file a message carries, to the phone's own share sheet, or a new tab in the preview. */
+async function openRoomFile(fileOf: (roomId: string, name: string) => Promise<string | null>, say: (line: string) => void, roomId: string, name: string) {
+  try {
+    const data = await fileOf(roomId, name);
+    if (!data) { say('That file is not here any more.'); return; }
+    if (Platform.OS === 'web') { window.open(`data:application/octet-stream;base64,${data}`, '_blank'); return; }
+    const copy = new File(Paths.cache, name);
+    if (copy.exists) copy.delete();
+    copy.create();
+    copy.write(Uint8Array.from(atob(data), (x) => x.charCodeAt(0)));
+    await Share.share({ url: copy.uri });
+  } catch (err) { say(String((err as Error)?.message ?? err)); }
+}
+
 function RoomFile({ roomId, name, label }: { roomId: string; name: string; label: string }) {
   const g = useGroups();
   const c = useCloud();
   const [busy, setBusy] = useState(false);
   const open = async () => {
     setBusy(true);
-    try {
-      const data = await g.fileOf(roomId, name);
-      if (!data) { c.say('That file is not here any more.'); return; }
-      if (Platform.OS === 'web') { window.open(`data:application/octet-stream;base64,${data}`, '_blank'); return; }
-      const copy = new File(Paths.cache, name);
-      if (copy.exists) copy.delete();
-      copy.create();
-      copy.write(Uint8Array.from(atob(data), (x) => x.charCodeAt(0)));
-      await Share.share({ url: copy.uri });
-    } catch (err) { c.say(String((err as Error)?.message ?? err)); } finally { setBusy(false); }
+    await openRoomFile(g.fileOf, c.say, roomId, name);
+    setBusy(false);
   };
   return (
     <Pressable onPress={() => void open()} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 11, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
