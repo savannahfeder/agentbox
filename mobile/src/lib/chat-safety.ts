@@ -1,6 +1,6 @@
 // Report, block and the word filter for the phone's chats (App Review 1.2).
 // A block is kept on this phone; a report goes to the feedback inbox, where a
-// person reads it, and hides the message here at once.
+// person reads it, and hides the message here once it is sent.
 import type { Room, RoomMessage } from '../../../renderer/src/types';
 import type { ReportAbout } from './report';
 
@@ -30,6 +30,12 @@ export function roomsShown(rooms: readonly Room[], blocked: ReadonlySet<string>,
     const other = (r.people ?? []).map((p) => p.id).find((id) => id !== me);
     return !(other && blocked.has(other));
   });
+}
+
+/** The chat message a sent report hides, or null when the report is not about one. */
+export function messageToHide(about: ReportAbout): string | null {
+  if (about?.kind !== 'message') return null;
+  return about.ref.split('/').pop() || null;
 }
 
 export function reportAboutMessage({ message, roomName, byName }: { message: RoomMessage; roomName: string; byName: string }): NonNullable<ReportAbout> {

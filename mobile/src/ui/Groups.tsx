@@ -442,7 +442,6 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
   const react = (m: RoomMessage, emoji: string, on: boolean) => { void g.act('react', room.id, m.id, emoji, on).then((o) => { if (o.error) c.say(o.error); }); };
   const reactOnce = (m: RoomMessage, emoji: string) => react(m, emoji, !(g.meId && m.reactions?.[emoji]?.includes(g.meId)));
   const report = (m: RoomMessage) => {
-    g.hideReported(m.id);
     const about = reportAboutMessage({ message: m, roomName: groupName(room), byName: nameOf(m.by) });
     router.push({ pathname: '/settings/feedback', params: { report: about.ref, title: about.title, answer: about.answer ?? '', kind: 'message' } });
   };

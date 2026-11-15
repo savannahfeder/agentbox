@@ -31,6 +31,33 @@ const { launchChrome, connect, freeProfile } = await import(path.resolve(here, '
 // Longer than any delayLongPress in the app (500 is React Native's default).
 export const HOLD_MS = 800;
 
+/** What a picker is handed: a picture when it asks for pictures, else a short note. */
+export function sampleFor(accept) {
+  return /image|video/.test(accept ?? '') ? { name: 'photo.png', type: 'image/png' } : { name: 'notes.txt', type: 'text/plain' };
+}
+
+// Headless Chrome opens no file chooser, so Expo's pickers (a click on a hidden
+// file input) would wait for ever. This answers that click with a sample.
+export const PICKER = `(() => { if (window.__phonePicker) return; window.__phonePicker = true;
+  const sampleFor = ${sampleFor.toString()};
+  document.addEventListener('click', async (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || input.type !== 'file') return;
+    e.preventDefault();
+    const s = sampleFor(input.getAttribute('accept'));
+    let blob = new Blob(['Notes from the phone test.\\n'], { type: s.type });
+    if (s.type === 'image/png') {
+      const c = document.createElement('canvas'); c.width = 600; c.height = 400; const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 600, 400); grad.addColorStop(0, '#2b2f3a'); grad.addColorStop(1, '#c4673a');
+      g.fillStyle = grad; g.fillRect(0, 0, 600, 400);
+      blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    }
+    const dt = new DataTransfer(); dt.items.add(new File([blob], s.name, { type: s.type }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  }, true);
+})()`;
+
 export const IPHONE = {
   width: 393, height: 852, scale: 3,
   userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
@@ -94,6 +121,8 @@ async function asPhone(t) {
   await t.call('Emulation.setDeviceMetricsOverride', { width: IPHONE.width, height: IPHONE.height, deviceScaleFactor: IPHONE.scale, mobile: true });
   await t.call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await t.call('Emulation.setUserAgentOverride', { userAgent: IPHONE.userAgent, platform: 'iPhone' });
+  await t.call('Page.addScriptToEvaluateOnNewDocument', { source: PICKER });
+  await t.evaluate(PICKER).catch(() => {});
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
