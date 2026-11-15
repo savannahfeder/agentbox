@@ -17,7 +17,7 @@ import { Magnifier } from './Filters';
 import { Caret, Gear } from './icons';
 import { share } from './LinkMenu';
 import { Waiting } from './LogoOrbit';
-import { IconButton, Sheet, SheetHead, SheetRow, T, TopBar } from './parts';
+import { IconButton, Sheet, SheetHead, SheetRow, SheetSep, T, TopBar } from './parts';
 import { color, corner, font, size } from './theme';
 
 const THUMB = 36;
@@ -160,7 +160,7 @@ export function FilesPlace({ tabs }: { tabs: ReactNode }) {
               <SheetHead>Open the thread it came from</SheetHead>
               {held.threads.map((t) => <SheetRow key={`${t.product}/${t.id}`} label={t.title} aside={updatedWords(t.at, c.now)} onPress={() => leave(() => openThread(t.product, t.id))} />)}
             </>}
-          {heldLink && <SheetRow label="Share or copy link" onPress={() => leave(() => share(heldLink))} />}
+          {heldLink && <><SheetSep /><SheetRow label="Share or copy link" onPress={() => leave(() => share(heldLink))} /></>}
         </>}
       </Sheet>
     </>
