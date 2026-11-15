@@ -412,12 +412,29 @@ export function findInvited(
   return (sent ?? []).map((s) => s.email).filter((e) => !joined.has(e.toLowerCase()) && e.toLowerCase().startsWith(q));
 }
 
+/** The rows under the people that the To search leaves: Auto and the agents
+ *  by name, an AI teammate by name or role. `agent` is the lone Agent row of
+ *  a Mac with one agent. Someone new only shows with nothing typed. */
+export function findInTo<A extends { label: string }, M extends { name: string; role?: string | null }>(
+  query: string, { auto, agents, mates }: { auto: boolean; agents: readonly A[]; mates: readonly M[] },
+): { auto: boolean; agents: A[]; agent: boolean; mates: M[]; someoneNew: boolean } {
+  const q = (query ?? '').trim().toLowerCase();
+  const hit = (...words: (string | null | undefined)[]) => !q || words.some((w) => !!w && w.toLowerCase().includes(q));
+  return {
+    auto: auto && hit('Auto'),
+    agents: agents.filter((a) => hit(a.label)),
+    agent: hit('Agent'),
+    mates: mates.filter((t) => hit(t.name, t.role)),
+    someoneNew: !q,
+  };
+}
+
 export type ToSection = 'people' | 'auto' | 'agents' | 'mates';
 
 /** The To menu, top to bottom: the people on the team first, then the agents and AI teammates. */
-export function toSections({ people, auto, mates, adding }: { people: boolean; auto: boolean; mates: boolean; adding: boolean }): ToSection[] {
+export function toSections({ people, auto, agents = true, mates, adding }: { people: boolean; auto: boolean; agents?: boolean; mates: boolean; adding: boolean }): ToSection[] {
   if (adding) return people ? ['people'] : [];
-  return [...(people ? ['people' as const] : []), ...(auto ? ['auto' as const] : []), 'agents', ...(mates ? ['mates' as const] : [])];
+  return [...(people ? ['people' as const] : []), ...(auto ? ['auto' as const] : []), ...(agents ? ['agents' as const] : []), ...(mates ? ['mates' as const] : [])];
 }
 
 /** What the reply box on an open thread asks: the people in a conversation, the agent where one runs, else a note. */
