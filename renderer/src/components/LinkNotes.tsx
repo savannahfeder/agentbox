@@ -55,6 +55,10 @@ export function linkNotesOnTheFile(comments: readonly LinkComment[], file: strin
 
 export const linkNoteId = (id: string) => `link-${id}`;
 
+/** The open quoted passages among these notes, as the page paints them. */
+export const quotedWords = (notes: readonly FileNote[]) =>
+  notes.flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : []));
+
 export function LinkNotes({ comments, onGo, reply, activeId = null }: {
   activeId?: string | null;
   comments: LinkComment[];
