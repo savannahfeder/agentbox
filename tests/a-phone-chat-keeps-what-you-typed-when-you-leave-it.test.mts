@@ -7,7 +7,7 @@
 // them, and switching group kept the words in the box for the next group.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
-import { chatDraft, chatDraftKey, keepChatDraft } from '../mobile/src/lib/chat-drafts';
+import { chatDraft, chatDraftKey, chatFiles, keepChatDraft, keepChatFiles } from '../mobile/src/lib/chat-drafts';
 
 describe('a chat draft', () => {
   it('comes back to the group it was typed in', () => {
@@ -28,7 +28,29 @@ describe('a chat draft', () => {
   });
 });
 
+// Round 3: the words came back and the attached notes.txt did not, so a
+// tester nearly sent a question that said "attached" with nothing on it.
+describe('a chat draft’s attachments', () => {
+  const file = { name: 'notes.txt', dataBase64: 'aGk=' };
+  it('come back with it', () => {
+    keepChatFiles(chatDraftKey('r-kai', null), [file]);
+    expect(chatFiles(chatDraftKey('r-kai', null))).toEqual([file]);
+  });
+  it('are not another group’s', () => {
+    expect(chatFiles(chatDraftKey('r-maya', null))).toEqual([]);
+  });
+  it('are gone once sent', () => {
+    keepChatFiles(chatDraftKey('r-kai', null), []);
+    expect(chatFiles(chatDraftKey('r-kai', null))).toEqual([]);
+  });
+});
+
 describe('the chat screen', () => {
+  it('starts its attachments from the draft and keeps every change', () => {
+    const src = fs.readFileSync(new URL('../mobile/src/ui/Groups.tsx', import.meta.url), 'utf8');
+    expect(src).toMatch(/useState<Picked\[\]>\(\(\) => chatFiles\(draftKey\)\)/);
+    expect(src).toContain('keepChatFiles(draftKey');
+  });
   const src = fs.readFileSync(new URL('../mobile/src/ui/Groups.tsx', import.meta.url), 'utf8');
   it('starts its box from the draft and keeps every change', () => {
     expect(src).toMatch(/useState\(\(\) => chatDraft\(draftKey\)\)/);

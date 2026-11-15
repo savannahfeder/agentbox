@@ -2,7 +2,7 @@
 // beside the words and a box to type in at the foot. Its name over the chat
 // switches group; People sits at the bar's right. A reply opens its thread,
 // as on the desktop (renderer/src/team/rooms/RoomChat.tsx).
-import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { AppState, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
 import Constants from 'expo-constants';
 import { File, Paths } from 'expo-file-system';
@@ -16,7 +16,7 @@ import { clockOf } from '../../../renderer/src/teammates/chat-lines';
 import { newLineAt, READ_AFTER_MS } from '../../../renderer/src/team/rooms/room-chat-rules';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import { bodyParts, chatRoots, dayWords, groupName, groupsInOrder, groupToOpen, onWords, peopleInOrder, pictureType, repliesTo, startsRun } from '../lib/groups';
-import { chatDraft, chatDraftKey, keepChatDraft } from '../lib/chat-drafts';
+import { chatDraft, chatDraftKey, chatFiles, keepChatDraft, keepChatFiles } from '../lib/chat-drafts';
 import { reportAboutMessage, shownMessages } from '../lib/chat-safety';
 import { withPicked } from '../lib/attach';
 import { router } from '../lib/router';
@@ -56,10 +56,14 @@ function GroupMark({ room }: { room: Room }) {
 
 const pictures = new Map<string, Promise<string | null>>();
 
+// A picture or file takes the press from its message, so it passes a hold back for the message's menu.
+const HoldMessage = createContext<(() => void) | null>(null);
+
 /** A picture a message carries, fetched once for each group and name (RoomChat.tsx `RoomPicture`). */
 function RoomPicture({ roomId, name, alt }: { roomId: string; name: string; alt: string }) {
   const g = useGroups();
   const c = useCloud();
+  const hold = useContext(HoldMessage);
   const [data, setData] = useState<string | null | undefined>(undefined);
   const [shape, setShape] = useState(4 / 3);
   const uri = data ? `data:${pictureType(name)};base64,${data}` : null;
@@ -74,7 +78,7 @@ function RoomPicture({ roomId, name, alt }: { roomId: string; name: string; alt:
   useEffect(() => { if (uri) Image.getSize(uri, (w, h) => { if (w && h) setShape(w / h); }, () => {}); }, [uri]);
   if (data === null) return <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint }}>{alt || 'A picture that is not here any more'}</T>;
   return (
-    <Pressable onPress={() => void openRoomFile(g.fileOf, c.say, roomId, name)} accessibilityRole="button" accessibilityLabel={`Open ${alt || name}`}
+    <Pressable onPress={() => void openRoomFile(g.fileOf, c.say, roomId, name)} onLongPress={hold ?? undefined} delayLongPress={350} accessibilityRole="button" accessibilityLabel={`Open ${alt || name}`}
       style={{ width: '100%', maxWidth: 280, aspectRatio: shape, marginVertical: 6, backgroundColor: color.film }}>
       {!!uri && <Image source={{ uri }} resizeMode="contain" style={{ width: '100%', height: '100%' }} />}
     </Pressable>
@@ -98,6 +102,7 @@ async function openRoomFile(fileOf: (roomId: string, name: string) => Promise<st
 function RoomFile({ roomId, name, label }: { roomId: string; name: string; label: string }) {
   const g = useGroups();
   const c = useCloud();
+  const hold = useContext(HoldMessage);
   const [busy, setBusy] = useState(false);
   const open = async () => {
     setBusy(true);
@@ -105,7 +110,7 @@ function RoomFile({ roomId, name, label }: { roomId: string; name: string; label
     setBusy(false);
   };
   return (
-    <Pressable onPress={() => void open()} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 11, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
+    <Pressable onPress={() => void open()} onLongPress={hold ?? undefined} delayLongPress={350} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 11, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
       <Clip size={14} />
       <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 13.5, color: color.dim }}>{label}</T>
     </Pressable>
@@ -161,6 +166,7 @@ function Message({ m, run, nameOf, faceOf, names, replies, onThread, onPress, ro
   const who = nameOf(m.by);
   const words = m.by && m.by !== me ? filtered(m.body) : m.body;
   return (
+    <HoldMessage.Provider value={m.deleted ? null : onPress}>
     <Pressable onLongPress={m.deleted ? undefined : onPress} delayLongPress={350} style={{ flexDirection: 'row', gap: 12, paddingTop: run ? 14 : 3 }}>
       {/* Your own face carries your initials, as People draws it, not the word "You". */}
       <View style={{ width: 32 }}>{run && <Face name={faceOf(m.by)} size={32} />}</View>
@@ -181,6 +187,7 @@ function Message({ m, run, nameOf, faceOf, names, replies, onThread, onPress, ro
         )}
       </View>
     </Pressable>
+    </HoldMessage.Provider>
   );
 }
 
@@ -359,12 +366,17 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
   const [thread, setThread] = useState<string | null>(null);
   const draftKey = chatDraftKey(room?.id ?? '', thread);
   const [text, setShown] = useState(() => chatDraft(draftKey));
-  useEffect(() => { setShown(chatDraft(draftKey)); }, [draftKey]);
+  const [files, setFilesShown] = useState<Picked[]>(() => chatFiles(draftKey));
+  useEffect(() => { setShown(chatDraft(draftKey)); setFilesShown(chatFiles(draftKey)); }, [draftKey]);
   const setText = (t: string) => { setShown(t); keepChatDraft(draftKey, t); };
+  const setFiles = (next: (f: Picked[]) => Picked[]) => {
+    const kept = next(chatFiles(draftKey));
+    keepChatFiles(draftKey, kept);
+    setFilesShown(kept);
+  };
   const [failed, setFailed] = useState<string | null>(null);
   const [acting, setActing] = useState<RoomMessage | null>(null);
   const [editing, setEditing] = useState<RoomMessage | null>(null);
-  const [files, setFiles] = useState<Picked[]>([]);
   const [sending, setSending] = useState(false);
   const [earlier, setEarlier] = useState<'idle' | 'busy' | 'none'>('idle');
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
@@ -372,7 +384,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
 
   useEffect(() => { g.setWatching(true); return () => g.setWatching(false); }, [g.setWatching]);
   useEffect(() => { if (room && room.id !== g.last) g.setLast(room.id); }, [room?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { setThread(null); setFailed(null); setEditing(null); setFiles([]); setEarlier('idle'); }, [room?.id]);
+  useEffect(() => { setThread(null); setFailed(null); setEditing(null); setEarlier('idle'); }, [room?.id]);
   // Where you had read to when the group opened, so the New line stays put while you read.
   const [readFrom, setReadFrom] = useState<{ id: string; at: number } | null>(null);
   useEffect(() => { if (room && readFrom?.id !== room.id) setReadFrom({ id: room.id, at: room.readAt ?? 0 }); }, [room?.id, room?.readAt]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -438,14 +450,14 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
     if (editing) {
       const out = await g.act('edit', room.id, editing.id, words, { mentions: mentionList(words) });
       if (out.error) { setFailed(out.error); return; }
-      setEditing(null); setShown(chatDraft(draftKey));
+      setEditing(null); setShown(chatDraft(draftKey)); setFilesShown(chatFiles(draftKey));
       return;
     }
     setSending(true);
     const sent = files.length ? await g.sendFiles(room.id, files) : { links: [], error: null };
     if (sent.error) { setSending(false); setFailed(sent.error); return; }
     const body = [words, ...sent.links].filter(Boolean).join(words && sent.links.length ? '\n\n' : '\n');
-    setText(''); setFiles([]);
+    setText(''); setFiles(() => []);
     const why = await g.send(room.id, body, root?.id ?? null, mentionList(words));
     setSending(false);
     if (why) { setText(typed); setFailed(why); }
@@ -509,7 +521,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
           {editing && (
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingBottom: 6 }}>
               <T style={{ flex: 1, fontSize: 13, color: color.dim }}>Editing your message</T>
-              <Pressable onPress={() => { setEditing(null); setShown(chatDraft(draftKey)); setFailed(null); }} accessibilityRole="button" hitSlop={8}><T style={{ fontSize: 13, color: color.dim, textDecorationLine: 'underline' }}>Cancel</T></Pressable>
+              <Pressable onPress={() => { setEditing(null); setShown(chatDraft(draftKey)); setFilesShown(chatFiles(draftKey)); setFailed(null); }} accessibilityRole="button" hitSlop={8}><T style={{ fontSize: 13, color: color.dim, textDecorationLine: 'underline' }}>Cancel</T></Pressable>
             </View>
           )}
           {files.length > 0 && <View style={{ paddingBottom: 8 }}><Attached files={files} drop={(i) => setFiles((f) => f.filter((_, n) => n !== i))} /></View>}
@@ -526,7 +538,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
       <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => setFiles((f) => withPicked(f, more))} fail={setFailed} />
       <MessageSheet m={acting} me={g.meId} who={acting ? nameOf(acting.by) : ''} open={!!acting} close={() => setActing(null)}
         onReact={(e) => acting && reactOnce(acting, e)} onThread={root || !acting ? undefined : () => setThread(acting.id)}
-        onEdit={() => { if (acting) { setEditing(acting); setShown(acting.body); setFiles([]); } }}
+        onEdit={() => { if (acting) { setEditing(acting); setShown(acting.body); setFilesShown([]); } }}
         onDelete={() => { if (acting) void g.act('deleteMessage', room.id, acting.id).then((o) => { if (o.error) c.say(o.error); }); }}
         onReport={() => acting && report(acting)} onBlock={() => acting && block(acting)} />
       {newChat}

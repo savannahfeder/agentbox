@@ -21,6 +21,13 @@ describe('a chat picture on the phone', () => {
     expect(part('RoomPicture')).toContain('openRoomFile(');
     expect(part('RoomFile')).toContain('openRoomFile(');
   });
+  // Round 3: holding a picture message did nothing, because the picture took
+  // the press and the message's hold never fired; Reply in thread was gone.
+  it('holding it still opens the message menu', () => {
+    expect(part('RoomPicture')).toMatch(/onLongPress=\{hold \?\? undefined\}/);
+    expect(part('RoomFile')).toMatch(/onLongPress=\{hold \?\? undefined\}/);
+    expect(part('Message')).toMatch(/<HoldMessage\.Provider value=\{m\.deleted \? null : onPress\}>/);
+  });
   it('a picture that is not here any more is not pressable', () => {
     const picture = part('RoomPicture');
     const gone = picture.slice(picture.indexOf('if (data === null)'), picture.indexOf('\n', picture.indexOf('if (data === null)')));
