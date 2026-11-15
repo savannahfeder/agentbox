@@ -49,6 +49,21 @@ export function engineName(engine: string | undefined): string {
   return engine === 'codex' ? 'Codex' : 'Claude Code';
 }
 
+/**
+ * Which coding agent a row is on: the run's own engine while one is up, then
+ * a Codex row's labels, then the supervisor's answer (`byItem[id] ?? workspace`).
+ * The row's `engine` field alone is empty for a task that took the default.
+ */
+export function engineOnRow(
+  item: { id: string; product: string; engine?: string | null; labels?: readonly string[] },
+  { engines, running = [] }: { engines?: { workspace: string; byItem: Record<string, string> } | null; running?: readonly { itemId: string; product: string; engine?: string }[] },
+): string {
+  const run = running.find((r) => r.itemId === item.id && r.product === item.product)?.engine;
+  if (run) return run;
+  if ((item.labels ?? []).some((l) => l === 'codex' || l === 'codex-import' || l === 'not-imported' || l.startsWith('codex:'))) return 'codex';
+  return engines?.byItem?.[item.id] ?? engines?.workspace ?? item.engine ?? 'claude';
+}
+
 /** The letter on a row's tile: C for Claude Code, X for Codex, so the two read apart. */
 export function engineLetter(engine: string | undefined): string {
   return engine === 'codex' ? 'X' : 'C';

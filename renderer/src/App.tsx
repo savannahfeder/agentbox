@@ -278,7 +278,7 @@ import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme } from './home/sky';
-import { engineLetter, engineName, greeting, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
+import { engineLetter, engineName, engineOnRow, greeting, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
@@ -1209,7 +1209,12 @@ export default function App() {
   // The tutorial on the inbox that follows it (components/Tour.tsx).
   const [tour, setTourState] = useState<TourState | null>(() => readTour(localStorage));
   const [tourNow, setTourNow] = useState<TourLesson | null>(null);
-  const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
+  // Cleared before the state changes: the box remounts on the new key and reads its draft while rendering.
+  const setTour = useCallback((t: TourState) => {
+    if (!tourLive(t) && practiceDraftLeft(readComposeDraft().text)) clearComposeDraft();
+    saveTour(localStorage, t);
+    setTourState(t);
+  }, []);
   const tourRef = useRef(tour);
   tourRef.current = tour;
   // The project Home's box pointed at before the walkthrough's practice thread.
@@ -7749,6 +7754,7 @@ export default function App() {
   const inboxCount = inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length });
   const inboxHere = !homeShown && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focused && !focusedRepeat
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
+  const rowEngine = (i: WorkItem) => engineOnRow(i, { engines: snap?.engines, running: snap?.supervisor?.running });
   const homeNeeds: NeedsRow[] = homeShown ? homeNeedsRows(needsList, {
     nameOf: (id) => team?.byId.get(id)?.name ?? '',
     item: (i) => {
@@ -7756,7 +7762,7 @@ export default function App() {
       const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
       // A conversation's record is named for nobody; the row's sender says who it is with.
       const project = directSlugs.has(i.product) ? '' : i.productName;
-      return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(i.engine), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+      return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i)), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
     },
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
@@ -7772,7 +7778,7 @@ export default function App() {
       state: teamRowState({ agents: m.agents, waitingOnYou: waiting }), week, total: week.reduce((a, b) => a + b, 0),
     };
   });
-  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, letter: engineLetter(i.engine), title: rowTitle(i), line: `${engineName(i.engine)} · ${i.productName}`, at: sentAtOf(i) })) : [];
+  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, letter: engineLetter(rowEngine(i)), title: rowTitle(i), line: `${engineName(rowEngine(i))} · ${i.productName}`, at: sentAtOf(i) })) : [];
   const homeOpenRow = (key: string) => {
     const entry = needsList.find((e) => e.key === key);
     if (!entry) return;
