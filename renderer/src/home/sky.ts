@@ -20,12 +20,6 @@ export type SkyArt = {
   ink?: boolean;
   /** How far the halo reaches below the streak, as a share of `haloW`; none when unset. */
   below?: number;
-  /** Light only: how strongly the streak itself opens to the card, so it reads as light through the dots. */
-  seam?: number;
-  /** Light only: dots on an even grid this many px apart, sized by strength. */
-  halftone?: number; halftoneGain?: number; halftoneAngle?: number;
-  /** A second grid, offset half a step, in this colour: two inks printed over each other. */
-  halftoneDuo?: Rgb;
   glow?: Glow[];
 };
 
@@ -55,17 +49,21 @@ const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyA
   bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165, ...over,
 });
 
+// Aubergine (design w-bd2cd91875/7): deep plum ink with a violet seam. No glow and no
+// grey grain, which read pastel and fake; the streak is tight like the dark one's.
+const AUBERGINE = light(
+  { core: [90, 30, 130], hot: [140, 50, 220], halo: [60, 35, 110], ember: [80, 25, 100] }, [],
+  { ink: true, grain: 0, coreW: 0.024, hotW: 0.006, haloW: 0.11, lightDepth: 120 });
+
 // The card is white and the sky fades into it, the way dark fades to black.
 // `frame` tints the window around the card so the white stands off it.
 const LIGHT_SKIES: Sky[] = [
   { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  // Aubergine (design w-bd2cd91875/7): deep plum ink with a violet seam. No glow and no
-  // grey grain, which read pastel and fake; the streak is tight like the dark one's.
-  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, frame: '#eae9ec', art: light(
-    { core: [90, 30, 130], hot: [140, 50, 220], halo: [60, 35, 110], ember: [80, 25, 100] }, [],
-    { ink: true, grain: 0, coreW: 0.024, hotW: 0.006, haloW: 0.11, lightDepth: 120 }) },
+  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, frame: '#eae9ec', art: AUBERGINE,
+    // On a whole page the inbox's tight streak read as a line through it (design 20): Home's dots fill the page above it.
+    home: { ...AUBERGINE, coreW: 0.03, haloW: 0.3, below: 0.25 } },
 ];
 
 /** Every sky theme, in the order Settings and Command-K show them. */
@@ -150,48 +148,6 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
     }
   }
 
-  if (art.light && art.halftone) {
-    const Ph = art.halftone, gain = art.halftoneGain ?? 1, LBh = art.lightBg ?? [255, 255, 255], PL = art.palette;
-    const depth = art.lightDepth ?? 150, below = art.below ?? 0.5, ang = ((art.halftoneAngle ?? 0) * Math.PI) / 180;
-    const ca = Math.cos(ang), sa = Math.sin(ang), R = Math.hypot(W, H);
-    const strength = (x: number, y: number) => {
-      const i = x / pitch, j = y / pitch, t = x / W;
-      const cyv = curveTop + (y0 + (y1 - y0) * t + bend * t * (1 - t)) * CH;
-      const slope = ((y1 - y0) + bend * (1 - 2 * t)) * CH / W;
-      const d = ((cyv - y) / Math.sqrt(1 + slope * slope)) / S;
-      const n = vn(i / 40, j / 40) * 0.7 + vn(i / 14, j / 14) * 0.3;
-      const along = Math.max(0, 1 - Math.abs(t - peak) * fall);
-      const core = Math.exp(-((d / coreW) ** 2)) * (0.6 + 0.4 * n) * (0.35 + 0.65 * along);
-      const hot = Math.exp(-(((d + coreW * 0.25) / hotW) ** 2)) * along * (0.7 + 0.3 * n);
-      const halo = (d > 0 ? Math.exp(-d / haloW) : Math.exp(d / (haloW * below))) * (0.5 + 0.5 * n) * (0.25 + 0.75 * along);
-      // The seam opens on a smooth curve, so its edges soften into the dots instead of cutting them.
-      const open = art.seam ? 1 - Math.min(1, art.seam * Math.exp(-((d / coreW) ** 2)) * (0.8 + 0.2 * along)) : 1;
-      const lit = art.seam ? halo : core + hot * 0.6 + halo * 0.7;
-      return { v: Math.min(1, lit * open * keepAt(y) * gain * lineStrength(x, y, quiet, 0.15, 60)), core, hot, halo };
-    };
-    const grid = (shift: number, colour: (s: ReturnType<typeof strength>) => Rgb, scale: number) => {
-      for (let u = -R; u < R; u += Ph) for (let w = -R; w < R; w += Ph) {
-        const x = W / 2 + (u + shift) * ca - (w + shift) * sa, y = H / 2 + (u + shift) * sa + (w + shift) * ca;
-        if (x < -Ph || y < -Ph || x > W + Ph || y > H + Ph) continue;
-        const s = strength(x, y);
-        const rad = (Ph / 2) * Math.sqrt(s.v * scale);
-        if (rad < 0.75) continue;
-        const c = colour(s), mx = Math.max(c[0], c[1], c[2], 1), sc = depth / mx;
-        const k = (art.lightStrength ?? 1) * (0.4 + 0.6 * s.v);
-        g.fillStyle = `rgb(${(LBh[0] * (1 - k) + c[0] * sc * k) | 0},${(LBh[1] * (1 - k) + c[1] * sc * k) | 0},${(LBh[2] * (1 - k) + c[2] * sc * k) | 0})`;
-        g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill();
-      }
-    };
-    const mixed = (s: ReturnType<typeof strength>): Rgb => {
-      const ws = s.core + s.hot + s.halo + 1e-6;
-      return [0, 1, 2].map((c) => (s.core * PL.core[c] + s.hot * PL.hot[c] + s.halo * PL.halo[c]) / ws) as Rgb;
-    };
-    grid(0, mixed, 1);
-    const duo = art.halftoneDuo;
-    if (duo) grid(Ph / 2, () => duo, 0.6);
-    return;
-  }
-
   const q = (v: number, th: number) => { const s = Math.min(1, Math.max(0, v / 255)) * (levels - 1); const f = Math.floor(s); return ((f + (s - f > th ? 1 : 0)) / (levels - 1)) * 255; };
   const LB = art.lightBg ?? [255, 255, 255];
   for (let j = 0; j < rows; j++) {
@@ -213,11 +169,9 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
       const halo = dc > 0 ? Math.exp(-dc / haloW) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along)
         : art.below ? Math.exp(dc / (haloW * art.below)) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along) : 0;
       const ember = dc < 0 ? Math.exp(dc / (coreW * 3)) * 0.45 * n * along * line : 0;
-      // A seam lets the card show through where the streak is brightest, the light sky's version of the glow.
-      const open = art.seam ? 1 - Math.min(1, art.seam * Math.exp(-((d / coreW) ** 2)) * (0.8 + 0.2 * along)) : 1;
-      const r = (core * P.core[0] + hot * P.hot[0] + halo * P.halo[0] + ember * P.ember[0]) * dim * open;
-      const gg = (core * P.core[1] + hot * P.hot[1] + halo * P.halo[1] + ember * P.ember[1]) * dim * open;
-      const b = (core * P.core[2] + hot * P.hot[2] + halo * P.halo[2] + ember * P.ember[2]) * dim * open;
+      const r = (core * P.core[0] + hot * P.hot[0] + halo * P.halo[0] + ember * P.ember[0]) * dim;
+      const gg = (core * P.core[1] + hot * P.hot[1] + halo * P.halo[1] + ember * P.ember[1]) * dim;
+      const b = (core * P.core[2] + hot * P.hot[2] + halo * P.halo[2] + ember * P.ember[2]) * dim;
       const th = (BAYER[(j % 8) * 8 + (i % 8)] + 0.5) / 64;
       let fadeK = 1;
       if (keep < 1) {

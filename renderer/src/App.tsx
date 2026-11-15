@@ -8297,7 +8297,7 @@ export default function App() {
                   running, which is when a row's line about what stopped it
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
-              {homeShown && sky && <SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />}
+              {homeShown && sky && <SkyBackdrop art={sky.home ?? sky.art} from={sky.dark || sky.home ? 40 : 150} span={sky.dark || sky.home ? 300 : 240} />}
               {skyOnInbox && sky && <InboxSky art={sky.art} />}
               {skyOnPlace && sky && <InboxSky art={sky.art} />}
               {homeShown ? (

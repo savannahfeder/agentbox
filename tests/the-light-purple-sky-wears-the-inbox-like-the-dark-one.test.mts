@@ -40,6 +40,17 @@ describe('the light purple sky', () => {
     expect(lilac.art.ink).toBe(true);
   });
 
+  it('fills Home above its line, which the inbox header keeps tight', () => {
+    // Home's sky was only a thin line across the page; dots now spread above it, a little below.
+    const home = lilac.home!;
+    expect(home.palette).toEqual(lilac.art.palette);
+    expect(home.haloW!).toBeGreaterThanOrEqual(lilac.art.haloW! * 2.5);
+    expect(home.below!).toBeGreaterThan(0);
+    expect(home.below!).toBeLessThan(0.5);
+    expect(lilac.art.below).toBeUndefined();
+    expect(app).toContain('<SkyBackdrop art={sky.home ?? sky.art}');
+  });
+
   it('sits on the white card', () => {
     expect(lilac.art.bg).toBe('#ffffff');
     expect(css).not.toContain('--sky-card');
