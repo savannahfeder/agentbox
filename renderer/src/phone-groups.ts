@@ -11,6 +11,7 @@ import type { cloudClient, CloudRow } from './cloud-rest';
 import type { Room, RoomCard, RoomMention, RoomMessage, RoomProfile, RoomsState } from './types';
 import { computerOf, type SettingsRow } from './phone-settings-view';
 import { displayNameOf, wallCards as wallCardsJs } from '../../shared/room-cards.mts';
+import { pairRooms } from '../../shared/pair-room.mts';
 import { Name } from '../../shared/product-name.mjs';
 
 const wallCards = wallCardsJs as unknown as (o: Record<string, unknown>) => RoomCard[];
@@ -27,9 +28,14 @@ export const GROUP_COLS = {
   message: 'id,room_id,by_person,body,in_reply_to,mentions,created_at,edited_at,deleted_at',
   // A cloud from before 20261022000000_room_messages_do_more.sql.
   oldMessage: 'id,room_id,by_person,body,in_reply_to,mentions,created_at',
+  reaction: 'message_id,room_id,person_id,emoji,is_on,updated_at',
 };
 
 const HELD = 200;
+const REACTIONS_HELD = 1000;
+// main/team/rooms-shape.mts ROOM_FILE_NAME and rooms.mts MAX_FILE_BYTES.
+export const ROOM_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,159}$/;
+export const ROOM_FILE_MAX_BYTES = 10 * 1024 * 1024;
 // People, faces and who is working change slower than a chat; read them less often.
 const PEOPLE_EVERY_MS = 30_000;
 export const NOT_ON_PHONE = `Do this in ${Name} on your computer.`;
@@ -110,6 +116,34 @@ export async function groupReads(c: GroupsRest): Promise<Map<string, number>> {
   const me = meOf(c);
   const rows = await c.select('room_reads', `select=room_id,read_at&person_id=eq.${encodeURIComponent(me)}`) as { room_id: string; read_at: string }[];
   return new Map(rows.map((r) => [r.room_id, Date.parse(r.read_at) || 0]));
+}
+
+interface ReactionRow { message_id: string; room_id: string; person_id: string; emoji: string; is_on: boolean; updated_at: string }
+export interface GroupReaction { messageId: string; roomId: string; by: string; emoji: string; on: boolean; at: number; here?: boolean }
+const reactionOut = (r: ReactionRow): GroupReaction => ({ messageId: r.message_id, roomId: r.room_id, by: r.person_id, emoji: r.emoji, on: !!r.is_on, at: Date.parse(r.updated_at) || 0 });
+const reactionKey = (x: Pick<GroupReaction, 'messageId' | 'by' | 'emoji'>) => `${x.messageId}\n${x.by}\n${x.emoji}`;
+
+/** A group's reactions, off ones too, newest first; `after` reads only what changed since. A cloud without them has none. */
+export async function groupReactions(c: GroupsRest, roomId: string, { after }: { after?: number } = {}): Promise<GroupReaction[]> {
+  meOf(c);
+  const when = after ? `&updated_at=gt.${isoOf(after)}` : '';
+  try {
+    return (await c.select('room_reactions', `select=${GROUP_COLS.reaction}&room_id=eq.${encodeURIComponent(roomId)}${when}&order=updated_at.desc&limit=${REACTIONS_HELD}`) as ReactionRow[]).map(reactionOut);
+  } catch (err) {
+    if (notThere(err)) return [];
+    throw err;
+  }
+}
+
+/** Each message with the reactions still on it, each emoji's people oldest first (main/team/rooms.mts `withReactions`). */
+export function withReactions(held: readonly RoomMessage[], rows: Iterable<GroupReaction>): RoomMessage[] {
+  const byMessage = new Map<string, Map<string, string[]>>();
+  for (const x of [...rows].filter((r) => r.on).sort((a, b) => a.at - b.at)) {
+    const emojis = byMessage.get(x.messageId) ?? new Map<string, string[]>();
+    emojis.set(x.emoji, [...(emojis.get(x.emoji) ?? []), x.by]);
+    byMessage.set(x.messageId, emojis);
+  }
+  return held.map((m) => ({ ...m, reactions: m.deleted ? {} : Object.fromEntries(byMessage.get(m.id) ?? []) }));
 }
 
 /** A file a message links, as base64, or null. */
@@ -213,6 +247,7 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
   let rooms: Group[] = [];
   let who: GroupPeople = { people: new Map(), names: new Map(), profiles: [], presence: [], teammates: [], teamCards: [], me: null };
   let messages = new Map<string, RoomMessage[]>();
+  let reactions = new Map<string, Map<string, GroupReaction>>();
   let reads = new Map<string, number>();
   let mentioned: RoomMessage[] = [];
   let peopleAt = -Infinity;
@@ -224,23 +259,54 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
 
   const build = () => {
     const meId = c.session()?.user.id;
-    state = meId && ready ? groupsState({ rooms, ...who, messages, reads, mentioned, meId, now: now(), error }) : { ...NO_GROUPS, error };
+    const shown = new Map([...messages].map(([id, list]) => [id, withReactions(list, reactions.get(id)?.values() ?? [])]));
+    state = meId && ready ? groupsState({ rooms, ...who, messages: shown, reads, mentioned, meId, now: now(), error }) : { ...NO_GROUPS, error };
     return state;
+  };
+
+  const holdReactions = (roomId: string, rows: readonly GroupReaction[], fresh = false) => {
+    const kept = fresh ? new Map<string, GroupReaction>() : new Map(reactions.get(roomId) ?? []);
+    for (const r of rows) {
+      const was = kept.get(reactionKey(r));
+      if (!was || was.at <= r.at) kept.set(reactionKey(r), r);
+    }
+    reactions.set(roomId, kept);
+  };
+  // Only the cloud's own stamps: a reaction made here carries this phone's clock.
+  const newestReaction = (roomId: string) => Math.max(0, ...[...(reactions.get(roomId)?.values() ?? [])].filter((r) => !r.here).map((r) => r.at));
+  const findMessage = (messageId: string) => {
+    for (const [roomId, list] of messages) {
+      const m = list.find((x) => x.id === messageId);
+      if (m) return { roomId, m };
+    }
+    return null;
+  };
+  const replaceMessage = (roomId: string, m: RoomMessage) => {
+    messages.set(roomId, (messages.get(roomId) ?? []).map((x) => (x.id === m.id ? m : x)));
+  };
+  const mine = (messageId: string) => {
+    const found = findMessage(messageId);
+    if (!found || found.m.by !== meOf(c) || found.m.deleted) throw new Error('Only your own messages can be changed.');
+    return found;
   };
 
   async function readOnce(): Promise<RoomsState> {
     const me = c.session()?.user.id;
     if (!me) { held = null; ready = false; return build(); }
     // Another account signed in on this device starts from nothing.
-    if (held !== me) { held = me; rooms = []; messages = new Map(); reads = new Map(); mentioned = []; peopleAt = -Infinity; ready = false; }
+    if (held !== me) { held = me; rooms = []; messages = new Map(); reactions = new Map(); reads = new Map(); mentioned = []; peopleAt = -Infinity; ready = false; }
     try {
       const got = await myGroups(c);
       const all = now() - peopleAt >= PEOPLE_EVERY_MS || got.some((r) => !rooms.some((x) => x.id === r.id));
-      const [people, fresh, readRows, mine] = await Promise.all([
+      const [people, fresh, reacted, readRows, mine] = await Promise.all([
         all ? groupPeople(c, got.map((r) => r.id)) : null,
         Promise.all(got.map(async (r) => {
           const newest = messages.get(r.id)?.at(-1)?.at;
           return [r.id, await groupMessages(c, r.id, all || !newest ? {} : { after: newest })] as const;
+        })),
+        Promise.all(got.map(async (r) => {
+          const since = all || !reactions.has(r.id) ? 0 : newestReaction(r.id);
+          return [r.id, since === 0, await groupReactions(c, r.id, since ? { after: since } : {})] as const;
         })),
         groupReads(c),
         myMentions(c).catch(() => mentioned),
@@ -251,6 +317,9 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
       for (const [id, list] of fresh) next.set(id, all ? merge([], list) : merge(messages.get(id), list));
       rooms = got;
       messages = next;
+      const keep = new Set(got.map((r) => r.id));
+      for (const id of [...reactions.keys()]) if (!keep.has(id)) reactions.delete(id);
+      for (const [id, whole, rows] of reacted) holdReactions(id, rows, whole);
       // A read point moved here a moment ago may not be in the cloud's answer yet.
       reads = new Map(got.map((r) => [r.id, Math.max(readRows.get(r.id) ?? 0, reads.get(r.id) ?? 0)]));
       mentioned = mine;
@@ -288,6 +357,61 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
     return got.length;
   }
 
+  async function react(messageId: string, emoji: string, on = true) {
+    const me = meOf(c);
+    const found = findMessage(messageId);
+    if (!found || found.m.deleted) throw new Error('That message is not here any more.');
+    await c.rpc('react_room_message', { m: messageId, p_emoji: emoji, p_on: !!on });
+    holdReactions(found.roomId, [{ messageId, roomId: found.roomId, by: me, emoji, on: !!on, at: now(), here: true }]);
+    build();
+  }
+
+  async function edit(messageId: string, body: string, mentions: string[] = []) {
+    const words = String(body ?? '').trim();
+    if (!words) throw new Error('Write something first, or delete the message.');
+    const { roomId, m } = mine(messageId);
+    await c.rpc('edit_room_message', { m: messageId, p_body: words, p_mentions: mentions });
+    replaceMessage(roomId, { ...m, body: words, mentions, editedAt: now() });
+    build();
+  }
+
+  async function remove(messageId: string) {
+    const { roomId, m } = mine(messageId);
+    await c.rpc('delete_room_message', { m: messageId });
+    replaceMessage(roomId, { ...m, body: '', mentions: [], deleted: true });
+    mentioned = mentioned.filter((x) => x.id !== messageId);
+    build();
+  }
+
+  async function putFile(roomId: string, name: string, dataBase64: string) {
+    const me = meOf(c);
+    if (!ROOM_FILE_NAME.test(name)) throw new Error(`A chat cannot keep a file named “${name}”.`);
+    const bytes = Math.floor((dataBase64.length * 3) / 4) - (dataBase64.endsWith('==') ? 2 : dataBase64.endsWith('=') ? 1 : 0);
+    if (bytes > ROOM_FILE_MAX_BYTES) throw new Error('That file is over 10 MB, the most a chat takes.');
+    await c.insert('room_files', { room_id: roomId, name, by_person: me, data: dataBase64 });
+    return name;
+  }
+
+  // Groups are your team's, as on the Mac (main/team/rooms.mts `create`); a chat with one teammate is the one you have.
+  async function create({ people: who0 = [], name = '' }: { people?: string[]; name?: string }) {
+    const me = meOf(c);
+    const people = [...new Set([me, ...who0])];
+    const others = people.filter((p) => p !== me);
+    const mates = new Set(who.teammates);
+    if (!others.length || others.some((p) => !mates.has(p))) throw new Error('A chat is only ever people on your team.');
+    let id: string | null = null;
+    if (others.length === 1) {
+      const pairs = (await myGroups(c)).filter((r) => r.kind === 'group' && !r.teamId && r.members === 2);
+      const inEach = new Map(await Promise.all(pairs.map(async (r) => [r.id, ((await c.rpc('room_people', { r: r.id }) as RoomPeopleRow[] | null) ?? [])
+        .map((x) => (typeof x === 'string' ? x : x?.room_people ?? x?.person_id)).filter(Boolean) as string[]] as const)));
+      id = pairRooms(pairs, others[0], (r) => inEach.get(r.id) ?? [])[0]?.id ?? null;
+    }
+    id ??= await c.rpc('create_room', { p_name: String(name ?? '').trim(), p_kind: 'group', p_listed: false, p_people: people, p_invite_only: false }) as string;
+    peopleAt = -Infinity;
+    await refresh();
+    return id;
+  }
+
   const ops: Record<string, (...a: never[]) => Promise<unknown>> = {
     refresh: async () => null,
     send: (roomId: string, body: string, opts?: { inReplyTo?: string | null; mentions?: string[] }) => send(roomId, body, opts),
@@ -296,6 +420,11 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
     markDone: (roomId: string) => markRead(roomId),
     older: (roomId: string) => older(roomId),
     file: (roomId: string, name: string) => groupFile(c, roomId, name),
+    react: (messageId: string, emoji: string, on?: boolean) => react(messageId, emoji, on),
+    edit: (messageId: string, body: string, mentions?: string[]) => edit(messageId, body, mentions),
+    delete: (messageId: string) => remove(messageId),
+    putFile: (roomId: string, name: string, dataBase64: string) => putFile(roomId, name, dataBase64),
+    create: (o: { people?: string[]; name?: string }) => create(o ?? {}),
   };
 
   /** The desktop's `rooms` door (main/ipc.mts `zero:rooms`), answered from here. */
