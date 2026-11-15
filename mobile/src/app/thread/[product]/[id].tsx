@@ -20,7 +20,7 @@ import { summaryOf, threadState } from '../../../../../shared/thread-cards.mts';
 import { arrivedAt } from '../../../../../renderer/src/unread';
 import { dayClock } from '../../../lib/back-at';
 import type { Choices, Press, PressedItem } from '../../../lib/actions';
-import { useDraft } from '../../../lib/drafts';
+import { readDraftOf, restoreDraftOf, takeDraftOf, useDraft, type Draft } from '../../../lib/drafts';
 import { typedWords } from '../../../lib/files';
 import { threadOf, type FiledRow, type Thread, type ThreadEvent, type ThreadNode, type ThreadSaid } from '../../../lib/thread';
 import { askUnderAnswer, CHOICES_FOLDED, foldKey, foldedKeys, pageOf, splitHeadline, toggleFold, walkKeeping } from '../../../lib/one-page';
@@ -43,7 +43,7 @@ import { useComputerAgents } from '../../../state/computer-agents';
 import { replyChoices, replyModel } from '../../../lib/compose';
 import { useSendWhenOnline } from '../../../state/send-when-online';
 import { AttachSheet, Attached } from '../../../ui/Attach';
-import { withPicked } from '../../../lib/attach';
+import { withAttachments, withPicked } from '../../../lib/attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
 import { Back, Caret, Chevron, Clip, Clock, Cross, DoneMark, More, Panel } from '../../../ui/icons';
 import { TimeBox, TypingSheet } from '../../../ui/Later';
@@ -175,7 +175,20 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const offline = useSendWhenOnline(() => {
     if (!draft.text.trim() && !draft.files.length) { offline.clear(); setFailed(null); return; }
     void send(pickedNow.current);
+  }, {
+    key: `${item.product}:${item.id}`,
+    send: () => {
+      const key = { product: item.product, id: item.id };
+      const taken: Draft = { text: draft.text, files: draft.files, priority: null };
+      const choices = replyChoices(item, pickedNow.current, agents);
+      return async (cloud) => {
+        const saved = await cloud.attach(item.product, taken.files);
+        await cloud.send({ kind: 'reply', text: withAttachments(taken.text, saved), choices }, item, { undone: () => { restoreDraftOf(key, taken, appStore); } });
+        if (readDraftOf(key, appStore).text === taken.text) takeDraftOf(key, appStore);
+      };
+    },
   });
+  useEffect(() => { if (offline.said) setFailed(offline.said); }, []);
   const sendByHand = () => { offline.clear(); void send(picked); };
   const talk = useDictation(draft, sendByHand);
   const typing = useRef<ComponentRef<typeof TextInput>>(null);

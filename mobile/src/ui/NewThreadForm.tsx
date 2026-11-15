@@ -18,7 +18,7 @@ import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFo
 import { AutoMark, TeammateMark } from './Teammates';
 import { roleOf } from '../lib/teammates';
 import type { Teammate } from '../../../renderer/src/types';
-import { useDraft, type Draft } from '../lib/drafts';
+import { readDraftOf, restoreDraftOf, takeDraftOf, useDraft, type Draft } from '../lib/drafts';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { useComputerAgents } from '../state/computer-agents';
@@ -41,6 +41,29 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>{children}</View>
     </View>
   );
+}
+
+type Cloud = ReturnType<typeof useCloud>;
+interface Sending { product: string; projectName: string; mate: Teammate | 'new' | null; onAuto: boolean; later: Choices; draft: Draft; harness: Choices }
+
+async function deliver(c: Cloud, s: Sending, undone: () => void) {
+  const { mate, product, projectName, onAuto, draft } = s;
+  // A teammate takes your words in your chat with it, not as a thread.
+  if (mate) {
+    if (draft.files.length) throw new Error('A message to a teammate carries words only. Send files in a thread.');
+    if (mate === 'new') {
+      const where = splitSlug(product);
+      if (!where || where.device !== c.team?.device) throw new Error('Pick a project on the computer that keeps your teammates.');
+      await c.askTeammate('describe', { text: draft.text, product: where.project });
+      c.say('Your new teammate is on its way. It asks you what it needs in Chats.');
+    } else {
+      await c.askTeammate('post', { text: draft.text, to: [mate.id], fresh: true });
+      c.say(mate.paused ? `Sent to ${mate.name}, who is paused. It waits until you resume it in Chats.` : `Sent to ${mate.name}`);
+    }
+    return;
+  }
+  const saved = await c.attach(product, draft.files);
+  await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...s.harness, ...s.later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null, { undone });
 }
 
 /** Everything the form holds, and its send; `sent` runs once a thread has gone, `reopen` once its Undo has put the draft back. */
@@ -90,38 +113,22 @@ export function useNewThread(sent: () => void, reopen?: () => void) {
   const chooseTo = (r: Recipient) => setPickedTo(r);
   const canSend = (!!draft.text.trim() || draft.files.length > 0) && !!product && !busy && (!mate || !!draft.text.trim());
 
-  // A teammate takes your words in your chat with it, not as a thread.
-  const sendToMate = async () => {
-    if (!mate) return;
-    if (draft.files.length) throw new Error('A message to a teammate carries words only. Send files in a thread.');
-    if (mate === 'new') {
-      const where = splitSlug(product);
-      if (!where || where.device !== c.team?.device) throw new Error('Pick a project on the computer that keeps your teammates.');
-      await c.askTeammate('describe', { text: draft.text, product: where.project });
-      c.say('Your new teammate is on its way. It asks you what it needs in Chats.');
-    } else {
-      await c.askTeammate('post', { text: draft.text, to: [mate.id], fresh: true });
-      c.say(mate.paused ? `Sent to ${mate.name}, who is paused. It waits until you resume it in Chats.` : `Sent to ${mate.name}`);
-    }
-  };
+  // Everything a send needs, taken from the page so it can still go once the page has closed.
+  const sendingNow = (later: Choices = {}): Sending => ({
+    product, projectName, mate, onAuto, later,
+    draft: { text: draft.text, files: draft.files, priority: draft.priority },
+    harness: newThreadChoices({ priority: draft.priority, engine, model, effort, engineCount: agents.engines.length, ...codex }),
+  });
 
   const sendNow = async (later: Choices = {}) => {
     if (!canSend) return;
     setSheet(null); setBusy(true); setError(null);
     try {
-      if (mate) {
-        await sendToMate();
-        draft.take();
-        sent();
-        return;
-      }
-      const saved = await c.attach(product, draft.files);
-      const harness = newThreadChoices({ priority: draft.priority, engine, model, effort, engineCount: agents.engines.length, ...codex });
       // Undo withdraws the thread, so its words and files come back to the box.
       // Taken from the page, not the store, which drops pictures too big to keep.
-      const sending: Draft = { text: draft.text, files: draft.files, priority: draft.priority };
-      const undone = () => { if (draft.restore(sending)) reopen?.(); };
-      await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null, { undone });
+      const sending = sendingNow(later);
+      const undone = () => { if (draft.restore(sending.draft)) reopen?.(); };
+      await deliver(c, sending, undone);
       // The draft goes only once the thread has: a failed send keeps every word on the page.
       draft.take();
       offline.clear();
@@ -136,7 +143,18 @@ export function useNewThread(sent: () => void, reopen?: () => void) {
   const offline = useSendWhenOnline(() => {
     if (!canSend) { offline.clear(); setError(null); return; }
     void sendOnce(lastLater.current);
+  }, {
+    key: 'new',
+    send: () => {
+      const sending = sendingNow(lastLater.current);
+      return async (cloud) => {
+        await deliver(cloud, sending, () => { restoreDraftOf('new', sending.draft, appStore); });
+        // Words typed into the box since are not this send's to take.
+        if (readDraftOf('new', appStore).text === sending.draft.text) takeDraftOf('new', appStore);
+      };
+    },
   });
+  useEffect(() => { if (offline.said) setError(offline.said); }, []);
   const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {

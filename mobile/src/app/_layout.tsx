@@ -13,6 +13,7 @@ import { bottomRoom } from '../lib/bottom-room';
 import { CloudProvider } from '../state/cloud';
 import { GroupsProvider } from '../state/groups';
 import { LookProvider, useLook } from '../state/look';
+import { CarriedSends } from '../state/send-when-online';
 import { Approvals } from '../ui/Approvals';
 import { color } from '../ui/theme';
 import { Toast } from '../ui/Toast';
@@ -65,6 +66,7 @@ function App() {
         </Stack>
         <Approvals />
         <Toast />
+        <CarriedSends />
       </GroupsProvider>
     </CloudProvider>
   );
