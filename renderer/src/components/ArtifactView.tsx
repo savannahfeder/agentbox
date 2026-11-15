@@ -32,7 +32,7 @@ import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { FileNoteCard } from './FileNoteCard';
-import { LinkNotes, linkNotesOnTheFile, useLinkNotes } from './LinkNotes';
+import { LinkNotes, linkNotesOnTheFile, quotedWords, useLinkNotes } from './LinkNotes';
 import { NoteGlyph } from './NoteGlyphs';
 import { NotesHead, NotesSection, ReturnGlyph } from './NotesSidebar';
 import { ShareLink, canShareFile } from './ShareLink';
@@ -558,20 +558,21 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   useEffect(() => {
     if (editing && family && editing.fam !== family.key) void endSitting();
   }, [family?.key]);
-  const liveQuotes = useMemo(() => [...notesHere, ...carried].flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : [])), [notesHere, carried]);
+  const liveQuotes = useMemo(() => quotedWords([...notesHere, ...carried]), [notesHere, carried]);
+  const linkQuotes = useMemo(() => quotedWords(linkDrawn), [linkDrawn]);
   const [goneQuotes, setGoneQuotes] = useState<string[]>([]);
   const noteGone = useCallback((ids: string[]) => setGoneQuotes((was) => (was.join() === ids.join() ? was : ids)), []);
   useEffect(() => { setGoneQuotes([]); }, [version?.id]);
   const draftQuote = placeNow.kind === 'quote' ? placeNow.text : null;
   const paintEditor = (root: HTMLElement) => {
-    const found = paintQuotes(root, liveQuotes, activeId, draftQuote);
+    const found = paintQuotes(root, [...liveQuotes, ...linkQuotes], activeId, draftQuote);
     editRanges.current = found;
     if (canPaintQuotes()) noteGone(liveQuotes.filter((q) => !found.has(q.id)).map((q) => q.id));
   };
   useEffect(() => {
     const root = editPane.current?.querySelector<HTMLElement>('.ProseMirror');
     if (editing && root) paintEditor(root);
-  }, [editing, draftQuote, activeId, quotesKey(liveQuotes)]);
+  }, [editing, draftQuote, activeId, quotesKey(liveQuotes), quotesKey(linkQuotes)]);
   // A press on words a comment is about opens that comment, as it does when reading.
   const pickInEditor = (e: ReactMouseEvent) => {
     if (window.getSelection()?.isCollapsed === false) return;
@@ -580,7 +581,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     for (const [id, range] of editRanges.current) {
       if (!range.isPointInRange(caret.startContainer, caret.startOffset)) continue;
       const n = [...notesHere, ...carried].find((x) => x.id === id);
-      if (n) pickNote(n);
+      if (n) pickNote(n); else setActiveId(id);
       return;
     }
   };

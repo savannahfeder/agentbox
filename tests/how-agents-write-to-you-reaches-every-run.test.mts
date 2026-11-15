@@ -329,10 +329,10 @@ describe(`the text ${NAME} ships`, () => {
   // Raised from 9000 to 9400 for the rule that a list is a table
   // (w-690551d7ea). As one bullet among what the app can show, it lost to
   // "the answer is in this message" and a ranking came back as markdown.
-  // Raised to 9700 for a list to practise from staying out of a table, and a
-  // side request answered under line one (w-fa44760932).
+  // Raised to 9900 for a list to practise from staying a list, and every side
+  // request answered under line one (w-890fa60914).
   it('stays small enough to sit on every run', () => {
-    expect(shipped.length).toBeLessThan(9700);
+    expect(shipped.length).toBeLessThan(9900);
   });
 
   // THE SECOND COPY IS NOT ASKED FOR ANY MORE, AND THAT REPLACES THE RULE THAT
