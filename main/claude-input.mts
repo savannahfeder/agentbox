@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ChildProcess } from 'node:child_process';
 import type { Readable, Writable } from 'node:stream';
 import { Name } from '../shared/product-name.mjs';
+import { streamLines } from './stream-lines.mts';
 
 export interface BackgroundTask { task_id?: string; description?: string }
 
@@ -138,7 +139,7 @@ export function streamInputArgs(run: InputRun | null | undefined, args: string[]
 // A result for earlier work must not close stdin over queued corrections.
 export function attachClaudeInput<C extends PipedChild>(child: C): C & ClaudeInput;
 export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput): C & ClaudeInput {
-  let closed = false, buffer = '', atResult = false, held = false;
+  let closed = false, atResult = false, held = false;
   const controls = new Map<string | undefined, PendingControl>();
   const seenUsers = new Set<string>();
   const pending = new Map<string | undefined, PendingSteer>();
@@ -217,14 +218,10 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
   child.on('exit', () => fail('The agent exited before confirming this correction.'));
   child.on('error', () => fail('The agent could not receive this correction.'));
   child.stdin.on('error', () => fail('The agent input connection closed.'));
-  child.stdout.on('data', data => {
-    buffer += String(data);
-    let index;
-    while ((index = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, index);
-      buffer = buffer.slice(index + 1);
+  child.stdout.on('data', streamLines(line => {
+    {
       let event: StreamEvent;
-      try { event = JSON.parse(line) as StreamEvent; } catch { continue; }
+      try { event = JSON.parse(line) as StreamEvent; } catch { return; }
       if (event.type === 'control_response') {
         const response = event.response, request = controls.get(response?.request_id);
         if (request) { controls.delete(response?.request_id); clearTimeout(request.timer);
@@ -276,7 +273,7 @@ export function attachClaudeInput<C extends PipedChild>(child: C & ClaudeInput):
         else if (waiting.length) nameWhatIsStillOut();
       }
     }
-  });
+  }));
   // A run the app reattached to (main/hosted-run.mts): the host has been
   // reading the stream meanwhile, and knows where the turn stands.
   child.on('input-state', (s: HostInputState | null | undefined) => {

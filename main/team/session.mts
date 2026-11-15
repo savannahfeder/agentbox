@@ -294,8 +294,11 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
 // resolves to a path OUTSIDE the store. A dir inside the store moves to a
 // per-store folder under the config home; if even that is inside the store
 // there is nowhere safe and it throws, because writing the token where a worker
-// reads it is worse than a sign-in to do again. A copy an older version left in
-// the store, under either name, is carried across.
+// reads it is worse than a sign-in to do again. A team sign-in an older version
+// left in the store is carried across only into the headless app's own sign-in
+// file: any other file taking it would sign the desktop out.
+const HEADLESS_SESSION = 'team-session.json';
+
 const isInside = (file: string, root: string) => {
   const f = path.resolve(file);
   const r = path.resolve(root);
@@ -314,7 +317,7 @@ export function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedi
     file = path.join(configHome({ home, env }), nameSlug, 'sessions', tag, name);
     if (isInside(file, storeRoot)) throw new Error(`no place outside the store root for the team session: ${storeRoot}`);
   }
-  const olds = [path.join(storeRoot, '.team-session'), path.join(storeRoot, 'team-session.json')];
+  const olds = name === HEADLESS_SESSION ? [path.join(storeRoot, '.team-session'), path.join(storeRoot, 'team-session.json')] : [];
   try {
     if (!fs.existsSync(file)) {
       for (const old of olds) {
@@ -331,7 +334,7 @@ export function sessionFileOutsideStore({ dir, name, storeRoot, home = os.homedi
 
 // The headless app keeps its sign-in as plain JSON readable by this user only.
 export function headlessSessionFile({ userDir, storeRoot, home, env }: { userDir: string; storeRoot: string; home?: string; env?: NodeJS.ProcessEnv }): string {
-  return sessionFileOutsideStore({ dir: userDir, name: 'team-session.json', storeRoot, home, env });
+  return sessionFileOutsideStore({ dir: userDir, name: HEADLESS_SESSION, storeRoot, home, env });
 }
 
 // The same session shape over the in-memory cloud, for tests.

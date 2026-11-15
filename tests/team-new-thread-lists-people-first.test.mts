@@ -27,6 +27,7 @@ describe('the order of the To list', () => {
 describe('the menu', () => {
   const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
   it('is drawn in that order', () => {
-    expect(card).toMatch(/toSections\(\{[^}]*\}\)\.map\(/);
+    expect(card).toMatch(/const sections = toSections\(\{/);
+    expect(card).toMatch(/\{sections\.map\(/);
   });
 });
