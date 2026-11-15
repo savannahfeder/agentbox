@@ -37,7 +37,7 @@ import { cameBackFromACrash, keepHeldWriter, RELOADED_AFTER_A_CRASH } from './af
 import { isTroubleRow, troubleRow } from './trouble-row';
 import { importAnswer, isImportRow, isNotImportedRow, justImported, type ImportChoice } from './import-row';
 import { lookedAtNow, needsYouLit } from './needs-you';
-import { arrivedAt, isUnread, readMoves, waitingSince } from './unread';
+import { arrivedAt, isUnread, readMoves, seenElsewhere, waitingSince } from './unread';
 import { readWhenTheySeeIt } from './read-what-you-saw';
 import { Focus } from './components/Focus';
 import { TicketItems } from './components/TicketReference';
@@ -3878,6 +3878,10 @@ export default function App() {
     setSeen((s) => { const c = new Set(s); c.delete(item.id); return c; });
     setSeenAt((m) => ({ ...m, [item.id]: 0 }));
   }, []);
+  useEffect(() => window.zero?.onSeenOnPhone?.(({ id, at }) => {
+    setSeen((s) => (s.has(id) ? s : new Set(s).add(id)));
+    setSeenAt((m) => seenElsewhere(m, id, at) as Record<string, number>);
+  }), []);
   // An answer that lands on the thread you are READING is read already, and
   // only that one: `readWhenTheySeeIt` asks whether it was on the screen at
   // all, and waits for the scroll that brings it there (./read-what-you-saw,

@@ -170,7 +170,14 @@ function useCloudState() {
   // No computer has sent this account a project yet: the inbox says how to connect one.
   const connect = phoneConnectState({ signedIn, started: !read.first, error: read.error, projects: rows.projects, email: cloud?.session()?.user.email });
   const [seen, setSeen] = useState(() => readSeen(appStore));
-  const markSeen = useCallback((item: { product: string; id: string }) => setSeen((s) => markSeenIn(s, item, appStore)), []);
+  const seenNow = useRef(seen);
+  seenNow.current = seen;
+  const seenSender = useRef<ReturnType<typeof phoneSender> | null>(null);
+  const markSeen = useCallback((item: Parameters<typeof isUnread>[0]) => {
+    // Its computer marks it read too, once, when it was unread here.
+    if (isUnread(item, seenNow.current)) void seenSender.current?.threadEdit({ product: item.product, id: item.id, patch: { seen: Date.now() } }).catch(() => {});
+    setSeen((s) => markSeenIn(s, item, appStore));
+  }, []);
   const markUnseen = useCallback((item: { product: string; id: string }) => setSeen((s) => markUnseenIn(s, item, appStore)), []);
   const unread = useCallback((item: { product: string; id: string }) => isUnread(item, seen), [seen]);
   const aliases = useRef(view.aliases);
@@ -179,6 +186,7 @@ function useCloudState() {
   const sender = useMemo(() => (cloud
     ? phoneSender({ client: cloud, rows: () => rowsNow.current, setRows, aliases: () => aliases.current, changed: () => setNow(Date.now()) })
     : null), [cloud, setRows]);
+  seenSender.current = sender;
 
   /** Says `text` on the toast; its Undo, when the text offers one, runs `undo`. */
   const say = useCallback((text: string, undo?: () => Promise<void>, goes?: Toast['goes']) => {

@@ -260,6 +260,7 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
   onFind: 'zero:find',
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
+  onSeenOnPhone: 'zero:seen-on-phone',
   onJoinRoom: 'zero:join-room',
   onThreadLink: 'zero:thread-link',
   onSharedFile: 'zero:shared-file',

@@ -387,6 +387,12 @@ contextBridge.exposeInMainWorld('zero', {
     ipcRenderer.on('zero:recovered', handler);
     return () => ipcRenderer.removeListener('zero:recovered', handler);
   },
+  // A thread opened on the phone, so it reads as read here too.
+  onSeenOnPhone: (fn) => {
+    const handler = (_e, payload) => fn(payload);
+    ipcRenderer.on('zero:seen-on-phone', handler);
+    return () => ipcRenderer.removeListener('zero:seen-on-phone', handler);
+  },
   // A thread's link opened the app.
   onThreadLink: (fn) => {
     const handler = (_e, payload) => fn(payload);
