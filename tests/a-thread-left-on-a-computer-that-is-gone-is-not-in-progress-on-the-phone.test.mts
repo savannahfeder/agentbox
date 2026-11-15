@@ -71,6 +71,20 @@ describe('what stays In progress', () => {
   it('a gone computer whose project the cloud carries on', () => {
     expect(ids(tabs({ cloud: true }).progress).sort()).toEqual(['w-here', 'w-old']);
   });
+  it('the online copy of a thread whose id the gone computer also holds', () => {
+    const rows = {
+      projects: [
+        { device: NEW, project: 'todo', name: 'Web Todo', updated_at: iso(NOW - 20_000) },
+        { device: OLD, project: 'todo', name: 'Web Todo', updated_at: iso(NOW - DAY) },
+      ],
+      threads: [thread(NEW, 'todo', 'w-same'), thread(OLD, 'todo', 'w-same')],
+      commands: [],
+    };
+    const t = phoneTabs(phoneView(rows as never, NOW), NOW);
+    const here = [...t.progress, ...t.inbox].filter((r) => r.id === 'w-same' && r.product.endsWith(`@${NEW}`));
+    expect(here.map((r) => r.away)).toEqual([false]);
+    expect(t.progress.some((r) => r.product.endsWith(`@${NEW}`))).toBe(true);
+  });
   it('a thread still running there', () => {
     const t = tabs({ live: { at: NOW - 60_000, since: NOW - 120_000 } });
     expect(ids(t.progress).sort()).toEqual(['w-here', 'w-old']);
