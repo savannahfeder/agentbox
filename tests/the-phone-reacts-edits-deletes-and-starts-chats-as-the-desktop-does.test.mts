@@ -7,7 +7,8 @@
 // that records every call: each action goes through the same table or
 // database function main/team/rooms-supabase.mts uses, and shows at once.
 import { describe, it, expect } from 'vitest';
-import { phoneGroups, NOT_ON_PHONE } from '../renderer/src/phone-groups';
+import { phoneGroups, NOT_ON_PHONE, ROOM_FILE_NAME } from '../renderer/src/phone-groups';
+import { roomFileName } from '../mobile/src/lib/groups';
 
 const ME = '00000000-0000-4000-8000-000000000001';
 const SAM = '00000000-0000-4000-8000-000000000002';
@@ -143,6 +144,14 @@ describe('files', () => {
     const out = await g.door({ op: 'putFile', args: ['r-1', 'photo-1.jpg', 'aGVsbG8='] });
     expect(out).toMatchObject({ ok: true, value: 'photo-1.jpg' });
     expect(c.calls.find((x) => x.kind === 'insert')).toEqual({ kind: 'insert', table: 'room_files', row: { room_id: 'r-1', name: 'photo-1.jpg', by_person: ME, data: 'aGVsbG8=' } });
+  });
+
+  it('a picked file is named so the chat can keep it, and two of the same name stay two', () => {
+    expect(roomFileName('IMG 0001.HEIC', 1)).toBe('IMG-0001-1.heic');
+    expect(roomFileName('.hidden', 2)).toBe('hidden-2');
+    expect(roomFileName('été rapport.pdf', 3)).toBe('t-rapport-3.pdf');
+    expect(ROOM_FILE_NAME.test(roomFileName('!!!.png', 4))).toBe(true);
+    expect(roomFileName('a.png', 5)).not.toBe(roomFileName('a.png', 6));
   });
 
   it('a name the room cannot keep, or a file over 10 MB, is refused before it goes', async () => {

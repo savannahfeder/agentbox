@@ -1,4 +1,4 @@
-// THE APP STORE BUILD LEAVES OUT GROUP CHAT AND ALPHA FEATURES.
+// THE APP STORE BUILD LEAVES OUT ALPHA FEATURES, AND HAD LEFT OUT GROUP CHAT.
 //
 // App Review guideline 1.2: an app where people message each other must let
 // them report a message, block a person and filter what is posted. The phone's
@@ -40,8 +40,17 @@ describe('a store build', () => {
   it('never shows AI teammates either, whatever the computer says', () => {
     expect(read('mobile/src/state/cloud.tsx')).toMatch(/const team = useMemo\(\(\) => \(STORE_BUILD \? null : /);
   });
-  it('never turns group chat on, whatever the computer says', () => {
-    expect(read('mobile/src/state/groups.tsx')).toMatch(/setOn\(!STORE_BUILD && groupsOn\(rows\)\)/);
+  // Chats came back to the store build on 2026-11-15 (w-47416cec15), once a
+  // message could be reported, a person blocked and bad words were covered
+  // (tests/a-phone-chat-can-report-a-message-block-a-person-and-hides-bad-words).
+  it('has group chat only with report, block and the word filter on every message', () => {
+    expect(read('mobile/src/state/groups.tsx')).toMatch(/setOn\(groupsOn\(rows\)\)/);
+    const chat = read('mobile/src/ui/Groups.tsx');
+    expect(chat).toMatch(/label="Report message"/);
+    expect(chat).toMatch(/label=\{`Block \$\{who\}`\}/);
+    expect(chat).toMatch(/const words = m\.by && m\.by !== me \? filtered\(m\.body\) : m\.body;/);
+    expect(chat).toMatch(/shownMessages\(held, \{ blocked: g\.blocked, reported: g\.reported, me: g\.meId \}\)/);
+    expect(read('mobile/store.config.json')).toMatch(/Report message/);
   });
   // The app review board (2026-11-08) still reached it through Search, which
   // lists every page, so the page is left out of the list itself.

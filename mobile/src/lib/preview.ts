@@ -247,7 +247,7 @@ export function previewGroups(now = Date.now()) {
   ].map(([id, agents, on, hours]) => ({ person_id: id, device: 'a1b2c3d4e5f6', agents_running: agents, working_on: on, working_private: false, working_at: at(4), hours_total: hours, updated_at: at(1) }));
   let n = 0;
   const msg = (room: string, by: string, when: string, body: string, extra: Record<string, unknown> = {}) =>
-    ({ id: `gm-${++n}`, room_id: room, by_person: by, body, in_reply_to: null, mentions: [], created_at: when, edited_at: null, deleted_at: null, ...extra });
+    ({ id: `gm-${++n}`, room_id: room, by_person: by, body, in_reply_to: null, mentions: [], created_at: when, edited_at: null as string | null, deleted_at: null as string | null, ...extra });
   const messages = [
     msg('r-team', 'p-2', iso(yesterday), 'Pushed the new sign-in screens. Five versions in the designs folder.'),
     msg('r-team', 'preview', iso(yesterday + 4 * MIN), 'Looking now. The quiet one reads best on a phone.'),
@@ -268,6 +268,11 @@ export function previewGroups(now = Date.now()) {
   messages.push(msg('r-team', 'p-3', at(46), 'Thanks.', { in_reply_to: sentence.id }));
   const reads = [{ room_id: 'r-team', read_at: at(20) }, { room_id: 'r-launch', read_at: at(100) }, { room_id: 'r-maya', read_at: at(130) }];
   messages.push(msg('r-launch', 'p-4', at(16), 'Here is the frame I mean. ![The opening frame](attachments/opening-frame.png)\n\nThe notes are in [cut-notes.pdf](attachments/cut-notes.pdf).'));
+  const reaction = (m: { id: string; room_id: string }, person: string, emoji: string, ago: number) => ({ message_id: m.id, room_id: m.room_id, person_id: person, emoji, is_on: true, updated_at: at(ago) });
+  const onIt = messages.find((m) => m.body === 'On it.')!;
+  const moving = messages.find((m) => m.body.startsWith('Morning.'))!;
+  const reactions = [reaction(onIt, 'p-3', '🙏', 48), reaction(moving, 'p-2', '👍', 30), reaction(moving, 'p-3', '👍', 29), reaction(moving, 'p-4', '🎉', 28)];
+  const files = new Map<string, string>();
   const cards = [
     { person_id: 'p-3', thread_id: 'w-card-1', title: 'Fix the login meter', project: 'Agentbox', state: 'running', priority: 5, problem: 'The meter shows the wrong reset time on Max accounts.', progress: 'Found where the time is read.', solution: null, visible: true, updated_at: at(10) },
     { person_id: 'p-2', thread_id: 'w-card-2', title: 'Pick the sign-in screen', project: 'Website', state: 'waiting', priority: 5, problem: 'Two sign-in screens are left.', progress: null, solution: null, visible: true, updated_at: at(25) },
@@ -285,8 +290,27 @@ export function previewGroups(now = Date.now()) {
       if (name === 'room_people') return members[args.r] ?? [];
       if (name === 'room_names') return (members[args.r] ?? []).map((id) => ({ person_id: id, name: profiles.find((p) => p.person_id === id)?.display_name ?? names[id], avatar_url: null, has_card: true }));
       if (name === 'mark_room_read') { const r = reads.find((x) => x.room_id === args.r); if (r && args.at > r.read_at) r.read_at = args.at; return null; }
+      if (name === 'react_room_message') {
+        const m = messages.find((x) => x.id === args.m);
+        if (!m) return null;
+        const was = reactions.find((x) => x.message_id === args.m && x.person_id === 'preview' && x.emoji === args.p_emoji);
+        if (was) Object.assign(was, { is_on: !!args.p_on, updated_at: new Date().toISOString() });
+        else reactions.push({ message_id: m.id, room_id: m.room_id, person_id: 'preview', emoji: args.p_emoji, is_on: !!args.p_on, updated_at: new Date().toISOString() });
+        return null;
+      }
+      if (name === 'edit_room_message') { const m = messages.find((x) => x.id === args.m); if (m) Object.assign(m, { body: args.p_body, mentions: args.p_mentions, edited_at: new Date().toISOString() }); return m ?? null; }
+      if (name === 'delete_room_message') { const m = messages.find((x) => x.id === args.m); if (m) m.deleted_at = new Date().toISOString(); return null; }
+      if (name === 'create_room') {
+        const id = `r-new-${rooms.length}`;
+        const people = args.p_people as unknown as string[];
+        rooms.push({ ...rooms[rooms.length - 1], id, name: args.p_name || '', kind: 'group', team_id: null, members: people.length, created_at: new Date().toISOString() });
+        members[id] = people;
+        reads.push({ room_id: id, read_at: new Date().toISOString() });
+        return id;
+      }
       return [];
     },
+    putFile(row: { room_id: string; name: string; data: string }) { files.set(`${row.room_id}/${row.name}`, row.data); return row; },
     select(table: string, query: string) {
       const q = new URLSearchParams(query);
       if (table === 'room_profiles') {
@@ -297,8 +321,11 @@ export function previewGroups(now = Date.now()) {
       if (table === 'room_presence') return presence;
       if (table === 'room_reads') return reads;
       if (table === 'thread_cards') return q.has('shipped_at') ? shipped : cards;
+      if (table === 'room_reactions') return reactions.filter((r) => `eq.${r.room_id}` === q.get('room_id') && (!q.get('updated_at')?.startsWith('gt.') || r.updated_at > q.get('updated_at')!.slice(3)));
+      const kept = files.get(`${q.get('room_id')?.slice(3)}/${q.get('name')?.slice(3)}`);
+      if (table === 'room_files' && kept) return [{ data: kept }];
       // A small drawing of a screen, as a stored file comes back.
-      if (table === 'room_files') return [{ data: 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
+      if (table === 'room_files') return [{ data:'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
       if (table !== 'room_messages') return null;
       let rows = [...messages];
       const room = q.get('room_id')?.slice(3);
@@ -442,6 +469,7 @@ export function previewCloud(now = () => Date.now()) {
     },
     async insert(table: string, row: Record<string, unknown>) {
       if (table === 'room_messages') return groups.send(row as MessageRow);
+      if (table === 'room_files') return groups.putFile(row as { room_id: string; name: string; data: string });
       if (table === 'team_invites' && !team.invites.some((i) => i.email === row.email)) team.invites.push({ email: row.email as string });
       return row;
     },

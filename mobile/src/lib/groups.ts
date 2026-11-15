@@ -93,3 +93,11 @@ export function onWords(c: RoomCard): string {
   if (c.agents) return c.workingOn ?? c.bio ?? 'Private thread';
   return c.status ?? 'Not running';
 }
+
+/** A picked file's name as a chat keeps it: its own letters, made unique, so two IMG_0001.jpg never meet. */
+export function roomFileName(name: string, now = Date.now()): string {
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot + 1).replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toLowerCase() : '';
+  const base = (dot > 0 ? name.slice(0, dot) : name).replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 100) || 'file';
+  return `${base}-${now.toString(36)}${ext ? `.${ext}` : ''}`;
+}

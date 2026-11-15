@@ -17,7 +17,7 @@ import { appStore } from '../platform/persist';
 import { Markdown } from './Markdown';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
-import { Face } from './Groups';
+import { Face, NewChatSheet } from './Groups';
 import { Gear } from './icons';
 import { footRoom, IconButton, T, TopBar } from './parts';
 import { color, corner, font, size } from './theme';
@@ -200,6 +200,7 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
   const team = c.team;
   const mates = team ? matesInOrder(team.view.list) : [];
   const rooms: Room[] = g.on ? groupsInOrder(g.state.rooms) : [];
+  const [starting, setStarting] = useState(false);
   return (
     <>
       <TopBar title="Chats" right={<IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>} below={tabs} />
@@ -220,9 +221,15 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
               <ChatRow key={r.id} first={i === 0} lead={r.kind === 'group' ? <Face name={groupName(r)} size={32} /> : <View style={{ width: 32, alignItems: 'center' }}><T style={{ fontFamily: font.mono, fontSize: 17, color: color.faint }}>#</T></View>}
                 name={groupName(r)} line={r.unread > 0 ? 'New messages' : updatedWords(r.lastAt, c.now)} need={r.unread > 0} onPress={() => openGroup(r.id)} />
             ))}
+            <ChatRow first={rooms.length === 0} lead={<View style={{ width: 32, alignItems: 'center' }}><T style={{ fontSize: 20, color: color.faint }}>+</T></View>} name="New chat" onPress={() => setStarting(true)} />
           </>
         )}
       </ScrollView>
+      {g.on && <NewChatSheet open={starting} close={() => setStarting(false)} mates={g.mates} start={async (people, name) => {
+        const out = await g.act('create', { people, name });
+        if (!out.error && typeof out.value === 'string') openGroup(out.value);
+        return out.error;
+      }} />}
     </>
   );
 }

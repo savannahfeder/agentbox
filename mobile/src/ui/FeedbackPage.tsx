@@ -46,7 +46,7 @@ export function FeedbackPage({ about = null }: { about?: ReportAbout } = {}) {
   return (
     <View style={{ marginTop: 14, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: color.fill }}>
       <TextInput multiline autoFocus value={text} onChangeText={(t) => { setText(t); setSaid(null); }} accessibilityLabel="Your feedback"
-        placeholder={about ? 'What is wrong with what the agent wrote?' : 'What happened, and what did you expect?'} placeholderTextColor={color.faint}
+        placeholder={about?.kind === 'message' ? 'What is wrong with this message?' : about ? 'What is wrong with what the agent wrote?' : 'What happened, and what did you expect?'} placeholderTextColor={color.faint}
         style={[{ minHeight: 160, padding: 16, fontFamily: font.regular, fontSize: 15.5, lineHeight: 24, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       {(files.length > 0 || said) && (
         <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>

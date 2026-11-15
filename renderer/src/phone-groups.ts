@@ -314,7 +314,8 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
       if (c.session()?.user.id !== me) return build();
       if (people) { who = people; peopleAt = now(); }
       const next = new Map<string, RoomMessage[]>();
-      for (const [id, list] of fresh) next.set(id, all ? merge([], list) : merge(messages.get(id), list));
+      // A whole read replaces what it covers; what Show earlier brought in, older than that, stays.
+      for (const [id, list] of fresh) next.set(id, all ? merge((messages.get(id) ?? []).filter((m) => list.length > 0 && m.at < list[0].at), list, Infinity) : merge(messages.get(id), list, Math.max(HELD, messages.get(id)?.length ?? 0)));
       rooms = got;
       messages = next;
       const keep = new Set(got.map((r) => r.id));
@@ -440,7 +441,7 @@ export function phoneGroups(c: GroupsRest, { now = Date.now }: { now?: () => num
     }
   }
 
-  return { state: () => state, refresh, send, markRead, older, door, forget: () => { held = null; ready = false; state = NO_GROUPS; } };
+  return { state: () => state, teammates: () => who.teammates, refresh, send, markRead, older, door, forget: () => { held = null; ready = false; state = NO_GROUPS; } };
 }
 
 /** Groups is on when the computer heard from last says so in its settings copy (shared/phone-settings.mts). */
