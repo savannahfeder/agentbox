@@ -506,12 +506,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     },
   });
 
-  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE }: { engine?: string } = {}) => {
+  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE, ask = false }: { engine?: string; ask?: boolean } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage refresh is only available in the main app window.');
-    // Codex is asked of this computer and not of OpenAI; main/codex-usage.mts
-    // says why there is no explicit read.
+    // Codex asks OpenAI only when the person pressed Refresh (`ask`); opening
+    // the page reads what this computer already has.
     if (engine !== DEFAULT_ENGINE) {
-      const reading = supervisor.refreshCodexUsage();
+      const reading = ask ? await supervisor.askCodexUsage() : supervisor.refreshCodexUsage();
       return reading ? { ok: true, reading: { engine, ...reading } } : { ok: false, error: 'Codex has reported no usage on this computer yet.' };
     }
     const result = await usage.refreshNow();

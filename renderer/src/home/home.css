@@ -159,8 +159,17 @@
 /* The empty Inbox has no rows to keep clear, so its sky covers the card
    (InboxSky `zero`) in place of the header strip. */
 .app:has(> .inbox-sky-zero) > .inbox-sky-head { display: none; }
-.app:has(> .inbox-sky-zero) .th-start .tc-text::placeholder { color: var(--text-dim); }
+/* Greys sink into the dots, so the writing box over the sky is drawn white.
+   The menus are left alone: they sit on a solid card. Lines stay softer than
+   the words so the priority bars still tell off from on. */
+.app:has(> .inbox-sky-zero) .th-start :is(.tc-text, .tc-chip, .tc-icon, .tc-send) {
+  --text-dim: var(--text); --text-faint: var(--text);
+  --line: color-mix(in srgb, var(--text) 32%, transparent);
+  --line-strong: color-mix(in srgb, var(--text) 40%, transparent); }
+.app:has(> .inbox-sky-zero) .th-start .tc-text::placeholder { color: var(--text); }
 .app:has(> .inbox-sky-zero) .th-start .tc-chip { color: var(--text); }
+.app:has(> .inbox-sky-zero) .th-start .tc-send > button:disabled { opacity: 1; }
+.app:has(> .inbox-sky-zero) .th-start .tc-send kbd { opacity: 1; }
 
 /* Team and Files wear the Inbox's sky; the Team list would cover it. */
 .app.sky-place .cx-list { background: transparent; }
