@@ -38,7 +38,7 @@
 // - Any server request not in APPROVAL_SHAPE gets the error frame, because one
 //   left open hangs whatever raised it.
 
-import { StringDecoder } from 'node:string_decoder';
+import { streamLines } from './stream-lines.mts';
 import { NAME, Name, nameSlug } from '../shared/product-name.mjs';
 
 export type ApprovalDecision = 'accept' | 'acceptForSession' | 'decline' | 'cancel';
@@ -356,9 +356,7 @@ export function createCodexAppServer({
   const pending = new Map<RpcId, Pending>();              // OUR request id
   const threads = new Map<string, CodexThreadHandlers>(); // thread id -> handlers
   const openCards = new Set<RpcId>();  // THEIR request ids, each waiting on a person
-  const decoder = new StringDecoder('utf8');
   let nextId = 1;
-  let buffer = '';
   let stderrText = '';
   let gone: CodexGone | null = null; // null while live; the closing reason once not
   let drained = false;          // stdout has ended, so the diagnostics are complete
@@ -410,17 +408,11 @@ export function createCodexAppServer({
 
   const notify = (method: string) => write({ jsonrpc: '2.0', method });
 
-  // A StringDecoder, because a chunk can end in the middle of a UTF-8 sequence.
+  const lines = streamLines((line) => { if (!gone) read(line); });
   child.stdout.on('data', (chunk) => {
     if (gone) return;
-    buffer += typeof chunk === 'string' ? chunk : decoder.write(chunk);
-    let at;
-    while (!gone && (at = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, at);
-      buffer = buffer.slice(at + 1);
-      read(line);
-    }
-    if (!gone && buffer.length > maxFrameLength) {
+    lines(chunk);
+    if (!gone && lines.held() > maxFrameLength) {
       fail('protocol', { note: `a frame passed ${maxFrameLength} characters with no end to it` });
     }
   });

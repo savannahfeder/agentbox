@@ -51,7 +51,8 @@ describe('a workday stopped mid-day', () => {
       // No grace after "Evidence:": the stop can land while the week's phone changes are still being read.
       while (!said.includes('Evidence:') && Date.now() < until) await new Promise((r) => setTimeout(r, 20));
       child.kill('SIGTERM');
-      await new Promise((r) => child.on('exit', r));
+      // 'close', not 'exit': the last lines can still be in the pipe when it exits.
+      await new Promise((r) => child.on('close', r));
 
       expect(said).toContain('stopped by SIGTERM');
       const report = fs.readFileSync(path.join(out, 'report.md'), 'utf8');
