@@ -1,6 +1,5 @@
-// THE OTHER END OF main/task-folders-offthread.mts. One job at a time, in the
-// order they were posted, which is what keeps two git commands from fighting
-// over the same repository's lock files.
+// THE OTHER END OF main/task-folders-offthread.mts, one per lane. That side
+// sends a thread one job at a time and never two jobs for the same folder at once.
 import { parentPort } from 'node:worker_threads';
 import * as folders from './task-folders.mts';
 import type { FolderJobName } from './task-folders-offthread.mts';

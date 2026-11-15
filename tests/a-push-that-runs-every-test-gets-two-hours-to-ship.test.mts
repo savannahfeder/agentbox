@@ -1,4 +1,8 @@
-// A PUSH THAT RUNS EVERY TEST GETS AN HOUR TO SHIP, NOT TWENTY MINUTES.
+// A PUSH THAT RUNS EVERY TEST GETS TWO HOURS TO SHIP, NOT TWENTY MINUTES.
+//
+// It was one hour until 2026-11-15, when a dozen agents on the Mac kept the
+// whole suite from finishing inside it and the onboarding branch was stopped
+// with no test red.
 //
 // What broke: the Glass removal deletes three code files, and the push hook
 // runs the whole suite (about 3,000 files) for any push that deletes code or
@@ -16,7 +20,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { RUNS_EVERY_TEST, runScript } from '../main/ship-queue.mts';
-import { DELETED_CODE, EVERY_TEST_DEPENDS_ON, runsEveryTest } from '../scripts/lib/ship-rules.mjs';
+import { DELETED_CODE, DELETED_TEST, EVERY_TEST_DEPENDS_ON, runsEveryTest } from '../scripts/lib/ship-rules.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const SHIP_SCRIPT = path.join(ROOT, 'scripts', 'ship.mjs');
@@ -87,6 +91,10 @@ describe('the rule is the hook\'s own', () => {
 
   it('counts the same files as code when they are deleted', () => {
     expect(hook).toContain(`--diff-filter=D "$base" "$local_sha" | grep -E '${DELETED_CODE}'`);
+  });
+
+  it('leaves out the same deleted test files', () => {
+    expect(hook).toContain(`grep -vqE '${DELETED_TEST}'`);
   });
 
   it('names the same files every test depends on', () => {

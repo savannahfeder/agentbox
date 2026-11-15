@@ -14,8 +14,9 @@
 // The Chrome and its profile go through scripts/lib/chrome-guard.mjs, so a
 // drive that throws or is killed leaves no orphan behind.
 import fs from 'node:fs';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
 import { MAC_CHROME, NO_HIDDEN_BROWSER, KEEPS_OFF_THE_KEYCHAIN, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mts';
 
@@ -36,6 +37,8 @@ export function findChrome(platform = process.platform, env = process.env, playw
   try { return playwright().chromium.executablePath(); } catch { return MAC_CHROME; }
 }
 export const CHROME = findChrome();
+
+const WATCH_SCRIPT = fileURLToPath(new URL('./browser-watch.sh', import.meta.url));
 
 const KEYS = {
   Enter: { code: 'Enter', keyCode: 13 },
@@ -124,7 +127,7 @@ export function canDrive(bin = CHROME, platform = process.platform, exists = fs.
  * browser, which lives across many short commands); then its profile should sit
  * inside the instance folder, so `live.mjs down` finds and stops it.
  */
-export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform, start = spawn } = {}) {
+export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform, start = spawn, owner = process.env.AGENTBOX_TEST_RUN_PID, activity = null, watchEvery = 30, watchIdle = 3600 } = {}) {
   if (platform === 'darwin' && bin === MAC_CHROME) throw new Error(NO_HIDDEN_BROWSER);
   if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
   const chrome = start(bin, [
@@ -146,8 +149,31 @@ export async function launchChrome({ width = 1440, height = 900, profile, detach
       reject(new Error(`chrome exited before printing a devtools url (code ${code}); another Chrome may hold ${profile}`));
     });
   });
-  if (detached) { chrome.stderr.destroy(); chrome.unref(); }
+  if (detached) {
+    chrome.stderr.destroy();
+    chrome.unref();
+    watchBrowser(chrome.pid, profile, { owner, activity, every: watchEvery, idle: watchIdle });
+  }
   return { chrome, wsUrl };
+}
+
+const startOf = (pid) => {
+  try { return execFileSync('ps', ['-o', 'lstart=', '-p', String(pid)], { encoding: 'utf8', timeout: 5000 }).trim(); } catch { return ''; }
+};
+
+/**
+ * A detached browser ends with the run that owns it (`owner`, a pid), or, with
+ * no owner, after `idle` seconds with no change to `activity`: tested runs
+ * killed outright left theirs running for days (scripts/browser-watch.sh).
+ */
+function watchBrowser(pid, profile, { owner, activity, every = 30, idle = 3600 }) {
+  const browserStart = startOf(pid);
+  const ownerPid = Number(owner) > 0 ? String(Number(owner)) : '';
+  const ownerStart = ownerPid ? startOf(ownerPid) : '';
+  if (!browserStart || (ownerPid && !ownerStart)) return;
+  try {
+    spawn('/bin/sh', [WATCH_SCRIPT, String(pid), browserStart, profile, ownerPid, ownerStart, activity ?? '', String(idle), String(every)], { detached: true, stdio: 'ignore' }).unref();
+  } catch { /* the run's own close still ends it */ }
 }
 
 /** Open `url` in a fresh headless Chrome. Returns the handful of verbs a drive needs. */
