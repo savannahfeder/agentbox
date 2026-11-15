@@ -745,7 +745,8 @@ export default function App() {
     () => new URLSearchParams(location.search).has('settings'),
   );
   // The feedback card (FeedbackCard.tsx), opened by the sidebar's Feedback row.
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // Null is closed; a string is the words it opens with.
+  const [feedbackOpen, setFeedbackOpen] = useState<string | null>(null);
   // THE TEAM PAGE, a page like Settings: it takes the main area and leaves the
   // header and the sidebar where they are.
   const [teamOpen, setTeamOpen] = useState(() => new URLSearchParams(location.search).has('team'));
@@ -8057,7 +8058,7 @@ export default function App() {
           all={snap.usageByEngine ?? []}
           recent={lastUsedEngine(snap)}
         />}
-        page={settingsOpen ? 'settings' : null} inboxLabel={roomsUi.live ? 'Inbox' : undefined} invisible={roomsUi.invisible} onSignIn={signInAsked.sidebar ? askToSignIn : undefined} onFeedback={() => setFeedbackOpen(true)} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
+        page={settingsOpen ? 'settings' : null} inboxLabel={roomsUi.live ? 'Inbox' : undefined} invisible={roomsUi.invisible} onSignIn={signInAsked.sidebar ? askToSignIn : undefined} onFeedback={() => setFeedbackOpen('')} teamPage={teamOpen && !settingsOpen} hasTeam={!!snap?.team?.configured} team={snap?.team ?? null}
         onInvite={multiplayer ? () => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(true); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); } : undefined}
         statuses={multiplayer}
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
@@ -9282,7 +9283,7 @@ export default function App() {
       {settingsOpen && (
         <Settings
           key={`${settingsPane ?? 'general'}:${settingsVisit}`}
-          onFeedback={() => setFeedbackOpen(true)}
+          onFeedback={setFeedbackOpen}
           embedded
           usageReadings={snap.usageByEngine ?? (snap.usage ? [snap.usage] : [])}
           now={now}
@@ -9919,7 +9920,7 @@ export default function App() {
       )}
       {/* The feedback card, from the sidebar's Feedback row (w-1b574413db).
           Over whatever is on screen, an opened task included. */}
-      {feedbackOpen && <FeedbackCard onClose={() => setFeedbackOpen(false)} onSend={(p) => api.sendFeedback(p)} />}
+      {feedbackOpen !== null && <FeedbackCard start={feedbackOpen} onClose={() => setFeedbackOpen(null)} onSend={(p) => api.sendFeedback(p)} />}
       {/* Last, and outside everything: the zoom percent is over whatever is on
           screen, including an opened task. */}
       <ZoomPercent />
