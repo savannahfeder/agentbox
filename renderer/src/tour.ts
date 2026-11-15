@@ -3,9 +3,9 @@
 // tests/the-tutorial-walks-you-through-your-first-real-thread.test.mts holds
 // what each rule is for.
 
-export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady' | 'inPalette' | 'startHere' | 'urgent';
+export type TourStep = 'start' | 'folder' | 'pick' | 'write' | 'send' | 'working' | 'answered' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'gettingReady' | 'inPalette' | 'startHere' | 'urgent' | 'home' | 'files';
 /** Each tip shows until it is done or put away, then never again. The New thread box's three steps are one. */
-export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'urgent';
+export type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'close' | 'palette' | 'busy' | 'urgent' | 'home' | 'files';
 /** Every lesson there is; a tour with all of them done has nothing left to say. */
 export const LESSONS: Lesson[] = ['start', 'compose', 'working', 'open', 'choose', 'reply', 'close', 'palette'];
 
@@ -22,6 +22,8 @@ export interface Tour {
   finishing?: boolean;
   /** Home's greeting says you finished, from that tip going until a first real thread is sent. */
   greets?: boolean;
+  /** It names Home before the practice thread and Files after it. Absent on one begun before it did. */
+  pages?: boolean;
 }
 
 export interface TourPractice { slug: string; item?: string; replies: number; answered?: number }
@@ -67,6 +69,10 @@ export interface TourScreen {
   options: boolean;
   /** ⌘K is open. */
   palette?: boolean;
+  /** Home is on screen, with its box. */
+  home?: boolean;
+  /** The Files page is on screen. */
+  files?: boolean;
   /** Something else is over the window: settings, another card. */
   covered: boolean;
 }
@@ -77,14 +83,19 @@ export const PRACTICE_RUN_MS = 6_000;
 /** Sent by the app once a thread is really closed, which is the close lesson. */
 export const THREAD_CLOSED = 'agentbox:thread-closed';
 
-export const startTour = (): Tour => ({ sent: false, skipped: false, done: [] });
+export const startTour = ({ pages = false }: { pages?: boolean } = {}): Tour => ({ sent: false, skipped: false, done: [], ...(pages ? { pages: true } : {}) });
 export const skipTour = (t: Tour): Tour => ({ ...t, skipped: true });
-/** A thread closed, ⌘K used, a new task known, and urgent explained if it was picked: the confetti, and no tip after it. */
-export const tourOver = (t: Tour | null): boolean =>
-  !!t && !t.skipped && t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start')) && !(t.urgent && !t.done.includes('urgent'));
-export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && !tourOver(t) && LESSONS.some((l) => !t.done.includes(l));
+/** A thread closed, ⌘K used, a new task known, and urgent explained if it was picked. */
+const threadDone = (t: Tour): boolean =>
+  t.done.includes('close') && t.done.includes('palette') && (t.sent || t.done.includes('start')) && !(t.urgent && !t.done.includes('urgent'));
+/** The practice thread is behind you and Files has not been named yet. */
+export const filesDue = (t: Tour | null): boolean => !!t && !t.skipped && !!t.pages && threadDone(t) && !t.done.includes('files');
+/** Everything it had to show has been shown: the confetti, and no tip after it but the last word on Home. */
+export const tourOver = (t: Tour | null): boolean => !!t && !t.skipped && threadDone(t) && (!t.pages || t.done.includes('files'));
+export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && !tourOver(t) && (filesDue(t) || LESSONS.some((l) => !t.done.includes(l)));
 export const madeUrgent = (t: Tour): Tour => ({ ...t, urgent: true });
-export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
+/** Sending is past the Home tip too, whether or not it was read. */
+export const noteSent = (t: Tour): Tour => { const sent = finishLesson({ ...t, sent: true }, 'compose'); return t.pages ? finishLesson(sent, 'home') : sent; };
 export function finishLesson(t: Tour, l: Lesson): Tour {
   if (t.done.includes(l)) return t;
   const next = { ...t, done: [...t.done, l] };
@@ -163,6 +174,8 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   const todo = (l: Lesson) => !t.done.includes(l);
   if (s.palette) return todo('palette') ? 'inPalette' : null;
   if (t.urgent && todo('urgent')) return 'urgent';
+  if (filesDue(t)) return s.files ? 'files' : null;
+  if (t.pages && todo('home') && !t.sent && s.home && !s.menu) return 'home';
   // The command bar is the last tip, so it goes before the suggestions on the empty inbox.
   if (!todo('close') && todo('palette') && (t.sent || !todo('start')) && s.composer === 'inline' && !s.thread) return 'palette';
   if (s.composer !== 'none' && !t.sent && todo('compose')) {
@@ -223,7 +236,7 @@ export function readTour(store: Store): Tour | null {
     const p = t.practice && typeof t.practice.slug === 'string'
       ? { practice: { slug: t.practice.slug, ...(typeof t.practice.item === 'string' ? { item: t.practice.item } : {}), replies: Number(t.practice.replies) || 0, ...(t.practice.answered ? { answered: Number(t.practice.answered) } : {}) } }
       : {};
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.finishing ? { finishing: true } : {}), ...(t.greets ? { greets: true } : {}) };
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.finishing ? { finishing: true } : {}), ...(t.greets ? { greets: true } : {}), ...(t.pages ? { pages: true } : {}) };
   } catch { return null; }
 }
 

@@ -187,7 +187,7 @@ import { ideasFor, runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, firstThreadSent, saysFinished, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, filesDue, finishLesson, firstTask, firstThreadSent, saysFinished, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
@@ -7220,7 +7220,7 @@ export default function App() {
     finishFirstRun(localStorage);
     setNewInstall(false);
     rememberOffered(localStorage);
-    setTour(startTour());
+    setTour(startTour({ pages: homeOn }));
     setFresh(false);
     // Lands on Home when it is on, where the setup's preview already was.
     setHomeOpen(homeOn);
@@ -7405,6 +7405,14 @@ export default function App() {
   }, [signInGate]);
 
   // The walkthrough's last word is said on Home, and leaving Home ends it (components/Tour.tsx).
+  // Before that, the walkthrough's last stop is Files: it takes you there, and leaving the page counts as having read the tip.
+  const filesStop = !fresh && filesDue(tour);
+  const filesStopSeen = useRef(false);
+  useEffect(() => {
+    if (!filesStop) { filesStopSeen.current = false; return; }
+    if (!filesStopSeen.current) { if (filesShown) filesStopSeen.current = true; else { setModal(null); openFiles(null); } return; }
+    if (!filesShown) setTour(finishLesson(tourRef.current!, 'files'));
+  }, [filesStop, filesShown]); // eslint-disable-line react-hooks/exhaustive-deps
   const finishOnHome = useRef(false);
   useEffect(() => {
     if (!finishing) { finishOnHome.current = false; return; }
@@ -9463,7 +9471,7 @@ export default function App() {
         }}
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
-      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
+      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} pages={!!tour!.pages} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
       {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} />}
       {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
         answering={practiceAnswering}

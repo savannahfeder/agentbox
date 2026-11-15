@@ -121,7 +121,7 @@ describe('the window', () => {
     expect(app).toContain('const tourFramed = !fresh && homeOn && (tourLive(tour) || tourFinishing(tour));');
     expect(frame).toContain("<span>{finished ? 'Walkthrough done' : `Walkthrough ${at} of ${of}`}</span>");
     expect(frame).toContain("{finished ? 'Close' : 'Skip walkthrough'}");
-    expect(app).toMatch(/<TourFrame done=\{tour!\.done\} now=\{tourNow\} finished=\{finishing\} onSkip=\{\(\) => setTour\(finishing \? closeFinish\(tour!\) : skipTour\(tour!\)\)\} \/>/);
+    expect(app).toMatch(/<TourFrame done=\{tour!\.done\} now=\{tourNow\} pages=\{!!tour!\.pages\} finished=\{finishing\} onSkip=\{\(\) => setTour\(finishing \? closeFinish\(tour!\) : skipTour\(tour!\)\)\} \/>/);
   });
   it('goes to Home for it, and ends it when you leave Home', () => {
     expect(app).toContain("if (!finishOnHome.current) { if (homeHere) finishOnHome.current = true; else { setModal(null); openView('inbox'); setHomeOpen(true); } return; }");

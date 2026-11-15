@@ -43,7 +43,11 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   startHere: { words: <>Press <K k="N" /> to give an agent a new task</>, side: 'below-right' },
   palette: { words: <>Press <K k={CMD} /><K k="K" /> to find anything {Name} can do</>, side: 'below' },
   urgent: { words: <>Urgent threads move up your list, and their agents start first</>, side: 'below-right' },
+  home: { words: <>This is Home. Start a thread here and see what needs you</>, side: 'above' },
+  files: { words: <>This is Files. Everything your agents make is kept here</>, side: 'below' },
 };
+/** A ring that stands off what it names, rather than tracing its edge: Home's box, the Files icon. */
+const ROOM: Partial<Record<TourStep, number>> = { home: 6, files: 5 };
 const PRACTICE_SEND = <>Press <K k={CMD} /><K k="↵" /> to send this practice thread</>;
 const PRACTICE_WORKING = <>Your agent is working. It moves to Needs you when it has something for you</>;
 const PRACTICE_OPEN = <>Agents land here when they need you. Press <K k="↵" /> to open this one</>;
@@ -97,6 +101,8 @@ function targetsOf(step: TourStep, practiceId: string | null = null): HTMLElemen
     case 'startHere': return one(document.querySelector('.ts-done'));
     case 'inPalette': return one(document.querySelector('.palette'));
     case 'gettingReady': return one([...document.querySelectorAll('.list-pane .row[data-catching-up]')].at(-1));
+    case 'home': return one(document.querySelector('.hm-start .tc-card'));
+    case 'files': return one(document.querySelector('.workspace-tab[data-tab="files"]'));
     // Nothing on screen opens the command bar, so the card sits alone under the tabs.
     // On the list, at the word Urgent on the thread just raised.
     case 'urgent': if (urgentCell()) return one(urgentCell());
@@ -137,8 +143,9 @@ function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   if (step === 'working' || step === 'answered' || step === 'open' || step === 'busy' || (step === 'urgent' && els[0] === urgentCell())) return snug(els[0]);
   const rs = els.map((e) => e.getBoundingClientRect()).filter((r) => r.width);
   if (!rs.length) return null;
-  const x = Math.min(...rs.map((r) => r.left)), y = Math.min(...rs.map((r) => r.top));
-  return { x, y, w: Math.max(...rs.map((r) => r.right)) - x, h: Math.max(...rs.map((r) => r.bottom)) - y };
+  const room = ROOM[step] ?? 0;
+  const x = Math.min(...rs.map((r) => r.left)) - room, y = Math.min(...rs.map((r) => r.top)) - room;
+  return { x, y, w: Math.max(...rs.map((r) => r.right)) + room - x, h: Math.max(...rs.map((r) => r.bottom)) + room - y };
 }
 
 function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean, answering: boolean, practiceId: string | null = null): TourScreen {
@@ -160,6 +167,8 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
     answering: thread && answering,
     menu: !!document.querySelector('.tc-menu'),
     options: !!document.querySelector('.opt-row'),
+    home: !!document.querySelector('.hm-start .tc-card'),
+    files: !!document.querySelector('.fp-page'),
     palette,
     covered,
   };
@@ -333,6 +342,12 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
       const tabsEnd = [...document.querySelectorAll('.tm-tab')].at(-1)?.getBoundingClientRect().right ?? null;
       top = tabsEnd !== null && !fitsBesideTabs(tabsEnd, left, GAP) ? box.y + box.h + 3 * GAP : box.y + (box.h - h) / 2;
     }
+    // Home's tip stands above the greeting on its left edge, as the walkthrough's last word does.
+    const hello = step === 'home' ? document.querySelector('.hm-hello')?.getBoundingClientRect() : null;
+    if (hello) { left = hello.left; top = hello.top - 20 - h; }
+    // The Files tip sits on the page's own top line, beside where it says which files these are: no file is under it.
+    const crumb = step === 'files' ? [...document.querySelectorAll('.fp-page .fp-crumb')].at(-1)?.getBoundingClientRect() : null;
+    if (crumb) { left = crumb.right + 24; top = crumb.top + (crumb.height - h) / 2; }
     left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
     top = Math.max(12, Math.min(top, window.innerHeight - h - 12));
     if (cardNow.current?.left !== left || cardNow.current?.top !== top) { cardNow.current = { left, top }; setCardAt(cardNow.current); }
@@ -360,6 +375,8 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
       learnSoon(lessonOf(step));
     };
     const key = (e: KeyboardEvent) => {
+      // These two ask for nothing but to be read, so ↵ moves on, and the box under the Home tip must not take it as a new line.
+      if ((step === 'home' || step === 'files') && e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) { e.preventDefault(); e.stopImmediatePropagation(); learnSoon(lessonOf(step)); return; }
       const typing = (e.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
       // The app holds the first E on a thread waiting on an answer, so it counts only once the thread has gone.
       // A close is counted when the app closes the thread (THREAD_CLOSED below); the first E on a waiting thread is held.
@@ -388,10 +405,11 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
   return (
     <>
       {burst ? <ConfettiBurst key={burst} /> : null}
-      {step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
+      {step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className={`tour-glow${ROOM[step] ? ' tour-glow-box' : ''}`} style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
         <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : step === 'send' && practice ? PRACTICE_SEND : step === 'working' && practiceId ? PRACTICE_WORKING : step === 'open' && practiceId ? PRACTICE_OPEN : SAY[step].words}</span>
+        {(step === 'home' || step === 'files') && <button type="button" className="tour-act tour-next" onClick={() => learnSoon(lessonOf(step))}>Next <K k="↵" /></button>}
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
         {step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick={openNotifySettings}>Didn’t see it? Open settings</button>}
       </div>
