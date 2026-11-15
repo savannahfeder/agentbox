@@ -81,7 +81,7 @@ beforeAll(async () => {
       function Page() {
         const [open, setOpen] = useState(null);
         return <>
-          <PhonePage onSignIn={() => {}} onFeedback={(start) => setOpen(start ?? '')} />
+          <PhonePage onSignIn={() => {}} onFeedback={setOpen} />
           {open !== null && <FeedbackCard start={open} onClose={() => setOpen(null)} onSend={async (p) => { window.sent = p; return { ok: true }; }} />}
         </>;
       }

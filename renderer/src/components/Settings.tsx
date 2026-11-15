@@ -769,11 +769,11 @@ function Reading({ running, capacity, gate }: {
 // FEEDBACK FROM A PHONE. Its corner has no Feedback button, by choice ("not
 // important to be big for mobile"), which left no way to send any ("not sure
 // how to give feedback on mobile", 2026-10-12).
-function PhoneFeedbackGroup({ onFeedback }: { onFeedback: () => void }) {
+function PhoneFeedbackGroup({ onFeedback }: { onFeedback: (start: string) => void }) {
   return (
     <Group id="phone-feedback" label="Feedback">
       <Row label="Send feedback" desc={`Tell us what works and what does not. It goes straight to the people who make ${Name}.`}>
-        <button type="button" className="set-ghost" onClick={() => onFeedback()}>Send feedback</button>
+        <button type="button" className="set-ghost" onClick={() => onFeedback('')}>Send feedback</button>
       </Row>
     </Group>
   );
@@ -863,7 +863,7 @@ function PhoneProjectsPicker({ macShut }: { macShut: MacShut }) {
 }
 export const ANDROID_ASK = 'I’d like an Android app.';
 
-function PhoneAppGroup({ email, onFeedback }: { email?: string | null; onFeedback?: (start?: string) => void }) {
+function PhoneAppGroup({ email, onFeedback }: { email?: string | null; onFeedback?: (start: string) => void }) {
   const [qr, setQr] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -927,7 +927,7 @@ function WebAccountPage({ web, feedback, onPhoneProjects }: { web: PhoneWeb; fee
   );
 }
 
-export function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { onFeedback?: (start?: string) => void; macShut?: MacShut; onSignIn?: () => void; web?: PhoneWeb; onPhoneProjects?: ReactNode }) {
+export function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { onFeedback?: (start: string) => void; macShut?: MacShut; onSignIn?: () => void; web?: PhoneWeb; onPhoneProjects?: ReactNode }) {
   const feedback = onFeedback && onPhone() ? <PhoneFeedbackGroup onFeedback={onFeedback} /> : null;
   if (web) return <WebAccountPage web={web} feedback={feedback} onPhoneProjects={onPhoneProjects} />;
   if (!macShut) {
@@ -1750,7 +1750,8 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
-  onFeedback?: (start?: string) => void;
+  /** Opens the Feedback card with `start` already written. */
+  onFeedback?: (start: string) => void;
   /** The cloud, when this Mac is set up for it: its own logins are listed on the agent's page. */
   cloud?: CloudStatus | null;
   /** Signs a Claude account in to the cloud (a login's key to sign it in again), on the cloud's own screen. */

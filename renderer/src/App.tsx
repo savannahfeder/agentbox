@@ -9266,7 +9266,7 @@ export default function App() {
       {settingsOpen && (
         <Settings
           key={`${settingsPane ?? 'general'}:${settingsVisit}`}
-          onFeedback={(start) => setFeedbackOpen(start ?? '')}
+          onFeedback={setFeedbackOpen}
           embedded
           usageReadings={snap.usageByEngine ?? (snap.usage ? [snap.usage] : [])}
           now={now}
