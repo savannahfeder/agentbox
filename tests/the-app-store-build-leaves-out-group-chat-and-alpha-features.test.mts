@@ -52,6 +52,15 @@ describe('a store build', () => {
     expect(chat).toMatch(/shownMessages\(held, \{ blocked: g\.blocked, reported: g\.reported, me: g\.meId \}\)/);
     expect(read('mobile/store.config.json')).toMatch(/Report message/);
   });
+  // The second board (2026-11-15) asked for the rules to be agreed before the
+  // first chat, the terms to say zero tolerance, and the filter to cover what is posted.
+  it('asks you to agree to the chat rules before any chat opens, and covers bad words in what you post', () => {
+    const chat = read('mobile/src/ui/Groups.tsx');
+    expect(chat).toMatch(/if \(!g\.agreed\) return <ChatRules/);
+    expect(chat).toMatch(/const words = filtered\(text\.trim\(\)\);/);
+    expect(read('phone-legal/terms.html')).toMatch(/no room for objectionable content or abusive people/);
+    expect(read('phone-legal/terms.html')).toMatch(/within 24 hours/);
+  });
   // The app review board (2026-11-08) still reached it through Search, which
   // lists every page, so the page is left out of the list itself.
   it('has no Alpha features page anywhere: Settings, Search, or its own address', () => {

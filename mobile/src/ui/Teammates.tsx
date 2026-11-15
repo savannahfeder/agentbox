@@ -17,9 +17,10 @@ import { appStore } from '../platform/persist';
 import { Markdown } from './Markdown';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
-import { Face, NewChatSheet } from './Groups';
+import { filtered } from '../platform/word-filter';
+import { ChatRules, Face, NewChatSheet } from './Groups';
 import { Gear } from './icons';
-import { footRoom, IconButton, T, TopBar } from './parts';
+import { footRoom, IconButton, Sheet, T, TopBar } from './parts';
 import { color, corner, font, size } from './theme';
 
 /** The corner of an AI teammate's dashed mark, as `--mate-corner` is on the web: round, like a person. */
@@ -201,6 +202,7 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
   const mates = team ? matesInOrder(team.view.list) : [];
   const rooms: Room[] = g.on ? groupsInOrder(g.state.rooms) : [];
   const [starting, setStarting] = useState(false);
+  const [rules, setRules] = useState(false);
   return (
     <>
       <TopBar title="Chats" right={<IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>} below={tabs} />
@@ -221,15 +223,18 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
               <ChatRow key={r.id} first={i === 0} lead={r.kind === 'group' ? <Face name={groupName(r)} size={32} /> : <View style={{ width: 32, alignItems: 'center' }}><T style={{ fontFamily: font.mono, fontSize: 17, color: color.faint }}>#</T></View>}
                 name={groupName(r)} line={r.unread > 0 ? 'New messages' : updatedWords(r.lastAt, c.now)} need={r.unread > 0} onPress={() => openGroup(r.id)} />
             ))}
-            <ChatRow first={rooms.length === 0} lead={<View style={{ width: 32, alignItems: 'center' }}><T style={{ fontSize: 20, color: color.faint }}>+</T></View>} name="New chat" onPress={() => setStarting(true)} />
+            <ChatRow first={rooms.length === 0} lead={<View style={{ width: 32, alignItems: 'center' }}><T style={{ fontSize: 20, color: color.faint }}>+</T></View>} name="New chat" onPress={() => (g.agreed ? setStarting(true) : setRules(true))} />
           </>
         )}
       </ScrollView>
       {g.on && <NewChatSheet open={starting} close={() => setStarting(false)} mates={g.mates} start={async (people, name) => {
-        const out = await g.act('create', { people, name, kind: 'group' });
+        const out = await g.act('create', { people, name: filtered(name), kind: 'group' });
         if (!out.error && typeof out.value === 'string') openGroup(out.value);
         return out.error;
       }} />}
+      <Sheet open={rules} close={() => setRules(false)}>
+        <View style={{ paddingTop: 12, paddingBottom: 8, marginHorizontal: -18 }}><ChatRules onAgree={() => { g.agree(); setRules(false); setStarting(true); }} /></View>
+      </Sheet>
     </>
   );
 }

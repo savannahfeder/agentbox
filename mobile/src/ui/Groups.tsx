@@ -4,7 +4,9 @@
 // as on the desktop (renderer/src/team/rooms/RoomChat.tsx).
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { AppState, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, TextInput, View } from 'react-native';
+import Constants from 'expo-constants';
 import { File, Paths } from 'expo-file-system';
+import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import type { Room, RoomMessage } from '../../../renderer/src/types';
@@ -273,6 +275,26 @@ function MessageSheet({ m, me, who, open, close, onReact, onThread, onEdit, onDe
   );
 }
 
+/** The rules, agreed once on this phone before the first chat opens (App Review 1.2). */
+export function ChatRules({ onAgree }: { onAgree: () => void }) {
+  const site = Constants.expoConfig?.extra?.cloud?.phoneSite?.replace(/\/+$/, '');
+  return (
+    <View style={{ paddingHorizontal: 32, gap: 14 }}>
+      <T style={{ fontFamily: font.medium, fontSize: 18, lineHeight: 23 }}>Chat rules</T>
+      <T style={{ fontSize: 15, lineHeight: 22, color: color.dim }}>Nothing abusive, hateful, threatening or explicit. Hold any message to report it or block the person who wrote it. We read reports within 24 hours and remove what breaks the rules, and whoever posted it.</T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, paddingTop: 4 }}>
+        <Pressable onPress={onAgree} accessibilityRole="button"
+          style={({ pressed }) => ({ height: 40, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
+          <T style={{ fontFamily: font.semibold, fontSize: 14.5 }}>I agree</T>
+        </Pressable>
+        {site ? <Pressable onPress={() => void WebBrowser.openBrowserAsync(`${site}/terms`)} accessibilityRole="link" hitSlop={8}>
+          <T style={{ fontSize: 14, color: color.dim, textDecorationLine: 'underline' }}>Terms</T>
+        </Pressable> : null}
+      </View>
+    </View>
+  );
+}
+
 /** A chat with one teammate, or a group of several, as on the desktop: only ever people on your team. */
 export function NewChatSheet({ open, close, mates, start }: { open: boolean; close: () => void; mates: { id: string; name: string }[]; start: (people: string[], name: string) => Promise<string | null> }) {
   const [picked, setPicked] = useState<string[]>([]);
@@ -310,6 +332,13 @@ export function NewChatSheet({ open, close, mates, start }: { open: boolean; clo
       )}
     </Sheet>
   );
+}
+
+function ChatRulesPage({ back, tabs, agree }: { back?: ReactNode; tabs?: ReactNode; agree: () => void }) {
+  return <>
+    <TopBar left={back} title="Groups" below={tabs} />
+    <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 80 }}><ChatRules onAgree={agree} /></View>
+  </>;
 }
 
 /** `tabs` are the inbox's tabs, drawn under the bar as the inbox draws them; opened from Chats, `onBack` goes back to it instead. */
@@ -359,11 +388,12 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
 
   const back = onBack ? <IconButton label="Back to Chats" onPress={onBack}><Back size={18} /></IconButton> : undefined;
   const startChat = async (picked: string[], name: string) => {
-    const out = await g.act('create', { people: picked, name, kind: 'group' });
+    const out = await g.act('create', { people: picked, name: filtered(name), kind: 'group' });
     if (!out.error && typeof out.value === 'string') g.setLast(out.value);
     return out.error;
   };
   const newChat = <NewChatSheet open={sheet === 'new'} close={() => setSheet(null)} mates={g.mates} start={startChat} />;
+  if (!g.agreed) return <ChatRulesPage back={back} tabs={tabs} agree={g.agree} />;
   if (!g.state.ready) {
     return <>
       <TopBar left={back} title="Groups" below={tabs} />
@@ -390,7 +420,8 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
 
   const mentionList = (body: string) => mentionsIn(body, [...people].map(([id, name]) => ({ id, name })));
   const send = async () => {
-    const words = text.trim();
+    const typed = text;
+    const words = filtered(text.trim());
     if ((!words && !files.length) || sending) return;
     setFailed(null);
     if (editing) {
@@ -406,7 +437,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
     setText(''); setFiles([]);
     const why = await g.send(room.id, body, root?.id ?? null, mentionList(words));
     setSending(false);
-    if (why) { setText(words); setFailed(why); }
+    if (why) { setText(typed); setFailed(why); }
   };
   const react = (m: RoomMessage, emoji: string, on: boolean) => { void g.act('react', room.id, m.id, emoji, on).then((o) => { if (o.error) c.say(o.error); }); };
   const reactOnce = (m: RoomMessage, emoji: string) => react(m, emoji, !(g.meId && m.reactions?.[emoji]?.includes(g.meId)));

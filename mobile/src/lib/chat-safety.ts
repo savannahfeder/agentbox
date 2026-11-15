@@ -6,6 +6,7 @@ import type { ReportAbout } from './report';
 
 export const BLOCKED_KEY = 'chats.blocked';
 export const REPORTED_KEY = 'chats.reported';
+export const RULES_KEY = 'chats.rules-agreed';
 
 const ids = (raw: string | null | undefined): string[] => {
   try {

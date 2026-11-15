@@ -8,7 +8,7 @@ import { readSettingsRows } from '../../../renderer/src/phone-rows';
 import { groupsOn, NO_GROUPS, phoneGroups } from '../../../renderer/src/phone-groups';
 import type { RoomsState } from '../../../renderer/src/types';
 import { isImageName } from '../../../renderer/src/attachments';
-import { BLOCKED_KEY, blockedFrom, REPORTED_KEY, roomsShown, withBlocked, withoutBlocked } from '../lib/chat-safety';
+import { BLOCKED_KEY, blockedFrom, REPORTED_KEY, roomsShown, RULES_KEY, withBlocked, withoutBlocked } from '../lib/chat-safety';
 import { LAST_GROUP_KEY, roomFileName } from '../lib/groups';
 import { appStore } from '../platform/persist';
 import { useCloud } from './cloud';
@@ -97,6 +97,9 @@ function useGroupsState() {
     setReportedRaw(next);
   }, []);
 
+  const [agreed, setAgreed] = useState(() => !!appStore.getItem(RULES_KEY));
+  const agree = useCallback(() => { appStore.setItem(RULES_KEY, String(Date.now())); setAgreed(true); }, []);
+
   const meId = cloud?.session()?.user.id ?? null;
   const rooms = useMemo(() => roomsShown(state.rooms, blocked, meId), [state.rooms, blocked, meId]);
   const shownState = useMemo(() => (rooms.length === state.rooms.length ? state : { ...state, rooms }), [state, rooms]);
@@ -113,7 +116,7 @@ function useGroupsState() {
 
   return {
     on, state: shownState, last, setLast, send, markRead, refresh, setWatching, fileOf, act, sendFiles,
-    blocked, block, reported, hideReported, mates,
+    blocked, block, reported, hideReported, mates, agreed, agree,
     unread: rooms.filter((r) => r.unread > 0).length,
     meId,
   };
