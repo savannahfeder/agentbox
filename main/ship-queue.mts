@@ -36,8 +36,9 @@ import type { GateAnswer, GateRequest, GateReply } from './memory-gate.mts';
 
 export const SHIP_LABEL = 'ship';
 const SHIP_MS = 20 * 60 * 1000;
-// The whole suite is about 3,000 files, and on a busy Mac it runs past 20 minutes.
-export const WHOLE_SUITE_SHIP_MS = 60 * 60 * 1000;
+// The whole suite is about 3,000 files, and with a dozen agents on the Mac it
+// ran past an hour.
+export const WHOLE_SUITE_SHIP_MS = 120 * 60 * 1000;
 // What scripts/ship.mjs says before a push the hook runs every test for.
 export const RUNS_EVERY_TEST = 'ship: the hook runs every test for this push';
 const KEEP = 4000;
