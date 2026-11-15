@@ -1372,6 +1372,7 @@ export class Supervisor {
   declare _traces: Map<string, { stamp: string; trace: ReturnType<typeof readDeadRunTrace> }> | undefined;
   declare _versionsLooked: Map<string, unknown> | undefined;
   declare _profilesKept: { at: number; list: ReturnType<typeof effectiveProfiles> } | undefined;
+  declare _pass: Map<string, unknown> | null | undefined;
   declare _reaching: Promise<unknown> | null | undefined;
   declare connections: SupervisorConnections | null | undefined;
   declare _resumeQueue: Set<string>;
@@ -6534,6 +6535,10 @@ export class Supervisor {
   // added for the cloud, and any sign-in going on. The usage file is read at
   // most every 30 seconds; the snapshot asks on every change.
   cloudStatus(handed?: WorkItem[]) {
+    return this._inOnePass(() => this._cloudStatusOf(handed));
+  }
+
+  _cloudStatusOf(handed?: WorkItem[]) {
     const config = readCloudConfig(process.env, this.config.home);
     const setUp = !!config;
     // Offered to a Mac whose app carries Agentbox Cloud's settings, until
@@ -7024,17 +7029,19 @@ export class Supervisor {
 
   // Set up, the engine offered, and this Mac's account of it signed in in the
   // cloud, working or resting at its limit; not one that must sign in again.
-  _cloudSignedInAtAll(engine: string = DEFAULT_ENGINE) {
+  _cloudSignedInAtAll(engine: string = DEFAULT_ENGINE): boolean {
     const which = engineOf(engine);
-    if (this.config.cloudRuns === false || !readCloudConfig(process.env, this.config.home)) return false;
-    if (!this.engineChoices().some((e) => e.id === which)) return false;
-    const now = Date.now();
-    // The account the cloud would run on, which is this Mac's or none.
-    const inUse = cloudLoginInUse(which, this._cloudAccountAsk(which, now));
-    if (!inUse) return false;
-    const state = cloudLoginState(inUse, { now });
-    // Resting at its limit, or a Codex sign-in being renewed: back soon.
-    return mayRunOn(state) || state === 'limited' || state === 'renew';
+    return this._onceInPass(`cloud-signed-in:${which}`, () => {
+      if (this.config.cloudRuns === false || !readCloudConfig(process.env, this.config.home)) return false;
+      if (!this.engineChoices().some((e) => e.id === which)) return false;
+      const now = Date.now();
+      // The account the cloud would run on, which is this Mac's or none.
+      const inUse = cloudLoginInUse(which, this._cloudAccountAsk(which, now));
+      if (!inUse) return false;
+      const state = cloudLoginState(inUse, { now });
+      // Resting at its limit, or a Codex sign-in being renewed: back soon.
+      return mayRunOn(state) || state === 'limited' || state === 'renew';
+    });
   }
 
   _maxCloud() {
@@ -8580,6 +8587,29 @@ export class Supervisor {
 
   /** `handed`: the threads a caller already read, so this reads none of its own. */
   status(handed?: WorkItem[]) {
+    return this._inOnePass(() => this._statusOf(handed));
+  }
+
+  // WHAT EVERY THREAD IN ONE PASS ASKS ALIKE IS ANSWERED ONCE IN IT. The
+  // window's snapshot asked whether this Mac is signed in to the cloud once per
+  // waiting thread, reading every login and the cloud's login files each time:
+  // 155 MB of every two minutes' garbage in main (heap profile, 2026-11-15).
+  _inOnePass<T>(run: () => T): T {
+    if (this._pass) return run();
+    this._pass = new Map();
+    try { return run(); } finally { this._pass = null; }
+  }
+
+  _onceInPass<T>(key: string, read: () => T): T {
+    const pass = this._pass;
+    if (!pass) return read();
+    if (pass.has(key)) return pass.get(key) as T;
+    const value = read();
+    pass.set(key, value);
+    return value;
+  }
+
+  _statusOf(handed?: WorkItem[]) {
     // One read of the threads for the whole answer: this runs for every
     // request the window makes.
     const readAt = Date.now();
