@@ -33,6 +33,8 @@ export function joinCause({ thread, cause, ask = '', causeId = null, isNew = fal
     kind: CAUSE_KIND,
     labels: ['founder', CAUSE_LABEL],
     priority: from?.priority ?? 5,
+    // Any agent can open one, so its lead waits for the person's reply.
+    status: 'blocked',
   }, { source: 'system' });
   // Two threads stuck at the same moment both find no open cause and both open
   // one (fourth Codex power test). The oldest is kept and the other closes itself.
