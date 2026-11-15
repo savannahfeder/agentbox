@@ -226,6 +226,7 @@ export interface ArtifactMark {
   do: 'note' | 'reply' | 'resolve' | 'reopen' | 'approve' | 'unapprove' | 'seen' | 'sent' | 'toagent' | 'edit';
   id?: string;
   file?: string;
+  v?: number;
   path?: string;
   place?: NotePlace;
   text?: string;
@@ -415,6 +416,8 @@ export interface ThreadTalk {
   at: number;
   /** A note's file version, and the note it opens at (a reply's is the note it answers). */
   file?: string;
+  /** The version number the note was written on, when it said. */
+  v?: number;
   note?: string;
   /** Whom a note or reply is for: the file's owner, whom it names, the writer of the note it answers. A comment is for the thread's owner. */
   to?: string[];

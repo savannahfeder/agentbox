@@ -325,7 +325,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     setSavingNotes((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), resolved: false, replies: [], saving: true, wait: !tagged, ...(pinned(place) ? { pin: nextPin } : {}) } as unknown as FileNote]);
     setWords(''); setDraftPlace(null); setWholeAsked(false); setAsking(null);
     setActiveId(id);
-    const out = await write({ do: 'note', id, file: version.id, place, text, wait: !tagged, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) })
+    const out = await write({ do: 'note', id, file: version.id, v: version.n, place, text, wait: !tagged, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) })
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
     if (failed(out, 'That comment did not save.')) {
