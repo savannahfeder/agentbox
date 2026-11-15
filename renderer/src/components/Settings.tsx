@@ -62,6 +62,8 @@ import { chord, chords } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
+import { IPHONE_APP_URL } from '../../../shared/phone-app.mts';
+import QRCode from 'qrcode';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
@@ -859,27 +861,38 @@ function PhoneProjectsPicker({ macShut }: { macShut: MacShut }) {
     </div>
   );
 }
+function PhoneAppGroup({ email, site }: { email?: string | null; site?: string | null }) {
+  const [qr, setQr] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    QRCode.toString(IPHONE_APP_URL, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((s) => { if (live) setQr(s); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const web = site?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? null;
+  return (
+    <Group id="phone-app" label="Get the app">
+      <div className="set-row set-phone-qr">
+        {qr && <img alt="QR code that opens Agentbox on the App Store" src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />}
+        <div className="set-row-text">
+          <div className="set-row-label">{Name} on the App Store</div>
+          <div className="set-row-desc">Scan with your phone's camera, then sign in {email ? <>as <b>{email}</b></> : `with your ${Name} account`}.</div>
+          <a className="set-ghost set-phone-store" href={IPHONE_APP_URL} target="_blank" rel="noreferrer">Open the App Store</a>
+        </div>
+      </div>
+      {web && <Row label="On Android" desc={<>Go to <code>{web}</code> in your phone's browser.</>} />}
+    </Group>
+  );
+}
+
 function MacShutGroup({ macShut }: { macShut: MacShut }) {
-  const site = macShut.site?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? null;
   return (
     <>
+      <PhoneAppGroup email={macShut.email} site={macShut.site} />
       <Group id="phone-mac-shut" label="On your phone">
         <PhoneConnection macShut={macShut} />
         <Row label="Projects on your phone" desc="A copy of their threads is kept in your account, so your phone can read and reply with this computer closed.">
           <PhoneProjectsPicker macShut={macShut} />
         </Row>
-      </Group>
-      <Group id="phone-site" label="Open on your phone">
-        {site && macShut.siteQr ? (
-          <div className="set-row set-phone-qr">
-            <img alt={`QR code that opens ${site} on a phone`} src={`data:image/svg+xml;utf8,${encodeURIComponent(macShut.siteQr)}`} />
-            <div className="set-row-desc">
-              Scan with your phone's camera, or go to <code>{site}</code>. Sign in with this account, then add the page to your home screen and it opens like an app.
-            </div>
-          </div>
-        ) : (
-          <Row label="Not set up yet" desc="The phone site has no address yet." />
-        )}
       </Group>
     </>
   );
@@ -910,13 +923,14 @@ function WebAccountPage({ web, feedback, onPhoneProjects }: { web: PhoneWeb; fee
   );
 }
 
-function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { onFeedback?: () => void; macShut?: MacShut; onSignIn?: () => void; web?: PhoneWeb; onPhoneProjects?: ReactNode }) {
+export function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { onFeedback?: () => void; macShut?: MacShut; onSignIn?: () => void; web?: PhoneWeb; onPhoneProjects?: ReactNode }) {
   const feedback = onFeedback && onPhone() ? <PhoneFeedbackGroup onFeedback={onFeedback} /> : null;
   if (web) return <WebAccountPage web={web} feedback={feedback} onPhoneProjects={onPhoneProjects} />;
   if (!macShut) {
     return (
-      <Page title="Phone">
-        <Group>
+      <Page title="Phone" lede="Read and reply from your phone, even with this computer closed.">
+        <PhoneAppGroup />
+        <Group id="phone-mac-shut" label="On your phone">
           <Row label="Sign in to use your phone" desc="Then your phone can read and reply with this computer closed.">
             {onSignIn && <button type="button" className="set-ghost" onClick={onSignIn}>Sign in</button>}
           </Row>
