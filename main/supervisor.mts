@@ -8590,10 +8590,8 @@ export class Supervisor {
     return this._inOnePass(() => this._statusOf(handed));
   }
 
-  // WHAT EVERY THREAD IN ONE PASS ASKS ALIKE IS ANSWERED ONCE IN IT. The
-  // window's snapshot asked whether this Mac is signed in to the cloud once per
-  // waiting thread, reading every login and the cloud's login files each time:
-  // 155 MB of every two minutes' garbage in main (heap profile, 2026-11-15).
+  // What every thread in one status pass asks alike (is this Mac signed in to
+  // the cloud) is read once in it, not once per thread.
   _inOnePass<T>(run: () => T): T {
     if (this._pass) return run();
     this._pass = new Map();
