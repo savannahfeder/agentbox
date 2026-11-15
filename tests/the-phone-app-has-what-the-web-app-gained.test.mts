@@ -28,7 +28,7 @@ describe('an account no computer has joined', () => {
   it('is drawn in place of the inbox, with a way to another account', () => {
     const src = read('mobile/src/app/index.tsx');
     expect(read('mobile/src/state/cloud.tsx')).toMatch(/phoneConnectState\(\{ signedIn, started: !read\.first/);
-    expect(src).toMatch(/if \(c\.connect\) return <ComputerWait email=\{c\.connect\.email\} signOut=\{c\.signOut\} \/>/);
+    expect(src).toMatch(/if \(c\.connect && !skipped\) return <ComputerWait email=\{c\.connect\.email\} signOut=\{c\.signOut\} skip=\{skip\} \/>/);
     expect(read('mobile/src/ui/Onboarding.tsx')).toMatch(/Use another account/);
   });
 });
