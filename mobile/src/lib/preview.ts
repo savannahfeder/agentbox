@@ -353,7 +353,8 @@ export function previewCloud(now = () => Date.now()) {
     const stuck = rows.threads.find((t) => t.item === 'w-2b3c4d5e6f');
     if (stuck) rows.threads.push({ ...stuck, item: 'w-2b3c4d5e70', snapshot: { ...stuck.snapshot, item: { ...stuck.snapshot.item, id: 'w-2b3c4d5e70', engine: 'codex' } as WorkItem } });
   }
-  let signedIn = scene !== 'signed-out' && !walking;
+  // `?scene=ran-out`: the sign-in page after the cloud refused to renew the sign-in.
+  let signedIn = scene !== 'signed-out' && scene !== 'ran-out' && !walking;
   const settings = previewSettings(now());
   // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.
   if (scene === 'codex') (settings.settings.workspace as PreviewWorkspace).engine = 'codex';
@@ -484,6 +485,7 @@ export function previewCloud(now = () => Date.now()) {
     async finishGoogle() { signedIn = true; signedInAt = now(); return session()!; },
     async askPasswordReset() {},
     resetAsked: () => false,
+    lapsed: () => (scene === 'ran-out' && !signedIn ? 'you@example.com' : null),
     async finishReset() { signedIn = true; signedInAt = now(); return session()!; },
     async setPassword() {},
     signOut() { signedIn = false; },

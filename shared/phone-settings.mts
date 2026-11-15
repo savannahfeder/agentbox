@@ -123,9 +123,14 @@ interface CodexAccountModel {
   email?: string | null;
   name?: string | null;
   plan?: string | null;
+  planNamed?: boolean;
   signedIn?: boolean;
   chosen?: boolean;
 }
+
+/** A plan id with no proper name is Codex's word, quoted, as the desktop's `accountSay` says it. */
+const codexPlanLine = (a: CodexAccountModel): string | null =>
+  !a.plan ? null : a.planNamed === false ? `Codex says “${a.plan}”` : a.plan;
 
 /** The window's own IPC channel for a change, and what it is handed: an object, or a bare value such as Pause's boolean. */
 export type SettingRoute = [string, unknown];
@@ -477,7 +482,7 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
         usage: usageFor(model.usage?.claude, a.profile),
       })),
       codexAccounts: (w.codex?.accounts ?? []).map((a) => ({
-        id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: a.plan ?? null, signedIn: !!a.signedIn, chosen: !!a.chosen,
+        id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: codexPlanLine(a), signedIn: !!a.signedIn, chosen: !!a.chosen,
         usage: usageFor(model.usage?.codex, a.profile),
       })),
       // Not `source`: it names the file on this computer.
