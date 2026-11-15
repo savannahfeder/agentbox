@@ -2,7 +2,7 @@
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mts';
 import { teammateIdOf } from '../../shared/teammates.mts';
-import { answerSettled, filedByThePerson, wakesItselfAt } from '../../shared/answers.mts';
+import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../../shared/answers.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
@@ -478,6 +478,12 @@ export function withdrawReply(statusWhenReplied: string): { answer: string; stat
 // A reply lifts a reminder, which only hides the row. A moment to run is left
 // alone: the reply runs now anyway (`wordWaits`, shared/work-items.mts) and the
 // moment stays for the run it was set for.
+/** When the window treats a thread's work as due: its moment, unless a reply
+ *  after the moment is running now, as the supervisor does (`isDue`). */
+export function deferredUntil(i: Parameters<typeof wordWaits>[0] & { runAt?: number }): number {
+  return wordWaits(i) ? 0 : i.runAt ?? 0;
+}
+
 export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
   return (i.snoozedUntil ?? 0) > now;
 }

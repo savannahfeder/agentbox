@@ -13,8 +13,11 @@
 .app.home-shown > .topbar { visibility: hidden; border-bottom-color: transparent; }
 .app.sky-shown .list-pane, .app.sky-shown .list-pane .th-table { background: transparent; }
 
-.hm-page { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: flex; justify-content: center; padding: clamp(24px, 9vh, 104px) 32px 40px; box-sizing: border-box; }
-.hm-col { width: 760px; max-width: 100%; display: flex; flex-direction: column; }
+.hm-page { position: relative; z-index: 1; height: 100%; overflow-y: auto; display: flex; justify-content: center; padding: 24px 32px 40px; box-sizing: border-box; }
+/* min-height: in a shorter window the page scrolls rather than squeeze the box shut. */
+.hm-col { width: 760px; max-width: 100%; display: flex; flex-direction: column; min-height: 660px; }
+/* The room above the greeting, given up first when a long message needs it. */
+.hm-col::before { content: ''; flex: 0 1000 clamp(0px, calc(9vh - 24px), 80px); }
 .hm-hello { margin: 0; font-size: 30px; line-height: 36px; font-weight: 500; letter-spacing: -0.012em; color: var(--text); }
 
 .hm-glass {
@@ -56,8 +59,18 @@
   border-color: rgba(30, 22, 36, .12); box-shadow: inset 0 1px 0 #fff, 0 12px 36px rgba(30, 30, 60, .08); }
 :root[data-theme="light"] .hm-start .tc-card.tc-inline:focus-within { border-color: rgba(30, 22, 36, .2); }
 
-.hm-two { display: grid; grid-template-columns: 1.35fr 1fr; gap: 22px; margin-top: 24px; }
-.hm-card { display: flex; flex-direction: column; height: 300px; min-width: 0; overflow: hidden; }
+/* A long message grows the box above. The cards give it room down to three
+   rows, then the words scroll inside the box, so neither runs past the
+   window's foot. */
+.hm-col > * { flex: none; }
+.hm-col > .hm-start { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.hm-start .tc-card.tc-inline { display: flex; flex-direction: column; min-height: 0; }
+.hm-start .tc-card.tc-inline > * { flex: none; }
+.hm-start .tc-inline .tc-text { flex: 0 1 auto; min-height: 74px; max-height: 30vh; }
+.hm-two { display: grid; grid-template-columns: 1.35fr 1fr; gap: 22px; margin-top: 24px; max-height: 300px; min-height: 240px; }
+/* Weighted so the cards give up their room before the words do. */
+.hm-col > .hm-two { flex: 1 100 300px; }
+.hm-card { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .hm-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px 12px; border-bottom: 1px solid rgba(255, 255, 255, .07); font-size: 14px; }
 .hm-head .t { color: var(--text); font-weight: 500; }
 .hm-head .t em { font-style: normal; font-weight: 400; color: var(--text-faint); margin-left: 8px; font-variant-numeric: tabular-nums; }
@@ -100,7 +113,13 @@
 :root[data-theme="light"] .hm-bars i.t { background: rgba(30, 22, 36, .72); }
 :root[data-theme="light"] .hm-bars i.z { background: rgba(30, 22, 36, .06); }
 
-@media (max-width: 980px) { .hm-two { grid-template-columns: 1fr; } }
+/* Stacked, the cards are taller than any window, so nothing shrinks and the page scrolls. */
+@media (max-width: 980px) {
+  .hm-two { grid-template-columns: 1fr; max-height: none; }
+  .hm-col > .hm-two, .hm-col > .hm-start { flex: none; }
+  .hm-col::before { flex-shrink: 0; }
+  .hm-card { height: 300px; }
+}
 
 /* Settings, Appearance: a tile is the sky on a small card, the way the window wears it. */
 .sky-swatch { background: var(--look-dark-page); }

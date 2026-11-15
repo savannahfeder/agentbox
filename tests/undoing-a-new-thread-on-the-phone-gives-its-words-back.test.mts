@@ -34,8 +34,9 @@ describe('Undo on a new thread sent from the phone', () => {
   it('is asked for by the New thread form, and the New thread page opens again with it', () => {
     const form = fs.readFileSync(new URL('../mobile/src/ui/NewThreadForm.tsx', import.meta.url), 'utf8');
     const send = form.slice(form.indexOf('const sendNow = async'), form.indexOf('// Busy is drawn a frame late'));
-    expect(send).toMatch(/const undone = \(\) => \{ if \(draft\.restore\(sending\)\) reopen\?\.\(\); \};/);
-    expect(send).toMatch(/c\.send\(\{ kind: 'new'[^\n]*, null, \{ undone \}\);/);
+    expect(send).toMatch(/const undone = \(\) => \{ if \(draft\.restore\(sending\.draft\)\) reopen\?\.\(\); \};\s*await deliver\(c, sending, undone\);/);
+    const deliver = form.slice(form.indexOf('async function deliver'), form.indexOf('/** Everything the form holds'));
+    expect(deliver).toMatch(/c\.send\(\{ kind: 'new'[^\n]*, null, \{ undone \}\);/);
     const page = fs.readFileSync(new URL('../mobile/src/app/new.tsx', import.meta.url), 'utf8');
     expect(page).toMatch(/useNewThread\(close, \(\) => router\.push\('\/new'\)\)/);
   });

@@ -84,7 +84,7 @@ describe('the note box', () => {
     expect(side).not.toMatch(/type="file" accept=/);
   });
   it('marks every note it writes to wait for Send', () => {
-    expect(side).toMatch(/mark: \{ do: 'note', id, file: version\.id, place, text, wait: true/);
+    expect(side).toMatch(/mark: \{ do: 'note', id, file: version\.id, v: version\.n, place, text, wait: true/);
     expect(side).toMatch(/mark: \{ do: 'toagent', on \}/);
   });
   it('lifts attached files out of a note to draw as chips, leaving pictures and other links', () => {
