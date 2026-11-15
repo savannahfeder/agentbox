@@ -8,7 +8,7 @@ import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type Parsed
 import { rowTitle } from '../../../renderer/src/list-rules';
 import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
 import { askHeading } from '../../../renderer/src/ask-line';
-import { phoneHistory, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
+import { phoneHistory, phoneRuns, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { recapFor, resultLeads } from '../../../renderer/src/recap';
 import { withoutTrailingWork } from '../../../renderer/src/trailing-work';
@@ -60,7 +60,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   // Taken, and not in the thread's copy yet: sent, and drawn until the copy has it.
   const sentAt = new Set(mine.filter((w) => w.sent).map((w) => w.at));
   const session = view.running.find((r: { itemId: string; product: string }) => r.itemId === id && r.product === product) ?? null;
-  const built = itemThread(lines, [], null, { whole, pending, me });
+  const built = itemThread(lines, phoneRuns(rows, product, id, view.aliases), null, { whole, pending, me });
   // The offer's own list comes out of the text while it is drawn as buttons
   // (Focus.tsx `cleanMessage`); "## Gist" is a heading old workers wrote.
   const live = offerIsLive(item);

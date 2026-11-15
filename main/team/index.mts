@@ -39,7 +39,9 @@ import QRCode from 'qrcode';
 import { createPhoneInbox } from '../phone-inbox.mts';
 import type { PhoneBackendCalls, PhoneHistoryLine, PhoneInboxOptions, PhoneItem } from '../phone-inbox.mts';
 import { PHONE_UNDO_HOLD_MS } from '../../shared/phone-undo.mts';
-import { SNAPSHOT_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mts';
+import { SNAPSHOT_LIMITS, RUN_LIMITS, phoneProjectsOf, phoneEligible } from '../../shared/phone-snapshot.mts';
+import { readRunTails } from '../run-traces.mts';
+import { machineryPath } from '../store/home.mts';
 import { createRooms } from './rooms.mts';
 import { isOnTeam } from '../../shared/rooms-on.mts';
 import { noticeEndedWaits } from './waits.mts';
@@ -722,6 +724,11 @@ export function createTeamService({
       },
       listItems: (slug) => { const p = productOf(slug); try { return p ? disk.readWorkItems(p.dir) : []; } catch { return []; } },
       historyOf: (slug, id, { all = false }: { all?: boolean } = {}) => { try { return store.readHistory(slug, id, { max: all ? Number.MAX_SAFE_INTEGER : SNAPSHOT_LIMITS.lines * 4 }); } catch { return []; } },
+      runsOf: (slug, id) => {
+        const p = productOf(slug);
+        if (!p?.dir || !/^[\w-]+$/.test(id)) return [];
+        try { return readRunTails(machineryPath(p.dir, path.join('sessions', id)), { newest: RUN_LIMITS.runs, chars: RUN_LIMITS.chars }); } catch { return []; }
+      },
       apply: phone.apply,
       waitsOf: () => phone.waits?.() ?? null,
       liveOf: (slug, id) => phone.live?.(slug, id) ?? null,
