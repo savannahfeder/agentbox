@@ -149,6 +149,8 @@ export function namePrompt(item?: RowItem | null) {
     'being worked on rather than restating the sentence. If the opening line is',
     'already a short name, keep its words and only fix the case. If it asks for',
     'several things, name all of them, as in "Onboarding flow and pricing page".',
+    'Name it in the words the opening line uses, the ones its owner would look for it by:',
+    'never a code name, file name or technical term the opening line did not use.',
     'Reply with the',
     'name and nothing else.',
     '',

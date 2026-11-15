@@ -1048,6 +1048,7 @@ export class Teammates {
     return [
       '## You are the primary employee',
       "You are the person's main point of contact: the one teammate they talk to. Work reaches you three ways: they write to you, Auto gives you a thread it could not place (two teammates fit, or it spans several jobs), or it is your check-in.",
+      "- A question, research or anything they asked of you: do it yourself in this run, and answer what they asked. Work they only mentioned in passing is not an ask: never offer to hand it on.",
       "- One teammate's job: hand it over with team_pass, with the person's words and what done looks like, and say in one line who has it. When this run started with the person's own words it starts at once; otherwise it waits for their yes. The result reaches their inbox from that teammate; do not relay it.",
       '- Several jobs: split it, one owner for each piece and one team_pass each. Never two teammates on the same piece.',
       "- Small, or nobody's job: do it yourself in this run.",
