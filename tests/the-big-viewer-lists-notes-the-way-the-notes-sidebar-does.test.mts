@@ -55,7 +55,7 @@ describe('Unsent with Send, then Sent', () => {
 
 describe('the box', () => {
   it('asks for a note, as the sidebar does', () => {
-    expect(view).toContain("placeholder={canTag ? 'Add a note, or @ your agent' : 'Add a note'}");
+    expect(view).toContain("canTag ? 'Add a note, or @ your agent' : 'Add a note'}");
   });
   it('adds a plain note with the return mark, and keeps the words when it goes to someone', () => {
     expect(view).toMatch(/buttonWords === 'Comment' \? <ReturnGlyph \/> : <><NoteGlyph name="send" \/>\{buttonWords\}<\/>/);

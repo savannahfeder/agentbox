@@ -59,9 +59,9 @@
 // without it, and only when both looks agree it is the same process;
 // /proc/<pid>/environ on Linux. A tag in a command's own words counts for
 // nothing. A program that renames itself (next-server) hides its environment
-// from `ps`, so a process under a tagged one belongs to the same task. Codex threads share one app-server and their commands carry
-// no task id yet, so a Codex task's leftovers are not found: coverage is
-// incomplete and the switch says so.
+// from `ps`, so a process under a tagged one belongs to the same task. Codex
+// threads share one app-server, so each thread's tag reaches its commands
+// through `shell_environment_policy.set` (main/codex-session.mts).
 
 import fs from 'node:fs';
 import os from 'node:os';

@@ -156,10 +156,15 @@ describe('two ends that hold the same key', () => {
   });
 });
 
+// The server's clock starts at the connection, before the client's, so with
+// equal timeouts the server usually gave up first and the client saw "peer
+// closed" instead of its own timeout. These tests are about the client's.
+const SERVER_WAITS = 5000;
+
 describe('a client', () => {
   it('writes nothing to a server that holds another key', async () => {
     const mine = challenge();
-    const { at, first } = await serve((sock) => authenticate(sock, { role: 'server', key: other, name: NAME, nonces: feed(mine.nonce), timeoutMs: 500 }));
+    const { at, first } = await serve((sock) => authenticate(sock, { role: 'server', key: other, name: NAME, nonces: feed(mine.nonce), timeoutMs: SERVER_WAITS }));
     const sock = await dial(at);
     await expect(authenticate(sock, { role: 'client', key, name: NAME, challenge: mine, timeoutMs: 500 })).rejects.toThrow(/no handshake within 500 ms/);
     expect(sock.written).toBe(0);
@@ -168,17 +173,17 @@ describe('a client', () => {
   });
 
   it('writes nothing to a server that does not know its nonce', async () => {
-    const { at } = await serve((sock) => authenticate(sock, { role: 'server', key, name: NAME, nonces: feed(crypto.randomBytes(32)), timeoutMs: 500 }));
+    const { at } = await serve((sock) => authenticate(sock, { role: 'server', key, name: NAME, nonces: feed(crypto.randomBytes(32)), timeoutMs: SERVER_WAITS }));
     const sock = await dial(at);
-    await expect(authenticate(sock, { role: 'client', key, name: NAME, challenge: challenge(), timeoutMs: 500 })).rejects.toThrow(/no handshake/);
+    await expect(authenticate(sock, { role: 'client', key, name: NAME, challenge: challenge(), timeoutMs: 500 })).rejects.toThrow(/no handshake within 500 ms/);
     expect(sock.written).toBe(0);
   });
 
   it('with another key refuses a server that holds the right one, and writes nothing', async () => {
     const mine = challenge();
-    const { at } = await serve((sock) => authenticate(sock, { role: 'server', key, name: NAME, nonces: feed(mine.nonce), timeoutMs: 500 }));
+    const { at } = await serve((sock) => authenticate(sock, { role: 'server', key, name: NAME, nonces: feed(mine.nonce), timeoutMs: SERVER_WAITS }));
     const sock = await dial(at);
-    await expect(authenticate(sock, { role: 'client', key: other, name: NAME, challenge: mine, timeoutMs: 500 })).rejects.toThrow(/no handshake/);
+    await expect(authenticate(sock, { role: 'client', key: other, name: NAME, challenge: mine, timeoutMs: 500 })).rejects.toThrow(/no handshake within 500 ms/);
     expect(sock.written).toBe(0);
   });
 

@@ -355,7 +355,7 @@ export default function Threads() {
   const setDisplay = (d: Display) => { setDisplayRaw(d); writeDisplay('inbox', d, appStore); };
   // Not kept between launches, as the desktop's filter is not.
   const [agent, setAgent] = useState<Harness | null>(null);
-  const order = useMemo(() => c.view.products.map((p) => p.slug), [c.view.products]);
+  const order = c.view.projectOrder;
   const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order, agent), [c.tabs, display, c.now, order, agent]);
   const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now, agent) : null), [teamMode, display, c.view, c.tabs, c.now, agent]);
   // Your card's board: your own threads, and what waits on you is Needs you, so it is no column (whose-board.ts).
