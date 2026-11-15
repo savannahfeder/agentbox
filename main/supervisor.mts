@@ -1397,6 +1397,7 @@ export class Supervisor {
   declare _lastFastExit: { at: number; cause: string; raw: string } | null | undefined;
   declare _lastStartAt: number | undefined;
   declare _lastParkSweep: number | undefined;
+  declare _sweeps: Map<string, { running: Promise<number>; next?: Promise<number> }> | undefined;
   declare _asleepQueue: { item: WorkItem; continuation: boolean }[] | undefined;
 
   declare _memoryLog: MemoryLog | undefined;
@@ -3453,7 +3454,7 @@ export class Supervisor {
     try { if (cloudWorkPending(taskFolderPath(base, item.id))) return null; } catch { /* no folder */ }
     try {
       const out = await folderJob('releaseTaskFolder', base, item.id);
-      await this.parkClosedFolders(product);
+      await this._sweepSoon(product);
       return out;
     } catch (error) {
       console.warn('zero: could not tidy the task folders:', (error as Error).message);
@@ -3687,8 +3688,34 @@ export class Supervisor {
     if (now - (this._lastParkSweep ?? 0) < Supervisor.PARK_SWEEP_MS) return;
     this._lastParkSweep = now;
     (async () => {
-      for (const product of this.store.listProducts()) await this.parkClosedFolders(product);
+      for (const product of this.store.listProducts()) await this._sweepSoon(product);
     })().catch((error) => console.warn('zero: could not put the finished folders away:', error.message));
+  }
+
+  /**
+   * ONE SWEEP OF A PROJECT AT A TIME, AND AT MOST ONE MORE BEHIND IT
+   * (2026-11-15). Every agent that finished used to start its own full sweep,
+   * and with 18 agents and 50 folders on her Mac one sweep was 32 s of
+   * `listTaskFolders` before it put a single folder away. They stacked up on the
+   * one folder thread faster than they drained, and new threads waited behind
+   * them for minutes. Now an agent finishing during a sweep shares a single
+   * follow-up with every other one that finishes meanwhile, so the folder it
+   * freed is still looked at, once. tests/finished-agents-share-one-tidy-up.
+   */
+  _sweepSoon(product: Product): Promise<number> {
+    const key = this.productFolder(product);
+    this._sweeps ??= new Map();
+    const now = this._sweeps.get(key);
+    if (now) {
+      now.next ??= now.running.catch(() => {}).then(() => this._sweepSoon(product));
+      return now.next;
+    }
+    const entry: { running: Promise<number>; next?: Promise<number> } = {
+      running: this.parkClosedFolders(product)
+        .finally(() => { if (this._sweeps?.get(key) === entry) this._sweeps.delete(key); }),
+    };
+    this._sweeps.set(key, entry);
+    return entry.running;
   }
 
   // A CLOSED THREAD WHOSE WORK NEVER REACHED MAIN COMES BACK, ONCE

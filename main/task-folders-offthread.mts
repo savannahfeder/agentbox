@@ -16,6 +16,15 @@
 // thread instead: `execFileSync` there blocks that thread and nothing else. One
 // thread, jobs in order, so folder work is serialised exactly as it was.
 //
+// A JOB SOMEBODY IS WAITING ON GOES FIRST (2026-11-15). The thread is still
+// fed one job at a time, so git never runs two at once, but the queue is kept
+// here rather than in the thread's mailbox, and `restoreTaskFolder` (a thread
+// whose agent cannot start until it answers) goes ahead of the tidying up.
+// Measured on her Mac with 18 agents and 50 folders: every agent that finished
+// queued a full sweep, `listTaskFolders` alone was 32 s of it, and new threads
+// sat behind them for minutes saying the copy "is taking much longer than it
+// should". tests/a-new-thread-gets-its-folder-before-the-tidying-up pins it.
+//
 // IF THE THREAD CANNOT START, THE JOB RUNS HERE, the old way. A packaged build
 // reads its code out of an asar archive, and a folder made slowly is better
 // than a task that never gets one.
@@ -41,10 +50,15 @@ const JOBS = new Set<string>([
   'inventoryWorktrees', 'strayWorktrees', 'pruneMissingWorktrees',
 ]);
 
+/** Jobs a thread is waiting on to start its agent: they skip the tidying up. */
+const SOMEBODY_WAITS = new Set<string>(['restoreTaskFolder']);
+
 let worker: Worker | null = null;
 let broken = false;
 let seq = 0;
 const waiting = new Map<number, FolderJobRequest>();
+/** Not yet handed to the thread, oldest first. */
+const queued: Array<FolderJobRequest & { id: number }> = [];
 
 function runHere({ name, args, resolve, reject }: FolderJobRequest) {
   try { resolve((folders[name] as (...args: unknown[]) => unknown)(...args)); } catch (error) { reject(error); }
@@ -53,9 +67,19 @@ function runHere({ name, args, resolve, reject }: FolderJobRequest) {
 function giveUp() {
   broken = true;
   worker = null;
-  const left = [...waiting.values()];
+  const left = [...waiting.values(), ...queued.splice(0)];
   waiting.clear();
   for (const job of left) runHere(job);
+}
+
+/** Hand the thread its next job if it has none: a waited-on one first, else the oldest. */
+function sendNext() {
+  if (!worker || waiting.size || !queued.length) return;
+  const urgent = queued.findIndex((job) => SOMEBODY_WAITS.has(job.name));
+  const [job] = queued.splice(urgent === -1 ? 0 : urgent, 1);
+  waiting.set(job.id, job);
+  worker.ref();
+  worker.postMessage({ id: job.id, name: job.name, args: job.args });
 }
 
 function thread(): Worker | null {
@@ -71,6 +95,7 @@ function thread(): Worker | null {
     const job = waiting.get(id);
     if (!job) return;
     waiting.delete(id);
+    sendNext();
     if (!waiting.size) worker?.unref();
     if (ok) job.resolve(value); else job.reject(new Error(error));
   });
@@ -93,9 +118,7 @@ export function folderJob<N extends FolderJobName>(name: N, ...args: Parameters<
     const job: FolderJobRequest = { name, args, resolve, reject };
     const w = thread();
     if (!w) { runHere(job); return; }
-    const id = ++seq;
-    waiting.set(id, job);
-    w.ref();
-    w.postMessage({ id, name, args });
+    queued.push({ ...job, id: ++seq });
+    sendNext();
   }) as Promise<Awaited<ReturnType<(typeof folders)[N]>>>;
 }
