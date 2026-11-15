@@ -35,6 +35,7 @@ describe('the next step under the notice', () => {
 describe('drawn', () => {
   it('under the notice\'s words, and the inbox passes it', () => {
     expect(notice).toMatch(/\{message\}\{!!next && <T[^>]*>\{` \$\{next\}`\}<\/T>\}/);
-    expect(inbox).toMatch(/<StatusNotice message=\{c\.status\} next=\{c\.statusNext\} \/>/);
+    expect(inbox).toMatch(/const notice = c\.status \? \{ message: c\.status, next: c\.statusNext \} : waitNotice\(c\.connect\);/);
+    expect(inbox).toMatch(/<StatusNotice message=\{notice\?\.message\} next=\{notice\?\.next\} \/>/);
   });
 });
