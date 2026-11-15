@@ -3755,17 +3755,6 @@ export default function App() {
     if (arrivals.length) window.zero?.notify?.(arrivals, inbox.filter((i) => i.product).map((i) => ({ id: i.id, product: i.product as string })));
   }, [snap, inbox, runningRows]);
 
-  // The corner tag's "Turn off…" lands on the switch that turns it off.
-  useEffect(() => {
-    const off = window.zero?.onOpenSettings?.(({ pane }) => {
-      setTeamOpen(false);
-      setSettingsPane(pane ?? null);
-      setSettingsVisit((n) => n + 1);
-      setSettingsOpen(true);
-    }) ?? (() => {});
-    return off;
-  }, []);
-
   useEffect(() => { setOptionSel(null); }, [focused?.id]);
 
   /* --------------------------- the answered card -------------------------- */

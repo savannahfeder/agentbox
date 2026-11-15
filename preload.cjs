@@ -413,12 +413,6 @@ contextBridge.exposeInMainWorld('zero', {
     ipcRenderer.on('zero:open-item', handler);
     return () => ipcRenderer.removeListener('zero:open-item', handler);
   },
-  // The corner tag's "Turn off…": opens Settings at the switch that does it.
-  onOpenSettings: (fn) => {
-    const handler = (_e, payload) => fn(payload);
-    ipcRenderer.on('zero:open-settings', handler);
-    return () => ipcRenderer.removeListener('zero:open-settings', handler);
-  },
   // The window moved to a screen that wants the other set of theme pictures.
   // Only main can see which physical display a window is on, and only main can
   // read a display's density without page zoom folded into it, so this is the
