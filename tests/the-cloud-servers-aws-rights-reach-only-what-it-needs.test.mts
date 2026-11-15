@@ -16,10 +16,10 @@ const resources = (p) => p.Statement.flatMap((s) => [].concat(s.Resource));
 const actions = (p) => p.Statement.flatMap((s) => [].concat(s.Action));
 
 describe('the links\' signer', () => {
-  it('reads and writes runs and sign-ins, and nothing else', () => {
+  it('reads and writes runs, sign-ins and kept files, and nothing else', () => {
     const p = signerPolicy(where);
     const objects = p.Statement.find((s) => [].concat(s.Action).includes('s3:GetObject'));
-    expect([].concat(objects.Resource).sort()).toEqual(['arn:aws:s3:::agentbox-cloud-x/logins/*', 'arn:aws:s3:::agentbox-cloud-x/runs/*']);
+    expect([].concat(objects.Resource).sort()).toEqual(['arn:aws:s3:::agentbox-cloud-x/files/*', 'arn:aws:s3:::agentbox-cloud-x/logins/*', 'arn:aws:s3:::agentbox-cloud-x/runs/*']);
     expect([].concat(objects.Action).sort()).toEqual(['s3:GetObject', 's3:PutObject']);
     expect(JSON.stringify(p)).not.toContain('ledger');
   });
@@ -27,10 +27,10 @@ describe('the links\' signer', () => {
   // So a link to a missing run file answers 404, not 403, and the Mac can
   // tell "not there" from "refused". Sign-ins are not listed since 2026-10-22
   // (tests/the-signers-key-works-only-inside-a-link-and-any-other-use-raises-an-alarm).
-  it('may list only runs', () => {
+  it('may list only runs and kept files', () => {
     const list = signerPolicy(where).Statement.find((s) => [].concat(s.Action).includes('s3:ListBucket'));
     expect(list.Resource).toBe('arn:aws:s3:::agentbox-cloud-x');
-    expect(list.Condition.StringLike['s3:prefix']).toEqual(['runs/*']);
+    expect(list.Condition.StringLike['s3:prefix']).toEqual(['runs/*', 'files/*']);
   });
 });
 
@@ -62,8 +62,8 @@ describe('the function\'s role', () => {
   it('lists only its ledger, and reads only the signer\'s secret', () => {
     const p = rolePolicy({ ...where, signerSecretArn: 'arn:aws:secretsmanager:us-east-1:000000000000:secret:agentbox-gateway-signer-AbCd' });
     const list = p.Statement.find((s) => [].concat(s.Action).includes('s3:ListBucket'));
-    // And runs, so a done.json not there yet answers 404, not 403.
-    expect(list.Condition.StringLike['s3:prefix']).toEqual(['ledger/*', 'runs/*']);
+    // And runs, so a done.json not there yet answers 404, not 403; and kept files, to weigh them.
+    expect(list.Condition.StringLike['s3:prefix']).toEqual(['ledger/*', 'runs/*', 'files/*']);
     const secret = p.Statement.find((s) => [].concat(s.Action).includes('secretsmanager:GetSecretValue'));
     expect(secret.Resource).toBe('arn:aws:secretsmanager:us-east-1:000000000000:secret:agentbox-gateway-signer-AbCd');
   });
@@ -75,9 +75,9 @@ describe('the function\'s role', () => {
     expect(actions(p).filter((a) => a.startsWith('bedrock-agentcore:')).sort()).toEqual(['bedrock-agentcore:InvokeAgentRuntime', 'bedrock-agentcore:StopRuntimeSession']);
   });
 
-  it('touches only runs, sign-ins and its ledger in our bucket, and no action or resource is a bare wildcard', () => {
+  it('touches only runs, sign-ins, kept files and its ledger in our bucket, and no action or resource is a bare wildcard', () => {
     const p = rolePolicy(where);
-    expect([...new Set(resources(p).filter((r) => r.startsWith('arn:aws:s3')))].sort()).toEqual(['', '/ledger/*', '/logins/*', '/runs/*', '/runs/*/calls/*', '/runs/*/done.json'].map((x) => `arn:aws:s3:::agentbox-cloud-x${x}`));
+    expect([...new Set(resources(p).filter((r) => r.startsWith('arn:aws:s3')))].sort()).toEqual(['', '/files/*', '/ledger/*', '/logins/*', '/runs/*', '/runs/*/calls/*', '/runs/*/done.json'].map((x) => `arn:aws:s3:::agentbox-cloud-x${x}`));
     expect(resources(p)).not.toContain('*');
     expect(actions(p).some((a) => a === '*' || a.endsWith(':*'))).toBe(false);
   });

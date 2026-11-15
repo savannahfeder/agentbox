@@ -129,7 +129,7 @@ describe('the tabs on the phone app', () => {
     expect(tabs).toMatch(/borderBottomWidth: 2, borderBottomColor: on === t\.id \? color\.accent/);
   });
   it('are 15pt, start where the title does, and scroll on a phone set larger still', () => {
-    expect(tabs).toMatch(/fontSize: 15,/);
+    expect(tabs).toMatch(/fontSize: 15 \* fit\.scale,/);
     expect(tabs).toMatch(/paddingLeft: size\.inset/);
     expect(tabs).toMatch(/<ScrollView horizontal/);
   });

@@ -1,6 +1,6 @@
 ---
 name: product-loop
-description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Codex plan (never Claude Code), paced to use about 90% of that plan's week by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
+description: Run Agentbox's own product loop. Synthetic power users test the phone app for a workday on the person's Codex plan (never Claude Code), stopping at 85% of that plan's week while more than two days are left and at 90% by its reset, and the run fixes and ships what they find under the project's own instructions. Use when asked for the product loop, the self-improving loop, a workday of testers, testing the phone or iOS app with synthetic users, or spending the Codex week on testing.
 ---
 
 # The product loop
@@ -31,10 +31,12 @@ iPhone's size, touch on: look, tap, type, swipe, shot, away) and `diary`. A
 tester is `codex exec` with every API key stripped, in Codex's sandbox with
 the local network open, or without the sandbox on a machine that refuses it
 (the Agentbox cloud). Each stretch after the first is told what was already
-logged. `--pace` keeps starting stretches while that login's week is behind
-its line, waits out a full 5-hour window, and stops at the target or at
-`--hours`. `report.md` in the run folder ranks every issue, worst first, with
-pictures.
+logged. `--pace` keeps starting stretches however far ahead of an even spread
+the week is. It stops at 85% while more than two days are left before the
+reset, runs up to the target in the last two days, waits out a full 5-hour
+window, and stops at `--hours`. The person set that rule on 2026-11-13: never
+hold a test day back for being ahead of pace. `report.md` in the run folder
+ranks every issue, worst first, with pictures.
 
 | flag | what | default |
 |---|---|---|
@@ -47,6 +49,8 @@ pictures.
 | `--focus` | what shipped and wants leaning on | none |
 | `--out` | the run folder; on the cloud, the thread's designs folder, which outlives the machine | a folder under `/tmp` |
 | `--detach` | start in the background, in a session of its own, logging to `workday.log` in the run folder | off |
+| `--iphone` | each tester gets an iPhone simulator on one of GitHub's Macs instead of the browser preview (below) | off |
+| `--build-url` | with `--iphone`, a simulator build (.tar.gz) to install instead of the one the run builds | none |
 
 In the Agentbox cloud Codex signs in with the login the cloud carries and
 runs without its sandbox, so the workday runs there as it does on a Mac.
@@ -95,14 +99,21 @@ real use before it is called done.
    It covers every screen, word and flow at an iPhone's size. It does not
    cover the iOS keyboard, safe areas as iOS draws them, native modules
    (speech, the keychain, Sign in with Apple) or alerts.
-2. **The iOS simulator, on the Mac.** Needs Xcode and a development build
-   (`npx expo run:ios` in `mobile/`, because of expo-dev-client and the
-   native modules). XcodeBuildMCP gives an agent the simulator's hands:
-   build and run, describe the screen, tap by label, type, swipe,
-   screenshot. Add it to Codex as an MCP server
-   (`[mcp_servers.XcodeBuildMCP]`, `command = "npx"`,
-   `args = ["-y", "xcodebuildmcp@latest"]`) and give the tester those tools
-   in place of `phone`. Mac only; not built into `workday.mjs` yet.
+2. **An iPhone simulator on GitHub's Macs** (`--iphone`). Free, because the
+   repository is public, and nothing runs on the person's computer but the
+   tester. Each tester gets a run of `.github/workflows/iphone-for-testers.yml`:
+   one iPhone 16 with the preview build of the app (the same made-up threads,
+   now drawn by iOS, with its keyboard, safe areas and alerts). The tester's
+   `phone` is `iphone.mjs`, with the same commands plus `home`; they reach
+   `iphone-host.mjs` on that Mac through a Cloudflare quick tunnel, and it
+   answers only the key `iphones.mjs` made, whose sha256 is all the public
+   run sees. The first run for a new version of `mobile/`, `renderer/` or
+   `shared/` builds the app there (allow up to an hour); later runs take it
+   from GitHub's cache in minutes. A run holds its iPhone for at most 5
+   hours and lets it go after 40 idle minutes; the workday starts another
+   when one has gone, and lets every one go when it ends.
+   By hand: `node $L/iphones.mjs start --out <folder>`, then
+   `PHONE_OUT=<folder> node $L/iphone.mjs look`, and `iphones.mjs stop`.
 3. **A real phone, through TestFlight.** Only for alerts reaching the lock
    screen and Sign in with Apple. A person or the outside QA tester does it.
 
@@ -141,5 +152,5 @@ end the day.
 >
 > If nothing in step 1 needs me, finish clean.
 
-`--pace` waits out a hold or a full 5-hour window inside its hours, so a
-day that starts ahead of the line still tests once the line passes it.
+`--pace` waits out the 85% hold or a full 5-hour window inside its hours,
+so a day that reaches either still tests once it clears.

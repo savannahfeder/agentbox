@@ -81,6 +81,8 @@ export const MODE_SENTENCE: Record<PermissionMode, string> = {
   bypassPermissions: 'Runs without asking: everything.',
   custom: `Set by hand in ${Name}’s settings file on this computer, so it is not changed here.`,
 };
+/** The custom sentence as a phone says it, where "this computer" would be the phone. */
+export const CUSTOM_MODE_FROM_PHONE = `Set by hand in ${Name}’s settings file on your computer, so it is not changed here.`;
 
 /**
  * Printed beside the six sentences everywhere they appear, because a mode is
