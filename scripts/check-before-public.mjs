@@ -176,20 +176,27 @@ export function checkPath(file) {
 // ---------------------------------------------------------------------------
 // What a push adds.
 
-/** Added lines per file between two commits, from a zero-context diff. */
+/** Added lines per file between two commits, from zero-context diffs: the net
+ * change, and every commit's own, because a line one commit adds and a later
+ * one removes is gone from the net change but still public in history. */
 function addedLines(base, head) {
-  const diff = git(['diff', '--no-color', '--no-ext-diff', '--no-renames', '-U0', base, head]);
+  const flags = ['--no-color', '--no-ext-diff', '--no-renames', '-U0'];
+  const net = git(['diff', ...flags, base, head]);
+  const each = git(['log', '-p', '--no-merges', '--format=', ...flags, `${base}..${head}`]);
   const files = new Map();
+  const seen = new Map();
   let file = null;
   let lineNo = 0;
-  for (const line of diff.split('\n')) {
+  for (const line of `${net}\n${each}`.split('\n')) {
     if (line.startsWith('+++ ')) {
       file = line === '+++ /dev/null' ? null : line.slice(6);
-      if (file && !files.has(file)) files.set(file, []);
+      if (file && !files.has(file)) { files.set(file, []); seen.set(file, new Set()); }
     } else if (line.startsWith('@@')) {
       lineNo = Number(/\+(\d+)/.exec(line)?.[1] ?? 0);
     } else if (file && line.startsWith('+')) {
-      files.get(file).push([lineNo++, line.slice(1)]);
+      const text = line.slice(1);
+      if (!seen.get(file).has(text)) { seen.get(file).add(text); files.get(file).push([lineNo, text]); }
+      lineNo++;
     }
   }
   return files;
@@ -259,6 +266,8 @@ material leaks into it easily. Flag ONLY things that should not be public:
 - pasted conversations or chat logs that carry private details (quoting a person's
   feedback or design notes is fine and allowed, unless it names them)
 - names, emails, phone numbers, addresses, or account ids of real people or customers
+- names of real companies or people being sold to, pitched or contacted (leads,
+  prospects), and the person's own sales, outreach or other work that is not this app
 - descriptions of someone's private data, finances, health, or private business
 - credentials, keys, tokens, passwords, internal URLs with secrets
 - paths or identifiers from a specific person's machine

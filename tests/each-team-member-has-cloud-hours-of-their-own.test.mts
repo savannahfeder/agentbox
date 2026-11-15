@@ -75,8 +75,8 @@ function setup({ members = [A, B], owners = [A], madeAt = MADE, start = MADE + H
 }
 
 describe('the trial', () => {
-  it('is 7 days and 50 hours a member; a seat is 400 hours', () => {
-    expect(TEAM).toEqual({ trialDays: 7, trialHoursPerMember: 50, hoursPerSeat: 400, dollarsPerSeat: 40 });
+  it('is 7 days and 50 hours a member; a seat is 400 hours and 100 GB of files', () => {
+    expect(TEAM).toEqual({ trialDays: 7, trialHoursPerMember: 50, hoursPerSeat: 400, dollarsPerSeat: 40, filesGBPerSeat: 100 });
   });
 
   it('runs a member with no plan on their own trial hours, not on their free hours', async () => {

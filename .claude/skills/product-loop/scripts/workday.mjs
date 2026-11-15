@@ -11,8 +11,8 @@
 // test's), and a tester session playing them for --minutes. Every stretch
 // after the first is told what was already logged, so testers confirm or go
 // elsewhere rather than file the same thing twice. --pace keeps starting
-// stretches while pace.mjs says the tester login's week is behind its line,
-// waits out a full 5-hour window, and stops at --hours. report.md ranks every issue.
+// stretches while pace.mjs says run, waits out a full 5-hour window or the
+// 85% hold, and stops at the target or --hours. report.md ranks every issue.
 //
 // Testers are always Codex, on the login codex-tester.mjs picks. --engine
 // external only writes each stretch's prompt to <person>/stretch-N.prompt.md
@@ -212,9 +212,6 @@ if (isMain) {
       }).listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}/`));
     });
   }
-  const sandboxed = engine === 'codex' && codexCanSandbox();
-  say(`${people.map((p) => p.name).join(', ')} on the phone app at ${url}, ${minutes}-minute stretches on ${engine === 'codex' ? `Codex at ${codexHome} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}` : 'testers started by hand'}. Evidence: ${root}`);
-
   const dirs = Object.fromEntries(people.map((p) => {
     const dir = path.join(root, p.slug);
     fs.mkdirSync(dir, { recursive: true });
@@ -248,6 +245,9 @@ if (isMain) {
       process.exit(1);
     });
   }
+  // Only once the handlers are in: whoever reads this line may stop the day straight away.
+  const sandboxed = engine === 'codex' && codexCanSandbox();
+  say(`${people.map((p) => p.name).join(', ')} on the phone app at ${url}, ${minutes}-minute stretches on ${engine === 'codex' ? `Codex at ${codexHome} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}` : 'testers started by hand'}. Evidence: ${root}`);
 
   let reached = [];
   try { reached = await (await import(path.join(REPO, 'scripts/phone-parity.mjs'))).newOnThePhone(7); } catch (err) { say(`could not read what reached the phone this week: ${err.message}`); }

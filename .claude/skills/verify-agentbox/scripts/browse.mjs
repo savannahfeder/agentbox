@@ -30,7 +30,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { launchChrome, connect, freeProfile, readModifiers } from './cdp.mjs';
+import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-types.mjs';
+
+rerunWithStripTypes(import.meta.url);
+// After the re-run: cdp.mjs reaches .mts, which a static import would load first.
+const { launchChrome, connect, freeProfile, readModifiers } = await import('./cdp.mjs');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, INSTANCE } = await import(path.join(here, 'live.mjs'));

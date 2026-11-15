@@ -167,3 +167,38 @@
 }
 .fp-sent-place:hover { color: var(--text); }
 .fp-sent-place svg { color: var(--text-faint); }
+
+/* The quiet total: a word beside the sort, its menu the ways to free the space. */
+.fp-total-box { position: relative; flex: none; }
+.fp-total {
+  height: 26px; padding: 0 9px; display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; border-radius: var(--artifact-corner-small);
+  font: inherit; font-size: 12.5px; color: var(--text-faint); white-space: nowrap; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.fp-total:hover { color: var(--text-dim); }
+.fp-total.is-on { color: var(--text); background: var(--wash-strong); }
+.fp-total-menu { width: 300px; max-height: none; right: 0; }
+.fp-menu-gap { height: 1px; margin: 5px 6px; background: var(--line); }
+.fp-menu-aside { margin-left: auto; padding-left: 16px; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* Kept in the cloud and off this computer: there, but faded until it is opened. */
+.fp-in-cloud { display: inline-flex; align-items: center; gap: 4px; vertical-align: top; }
+.fp-in-cloud svg { flex: none; }
+.is-in-cloud .fp-face > * { opacity: .45; }
+.is-in-cloud .fp-face { background: var(--wash); }
+
+/* Choosing files for the Trash. */
+.fp-choosing { min-height: 26px; }
+.fp-chosen-words { font-size: 13px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.fp-trash-go {
+  height: 26px; padding: 0 11px; display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: var(--artifact-corner-small);
+  background: var(--wash-strong); font: inherit; font-size: 12.5px; color: var(--text); cursor: pointer;
+}
+.fp-trash-go:disabled { color: var(--text-faint); background: none; cursor: default; }
+.fp-check {
+  position: absolute; top: 9px; right: 9px; z-index: 2; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .85); background: rgba(0, 0, 0, .35); color: #111; pointer-events: none;
+}
+.is-chosen .fp-check { background: #fff; border-color: #fff; }
+.is-chosen .fp-face { border-color: var(--text-dim); }
+.fp-line .fp-check { top: 13px; right: 12px; }
+.is-unmovable { opacity: .4; }

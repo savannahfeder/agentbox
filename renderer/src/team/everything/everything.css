@@ -180,6 +180,17 @@
 .pl-send > .rm-compose:not(.tq-compose) { margin: 8px 32px 24px 0; }
 .pl-first .rm-compose-input { display: block; width: 100%; border: 0; background: none; resize: none; outline: none; font: inherit; font-size: 15px; line-height: 22px; }
 .pl-first .rm-compose-bar { justify-content: flex-end; }
+/* An AI teammate's page: the task box, then what it has on. */
+.pl-work { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 0 24px 6px; }
+.pl-give .rm-compose-input { display: block; width: 100%; border: 0; background: none; resize: none; outline: none; font: inherit; font-size: 15px; line-height: 22px; }
+.pl-give .rm-compose-bar { justify-content: flex-end; }
+.pl-work .rm-compose.tq-compose { margin: 0; }
+.pl-work-h { display: flex; align-items: baseline; gap: 8px; margin: 28px 0 6px; font-size: 13px; font-weight: 500; color: var(--text-dim); }
+.pl-work-h b, .pl-work-fold b { font-weight: 400; color: var(--text-faint); }
+.pl-work-none { margin: 4px 0; font-size: 13.5px; color: var(--text-faint); }
+.pl-work-fold { display: inline-flex; align-items: center; gap: 7px; margin-top: 18px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
+.pl-work-fold:hover { color: var(--text-dim); }
+.pl-work-fold + .pl-rows { margin-top: 6px; }
 .pl-note { margin: 8px 2px 0; font-size: 12.5px; color: var(--text-faint); }
 @media (max-width: 860px) {
   .pl-head { flex-wrap: wrap; }

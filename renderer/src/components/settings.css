@@ -276,3 +276,8 @@
 .set-wait.on::before { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 7px 1px 0; background: var(--accent); vertical-align: middle; }
 .set-in-use { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
 .set-row-ctl .set-ghost + .set-ghost { margin-left: 8px; }
+
+/* Settings › Files: what is kept in the cloud against the plan's room. */
+.set-files-used { font-size: 13px; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.set-files-bar { display: inline-block; width: 164px; height: 2px; margin-left: 14px; vertical-align: middle; background: var(--line); }
+.set-files-bar i { display: block; height: 100%; background: var(--text-dim); }

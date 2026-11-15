@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveProduct } from './account.mts';
+import { personSaid, threadOfThisRun } from './repeats.mts';
 
 export function addProjectRule(dir: string, rule: string): string {
   const text = String(rule ?? '').trim().replace(/^[-*]\s+/, '');
@@ -19,7 +20,13 @@ export function addProjectRule(dir: string, rule: string): string {
   return file;
 }
 
-export function addRuleToProduct(product: string, rule: string) {
+const NOT_AGREED = 'No rule was added: every agent in that project reads it as the person\'s own instruction, so it needs their own words on this thread giving or agreeing to it, quoted exactly in askedBecause. If they did, send it again with their words; if not, ask them.';
+
+// Every agent there reads the rule as the person's, so a run on a thread
+// adds one only on their own words there, as a repeating task is made.
+export function addRuleToProduct(product: string, rule: string, askedBecause?: unknown, run: { env?: NodeJS.ProcessEnv | Record<string, string | undefined>; now?: number } = {}) {
+  const thread = threadOfThisRun(run);
+  if (thread !== undefined && !personSaid(thread, askedBecause)) throw new Error(NOT_AGREED);
   const project = resolveProduct(product);
   addProjectRule(project.dir, rule);
   return { product: project.id, added: rule.trim() };

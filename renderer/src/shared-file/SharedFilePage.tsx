@@ -7,8 +7,8 @@ import { AppMark } from '../components/AppMark';
 import { PdfPages } from '../components/PdfPages';
 import type { CloudClient } from '../cloud-rest';
 import {
-  blobType, commentWhen, fileBytes, filmOf, initialOf, isTable, mayComment, mayEdit, mayLookBack, postComment, readFilm, readComments, readHistory, readSharedFile,
-  pictureAddress, readVersion, removeComment, restoreVersion, saidOf, saveEdit, sharedLine, titleOf, versionLine, versionWhen,
+  blobType, commentWhen, fileBytes, filmOf, initialOf, isTable, mayComment, mayEdit, mayLookBack, readFilm, readComments, readHistory, readSharedFile,
+  pictureAddress, readVersion, restoreVersion, saidOf, saveEdit, sendComment, takeBackComment, sharedLine, titleOf, versionLine, versionWhen,
   type FileComment, type LinkVersion, type Rpc, type SharedFile, type Shown,
 } from './shared-file';
 import { SharedSignIn, type SignInFor } from './SharedSignIn';
@@ -258,11 +258,11 @@ export function SharedFilePage({ token, client, finishing = null }: {
               where={draftWords(kind, sendTo)} canClear={!!sendTo} onClear={() => { if (draft) setDraft(null); else setWholeFilm(true); }}
               onWriting={() => setHold((n) => n + 1)}
               post={async (words) => {
-                await postComment(asMe, token, words, sendTo);
+                const list = await sendComment(asMe, anyone, token, words, sendTo);
                 setDraft(null); setWholeFilm(false);
-                setComments(await readComments(anyone, token));
+                if (list) setComments(list);
               }}
-              remove={async (id) => { await removeComment(asMe, id); setComments(await readComments(anyone, token)); }}
+              remove={async (id) => { const list = await takeBackComment(asMe, anyone, token, id); if (list) setComments(list); }}
             />
           )}
           {signedIn && (
