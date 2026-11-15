@@ -89,7 +89,7 @@ export interface ThreadFileMark { id: string; owner: string; threadId: string; b
 export interface ThreadFileNews { owner: string; threadId: string; id: string; file: string; text: string | undefined; by: string | null; ts: number }
 
 /** Words left on a thread or on one of its files, for the person's page in the window. */
-export interface ThreadTalk { id: string; kind: 'comment' | 'note'; owner: string; threadId: string; by: string; text: string; at: number; file?: string; note?: string; to?: string[] }
+export interface ThreadTalk { id: string; kind: 'comment' | 'note'; owner: string; threadId: string; by: string; text: string; at: number; file?: string; v?: number; note?: string; to?: string[] }
 
 export interface SharedThreadView { shared: boolean; lines: SharedLine[]; earlier: number; product: string | null; dir: string | null }
 
@@ -791,8 +791,8 @@ export function createThreadShare({
       for (const [threadId, b] of built) if (readers.has(threadId)) fromLines(me, threadId, b.work.marks ?? [], false);
       for (const [owner, threadId] of localThreads()) fromLines(owner, threadId, readLocal(owner, threadId)?.marks ?? [], true);
 
-      const notes = new Map<string, { by: string; file: string }>();
-      for (const s of all) if (s.mark.do === 'note') notes.set(`${s.owner}:${s.threadId}:${s.mark.id}`, { by: s.by, file: s.mark.file });
+      const notes = new Map<string, { by: string; file: string; v?: number }>();
+      for (const s of all) if (s.mark.do === 'note') notes.set(`${s.owner}:${s.threadId}:${s.mark.id}`, { by: s.by, file: s.mark.file, v: s.mark.v });
       const seen = new Set<string>();
       for (const s of all) {
         const { mark } = s;
@@ -808,7 +808,8 @@ export function createThreadShare({
           to = to.filter((p) => p === me || may === null || may?.includes(p));
         }
         if (!to.length || (s.theirs && s.by !== me && !to.includes(me))) continue;
-        out.push({ id: s.id, kind: 'note', owner: s.owner, threadId: s.threadId, by: s.by, text: mark.text, at: s.at, file: answers?.file ?? mark.file, note: mark.do === 'note' ? mark.id : mark.on, to });
+        const v = answers ? answers.v : mark.do === 'note' ? mark.v : undefined;
+        out.push({ id: s.id, kind: 'note', owner: s.owner, threadId: s.threadId, by: s.by, text: mark.text, at: s.at, file: answers?.file ?? mark.file, ...(v ? { v } : {}), note: mark.do === 'note' ? mark.id : mark.on, to });
       }
       return out.sort((a, b) => a.at - b.at);
     },

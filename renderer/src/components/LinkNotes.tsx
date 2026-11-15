@@ -1,6 +1,7 @@
 // COMMENTS ON A FILE'S PUBLIC LINK, in the file's Notes beside its owner's own
-// notes, each at its place. Pressing one goes there; a reply is posted on the
-// link page. They are never sent to the agent: whoever has the link wrote them.
+// notes, each at its place. Pressing one goes there; its Reply points the note
+// box at the link page. They are never sent to the agent: whoever has the link
+// wrote them.
 import { useCallback, useEffect, useState } from 'react';
 import { api, type LinkComment } from '../api';
 import { Face } from '../team/people';
@@ -32,11 +33,11 @@ export function useLinkNotes(ask: { product: string; thread: string | null | und
   }, [read]);
   const reply = useCallback(async (text: string) => {
     if (!got) return false;
-    const out = await api.fileLinkComment({ token: got.token, text });
+    const out = await api.fileLinkComment({ token: got.token, text, ...(ask?.thread && ask.src ? { product: ask.product, thread: ask.thread, src: ask.src } : {}) });
     if (!out.ok) return false;
     setGot({ token: got.token, comments: out.comments ?? got.comments });
     return true;
-  }, [got]);
+  }, [got, key]); // eslint-disable-line react-hooks/exhaustive-deps
   return { comments: got?.comments ?? [], reply };
 }
 
@@ -55,33 +56,37 @@ export function linkNotesOnTheFile(comments: readonly LinkComment[], file: strin
 
 export const linkNoteId = (id: string) => `link-${id}`;
 
-export function LinkNotes({ comments, onGo, reply, activeId = null }: {
+/** The open quoted passages among these notes, as the page paints them. */
+export const quotedWords = (notes: readonly FileNote[]) =>
+  notes.flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : []));
+
+/** Whom the note box answers on the link page, once a comment's Reply is pressed. */
+export interface LinkReplyTo { id: string; name: string }
+
+export const LINK_REPLIED = 'Replied on the link page';
+
+export const linkReplyWords = (to: LinkReplyTo) => `Reply to ${to.name.split(/\s+/)[0]} on the link page`;
+export const linkReplyChip = (to: LinkReplyTo) => `To ${to.name.split(/\s+/)[0]} on the link page`;
+
+export function LinkNotes({ comments, onGo, onReply, replyingTo = null, activeId = null }: {
   activeId?: string | null;
   comments: LinkComment[];
   /** Go to a comment's place in the file, as pressing a note does. */
   onGo: (place: NotePlace, id: string) => void;
-  reply: (text: string) => Promise<boolean>;
+  /** Points the note box at the link page, answering this comment. */
+  onReply: (to: LinkReplyTo) => void;
+  replyingTo?: string | null;
 }) {
-  const [writing, setWriting] = useState(false);
-  const [words, setWords] = useState('');
-  const [sending, setSending] = useState(false);
   if (!comments.length) return null;
   const numbers = pinNumbers(comments);
-  const send = async () => {
-    const text = words.trim();
-    if (!text || sending) return;
-    setSending(true);
-    const ok = await reply(text);
-    setSending(false);
-    if (ok) { setWords(''); setWriting(false); }
-  };
   return <>
     <NotesSection word="On the link" />
     {comments.map((c) => {
       const at = placeLabel(c, numbers);
       const quote = c.place?.kind === 'quote';
       const who = c.byOwner ? 'You' : c.byName;
-      return <article key={c.id} className={`av-note is-link${activeId === linkNoteId(c.id) ? ' is-on' : ''}`}>
+      const on = activeId === linkNoteId(c.id) || replyingTo === c.id;
+      return <article key={c.id} className={`av-note is-link${on ? ' is-on' : ''}`}>
         <button type="button" className="av-note-go" disabled={!c.place} onClick={() => { if (c.place) onGo(c.place, linkNoteId(c.id)); }} aria-label={at ? `Go to ${at}` : who}>
           <span className="av-note-head">
             <Face person={null} name={who} me={c.byOwner} />
@@ -92,22 +97,12 @@ export function LinkNotes({ comments, onGo, reply, activeId = null }: {
           {at && quote && <span className="av-note-place">{at}</span>}
           <span className="av-note-text">{c.text}</span>
         </button>
+        {!c.byOwner && replyingTo !== c.id && <span className="av-note-acts">
+          <span className="av-note-btns">
+            <button type="button" className="av-note-act" onClick={() => onReply({ id: c.id, name: c.byName })}><NoteGlyph name="reply" />Reply</button>
+          </span>
+        </span>}
       </article>;
     })}
-    {writing ? (
-      <form className="av-reply-write av-link-reply" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-        <textarea rows={1} autoFocus value={words} placeholder="Reply on the link page" aria-label="Reply on the link page"
-          onChange={(e) => setWords(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
-        <span className="av-note-acts">
-          <button type="button" className="av-note-act" onClick={() => { setWords(''); setWriting(false); }}>Cancel</button>
-          <button type="submit" className="av-note-act is-strong" disabled={!words.trim() || sending}><NoteGlyph name="reply" />Reply</button>
-        </span>
-      </form>
-    ) : (
-      <span className="av-note-acts av-link-acts">
-        <button type="button" className="av-note-act" onClick={() => setWriting(true)}><NoteGlyph name="reply" />Reply on the link page</button>
-      </span>
-    )}
   </>;
 }
