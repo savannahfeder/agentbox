@@ -1,6 +1,7 @@
 import { currentActivity } from './agent-activity.mts';
 import { workerGitBrief, withWorkerGitBrief } from './worker-git.mts';
 import { harnessFor, supportsHarnessOperation } from './harnesses.mts';
+import { turnThatEnded, type EndedTurn } from '../shared/finished-turn.mts';
 import { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mts';
 import { NO_METERED_KEY } from './harnesses/claude.mts';
 export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mts';
@@ -966,6 +967,7 @@ const POLL_MS = 15_000;
 // How long a cloud session stays open after answering, for a reply that then
 // reaches it in seconds rather than after a new machine's two minutes.
 export const WAIT_FOR_NEXT_REPLY_MS = 10 * 60_000;
+const TURN_TAIL_BYTES = 256 * 1024;
 // How often an agent may restart its own thread on a model or effort it chose.
 const SWITCH_RESTARTS = 3;
 const SWITCH_WINDOW_MS = 30 * 60_000;
@@ -3222,6 +3224,25 @@ export class Supervisor {
     return harnessFor(engineOf(rec.engine)).transcript(this, rec) as string | null;
   }
 
+  // The tail is enough: a finished turn is the transcript's last few lines, and
+  // a Codex rollout can run to tens of megabytes.
+  _turnThatEnded(item: WorkItem, ref: TranscriptRef): EndedTurn | null {
+    const live = this._liveSessions?.[item.id];
+    const rec = live?.sessionId === ref.sessionId ? { ...ref, cwd: live.cwd, cloud: live.cloud } : ref;
+    try {
+      const file = this.transcriptFile(rec);
+      if (!file) return null;
+      const fd = fs.openSync(file, 'r');
+      try {
+        const size = fs.fstatSync(fd).size;
+        const len = Math.min(size, TURN_TAIL_BYTES);
+        const buf = Buffer.alloc(len);
+        fs.readSync(fd, buf, 0, len, size - len);
+        return turnThatEnded(buf.toString('utf8'), engineOf(rec.engine));
+      } finally { fs.closeSync(fd); }
+    } catch { return null; }
+  }
+
   /* `rememberPersonalSession` and `personalSessionFor` were a pair here: one
      map of itemId -> session id, so that a reply on a personal row resumed the
      session that wrote what she was replying to. `_rowSessions` does exactly
@@ -4026,7 +4047,22 @@ export class Supervisor {
   // start over, which is the restart this whole path exists to avoid.
   // `after` is the account trouble that stopped it (`_noteStoppedByAccount`),
   // null for a sleep or a restart.
-  resumeBrief(item: WorkItem, { continuation, product = null, after = null }: { continuation?: boolean; product?: Product | null; after?: string | null } = {}) {
+  resumeBrief(item: WorkItem, { continuation, product = null, after = null, ended = null }: { continuation?: boolean; product?: Product | null; after?: string | null; ended?: EndedTurn | null } = {}) {
+    // A turn that had already ended has no step part-way through, and being
+    // asked to check one is what made it redo its checks (F-216).
+    if (ended) {
+      const parts = [
+        `${NAME} restarted after your last turn on this work item had already ended.`,
+        'Nothing was cut off, and this is that same session. Your answer was:',
+        '',
+        ended.text,
+        '',
+        'Do not re-read files, re-run checks or redo any step. Reply with that same',
+        'answer, word for word, and end your turn.',
+      ];
+      if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
+      return parts.join('\n');
+    }
     const why = after === 'at-limit'
       ? ['Your session on this work item stopped when the plan it runs on reached its',
         'usage limit. The limit has reset.']
@@ -9994,7 +10030,8 @@ export class Supervisor {
     else {
       const kept = this._stoppedSessions?.[item.id];
       const after = resumeId && kept?.sessionId === resumeId ? kept.cause : null;
-      prompt = resumeId ? this.resumeBrief(item, { continuation, product, after }) : this.buildBrief(item, product, { continuation, engine });
+      const ended = resumeId && !after && !(continuation && item.answer) ? this._turnThatEnded(item, { sessionId: resumeId, engine, profile: resumeProfile }) : null;
+      prompt = resumeId ? this.resumeBrief(item, { continuation, product, after, ended }) : this.buildBrief(item, product, { continuation, engine });
     }
     // A BRANCH THE APP COULD NOT SHIP (main/ship-queue.mts) goes back to the
     // session that wrote it, and that is all it is told: it has everything
