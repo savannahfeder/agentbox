@@ -417,11 +417,11 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'stop_repeating_task',
-      description: 'Stop a repeating task for good, as Stop repeating on the person\'s own screen does: no more runs start, and runs already made are left as they are. Use it when the person asks for one to stop, be switched off or cancelled, rather than telling them to find it and stop it by hand. Name it as it is listed (such as "Daily security review") or by its id; a name not in this thread\'s product is looked for in every product, and a name two running tasks share is refused with both ids. On a thread it needs the person\'s own words there asking for it to stop, quoted in askedBecause.',
+      description: 'Stop a repeating task for good, as Stop repeating on the person\'s own screen does: no more runs start, and runs already made are left as they are. Use it when the person asks for one to stop, be switched off or cancelled, rather than telling them to find it and stop it by hand. Name it as it is listed (such as "Daily security review") or by its id; a name not in this thread\'s product is looked for in every product, and a name two running tasks share is refused with both ids. On a thread it needs the person\'s own words there asking for it to stop and naming it, quoted in askedBecause; on one of the task\'s own runs, words like "Switch it off" are enough.',
       schema: {
         which: z.string().describe('the task\'s name as it is listed, or its id (r-…)'),
         product: z.string().optional().describe('which product it is in, when you know; otherwise every product is searched'),
-        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to stop, quoted exactly, such as "Switch it off". Without them nothing is stopped'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to stop, quoted exactly, such as "Stop the daily security review". Without them nothing is stopped'),
       },
       run: (ask: StopRepeatingTask) => json(stopRepeatingTask(ask, thisRun())),
     },
