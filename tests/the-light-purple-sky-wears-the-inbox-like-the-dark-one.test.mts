@@ -1,8 +1,9 @@
 // The light purple sky wears the Inbox the way the dark purple one does
 // (w-bd2cd91875). Before, a light theme's Inbox had no sky at all, and the
 // "Light purple sky" read pink-red on Home: its core was [240, 90, 160]
-// against the dark sky's violet. Measured by drawing both in the app window.
-// The green light sky, the default for anyone in light, stays off the Inbox.
+// against the dark sky's violet. A pale lilac redo still read "pink and fake":
+// its soft glow and dots faded toward white went pastel. Measured by drawing
+// each in the app window. The green light sky stays off the Inbox.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { skyTheme, wearsInboxSky } from '../renderer/src/home/sky.ts';
@@ -24,19 +25,24 @@ describe('the light purple sky', () => {
     expect(app).toMatch(/const skyOnPlace = wearsInboxSky\(sky\) && !onPhone\(\)/);
   });
 
-  it('is violet, not pink', () => {
-    for (const c of [lilac.art.palette.core, lilac.art.palette.halo]) {
-      expect(hue(c)).toBeGreaterThan(240);
+  it('is a deep purple, not pink', () => {
+    for (const c of [lilac.art.palette.core, lilac.art.palette.halo, lilac.art.palette.hot]) {
+      expect(hue(c)).toBeGreaterThan(250);
       expect(hue(c)).toBeLessThan(300);
     }
-    expect(hue([240, 90, 160])).toBeGreaterThan(300); // the old pink core fails the same bound
+    expect(hue([240, 90, 160])).toBeGreaterThan(300); // the first light purple's core fails the same bound
+    expect(lilac.art.lightDepth).toBeLessThanOrEqual(130);
   });
 
-  it('draws on a pale lilac card the sky fades into', () => {
-    expect(lilac.card).toBe(lilac.art.bg);
-    expect(lilac.art.lightBg).toEqual([247, 245, 252]);
-    expect(css).toMatch(/\[data-sky-frame\] \.app\.workspace-layout::before \{ background: var\(--sky-card, /);
-    expect(app).toContain("root.style.setProperty('--sky-card', sky.card)");
+  it('has no soft glow or grey specks, and its faint dots stay deep', () => {
+    expect(lilac.art.glow ?? []).toEqual([]);
+    expect(lilac.art.grain).toBe(0);
+    expect(lilac.art.ink).toBe(true);
+  });
+
+  it('sits on the white card', () => {
+    expect(lilac.art.bg).toBe('#ffffff');
+    expect(css).not.toContain('--sky-card');
   });
 });
 

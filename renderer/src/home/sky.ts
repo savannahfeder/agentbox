@@ -16,12 +16,14 @@ export type SkyArt = {
   dim?: number; coreW?: number; hotW?: number; haloW?: number;
   grain?: number;
   light?: boolean; lightBg?: Rgb; lightStrength?: number; lightDepth?: number;
+  /** Light only: faint dots stay deep and thin out, rather than fading to pastel. */
+  ink?: boolean;
   glow?: Glow[];
 };
 
 export type SkyId = string;
 /** A theme of its own: the window's light or dark look, with this sky on Home and the Inbox. */
-export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; frame?: string; card?: string; inbox?: boolean };
+export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; frame?: string; inbox?: boolean };
 
 /** Dark skies all wear the Inbox's header; a light one only when its look was drawn for it. */
 export const wearsInboxSky = (sky: Sky | null): sky is Sky => !!sky && (sky.dark || !!sky.inbox);
@@ -44,21 +46,17 @@ const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyA
   bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165, ...over,
 });
 
-const LILAC = '#f7f5fc';
-
-// The sky fades into the card, the way dark fades to black. `frame` is the
-// window's background around the card, so the card stands off it.
+// The card is white and the sky fades into it, the way dark fades to black.
+// `frame` tints the window around the card so the white stands off it.
 const LIGHT_SKIES: Sky[] = [
   { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  // Lilac (design w-bd2cd91875/2):the dark purple sky's dots in violet on a pale lilac card.
-  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, card: LILAC,
-    frame: 'radial-gradient(circle at 16px 16px, rgba(80,55,150,.14) 1.2px, transparent 1.6px) 0 0 / 32px 32px, #e4dff0',
-    art: light(
-      { core: [185, 90, 235], hot: [250, 130, 200], halo: [115, 95, 235], ember: [165, 70, 205] },
-      [['rgba(150,125,245,0.28)', 260, 90, -120], ['rgba(205,140,240,0.32)', 120, 50, -10], ['rgba(245,160,215,0.36)', 34, 18, 0]],
-      { bg: LILAC, lightBg: [247, 245, 252], grain: 0.08, lightDepth: 185 }) },
+  // Aubergine (design w-bd2cd91875/7): deep plum ink with a violet seam. No glow and no
+  // grey grain, which read pastel and fake; the streak is tight like the dark one's.
+  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, frame: '#eae9ec', art: light(
+    { core: [90, 30, 130], hot: [140, 50, 220], halo: [60, 35, 110], ember: [80, 25, 100] }, [],
+    { ink: true, grain: 0, coreW: 0.024, hotW: 0.006, haloW: 0.11, lightDepth: 120 }) },
 ];
 
 /** Every sky theme, in the order Settings and Command-K show them. */
@@ -180,7 +178,7 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
           if (rnd() < grain * fadeK) { const m = 214 + rnd() * 22; g.fillStyle = `rgb(${m | 0},${(m - 7) | 0},${(m - 1) | 0})`; g.fillRect(x, y, dot, dot); }
           continue;
         }
-        const k = Math.min(1, mx / 255) * (art.lightStrength ?? 0.82);
+        const k = (art.ink ? 0.3 + 0.7 * Math.min(1, mx / 255) : Math.min(1, mx / 255)) * (art.lightStrength ?? 0.82);
         const sc = (art.lightDepth ?? 190) / mx;
         g.fillStyle = `rgb(${(LB[0] * (1 - k) + R * sc * k) | 0},${(LB[1] * (1 - k) + G * sc * k) | 0},${(LB[2] * (1 - k) + B * sc * k) | 0})`;
         g.fillRect(x, y, dot, dot);

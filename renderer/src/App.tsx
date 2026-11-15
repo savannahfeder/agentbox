@@ -3012,9 +3012,7 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
-    else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }
-    if (sky?.card) root.style.setProperty('--sky-card', sky.card); else root.style.removeProperty('--sky-card');
-  }, [sky]);
+    else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }  }, [sky]);
   // GLASS (Alpha features): only a window main/window-glass.mts can blur behind goes see-through.
   const glassOn = !!snap?.alpha?.glass && !onPhone();
   useEffect(() => {
