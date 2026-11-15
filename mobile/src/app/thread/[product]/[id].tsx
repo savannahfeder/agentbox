@@ -36,7 +36,7 @@ import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, summaryParts, type 
 import { madeThreadOf, phoneSlug, waitFacts } from '../../../../../renderer/src/phone-rows';
 import { madeHere } from '../../../../../shared/phone-snapshot.mts';
 import { replySender, type ReplyDeps } from '../../../lib/thread-reply';
-import { atEnd, keptPlace } from '../../../lib/thread-scroll';
+import { atEnd, followsHerSend, keptPlace, yoursIn } from '../../../lib/thread-scroll';
 import { appStore } from '../../../platform/persist';
 import { useCloud } from '../../../state/cloud';
 import { useComputerAgents } from '../../../state/computer-agents';
@@ -385,6 +385,18 @@ export default function ThreadScreen() {
   const footList = useRef(0);
   // A page opens on its name; only a conversation with no answer yet opens at its end, to follow it.
   const placedOn = useRef<string | null>(null);
+  // What she just sent, a reply or a pick, lands at the end: the page follows it there.
+  const yours = useRef<{ key: string; yours: number } | null>(null);
+  const yoursNow = thread ? yoursIn(thread.events) : null;
+  useEffect(() => {
+    if (yoursNow === null) return;
+    const key = `${product}/${id}`;
+    if (followsHerSend(yours.current, key, yoursNow)) {
+      resting.current = true;
+      scroll.current?.scrollToEnd({ animated: true });
+    }
+    yours.current = { key, yours: yoursNow };
+  }, [product, id, yoursNow]);
   const walked = useRef<{ product: string; id: string }[]>([]);
   const groups = useGroups();
 
