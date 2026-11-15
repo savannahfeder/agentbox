@@ -277,7 +277,7 @@ import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
-import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme } from './home/sky';
+import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sky';
 import { busiestFirst, engineLetter, engineName, finishedHello, greeting, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
@@ -3015,8 +3015,7 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
-    else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }
-  }, [sky]);
+    else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }  }, [sky]);
   // GLASS (Alpha features): only a window main/window-glass.mts can blur behind goes see-through.
   const glassOn = !!snap?.alpha?.glass && !onPhone();
   useEffect(() => {
@@ -7805,11 +7804,10 @@ export default function App() {
       follow: (n, card) => { changeFollows((was) => markTold(was, n)); openTeammateCard(card); },
     });
   };
-  // Light themes keep the Inbox plain; only dark ones wear its sky.
-  const skyOnInbox = !!sky && sky.dark && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+  const skyOnInbox = wearsInboxSky(sky) && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evPick;
   // Team and Files wear the same sky over their header.
-  const skyOnPlace = !!sky && sky.dark && !onPhone() && (chatsPlaceShown || filesShown);
+  const skyOnPlace = wearsInboxSky(sky) && !onPhone() && (chatsPlaceShown || filesShown);
   const tasksShown = teamMode && tasksOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const firstNameOf = (id: string) => team?.byId.get(id)?.name?.split(/\s+/)[0] ?? 'Someone';
   const tasksPage = (title?: string) => snap ? <TasksPage title={title} keys={!modal} me={team?.me ?? null} nameOf={firstNameOf} picked={tasksPick} onPicked={setTasksPick}
@@ -8319,7 +8317,7 @@ export default function App() {
                   running, which is when a row's line about what stopped it
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
-              {homeShown && sky && <SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />}
+              {homeShown && sky && <SkyBackdrop art={sky.home ?? sky.art} from={sky.dark || sky.home ? 40 : 150} span={sky.dark || sky.home ? 300 : 240} />}
               {skyOnInbox && sky && <InboxSky art={sky.art} />}
               {skyOnPlace && sky && <InboxSky art={sky.art} />}
               {homeShown ? (

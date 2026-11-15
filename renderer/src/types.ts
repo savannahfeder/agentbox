@@ -1739,7 +1739,7 @@ declare global {
       // The thread on screen, or null anywhere that is not one thread. Optional:
       // a preload from before this channel existed simply never says.
       looking?(p: { product: string | null; id: string | null }): Promise<boolean>;
-      refreshUsage?(p?: { engine?: 'claude' | 'codex' }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
+      refreshUsage?(p?: { engine?: 'claude' | 'codex'; ask?: boolean }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
       accountUsage?(p: { refresh?: boolean; engine?: 'claude' | 'codex' }): Promise<{ readings: AccountUsageReading[] }>;
       // Whether a screen reader is running, which is what decides xterm's
       // accessibility tree. Optional: a preload from before this channel
