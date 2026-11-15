@@ -79,8 +79,8 @@ describe('the Feedback row', () => {
   });
 
   it('opens the feedback card in the App', () => {
-    expect(app).toContain('onFeedback={() => setFeedbackOpen(true)}');
-    expect(app).toMatch(/\{feedbackOpen && <FeedbackCard[^>]*onClose=\{\(\) => setFeedbackOpen\(false\)\}/);
+    expect(app).toContain("onFeedback={() => setFeedbackOpen('')}");
+    expect(app).toMatch(/\{feedbackOpen !== null && <FeedbackCard[^>]*onClose=\{\(\) => setFeedbackOpen\(null\)\}/);
   });
 });
 

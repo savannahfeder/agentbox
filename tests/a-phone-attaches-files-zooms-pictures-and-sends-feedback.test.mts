@@ -61,7 +61,7 @@ describe('on a phone, feedback', () => {
     const settings = read('renderer/src/components/Settings.tsx');
     expect(settings).toMatch(/<Group id="phone-feedback" label="Feedback">/);
     expect(settings).toMatch(/<PhonePage onFeedback=\{onFeedback\} /);
-    expect(read('renderer/src/App.tsx')).toMatch(/<Settings[\s\S]{0,200}onFeedback=\{\(\) => setFeedbackOpen\(true\)\}/);
+    expect(read('renderer/src/App.tsx')).toMatch(/<Settings[\s\S]{0,200}onFeedback=\{setFeedbackOpen\}/);
   });
   it('and its card says nothing of pasting, dropping or keys a phone does not have', () => {
     expect(last('.fb-hint', 'display')).toBe('none');
