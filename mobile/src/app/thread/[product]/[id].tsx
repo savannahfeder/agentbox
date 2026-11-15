@@ -413,7 +413,7 @@ export default function ThreadScreen() {
   }
   // Its place in Needs you, with the arrows that walk it (OneThingAtATime.tsx `QueueNav`).
   const here = { product: String(product), id: String(id) };
-  const inbox = shownTabs(c.tabs, readDisplay('inbox', appStore), c.now, c.view.products.map((p) => p.slug)).rows.inbox;
+  const inbox = shownTabs(c.tabs, readDisplay('inbox', appStore), c.now, c.view.projectOrder).rows.inbox;
   const inNeedsYou = new Set(inbox.map((r) => r.key));
   const asks = questionsForYou(c.team, c.teamPending)
     .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
