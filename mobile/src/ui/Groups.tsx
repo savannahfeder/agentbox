@@ -16,6 +16,7 @@ import { clockOf } from '../../../renderer/src/teammates/chat-lines';
 import { newLineAt, READ_AFTER_MS } from '../../../renderer/src/team/rooms/room-chat-rules';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import { bodyParts, chatRoots, dayWords, groupName, groupsInOrder, groupToOpen, onWords, peopleInOrder, pictureType, repliesTo, startsRun } from '../lib/groups';
+import { chatDraft, chatDraftKey, keepChatDraft } from '../lib/chat-drafts';
 import { reportAboutMessage, shownMessages } from '../lib/chat-safety';
 import { withPicked } from '../lib/attach';
 import { router } from '../lib/router';
@@ -356,7 +357,10 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
   const room = groupToOpen(rooms, g.last);
   const [sheet, setSheet] = useState<'groups' | 'people' | 'new' | 'attach' | null>(null);
   const [thread, setThread] = useState<string | null>(null);
-  const [text, setText] = useState('');
+  const draftKey = chatDraftKey(room?.id ?? '', thread);
+  const [text, setShown] = useState(() => chatDraft(draftKey));
+  useEffect(() => { setShown(chatDraft(draftKey)); }, [draftKey]);
+  const setText = (t: string) => { setShown(t); keepChatDraft(draftKey, t); };
   const [failed, setFailed] = useState<string | null>(null);
   const [acting, setActing] = useState<RoomMessage | null>(null);
   const [editing, setEditing] = useState<RoomMessage | null>(null);
@@ -434,7 +438,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
     if (editing) {
       const out = await g.act('edit', room.id, editing.id, words, { mentions: mentionList(words) });
       if (out.error) { setFailed(out.error); return; }
-      setEditing(null); setText('');
+      setEditing(null); setShown(chatDraft(draftKey));
       return;
     }
     setSending(true);
@@ -505,13 +509,13 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
           {editing && (
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingBottom: 6 }}>
               <T style={{ flex: 1, fontSize: 13, color: color.dim }}>Editing your message</T>
-              <Pressable onPress={() => { setEditing(null); setText(''); setFailed(null); }} accessibilityRole="button" hitSlop={8}><T style={{ fontSize: 13, color: color.dim, textDecorationLine: 'underline' }}>Cancel</T></Pressable>
+              <Pressable onPress={() => { setEditing(null); setShown(chatDraft(draftKey)); setFailed(null); }} accessibilityRole="button" hitSlop={8}><T style={{ fontSize: 13, color: color.dim, textDecorationLine: 'underline' }}>Cancel</T></Pressable>
             </View>
           )}
           {files.length > 0 && <View style={{ paddingBottom: 8 }}><Attached files={files} drop={(i) => setFiles((f) => f.filter((_, n) => n !== i))} /></View>}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: canWrite ? color.lineStrong : color.line, backgroundColor: color.field }}>
             {!editing && <IconButton label="Attach a photo or file" onPress={() => setSheet('attach')}><Clip size={17} /></IconButton>}
-            <TextInput value={text} onChangeText={setText} multiline {...(Platform.OS === 'web' ? { numberOfLines: 1 } : {})} placeholder={root ? 'Reply in thread' : `Message ${groupName(room)}`} placeholderTextColor={color.faint}
+            <TextInput value={text} onChangeText={editing ? setShown : setText} multiline {...(Platform.OS === 'web' ? { numberOfLines: 1 } : {})} placeholder={root ? 'Reply in thread' : `Message ${groupName(room)}`} placeholderTextColor={color.faint}
               style={[{ flex: 1, minHeight: 42, maxHeight: 140, paddingTop: 10, paddingBottom: 10, paddingLeft: editing ? 14 : 2, paddingRight: 14, fontFamily: font.regular, fontSize: 15.5, lineHeight: 22, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
             {canWrite && <IconButton label={editing ? 'Save' : 'Send'} onPress={() => void send()}><SendGlyph tint={sending ? color.faint : color.accent} /></IconButton>}
           </View>
@@ -522,7 +526,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
       <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => setFiles((f) => withPicked(f, more))} fail={setFailed} />
       <MessageSheet m={acting} me={g.meId} who={acting ? nameOf(acting.by) : ''} open={!!acting} close={() => setActing(null)}
         onReact={(e) => acting && reactOnce(acting, e)} onThread={root || !acting ? undefined : () => setThread(acting.id)}
-        onEdit={() => { if (acting) { setEditing(acting); setText(acting.body); setFiles([]); } }}
+        onEdit={() => { if (acting) { setEditing(acting); setShown(acting.body); setFiles([]); } }}
         onDelete={() => { if (acting) void g.act('deleteMessage', room.id, acting.id).then((o) => { if (o.error) c.say(o.error); }); }}
         onReport={() => acting && report(acting)} onBlock={() => acting && block(acting)} />
       {newChat}
