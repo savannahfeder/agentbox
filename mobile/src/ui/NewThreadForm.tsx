@@ -14,11 +14,12 @@ import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mo
 import { splitSlug } from '../../../renderer/src/phone-rows';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import type { Choices } from '../lib/actions';
+import { projectsByComputer, runnableFirst } from '../lib/project-computers';
 import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFor, openingRecipient, pickEffort, pickModel, projectNow, type Recipient } from '../lib/compose';
 import { AutoMark, TeammateMark } from './Teammates';
 import { roleOf } from '../lib/teammates';
 import type { Teammate } from '../../../renderer/src/types';
-import { useDraft, type Draft } from '../lib/drafts';
+import { readDraftOf, restoreDraftOf, takeDraftOf, useDraft, type Draft } from '../lib/drafts';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { useComputerAgents } from '../state/computer-agents';
@@ -43,10 +44,34 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+type Cloud = ReturnType<typeof useCloud>;
+interface Sending { product: string; projectName: string; mate: Teammate | 'new' | null; onAuto: boolean; later: Choices; draft: Draft; harness: Choices }
+
+async function deliver(c: Cloud, s: Sending, undone: () => void) {
+  const { mate, product, projectName, onAuto, draft } = s;
+  // A teammate takes your words in your chat with it, not as a thread.
+  if (mate) {
+    if (draft.files.length) throw new Error('A message to a teammate carries words only. Send files in a thread.');
+    if (mate === 'new') {
+      const where = splitSlug(product);
+      if (!where || where.device !== c.team?.device) throw new Error('Pick a project on the computer that keeps your teammates.');
+      await c.askTeammate('describe', { text: draft.text, product: where.project });
+      c.say('Your new teammate is on its way. It asks you what it needs in Chats.');
+    } else {
+      await c.askTeammate('post', { text: draft.text, to: [mate.id], fresh: true });
+      c.say(mate.paused ? `Sent to ${mate.name}, who is paused. It waits until you resume it in Chats.` : `Sent to ${mate.name}`);
+    }
+    return;
+  }
+  const saved = await c.attach(product, draft.files);
+  await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...s.harness, ...s.later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null, { undone });
+}
+
 /** Everything the form holds, and its send; `sent` runs once a thread has gone, `reopen` once its Undo has put the draft back. */
 export function useNewThread(sent: () => void, reopen?: () => void) {
   const c = useCloud();
-  const projects = c.view.products;
+  const groups = useMemo(() => projectsByComputer(c.rows.projects, c.computers, c.now), [c.rows.projects, c.computers, c.now]);
+  const projects = useMemo(() => runnableFirst(c.view.products, groups), [c.view.products, groups]);
   // Your words, files and priority outlive the page (lib/drafts.ts); the
   // model and level are the ones last picked, the To and project this thread's own (lib/compose.ts).
   const draft = useDraft('new', appStore);
@@ -90,38 +115,22 @@ export function useNewThread(sent: () => void, reopen?: () => void) {
   const chooseTo = (r: Recipient) => setPickedTo(r);
   const canSend = (!!draft.text.trim() || draft.files.length > 0) && !!product && !busy && (!mate || !!draft.text.trim());
 
-  // A teammate takes your words in your chat with it, not as a thread.
-  const sendToMate = async () => {
-    if (!mate) return;
-    if (draft.files.length) throw new Error('A message to a teammate carries words only. Send files in a thread.');
-    if (mate === 'new') {
-      const where = splitSlug(product);
-      if (!where || where.device !== c.team?.device) throw new Error('Pick a project on the computer that keeps your teammates.');
-      await c.askTeammate('describe', { text: draft.text, product: where.project });
-      c.say('Your new teammate is on its way. It asks you what it needs in Chats.');
-    } else {
-      await c.askTeammate('post', { text: draft.text, to: [mate.id], fresh: true });
-      c.say(mate.paused ? `Sent to ${mate.name}, who is paused. It waits until you resume it in Chats.` : `Sent to ${mate.name}`);
-    }
-  };
+  // Everything a send needs, taken from the page so it can still go once the page has closed.
+  const sendingNow = (later: Choices = {}): Sending => ({
+    product, projectName, mate, onAuto, later,
+    draft: { text: draft.text, files: draft.files, priority: draft.priority },
+    harness: newThreadChoices({ priority: draft.priority, engine, model, effort, engineCount: agents.engines.length, ...codex }),
+  });
 
   const sendNow = async (later: Choices = {}) => {
     if (!canSend) return;
     setSheet(null); setBusy(true); setError(null);
     try {
-      if (mate) {
-        await sendToMate();
-        draft.take();
-        sent();
-        return;
-      }
-      const saved = await c.attach(product, draft.files);
-      const harness = newThreadChoices({ priority: draft.priority, engine, model, effort, engineCount: agents.engines.length, ...codex });
       // Undo withdraws the thread, so its words and files come back to the box.
       // Taken from the page, not the store, which drops pictures too big to keep.
-      const sending: Draft = { text: draft.text, files: draft.files, priority: draft.priority };
-      const undone = () => { if (draft.restore(sending)) reopen?.(); };
-      await c.send({ kind: 'new', product, to: projectName, text: draft.text, saved, choices: { ...harness, ...later, ...(onAuto ? { labels: [AUTO_LABEL] } : {}) } }, null, { undone });
+      const sending = sendingNow(later);
+      const undone = () => { if (draft.restore(sending.draft)) reopen?.(); };
+      await deliver(c, sending, undone);
       // The draft goes only once the thread has: a failed send keeps every word on the page.
       draft.take();
       offline.clear();
@@ -136,11 +145,22 @@ export function useNewThread(sent: () => void, reopen?: () => void) {
   const offline = useSendWhenOnline(() => {
     if (!canSend) { offline.clear(); setError(null); return; }
     void sendOnce(lastLater.current);
+  }, {
+    key: 'new',
+    send: () => {
+      const sending = sendingNow(lastLater.current);
+      return async (cloud) => {
+        await deliver(cloud, sending, () => { restoreDraftOf('new', sending.draft, appStore); });
+        // Words typed into the box since are not this send's to take.
+        if (readDraftOf('new', appStore).text === sending.draft.text) takeDraftOf('new', appStore);
+      };
+    },
   });
+  useEffect(() => { if (offline.said) setError(offline.said); }, []);
   const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {
-    draft, box, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
+    draft, box, product, projectName, projects, groups, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
     agents, offered, engine, codex, mates, reach, autoHere, onAuto, mate, toWord,
     pickProject: (slug: string) => setPicked(slug),
     pickAuto: () => chooseTo({ to: 'agent', mate: null, auto: true }),
@@ -256,6 +276,9 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
   const read = readRule(typed);
   const rule = read && 'rule' in read ? read.rule : null;
   const typedSend = () => { if (rule) void send({ repeat: rule }); else if (moment) void send({ runAt: moment.ts }); };
+  const ProjectRow = ({ slug, label }: { slug: string; label: string }) => (
+    <SheetRow label={label} on={slug === product} lead={<Swatch slug={slug} />} onPress={() => { form.pickProject(slug); setSheet(null); }} />
+  );
   return (
     <>
       <Sheet open={sheet === 'to'} close={() => setSheet(null)}>
@@ -274,8 +297,16 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priorityValueOf(draft.priority ?? 'medium')} pick={(v) => draft.setPriority(priorityIdOf(v))} />
       <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => withPicked(f, more))} fail={setError} />
       <Sheet open={sheet === 'project'} close={() => setSheet(null)}>
-        <SheetHead>Project</SheetHead>
-        {projects.map((p) => <SheetRow key={p.slug} label={p.name} on={p.slug === product} lead={<Swatch slug={p.slug} />} onPress={() => { form.pickProject(p.slug); setSheet(null); }} />)}
+        {form.groups.length <= 1 && <SheetHead>Project</SheetHead>}
+        {form.groups.length > 1
+          ? form.groups.map((g, i) => (
+            <View key={g.device}>
+              {i > 0 && <SheetSep />}
+              <SheetHead>{g.label}</SheetHead>
+              {g.projects.map((p) => <ProjectRow key={p.slug} slug={p.slug} label={p.name} />)}
+            </View>
+          ))
+          : projects.map((p) => <ProjectRow key={p.slug} slug={p.slug} label={p.name} />)}
       </Sheet>
       {/* Send later, as the desktop's composer offers it (composer-rules.ts). */}
       <TypingSheet open={sheet === 'later'} close={() => setSheet(null)}>

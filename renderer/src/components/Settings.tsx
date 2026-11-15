@@ -62,6 +62,8 @@ import { chord, chords } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
+import { IPHONE_APP_URL } from '../../../shared/phone-app.mts';
+import QRCode from 'qrcode';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
@@ -767,11 +769,11 @@ function Reading({ running, capacity, gate }: {
 // FEEDBACK FROM A PHONE. Its corner has no Feedback button, by choice ("not
 // important to be big for mobile"), which left no way to send any ("not sure
 // how to give feedback on mobile", 2026-10-12).
-function PhoneFeedbackGroup({ onFeedback }: { onFeedback: () => void }) {
+function PhoneFeedbackGroup({ onFeedback }: { onFeedback: (start: string) => void }) {
   return (
     <Group id="phone-feedback" label="Feedback">
       <Row label="Send feedback" desc={`Tell us what works and what does not. It goes straight to the people who make ${Name}.`}>
-        <button type="button" className="set-ghost" onClick={onFeedback}>Send feedback</button>
+        <button type="button" className="set-ghost" onClick={() => onFeedback('')}>Send feedback</button>
       </Row>
     </Group>
   );
@@ -859,8 +861,35 @@ function PhoneProjectsPicker({ macShut }: { macShut: MacShut }) {
     </div>
   );
 }
+export const ANDROID_ASK = 'I’d like an Android app.';
+
+function PhoneAppGroup({ email, onFeedback }: { email?: string | null; onFeedback?: (start: string) => void }) {
+  const [qr, setQr] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    QRCode.toString(IPHONE_APP_URL, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((s) => { if (live) setQr(s); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  return (
+    <Group id="phone-app" label="Get the app">
+      <div className="set-row set-phone-qr">
+        {qr && <img alt={`QR code that opens ${Name} on the App Store`} src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />}
+        <div className="set-row-text">
+          <div className="set-row-label">{Name} for iOS</div>
+          <div className="set-row-desc">Scan with your phone's camera, then sign in {email ? <>as <b>{email}</b></> : `with your ${Name} account`}.</div>
+          <a className="set-ghost set-phone-store" href={IPHONE_APP_URL} target="_blank" rel="noreferrer">Open the App Store</a>
+        </div>
+      </div>
+      {onFeedback && (
+        <Row label="On Android">
+          <button type="button" className="set-ghost" onClick={() => onFeedback(ANDROID_ASK)}>Request the Android app</button>
+        </Row>
+      )}
+    </Group>
+  );
+}
+
 function MacShutGroup({ macShut }: { macShut: MacShut }) {
-  const site = macShut.site?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? null;
   return (
     <>
       <Group id="phone-mac-shut" label="On your phone">
@@ -868,18 +897,6 @@ function MacShutGroup({ macShut }: { macShut: MacShut }) {
         <Row label="Projects on your phone" desc="A copy of their threads is kept in your account, so your phone can read and reply with this computer closed.">
           <PhoneProjectsPicker macShut={macShut} />
         </Row>
-      </Group>
-      <Group id="phone-site" label="Open on your phone">
-        {site && macShut.siteQr ? (
-          <div className="set-row set-phone-qr">
-            <img alt={`QR code that opens ${site} on a phone`} src={`data:image/svg+xml;utf8,${encodeURIComponent(macShut.siteQr)}`} />
-            <div className="set-row-desc">
-              Scan with your phone's camera, or go to <code>{site}</code>. Sign in with this account, then add the page to your home screen and it opens like an app.
-            </div>
-          </div>
-        ) : (
-          <Row label="Not set up yet" desc="The phone site has no address yet." />
-        )}
       </Group>
     </>
   );
@@ -910,13 +927,14 @@ function WebAccountPage({ web, feedback, onPhoneProjects }: { web: PhoneWeb; fee
   );
 }
 
-function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { onFeedback?: () => void; macShut?: MacShut; onSignIn?: () => void; web?: PhoneWeb; onPhoneProjects?: ReactNode }) {
+export function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { onFeedback?: (start: string) => void; macShut?: MacShut; onSignIn?: () => void; web?: PhoneWeb; onPhoneProjects?: ReactNode }) {
   const feedback = onFeedback && onPhone() ? <PhoneFeedbackGroup onFeedback={onFeedback} /> : null;
   if (web) return <WebAccountPage web={web} feedback={feedback} onPhoneProjects={onPhoneProjects} />;
   if (!macShut) {
     return (
-      <Page title="Phone">
-        <Group>
+      <Page title="Phone" lede="Read and reply from your phone, even with this computer closed.">
+        <PhoneAppGroup onFeedback={onFeedback} />
+        <Group id="phone-mac-shut" label="On your phone">
           <Row label="Sign in to use your phone" desc="Then your phone can read and reply with this computer closed.">
             {onSignIn && <button type="button" className="set-ghost" onClick={onSignIn}>Sign in</button>}
           </Row>
@@ -927,6 +945,7 @@ function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { on
   }
   return (
     <Page title="Phone" lede="Read and reply from your phone, even with this computer closed.">
+      <PhoneAppGroup email={macShut.email} onFeedback={onFeedback} />
       <MacShutGroup macShut={macShut} />
       {feedback}
     </Page>
@@ -1731,7 +1750,8 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
-  onFeedback?: () => void;
+  /** Opens the Feedback card with `start` already written. */
+  onFeedback?: (start: string) => void;
   /** The cloud, when this Mac is set up for it: its own logins are listed on the agent's page. */
   cloud?: CloudStatus | null;
   /** Signs a Claude account in to the cloud (a login's key to sign it in again), on the cloud's own screen. */
@@ -2828,11 +2848,11 @@ function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'cl
   return (
     <>
       {list.map((a) => {
-        const live = picked && chosen(a);
+        const live = picked && chosen(a) && a.signedIn !== false;
         return (
           <ReadRow key={a.id} label={a.email ?? a.name ?? 'Not signed in'} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
             {live ? <span className="set-in-use">In use</span>
-              : list.length > 1 && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
+              : list.length > 1 && a.signedIn !== false && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
           </ReadRow>
         );
       })}
