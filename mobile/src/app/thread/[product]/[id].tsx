@@ -198,6 +198,13 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   useEffect(() => { if (!talk.on && !talk.problem && !ready && !sheet && !typing.current?.isFocused()) setOpen(false); }, [talk.on]);
   const foot = footRoom(inset);
   const card = { borderWidth: 1, borderRadius: corner.small, backgroundColor: color.fill };
+  const stopButton = (
+    <Pressable onPress={() => setSheet('stop')} disabled={stopping} accessibilityRole="button" accessibilityLabel={thread.running ? 'Stop this agent' : 'Stop this task'}
+      style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: stopping ? 0.5 : 1 })}>
+      {!stopping && <StopMark />}
+      <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>{stopping ? 'Stopping…' : 'Stop'}</T>
+    </Pressable>
+  );
   return (
     <View style={{ paddingHorizontal: 12, paddingBottom: 16 + foot, paddingTop: 8 }}>
       {!open ? (
@@ -214,7 +221,8 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
               <Chevron up size={13} />
             </Pressable>
           )}
-          <View style={{ marginRight: 4 }}><MicButton talk={{ ...talk, start: () => { setOpen(true); talk.start(); } }} /></View>
+          <View style={{ marginRight: offers.stop ? 0 : 4 }}><MicButton talk={{ ...talk, start: () => { setOpen(true); talk.start(); } }} /></View>
+          {offers.stop && <View style={{ marginRight: 7 }}>{stopButton}</View>}
         </View>
       ) : (
         <View style={{ ...card, borderColor: color.lineStrong }} onTouchStartCapture={() => { pressInside.current = true; }}
@@ -257,13 +265,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
               </View>
             </View>
             {/* One slot: Stop while it is in progress and the box is empty, Send once anything is typed (Focus.tsx). */}
-            {offers.stop && !ready ? (
-              <Pressable onPress={() => setSheet('stop')} disabled={stopping} accessibilityRole="button" accessibilityLabel={thread.running ? 'Stop this agent' : 'Stop this task'}
-                style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: stopping ? 0.5 : 1 })}>
-                {!stopping && <StopMark />}
-                <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>{stopping ? 'Stopping…' : 'Stop'}</T>
-              </Pressable>
-            ) : (
+            {offers.stop && !ready ? stopButton : (
               // Send and its Send later caret, which only sets the time; the caret says it (components/ReplyLater.tsx).
               <View style={{ flexDirection: 'row', opacity: busy || !ready ? 0.5 : 1 }}>
                 <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={sendByHand}
@@ -426,7 +428,7 @@ export default function ThreadScreen() {
   }
   // Its place in Needs you, with the arrows that walk it (OneThingAtATime.tsx `QueueNav`).
   const here = { product: String(product), id: String(id) };
-  const inbox = shownTabs(c.tabs, readDisplay('inbox', appStore), c.now, c.view.products.map((p) => p.slug)).rows.inbox;
+  const inbox = shownTabs(c.tabs, readDisplay('inbox', appStore), c.now, c.view.projectOrder).rows.inbox;
   const inNeedsYou = new Set(inbox.map((r) => r.key));
   const asks = questionsForYou(c.team, c.teamPending)
     .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))

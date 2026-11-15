@@ -14,6 +14,7 @@ import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mo
 import { splitSlug } from '../../../renderer/src/phone-rows';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import type { Choices } from '../lib/actions';
+import { projectsByComputer, runnableFirst } from '../lib/project-computers';
 import { newThreadChoices, onceAtATime, openingChoices, openingEngine, openingFor, openingRecipient, pickEffort, pickModel, projectNow, type Recipient } from '../lib/compose';
 import { AutoMark, TeammateMark } from './Teammates';
 import { roleOf } from '../lib/teammates';
@@ -69,7 +70,8 @@ async function deliver(c: Cloud, s: Sending, undone: () => void) {
 /** Everything the form holds, and its send; `sent` runs once a thread has gone, `reopen` once its Undo has put the draft back. */
 export function useNewThread(sent: () => void, reopen?: () => void) {
   const c = useCloud();
-  const projects = c.view.products;
+  const groups = useMemo(() => projectsByComputer(c.rows.projects, c.computers, c.now), [c.rows.projects, c.computers, c.now]);
+  const projects = useMemo(() => runnableFirst(c.view.products, groups), [c.view.products, groups]);
   // Your words, files and priority outlive the page (lib/drafts.ts); the
   // model and level are the ones last picked, the To and project this thread's own (lib/compose.ts).
   const draft = useDraft('new', appStore);
@@ -158,7 +160,7 @@ export function useNewThread(sent: () => void, reopen?: () => void) {
   const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {
-    draft, box, product, projectName, projects, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
+    draft, box, product, projectName, projects, groups, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,
     agents, offered, engine, codex, mates, reach, autoHere, onAuto, mate, toWord,
     pickProject: (slug: string) => setPicked(slug),
     pickAuto: () => chooseTo({ to: 'agent', mate: null, auto: true }),
@@ -274,6 +276,9 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
   const read = readRule(typed);
   const rule = read && 'rule' in read ? read.rule : null;
   const typedSend = () => { if (rule) void send({ repeat: rule }); else if (moment) void send({ runAt: moment.ts }); };
+  const ProjectRow = ({ slug, label }: { slug: string; label: string }) => (
+    <SheetRow label={label} on={slug === product} lead={<Swatch slug={slug} />} onPress={() => { form.pickProject(slug); setSheet(null); }} />
+  );
   return (
     <>
       <Sheet open={sheet === 'to'} close={() => setSheet(null)}>
@@ -292,8 +297,16 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
       <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priorityValueOf(draft.priority ?? 'medium')} pick={(v) => draft.setPriority(priorityIdOf(v))} />
       <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => withPicked(f, more))} fail={setError} />
       <Sheet open={sheet === 'project'} close={() => setSheet(null)}>
-        <SheetHead>Project</SheetHead>
-        {projects.map((p) => <SheetRow key={p.slug} label={p.name} on={p.slug === product} lead={<Swatch slug={p.slug} />} onPress={() => { form.pickProject(p.slug); setSheet(null); }} />)}
+        {form.groups.length <= 1 && <SheetHead>Project</SheetHead>}
+        {form.groups.length > 1
+          ? form.groups.map((g, i) => (
+            <View key={g.device}>
+              {i > 0 && <SheetSep />}
+              <SheetHead>{g.label}</SheetHead>
+              {g.projects.map((p) => <ProjectRow key={p.slug} slug={p.slug} label={p.name} />)}
+            </View>
+          ))
+          : projects.map((p) => <ProjectRow key={p.slug} slug={p.slug} label={p.name} />)}
       </Sheet>
       {/* Send later, as the desktop's composer offers it (composer-rules.ts). */}
       <TypingSheet open={sheet === 'later'} close={() => setSheet(null)}>
