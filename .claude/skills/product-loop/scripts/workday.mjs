@@ -53,7 +53,7 @@ export function phonePrompt(person, { dir, minutes, focus = null, logged = [] })
     ...(focus ? ['', `Lean on this today: ${focus}`] : []),
     '',
     '## Your two commands, run from this folder',
-    `- \`${path.join(dir, 'phone')}\`: open, look, tap <n|"words">, type "<text>", press <key>, swipe up|down|left|right, shot <name>, away <minutes>, reload. The phone is already open; start with look.`,
+    `- \`${path.join(dir, 'phone')}\`: open, look, tap <n|"words">, hold <n|"words">, type "<text>", press <key>, swipe up|down|left|right, shot <name>, away <minutes>, reload. The phone is already open; start with look.`,
     `- \`${path.join(dir, 'diary')}\`: note "<what you did and how it felt>", issue --severity broken|wrong|slow|confusing --title "…" --steps "…" --expected "…" --actual "…" --shot <name>, again <n> "<what you saw>", time.`,
     '',
     'Write in the diary as you go, not at the end: a session can be stopped at any moment. Take a shot before logging an issue and name it in --shot. Open a shot when you need to see the screen rather than its words.',
