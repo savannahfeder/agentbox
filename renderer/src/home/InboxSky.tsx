@@ -51,7 +51,14 @@ export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; ban
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       if (shape === 'zero') { drawSky(canvas, art, { from: 40, span: 300, dpr, quiet: words() }); return; }
       const start = Math.round(h - band);
-      drawSky(canvas, art, { from: start, span: 120, curveTop: start - 60, dpr });
+      // A light halftone is dark ink under dark words, so it stays clear of the title. The head is drawn upside down.
+      const marks = art.halftone ? [...host.querySelectorAll(':scope > .topbar :is(.back-forward, .workspace-title)')].map((e) => e.getBoundingClientRect()).filter((r) => r.height > 0) : [];
+      const quiet = marks.length ? (() => {
+        const x = Math.min(...marks.map((r) => r.left)), x2 = Math.max(...marks.map((r) => r.right));
+        const y = Math.min(...marks.map((r) => r.top)), y2 = Math.max(...marks.map((r) => r.bottom));
+        return { x: Math.round(x - hr.left - L), y: Math.round(h - (y2 - hr.top - T)), w: Math.round(x2 - x), h: Math.round(y2 - y) };
+      })() : null;
+      drawSky(canvas, art, { from: start, span: 120, curveTop: start - 60, dpr, quiet });
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(paint); };
     paint();

@@ -18,12 +18,21 @@ export type SkyArt = {
   light?: boolean; lightBg?: Rgb; lightStrength?: number; lightDepth?: number;
   /** Light only: faint dots stay deep and thin out, rather than fading to pastel. */
   ink?: boolean;
+  /** How far the halo reaches below the streak, as a share of `haloW`; none when unset. */
+  below?: number;
+  /** Light only: how strongly the streak itself opens to the card, so it reads as light through the dots. */
+  seam?: number;
+  /** Light only: dots on an even grid this many px apart, sized by strength. */
+  halftone?: number; halftoneGain?: number; halftoneAngle?: number;
+  /** A second grid, offset half a step, in this colour: two inks printed over each other. */
+  halftoneDuo?: Rgb;
   glow?: Glow[];
 };
 
 export type SkyId = string;
 /** A theme of its own: the window's light or dark look, with this sky on Home and the Inbox. */
-export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; frame?: string; inbox?: boolean };
+/** `home` is Home's own drawing of the sky, when the Inbox's would not suit a whole page. */
+export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; home?: SkyArt; frame?: string; inbox?: boolean };
 
 /** Dark skies all wear the Inbox's header; a light one only when its look was drawn for it. */
 export const wearsInboxSky = (sky: Sky | null): sky is Sky => !!sky && (sky.dark || !!sky.inbox);
@@ -141,6 +150,48 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
     }
   }
 
+  if (art.light && art.halftone) {
+    const Ph = art.halftone, gain = art.halftoneGain ?? 1, LBh = art.lightBg ?? [255, 255, 255], PL = art.palette;
+    const depth = art.lightDepth ?? 150, below = art.below ?? 0.5, ang = ((art.halftoneAngle ?? 0) * Math.PI) / 180;
+    const ca = Math.cos(ang), sa = Math.sin(ang), R = Math.hypot(W, H);
+    const strength = (x: number, y: number) => {
+      const i = x / pitch, j = y / pitch, t = x / W;
+      const cyv = curveTop + (y0 + (y1 - y0) * t + bend * t * (1 - t)) * CH;
+      const slope = ((y1 - y0) + bend * (1 - 2 * t)) * CH / W;
+      const d = ((cyv - y) / Math.sqrt(1 + slope * slope)) / S;
+      const n = vn(i / 40, j / 40) * 0.7 + vn(i / 14, j / 14) * 0.3;
+      const along = Math.max(0, 1 - Math.abs(t - peak) * fall);
+      const core = Math.exp(-((d / coreW) ** 2)) * (0.6 + 0.4 * n) * (0.35 + 0.65 * along);
+      const hot = Math.exp(-(((d + coreW * 0.25) / hotW) ** 2)) * along * (0.7 + 0.3 * n);
+      const halo = (d > 0 ? Math.exp(-d / haloW) : Math.exp(d / (haloW * below))) * (0.5 + 0.5 * n) * (0.25 + 0.75 * along);
+      // The seam opens on a smooth curve, so its edges soften into the dots instead of cutting them.
+      const open = art.seam ? 1 - Math.min(1, art.seam * Math.exp(-((d / coreW) ** 2)) * (0.8 + 0.2 * along)) : 1;
+      const lit = art.seam ? halo : core + hot * 0.6 + halo * 0.7;
+      return { v: Math.min(1, lit * open * keepAt(y) * gain * lineStrength(x, y, quiet, 0.15, 60)), core, hot, halo };
+    };
+    const grid = (shift: number, colour: (s: ReturnType<typeof strength>) => Rgb, scale: number) => {
+      for (let u = -R; u < R; u += Ph) for (let w = -R; w < R; w += Ph) {
+        const x = W / 2 + (u + shift) * ca - (w + shift) * sa, y = H / 2 + (u + shift) * sa + (w + shift) * ca;
+        if (x < -Ph || y < -Ph || x > W + Ph || y > H + Ph) continue;
+        const s = strength(x, y);
+        const rad = (Ph / 2) * Math.sqrt(s.v * scale);
+        if (rad < 0.75) continue;
+        const c = colour(s), mx = Math.max(c[0], c[1], c[2], 1), sc = depth / mx;
+        const k = (art.lightStrength ?? 1) * (0.4 + 0.6 * s.v);
+        g.fillStyle = `rgb(${(LBh[0] * (1 - k) + c[0] * sc * k) | 0},${(LBh[1] * (1 - k) + c[1] * sc * k) | 0},${(LBh[2] * (1 - k) + c[2] * sc * k) | 0})`;
+        g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill();
+      }
+    };
+    const mixed = (s: ReturnType<typeof strength>): Rgb => {
+      const ws = s.core + s.hot + s.halo + 1e-6;
+      return [0, 1, 2].map((c) => (s.core * PL.core[c] + s.hot * PL.hot[c] + s.halo * PL.halo[c]) / ws) as Rgb;
+    };
+    grid(0, mixed, 1);
+    const duo = art.halftoneDuo;
+    if (duo) grid(Ph / 2, () => duo, 0.6);
+    return;
+  }
+
   const q = (v: number, th: number) => { const s = Math.min(1, Math.max(0, v / 255)) * (levels - 1); const f = Math.floor(s); return ((f + (s - f > th ? 1 : 0)) / (levels - 1)) * 255; };
   const LB = art.lightBg ?? [255, 255, 255];
   for (let j = 0; j < rows; j++) {
@@ -159,11 +210,14 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
       const line = lineStrength(x, y, quiet);
       const core = Math.exp(-((dc / coreW) ** 2)) * (0.5 + 0.5 * n) * (0.35 + 0.65 * along) * line;
       const hot = Math.exp(-(((dc + coreW * 0.25) / hotW) ** 2)) * along * (0.6 + 0.4 * n) * line;
-      const halo = dc > 0 ? Math.exp(-dc / haloW) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along) : 0;
+      const halo = dc > 0 ? Math.exp(-dc / haloW) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along)
+        : art.below ? Math.exp(dc / (haloW * art.below)) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along) : 0;
       const ember = dc < 0 ? Math.exp(dc / (coreW * 3)) * 0.45 * n * along * line : 0;
-      const r = (core * P.core[0] + hot * P.hot[0] + halo * P.halo[0] + ember * P.ember[0]) * dim;
-      const gg = (core * P.core[1] + hot * P.hot[1] + halo * P.halo[1] + ember * P.ember[1]) * dim;
-      const b = (core * P.core[2] + hot * P.hot[2] + halo * P.halo[2] + ember * P.ember[2]) * dim;
+      // A seam lets the card show through where the streak is brightest, the light sky's version of the glow.
+      const open = art.seam ? 1 - Math.min(1, art.seam * Math.exp(-((d / coreW) ** 2)) * (0.8 + 0.2 * along)) : 1;
+      const r = (core * P.core[0] + hot * P.hot[0] + halo * P.halo[0] + ember * P.ember[0]) * dim * open;
+      const gg = (core * P.core[1] + hot * P.hot[1] + halo * P.halo[1] + ember * P.ember[1]) * dim * open;
+      const b = (core * P.core[2] + hot * P.hot[2] + halo * P.halo[2] + ember * P.ember[2]) * dim * open;
       const th = (BAYER[(j % 8) * 8 + (i % 8)] + 0.5) / 64;
       let fadeK = 1;
       if (keep < 1) {
