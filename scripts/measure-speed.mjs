@@ -14,7 +14,7 @@ import crypto from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
+import { PerformanceObserver, constants, monitorEventLoopDelay, performance } from 'node:perf_hooks';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -44,9 +44,9 @@ async function makeStore(projects, perProject, strandedCount) {
   fs.mkdirSync(data, { recursive: true });
   fs.mkdirSync(path.join(root, 'home'), { recursive: true });
   fs.writeFileSync(path.join(data, 'zero.config.json'), JSON.stringify({ storeRoot, accountId: 'speed', engineChoice: '2026-01-01T00:00:00.000Z', maxConcurrentSessions: 2 }, null, 2));
-  const { storeRootEnv, machineryPath } = await import('../main/store/home.mjs');
+  const { storeRootEnv, machineryPath } = await import('../main/store/home.mts');
   Object.assign(process.env, storeRootEnv(storeRoot));
-  const { buildLine } = await import('../shared/work-items.mjs');
+  const { buildLine } = await import('../shared/work-items.mts');
   const words = 'the app froze when she pressed E and the inbox moved on to the next task while a worker wrote its answer report.md into the store'.split(' ');
   const text = (n) => Array.from({ length: n }, () => words[Math.floor(Math.random() * words.length)]).join(' ');
   const now = Date.now();
@@ -97,6 +97,9 @@ async function serve(port) {
   const { bootHeadless, createServer, newToken, picturesTheAppOwns } = await import('../main/serve.mts');
   const { startFreezeRecorder } = await import('../main/freeze-recorder.mts');
   const booted = await bootHeadless({ dataDir: data, appDir: repo, userDir: data });
+  // The desktop app watches the store and the browser copy does not; what is
+  // kept between reads depends on it.
+  booted.store.watch();
   startFreezeRecorder({ dir: path.join(data, 'memory-log'), appDir: repo, thresholdMs: 200, onFreeze: (f) => log({ freeze: f }) });
   for (const [channel, fn] of booted.channels) {
     booted.channels.set(channel, (...a) => {
@@ -110,6 +113,8 @@ async function serve(port) {
   const loop = monitorEventLoopDelay({ resolution: 10 });
   loop.enable();
   setInterval(() => { log({ loopMax: Math.round(loop.max / 1e6) }); loop.reset(); }, 5000).unref();
+  // On a swapping Mac each collection pages the heap back in, so how often it runs matters.
+  new PerformanceObserver((list) => { for (const e of list.getEntries()) log({ gc: Math.round(e.duration * 10) / 10, major: e.detail?.kind === constants.NODE_PERFORMANCE_GC_MAJOR }); }).observe({ entryTypes: ['gc'] });
   sup.start();
   const token = newToken();
   createServer({ channels: booted.channels, token, listeners: booted.window.listeners, dist: path.join(repo, 'renderer', 'dist'), files: picturesTheAppOwns(booted) })
@@ -132,7 +137,10 @@ async function measure() {
   fs.rmSync(timings, { force: true });
   fs.rmSync(path.join(data, 'memory-log'), { recursive: true, force: true });
   const port = 4700 + Math.floor(Math.random() * 200);
-  const env = { PATH: process.env.PATH, HOME: path.join(root, 'home'), AGENTBOX_FRESH_USER: '1' };
+  // TMPDIR: on a Mac os.tmpdir() is read from it, and without it the copy
+  // opened an empty store in /tmp instead of the one made above. NODE_OPTIONS:
+  // scripts/run.mjs puts the flag a Node before 22.18 needs for .mts there.
+  const env = { PATH: process.env.PATH, TMPDIR: os.tmpdir(), NODE_OPTIONS: process.env.NODE_OPTIONS ?? '', HOME: path.join(root, 'home'), AGENTBOX_FRESH_USER: '1' };
   const app = spawn(process.execPath, [fileURLToPath(import.meta.url), '--serve', String(port)], { env, stdio: ['ignore', 'pipe', 'inherit'] });
   const url = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('the app did not start in 2 minutes')), 120_000);
@@ -172,6 +180,9 @@ function report(lines) {
   const ticks = lines.filter((l) => l.tick != null).map((l) => l.tick);
   if (ticks.length) console.log(`\nAgents' clock: ${ticks.length} ticks, average ${Math.round(ticks.reduce((a, b) => a + b, 0) / ticks.length)} ms, longest ${Math.max(...ticks)} ms`);
   console.log(`Longest stall in any 5 s: ${Math.max(0, ...lines.filter((l) => l.loopMax != null).map((l) => l.loopMax))} ms`);
+  const gcs = lines.filter((l) => l.gc != null);
+  const majors = gcs.filter((l) => l.major);
+  console.log(`Garbage collections: ${gcs.length}, ${Math.round(gcs.reduce((a, l) => a + l.gc, 0))} ms in all; ${majors.length} full, ${Math.round(majors.reduce((a, l) => a + l.gc, 0))} ms`);
   const freezes = lines.filter((l) => l.freeze);
   console.log(`\nFreezes of 200 ms or more: ${freezes.length}`);
   let last = null;

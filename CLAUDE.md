@@ -17,7 +17,7 @@ rules that are not obvious from them.
 - Cover the cases, not the case: the reported one, the boundary either side of
   it, and the case that must NOT match.
 - Name the test file after the behaviour, as a sentence
-  (`a-reply-moves-the-agent-row.test.mjs`), and open it with a comment saying
+  (`a-reply-moves-the-agent-row.test.mts`), and open it with a comment saying
   what broke and how you measured it.
 - Before you report, run the tests for what you changed: `npm run test:changed`
   (or `npm run test:changed <files>`). That is your own tests, every test that
@@ -62,6 +62,15 @@ picture of the real tray over a dark window and a light one. A bug fix in
 those files still counts as a change to the look. Never move the fingerprints in
 `tests/fixtures/the-trays-approved-look.json` without that approval. Taking
 those pictures puts windows on their screen, so ask before you do it.
+
+## THE DESIGN IS ROUNDED (2026-11-10)
+
+A button, card, tip, key cap or ring with a border has rounded corners. Square
+ones kept coming back, so the founder had to point them out by hand.
+`tests/the-design-is-rounded-and-square-boxes-only-go-down` allows none in the
+first run, the setup, the walkthrough and the sign-in page, and elsewhere the
+count may only go down. Round what you touch; never raise a number in
+`tests/fixtures/square-boxes.json`.
 
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
@@ -131,6 +140,12 @@ a Codex plan for testing only. Both skills start every tester as `codex exec`
 on the Codex login with the best plan; never run one as a subagent
 (`tests/every-synthetic-tester-runs-on-codex`).
 
+The app they test runs real agents on real plans, Claude Code and Codex
+(2026-11-11). Stand-in agents run only when the person agreed to them for
+that run, in their own words (`--stand-ins "<their words>"`), and the run
+says so up front. 48 of 50 runs were on stand-ins without anyone being told
+(`tests/a-power-test-runs-on-real-plans-unless-the-person-agreed`).
+
 The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
 used the multiplayer build for whole workdays, logged what broke, agents
 fixed it on the branch, and the team tested the fixes. The person only chose
@@ -158,15 +173,19 @@ refuses any push that carries the old history. Carry your own commits across
 instead, then ship as usual:
 `git fetch origin && git rebase --onto refs/remotes/origin/main $(git merge-base HEAD 99b8b0e5b04fbbc976003851ebdbb7bb58c2bf89)`
 
-## NO WORKER EVER DRIVES THE USER'S OWN BROWSER
+## NO WORKER EVER DRIVES THE USER'S OWN BROWSER UNTIL THEY TURN IT ON (2026-11-11)
 
 Claude Code can attach a session to the browser a person is signed into with
-`--chrome`. That flag must never appear in anything this app spawns, because
-that browser is signed into every account its owner holds.
-`tests/no-worker-drives-her-own-browser.test.mjs` fails if it ever does. A
-browser an agent may drive has to carry nothing; the app's own pane on the
-`persist:junk` partition is the only candidate. `--ide` is the user's to switch
-on, never ours.
+`--chrome`, and that browser is signed into every account its owner holds. It
+follows the person's own Claude Code: a worker gets it only when the account it
+runs on has "Claude in Chrome enabled by default" on (`/chrome`, kept as
+`claudeInChromeDefaultEnabled: true` in that account's `.claude.json`), which
+Claude Code itself ignores in a `-p` run. There is no Agentbox switch for it.
+Only `main/your-chrome.mts` may put `--chrome` on a worker's line: never in the
+cloud, and never on a run that skips permissions (that also skips Chrome's
+per-site asks).
+`tests/no-worker-drives-her-own-browser.test.mts` fails if the flag appears
+anywhere else. `--ide` is the user's to switch on, never ours.
 
 Nor does an agent start the person's Google Chrome headless: the Mac files that
 copy as their Chrome, and their own Chrome then opens no window. Every hidden
@@ -198,6 +217,27 @@ menu offers or an alias the picker offers has gone. If a build says the committe
 table is behind, run `npm run read:claude` and commit the diff; do not reach for
 the build.
 
+## The app is TypeScript; write new code and tests as `.mts` (2026-11-06)
+
+`main/`, `shared/`, `mcp/` and `tests/` are `.mts`, run as they are (Node
+strips the types; nothing compiles them). `npm run typecheck` is strict `tsc`
+over the back end and the renderer, CI runs it and the phone app's on every
+push, and all three are clean: keep them that way. The tests are not
+type-checked yet. Only syntax that strips cleanly is allowed: no enums,
+namespaces or parameter properties. The few `.mjs` left there are named, with
+the reason, in `tests/the-back-end-is-typescript-that-runs-as-it-is`.
+`tests/fixtures` stays `.mjs` because those are fake CLIs started as their own
+processes.
+
+No `@ts-ignore`, `@ts-nocheck` or `@ts-expect-error`, and no `any` as a type,
+in `main/`, `shared/`, `mcp/`, `renderer/src` or `mobile/src`
+(`tests/no-type-check-is-switched-off-and-any-only-goes-down`). Name the shape,
+or take `unknown` and narrow it.
+
+Node loads `.mts` by itself from 22.18. On an older 22, start a script that
+reaches the back end as `node scripts/run.mjs scripts/<name>.mjs`, which adds
+the flag; npm scripts already do.
+
 ## One-off harnesses go in `scripts/scratch/`
 
 It is gitignored. A script that proves one change runs once; move it up into
@@ -223,7 +263,7 @@ is the one app and the one source of truth. The plan is `docs/team/PLAN.md`.
   makes a copy the team version: machines that run it keep their own copy, and
   without it the app is the single-person app. `cloud/team.config.example.json`
   shows the shape. The same database's public address and anon key do ship, in
-  `shared/cloud-address.mjs`, so every copy can sign in to Agentbox Cloud
+  `shared/cloud-address.mts`, so every copy can sign in to Agentbox Cloud
   (2026-10-26); they were already inside every download.
 - A branch cut from the old private repository's history will not line up with
   this one: the merge rewrote those commits to take the key file out. Move it
@@ -231,5 +271,5 @@ is the one app and the one source of truth. The plan is `docs/team/PLAN.md`.
   `git rebase --onto refs/remotes/origin/main $(git merge-base <branch> 5ff1b688195c90508ecb8abdc7355e028226e729) <branch>`,
   where that sha is the old team history's last commit.
 - Keep team code in its own files (`main/team/`, `renderer/src/team/`,
-  `shared/team-*.mjs`, `cloud/`, `tests/team-*.test.mjs`) where that is
+  `shared/team-*.mjs`, `cloud/`, `tests/team-*.test.mts`) where that is
   natural.

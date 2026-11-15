@@ -16,8 +16,8 @@
 // product, and these two functions are the whole of the disk access.
 import fsDefault from 'node:fs';
 import path from 'node:path';
-import { artifactRoots } from './artifact-path.mjs';
-import type { ArtifactProduct } from './artifact-path.mjs';
+import { artifactRoots } from './artifact-path.mts';
+import type { ArtifactProduct } from './artifact-path.mts';
 
 export type DocFs = Pick<typeof fsDefault, 'existsSync' | 'statSync' | 'readFileSync' | 'writeFileSync'>;
 

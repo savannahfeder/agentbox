@@ -3,7 +3,7 @@
 
 .tour-glow {
   position: fixed; z-index: 1000; pointer-events: none; box-sizing: border-box;
-  border: 1px solid rgba(var(--tour-gold), .5);
+  border: 1px solid rgba(var(--tour-gold), .5); border-radius: 10px;
   background: rgba(var(--tour-gold), .04);
   box-shadow: 0 0 44px 2px rgba(var(--tour-gold), .42);
   animation: tour-in .25s ease both;
@@ -15,7 +15,7 @@
   position: fixed; z-index: 1001; display: flex; align-items: center; gap: 18px;
   padding: 10px 14px; white-space: nowrap;
   background: var(--surface, #2a2521); color: var(--text);
-  border: 1px solid rgba(var(--tour-gold), .55);
+  border: 1px solid rgba(var(--tour-gold), .55); border-radius: 10px;
   box-shadow: 0 0 24px rgba(var(--tour-gold), .18);
   font-size: 15px; line-height: 22px;
 }
@@ -23,11 +23,11 @@
 .tour-k {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 24px; height: 24px; padding: 0 6px; box-sizing: border-box;
-  border: 1px solid rgba(var(--tour-gold), .7);
+  border: 1px solid rgba(var(--tour-gold), .7); border-radius: 6px;
   font: 12px/1 var(--mono); color: var(--text);
 }
 .tour-k + .tour-k { margin-left: -6px; }
-.tour-act { background: none; border: 1px solid rgba(var(--tour-gold), .55); padding: 3px 9px; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--text); white-space: nowrap; }
+.tour-act { background: none; border: 1px solid rgba(var(--tour-gold), .55); border-radius: 7px; padding: 3px 9px; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--text); white-space: nowrap; }
 .tour-act:hover { background: rgba(var(--tour-gold), .12); }
 
 @media (prefers-reduced-motion: reduce) { .tour-glow, .tour-card { animation: none; } }

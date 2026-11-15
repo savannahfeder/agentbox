@@ -17,7 +17,7 @@
 # repository first and lets main follow what came back.
 #
 # WHAT THIS MUST NEVER TOUCH, and each one is pinned in
-# tests/local-main-only-moves-to-what-is-shipped.test.mjs:
+# tests/local-main-only-moves-to-what-is-shipped.test.mts:
 #   - a repository with no refs/remotes/origin/main (a fresh init, a fork, a
 #     tarball) has nothing to compare against and is left alone completely;
 #   - every ref that is not refs/heads/main, including every fetch, which writes

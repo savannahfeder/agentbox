@@ -10,7 +10,7 @@
 // border around it rather than just showing the logo on its own", 2026-10-13).
 // So the margin, the shadow and the tile's edge line go, the tile's own
 // background fills the square edge to edge, and the dots keep their place on it.
-// tests/the-phone-icon-fills-its-square.test.mjs checks the result.
+// tests/the-phone-icon-fills-its-square.test.mts checks the result.
 //
 // Electron, off screen, for the reasons scripts/make-icon.mjs gives.
 import { app, BrowserWindow } from 'electron';

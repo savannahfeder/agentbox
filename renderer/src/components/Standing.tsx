@@ -89,12 +89,12 @@ export function Standing({ kind = STANDING, onClose }: { kind?: Instructions; on
       pending.current = null;
       setSave('saved');
       setError(null);
-    } catch (e: any) {
+    } catch (e) {
       // A rule she thinks the fleet has and it does not is the whole failure
       // mode this feature can have, so a failed save says so on screen. In the
       // footer's voice, not in red: she cannot do anything about it from here
       // beyond the one thing this line asks for.
-      const message = String(e?.message ?? e);
+      const message = String((e as Error)?.message ?? e);
       setSave('failed');
       setError(isMissingHandler(message) ? RESTART : message);
     }

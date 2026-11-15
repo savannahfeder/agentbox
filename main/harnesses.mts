@@ -69,7 +69,7 @@ export function createHarnessRegistry(adapters: HarnessAdapter[]) {
 }
 // REGISTERED IS NOT OFFERED. OpenCode is here so anything that asks for it by
 // name gets the real adapter, and it is deliberately absent from `ENGINES`
-// (shared/engines.mjs) so no row can choose it and no picker draws it until
+// (shared/engines.mts) so no row can choose it and no picker draws it until
 // that is turned on deliberately. The two decisions are separate on purpose.
 const registry = createHarnessRegistry([claudeHarness, codexHarness, openCodeHarness]);
 export const harnessFor = (id?: string): Harness => registry.get(id);

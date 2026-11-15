@@ -9,7 +9,7 @@
 // writes it onto the row as an agent. A level the person set by hand wins, by
 // the fold's own rule, and this does not ask again after one.
 import { askSmallModel } from './row-label.mts';
-import { isTaskRow } from '../shared/team-rules.mjs';
+import { isTaskRow } from '../shared/team-rules.mts';
 
 /** The four words, onto the app's own values (renderer/src/priority.ts). */
 export const LEVELS: Record<string, number> = { urgent: 9, high: 7, medium: 5, low: 2 };

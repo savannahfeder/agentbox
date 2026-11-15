@@ -92,7 +92,7 @@ export function joinMessage(part: { title: string; body?: string }): string {
   // line whose detail opened with those same words answered yes. The join then
   // dropped her first line, and since the box saves what it shows, one edit
   // would have cut it out of the rule that briefs every run after. Caught by
-  // the round trip in `tests/a-repeating-task-can-be-edited.test.mjs`,
+  // the round trip in `tests/a-repeating-task-can-be-edited.test.mts`,
   // 2026-08-21.
   const again = splitMessage(body);
   if (again.body === body && again.title === part.title) return body;

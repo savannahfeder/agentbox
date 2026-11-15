@@ -40,12 +40,13 @@ import { notShipped } from '../../../shared/not-shipped.mts';
 import { asksForGitHubSignIn } from '../../../shared/github-push-sign-in.mts';
 import { GitHubSignInCard } from './GitHubSignInCard';
 import { SignInCard } from './SignInCard';
-import { openSignIn } from '../../../shared/sign-in-ask.mjs';
+import { openSignIn } from '../../../shared/sign-in-ask.mts';
 import type { ModelChoice } from '../models';
 import type { LedgerLine } from '../thread-history';
 import type { TraceSession } from '../notes';
 import { withEveryRun } from '../every-run';
 import { keepPlace, placeKey, placeToReturnTo } from '../thread-place';
+import { bringIntoView } from '../thread-bottom';
 import { arrivedAt } from '../unread';
 import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types';
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
@@ -53,7 +54,7 @@ import { FileMarkOpener } from './FileMarkLine';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
 import { catchUpDue } from '../../../shared/agent-import.mts';
 import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
-import { gapIndex } from '../../../shared/agents.mjs';
+import { gapIndex } from '../../../shared/agents.mts';
 import { askMarkUnread, say } from '../team/chat-events';
 import { seenLine } from '../team/seen-line';
 import { conversationName } from '../threads/page-rules';
@@ -61,10 +62,15 @@ import { firstName } from '../team/people';
 import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { TeammatesContext } from '../teammates/row-lead';
 import { RouteLine } from './RouteLine';
+import { TeammateOffer } from './TeammateOffer';
 import { withoutLoneQuoteMark } from '../typed-message';
-import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mjs';
-import { REACH_LABEL } from '../../../shared/teammate-reach.mjs';
+import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mts';
+import { REACH_LABEL } from '../../../shared/teammate-reach.mts';
 import { Name } from '../../../shared/product-name.mjs';
+import { isCause, isCauseLedger, withoutBrief } from '../../../shared/causes.mts';
+
+// A cause row's body is the brief its lead works from, not something said to her.
+const spoken = <T extends { source?: string; patch?: Record<string, unknown> | null }>(lines: T[]): T[] => (isCauseLedger(lines) ? withoutBrief(lines) : lines);
 
 // THE BACKSTOP, NOT THE HEARTBEAT.
 //
@@ -289,7 +295,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     // away (../phone-polls, oneAtATime).
     const read = oneAtATime(() => Promise.allSettled([
       api.itemHistory({ product: item.product, id: item.id })
-        .then((r) => { if (live) setLedger({ key: rowKey, lines: r?.lines ?? [], error: r?.ok ? undefined : r?.error }); })
+        .then((r) => { if (live) setLedger({ key: rowKey, lines: spoken(r?.lines ?? []), error: r?.ok ? undefined : r?.error }); })
         .catch((err) => { if (live) setLedger({ key: rowKey, lines: [], error: String((err as Error)?.message ?? err) }); }),
       api.sessionTrace({ product: item.product, id: item.id })
         .then((r) => { if (live) setSessions(r?.sessions ?? []); })
@@ -299,7 +305,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       // writes it the moment it exits. Without this she would have to leave the
       // row and come back before a file she watched being edited became
       // pressable.
-      api.codeChange({ product: item.product, src: changePathFor(item.id) })
+      api.codeChange({ product: item.product, src: changePathFor(item.id), summary: true })
         .then((r) => {
           if (!live) return;
           const files = (r?.ok ? (r.change as Change | undefined)?.files : null) ?? [];
@@ -323,12 +329,17 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // A note on a file names its version by the number Files gives it.
   const fileLine = useFileLine(item.product, item.id, ledger?.lines?.length ?? 0, false);
 
-  // The rows move as the unfolded thread loads, so it scrolls again as they land.
+  // Once per raise, from the first render that has drawn the question; it
+  // follows the question while the unfolded thread loads above it.
+  const brought = useRef<{ raised: number; release: () => void } | null>(null);
   useEffect(() => {
-    if (!closeAsk) return;
-    const frame = requestAnimationFrame(() => askRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
-    return () => cancelAnimationFrame(frame);
+    if (!closeAsk || brought.current?.raised === closeAsk.raised) return;
+    const box = askRef.current?.closest('.focus-scroll') as HTMLElement | null;
+    if (!box) return;
+    brought.current?.release();
+    brought.current = { raised: closeAsk.raised, release: bringIntoView(box, () => askRef.current) };
   }, [!!closeAsk, closeAsk?.raised, earlierOpen, everyRun.length, ledger?.lines?.length]);
+  useEffect(() => () => { brought.current?.release(); brought.current = null; }, [item.product, item.id]);
 
   if (!ledger) return <ThreadWaiting head="Reading this conversation…" />;
   if (ledger.error) return <div className="thread-wait">{ledger.error}</div>;
@@ -464,13 +475,13 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const start = stands > gapIndex(events, omitted) ? stands : -1;
   const alone = !!newest && !working && stands < 0;
   const behind = start >= 0 ? earlierThan(events, start) + omitted : alone ? earlierCount(events, byApp ? null : outcome) + omitted : 0;
-  const short = !earlierOpen && drawnWhole(behind, broughtIn(item));
+  const short = !earlierOpen && drawnWhole(behind, { leads: alone, imported: broughtIn(item) });
   const from = short || earlierOpen ? -1 : start;
   const queueHead = queue && (
     <QueueSummary
       key={`${item.product}:${item.id}`}
       title={talkName ?? pageTitle(item)}
-      context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}
+      context={working && !queue.context ? workingContext(isCause(item) ? '' : item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}
       earlier={short ? 0 : behind}
       steps={!short && alone && (events.some((e) => e.kind === 'work') || after.length > 0)}
       open={earlierOpen}
@@ -500,6 +511,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       <>
         {queueHead}
         <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} />
+        <TeammateOffer item={item} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
         {signInHere}
@@ -583,6 +595,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
         thread.host,
       )}
       {answer}
+      <TeammateOffer item={item} />
       {afterList}
       {signInHere}
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}

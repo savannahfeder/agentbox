@@ -346,7 +346,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   const [jump, setJump] = useState(0);
   const seenJump = useRef(0);
   // Files folded shut from their header
-  // (tests/a-file-folds-shut-from-its-header.test.mjs). Folding the file in
+  // (tests/a-file-folds-shut-from-its-header.test.mts). Folding the file in
   // view keeps its header where it was.
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set(foldsFor(product, src)));
   const foldFile = (path: string, block: HTMLElement | null) => {
@@ -750,7 +750,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
   useEffect(() => { onFileAt(current?.path ?? null); }, [current?.path]);
 
   // Opening at a file named by a chip. The chip is drawn only when the change
-  // holds the file (fileInChange, shared/work-lines.mjs).
+  // holds the file (fileInChange, shared/work-lines.mts).
   useEffect(() => {
     if (startAt) goTo(startAt);
   }, [startAt, startAtFrom, files]);
@@ -876,7 +876,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
       {/* The file picker stands in for the tree when the pane is narrow. The
           chevron is drawn here, not by Chromium, so it matches the tree's; the
           select underneath is still the whole control
-          (tests/the-file-picker-draws-its-own-chevron.test.mjs). */}
+          (tests/the-file-picker-draws-its-own-chevron.test.mts). */}
       <div className="code-file-pick">
         <select className="code-file-picker" aria-label="File to review" value={current?.path ?? files[0]?.path ?? ''} onChange={e => goTo(e.target.value)}>{files.map(file => <option key={file.path} value={file.path}>{file.path}{unsaved.has(file.path) ? ' · Unsaved' : ''}</option>)}</select>
         <svg className="code-pick-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
@@ -898,7 +898,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
                 const next = new Set(shut);
                 if (next.has(row.key)) next.delete(row.key); else next.add(row.key);
                 // Folding moves only the tree, because `at` indexes `files`
-                // (tests/folding-the-tree-never-moves-the-code.test.mjs).
+                // (tests/folding-the-tree-never-moves-the-code.test.mts).
                 setShut(next);
               }}
             >
@@ -924,7 +924,7 @@ export function CodeArtifact({ product, src, change, startAt = null, startAtFrom
           )))}
         </div>
         {/* No key legend, here or as a hover, menu or "?"
-            (tests/the-code-pane-prints-no-key-legend.test.mjs). */}
+            (tests/the-code-pane-prints-no-key-legend.test.mts). */}
       </div>
 
       <div className="code-body" ref={bodyRef}>

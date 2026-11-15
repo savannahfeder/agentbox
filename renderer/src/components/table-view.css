@@ -149,13 +149,26 @@
 .tbl-showall:hover { color: var(--text); }
 
 /* A markdown table in a message: the same table, in the message's own flow.
-   Every row shows, nothing sticks, and it sits on the message's ground. */
+   Every row shows and it sits on the message's ground. The first column (and
+   the name beside a rank) stays put while the rest scrolls sideways, so it
+   needs that ground painted in; the left edge is drawn on it so it stays too. */
 .tbl-inline { margin: 18px 0; font-size: 14px; container-type: inline-size; }
 .tbl-inline .tbl-scroll { overflow-x: auto; overflow-y: visible; }
-.tbl-inline .tbl-grid { border-left: 1px solid var(--tbl-line); }
-.tbl-inline .tbl-tr > :nth-child(1), .tbl-inline .tbl-tr > :nth-child(2) { position: static; background: transparent; }
+.tbl-inline .tbl-grid { border-left: 0; }
 .tbl-inline .tbl-th { position: static; background: transparent; }
+/* Every header is a grid item with z-index 1, so what stays must sit above 1. */
+.tbl-inline .tbl-tr > :first-child { position: sticky; left: 0; z-index: 2; background: var(--surface); border-left: 1px solid var(--tbl-line); }
+.tbl-inline.tbl-ranked .tbl-tr > :nth-child(2) { position: sticky; left: var(--tbl-rn-w); z-index: 2; background: var(--surface); }
+.tbl-inline:not(.tbl-ranked) .tbl-tr > :nth-child(2) { position: static; z-index: auto; background: transparent; }
+/* Under a picture the ground is the skin's glass over the picture, so the
+   column paints that glass over the theme's ground colour. */
+:root[data-skin] .tbl-inline .tbl-tr > :first-child,
+:root[data-skin] .tbl-inline.tbl-ranked .tbl-tr > :nth-child(2) { background: linear-gradient(var(--skin-pane), var(--skin-pane)), var(--bg); }
 .tbl-inline .tbl-ell { max-width: 300px; }
+/* A long header wraps, so it does not set its column's width. */
+.tbl-inline .tbl-th { white-space: normal; align-items: flex-end; padding: 11px 16px; line-height: 15px; }
+.tbl-inline .tbl-th > .tbl-ell { white-space: normal; overflow: visible; max-width: none; }
+.tbl-inline .tbl-th.tbl-num { justify-content: flex-end; text-align: right; }
 
 /* ---- Working the table: beside the message and full screen. ---- */
 /* The pick is the table's own blue (its Contacted tag's dot), not a white or

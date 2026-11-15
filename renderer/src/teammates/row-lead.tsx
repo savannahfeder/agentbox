@@ -1,8 +1,8 @@
 // A thread a teammate's run sent you says whose it is before its title.
 import { createContext, useContext } from 'react';
 import type { Teammate, WorkItem } from '../types';
-import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mjs';
-import { REACH_LABEL } from '../../../shared/teammate-reach.mjs';
+import { teammateIdOf, OFFER_LABEL } from '../../../shared/teammates.mts';
+import { REACH_LABEL } from '../../../shared/teammate-reach.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { TeammateMark } from './TeammatesRail';
 

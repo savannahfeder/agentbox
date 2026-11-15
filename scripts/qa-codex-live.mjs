@@ -43,14 +43,14 @@ import os from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
-import { createCodexAppServer } from '../main/codex-app-server.mjs';
+import { createCodexAppServer } from '../main/codex-app-server.mts';
 import {
   createCodexWorker, workerThreadParams, resumeThreadParams, mcpServerNames,
 } from '../main/codex-session.mts';
 import { compactCodexThread } from '../main/codex-compaction.mts';
 import { denyOutput } from '../main/memory-gate-server.mts';
 import { codexLaunchEnv } from '../main/codex-launch-env.mts';
-import { resolveCodexBin } from '../main/codex-bin.mjs';
+import { resolveCodexBin } from '../main/codex-bin.mts';
 import { loggedCodexLimits, forgetLoggedLimits } from '../main/codex-usage-file.mts';
 import { codexLimits, codexPlan } from '../shared/codex-usage.mts';
 

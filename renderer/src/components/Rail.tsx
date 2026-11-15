@@ -187,7 +187,7 @@ export function Rail({ item, products, rows, now, onNotice }: {
 // on the right. So the rows are her work items in those three states
 // (`belongsOnTheRail`, list-rules.ts) together with the sessions she started
 // herself in a terminal in this product's folder (`onTheRail`,
-// shared/agents.mjs), which have no work item to be counted by. Both sets are
+// shared/agents.mts), which have no work item to be counted by. Both sets are
 // gathered in App.tsx.
 //
 // • No dot, and no mark of any kind. Ten ways of marking a live row were drawn

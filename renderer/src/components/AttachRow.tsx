@@ -4,7 +4,7 @@
 
 import { attachProblem, type Attaching, type PendingAttachment } from '../attachments';
 import { pictureUrl } from '../picture';
-import { overTheLimit, sizeWords, tooBigToSend } from '../../../shared/carried-files.mjs';
+import { overTheLimit, sizeWords, tooBigToSend } from '../../../shared/carried-files.mts';
 import { VoiceNote } from '../team/VoiceNote';
 import { voiceNoteOf } from '../team/voice-note';
 

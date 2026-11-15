@@ -1,8 +1,8 @@
 // WHAT A RUN CHANGED: the checkout read back against its photograph, then the
 // change file written. Git commands and a whole transcript, so it runs on the
 // git thread (main/git-change-offthread.mts), not on the app's main thread.
-import { changeFromRepo } from './git-change.mjs';
-import { writeChangeForRun } from './code-change.mjs';
+import { changeFromRepo } from './git-change.mts';
+import { writeChangeForRun } from './code-change.mts';
 
 export interface RunChangeInput {
   repoBefore?: Parameters<typeof changeFromRepo>[0] | null;

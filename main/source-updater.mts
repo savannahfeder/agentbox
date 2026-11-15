@@ -32,10 +32,12 @@
 
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import type { PathLike } from 'node:fs';
+import { leftFromARelease } from '../shared/release-leftover.mts';
 import { describe } from './updater.mts';
 import type { UpdaterState, UpdaterView } from './updater.mts';
-import { loginShell } from './shell-path.mjs';
+import { loginShell } from './shell-path.mts';
 
 const FIRST_CHECK_MS = 20_000;
 const EVERY_MS = 30 * 60 * 1000;
@@ -66,18 +68,17 @@ const SAY = {
 // rewrites shared/*.generated.mjs with the version and date of the Claude Code
 // on this Mac, and the restart below runs that build. Counted as her changes,
 // they made every update after the first say "changes of your own" for good
-// (tests/a-build-does-not-stop-the-next-update.test.mjs).
+// (tests/a-build-does-not-stop-the-next-update.test.mts).
 //
 // THE LOCKFILE IS NPM'S, TOO (2026-10-07). The restart's `npm install` rewrote
 // package-lock.json (this npm drops its `libc` lines), and the card never came
 // back while main ran 21 commits ahead. An edit to the dependencies themselves
 // is in package.json, which still blocks
-// (tests/a-package-install-does-not-stop-the-next-update.test.mjs).
+// (tests/a-package-install-does-not-stop-the-next-update.test.mts).
 const isBuildOutput = (file: string) => file === 'package-lock.json' || /^shared\/[^/]+\.generated\.[cm]?[jt]s$/.test(file);
 // The status code is one or two letters and `gitIn` trims the output, which
 // takes the leading space off the first line, so it is matched, not sliced.
 const changedPaths = (porcelain: unknown) => String(porcelain ?? '').split('\n').filter(Boolean).map((l) => l.replace(/^[ MADRCUT?!]{1,2} /, '').replace(/^"|"$/g, ''));
-const theirEdits = (porcelain: unknown) => changedPaths(porcelain).filter((f) => !isBuildOutput(f));
 
 function gitIn(appDir: string) {
   return (args: string[], { timeout = 30_000 }: { timeout?: number } = {}) => new Promise<GitResult>((resolve) => {
@@ -116,7 +117,7 @@ function collect(bin: string, args: string[], { cwd, timeout }: { cwd: string; t
 // WHICH npm. Started with `npm start`, the process carries npm's own path in
 // its environment, so that one is used and nvm or a version manager never
 // matters. Started any other way, their login shell is asked, the way
-// main/claude-bin.mjs finds Claude Code, and only a shell this machine has: a
+// main/claude-bin.mts finds Claude Code, and only a shell this machine has: a
 // Linux launcher start carries no SHELL, so the old `|| '/bin/zsh'` was a path
 // to nothing and every update on a box without zsh failed in two seconds. With
 // no shell at all, npm on PATH is the better guess. The arguments are fixed
@@ -204,6 +205,20 @@ export function createSourceUpdater({
     try { onChanged(describe(state)); } catch {}
   };
 
+  // The changed files that are not her edits: what the build and npm rewrite,
+  // and a package.json a deploy cut short left behind.
+  async function notHers(porcelain: string) {
+    const files = changedPaths(porcelain);
+    const ours = files.filter(isBuildOutput);
+    if (files.includes('package.json')) {
+      const committed = await git(['show', 'HEAD:package.json']);
+      let current = '';
+      try { current = fs.readFileSync(path.join(appDir, 'package.json'), 'utf8'); } catch { /* gone: hers */ }
+      if (committed.code === 0 && leftFromARelease(committed.out, current)) ours.push('package.json');
+    }
+    return { ours, hers: files.filter((f) => !ours.includes(f)) };
+  }
+
   // Everything that has to be true before an update is offered or applied.
   // Returns the upstream commit, or the sentence saying why not.
   async function preconditions(): Promise<{ why: string; up?: undefined } | { up: string; why?: undefined }> {
@@ -211,7 +226,7 @@ export function createSourceUpdater({
     const upstream = await git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
     if (upstream.code !== 0) return { why: SAY.noUpstream };
     const dirty = await git(['status', '--porcelain', '--untracked-files=no']);
-    if (dirty.code !== 0 || theirEdits(dirty.out).length) return { why: SAY.dirty };
+    if (dirty.code !== 0 || (await notHers(dirty.out)).hers.length) return { why: SAY.dirty };
     const ahead = await git(['merge-base', '--is-ancestor', 'HEAD', '@{u}']);
     if (ahead.code !== 0) return { why: SAY.diverged };
     const up = await git(['rev-parse', '@{u}']);
@@ -269,11 +284,11 @@ export function createSourceUpdater({
       return;
     }
     const head = await git(['rev-parse', 'HEAD']);
-    // What the last build stamped goes back first, so the fast-forward can
-    // never trip on it. The build below writes it again.
+    // What the last build or deploy stamped goes back first, so the
+    // fast-forward can never trip on it. The build below writes it again.
     const stamped = await git(['status', '--porcelain', '--untracked-files=no']);
-    const buildOutput = stamped.code === 0 ? changedPaths(stamped.out).filter(isBuildOutput) : [];
-    if (buildOutput.length) await git(['checkout', '--', ...buildOutput]);
+    const ours = stamped.code === 0 ? (await notHers(stamped.out)).ours : [];
+    if (ours.length) await git(['checkout', '--', ...ours]);
     if (head.out !== ok.up) {
       const merged = await git(['merge', '--ff-only', '--quiet', '@{u}']);
       if (merged.code !== 0) {
@@ -283,7 +298,7 @@ export function createSourceUpdater({
     }
     // Packages changed when either file's object id moved. Compared by id
     // rather than by asking git for a diff, which this process does in exactly
-    // one file (tests/the-old-git-diff-screen-stays-gone.test.mjs).
+    // one file (tests/the-old-git-diff-screen-stays-gone.test.mts).
     let depsMoved = false;
     for (const file of ['package.json', 'package-lock.json']) {
       const was = await git(['rev-parse', '--verify', '--quiet', `${bootHead}:${file}`]);

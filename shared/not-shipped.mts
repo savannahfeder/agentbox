@@ -5,7 +5,7 @@
 // from the writers. The agent's last message was written before either, and
 // usually says the work is shipping, so these notes are what has to be shown.
 
-import { isShippedNote } from './shipped-note.mjs';
+import { isShippedNote } from './shipped-note.mts';
 import { NOT_PUSHED } from './github-push-sign-in.mts';
 
 export const SHIP_FAILED: string = 'It did not ship, and it went back to its agent: ';

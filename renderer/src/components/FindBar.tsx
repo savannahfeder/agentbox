@@ -39,7 +39,7 @@ function textOnScreen(): { runs: TextRun[]; nodes: Text[] } {
   const visible = (el: Element) => {
     let v = seen.get(el);
     if (v === undefined) {
-      const check = (el as any).checkVisibility;
+      const check: Element['checkVisibility'] | undefined = el.checkVisibility;
       v = typeof check === 'function' ? check.call(el, { visibilityProperty: true, checkVisibilityCSS: true }) : true;
       seen.set(el, v!);
     }
@@ -77,8 +77,8 @@ const ALL = 'find-match';
 const CURRENT = 'find-current';
 
 function paint(ranges: Range[], current: number) {
-  const registry = (CSS as any).highlights;
-  const Highlight = (window as any).Highlight;
+  const registry: HighlightRegistry | undefined = CSS.highlights;
+  const Highlight: typeof window.Highlight | undefined = window.Highlight;
   if (!registry || !Highlight) return;
   registry.set(ALL, new Highlight(...ranges));
   if (current >= 0 && ranges[current]) registry.set(CURRENT, new Highlight(ranges[current]));
@@ -86,7 +86,7 @@ function paint(ranges: Range[], current: number) {
 }
 
 function unpaint() {
-  const registry = (CSS as any).highlights;
+  const registry: HighlightRegistry | undefined = CSS.highlights;
   registry?.delete(ALL);
   registry?.delete(CURRENT);
 }
@@ -175,7 +175,7 @@ export function FindBar() {
 
   // The key, from the main process, wherever the keyboard was.
   useEffect(() => {
-    const off = (window as any).zero?.onFind?.((payload: { step?: number }) => {
+    const off = window.zero?.onFind?.((payload: { step?: number }) => {
       const s = Number(payload?.step) || 0;
       if (!openRef.current) {
         const active = document.activeElement;

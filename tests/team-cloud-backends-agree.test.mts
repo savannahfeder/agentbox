@@ -1,0 +1,343 @@
+// THE IN-MEMORY CLOUD AND THE REAL ONE BEHAVE THE SAME.
+//
+// The sync engine and the app are tested against main/team/memory-cloud.mts,
+// because a test that needs the network is a test nobody runs. That is only
+// worth anything if the memory cloud keeps the real database's rules. So one
+// scenario (a team forms, a project is shared, lines go back and forth,
+// private work is published) runs against both.
+//
+// The memory run is always on. The live run needs the hosted project's
+// service key in TEAM_SERVICE_KEY, which it uses only to make three
+// throwaway people and to delete everything they made afterwards:
+//   TEAM_SERVICE_KEY=... npx vitest run tests/team-cloud-backends-agree.test.mts
+import { it, expect, describe, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
+import { supabaseBackend } from '../main/team/supabase-backend.mts';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function memoryWorld() {
+  const cloud = createMemoryCloud();
+  const people = {};
+  for (const [name, email] of [['Maya', 'maya@northwind.test'], ['Theo', 'theo@northwind.test'], ['Jun', 'jun@elsewhere.test']]) {
+    people[name.toLowerCase()] = memoryBackend(cloud, signUpMemory(cloud, { email, name }));
+  }
+  return { ...people, emails: { theo: 'theo@northwind.test', jun: 'jun@elsewhere.test' }, cleanup: async () => {} };
+}
+
+async function liveWorld() {
+  const { createClient } = await import('@supabase/supabase-js');
+  const config = JSON.parse(fs.readFileSync(path.join(root, 'cloud/team.config.json'), 'utf8'));
+  const admin = createClient(config.url, process.env.TEAM_SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const tag = crypto.randomBytes(4).toString('hex');
+  const made = [];
+  const people = {};
+  const emails = {};
+  for (const name of ['Maya', 'Theo', 'Jun']) {
+    const email = `team-test-${tag}-${name.toLowerCase()}@example.com`;
+    const password = crypto.randomBytes(18).toString('base64url');
+    const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: `${name} Test` } });
+    if (error) throw error;
+    made.push(data.user.id);
+    const client = createClient(config.url, config.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+    const signed = await client.auth.signInWithPassword({ email, password });
+    if (signed.error) throw signed.error;
+    people[name.toLowerCase()] = supabaseBackend(client);
+    emails[name.toLowerCase()] = email;
+  }
+  return {
+    ...people, emails,
+    // Fails loudly: a silent failure here once left test people in the
+    // real project (the admin role had no table rights).
+    cleanup: async () => {
+      const teams = await admin.from('teams').delete().in('created_by', made);
+      if (teams.error) throw new Error(`could not delete the test team: ${teams.error.message}`);
+      for (const id of made) {
+        const gone = await admin.auth.admin.deleteUser(id);
+        if (gone.error) throw new Error(`could not delete test person ${id}: ${gone.error.message}`);
+      }
+    },
+  };
+}
+
+const worlds = [['in memory', memoryWorld, true], ['on the hosted project', liveWorld, !!process.env.TEAM_SERVICE_KEY]];
+
+for (const [where, makeWorld, enabled] of worlds) {
+  describe.skipIf(!enabled)(`the shared cloud ${where}`, () => {
+    let w;
+    let team;
+    const shared = crypto.randomUUID();
+    const secret = crypto.randomUUID();
+    const line = (who, n) => ({ id: 'w-abcdef', ts: n, source: 'founder', by: who.personId, uid: `l-${shared.slice(0, 8)}-${n}`, patch: { note: `n${n}` } });
+
+    beforeAll(async () => {
+      w = await makeWorld();
+      await w.maya.me();
+      await w.theo.me();
+      await w.jun.me();
+      team = await w.maya.createTeam('Northwind');
+      await w.maya.invite(team.id, w.emails.theo.toUpperCase());
+      await w.theo.acceptInvite(team.id);
+    }, 60_000);
+    afterAll(async () => { await w?.cleanup(); }, 60_000);
+
+    it('puts an invited teammate on the team and leaves a stranger off it', async () => {
+      expect((await w.theo.myTeam())?.id).toBe(team.id);
+      expect((await w.theo.teamPeople(team.id)).map((p) => p.name).sort()).toEqual(['Maya', 'Theo'].map((n) => expect.stringContaining(n)));
+      expect(await w.jun.myTeam()).toBeNull();
+    });
+
+    it('offers an invite without joining, and uses one up once accepted', async () => {
+      await w.maya.invite(team.id, w.emails.jun);
+      expect((await w.jun.pendingInvites()).map((i) => [i.teamId, i.teamName])).toEqual([[team.id, 'Northwind']]);
+      expect(await w.jun.myTeam()).toBeNull();
+      expect(await w.theo.pendingInvites()).toEqual([]);
+      await expect(w.theo.acceptInvite(team.id)).rejects.toThrow();
+    });
+
+    it('shows a project shared with the team to the team and nobody else', async () => {
+      await w.maya.shareProject({ id: shared, teamId: team.id, name: 'Website', visibility: 'team' });
+      expect((await w.theo.listProjects()).map((p) => p.id)).toContain(shared);
+      expect(await w.jun.listProjects()).toEqual([]);
+    });
+
+    it('carries lines across in order, and a line pushed twice once', async () => {
+      expect(await w.maya.pushLines(shared, [line(w.maya, 1), line(w.maya, 2)])).toBe(2);
+      expect(await w.maya.pushLines(shared, [line(w.maya, 1)])).toBe(0);
+      const all = await w.theo.pullLines(shared, 0);
+      expect(all.map((r) => r.line.patch.note)).toEqual(['n1', 'n2']);
+      const after = await w.theo.pullLines(shared, all[0].seq);
+      expect(after.map((r) => r.line.patch.note)).toEqual(['n2']);
+    });
+
+    // Review 2026-10-01: a pulled line's ts, claim and epoch came straight from
+    // the body its writer's Mac sent, so a teammate could date a line into the
+    // future to outrank every later edit, or hand this Mac a worker's lease.
+    it('dates a teammate\'s line by the server and drops the lease it carried', async () => {
+      const sent = { ...line(w.maya, 9), ts: 1, epoch: 7, claim: { holder: 'h', leaseUntil: 9e15 }, release: true, heartbeat: true };
+      await w.maya.pushLines(shared, [sent]);
+      const got = (await w.theo.pullLines(shared, 0)).find((r) => r.line.uid === sent.uid).line;
+      expect(Math.abs(got.ts - Date.now())).toBeLessThan(10 * 60_000);
+      expect(['claim', 'epoch', 'release', 'heartbeat'].filter((k) => k in got)).toEqual([]);
+      expect(got.by).toBe(w.maya.personId);
+    });
+
+    it('refuses a line pushed as somebody else', async () => {
+      await expect(w.theo.pushLines(shared, [line(w.maya, 3)])).rejects.toThrow();
+    });
+
+    it('keeps a project shared with specific people from the rest of the team', async () => {
+      await w.maya.shareProject({ id: secret, teamId: team.id, name: 'Board deck', visibility: 'people', people: [] });
+      expect((await w.theo.listProjects()).map((p) => p.id)).not.toContain(secret);
+      await w.maya.shareProject({ id: secret, teamId: team.id, name: 'Board deck', visibility: 'people', people: [w.theo.personId] });
+      expect((await w.theo.listProjects()).find((p) => p.id === secret)?.people).toEqual([w.theo.personId]);
+    });
+
+    // A small group now (2026-10-01, 20261001000700): its maker and up to eleven others.
+    it('keeps a message record to a small group', async () => {
+      await w.maya.shareProject({ id: crypto.randomUUID(), teamId: team.id, name: 'Direct', visibility: 'people', people: [w.theo.personId, w.jun.personId], direct: true });
+      const twelve = Array.from({ length: 12 }, () => crypto.randomUUID());
+      await expect(w.maya.shareProject({ id: crypto.randomUUID(), teamId: team.id, name: 'Direct', visibility: 'people', people: twelve, direct: true })).rejects.toThrow();
+    });
+
+    // WHO HAS OPENED A CONVERSATION (20261101000000_a_conversation_says_who_has_seen_it.sql):
+    // the lines' rule, your own mark only, and the cloud's time on it.
+    it('keeps a read mark to the people who can see the conversation', async () => {
+      const direct = crypto.randomUUID();
+      await w.maya.shareProject({ id: direct, teamId: team.id, name: 'Direct', visibility: 'people', people: [w.theo.personId], direct: true });
+      await w.theo.markSeen(direct, 'w-0123456789');
+      await w.theo.markSeen(direct, 'w-0123456789');
+      const seen = (await w.maya.seenMarks()).filter((m) => m.projectId === direct);
+      expect(seen.map((m) => [m.itemId, m.personId])).toEqual([['w-0123456789', w.theo.personId]]);
+      expect(Math.abs(seen[0].at - Date.now())).toBeLessThan(10 * 60_000);
+      expect((await w.jun.seenMarks()).filter((m) => m.projectId === direct)).toEqual([]);
+      await expect(w.jun.markSeen(direct, 'w-0123456789')).rejects.toThrow();
+      await expect(w.theo.markSeen(direct, 'not-a-row')).rejects.toThrow();
+    });
+
+    // A private thread publishes no card at all (decided 2026-10-01), and a
+    // card not marked visible that reaches a backend anyway never goes up.
+    it('publishes a thread card to the team, never a private one, and can take it back', async () => {
+      const card = { threadId: 'w-1', visible: true, title: 'Acme renewal terms', project: 'Northwind', state: 'running', priority: 7, problem: 'P', progress: 'Q', solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 };
+      await w.theo.putCards(team.id, [card, { threadId: 'w-2', visible: false, title: null, project: null, state: 'waiting', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 }]);
+      const seen = (await w.maya.listCards()).filter((c) => c.personId === w.theo.personId).sort((a, b) => a.threadId.localeCompare(b.threadId));
+      expect(seen.map((c) => [c.threadId, c.visible, c.title, c.state])).toEqual([['w-1', true, 'Acme renewal terms', 'running']]);
+      expect(await w.jun.listCards()).toEqual([]);
+      await w.theo.putCards(team.id, [{ ...card, threadId: 'w-3', visible: false }]);
+      expect((await w.maya.listCards()).filter((c) => c.personId === w.theo.personId)).toEqual([]);
+      await w.theo.putCards(team.id, []);
+      expect((await w.maya.listCards()).filter((c) => c.personId === w.theo.personId)).toEqual([]);
+    });
+
+    it('a card says when its thread shipped, and one that has not says nothing', async () => {
+      const card = { threadId: 'w-4', visible: true, title: 'Fix', project: 'Northwind', state: 'done', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 };
+      await w.theo.putCards(team.id, [{ ...card, shippedAt: 1_790_000_000_500 }, { ...card, threadId: 'w-5' }]);
+      const seen = (await w.maya.listCards()).filter((c) => c.personId === w.theo.personId).sort((a, b) => a.threadId.localeCompare(b.threadId));
+      expect(seen.map((c) => [c.threadId, c.shippedAt])).toEqual([['w-4', 1_790_000_000_500], ['w-5', undefined]]);
+      await w.theo.putCards(team.id, []);
+    });
+
+    // SHARED WITH CHOSEN PEOPLE (w-41ff964775, 20261001000800). No list is the
+    // whole team; a list reaches exactly those people; an empty list is
+    // refused rather than read as everyone. Jun is on another team here, so
+    // the third person who must not see it is Maya.
+    it('shows a card with a list of people only to the people on it', async () => {
+      const card = { threadId: 'w-chosen', visible: true, title: 'Pay review', project: 'Northwind', state: 'running', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 };
+      await w.theo.putCards(team.id, [{ ...card, people: [w.theo.personId] }]);
+      expect((await w.maya.listCards()).filter((c) => c.threadId === 'w-chosen')).toEqual([]);
+      expect((await w.theo.listCards()).map((c) => c.title)).toEqual(['Pay review']);
+
+      await w.theo.putCards(team.id, [{ ...card, people: [w.maya.personId] }]);
+      expect((await w.maya.listCards()).map((c) => c.title)).toEqual(['Pay review']);
+
+      await expect(w.theo.putCards(team.id, [{ ...card, people: [] }])).rejects.toThrow();
+    });
+
+    // A SHARED THREAD'S WORK (20261030120000_shared_threads_carry_their_work.sql):
+    // readable and open to comment only while the card is, and gone with it.
+    it('holds a thread\'s work, files and comments to its card', async () => {
+      const card = { threadId: 'w-work', visible: true, title: 'Work', project: 'Northwind', state: 'done', priority: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: 1_790_000_000_000 };
+      const work = { lines: [{ id: 'w-work', ts: 1, source: 'agent', patch: { result: 'Answer' } }], earlier: 0, files: ['a.png'] };
+      await expect(w.theo.putThreadWork(team.id, { threadId: 'w-work', hash: 'h', work })).rejects.toThrow();
+
+      await w.theo.putCards(team.id, [card]);
+      await w.theo.putThreadFile('w-work', 'a.png', 'QQ==');
+      await w.theo.putThreadWork(team.id, { threadId: 'w-work', hash: 'h', work });
+      expect((await w.maya.threadWorkHeads()).map((h) => [h.personId, h.threadId, h.hash])).toEqual([[w.theo.personId, 'w-work', 'h']]);
+      expect((await w.maya.getThreadWork(w.theo.personId, 'w-work')).work).toEqual(work);
+      expect(await w.maya.getThreadFile(w.theo.personId, 'w-work', 'a.png')).toBe('QQ==');
+      expect(await w.theo.threadFileNames('w-work')).toEqual(['a.png']);
+      const said = await w.maya.addThreadComment(w.theo.personId, 'w-work', 'Nice');
+      expect(said).toMatchObject({ owner: w.theo.personId, threadId: 'w-work', by: w.maya.personId, text: 'Nice' });
+      expect((await w.theo.threadComments()).map((c) => c.text)).toEqual(['Nice']);
+
+      expect(await w.jun.threadWorkHeads()).toEqual([]);
+      expect(await w.jun.getThreadWork(w.theo.personId, 'w-work')).toBeNull();
+      expect(await w.jun.getThreadFile(w.theo.personId, 'w-work', 'a.png')).toBeNull();
+      expect(await w.jun.threadComments()).toEqual([]);
+      await expect(w.jun.addThreadComment(w.theo.personId, 'w-work', 'Hi')).rejects.toThrow();
+      await expect(w.maya.addThreadComment(w.theo.personId, 'w-work', '  ')).rejects.toThrow();
+
+      const mark = { do: 'note', id: 'n1', file: 'a.png', place: { kind: 'pin', x: 0.5, y: 0.5 }, text: 'Lower' };
+      await w.maya.addFileMark(w.theo.personId, 'w-work', { id: 'm1', mark });
+      await w.maya.addFileMark(w.theo.personId, 'w-work', { id: 'm1', mark });
+      expect(await w.theo.fileMarks()).toMatchObject([{ id: 'm1', owner: w.theo.personId, threadId: 'w-work', by: w.maya.personId, mark }]);
+      expect(await w.jun.fileMarks()).toEqual([]);
+      await expect(w.jun.addFileMark(w.theo.personId, 'w-work', { id: 'm2', mark })).rejects.toThrow();
+
+      // Folders: a folder says who reads it; a file's place hangs on the card.
+      await w.theo.putFileFolder(team.id, { id: 'f-launch', project: 'Northwind', name: 'Launch', parent: null, people: null, at: 1 });
+      await w.theo.putFileFolder(team.id, { id: 'f-board', project: 'Northwind', name: 'Board', parent: null, people: [w.theo.personId], at: 1 });
+      expect((await w.maya.fileFolders()).map((f) => f.name)).toEqual(['Launch']);
+      expect(await w.jun.fileFolders()).toEqual([]);
+      await w.maya.putFileFolder(team.id, { id: 'f-launch', project: 'Northwind', name: 'Launch day', parent: null, people: null, at: 2 });
+      expect((await w.theo.fileFolders()).find((f) => f.id === 'f-launch')).toMatchObject({ name: 'Launch day', by: w.theo.personId, at: 2 });
+      await expect(w.jun.putFileFolder(team.id, { id: 'f-jun', project: 'Northwind', name: 'Mine', parent: null, people: null, at: 1 })).rejects.toThrow();
+      await expect(w.maya.putFileFolder(team.id, { id: 'f-board', project: 'Northwind', name: 'Taken', parent: null, people: null, at: 3 })).rejects.toThrow();
+      await w.maya.placeFile(w.theo.personId, 'w-work', { project: 'Northwind', family: 'a/image', folder: 'f-launch', at: 1 });
+      await w.maya.placeFile(w.theo.personId, 'w-work', { project: 'Northwind', family: 'a/image', folder: 'f-launch', at: 2 });
+      expect(await w.theo.filePlaces()).toMatchObject([{ owner: w.theo.personId, threadId: 'w-work', family: 'a/image', folder: 'f-launch', by: w.maya.personId, at: 2 }]);
+      expect(await w.jun.filePlaces()).toEqual([]);
+      await expect(w.jun.placeFile(w.theo.personId, 'w-work', { project: 'Northwind', family: 'b/image', folder: null, at: 1 })).rejects.toThrow();
+      await expect(w.maya.placeFile(w.theo.personId, 'w-work', { project: 'Northwind', family: 'b/image', folder: 'f-board', at: 1 })).rejects.toThrow();
+
+      // Chosen people: the list decides, on the same row.
+      await w.theo.putCards(team.id, [{ ...card, people: [w.theo.personId] }]);
+      expect(await w.maya.threadWorkHeads()).toEqual([]);
+      expect(await w.maya.getThreadFile(w.theo.personId, 'w-work', 'a.png')).toBeNull();
+      await expect(w.maya.addThreadComment(w.theo.personId, 'w-work', 'Hi')).rejects.toThrow();
+
+      await w.theo.pruneThreadFiles('w-work', []);
+      expect(await w.theo.threadFileNames('w-work')).toEqual([]);
+
+      await w.theo.putCards(team.id, []);
+      expect(await w.theo.threadWorkHeads()).toEqual([]);
+      expect(await w.theo.threadComments()).toEqual([]);
+    });
+
+    // HER THREADS ON HER PHONE (20261014000200_phone_inbox.sql): her own
+    // rows, read by nobody else, not even a teammate, and a command marked
+    // once only by her.
+    it('keeps the phone rows to their owner, teammate or not', async () => {
+      const project = `phone-${shared.slice(0, 8)}`;
+      const device = 'a1b2c3d4e5f6';
+      await w.maya.putPhoneProject({ device, project, name: 'Website' });
+      await w.maya.putPhoneThreads(device, project, [{ item: 'w-1', snapshot: { v: 3, item: { id: 'w-1', title: 'Hi' }, history: [] } }]);
+      expect((await w.maya.phoneThreads()).filter((t) => t.project === project).map((t) => [t.device, t.item, t.snapshot.item.title])).toEqual([[device, 'w-1', 'Hi']]);
+      expect(await w.theo.phoneThreads()).toEqual([]);
+      expect(await w.jun.phoneProjects()).toEqual([]);
+
+      const cmd = await w.maya.addPhoneCommand({ device, project, item: 'w-1', kind: 'reply', payload: { text: 'yes' } });
+      expect(await w.theo.waitingPhoneCommands(device)).toEqual([]);
+      expect(await w.maya.waitingPhoneCommands('0f0e0d0c0b0a')).toEqual([]);
+      await w.theo.markPhoneCommand(cmd.id, 'done');
+      expect((await w.maya.waitingPhoneCommands(device)).map((c) => c.id)).toEqual([cmd.id]);
+      await w.maya.markPhoneCommand(cmd.id, 'done');
+      await w.maya.markPhoneCommand(cmd.id, 'refused: late');
+      expect((await w.maya.phoneCommands()).find((c) => c.id === cmd.id)?.outcome).toBe('done');
+      expect(await w.maya.waitingPhoneCommands(device)).toEqual([]);
+
+      await w.maya.dropPhoneProject(device, project);
+      expect((await w.maya.phoneThreads()).filter((t) => t.project === project)).toEqual([]);
+    });
+
+    // HER COMPUTER'S SETTINGS FOR HER PHONE (20261023000000_phone_settings.sql).
+    it('keeps a computer\'s settings to their owner, and a setting command to no project', async () => {
+      const device = 'a1b2c3d4e5f6';
+      await w.maya.putPhoneSettings({ device, name: 'Studio Mac', settings: { v: 1, workspace: { adhdMode: true } } });
+      await w.maya.putPhoneSettings({ device, name: 'Studio Mac', settings: { v: 1, workspace: { adhdMode: false } } });
+      expect((await w.maya.phoneSettings()).map((s) => [s.device, s.name, s.settings.workspace.adhdMode])).toEqual([[device, 'Studio Mac', false]]);
+      expect(await w.theo.phoneSettings()).toEqual([]);
+      await expect(w.theo.putPhoneSettings({ owner: w.maya.personId, device, name: 'x', settings: {} })).rejects.toThrow();
+      const cmd = await w.maya.addPhoneCommand({ device, kind: 'setting', payload: { scope: 'workspace', key: 'adhdMode', value: true } });
+      expect([cmd.project, cmd.item]).toEqual([null, null]);
+      await expect(w.maya.addPhoneCommand({ device, project: 'alpha', kind: 'setting', payload: {} })).rejects.toThrow();
+      await w.maya.markPhoneCommand(cmd.id, 'done');
+    });
+
+    // THE PHONES HER ALERTS GO TO (20261025000000_push_devices.sql).
+    it('keeps the phones her alerts go to to their owner', async () => {
+      const token = `ExponentPushToken[${shared.replace(/-/g, '').slice(0, 22)}]`;
+      await w.maya.putPushDevice({ token, platform: 'ios', appVersion: '1.0.0' });
+      await w.maya.putPushDevice({ token, platform: 'ios', appVersion: '1.0.1' });
+      expect((await w.maya.pushDevices()).filter((d) => d.token === token).map((d) => d.appVersion)).toEqual(['1.0.1']);
+      expect(await w.theo.pushDevices()).toEqual([]);
+      await w.theo.dropPushDevice(token);
+      expect((await w.maya.pushDevices()).map((d) => d.token)).toContain(token);
+      await w.maya.dropPushDevice(token);
+      expect((await w.maya.pushDevices()).map((d) => d.token)).not.toContain(token);
+    });
+
+    // A STATUS LINE YOU WRITE YOURSELF (w-0b54ee983f).
+    it('carries a status line to the team and clears it again', async () => {
+      const until = Date.now() + 2 * 86_400_000;
+      await w.theo.setStatus({ text: 'At the Acme onsite, back Monday', until });
+      const mine = (people) => people.find((p) => p.id === w.theo.personId)?.status ?? null;
+      expect(mine(await w.maya.teamPeople(team.id))).toEqual({ text: 'At the Acme onsite, back Monday', until });
+      expect((await w.theo.me()).status.text).toBe('At the Acme onsite, back Monday');
+      expect(await w.jun.teamPeople(team.id)).toEqual([]);
+      await w.theo.setStatus({ text: '', until: null });
+      expect(mine(await w.maya.teamPeople(team.id))).toBeNull();
+    });
+
+    // A PERSON WHO LEAVES HANDS THEIR WORK TO SOMEONE (20261101093000). Last,
+    // because Theo is off the team after it.
+    it('lets only the owner remove someone and name who takes their work, and keeps that record to the team', async () => {
+      const mates = [{ id: 'tm-support', name: 'Support lead', job: 'Answer user emails.', to: w.maya.personId }];
+      await expect(w.theo.removeMember(team.id, w.maya.personId, { handTo: w.theo.personId, name: 'Maya', mates: [] })).rejects.toThrow();
+      await expect(w.maya.removeMember(team.id, w.theo.personId, { handTo: w.jun.personId, name: 'Theo', mates: [] })).rejects.toThrow();
+      await expect(w.maya.removeMember(team.id, w.theo.personId, { handTo: w.maya.personId, name: 'Theo', mates: [{ ...mates[0], to: w.jun.personId }] })).rejects.toThrow();
+      expect(await w.maya.departures(team.id)).toEqual([]);
+      await w.maya.removeMember(team.id, w.theo.personId, { handTo: w.maya.personId, name: 'Theo', mates });
+      const [d] = await w.maya.departures(team.id);
+      expect(d).toMatchObject({ personId: w.theo.personId, name: 'Theo', handTo: w.maya.personId, mates });
+      expect((await w.maya.teamPeople(team.id)).map((p) => p.id)).not.toContain(w.theo.personId);
+      expect(await w.theo.departures(team.id)).toEqual([]);
+      expect(await w.jun.departures(team.id)).toEqual([]);
+    });
+  });
+}

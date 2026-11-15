@@ -79,7 +79,7 @@ export function capWord(glyph: string, mac: boolean = MAC): string | null {
  *
  *  A component opts in by writing `data-hint="<id>"` on itself; the id is
  *  looked up here. Adding a component means adding it in both places, and
- *  `tests/the-hint-plate.test.mjs` holds the two lists to each other so a
+ *  `tests/the-hint-plate.test.mts` holds the two lists to each other so a
  *  `data-hint` with nothing to say cannot ship.
  */
 export const HINTS: Record<string, HintLine[]> = {
@@ -139,6 +139,8 @@ export const HINTS: Record<string, HintLine[]> = {
   // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.
   summary: [{ key: 'S', what: 'Show or hide the summary' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
+  // The Inbox button left of the back arrow, drawn only on a thread.
+  inbox: [{ key: 'esc', what: 'Inbox' }],
   // The up and down arrows on a thread in Needs you (w-65bcefb857).
   'previous-thread': [{ key: 'K', what: 'Previous thread' }],
   'next-thread': [{ key: 'J', what: 'Next thread' }],

@@ -2,7 +2,7 @@
 // when no box has the keyboard, and what the box says about its own words.
 import { chord } from './this-keyboard';
 import { PICK_SETTLES_MS } from './pick-settles';
-import { PLAIN_AGENT, voiceName } from '../../shared/agent-voice.mjs';
+import { PLAIN_AGENT, voiceName } from '../../shared/agent-voice.mts';
 
 export type BoxKey = 'send' | 'new line' | 'leave';
 

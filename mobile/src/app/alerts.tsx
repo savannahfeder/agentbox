@@ -16,7 +16,7 @@ export default function Alerts() {
   const done = () => { appStore.setItem(ALERTS_ASKED_KEY, '1'); leaveSetup(); };
   const turnOn = async () => {
     setBusy(true); setError(null);
-    try { await c.turnOnAlerts(); done(); } catch (err: any) { setError(String(err?.message ?? err)); } finally { setBusy(false); }
+    try { await c.turnOnAlerts(); done(); } catch (err) { setError(String((err as Error)?.message ?? err)); } finally { setBusy(false); }
   };
   return (
     <Screen top={24} foot={<><Btn kind="primary" label={busy ? 'Turning on…' : 'Turn on alerts'} disabled={busy} onPress={turnOn} /><Btn kind="quiet" label="Not now" onPress={done} /></>}>

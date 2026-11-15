@@ -22,7 +22,10 @@ import { installStrayLetters } from './stray-letters';
 import { installFullScreenEscape } from './full-screen-escape';
 import { onASharedFilePage } from './shared-file/route';
 import { bootSharedFile } from './shared-file/boot';
+import { bootSharedThread } from './shared-thread/boot';
+import { sharedThreadOf } from './shared-thread/shared-thread';
 import { readCloudConfig } from './cloud-bridge';
+import { keepACopyOfTheDrafts } from './draft-copy';
 
 // A thrown React error takes the screen down without taking the process down,
 // so nothing in the main process ever hears about it. These two lines are the
@@ -56,7 +59,7 @@ window.addEventListener('error', (e) => {
   comeBack();
 });
 window.addEventListener('unhandledrejection', (e) => {
-  const r: any = (e as PromiseRejectionEvent).reason;
+  const r: { name?: string; message?: string; stack?: string } | null | undefined = (e as PromiseRejectionEvent).reason;
   sendCrash(r?.name ?? 'UnhandledRejection', r?.message ?? String(r ?? ''), r?.stack ?? '');
 });
 
@@ -65,7 +68,9 @@ window.addEventListener('unhandledrejection', (e) => {
 // a dark room.
 // A file shared by its link is its own page on the web app, dark unless this browser chose otherwise.
 const sharedFile = onASharedFilePage();
-if (!sharedFile) normalizeSavedLook(localStorage, machineTheme());
+// A thread's link is a page of its own on the web app too.
+const sharedThread = sharedFile ? null : sharedThreadOf(location.pathname, !!readCloudConfig(document));
+if (!sharedFile && !sharedThread) normalizeSavedLook(localStorage, machineTheme());
 applyTheme(resolveTheme(localStorage.getItem(THEME_KEY)));
 // And the picture, for the same reason and one worse: a skin changes what the
 // surfaces are made of, so a frame drawn before it lands is an opaque card
@@ -88,6 +93,8 @@ const paintTheLook = () => {
 };
 
 const boot = () => {
+  // Before any box reads its draft.
+  keepACopyOfTheDrafts(localStorage, window.zero?.draftCopy);
   paintTheLook();
   // A picture holds its place while it loads, in every window (phone.css).
   installPictureWatch();
@@ -104,7 +111,7 @@ const boot = () => {
 // pictures without leaving her inbox, it did its job, she picked her sixteen,
 // and it left with the round it belonged to. The seventeen candidates it
 // carried are recorded in decisions.md and their raw files are in designs/.
-// tests/the-theme-lab-is-gone.test.mjs holds the door shut.
+// tests/the-theme-lab-is-gone.test.mts holds the door shut.
 
 // A TAB THIS COMPUTER SERVED WITH NO KEY ON ITS ADDRESS DRAWS NOTHING. Without
 // a bridge the screen draws its fixtures, and an inbox of invented threads is
@@ -112,4 +119,5 @@ const boot = () => {
 // has already put up by now.
 const cloud = readCloudConfig();
 if (sharedFile && cloud) bootSharedFile(sharedFile, cloud);
+else if (sharedThread && cloud) bootSharedThread(sharedThread, cloud);
 else if (!theDoorNeedsItsKey()) boot();

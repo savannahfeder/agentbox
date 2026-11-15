@@ -1,13 +1,13 @@
 // The Tasks page: every task on the team, one row each, with who has it, who
 // gave it, when it is due and what blocks it. Tasks only, never agent threads.
-import { isTaskRow, taskGiver } from '../../../shared/team-rules.mjs';
-import { blockedWords, deadlineOf, dueSaid, taskBlocks } from '../../../shared/team-tasks.mjs';
-import { waitParts } from '../../../shared/thread-waits.mjs';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { isTaskRow, taskGiver } from '../../../shared/team-rules.mts';
+import { blockedWords, deadlineOf, dueSaid, taskBlocks } from '../../../shared/team-tasks.mts';
+import { waitParts } from '../../../shared/thread-waits.mts';
+import { shownTitle } from '../../../shared/thread-title.mts';
 import { taskWords } from './company';
 import { rangeOf } from './today';
 import { handedFromLabel } from '../threads/composer-rules';
-import { teammateIdOf } from '../../../shared/teammates.mjs';
+import { teammateIdOf } from '../../../shared/teammates.mts';
 import type { Product, ThreadCard, WorkItem } from '../types';
 
 /** The agent thread handed this task, newest and open first: who it is, and the thread to open. */

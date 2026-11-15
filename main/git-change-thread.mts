@@ -1,6 +1,6 @@
 // THE OTHER END OF main/git-change-offthread.mts. One job at a time, in order.
 import { parentPort } from 'node:worker_threads';
-import * as git from './git-change.mjs';
+import * as git from './git-change.mts';
 import { saveRunChange } from './run-change.mts';
 
 const jobs = { ...git, saveRunChange } as unknown as Record<string, (...args: unknown[]) => unknown>;

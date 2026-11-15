@@ -15,7 +15,7 @@
 // Both are rewritten here, below the page, for local addresses only and only
 // inside the app's own window. Framing protection exists to stop another site
 // drawing yours under a stranger's pointer; the app drawing her own dev server
-// for her is not that. tests/a-local-app-shows-in-the-pane-and-stays-signed-in.test.mjs
+// for her is not that. tests/a-local-app-shows-in-the-pane-and-stays-signed-in.test.mts
 
 import type { OnHeadersReceivedListenerDetails, WebContents } from 'electron';
 

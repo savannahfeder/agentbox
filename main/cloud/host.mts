@@ -46,7 +46,7 @@ export interface CloudHostOptions {
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // The files a host is made of. A host started by an older app serves only the
 // stand-ins of that app: a newer one starts its own beside it.
-const MADE_OF = ['host.mts', 'run.mts', 'run-cli.mts', 'docs.mts', 'exec.mts', 'marker.mts', 'aws.mjs', '../approval-prompt-core.mts', '../../mcp/stdio.mjs', '../../mcp/tools.mjs'];
+const MADE_OF = ['host.mts', 'run.mts', 'run-cli.mts', 'docs.mts', 'exec.mts', 'marker.mts', 'aws.mts', '../approval-prompt-core.mts', '../../mcp/stdio.mts', '../../mcp/tools.mts'];
 const TRANSPORT_FAULT = 75;
 // The exit of a host that found one of this app's already serving its socket.
 export const HOST_ALREADY_THERE = 3;

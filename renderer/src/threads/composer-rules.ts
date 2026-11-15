@@ -15,9 +15,10 @@ import { splitMessage } from '../message-split';
 import { parseWhen } from '../format';
 import { firstName } from '../team/company';
 import type { Person } from '../types';
-import { projectSeenBy } from '../../../shared/thread-cards.mjs';
-import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
-import { clockWords, dayDeadline } from '../../../shared/team-tasks.mjs';
+import { projectSeenBy } from '../../../shared/thread-cards.mts';
+import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mts';
+import { clockWords, dayDeadline } from '../../../shared/team-tasks.mts';
+import { threadOfLink } from '../../../shared/thread-link.mts';
 
 export type Harness = 'claude' | 'codex';
 
@@ -36,7 +37,7 @@ type CodexRow = Pick<ModelChoice, 'id'> & Partial<ModelChoice>;
  * Where a model runs. Claude Code's own rows are asked first, by alias and by
  * full id, then the Codex list read off this Mac. A slug neither list knows is
  * read by its shape: a GPT name is Codex, anything else is Claude Code, which is
- * the default everywhere else in the app too (shared/engines.mjs says why).
+ * the default everywhere else in the app too (shared/engines.mts says why).
  */
 export function harnessOf(model: string, codexModels: readonly CodexRow[] = []): Harness {
   if (claudeModelRows().some((m) => m.id === model || m.model === model)) return 'claude';
@@ -79,7 +80,7 @@ const WINDOW = 40;
  * always has three rows under it.
  */
 export function recentModels(
-  items: ReadonlyArray<{ createdAt?: number; model?: string; engine?: string }>,
+  items: ReadonlyArray<{ createdAt?: number; model?: string; engine?: string; wrote?: { model?: { ts: number } | undefined } }>,
   { codexModels = [], codexDefault = null, codexOffered, claudeOffered = true, limit = 3 }:
     { codexModels?: readonly CodexRow[]; codexDefault?: string | null; codexOffered: boolean; claudeOffered?: boolean; limit?: number },
 ): ModelPick[] {
@@ -90,15 +91,18 @@ export function recentModels(
     seen.add(keyOf(p));
     out.push(p);
   };
+  // Dated by when the model was last set, not when the thread began: a model
+  // picked on a reply to an older thread is the newest pick.
+  const pickedAt = (i: (typeof items)[number]) => Math.max(i.createdAt ?? 0, i.wrote?.model?.ts ?? 0);
   const used = items
     .filter((i) => typeof i.model === 'string' && i.model)
-    .slice()
-    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+    .map((i) => ({ i, at: pickedAt(i) }))
+    .sort((a, b) => b.at - a.at)
     .slice(0, WINDOW)
-    .map((i) => {
+    .map(({ i, at }) => {
       const model = i.model as string;
       const engine: Harness = i.engine === 'codex' || i.engine === 'claude' ? i.engine : harnessOf(model, codexModels);
-      return { pick: { engine, model: engine === 'claude' ? claudeAliasOf(model) : model }, at: i.createdAt ?? 0 };
+      return { pick: { engine, model: engine === 'claude' ? claudeAliasOf(model) : model }, at };
     })
     .filter(({ pick }) => (pick.engine === 'codex' ? codexOffered : claudeOffered));
   const tally = new Map<string, { pick: ModelPick; count: number; last: number }>();
@@ -233,7 +237,7 @@ export function laterHint(ts: number): string {
  * What a time typed into Send later means, or null. It reads the same words the
  * Schedule box on a thread reads ("3h", "fri 6pm", "tomorrow 3pm"), because a
  * browser date field was the harder of the two to use
- * (tests/send-later-takes-a-time-in-words.test.mjs). A moment already past is
+ * (tests/send-later-takes-a-time-in-words.test.mts). A moment already past is
  * refused rather than sent: the store would run it at once, and a card that
  * says "later" and starts now is a small lie about when an agent has it.
  */
@@ -362,9 +366,11 @@ export function projectOnScreen({ filter, open }: { filter: string | null; open:
  */
 export function cardProject<T extends ProjectLike>(
   offered: readonly T[],
-  { picked, defaultProduct, remembered }: { picked: string | null; defaultProduct?: string | null; remembered?: string | null },
+  { picked, defaultProduct, remembered, mustChoose = false }: { picked: string | null; defaultProduct?: string | null; remembered?: string | null; mustChoose?: boolean },
 ): T | null {
-  return offered.find((p) => p.slug === picked) ?? startingProject(offered, { defaultProduct, remembered });
+  const hit = offered.find((p) => p.slug === picked);
+  if (hit || mustChoose) return hit ?? null;
+  return startingProject(offered, { defaultProduct, remembered });
 }
 
 // Projects carry no colour of their own yet, so the swatch is read off the slug:
@@ -385,7 +391,7 @@ export function teammates(people: readonly Person[], me: string | null): Person[
 }
 
 /**
- * "Find a person": any part of a name, or the start of an email, in any case.
+ * "Find a person" matches any part of a name, or the start of an email, in any case.
  * An email is matched from its start because the end of it is the domain the
  * whole team shares, so "th" used to keep everyone at northwind.test.
  */
@@ -512,7 +518,7 @@ export function writeVisibility(v: Visibility, store?: KeyStore, project?: strin
 // the same gesture gives one to a teammate. The store already knew how to hold
 // that — `assignee` means the person who has to act next, a row held by a
 // person never starts an agent, and it sits in that one person's inbox until
-// it is done (shared/team-rules.mjs). The card simply had no way to say it.
+// it is done (shared/team-rules.mts). The card simply had no way to say it.
 //
 // So a card addressed to a person asks one more question, SEND AS, and a task
 // gets one more row, DUE ON. Everything general stays on the bar: the project,
@@ -709,23 +715,58 @@ export function handOffStart({ product, id, message, nameOf, dir }: {
   };
 }
 
+type NamedProject = ProjectLike & { name: string };
+const ESCAPED = /[.*+?^${}()|[\]\\]/g;
+
+/**
+ * The project a handed-on task runs in: the one the thread it came from is in,
+ * else the one its words name, else none, so the card asks. Only one of yours.
+ */
+export function handOffProject({ words, cards, offered }: {
+  words: string;
+  cards: readonly { personId: string; threadId: string; project: string | null }[];
+  offered: readonly NamedProject[];
+}): string | null {
+  const mine = offered.filter((p) => !p.practice && !isDirect(p) && p.name.trim());
+  const called = (name: string) => {
+    const hits = mine.filter((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+    return (hits.find((p) => p.team) ?? hits[0])?.slug ?? null;
+  };
+  for (const m of words.matchAll(/https:\/\/[^\s)]+/g)) {
+    const link = threadOfLink(m[0]);
+    const card = link ? cards.find((c) => c.personId === link.owner && c.threadId === link.id) : null;
+    if (!card?.project) continue;
+    // Handed from a thread in a project you do not have: the work is about that project, so ask.
+    return called(card.project);
+  }
+  const plain = words.replace(/\]\([^)]*\)/g, ']');
+  const said = new Set(mine.filter((p) => new RegExp(`(?<![\\w])${p.name.trim().replace(ESCAPED, '\\$&')}(?![\\w])`, 'i').test(plain)).map((p) => p.name.trim().toLowerCase()));
+  return said.size === 1 ? called([...said][0]) : null;
+}
+
+/** The project a hand-off opens on, or the card asks for one. */
+const projectOrAsk = (slug: string | null) => (slug ? { product: slug } : { chooseProject: true as const });
+
 /** The same for a task, whose files come from its brief because a new thread cannot read the record. */
-export function taskHandOff({ from, brief, message, nameOf, handFrom }: {
+export function taskHandOff({ from, brief, message, nameOf, handFrom, offered = [], cards = [] }: {
   from: string | null | undefined;
-  brief: { body: string; files: { name: string; srcPath: string }[] };
+  brief: { title?: string; body: string; files: { name: string; srcPath: string }[] };
   message: { text?: string; by?: string | null } | null;
   nameOf: (person: string) => string | null | undefined;
   /** The task, so the task can say which agent has it. */
   handFrom?: HandFrom;
+  offered?: readonly NamedProject[];
+  cards?: readonly { personId: string; threadId: string; project: string | null }[];
 }) {
   const attachments = brief.files.map((f) => ({ ...f, image: /\.(png|jpe?g|gif|webp)$/i.test(f.name) }));
   const pressed = (message?.text ?? '').replace(FILE_LINK, '').trim();
   const from_ = handFrom ? { handFrom } : {};
+  const where = projectOrAsk(handOffProject({ words: `${brief.title ?? ''}\n${brief.body}\n${pressed}`, cards, offered }));
   if (pressed && pressed !== brief.body.trim()) {
     const who = message?.by ? nameOf(message.by) : null;
-    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_ };
+    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_, ...where };
   }
-  return { to: 'agent', body: from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`, attachments, ...from_ };
+  return { to: 'agent', body: from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`, attachments, ...from_, ...where };
 }
 
 export const handedFromLabel = (product: string, id: string) => `handed-from:${product}:${id}`;
@@ -738,7 +779,7 @@ export function agentOnThisWork<T extends { status?: string; labels?: string[]; 
 }
 
 /**
- * Whether To offers Auto (shared/auto-route.mjs): only with an AI teammate that
+ * Whether To offers Auto (shared/auto-route.mts): only with an AI teammate that
  * is working to give a thread to, and only where the box can reach teammates.
  * Auto keeps the Model row, so what it runs on is still yours to pick.
  */

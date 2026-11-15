@@ -2,7 +2,7 @@
 //
 // WHY THIS IS THE NEW-USER ROW AND NOT A NEW MECHANISM. Being a new user
 // already opens a second Agentbox inside a throwaway home
-// (shared/fresh-user-home.mjs, main/fresh-user.mts), and everything that makes
+// (shared/fresh-user-home.mts, main/fresh-user.mts), and everything that makes
 // that safe is exactly what a demo needs: her own copy keeps running with every
 // agent in it, nothing of hers is read, and nothing anywhere is deleted. The
 // single-instance lock is keyed on userData and a throwaway home is a different
@@ -13,7 +13,7 @@
 // WHAT IS DIFFERENT IS WHAT IS IN THE STORE. A new user opens on an empty one,
 // which is correct for testing a first run and useless for a demo: an inbox
 // with nothing in it demonstrates nothing. So this seeds three invented
-// products and a day of invented work first (shared/demo-world.mjs), and
+// products and a day of invented work first (shared/demo-world.mts), and
 // because the store then has projects in it, the welcome walk does not run
 // (`firstRunNeeded` counts projects) and the copy opens straight on the inbox.
 //
@@ -32,10 +32,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { DEMO_DOCS, DEMO_ENV, DEMO_PRODUCTS, demoLedgerLines } from '../shared/demo-world.mjs';
-import { prepareHome } from '../shared/fresh-user-home.mjs';
+import { DEMO_DOCS, DEMO_ENV, DEMO_PRODUCTS, demoLedgerLines } from '../shared/demo-world.mts';
+import { prepareHome } from '../shared/fresh-user-home.mts';
 import { relaunchCommand } from './fresh-user.mts';
-import { defaultStoreRoot, encodeProjectPath, storeRootEnv } from './store/home.mjs';
+import { defaultStoreRoot, encodeProjectPath, storeRootEnv } from './store/home.mts';
 import { NAME, nameSlug } from '../shared/product-name.mjs';
 
 /**
@@ -47,7 +47,7 @@ export const HOMES = path.join(os.tmpdir(), `${nameSlug}-demo`);
 
 /**
  * The account the demo store is laid out under. It matches the id
- *  `main/config.mjs` defaults to, because the demo copy has no config file and
+ *  `main/config.mts` defaults to, because the demo copy has no config file and
  *  will therefore look for its products at exactly this path. */
 export const DEMO_ACCOUNT = '00000000-0000-4000-8000-000000000000';
 
@@ -110,7 +110,7 @@ export function demoPaths(home: string): { storeRoot: string; accountRoot: strin
  * THE LEDGER DOES NOT GO IN THE PRODUCT FOLDER, and this is the one thing in
  * here that is easy to get wrong: since 2026-08-27 the app keeps its own
  * records under its own home, `<appHome>/projects/<encoded product dir>/`
- * (main/store/home.mjs). Writing `work-items.jsonl` beside `project.json`
+ * (main/store/home.mts). Writing `work-items.jsonl` beside `project.json`
  * instead would produce a demo whose inbox is empty, and the file would then be
  * silently folded away the first time anything touched the store. The encoding
  * is imported rather than repeated for exactly that reason.
@@ -146,7 +146,7 @@ export function seedDemoStore(home: string, { now = Date.now() }: { now?: number
 
     // The documents, and the catalog that makes them visible. A file on disk
     // with no entry in index.json is a file the pane does not know about
-    // (main/store/project.mjs), so both halves or neither.
+    // (main/store/project.mts), so both halves or neither.
     const docs = DEMO_DOCS[product.slug as keyof typeof DEMO_DOCS] ?? [];
     for (const doc of docs) {
       const file = path.join(dir, doc.path);

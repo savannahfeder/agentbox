@@ -213,7 +213,7 @@ export function EveryEmoji({ onPick, at, boxRef, recent = [], typed: given, onTy
  *
  * Pressing one you are on takes yours back; pressing one you are not on adds
  * you. The count is the people, so a chip never reads 0: the store drops an
- * emoji nobody is left on (shared/work-items.mjs).
+ * emoji nobody is left on (shared/work-items.mts).
  */
 export function whoReacted(emoji: string, who: string[], me: string | null, nameOf: (id: string) => string | null | undefined) {
   // A press written with no person on it (the one-person app) is filed as 'you'.

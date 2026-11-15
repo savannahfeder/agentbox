@@ -33,8 +33,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { nameSlug } from '../shared/product-name.mjs';
-import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mjs';
-import { CODEX_MODE_ORDER } from '../shared/codex-modes.mjs';
+import { CLAUDE_PERMISSION_MODES } from '../shared/work-items.mts';
+import { CODEX_MODE_ORDER } from '../shared/codex-modes.mts';
 
 const FILE = 'answer-modes.json';
 
@@ -65,7 +65,7 @@ function configHome(home: string, env: NodeJS.ProcessEnv | undefined) {
  *
  * In `userDir`, unless that is inside the store root, as the headless copy's
  * is: then in a per-store folder under the config home, the way the team
- * sign-in moves (main/team/session.mjs). If that is inside the store root too,
+ * sign-in moves (main/team/session.mts). If that is inside the store root too,
  * nowhere: every thread runs on its project's mode, which is the safe side.
  * Returns the file, or null.
  */

@@ -1,6 +1,6 @@
 // SELECT MODE ON THE PROJECTS PAGE: what it says and which projects it holds.
 // Pure, so the words and the ticks are tested without a window
-// (tests/a-project-can-be-archived-and-brought-back.test.mjs).
+// (tests/a-project-can-be-archived-and-brought-back.test.mts).
 
 const projects = (n: number) => `${n} project${n === 1 ? '' : 's'}`;
 

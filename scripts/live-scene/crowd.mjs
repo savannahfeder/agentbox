@@ -10,10 +10,10 @@
 // other's edits; `--typists` is the share of people typing rather than reading.
 import WebSocket from 'ws';
 import * as Y from 'yjs';
-import { connectLive } from '../../renderer/src/live/client.mjs';
-import { liveRoomId } from '../../main/team/live-room.mjs';
-import { liveColorOf } from '../../shared/live/colors.mjs';
-import { gridOf, isSeeded, putGrid } from '../../renderer/src/live/table-doc.mjs';
+import { connectLive } from '../../renderer/src/live/client.ts';
+import { liveRoomId } from '../../main/team/live-room.mts';
+import { liveColorOf } from '../../shared/live/colors.mts';
+import { gridOf, isSeeded, putGrid } from '../../renderer/src/live/table-doc.ts';
 
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : d; };
 const TEAM = arg('team');

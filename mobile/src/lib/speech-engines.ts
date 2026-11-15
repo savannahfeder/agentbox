@@ -6,6 +6,21 @@ import { engineFor, languageFor, type Speech, type SpeechEvents } from '../../..
 type Sub = { remove(): void };
 type Allowed = { granted: boolean; canAskAgain: boolean };
 
+type KeyboardEvents = {
+  start: (e?: unknown) => void;
+  end: (e?: unknown) => void;
+  result: (e: { results?: { transcript?: string }[]; isFinal: boolean }) => void;
+  error: (e: { error: string; message: string }) => void;
+  volumechange: (e: { value: number }) => void;
+};
+type NewerEvents = {
+  onStart: (e?: unknown) => void;
+  onEnd: (e?: unknown) => void;
+  onResult: (e: { text: string; isFinal: boolean }) => void;
+  onError: (e: { code: string; message: string }) => void;
+  onLevel: (e: { value: number }) => void;
+};
+
 export interface KeyboardModel {
   supportsOnDeviceRecognition(): boolean;
   requestPermissionsAsync(): Promise<Allowed>;
@@ -14,7 +29,7 @@ export interface KeyboardModel {
   start(options: object): void;
   stop(): void;
   abort(): void;
-  addListener(event: string, listener: (e: any) => void): Sub;
+  addListener<K extends keyof KeyboardEvents>(event: K, listener: KeyboardEvents[K]): Sub;
 }
 
 export interface NewerModel {
@@ -23,7 +38,7 @@ export interface NewerModel {
   start(language: string): Promise<void>;
   stop(): void;
   abort(): void;
-  addListener(event: string, listener: (e: any) => void): Sub;
+  addListener<K extends keyof NewerEvents>(event: K, listener: NewerEvents[K]): Sub;
 }
 
 export function phoneSpeechOf({ keyboard, newer, android, phoneLanguage }: {
@@ -102,7 +117,7 @@ export function phoneSpeechOf({ keyboard, newer, android, phoneLanguage }: {
       else if (was === 'keyboard') keyboard.abort();
     },
     listen(on: SpeechEvents) {
-      const only = (engine: 'newer' | 'keyboard') => (fn: (e: any) => void) => (e: any) => { if (active === engine) fn(e); };
+      const only = (engine: 'newer' | 'keyboard') => <E>(fn: (e: E) => void) => (e: E) => { if (active === engine) fn(e); };
       const k = only('keyboard');
       const n = only('newer');
       const subs = [

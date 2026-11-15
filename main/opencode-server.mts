@@ -20,7 +20,7 @@
 // Both measured end to end against the real binary, both answers, 200 each
 // time, the tool running in the first case and coming back
 // "The user rejected permission to use this specific tool call." in the second.
-// That is the same card contract main/codex-approvals.mjs already fills, which
+// That is the same card contract main/codex-approvals.mts already fills, which
 // is why this file exists and a second stream parser does not.
 //
 // AND IT IS WHY WE DO NOT PASS `--auto` ANYWHERE. A grep for it is a test

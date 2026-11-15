@@ -18,7 +18,7 @@
 import { createRequire } from 'node:module';
 import { readEnv } from '../shared/product-name.mjs';
 
-export { sendFeedback } from '../shared/feedback.mjs';
+export { sendFeedback } from '../shared/feedback.mts';
 
 export const FEEDBACK_ADDRESS = 'https://lywvthwkhkfzhqivvond.supabase.co/functions/v1/feedback';
 

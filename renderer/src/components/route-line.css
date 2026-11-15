@@ -7,3 +7,4 @@
 .rt-line button:hover, .rt-line button:focus-visible { color: var(--text); text-decoration-color: currentColor; outline: none; }
 .rt-change { margin-left: 6px; }
 .rt-error { flex-basis: 100%; color: var(--text-faint); font-size: 13px; }
+.rt-line button:disabled { cursor: default; opacity: .5; }

@@ -91,7 +91,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   onSignOut?: () => void;
   // `collapsed` is true while the sidebar is narrow, which is always on a phone.
   view: View; collapsed: boolean; onView: (view: View) => void;
-  /** Home (Alpha features): its row above the Inbox, and whether it is the page on screen. */
+  /** Home: its row above the Inbox, and whether it is the page on screen. */
   onHome?: () => void; homePage?: boolean; onSearch: () => void; onCompose: () => void;
 }) {
   // The Team page is a page like Settings: while it is up no list tab is lit.

@@ -1,6 +1,6 @@
-import { isKeyAsk, keyAsks, keyWords, savedReply } from '../../shared/cloud-keys.mjs';
+import { isKeyAsk, keyAsks, keyWords, savedReply } from '../../shared/cloud-keys.mts';
 import { stripOptionsSection } from './format';
-import { needsIn } from '../../shared/cloud-needs.mjs';
+import { needsIn } from '../../shared/cloud-needs.mts';
 
 export const NEED_BLOCK = 'agentbox-need';
 
@@ -55,6 +55,8 @@ const keyShaped = (w: string) => w.length >= 12 && !/^https?:\/\//i.test(w) && !
 export function keyFromReply(text: string, asks: string[], saved: string[]): { name: string; value: string; words: boolean } | null {
   const open = asks.filter((n) => !saved.includes(n));
   if (open.length !== 1) return null;
+  // Where the key is kept, not the key: the agent can ask this computer for it (request_cloud_key).
+  if (/\bkeychain\b|~\/|\.env\b|\$[A-Z][A-Z0-9_]+|\bshell\b/i.test(text)) return null;
   const words = text.trim().split(/\s+/).map((w) => w.replace(/^[`'"(<]+|[`'".,)>:;!]+$/g, '')).filter(Boolean);
   const keys = words.filter(keyShaped);
   if (keys.length !== 1) return null;

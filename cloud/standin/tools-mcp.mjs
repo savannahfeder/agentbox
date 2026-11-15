@@ -7,7 +7,7 @@
 // A plain HTTP MCP server with OAuth (dynamic registration, PKCE, a loopback
 // redirect) over Lumen's sample issues and pages. It plays no vendor. It trusts
 // loopback only, and its catalog entry appears only under AGENTBOX_TOOLS_FIXTURE
-// (shared/connections-catalog.mjs), so no installed build can reach it.
+// (shared/connections-catalog.mts), so no installed build can reach it.
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';

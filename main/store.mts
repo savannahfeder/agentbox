@@ -8,15 +8,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { loadStore } from './store-modules.mts';
 import type { StoreModules } from './store-modules.mts';
-import { hasCode } from '../shared/has-code.mjs';
-import { Repeats } from './repeats.mjs';
+import { hasCode } from '../shared/has-code.mts';
+import { Repeats } from './repeats.mts';
 import type { CodexThreadLike } from '../shared/codex-import.mts';
 import type { Callout } from '../shared/dashboard.mts';
-import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mjs';
+import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mts';
 import { answerFor, describeFor } from './first-run.mts';
 import { checkProjectFolder } from '../shared/project-folder-check.mts';
 import { SAME_PROJECT, carriedLines, leftByAMove, movedAway, movedHere, ranHere, splitForCompose, whatMoves, whyItCannotMove, type CarriedLine } from '../shared/move-thread.mts';
-import { agentSpokeSince, answerTs } from '../shared/answers.mjs';
+import { agentSpokeSince, answerTs } from '../shared/answers.mts';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import {
   PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
@@ -24,8 +24,8 @@ import {
 } from '../shared/first-run-practice.mts';
 import { NOTE_NAME } from './rail-note.mts';
 import { iconPathFor } from './project-identity.mts';
-import { patchProjectAt } from './store/project.mjs';
-import { projectWrites, projectWritten } from './store/projects-changed.mjs';
+import { patchProjectAt } from './store/project.mts';
+import { projectWrites, projectWritten } from './store/projects-changed.mts';
 import { imgUrl } from './img-scheme.mts';
 import { teamOf, PERSONAL_FLAG } from './team/projects.mts';
 import {
@@ -35,16 +35,16 @@ import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mts';
-import { buildClaimLine, buildReleaseLine, GIVEN_TASK } from '../shared/work-items.mjs';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
-import { shippedNote } from '../shared/shipped-note.mjs';
+import { shippedNote } from '../shared/shipped-note.mts';
 import { notShipped } from '../shared/not-shipped.mts';
 import { asksForGitHubSignIn, SHIPPING_AGAIN } from '../shared/github-push-sign-in.mts';
-import { cleanSignInAnswer, openSignIn } from '../shared/sign-in-ask.mjs';
-import { machineryPath, removeMachinery } from './store/home.mjs';
+import { cleanSignInAnswer, openSignIn } from '../shared/sign-in-ask.mts';
+import { machineryPath, removeMachinery } from './store/home.mts';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
-import { hopOf, HOP_LABEL_PREFIX } from '../shared/teammates.mjs';
+import { hopOf, HOP_LABEL_PREFIX } from '../shared/teammates.mts';
 import {
   answerMode as readAnswerMode, answerModes, clearAnswerMode as clearAnswerModeFile, setAnswerMode,
   touchAnswerMode as touchAnswerModeFile,
@@ -52,7 +52,7 @@ import {
 
 // WHAT A ROW'S ID LOOKS LIKE, for the reads that take one from the window: a
 // task, `w-` and hex, or a run of a repeating task, `r-<rule>-<YYYYMMDD>`
-// (shared/repeats.mjs occurrenceId). Runs were refused until a repeating task
+// (shared/repeats.mts occurrenceId). Runs were refused until a repeating task
 // began opening as its latest run (w-5e3f2e047f), and a run's page then had no
 // conversation to draw.
 const ROW_ID = /^(w-[0-9a-f]{6,}|r-[0-9a-f]{6,}-\d{8})$/;
@@ -62,6 +62,11 @@ const ROW_ID = /^(w-[0-9a-f]{6,}|r-[0-9a-f]{6,}-\d{8})$/;
 // a thousand times reads the disk once, short enough that nothing a person can
 // do lands inside it.
 const PRODUCTS_KEPT_NS = 1_000_000n;
+// While the store's watchers are up, any project folder made, removed or
+// renamed and any project.json written clears the kept list, so the stamps only
+// have to catch what they cannot see: a code folder gaining its first file and
+// an archived project's project.json, which is not watched.
+const PRODUCTS_WATCHED_KEPT_NS = 5_000_000_000n;
 const stampable = (file: string): fs.Stats | null => { try { return fs.statSync(file); } catch { return null; } };
 const markOf = (st: fs.Stats | null): string => (st ? `${st.mtimeMs}:${st.size}` : 'gone');
 export interface StoreConfig {
@@ -95,6 +100,9 @@ export interface StoreItem extends Omit<WorkItem, 'product'> {
   product?: string;
   [field: string]: unknown;
 }
+
+/** An item as listItems returns it: always with the slug of the project it came from. */
+export type ListedItem = StoreItem & { product: string };
 
 export interface AnswerInput {
   answer?: string | null;
@@ -184,6 +192,7 @@ interface ProductsRead {
   repos: string[];
   stamp?: string;
   writes?: number;
+  seen?: number;
   at?: bigint;
 }
 
@@ -200,6 +209,8 @@ export class Store {
   declare onChange: (() => void) | null;
   declare _debounce: NodeJS.Timeout | null;
   declare _products: ProductsRead | null;
+  declare _projectsWatched: boolean;
+  declare _projectEvents: number;
 
   constructor(config: StoreConfig) {
     this.config = config;
@@ -209,6 +220,8 @@ export class Store {
     this.onChange = null; // set by ipc layer; called on any store file change
     this._debounce = null;
     this._products = null; // the kept project list (_productsNow)
+    this._projectsWatched = false;
+    this._projectEvents = 0;
   }
 
   async init() {
@@ -261,16 +274,22 @@ export class Store {
    *  parse apiece. Inside that millisecond no stamp is taken at all, which is
    *  what makes a thousand asks cost what one costs. Nothing the app writes
    *  itself can hide in there whatever the folder times say, because the
-   *  writers count their writes (main/store/projects-changed.mjs) and the
+   *  writers count their writes (main/store/projects-changed.mts) and the
    *  store's own writes forget the list outright; what a millisecond can hide
    *  is another process making a project folder, and the app waits 150 ms on
    *  its watcher before it redraws on one of those anyway.
    *
+   *  While the store watches its folders the millisecond becomes five seconds,
+   *  and what the watchers see forgets the list instead: a stamp of 48
+   *  projects is about 140 stats, and taken every millisecond it was the
+   *  app's biggest share of the holds on a swapping Mac on 2026-11-12.
+   *
    *  The clock is hrtime, not Date.now: a test with a fake clock would
    *  otherwise hold the window open for its whole run. */
   _productsNow(): ProductsRead {
-    const kept = this._products?.writes === projectWrites() ? this._products : null;
-    if (kept && process.hrtime.bigint() - kept.at! < PRODUCTS_KEPT_NS) return kept;
+    const kept = this._products?.writes === projectWrites() && this._products.seen === this._projectEvents ? this._products : null;
+    const keep = this._projectsWatched ? PRODUCTS_WATCHED_KEPT_NS : PRODUCTS_KEPT_NS;
+    if (kept && process.hrtime.bigint() - kept.at! < keep) return kept;
     const stamped = this._stampProducts(kept?.repos ?? []);
     if (!stamped) return { live: [], all: [], repos: [] }; // the account root is unreadable
     if (kept && stamped.stamp === kept.stamp) {
@@ -360,7 +379,7 @@ export class Store {
         // otherwise (main/team/projects.mts, w-b989839656).
         personal: project[PERSONAL_FLAG] === true,
         // WHO SEES ITS THREADS on the Team page (w-b989839656), read as
-        // written; shared/thread-cards.mjs projectSeenBy is the one reading.
+        // written; shared/thread-cards.mts projectSeenBy is the one reading.
         ...(typeof project.seenBy === 'string' ? { seenBy: project.seenBy } : {}),
         ...(Array.isArray(project.seenByPeople) ? { seenByPeople: project.seenByPeople.filter((p) => typeof p === 'string') } : {}),
         // SHARED OR PRIVATE. Null on a private project, which is every
@@ -372,7 +391,7 @@ export class Store {
       if (!project.archived) live.push({ slug, ...rest });
     }
     const byName = (a: ProductRow, b: ProductRow) => a.name.localeCompare(b.name);
-    return { live: live.sort(byName), all: all.sort(byName), repos, stamp, writes: projectWrites(), at: process.hrtime.bigint() };
+    return { live: live.sort(byName), all: all.sort(byName), repos, stamp, writes: projectWrites(), seen: this._projectEvents, at: process.hrtime.bigint() };
   }
 
   /** ARCHIVE A PROJECT, OR BRING ONE BACK. One flag in its project.json and
@@ -412,25 +431,25 @@ export class Store {
   /* ------------------------------ work items ----------------------------- */
   // The cross-product fold. Every item carries its product slug so the
   // renderer can group, filter, and rail without a second lookup.
-  listItems(now = Date.now()) {
+  listItems(now = Date.now()): ListedItem[] {
     const { workItemsDisk } = this.modules;
-    const all: (StoreItem & { product: string })[] = [];
+    const all: ListedItem[] = [];
     // WHAT ONE REPLY MAY DO IS NOT ON THE LEDGER, so it is joined on here, once
     // for the whole fold rather than a file read per row (main/answer-modes.mts).
     const modes = answerModes({ now });
     for (const product of this.listProducts()) {
-      let items: StoreItem[] = [];
+      let rows: (StoreItem & { product: string })[] = [];
       try {
-        items = workItemsDisk.readWorkItems(product.dir, now);
+        rows = workItemsDisk.readWorkItemRows(product.dir, now, { product: product.slug, productName: product.name });
       } catch (err) {
         console.warn(`zero: unreadable work items for ${product.slug}: ${(err as Error).message}`);
         continue;
       }
-      for (const item of items) {
-        const row = { ...item, product: product.slug, productName: product.name };
-        const key = `${product.slug}/${item.id}`;
-        if (key in modes) row.answerMode = modes[key];
-        all.push(row);
+      // The rows are shared and frozen (`readWorkItemRows`); the few with an
+      // answer mode get a copy of their own.
+      for (const row of rows) {
+        const key = `${product.slug}/${row.id}`;
+        all.push(key in modes ? { ...row, answerMode: modes[key] } : row);
       }
     }
     return all;
@@ -461,7 +480,7 @@ export class Store {
     const { workItemsDisk } = this.modules;
     const item = workItemsDisk.readWorkItem(this.productDir(slug), id, now);
     if (!item) return null;
-    const row = { ...item, product: slug };
+    const row: StoreItem & { product: string } = { ...item, product: slug };
     const mode = readAnswerMode(slug, id, { now });
     if (mode !== undefined) row.answerMode = mode;
     return row;
@@ -496,7 +515,7 @@ export class Store {
   // THE CONVERSATION ON ONE ROW, oldest first, for the brief a spawning worker
   // is handed (main/supervisor.mts, buildBrief). readHistory above is the same
   // ledger read for her thread view and stops at the lines; this one asks
-  // shared/work-items.mjs which of them was somebody SPEAKING.
+  // shared/work-items.mts which of them was somebody SPEAKING.
   //
   // Uncapped on purpose. The brief does the trimming, because only the brief
   // knows what else is competing for the same session's attention, and a cap
@@ -524,7 +543,7 @@ export class Store {
   // WHERE ONE OF OUR OWN RECORDS FOR A PRODUCT LIVES, and it is not in the
   // product folder. The ledger, session traces and repeat rules are the app's
   // bookkeeping, so they sit in the app's home the way Claude Code's do
-  // (main/store/home.mjs). The founder's own documents, and the two files that
+  // (main/store/home.mts). The founder's own documents, and the two files that
   // describe them, stay where she can see them.
   machineryFile(slug: string, rel: string) {
     return machineryPath(this.productDir(slug), rel);
@@ -541,8 +560,8 @@ export class Store {
   //
   // The fold now draws that line itself: her 'open' is a HANDBACK and claims no
   // authority, so the claim, the blocked and the done that follow all land,
-  // while her terminal words hold (shared/work-items.mjs, authorityOf). Pinned
-  // by tests/v0-loop.test.mjs here and archive-is-final.test.mjs there.
+  // while her terminal words hold (shared/work-items.mts, authorityOf). Pinned
+  // by tests/v0-loop.test.mts here and archive-is-final.test.mjs there.
   // `permissionMode` is WHAT THE ANSWER ITSELF MAY DO, and it belongs to this
   // one reply rather than to the project.It is written as a founder field
   // beside the answer, read once by the run that answer starts
@@ -552,7 +571,7 @@ export class Store {
   //
   // They go on the ITEM as founder fields, exactly where the new-task card
   // writes them, because that is where the spawn reads them back
-  // (`modelForEngine`, shared/engines.mjs). Unlike `permissionMode` they are NOT
+  // (`modelForEngine`, shared/engines.mts). Unlike `permissionMode` they are NOT
   // cleared by the run that uses them: she changed the model of the
   // conversation, and the conversation keeps it until she says otherwise.
   //
@@ -565,14 +584,14 @@ export class Store {
   answerItem(slug: string, id: string, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo, fromPhone, voice, forAgent, fromNotes, typed, putAway }: AnswerInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    let item: (StoreItem & { product: string }) | null = null;
+    let item: StoreItem | null = null;
     // THE MODEL GOES ON FIRST, BEFORE THE ANSWER. A reply on an idle row is
     // what starts a run, and the run reads the model off the item; written
     // after the answer it is a race the run can win, and she would pick a model
     // and watch the old one take the task.
     //
     // Written as '' rather than null to clear, because that is how "no model"
-    // is said everywhere else here: `modelForEngine` (shared/engines.mjs) reads
+    // is said everywhere else here: `modelForEngine` (shared/engines.mts) reads
     // the empty string as nothing chosen, where a JSON null would have to be
     // special-cased in both engines' argument builders.
     // AND WHICH ENGINE, BESIDE IT AND FOR THE SAME REASON (w-c9da359466). The
@@ -614,7 +633,7 @@ export class Store {
     return item;
   }
 
-  // A TEAMMATE'S WORDS ON A THREAD (shared/teammates.mjs, `planWakes`). A reply
+  // A TEAMMATE'S WORDS ON A THREAD (shared/teammates.mts, `planWakes`). A reply
   // like yours, so the next turn carries it and a finished thread opens again,
   // but written as the app with the teammate named on the line, so it is never
   // read as yours. `hold` blocks the thread after it until you reply
@@ -676,12 +695,16 @@ export class Store {
   }
 
   // The person's answer, or the app's when it caught the browser coming back, to the sign-in a thread is open on.
-  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
+  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown; code?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
     const item = this.readItem(slug, id);
     const ask = openSignIn(item);
     if (!ask || ask.id !== answer.id) throw new Error('That sign-in is no longer open.');
     const clean = cleanSignInAnswer({ ...answer, at: now });
-    if (!clean) throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.' : 'That answer is not one the agent can take.');
+    if (!clean) {
+      throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.'
+        : answer.said === 'code' ? 'Paste the code first.'
+        : 'That answer is not one the agent can take.');
+    }
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signInAnswer: clean }, { source, now });
   }
 
@@ -719,7 +742,7 @@ export class Store {
     return workItemsDisk.updateWorkItem(this.productDir(slug), id, { label, problem, result }, { source: 'agent' });
   }
 
-  // Who a thread sent to Auto went to (shared/auto-route.mjs). On system
+  // Who a thread sent to Auto went to (shared/auto-route.mts). On system
   // authority, so it never locks her labels against a later write, the `ship`
   // an agent adds among them.
   routeItem(slug: string, id: string, patch: Record<string, unknown>) {
@@ -765,7 +788,7 @@ export class Store {
   // session exits, because the worker cannot be relied on to close a thread
   // that is still alive: the ordinary and correct end of the loop leaves the
   // row open with her answer still on it, and that state used to be
-  // indistinguishable from a worker that died (shared/answers.mjs).
+  // indistinguishable from a worker that died (shared/answers.mts).
   //
   // Source 'system': it is machinery's record of what happened, not a word
   // anyone said, and it must never hold the field against her. She cannot
@@ -813,7 +836,7 @@ export class Store {
   // one name for a message that is the same on every teammate's Mac. Written as
   // the person's own word, and appended like anything else: the fold keeps a
   // press per person rather than one value per row, so two people reacting at
-  // the same moment keep both chips (shared/work-items.mjs).
+  // the same moment keep both chips (shared/work-items.mts).
   react(slug: string, id: string, { on, emoji, off = false }: { on: string; emoji: string; off?: boolean }) {
     return this.modules.workItemsDisk.updateWorkItem(
       this.productDir(slug), id, { react: off ? { on, emoji, off: true } : { on, emoji } }, { source: 'founder' },
@@ -821,14 +844,14 @@ export class Store {
   }
 
   // NEW WORDS FOR A MESSAGE YOU SENT, OR THE MESSAGE TAKEN BACK. The fold only
-  // believes it from the message's own author (shared/message-edits.mjs).
+  // believes it from the message's own author (shared/message-edits.mts).
   editMessage(slug: string, id: string, { on, text, gone = false }: { on: string; text?: string; gone?: boolean }) {
     const edit = gone ? { on, gone: true } : { on, text };
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { edit }, { source: 'founder' });
   }
 
   // A COMMENT, RESOLVE, APPROVAL OR "SEEN" ON ONE FILE OF A THREAD
-  // (shared/artifact-marks.mjs). Starts nothing, on any Mac.
+  // (shared/artifact-marks.mts). Starts nothing, on any Mac.
   fileMark(slug: string, id: string, mark: unknown) {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { artifact: mark }, { source: 'founder' });
   }
@@ -836,7 +859,7 @@ export class Store {
   // AN EDIT TO A THREAD FROM ITS SUMMARY (approved 2026-10-01): the summary's
   // three lines and its links, who sees it, and its priority. Written as the
   // person's own words; on the summary the later write wins either way
-  // (SHARED_FIELDS in shared/work-items.mjs).
+  // (SHARED_FIELDS in shared/work-items.mts).
   threadEdit(slug: string, id: string, patch?: Record<string, unknown> | null) {
     // `start` is how a thread leaves Later: the summary and the thread page
     // both write 'now' on it, which is what makes `isDue` true again.
@@ -864,7 +887,7 @@ export class Store {
     // row, so no row it made is ever without it (Codex's fourth review).
     const first = { title, kind, priority, labels: allLabels, ...(fromPhone ? { fromPhone: String(fromPhone) } : {}) };
     // A task's audience rides the line that makes it, the only one a teammate's
-    // copy takes it from (shared/team-rules.mjs whatATeammateMaySet).
+    // copy takes it from (shared/team-rules.mts whatATeammateMaySet).
     if (allLabels.includes(GIVEN_TASK) && (visibility === 'team' || (visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length))) {
       Object.assign(first, { visibility, ...(visibility === 'people' ? { visibleTo: [...new Set((visibleTo ?? []).map(String))] } : {}) });
     }
@@ -899,7 +922,7 @@ export class Store {
       // it, so the 08-25 picker's choice never reached the ledger at all.
       //
       // ON FOUNDER AUTHORITY, WRITTEN AS ITS OWN LINE, which is what makes
-      // `wrote.engine.ts` the moment she chose. shared/engines.mjs leans on that
+      // `wrote.engine.ts` the moment she chose. shared/engines.mts leans on that
       // stamp to tell a choice she is making now from one made in August, so a
       // path that wrote this any other way would quietly re-open the hazard the
       // whole gate exists for. Whether the word may be written at all is decided
@@ -907,7 +930,7 @@ export class Store {
       ...(engine ? { engine: String(engine) } : {}),
       // A TASK GIVEN TO A PERSON (the team version): who has to do it and
       // when. No agent runs on it until that person hands it to one
-      // (shared/team-rules.mjs), and it reaches their inbox, not the sender's.
+      // (shared/team-rules.mts), and it reaches their inbox, not the sender's.
       ...(assignee ? { assignee: String(assignee) } : {}),
       ...(due ? { due: String(due) } : {}),
       ...(Array.isArray(people) && people.length ? { people } : {}),
@@ -947,7 +970,7 @@ export class Store {
     const to = this.listProducts().find((p) => p.slug === toSlug);
     if (!to) throw new Error(`no such project: ${toSlug}`);
     const item = this.readItem(fromSlug, id);
-    const why = whyItCannotMove(item, { live: false });
+    const why = whyItCannotMove(item);
     if (why) throw new Error(why);
 
     // Where it came from, in the thread rather than only in a toast, because a
@@ -1006,7 +1029,7 @@ export class Store {
     // gave must not read as a reply still waiting for one.
     const replied = !!landed.answer && landed.answer !== '(withdrawn)';
     if (replied && agentSpokeSince(landed, answerTs(landed))) {
-      landed = workItemsDisk.updateWorkItem(dir, created.id, { answeredThrough: answerTs(landed) }, { source: 'system' });
+      landed = { ...workItemsDisk.updateWorkItem(dir, created.id, { answeredThrough: answerTs(landed) }, { source: 'system' }), product: toSlug };
     }
     try {
       const traces = this.machineryFile(fromSlug, path.join('sessions', id));
@@ -1016,7 +1039,7 @@ export class Store {
   }
 
   /* ------------------------------- teammates ------------------------------ */
-  teammatesView(items?: StoreItem[] | null, now = Date.now()) {
+  teammatesView(items?: ListedItem[] | null, now = Date.now()) {
     if (!this.teammates) return null;
     return this.teammates.view(items ?? this.listItems(now), now);
   }
@@ -1067,7 +1090,7 @@ export class Store {
   // is news about a repeating task rather than work she asked for.
   // `problem` is the summary's Context, the few sentences a reader gets before
   // they open anything. Without one the panel falls back to the first sentence
-  // of the body (summaryOf, shared/thread-cards.mjs), which on a row whose body
+  // of the body (summaryOf, shared/thread-cards.mts), which on a row whose body
   // is a list reads as that list with its line breaks taken out.
   fileItem(slug: string, { title, body, problem, kind = 'review', priority = 5, labels = [] }: FiledItem) {
     const { workItemsDisk } = this.modules;
@@ -1078,7 +1101,7 @@ export class Store {
 
   // A FIX FOR A RED MAIN, which runs without waiting for anyone: the app files
   // it with the 'founder' label the way a repeating task's run is filed
-  // (main/repeats.mjs), because the person agreed that these start and ship on
+  // (main/repeats.mts), because the person agreed that these start and ship on
   // their own (main/main-went-red.mts).
   fileMainFix(slug: string, row: FiledItem) {
     return this.fileOnItsOwn(slug, row);
@@ -1106,10 +1129,10 @@ export class Store {
   }
 
   // SOMEONE COMMENTED ON A FILE THIS THREAD MADE, through its shared link
-  // (main/team/link-comments.mjs). Said as a note; a closed thread comes back
+  // (main/team/link-comments.mts). Said as a note; a closed thread comes back
   // to wait on her as `closedBeforeItShipped` brings one, and a thread still
   // going is left going.
-  commentOnASharedFile(slug: string, id: string, note: string, linkComment: { name: string; file: string; text: string } | null = null) {
+  commentOnASharedFile(slug: string, id: string, note: string, linkComment: LinkComment | null = null) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const item = workItemsDisk.updateWorkItem(dir, id, { note, ...(linkComment ? { linkComment } : {}) }, { source: 'system' });
@@ -1245,6 +1268,7 @@ export class Store {
       name: PRACTICE_NAME,
       createdAt: new Date().toISOString(),
       [PRACTICE_FLAG]: true,
+      seenBy: 'private',
     }, null, 2));
     // AND THE SIDEBAR NOTE IS WRITTEN WITH IT.
     //
@@ -1323,7 +1347,7 @@ export class Store {
    *  `$ASTRAL_HOME/projects/<escaped path>/` — the work-item ledger, the session
    *  traces, any repeat rules. WHAT DOES NOT: anything else in the account root,
    *  ever, and any machinery directory whose `.origin` does not name this exact
-   *  project (main/store/home.mjs).
+   *  project (main/store/home.mts).
    *
    *  THE MACHINERY GOES FIRST, and on purpose. It is keyed on the project's
    *  path, so removing the folder first would leave the ledger addressable only
@@ -1563,7 +1587,7 @@ export class Store {
     // and no second trace, because the run it did is already on the thread.
     // AND THE REPLY IS SETTLED FIRST, the way the supervisor settles one when a
     // session exits: without it the row reads as an answer still waiting for an
-    // agent and stays in In progress (`answerSettled`, shared/answers.mjs).
+    // agent and stays in In progress (`answerSettled`, shared/answers.mts).
     if (product?.practice && round > 0) {
       const before = this.readItem(slug, id);
       this.settleAnswer(slug, id, before?.wrote?.answer?.ts ?? 0);
@@ -1864,7 +1888,7 @@ export class Store {
       }
       this.answerCodexImport(slug, rowId!, 'yes', { thread, now: last + 2, bodyAt: fresh ? at + 1 : last + 2 });
       if (land === 'sorted' && !thread.waiting) {
-        workItemsDisk.updateWorkItem(dir, rowId, { status: 'done' }, { source: 'founder', now: last + 4 });
+        workItemsDisk.updateWorkItem(dir, rowId!, { status: 'done' }, { source: 'founder', now: last + 4 });
         done += 1;
       }
       ids.push(rowId!);
@@ -1996,9 +2020,12 @@ export class Store {
         this.watchers.push(watcher);
       } catch {}
     }
+    let watchedAll = true;
     for (const dir of dirs) {
+      const isRoot = dir === this.config.accountRoot;
       try {
         const watcher = fs.watch(dir, (event, file) => {
+          if (isRoot || !file || file === 'project.json') this._projectEvents += 1;
           if (file && !/work-items\.jsonl|dashboard\.jsonl|project\.json/.test(file)) return;
           this._notify();
         });
@@ -2006,12 +2033,14 @@ export class Store {
         // EMFILE). An unhandled error takes down the app, outside this catch.
         // Reads still work without a watcher; release only the failed one.
         watcher.on('error', () => {
+          this._projectsWatched = false;
           try { watcher.close(); } catch {}
           this.watchers = this.watchers.filter((w) => w !== watcher);
         });
         this.watchers.push(watcher);
-      } catch {}
+      } catch { watchedAll = false; }
     }
+    this._projectsWatched = watchedAll;
   }
 
   _notify() {
@@ -2020,6 +2049,7 @@ export class Store {
   }
 
   unwatch() {
+    this._projectsWatched = false;
     for (const w of this.watchers) try { w.close(); } catch {}
     this.watchers = [];
   }
@@ -2040,7 +2070,7 @@ export class Store {
  *  pane printed "Mon, Aug 24 3:38pm" under a result stamped 10:37pm. Seventeen
  *  hours out and the work appeared to happen after the answer.
  *
- *  Pinned by tests/the-practice-project-is-the-whole-app.test.mjs, which writes
+ *  Pinned by tests/the-practice-project-is-the-whole-app.test.mts, which writes
  *  a trace and reads it back through the renderer's own parser. */
 function clockAt(ms: number) {
   return new Date(ms).toISOString().slice(11, 19);

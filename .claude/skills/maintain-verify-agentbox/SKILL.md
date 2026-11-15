@@ -34,8 +34,8 @@ End with exactly one, and say which:
 
 Only `.claude/skills/verify-agentbox/` and the harness it owns:
 `scripts/lib/stub-claude-worker.mjs` and the two tests that pin the harness
-(`tests/the-pre-deploy-check-runs-what-a-change-needs.test.mjs`,
-`tests/the-stand-in-worker-speaks-claude-codes-input-protocol.test.mjs`).
+(`tests/the-pre-deploy-check-runs-what-a-change-needs.test.mts`,
+`tests/the-stand-in-worker-speaks-claude-codes-input-protocol.test.mts`).
 Never product code. Behaviour the map describes that the app no longer has is
 either drift (fix the map) or a regression (file it as its own thread, mark
 the claim `known` with that thread's id, leave the product alone).

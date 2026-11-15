@@ -171,6 +171,16 @@ export function codexLimits(snapshot: unknown): CodexLimit[] {
 }
 
 /**
+ * When a spent window comes back: the latest reset among the windows at their
+ * limit or refused, since nothing runs before the last of them. Null when none
+ * is spent or none says.
+ */
+export function codexBackAt(limits: ReadonlyArray<UsageLimit & { reached?: boolean }> | null | undefined, now = Date.now()): number | null {
+  const backs = (limits ?? []).filter((l) => (l.reached || l.percent >= 100) && l.resetsAt != null && l.resetsAt > now).map((l) => l.resetsAt!);
+  return backs.length ? Math.max(...backs) : null;
+}
+
+/**
  * WHICH WINDOW THE PROVIDER SAYS IS SPENT, or null when it says nothing.
  *
  * `rateLimitReachedType` NAMES a window (`primary` / `secondary`), measured on a
@@ -252,7 +262,7 @@ export function codexPlan(snapshot: unknown): CodexPlan {
  * carrying only the five hour window would take the week away, and one carrying
  * neither would take both -- and this repo already puts exactly that on the wire
  * (`{ rateLimits: {} }`, in
- * tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-waits.test.mjs).
+ * tests/one-codex-process-carries-many-threads-and-a-card-nobody-answers-waits.test.mts).
  * The failure would look like the corner going quiet for no reason, which is the
  * complaint this whole surface started from.
  *

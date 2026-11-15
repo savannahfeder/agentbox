@@ -108,6 +108,10 @@ export function traceLines(session: TraceSession): TraceLine[] {
   // How many blank lines have gone by since the last line of prose, so a
   // paragraph break survives and a run of them does not become a gap.
   let blanks = 0;
+  // The supervisor writes a stderr chunk with one unstamped `stderr:` in front,
+  // so its later lines carry no prefix. Without this they read as the agent's
+  // last sentence running on.
+  let inStderr = false;
 
   // THE TOOL'S OWN REFUSAL, WHEN THE RUN ENDED ON ONE. The CLI types it into
   // the run as a line of prose and then repeats it as an ERROR result; the
@@ -123,6 +127,12 @@ export function traceLines(session: TraceSession): TraceLine[] {
   for (const raw of (session?.text ?? '').split('\n')) {
     const stamped = STAMPED.exec(raw);
     if (!stamped) {
+      if (raw.startsWith('stderr:')) { inStderr = true; continue; }
+      if (inStderr) {
+        if (raw.trim() && !raw.startsWith('#')) continue;
+        inStderr = false;
+        if (!raw.trim()) continue;
+      }
       if (raw.startsWith('#| ')) {
         if (outputOf) { outputRead.push(raw.slice(3)); outputOf.output = outputRead.join('\n'); }
         continue;
@@ -164,9 +174,10 @@ export function traceLines(session: TraceSession): TraceLine[] {
     const at = momentOf(session.startedAt, Number(stamped[1]), Number(stamped[2]), Number(stamped[3]));
     const time = hers(session.startedAt, Number(stamped[1]), Number(stamped[2]), Number(stamped[3]));
 
+    inStderr = body.startsWith('stderr:');
     if (body.startsWith('== RESULT')) { inResult = true; continue; }
     inResult = false;
-    if (body.startsWith('stderr:')) continue;
+    if (inStderr) continue;
     if (!body.trim()) continue;
 
     const kind = body.startsWith('[') ? 'tool' : 'say';

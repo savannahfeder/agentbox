@@ -1,5 +1,5 @@
 // Every request the app makes ends: one that never answers is cut off, as the
-// desktop's are (main/team/session.mjs `withDeadline`). A caller's own signal
+// desktop's are (main/team/session.mts `withDeadline`). A caller's own signal
 // still ends it sooner.
 export const CLOUD_DEADLINE_MS = 60_000;
 

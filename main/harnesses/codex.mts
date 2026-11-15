@@ -1,14 +1,14 @@
 import path from 'node:path';
 import type { EventEmitter } from 'node:events';
-import { harnessDefinition } from '../../shared/harness-definitions.mjs';
-import { resolveCodexBin } from '../codex-bin.mjs';
+import { harnessDefinition } from '../../shared/harness-definitions.mts';
+import { resolveCodexBin } from '../codex-bin.mts';
 import { codexLaunchEnv } from '../codex-launch-env.mts';
 import { codexModels, codexDefaultModel, codexModelLevels } from '../codex-models.mts';
 import { codexTranscriptFile, workerThreadParams, refusedCodexWorker } from '../codex-session.mts';
 import { codexKeyRefusal } from '../codex-account.mts';
 import { compactCodexThread } from '../codex-compaction.mts';
 import type { CompactServer } from '../codex-compaction.mts';
-import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent, rememberCodexChange, changeFromCodexTurn } from '../codex.mjs';
+import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent, rememberCodexChange, changeFromCodexTurn } from '../codex.mts';
 import { codexActivity } from '../agent-activity.mts';
 import { runCodexCommand } from '../provider-commands.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
@@ -71,6 +71,9 @@ export const codexHarness = {
       env: { CODEX_HOME: standalone[1], CODEX_INSTALL_DIR: path.dirname(bin) },
       feed: 'https://releases.openai.com/codex/channels/latest', format: 'codex' } : null;
   }),
-  smallModelArgs: (prompt: string) => [
-'exec', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules', '-s', 'read-only', '-c', 'model_reasoning_effort=low', prompt],
+  // `--image=` with the value attached, because `-i <FILE>...` takes every
+  // word after it, the prompt included.
+  smallModelArgs: (prompt: string, model?: string | null, pictures: readonly string[] = []) => [
+'exec', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules', '-s', 'read-only', '-c', 'model_reasoning_effort=low',
+    ...(model ? ['-m', model] : []), ...pictures.map((p) => `--image=${p}`), prompt],
 };

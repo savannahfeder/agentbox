@@ -82,6 +82,22 @@ export function codexTesterArgv({ dir, prompt, last, model = null, sandboxed = t
   ];
 }
 
+// `codex login status` sends no request, so it says signed in for a sign-in
+// OpenAI refuses. One tiny real request is the check.
+export const CODEX_CHECK_ARGV = ['exec', '--skip-git-repo-check', '--ephemeral', '-s', 'read-only', '-c', 'model_reasoning_effort=low', 'Reply with the single word: ok'];
+const REFUSED = /\b401\b|unauthorized|token_expired|refresh_token_|sign in again|log in again|not logged in|not signed in/i;
+
+/** Null when the check answered, else the one sentence the script stops with. */
+export function codexCheckFailed({ code, out }, { home, onCloud = false }) {
+  if (code === 0) return null;
+  const said = String(out || '').trim().replace(/\s+/g, ' ').slice(-300);
+  if (!REFUSED.test(said)) return `the testers' Codex at ${home} could not answer one request: "${said}".`;
+  return `OpenAI refuses the testers' Codex sign-in at ${home} ("${said}"), even though \`codex login status\` says signed in. `
+    + (onCloud
+      ? 'This is the cloud\'s Codex sign-in: a sign-in made on this machine is lost when it goes, so it needs Sign in again in the cloud menu on the computer. Until then, run the testers on the computer.'
+      : `Sign it in again (CODEX_HOME=${home} codex login) or name another with --codex-home.`);
+}
+
 /** A tester's environment: the chosen login, and no API key, so it spends the plan and nothing else. */
 export function codexTesterEnv(base, home) {
   const env = {};

@@ -10,7 +10,7 @@
 // terminal in front of it and a downloaded app has neither.
 //
 // So this launches THE RUNNING APP AGAIN, inside a throwaway home. The recipe
-// is `shared/fresh-user-home.mjs`, which is the one `scripts/fresh-user.mjs`
+// is `shared/fresh-user-home.mts`, which is the one `scripts/fresh-user.mjs`
 // has used since 2026-08-20, so there is one place it is written down.
 //
 // NOTHING OF HERS IS TOUCHED. Nothing is deleted, nothing is copied out, and
@@ -22,7 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { HOMES, existingHomes, prepareHome, makeHome, freshEnv } from '../shared/fresh-user-home.mjs';
+import { HOMES, existingHomes, prepareHome, makeHome, freshEnv } from '../shared/fresh-user-home.mts';
 import { NAME } from '../shared/product-name.mjs';
 
 /**

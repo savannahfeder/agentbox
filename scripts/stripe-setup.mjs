@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
 import { formOf, lookupKeyOf } from '../cloud/gateway/stripe.mjs';
-import { readCloudConfig } from '../main/cloud/config.mjs';
+import { readCloudConfig } from '../main/cloud/config.mts';
 import { STRIPE_SECRET_NAME, GATEWAY_FUNCTION } from './cloud-gateway-setup.mjs';
 
 // SaaS sold to businesses (Stripe's tax codes).
@@ -33,7 +33,7 @@ export const WEBHOOK_EVENTS = ['checkout.session.completed', 'customer.subscript
 
 export const paidPlans = (plans = PLANS) => Object.entries(plans).filter(([, p]) => p.agents > 0 && p.dollarsPerMonth > 0);
 /** The team plan as Stripe sells it: one seat, bought once a member. */
-export const teamPlan = (team = TEAM) => ['team', { agents: team.agentsPerSeat, hoursPerMonth: team.hoursPerSeat, dollarsPerMonth: team.dollarsPerSeat }];
+export const teamPlan = (team = TEAM) => ['team', { unlimited: true, hoursPerMonth: team.hoursPerSeat, dollarsPerMonth: team.dollarsPerSeat }];
 const title = (plan) => plan[0].toUpperCase() + plan.slice(1);
 export const productOf = (plan, p) => ({
   name: `Agentbox Cloud ${title(plan)}`,

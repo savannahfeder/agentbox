@@ -3,12 +3,13 @@ import '../platform/crash';
 import { Geist_400Regular, Geist_500Medium, Geist_600SemiBold, useFonts } from '@expo-google-fonts/geist';
 import { GeistMono_400Regular, GeistMono_500Medium } from '@expo-google-fonts/geist-mono';
 import * as Notifications from 'expo-notifications';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { router } from '../lib/router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { Platform, View } from 'react-native';
-import { SafeAreaInsetsContext, SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { bottomRoom } from '../lib/bottom-room';
 import { CloudProvider } from '../state/cloud';
 import { GroupsProvider } from '../state/groups';
 import { LookProvider, useLook } from '../state/look';
@@ -22,8 +23,8 @@ const PREVIEW_PHONE = process.env.EXPO_PUBLIC_PREVIEW === '1' && Platform.OS ===
 function useAlertsOpenThreads() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
-    const open =(data: any) => { if (data?.product && data?.id) router.push({ pathname: '/thread/[product]/[id]', params: { product: data.product, id: data.id } }); };
-    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data));
+    const open =(data: { product?: string; id?: string } | undefined) => { if (data?.product && data?.id) router.push({ pathname: '/thread/[product]/[id]', params: { product: data.product, id: data.id } }); };
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data as { product?: string; id?: string } | undefined));
     return () => sub.remove();
   }, []);
 }
@@ -35,7 +36,15 @@ function Redrawn({ children }: { children: ReactNode }) {
 }
 const redrawn = ({ children }: { children: ReactNode }) => <Redrawn>{children}</Redrawn>;
 
+// Android mounts the new root before the old one unmounts, and expo-router's
+// shared router ends up unbound (QA M-35), so the live root binds ours itself.
+function useRootBindsTheRouter() {
+  const live = useRouter();
+  useLayoutEffect(() => router.bindLive(live), [live]);
+}
+
 export default function Root() {
+  useRootBindsTheRouter();
   return <LookProvider><App /></LookProvider>;
 }
 
@@ -62,7 +71,15 @@ function App() {
   return (
     <SafeAreaProvider>
       {/* A browser has no status bar or home bar; the preview is drawn with an iPhone's. */}
-      {PREVIEW_PHONE ? <SafeAreaInsetsContext.Provider value={PREVIEW_PHONE}>{app}</SafeAreaInsetsContext.Provider> : app}
+      {PREVIEW_PHONE ? <SafeAreaInsetsContext.Provider value={PREVIEW_PHONE}>{app}</SafeAreaInsetsContext.Provider> : <FootRoom>{app}</FootRoom>}
     </SafeAreaProvider>
   );
+}
+
+// Every screen and sheet reads its insets from here, so the foot is mended once.
+function FootRoom({ children }: { children: ReactNode }) {
+  const inset = useSafeAreaInsets();
+  const bottom = bottomRoom(Platform.OS, inset.bottom);
+  const value = useMemo(() => ({ ...inset, bottom }), [inset.top, inset.left, inset.right, bottom]);
+  return <SafeAreaInsetsContext.Provider value={value}>{children}</SafeAreaInsetsContext.Provider>;
 }

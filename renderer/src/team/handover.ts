@@ -1,4 +1,4 @@
-// REMOVING SOMEONE ASKS WHO TAKES THEIR WORK (main/team/departures.mjs moves it).
+// REMOVING SOMEONE ASKS WHO TAKES THEIR WORK (main/team/departures.mts moves it).
 import type { Person, TeamMate } from '../types';
 
 export interface HandoverAsk {

@@ -40,7 +40,7 @@ const REPO = path.resolve(here, '../../../..');
 
 /**
  * WHICH LAYERS A SET OF CHANGED FILES NEEDS. Pure, so it is tested
- * (tests/the-pre-deploy-check-runs-what-a-change-needs.test.mjs).
+ * (tests/the-pre-deploy-check-runs-what-a-change-needs.test.mts).
  *
  * The rule is "could this change what a user's Mac does", not "is it code":
  * anything under main/, shared/, bin/, renderer/ or preload can, and the

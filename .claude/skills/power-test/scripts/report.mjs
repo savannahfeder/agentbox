@@ -25,7 +25,7 @@ export function nearestEvent(events, at, windowMs = 10 * 60_000) {
   return [...events].filter((e) => e.kind !== 'agents' && e.at <= at && at - e.at <= windowMs).sort((a, b) => b.at - a.at)[0] ?? null;
 }
 
-export function writeReport({ root, startedAt, endedAt, focus = null, real = false, chaos = 'normal', people }) {
+export function writeReport({ root, startedAt, endedAt, focus = null, real = false, codexReal = false, standIns = null, chaos = 'normal', people }) {
   const since = (at) => clock(at - startedAt);
   const all = [];
   const machine = [];
@@ -62,8 +62,11 @@ export function writeReport({ root, startedAt, endedAt, focus = null, real = fal
   const lines = [
     `# Power test, ${new Date(startedAt).toISOString().slice(0, 16).replace('T', ' ')}: ${focus ?? 'an ordinary day'}`,
     '',
-    `${people.length} ${people.length === 1 ? 'person' : 'people'} (${people.map((p) => p.name).join(', ')}) for ${clock(endedAt - startedAt)} (${minutes} min), on ${real ? 'the real Claude Code and Codex on this computer' : 'stand-in agents'}, chaos ${chaos}. Testers logged ${ranked.length} issue(s), ${seenTwice} seen more than once; the watcher found ${severe.length}.`,
-    real ? '' : 'The agents were stand-ins: their answers are canned, so an issue about what an answer said is about the stand-in, not the app. What the app did with it counts.',
+    ...(real ? [] : [`**These agents were stand-ins, NOT real plans.** The person agreed: "${standIns ?? 'nobody agreed, which should not be possible'}"`, '']),
+    `${people.length} ${people.length === 1 ? 'person' : 'people'} (${people.map((p) => p.name).join(', ')}) for ${clock(endedAt - startedAt)} (${minutes} min), on ${real ? 'the real Claude Code and Codex on this computer' : codexReal ? 'the real Codex and a Claude Code stand-in' : 'stand-in agents'}, chaos ${chaos}. Testers logged ${ranked.length} issue(s), ${seenTwice} seen more than once; the watcher found ${severe.length}.`,
+    real ? '' : codexReal
+      ? 'Codex was real, on the testers\' login; Claude Code was a stand-in whose answers are canned, so an issue about what a Claude Code answer said is about the stand-in, not the app.'
+      : 'The agents were stand-ins: their answers are canned, so an issue about what an answer said is about the stand-in, not the app. What the app did with it counts.',
     '',
     '## What the testers hit',
     '',

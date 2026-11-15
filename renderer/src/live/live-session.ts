@@ -1,9 +1,9 @@
 // A copy's place in a file's live room, for as long as the file is open.
 import { useEffect, useState } from 'react';
 import * as Y from 'yjs';
-import { connectLive, type LiveConnection, type LiveState } from './client.mjs';
+import { connectLive, type LiveConnection, type LiveState } from './client';
 import { api } from '../api';
-import { familyOfName } from '../../../shared/artifact-marks.mjs';
+import { familyOfName } from '../../../shared/artifact-marks.mts';
 import type { LiveRoomTicket } from '../types';
 
 const ROOM_WAIT_MS = 4000;

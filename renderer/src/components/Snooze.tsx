@@ -16,7 +16,7 @@
 import { useMemo } from 'react';
 import type { WorkItem } from '../types';
 import { dayAndTime, parseWhen, readRule } from '../format';
-import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mjs';
+import { ruleLabel, type RepeatShape } from '../../../shared/repeats.mts';
 import { scheduleSubtitle } from '../list-rules';
 import { SchedulePicker } from './SchedulePicker';
 import { laterPresets, type LaterPreset } from '../later-times';

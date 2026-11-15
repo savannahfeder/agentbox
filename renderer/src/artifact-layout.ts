@@ -1,4 +1,4 @@
-import { viewKind } from '../../shared/artifact-marks.mjs';
+import { viewKind } from '../../shared/artifact-marks.mts';
 import { isWebsiteAddress } from '../../shared/websites.mts';
 import { opensInPane } from './doc-pane';
 

@@ -6,10 +6,12 @@
 // rules; the test is tests/a-room-wall-shows-each-person-as-they-chose.
 import { localDate, streakOf } from './agent-hours.mts';
 import type { AgentHoursSummary } from './agent-hours.mts';
-import { visibilityOf } from './thread-cards.mjs';
+import { visibilityOf } from './thread-cards.mts';
+import type { ProjectSeen } from './thread-cards.mts';
 
-type Row = Parameters<typeof visibilityOf>[0];
-type Seen = Parameters<typeof visibilityOf>[1];
+/** A running thread's row, as far as the presence row names it. */
+interface Row { id?: string; product?: string; label?: string; title?: string; visibility?: string }
+type Seen = ProjectSeen;
 type Stamp = string | number | null | undefined;
 type Working = { workingOn: string | null; workingPrivate: boolean };
 type MonthRow = { month?: unknown; hours?: unknown } | null;

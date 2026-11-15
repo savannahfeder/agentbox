@@ -9,7 +9,7 @@
 // `list-rules.ts` already keeps for the hint on a row, and the reason it holds
 // even harder here is that a hint is read for a second and a reference page is
 // believed. So the list is a value, and
-// `tests/the-shortcuts-page-lists-keys-that-work.test.mjs` reads every entry
+// `tests/the-shortcuts-page-lists-keys-that-work.test.mts` reads every entry
 // below against the branch in App.tsx (or main/main.mts, or Compose.tsx) that
 // actually runs it. A key added here without a handler fails the suite.
 //

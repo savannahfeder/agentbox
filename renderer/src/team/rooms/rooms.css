@@ -127,6 +127,8 @@
 .rm-cm.cont .tx { margin-top: 0; }
 .rm-cm .rep { display: flex; align-items: center; gap: 3px; margin-top: 5px; font: 10px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; }
 .rm-cm .rep:hover { color: var(--text-dim); }
+.rm-cm .rm-there { display: block; max-width: 100%; margin-top: 3px; padding: 0; border: 0; background: none; font-family: inherit; font-size: 12px; line-height: 18px; color: var(--text-faint); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.rm-cm .rm-there:hover { color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; }
 .rm-cm .act { display: none; margin-left: auto; font: 10px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; }
 .rm-cm:hover .act { display: inline; }
 .rm-cm.root { padding-bottom: 12px; margin-bottom: 4px; }

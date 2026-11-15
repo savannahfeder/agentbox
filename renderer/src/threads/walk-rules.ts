@@ -9,7 +9,7 @@
 // order the list or the board draws them; with nobody else picked there are
 // no cards, so your own page walks as it always has.
 // Pure, so tests read it directly
-// (tests/j-walks-onto-a-teammates-thread-when-they-are-on-the-page.test.mjs).
+// (tests/j-walks-onto-a-teammates-thread-when-they-are-on-the-page.test.mts).
 import type { ThreadCard, WorkItem } from '../types';
 import type { BoardEntry } from './page-rules';
 import type { MixedRow } from './people-rules';

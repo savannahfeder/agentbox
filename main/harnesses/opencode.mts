@@ -6,7 +6,7 @@
 // and the answer is nearly yes: OpenCode is this file, main/opencode.mts,
 // main/opencode-server.mts, one entry of data in shared/harness-definitions,
 // one line registering it in main/harnesses.mts -- and one filter in
-// shared/engines.mjs, which was NOT free and is written up there. No existing
+// shared/engines.mts, which was NOT free and is written up there. No existing
 // file grew an engine branch.
 //
 // WHAT IS DECLARED MISSING RATHER THAN FAKED. `usage` is absent, so the
@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
-import { harnessDefinition } from '../../shared/harness-definitions.mjs';
+import { harnessDefinition } from '../../shared/harness-definitions.mts';
 import { openCodeClient, createOpenCodeWorker, splitModel } from '../opencode-server.mts';
 import type { OpenCodeClient, OpenCodePlan, OpenCodeWorker } from '../opencode-server.mts';
 import {

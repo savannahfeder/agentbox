@@ -151,10 +151,17 @@ function readSession(session: TraceSession) {
   // read it (two of the nine runs on claimed 8h 37m and 6h 37m of work that
   // took minutes).
   let saidAt: number | null = null;
+  // A stderr chunk's lines after its first carry no prefix (see traceLines).
+  let inStderr = false;
 
   for (const line of session.text.split('\n')) {
     const stamped = LINE.exec(line);
     if (!stamped) {
+      if (line.startsWith('stderr:')) { inStderr = true; continue; }
+      if (inStderr) {
+        if (line.trim() && !line.startsWith('#')) continue;
+        inStderr = false;
+      }
       const exit = EXIT.exec(line);
       if (exit) {
         exitCode = Number(exit[1]);
@@ -172,6 +179,7 @@ function readSession(session: TraceSession) {
     }
 
     const body = stamped[4];
+    inStderr = body.startsWith('stderr:');
 
     if (body.startsWith('== RESULT')) {
       inResult = true;

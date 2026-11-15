@@ -9,7 +9,7 @@
 // When the supervisor cannot act on a push (agents paused, scheduled, held by
 // another session) it refuses with a reason, and the toast says it.
 //
-// tests/run-now-is-offered-on-every-waiting-task-and-in-command-k.test.mjs
+// tests/run-now-is-offered-on-every-waiting-task-and-in-command-k.test.mts
 
 import type { LiveFacts } from './live-line';
 import type { WorkItem } from './types';

@@ -7,7 +7,7 @@
 // Agents wear the dashed square a teammate's agent wears in the inbox, so
 // every name in the menu starts on one line.
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_ENGINE, engineLabel, type Engine } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE, engineLabel, type Engine } from '../../../shared/engines.mts';
 import { useKeepInWindow } from '../keep-in-window';
 import type { Person } from '../types';
 import { Face, firstName } from './people';

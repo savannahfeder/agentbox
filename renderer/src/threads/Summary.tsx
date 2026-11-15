@@ -8,7 +8,7 @@
 // button. Clicking a line makes it a text box, and it saves as she types,
 // because a summary she has to remember to save is one that goes stale.
 //
-// The data was already there (shared/thread-cards.mjs reads the state and the
+// The data was already there (shared/thread-cards.mts reads the state and the
 // summary, main/store.mts threadEdit writes an edit); this file only draws it.
 // The rules that decide words (how long ago, when it was updated, which threads
 // may be linked) are in ./summary-rules.ts, and the bar's crumb in
@@ -16,7 +16,7 @@
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Person, RepeatRule, ThreadCard, ThreadEditPatch, WorkItem } from '../types';
 import { api } from '../api';
-import { doneSteps, summaryOf, threadState } from '../../../shared/thread-cards.mjs';
+import { doneSteps, summaryOf, threadState } from '../../../shared/thread-cards.mts';
 import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
 import { Face, TeamContext, firstName, type TeamView } from '../team/people';
@@ -28,8 +28,8 @@ import { crumbName, renameTo } from './crumb-rules';
 import { summaryFits, useRoomyToggle } from '../room';
 import { VISIBILITY_WORD, chosenNames, whoSees, type Seen } from './summary-rules';
 import { findPeople, teammates } from './composer-rules';
-import { shownToPeople } from '../../../shared/thread-cards.mjs';
-import { shownPriority } from '../../../shared/rank.mjs';
+import { shownToPeople } from '../../../shared/thread-cards.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { isDirect } from './page-rules';
 import { rowTitle } from '../list-rules';
 import { inStep, RunningMark, SharedMark } from './Pages';
@@ -862,7 +862,7 @@ export function TeammateStanding({ card, person, now = Date.now() }: { card: Thr
  * done, the files it links to, what it waits on or holds up when anything
  * does, and its properties. Its state heads the page (TeammateStanding). A
  * private thread's card says only that it is private, because the Mac that
- * published it sent nothing else (shared/thread-cards.mjs cardsFor).
+ * published it sent nothing else (shared/thread-cards.mts cardsFor).
  */
 export function TeammateCard({ card, person, files = [] }: {
   card: ThreadCard; person: Person | null; now?: number;

@@ -1,13 +1,13 @@
 // PURE. The files a thread made, for the Files button over it.
-import { filesInLines, otherFilesInLines, threadFiles, viewKind } from '../../../shared/artifact-marks.mjs';
+import { filesInLines, otherFilesInLines, threadFiles, viewKind, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 export interface ThreadFile { src: string; name: string; notes: number; at: number }
 
 // A page or script in backticks is usually code being talked about, not something the thread made.
-const tablesIn = (lines: unknown[]) => otherFilesInLines(lines).filter((f) => viewKind(f.path) === 'table');
+const tablesIn = (lines: readonly ThreadLine[]) => otherFilesInLines(lines).filter((f) => viewKind(f.path) === 'table');
 
 /** Each file once at its newest version, with the notes on any version, newest first. */
-export function filesMadeHere(lines: unknown[], notes: { file: string }[]): ThreadFile[] {
+export function filesMadeHere(lines: readonly ThreadLine[], notes: { file: string }[]): ThreadFile[] {
   return threadFiles([...filesInLines(lines), ...tablesIn(lines)]).map((family: { versions: { id: string; name: string; path: string; at: number }[] }) => {
     const newest = family.versions[family.versions.length - 1];
     const ids = new Set(family.versions.map((v) => v.id));

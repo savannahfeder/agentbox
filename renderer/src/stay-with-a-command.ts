@@ -13,7 +13,7 @@
 // the row is no longer in. That is the exception she names.
 
 import { commandPrompt } from '../../shared/claude-commands.mts';
-import { DEFAULT_ENGINE } from '../../shared/engines.mjs';
+import { DEFAULT_ENGINE } from '../../shared/engines.mts';
 
 /**
  * The row she is watching a command run on. Product and id, because two
@@ -65,14 +65,13 @@ export function staysOnTheTask(
 /**
  * IS SHE STILL ON THE ROW SHE RAN IT FROM.
  *
- * Written against the state rather than against each way out of a task, for the
- * same reason `heldByUrgent` is: Escape, the back arrow, clicking away and the
- * palette are four routes and fixing the ones you can find is how the fifth gets
- * missed. `null` focused means she has left, and then `wayOut` answers where to.
+ * Written against the state rather than against each way out of a task:
+ * Escape, the back arrow, clicking away and the palette are four routes and
+ * fixing the ones you can find is how the fifth gets missed. `null` focused
+ * means she has left, and then `wayOut` answers where to.
  *
- * A DIFFERENT ROW ENDS IT. An urgent row can take the pane over her head while
- * a command is running; from there the inbox is no longer a promise this rule
- * can keep, so it stops making it.
+ * A DIFFERENT ROW ENDS IT: from there the inbox is no longer a promise this
+ * rule can keep, so it stops making it.
  */
 export function stillFollowing(following: Followed, focused: { product: string; id: string } | null): Followed {
   if (!following) return null;
@@ -114,7 +113,7 @@ export function wayOut(following: Followed, focused: unknown): 'inbox' | 'stay' 
  * Keep-on-this-Mac and a hand-back are laid over the row by the supervisor
  * without moving `updatedAt`, so a change to either counts too: the Runs on
  * button reads them (w-bac3eb6bd2). So does a rename: a `label` written alone
- * is not news and leaves `updatedAt` where it was (shared/work-items.mjs).
+ * is not news and leaves `updatedAt` where it was (shared/work-items.mts).
  *
  * Returns the copy to take, or null for leave it alone.
  */

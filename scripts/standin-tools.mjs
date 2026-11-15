@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { startToolsFixture } from '../cloud/standin/tools-mcp.mjs';
-import { OWN_CLIENT_REDIRECT } from '../shared/connections-catalog.mjs';
+import { OWN_CLIENT_REDIRECT } from '../shared/connections-catalog.mts';
 
 const schema = (properties = {}, required = []) => ({ type: 'object', properties, required });
 const t = (name, description, properties, required) => ({ name, description, inputSchema: schema(properties, required) });

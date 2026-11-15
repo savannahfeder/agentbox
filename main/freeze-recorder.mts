@@ -101,7 +101,7 @@ function fileOf(url: string | undefined, appDirs: string[]) {
 // The profile names a file by its real path, which on macOS is /private/var for /var.
 const realPath = (dir: string) => { try { return dir ? fs.realpathSync(dir) : ''; } catch { return ''; } };
 
-const ours = (frame: FreezeStackFrame) => /\.(m?js|cjs|ts)$/.test(frame.file) && !/^(node:|…\/)/.test(frame.file) && !frame.file.includes('node_modules');
+const ours = (frame: FreezeStackFrame) => /\.[cm]?[jt]s$/.test(frame.file) && !/^(node:|…\/)/.test(frame.file) && !frame.file.includes('node_modules');
 const named = (f: FreezeStackFrame) => (f.file ? `${f.fn} ${f.file}:${f.line}` : f.fn);
 
 /**

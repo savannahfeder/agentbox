@@ -1,4 +1,4 @@
-import type {CarryState} from '../../shared/carried-files.mjs';
+import type {CarryState} from '../../shared/carried-files.mts';
 
 /** What a file under a message says at a glance, as plain words: its own
  * title, the first thing it says, and its opening blocks for a miniature page.
@@ -9,7 +9,7 @@ export type Glance = {title:string|null;line:string|null;blocks:{heading:boolean
 type Answer = {ok:boolean;coming?:boolean;waits?:boolean;error?:string;carry?:CarryState;opened?:string};
 type Reader = {
   readDoc:(p:{product:string;src:string})=>Promise<Answer&{text?:string}>;
-  codeChange:(p:{product:string;src:string})=>Promise<{ok:boolean;change?:unknown}>;
+  codeChange:(p:{product:string;src:string;summary?:boolean})=>Promise<{ok:boolean;change?:unknown}>;
   resolveDoc:(p:{product:string;src:string})=>Promise<Answer>;
 };
 
@@ -26,7 +26,7 @@ export async function glanceFile(reader:Reader, product:string, path:string):Pro
       return {...fileGlance(r.text ?? '', kind), ...(r.carry ? {carry:r.carry} : {})};
     }
     if (kind === 'code') {
-      const r = await reader.codeChange({product, src:path});
+      const r = await reader.codeChange({product, src:path, summary: true});
       return r.ok && r.change ? {title:'Code changes', line:null, blocks:[]} : null;
     }
     const r = await reader.resolveDoc({product, src:path});
@@ -92,4 +92,9 @@ function plain(s:string) {
 }
 
 /** A link's own label (`[plan.md](reports/plan.md)`) reads as a second, bare name for the same file: one tile for it, not two. */
-export const withoutBareTwins = (paths:string[]) => paths.filter(p => p.includes('/') || !paths.some(q => q !== p && q.endsWith(`/${p}`)));
+export const withoutBareTwins = (paths:string[]) => paths.filter(p => (p.includes('/') || !paths.some(q => q !== p && (q.endsWith(`/${p}`) || isCopyOf(q, p)))) && !arrivedAsCopy(p, paths));
+
+// A copy that came across sits in attachments/ under a prefix: `attachments/mw94aqml-7ooz52-rows.csv` is rows.csv.
+const isCopyOf = (q:string, name:string) => q.startsWith('attachments/') && q.endsWith(`-${name}`);
+// A sender's own full path, when the file itself came across: the copy is the one that opens here.
+const arrivedAsCopy = (p:string, paths:string[]) => /^(?:\/|~\/)/.test(p) && paths.some(q => isCopyOf(q, p.split('/').pop() ?? ''));

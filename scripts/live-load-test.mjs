@@ -26,9 +26,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import WebSocket from 'ws';
 import * as Y from 'yjs';
-import { connectLive } from '../renderer/src/live/client.mjs';
-import { changes } from '../shared/text-merge.mjs';
-import { UPDATE, AWARENESS } from '../shared/live/wire.mjs';
+import { connectLive } from '../renderer/src/live/client.ts';
+import { changes } from '../shared/text-merge.mts';
+import { UPDATE, AWARENESS } from '../shared/live/wire.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (name, d) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : d; };

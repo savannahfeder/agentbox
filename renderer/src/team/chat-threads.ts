@@ -12,7 +12,7 @@
 // allow resizing."
 import { agoWords } from '../threads/summary-rules';
 import type { AgentEvent, AgentTurn } from '../types';
-import type { Waits } from '../../../shared/team-rules.mjs';
+import type { Waits } from '../../../shared/team-rules.mts';
 
 /**
  * Lift the replies out of a chat. A reply whose message is in this chat goes

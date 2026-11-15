@@ -36,7 +36,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REAL_NAME, isNewUserBuild, isSideBuild } from '../shared/side-build.mjs';
+import { REAL_NAME, isNewUserBuild, isSideBuild } from '../shared/side-build.mts';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);

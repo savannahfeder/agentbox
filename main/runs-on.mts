@@ -12,7 +12,7 @@
 // it connect to something of mine", and the engine is the whole of that answer.
 // What somebody is paying for is on each agent's own page in Settings, which is
 // where you go when you actually want it (main/settings.mts reads
-// main/claude-plan.mjs and main/codex-account.mts for exactly that).
+// main/claude-plan.mts and main/codex-account.mts for exactly that).
 //
 // NULL IS AN ORDINARY ANSWER AND IT MEANS SAY NOTHING. A Mac mid-setup, a config
 // file being rewritten under us, a login that is not there: all null, and the
@@ -32,7 +32,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { planFile } from './claude-plan.mjs';
+import { planFile } from './claude-plan.mts';
 import { codexAccount, codexAuthFile } from './codex-account.mts';
 import { signInFiles, signInStamp } from './sign-in-files.mts';
 

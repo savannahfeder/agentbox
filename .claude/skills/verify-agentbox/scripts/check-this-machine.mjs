@@ -23,9 +23,9 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
-const { recoverShellPath, readShellDataDirs } = await import(path.join(repo, 'main/shell-path.mjs'));
-const { findClaudeBin, askShell } = await import(path.join(repo, 'main/claude-bin.mjs'));
-const { findCodexBin } = await import(path.join(repo, 'main/codex-bin.mjs'));
+const { recoverShellPath, readShellDataDirs } = await import(path.join(repo, 'main/shell-path.mts'));
+const { findClaudeBin, askShell } = await import(path.join(repo, 'main/claude-bin.mts'));
+const { findCodexBin } = await import(path.join(repo, 'main/codex-bin.mts'));
 const { harnessFor } = await import(path.join(repo, 'main/harnesses.mts'));
 
 const args = process.argv.slice(2);

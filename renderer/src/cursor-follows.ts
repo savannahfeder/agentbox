@@ -5,7 +5,7 @@
 // agent carrying it to another column, place 21 names a different card, and
 // the board scrolls to that card. With a busy fleet that was every few
 // seconds, wherever you had scrolled to (2026-10-05,
-// tests/a-refresh-keeps-the-keyboard-on-the-same-thread.test.mjs).
+// tests/a-refresh-keeps-the-keyboard-on-the-same-thread.test.mts).
 //
 // So: if the place is the one we last drew, the cursor is on the thread we
 // last drew, wherever it now sits. If the place changed, you moved it, and

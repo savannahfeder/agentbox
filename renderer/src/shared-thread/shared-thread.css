@@ -1,0 +1,9 @@
+.st-main { max-width: 760px; }
+.st-lines { margin-top: 18px; }
+.st-lines .sf-comment.is-agent .sf-face { background: none; border: 1px dashed var(--line-strong, rgba(255,255,255,.2)); }
+.st-lines .doc-prose { font-size: 14.5px; line-height: 22px; }
+.st-lines .doc-prose > :first-child { margin-top: 0; }
+.st-lines .doc-prose > :last-child { margin-bottom: 0; }
+.st-ask { gap: 12px; }
+.st-ask .sf-join { width: auto; min-width: 220px; align-self: center; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.st-open { text-decoration: none; text-align: center; background: none; }

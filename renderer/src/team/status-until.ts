@@ -7,7 +7,7 @@
 // as the composer's When menu, so a phrase that works there works here, and
 // one it cannot read is refused rather than guessed at.
 import { parseWhen } from '../format';
-import { holdEnds, holdsUntil } from '../../../shared/team-status.mjs';
+import { holdEnds, holdsUntil } from '../../../shared/team-status.mts';
 
 /** Either a named hold or a moment you chose. */
 export type StatusEnd = { hold: string; until?: undefined } | { until: number; hold?: undefined };

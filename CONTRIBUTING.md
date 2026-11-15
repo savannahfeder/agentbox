@@ -17,13 +17,14 @@ by a person before it is merged.
 npm install
 npm run dev          # the app, with hot reload
 npm run test:changed # the tests for what you changed
+npm run typecheck    # strict tsc, which CI also runs
 ```
 
 - **Every change comes with tests.** Write the test first and watch it fail,
   then make it pass. Cover the case you fixed, the cases either side of it, and
   a case that must not match.
 - **Tests are named as sentences** that say the behaviour
-  (`a-reply-moves-the-agent-row.test.mjs`), and open with a comment saying what
+  (`a-reply-moves-the-agent-row.test.mts`), and open with a comment saying what
   was wrong and how you know.
 - **Run `npm run test:changed`** before you push. The full suite runs on GitHub
   for your pull request.

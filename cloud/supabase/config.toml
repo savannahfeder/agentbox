@@ -192,7 +192,7 @@ otp_expiry = 3600
 # Authentication › Emails › Confirm signup; this file is what it should say.
 [auth.email.template.confirm]
 subject = "Confirm your email for Agentbox"
-content_path = "./templates/confirm.html"
+content_path = "./supabase/templates/confirm.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -304,6 +304,11 @@ inspector_port = 8083
 # Feedback from the app's Feedback card (functions/feedback). Anyone using
 # Agentbox may send it, signed in or not, so it takes no sign-in token.
 [functions.feedback]
+verify_jwt = false
+
+# The founder's thank-you note (functions/founder-note). Called by the
+# database's daily job, which knocks with its own key instead of a sign-in.
+[functions.founder-note]
 verify_jwt = false
 
 [analytics]

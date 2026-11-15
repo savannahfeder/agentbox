@@ -13,6 +13,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import type { FolderListing } from '../types';
+import { tabStop } from '../setup-split';
 
 type Props = {
   title?: string;
@@ -64,29 +65,52 @@ export default function FolderPicker({ title, startIn, onPick, onClose }: Props)
 
   useEffect(() => { void go(startIn ?? null, false); }, [go, startIn]);
 
+
+
   const here = listing?.at ?? '';
   const canUse = !!here && !listing?.refused && !listing?.unreadable;
   const want = folderToUse(typed, here);
   const note = pickerNote(listing, moved);
 
+  const card = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  const useRef_ = useRef<() => Promise<void>>(async () => {});
+  // Held on the window, so focus left behind the picker cannot act on what is behind it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+      const inCard = !!card.current?.contains(e.target as Node | null);
+      if (e.key === 'Escape') { stop(); close.current(); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { stop(); void useRef_.current(); return; }
+      if (e.key === 'Tab') {
+        const stops = [...(card.current?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled])') ?? [])];
+        stop();
+        stops[tabStop(stops.length, stops.indexOf(document.activeElement as HTMLElement), e.shiftKey)]?.focus();
+        return;
+      }
+      if (!inCard) stop();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+
   const use = async () => {
     if (busy || !want) return;
-    if (want === here) { if (canUse) onPick(here); return; }
+    if (want === here) { if (canUse) onPick(here); else setMoved(true); return; }
     const next = await go(want);
     if (next && !next.refused && !next.unreadable) onPick(next.at);
   };
+  useRef_.current = use;
 
   return (
     <div className="modal-backdrop fp-backdrop" onClick={onClose}>
       <div
         className="modal fp-card"
+        ref={card}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label={title ?? 'Choose a folder'}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
-          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void use();
-        }}
       >
         {title && <h2 className="fp-title">{title}</h2>}
         <div className="fp-head">
@@ -138,7 +162,7 @@ export default function FolderPicker({ title, startIn, onPick, onClose }: Props)
         <div className="fp-foot">
           <span className="fp-hint">{note.hint ?? ''}</span>
           <button className="fp-cancel" onClick={onClose}>Cancel</button>
-          <button className="fp-use" onClick={() => void use()} disabled={busy || (want === here && !canUse)}>Use this folder</button>
+          <button className="fp-use" onClick={() => void use()} disabled={busy}>Use this folder</button>
         </div>
       </div>
     </div>

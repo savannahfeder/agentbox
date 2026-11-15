@@ -50,13 +50,13 @@
 // A session held at a permission box is NOT one of them, and that is
 // deliberate: a reply from here would wait behind that box instead of clearing
 // it, so "open it and answer it" would be false advice. It is the same split
-// `asksSomething` and `replyReaches` already make in shared/agents.mjs.
+// `asksSomething` and `replyReaches` already make in shared/agents.mts.
 //
 // A thread with a worker running on it right now is not asked about either,
 // because a live offer is what the test reads and a running worker's row sits
 // in In progress rather than the inbox.
 
-import { replyReaches } from '../../shared/agents.mjs';
+import { replyReaches } from '../../shared/agents.mts';
 import { closesTheTask, itemOptions, offerIsLive } from './format';
 
 const WARNED_KEY = 'zero.stoppedWarned';

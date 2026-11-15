@@ -2,6 +2,7 @@
 // unread while its latest answer is newer than when you last opened it here.
 // Keyed by project and id, since two computers can both have a w-1.
 import { arrivedAt } from '../../../renderer/src/unread';
+import type { WorkItem } from '../../../renderer/src/types';
 
 type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void };
 
@@ -36,6 +37,6 @@ export function markUnseen(seen: Seen, item: { product: string; id: string }, st
 }
 
 // Her own thread with no answer yet holds nothing new: only her message, and "Queued".
-export const isUnread =(item: { product: string; id: string; createdAt?: number; wrote?: any; waitsForMac?: boolean }, seen: Seen) =>
+export const isUnread =(item: { product: string; id: string; createdAt?: number; wrote?: WorkItem['wrote']; waitsForMac?: boolean }, seen: Seen) =>
   !(!item.wrote?.result && (item.waitsForMac || item.wrote?.body?.source === 'founder'))
-  && arrivedAt(item as any) > (seen.at[keyOf(item)] ?? seen.since);
+  && arrivedAt(item as Parameters<typeof arrivedAt>[0]) > (seen.at[keyOf(item)] ?? seen.since);

@@ -5,7 +5,7 @@ import { isLocalPreview } from './artifact-layout';
 // a port nothing listens on used to "load" an empty page and sit there. One
 // no-cors request settles it: a refused connection rejects at once, anything
 // that answers resolves, even with a body we may not read.
-// tests/a-local-app-that-is-not-running-says-so.test.mjs
+// tests/a-local-app-that-is-not-running-says-so.test.mts
 
 export type LocalPreviewPhase = 'checking' | 'up' | 'slow' | 'down';
 

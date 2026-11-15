@@ -1,0 +1,47 @@
+// THE MACOS TEST JOB HAS ROOM PAST ITS SLOWEST RUN.
+//
+// w-2351330171, 2026-11-01. The macOS `vitest` job had a 20 minute limit. Over
+// the 40 runs on main before that day it took between 5 and 20 minutes for
+// the same suite, because GitHub's macOS runners were short of capacity, and
+// on 1c49055b it finished in 19 min 59 s. One more slow runner and a green
+// suite shows a red cross for running out of time. The Linux job took 7 to
+// 10 minutes on every one of those runs.
+
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+
+const workflow = fs.readFileSync('.github/workflows/tests.yml', 'utf8');
+
+function job(name) {
+  const lines = workflow.split('\n');
+  const start = lines.findIndex((l) => l === `  ${name}:`);
+  const end = lines.findIndex((l, i) => i > start && /^ {2}\S/.test(l));
+  return lines.slice(start, end < 0 ? undefined : end).join('\n');
+}
+
+const minutes = (text) => Number(text.match(/timeout-minutes: (\d+)/)?.[1]);
+
+describe('the test jobs', () => {
+  it('give the macOS job at least half again its slowest measured run', () => {
+    expect(job('vitest')).toContain('runs-on: macos-latest');
+    expect(minutes(job('vitest'))).toBeGreaterThanOrEqual(30);
+  });
+
+  it('still stop a stuck macOS run within the hour', () => {
+    expect(minutes(job('vitest'))).toBeLessThanOrEqual(60);
+  });
+
+  // w-21deee25f1, 2026-11-14. vitest.config takes one worker per 4 GB, and
+  // GitHub's macOS runner has 7 GB, so the job ran one file at a time. On the
+  // 40 runs on main up to 2026-11-13 it got through half the suite in 30
+  // minutes and was cancelled every time.
+  it('run more than one test file at a time on the macOS runner', () => {
+    const workers = Number(job('vitest').match(/npx vitest run .*--maxWorkers[= ](\d+)/)?.[1]);
+    expect(workers).toBeGreaterThanOrEqual(2);
+  });
+
+  it('leave the Linux job its own limit', () => {
+    expect(job('vitest-linux')).toContain('runs-on: ubuntu-latest');
+    expect(minutes(job('vitest-linux'))).toBeGreaterThanOrEqual(20);
+  });
+});

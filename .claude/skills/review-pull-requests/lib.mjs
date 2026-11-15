@@ -29,9 +29,9 @@ export function repoOf(root = repoRoot) {
 
 /** The store's own work-item functions, for the one account on this Mac. */
 export async function inbox() {
-  const { resolveAccount } = await import('../../../mcp/core/account.mjs');
+  const { resolveAccount } = await import('../../../mcp/core/account.mts');
   resolveAccount();
-  return import('../../../mcp/core/work.mjs');
+  return import('../../../mcp/core/work.mts');
 }
 
 export function argOf(argv, name, fallback = null) {

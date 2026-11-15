@@ -5,7 +5,7 @@
 // message into the text as markdown, one per line (attachments.ts:
 // `![name](attachments/…)` or `[name](attachments/…)`). Drawn as typed, a pasted
 // screenshot showed up as that line of brackets instead of the picture
-// (2026-10-05, tests/a-picture-you-paste-into-a-message-is-drawn.test.mjs).
+// (2026-10-05, tests/a-picture-you-paste-into-a-message-is-drawn.test.mts).
 //
 // So those lines are lifted out to be drawn as markdown:
 //   a picture, `![…](…)`, standing alone on its line, quoted or not;

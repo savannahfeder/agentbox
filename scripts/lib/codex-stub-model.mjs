@@ -2,8 +2,8 @@
 // SPENDING A SUBSCRIPTION OR TOUCHING THE FOUNDER'S ~/.codex.
 //
 // WHY THIS EXISTS. The proof scripts beside it have to drive the REAL shipping
-// modules against the REAL `codex` binary -- main/codex-app-server.mjs,
-// main/codex-session.mts, main/codex-approvals.mjs and the supervisor's own
+// modules against the REAL `codex` binary -- main/codex-app-server.mts,
+// main/codex-session.mts, main/codex-approvals.mts and the supervisor's own
 // spawn path -- and they have to do it repeatably, on demand, in a way that
 // asks the same question twice and gets the same answer. Two things were in the
 // way, and both are solved here rather than argued around:

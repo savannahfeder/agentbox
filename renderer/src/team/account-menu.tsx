@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Person } from '../types';
 import { Face } from './people';
 import { STATUS_PROMPT, StatusComposer, saying } from './status';
-import { holdsUntil } from '../../../shared/team-status.mjs';
+import { holdsUntil } from '../../../shared/team-status.mts';
 import { SettingsIcon } from '../components/SettingsIcon';
 import { GoInvisible, GhostIcon, EyeOffSmall, type Invisible } from './rooms/GoInvisible';
 

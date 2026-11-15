@@ -1,0 +1,21 @@
+{
+  "renderer/src/components/artifact-view.css": 1,
+  "renderer/src/components/direct-review.css": 2,
+  "renderer/src/components/feedback-card.css": 2,
+  "renderer/src/components/file-views.css": 1,
+  "renderer/src/components/first-run-classic.css": 3,
+  "renderer/src/components/remote-control.css": 2,
+  "renderer/src/components/table-view.css": 6,
+  "renderer/src/one-thing-at-a-time.css": 1,
+  "renderer/src/shared-thread/shared-thread.css": 1,
+  "renderer/src/styles.css": 24,
+  "renderer/src/team/chat.css": 2,
+  "renderer/src/team/everything/everything.css": 3,
+  "renderer/src/team/rooms/rooms.css": 11,
+  "renderer/src/team/team.css": 6,
+  "renderer/src/teammates/teammates.css": 1,
+  "renderer/src/threads/pages.css": 3,
+  "renderer/src/threads/summary.css": 6,
+  "renderer/src/threads/thread-composer.css": 4,
+  "renderer/src/workspace-navigation.css": 1
+}

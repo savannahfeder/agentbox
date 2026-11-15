@@ -12,6 +12,8 @@
 import { DOC_SCHEMES, IMG_SCHEMES } from '../../shared/schemes.mts';
 
 export interface FileEntry { n?: string; s: number; big?: boolean; w?: number; h?: number }
+/** A copy's list of its files, as JSON the Mac wrote (main/phone-uploads.mts). */
+export interface Attached { dir?: unknown; repo?: unknown; files?: Record<string, unknown>; folders?: Record<string, unknown> }
 export interface Place { device: string; dir: string; repo: string; files: Map<string, FileEntry>; folders: Map<string, string[]> }
 export const BUCKET = 'phone-files';
 
@@ -28,7 +30,7 @@ export function standIn(device: string, written: unknown): string {
  * Each project's place, from its threads' copies: the newest copy's word on a
  * key wins, since a page can change under the same name.
  */
-export function cloudPlaces(threads: { device: string; project: string; snapshot: any }[], slugOf: (device: string, project: string) => string): Map<string, Place> {
+export function cloudPlaces(threads: { device: string; project: string; snapshot: { item?: { updatedAt?: number }; attached?: Attached } | null }[], slugOf: (device: string, project: string) => string): Map<string, Place> {
   const places = new Map<string, Place>();
   const newestFirst = [...threads].sort((a, b) => (Number(b.snapshot?.item?.updatedAt) || 0) - (Number(a.snapshot?.item?.updatedAt) || 0));
   for (const t of newestFirst) {
@@ -83,7 +85,7 @@ export function findFolder(place: Place, src: string): { folder: string; keys: s
 
 /**
  * What a path a message gives stands for, looked for where the Mac looks
- * (main/artifact-path.mjs resolveArtifact): in full, then under the project's
+ * (main/artifact-path.mts resolveArtifact): in full, then under the project's
  * folders, then by its name alone, the newest first.
  */
 export function findFile(places: Map<string, Place>, product: string, src: string): { key: string; entry: FileEntry; file: string; place: Place } | null {

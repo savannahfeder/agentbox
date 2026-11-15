@@ -2,7 +2,7 @@
 // (`every`), with the regular read (`newest`) laid over it as it keeps arriving.
 import type { TraceSession } from './notes';
 
-// The line main/run-traces.mjs puts on a log it cut to its tail.
+// The line main/run-traces.mts puts on a log it cut to its tail.
 const CUT = /^… truncated \((\d+) bytes total\)\n\n/;
 
 // A log only grows, so a cut tail starts at a known place in the whole copy.

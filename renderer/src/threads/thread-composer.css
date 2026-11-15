@@ -110,6 +110,7 @@
 }
 .tc-chip:hover, .tc-chip.open, .tc-chip:focus-visible { color: var(--text); border-color: var(--line-strong); outline: none; }
 .tc-chip svg { color: var(--text-faint); flex: none; }
+.tc-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tc-chip-name { display: inline-block; max-width: 200px; overflow: hidden; white-space: nowrap; }
 .tc-chip-name.cut { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
 .tc-repeat-note { display: flex; align-items: center; gap: 6px; }

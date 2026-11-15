@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type Press = { on: string; emoji: string; off: boolean };
-/** message uid -> emoji -> the people on it, oldest first (shared/work-items.mjs). */
+/** message uid -> emoji -> the people on it, oldest first (shared/work-items.mts). */
 export type Reactions = Record<string, Record<string, string[]>>;
 
 const same = (a: Press, b: Press) => a.on === b.on && a.emoji === b.emoji;

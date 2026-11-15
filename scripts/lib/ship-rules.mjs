@@ -1,5 +1,5 @@
 // THE TWO JUDGEMENTS SHIPPING HAS TO MAKE, kept pure so they can be tested
-// without pushing anything (tests/one-ship-command-every-agent-runs.test.mjs).
+// without pushing anything (tests/one-ship-command-every-agent-runs.test.mts).
 
 /**
  * Did this push fail because somebody else pushed first?
@@ -56,6 +56,26 @@ export function notReadyToShip({ isPrimaryWorktree, dirty, onMain, hasCommits })
     return 'There is nothing to ship: this branch has no commits that origin/main does not already have.';
   }
   return null;
+}
+
+// The two reasons scripts/hooks/pre-push runs every test, in the hook's own
+// patterns (a test holds them the same).
+export const DELETED_CODE = '\\.(mjs|mts|cjs|js|jsx|ts|tsx)$';
+export const EVERY_TEST_DEPENDS_ON = '^(package(-lock)?\\.json|vitest\\.config\\.mjs|tests/agentbox-home\\.setup\\.mts|tests/app-home\\.mts|scripts/hooks/)';
+
+/**
+ * Whether the hook runs every test for a push carrying `nameStatus`, the
+ * output of `git diff --name-status <remote main> HEAD`. Like the hook, a file
+ * git reads as moved is not a deletion.
+ */
+export function runsEveryTest(nameStatus) {
+  const deleted = new RegExp(DELETED_CODE);
+  const core = new RegExp(EVERY_TEST_DEPENDS_ON);
+  return String(nameStatus ?? '').split('\n').some((line) => {
+    const [status = '', ...paths] = line.split('\t');
+    if (status === 'D') return deleted.test(paths[0] ?? '');
+    return paths.some((p) => core.test(p));
+  });
 }
 
 /**

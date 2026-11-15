@@ -1,4 +1,4 @@
-// AUTO'S MARK in To (shared/auto-route.mjs): the agent's dashed square with a
+// AUTO'S MARK in To (shared/auto-route.mts): the agent's dashed square with a
 // fork in it, because Auto sends the thread one way or the other.
 import './agent-face.css';
 

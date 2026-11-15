@@ -45,7 +45,8 @@ import { accountLabel, cloudAccountInUse, cloudRunsLine, cloudToggleTarget, coun
 import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
-import type { CloudPlan, TeamBillingDetails } from '../types';
+import type { CloudPlan, FilesCloudStatus, TeamBillingDetails } from '../types';
+import { MACHINE, sizeWords } from '../files/files-shown';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
 import { runningFigures, type GateReading } from '../running-reading';
 import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
@@ -57,7 +58,7 @@ import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS, RULES_ALWAYS_APPLY } from '../mo
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../codex-modes';
 import { ProductMark } from './ProductMark';
 import { SHORTCUTS } from '../shortcuts';
-import { chord, chords, sayKeys } from '../this-keyboard';
+import { chord, chords } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
@@ -68,7 +69,7 @@ import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
 import { SkyTile } from '../home/SkyPicker';
-import { HOME_KEY, setHomeSetting, useHomeSettings } from '../home/home-settings';
+import { useHomeSettings } from '../home/home-settings';
 import { SKY_THEMES } from '../home/sky';
 
 /* * TEAM IS A PANE HERE (w-8415594d19, 2026-10-01). The pane's CONTENT is
@@ -932,6 +933,46 @@ function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { on
   );
 }
 
+/* --------------------------------- Files ---------------------------------- */
+// On a plan that keeps files, what agents make is saved to the cloud and big
+// files leave this computer after the days chosen (main/files-cloud.mts).
+// Without one, the same row leads to the plans.
+const OFF_AFTER: Array<{ value: string; label: string }> = [
+  { value: '7', label: 'After 7 days' }, { value: '30', label: 'After 30 days' }, { value: '90', label: 'After 90 days' }, { value: '0', label: 'Never' },
+];
+
+function FilesPage({ files, onSet, onPlans }: {
+  files: { on: boolean; offAfterDays: number };
+  onSet: (key: 'filesInCloud' | 'filesOffAfterDays', value: unknown) => void;
+  onPlans: () => void;
+}) {
+  const [cloud, setCloud] = useState<FilesCloudStatus | null>(null);
+  useEffect(() => { let live = true; void api.filesCloud().then((c) => { if (live) setCloud(c); }); return () => { live = false; }; }, [files.on, files.offAfterDays]);
+  const cap = cloud?.cap ?? 0;
+  return (
+    <Page title="Files">
+      <Group id="files-cloud" label="In the cloud">
+        <Row label="Keep files in the cloud" desc={cap ? `What your agents make is saved to ${Name} Cloud as they make it.` : `Comes with Pro, Plus and Max. Until then your files stay on this ${MACHINE}.`}>
+          {cap
+            ? <Switch label="Keep files in the cloud" on={files.on} onChange={(v) => onSet('filesInCloud', v)} />
+            : <button type="button" className="set-ghost" onClick={onPlans}>See plans</button>}
+        </Row>
+        {cap > 0 && files.on && (
+          <Row label={`Take big files off this ${MACHINE}`} desc="Films and pictures only. Documents always stay.">
+            <Picker bare label={`Take big files off this ${MACHINE}`} value={String(files.offAfterDays)} options={OFF_AFTER} onChange={(v) => onSet('filesOffAfterDays', Number(v))} />
+          </Row>
+        )}
+        {cap > 0 && (
+          <Row label="Space used">
+            <span className="set-files-used">{sizeWords(cloud!.bytes)} of {sizeWords(cap)}</span>
+            <span className="set-files-bar"><i style={{ width: `${Math.min(100, Math.max(cloud!.bytes ? 2 : 0, (cloud!.bytes / cap) * 100))}%` }} /></span>
+          </Row>
+        )}
+      </Group>
+    </Page>
+  );
+}
+
 /* ---------------------------- Plan and Billing ---------------------------- */
 // With no plan, the plans as cards (w-1dc7ee2408, cloud-slots/20) and how the
 // cloud counts. With one, the plan and Stripe's billing page, this month as
@@ -992,7 +1033,7 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
   };
   // A paying team's owner sees its card, next bill and last invoice, read from Stripe through the cloud.
   const [teamBillingSeen, setTeamBillingSeen] = useState<TeamBillingDetails | null>(null);
-  const readsStripe = !!plan?.team?.owner && !plan.team.trial;
+  const readsStripe = !!plan?.team?.owner && (!plan.team.trial || plan.team.seats > 0);
   useEffect(() => {
     if (!readsStripe) return;
     void api.cloudAccountTeamBilling().then((out) => { if (out.ok && out.owner) setTeamBillingSeen(out as TeamBillingDetails); });
@@ -1112,7 +1153,7 @@ const PERMISSION_OPTIONS: Array<{ value: PermissionMode; label: string }> = MODE
   (value) => ({ value, label: MODE_WORDS[value] }),
 );
 
-// CODEX'S THREE, in the order shared/codex-modes.mjs keeps them, which is
+// CODEX'S THREE, in the order shared/codex-modes.mts keeps them, which is
 // least to most an agent may do. That file is the only place the list lives.
 const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_MODE_ORDER.map(
   (value) => ({ value, label: CODEX_MODES[value].label }),
@@ -1658,6 +1699,7 @@ function NavIcon({ id }: { id: SettingsPageId }) {
     cloud: <path d="M4 18V9M9.5 18V5M15 18v-6M20.5 18v-9" />,
     instructions: <path d="M6.5 3.5h7.5l4 4V20.5h-11.5zM14 3.5V8h4M9.5 12h5M9.5 16h5" />,
     projects: <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />,
+    files: <path d="M6.5 3.5h7l4 4v13h-11zM13.5 3.5v4h4" />,
     team: <><circle cx="9" cy="9" r="3" /><path d="M3.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5" /><circle cx="16.5" cy="9.5" r="2.5" /><path d="M16 14.6c2.3-.2 4 1.2 4.5 4" /></>,
     alpha: <><path d="M9.5 3.5h5M10.5 3.5v5.2L5.6 17.6a2 2 0 0 0 1.8 2.9h9.2a2 2 0 0 0 1.8-2.9l-4.9-8.9V3.5" /><path d="M7.6 14.5h8.8" /></>,
     rooms: <path d="M9.5 4.5 7.5 19.5M16.5 4.5l-2 15M5 9.5h14.5M4.5 14.5H19" />,
@@ -1702,7 +1744,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   // and then a background is two decisions for one choice.
   look: Look;
   onSetLook: (l: Look) => void;
-  /** A sky theme (Alpha features, Home): its look and its sky together. */
+  /** A sky theme: its look and its sky together. */
   onSkyTheme?: (id: string) => void;
   // The dials on whichever picture is on. They only ever show under a picture,
   // so there is no disabled control on this screen for her to wonder about.
@@ -1761,7 +1803,10 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   onClose: () => void;
 }) {
   const homeSet = useHomeSettings();
-  const skyOn = homeSet.on ? homeSet.skyTheme : null;
+  // A phone has no skies (App.tsx's `homeOn`).
+  const skies = !onPhone();
+  // Under Match system the sky is Match's default, so the Match tile is the one ticked.
+  const skyOn = skies && (homeSet.picked || look !== 'match') ? homeSet.skyTheme : null;
   const sidebarShrinks = useSidebarShrinks();
   const [model, setModel] = useState<SettingsModel | null>(null);
   // ?settings=claude, or ?settings=project:kestrel. Anything else (including the
@@ -2067,7 +2112,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <div className="ac-adding">
                 <div className="ac-adding-top">
                   <span>{adding.error ? 'Could not add an account' : `Sign in to ${adding.name ?? 'your account'}`}</span>
-                  <button type="button" className="ac-adding-x" aria-label="Close" onClick={() => { setAdding(null); void load(); }}>&#215;</button>
+                  <button type="button" className="ac-adding-x" aria-label="Close" onClick={() => { setAdding(null); void api.terminal({ ...SETTINGS_TERMINAL, action: 'close' }); void load(); }}>&#215;</button>
                 </div>
                 {adding.error
                   ? <p>{adding.error}</p>
@@ -2230,6 +2275,10 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
         {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan}
           onInvite={teamPane ? () => setPane('team') : undefined} />}
 
+        {model && w && pane === 'files' && (
+          <FilesPage files={w.files ?? { on: true, offAfterDays: 30 }} onSet={(key, value) => setWorkspace(key, value)} onPlans={() => setPane('cloud')} />
+        )}
+
         {pane === 'rooms' && roomsPane && (
           <Page title="Rooms" lede="What people in your rooms see of you. Private threads never show.">
             {roomsPane}
@@ -2279,8 +2328,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
-              <Row label="Home" desc="A page to start from: what needs you, a box to start a thread, and your team's week. The Inbox gets a sky below its list. Pick the sky in Appearance.">
-                <Switch label="Home" on={homeSet.on} onChange={(v) => setHomeSetting(HOME_KEY, v)} />
+              <Row label="Glass" desc="The space around the page becomes frosted glass over your desktop.">
+                <Switch label="Glass" on={!!w.alpha?.glass} onChange={(v) => setWorkspace('alphaGlass', v)} />
               </Row>
             </Group>
           </Page>
@@ -2375,7 +2424,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                   THE NUMBER SHOWN IS THE MACHINE'S, NOT THE ACCOUNT'S. The
                   stepper was per account while the sentence beside it talked
                   about the total, so this Mac showed 3 and said 6. Automatic
-                  answers for the Mac and main/machine.mjs shares it out; the
+                  answers for the Mac and main/machine.mts shares it out; the
                   per-account number is arithmetic nobody is asked to do.
 
                   THE CLAUDE PLAN HAS NO SAY (w-54c640f8da): its limit is a
@@ -2546,7 +2595,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                     <span className="look-name">{l.name}</span>
                   </button>
                 ))}
-                {homeSet.on && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
+                {skies && SKY_THEMES.map((k) => <SkyTile key={k.id} sky={k} on={skyOn === k.id} onPick={() => onSkyTheme?.(k.id)} />)}
               </div>
             </Group>
             {/* THE DIALS, and only under a picture. Both move the window she is
@@ -2595,7 +2644,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             CONTROL: it is the one page you read rather than set. What is here
             is what a person actually presses, grouped by the moment they would
             want it; ../shortcuts.ts holds the list. Every key on it works today
-            (`tests/the-shortcuts-page-lists-keys-that-work.test.mjs`). */}
+            (`tests/the-shortcuts-page-lists-keys-that-work.test.mts`). */}
         {pane === 'phone' && <PhonePage onFeedback={onFeedback} onSignIn={onPhoneSignIn} web={phoneWeb}
           onPhoneProjects={webComputer ? <WebPhoneProjects web={webComputer} onWorkspace={setWorkspace} /> : undefined} macShut={phoneCloud ? { ...phoneCloud, all: model?.workspace?.phoneAll !== false, projects: projects.filter((p) => p.slug !== 'practice'), onChoose: (all, except) => setWorkspace('phoneProjects', { all, except }) } : undefined} />}
         {pane === 'shortcuts' && (
@@ -2878,7 +2927,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
             desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
             <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
           </ReadRow>
-          {gate.value && !isAuto && (
+          {(gate.value as boolean) && !isAuto && (
             <ReadRow label="Heavy commands at once" reading={slots}
               desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}>
               <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}

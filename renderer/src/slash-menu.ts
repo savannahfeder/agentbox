@@ -39,7 +39,7 @@ import { SEND } from './this-keyboard';
 import type { CodexModeId, PermissionMode } from './types';
 import { CLEAR_COMMAND, CLEAR_HINT, MODE_COMMAND, MODE_HINT, menuRowsFor } from './modes';
 import { CLAUDE_COMMANDS, commandHint, commandMatches } from '../../shared/claude-commands.mts';
-import { CODEX_MODE_COMMAND, CODEX_MODE_HINT, codexMenuRowsFor } from '../../shared/codex-modes.mjs';
+import { CODEX_MODE_COMMAND, CODEX_MODE_HINT, codexMenuRowsFor } from '../../shared/codex-modes.mts';
 import type { ClaudeCommand } from '../../shared/claude-commands.mts';
 
 export type SlashRow =
@@ -118,7 +118,7 @@ export function slashRows(
     // CODEX HAS ITS OWN THREE NOW (2026-09-23). The paragraph above used to end
     // "the honest menu on a Codex row is no menu... one line here reverses it
     // the day either half gets built". Both halves are built: the modes are
-    // real settings in shared/codex-modes.mjs and they reach `thread/start`.
+    // real settings in shared/codex-modes.mts and they reach `thread/start`.
     const codexModes: SlashRow[] = codexMenuRowsFor(query, modeSet).map((mode: CodexModeId | null) => ({ kind: 'codexMode', mode }));
     return [...codexModes, ...commands.map((cmd) => ({ kind: 'command', cmd } as SlashRow))];
   }

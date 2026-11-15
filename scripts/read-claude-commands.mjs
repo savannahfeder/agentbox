@@ -43,7 +43,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { findClaudeBin } from '../main/claude-bin.mjs';
+import { findClaudeBin } from '../main/claude-bin.mts';
 // The app's name is never typed, here or in what this writes out.
 import { Possessive } from '../shared/product-name.mjs';
 
@@ -61,7 +61,7 @@ const ROOT = path.join(HERE, '..');
 // work, and the diff in a change card carried two files nobody had touched).
 // `npm run build` writes LOCAL instead; `npm run read:claude` writes this one,
 // which is how adopting a new reading became a decision rather than a side
-// effect. tests/a-build-does-not-rewrite-a-tracked-file.test.mjs holds the
+// effect. tests/a-build-does-not-rewrite-a-tracked-file.test.mts holds the
 // measurement.
 export const OUT = path.join(ROOT, 'shared', 'claude-commands.generated.mts');
 

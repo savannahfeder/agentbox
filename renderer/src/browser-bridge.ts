@@ -23,6 +23,7 @@ import { installPhoneFiles } from './phone-files';
 import { installPhoneScreen, pagePinched } from './phone-screen';
 import { atMostEvery, PHONE_PUSH_MS } from './phone-polls';
 import { callLane } from './tab-calls';
+import type { AppBridge } from './types';
 
 type Push = (payload: unknown) => void;
 
@@ -47,31 +48,35 @@ const KEEPALIVE_MAX = 16_000;
 // a phone's home-screen icon is saved from that address, and on a phone the
 // icon gets storage of its own, so a key kept anywhere else is lost to it.
 const LOOPBACK = /^(127\.\d+\.\d+\.\d+|localhost|\[::1\])$/;
-// A DESKTOP WINDOW ONTO A HUB is not a phone, wherever its hub is (main/hub-client.mjs).
+// A DESKTOP WINDOW ONTO A HUB is not a phone, wherever its hub is (main/hub-client.mts).
 type DesktopShell = {
   notify(payload: { arrivals: unknown; needsYou: unknown }): Promise<unknown>;
   badge(count: unknown): Promise<unknown>;
   open(address: string): Promise<unknown>;
-  onOpenItem?(fn: (payload: unknown) => void): () => void;
+  onOpenItem?(fn: (payload: { id: string }) => void): () => void;
 };
-const desktopShell = (): DesktopShell | undefined => (typeof window === 'undefined' ? undefined : (window as any).agentboxShell);
+const desktopShell = (): DesktopShell | undefined => (typeof window === 'undefined' ? undefined : (window as Window & { agentboxShell?: DesktopShell }).agentboxShell);
 export const onPhoneDoor = (host = location.hostname, shell: unknown = desktopShell()) => !shell && !LOOPBACK.test(host);
 
+// Built channel by channel from shared/bridge-map.mts, so only the two doors read here are named.
+type HubBridge = Record<string, unknown> & Required<Pick<AppBridge, 'openArtifact'>> & Pick<AppBridge, 'onOpenItem'>;
+type OpenAsk = Parameters<HubBridge['openArtifact']>[0];
+
 /** What stays on this Mac when the rest of the app is on a hub. */
-export function withDesktopShell(bridge: Record<string, any>, shell?: DesktopShell) {
+export function withDesktopShell(bridge: HubBridge, shell?: DesktopShell) {
   if (!shell) return bridge;
   const hubOpens = bridge.openArtifact;
   const hubSays = bridge.onOpenItem;
   return {
     ...bridge,
-    onOpenItem: (fn: (payload: unknown) => void) => {
+    onOpenItem: (fn: (payload: { id: string }) => void) => {
       const offHub = hubSays?.(fn);
       const offHere = shell.onOpenItem?.(fn);
       return () => { offHub?.(); offHere?.(); };
     },
     notify: (arrivals: unknown, needsYou: unknown) => shell.notify({ arrivals, needsYou }),
     badge: (count: unknown) => shell.badge(count),
-    openArtifact: async (p: { src?: string; mode?: string }) => {
+    openArtifact: async (p: OpenAsk) => {
       if (p?.mode !== 'resolve' && /^https?:/.test(String(p?.src))) {
         await shell.open(String(p.src));
         return { ok: true, opened: p.src };
@@ -156,7 +161,7 @@ function takeToken(): string | null {
 
 export function installBrowserBridge(): boolean {
   // A desktop window already has the real bridge and must keep it.
-  if (typeof window === 'undefined' || (window as any).zero) return false;
+  if (typeof window === 'undefined' || window.zero) return false;
   const token = takeToken();
   if (!token) {
     if (servedByThisComputer()) askForTheKey();
@@ -266,7 +271,7 @@ export function installBrowserBridge(): boolean {
     deliver(message.channel, message.args?.[0]);
   };
 
-  (window as any).zero = withDesktopShell(bridge, desktopShell());
+  window.zero = withDesktopShell(bridge as HubBridge, desktopShell()) as AppBridge;
   // A tapped alert opens its thread, the way the desktop's notification does.
   if (phone) {
     startPhoneAlerts({ token, device }, (id) => {

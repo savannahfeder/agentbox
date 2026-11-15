@@ -54,6 +54,20 @@ export function engineLetter(engine: string | undefined): string {
   return engine === 'codex' ? 'X' : 'C';
 }
 
+/**
+ * A page drawn in place of the Inbox list (Home, a person's or the team's place,
+ * the Team page, a file over the whole window) hides its selected row, so no key
+ * may act on it. An open thread answers its own keys.
+ */
+export function somethingCoversTheList(p: {
+  homeOn: boolean; homeOpen: boolean; threadOpen: boolean; searching: boolean; settingsOpen: boolean;
+  teamShown: boolean; placeShown: boolean; fileOverTheList: boolean;
+}): boolean {
+  if (p.threadOpen || p.settingsOpen) return false;
+  if (p.teamShown || p.placeShown || p.fileOverTheList) return true;
+  return p.homeOn && p.homeOpen && !p.searching;
+}
+
 export type TeamRowState = 'working' | 'waiting' | 'quiet';
 
 export function teamRowState({ agents, waitingOnYou }: { agents: number | null; waitingOnYou: boolean }): TeamRowState {

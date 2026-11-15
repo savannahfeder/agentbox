@@ -11,7 +11,7 @@
 //
 // The three readers are the button in the corner (Focus.tsx), the inbox row's
 // hover hint (`rowKeys` in list-rules.ts), the palette row (App.tsx) and the
-// sidebar tab with its page heading (workspace-navigation.mjs). Add a fourth
+// sidebar tab with its page heading (workspace-navigation.ts). Add a fourth
 // and it reads this, so they cannot drift apart again.
 export const DONE = { verb: 'Done', short: 'Done', noun: 'Done' };
 

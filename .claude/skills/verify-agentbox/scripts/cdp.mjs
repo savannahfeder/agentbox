@@ -17,17 +17,21 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { guard, sweep, processes } from '../../../../scripts/lib/chrome-guard.mjs';
-import { MAC_CHROME, NO_HIDDEN_BROWSER, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mjs';
+import { MAC_CHROME, NO_HIDDEN_BROWSER, KEEPS_OFF_THE_KEYCHAIN, chromesForTesting, headlessShells } from '../../../../shared/hidden-browser.mts';
 
 export { chromesForTesting, headlessShells };
 
 /**
- * On a Mac, the hidden browser (shared/hidden-browser.mjs), and Google Chrome only as a
+ * On a Mac, `VERIFY_CHROME` when it is on disk and is not the person's Chrome, else the hidden browser (shared/hidden-browser.mjs), and Google Chrome only as a
  * name launchChrome refuses; elsewhere `VERIFY_CHROME`, or the Chromium Playwright
  * installed (the Linux cloud has it).
  */
 export function findChrome(platform = process.platform, env = process.env, playwright = () => createRequire(import.meta.url)('playwright'), forTesting = chromesForTesting, shells = headlessShells) {
-  if (platform === 'darwin') return forTesting()[0] ?? shells()[0] ?? MAC_CHROME;
+  if (platform === 'darwin') {
+    // VERIFY_CHROME picks among the hidden browsers only: never the person's own Chrome.
+    const hidden = [...forTesting(), ...shells()];
+    return hidden.includes(env.VERIFY_CHROME) ? env.VERIFY_CHROME : hidden[0] ?? MAC_CHROME;
+  }
   if (env.VERIFY_CHROME) return env.VERIFY_CHROME;
   try { return playwright().chromium.executablePath(); } catch { return MAC_CHROME; }
 }
@@ -85,6 +89,11 @@ export function holdersOf(profile, list = processes, chrome = CHROME) {
   return list().filter((p) => p.command.startsWith(bundle) && flag.test(p.command)).map((p) => p.pid);
 }
 
+/** EPERM is a process this one may not signal, such as a Chrome the harness opened outside a tester's sandbox: it is there. */
+export function isRunning(pid, kill = process.kill.bind(process)) {
+  try { kill(pid, 0); return true; } catch (e) { return e?.code === 'EPERM'; }
+}
+
 /** Stop any Chrome still on this profile: one that will not answer keeps its lock, and every Chrome after it exits. */
 export function freeProfile(profile, bin = CHROME) {
   const pids = holdersOf(profile, processes, bin);
@@ -120,7 +129,7 @@ export async function launchChrome({ width = 1440, height = 900, profile, detach
   if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
   const chrome = start(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
+    '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'], detached });
   const wsUrl = await new Promise((resolve, reject) => {

@@ -49,7 +49,7 @@ The same online inbox the phone site uses (docs/cloud/PHONE-PLAN.md). The app
 adds no server of its own except the alert sender.
 
 - **The owner's threads.** It reads `phone_projects` and `phone_threads` (the
-  snapshot shape is `shared/phone-snapshot.mjs`) and writes `phone_commands`,
+  snapshot shape is `shared/phone-snapshot.mts`) and writes `phone_commands`,
   every kind the site sends today: `reply`, `new`, `snooze`, `close`, `stop`,
   `run-now`, `send-now`, `reopen`, `schedule`, `approve` (migration
   20261019000000), with the device identity and approval fingerprints the site
@@ -66,7 +66,7 @@ adds no server of its own except the alert sender.
 - **People's messages: Direct conversations only, at first.** In a shared
   project a teammate's line carries only `problem`, `progress`, `solution`,
   `blockedBy`, `blocks` and `assignee` (`whatATeammateMaySet` in
-  shared/team-rules.mjs); message text crosses only in a Direct conversation.
+  shared/team-rules.mts); message text crosses only in a Direct conversation.
   Conversations inside shared projects need that protocol changed first.
 - **Writing a message.** Not a plain insert into `lines`: row security there
   checks only `by_person` and the project, and `body` is any JSON
@@ -80,7 +80,7 @@ adds no server of its own except the alert sender.
   that likelier. Either sequence numbers are handed out one at a time per
   project, or the pull rereads a window behind its cursor. Edits made at the
   same moment get a fixed tie-breaker instead of the order they arrived in
-  (shared/work-items.mjs).
+  (shared/work-items.mts).
 - **Deadlines.** Every request has one. supabase-js takes a `fetch`, and the
   app gives it one that stops at a timeout.
   `tests/no-network-call-in-the-app-can-wait-forever` reads only `.mjs`,
@@ -118,7 +118,7 @@ reviewers sometimes test there.
 
 ## Alerts (PHONE-PLAN step 3)
 
-The first version is sent by the Mac (2026-10-23, main/phone-alerts.mjs): the
+The first version is sent by the Mac (2026-10-23, main/phone-alerts.mts): the
 phone leaves its token in `push_devices`, and the Mac's phone pass sends the
 desktop banner's arrivals to it through Expo, by the desktop's rules, with no
 words of a thread in it. It reaches the phone only while that Mac is on and
@@ -130,14 +130,14 @@ and the Edge Function, is still to build.
 - `push_outbox`: owner, a dedupe key, the thread, created and sent times, and
   where it came from. Two things write it:
   - the Mac, for its own threads, from the same arrivals that make a desktop
-    banner today (`shared/notify-rules.mjs`, and the arrivals
+    banner today (`shared/notify-rules.mts`, and the arrivals
     main/phone-link.mts fed to web push);
   - the database, when a line for a person is written: a Direct message, an
     @mention, a task given to them. These have to buzz with every Mac shut.
 - **One rule on the server decides what is sent**, for both: duplicates,
   the person's settings, whether they may see the thread, age, and whether
   they are at a computer. The desk rule stays: no buzz while they have used a
-  Mac in the last five minutes (`shared/notify-rules.mjs`), read from an
+  Mac in the last five minutes (`shared/notify-rules.mts`), read from an
   activity record each Mac renews and that expires on its own. Alerts close
   together are folded into one, as main/phone-link.mts does.
 - **History is never an alert.** Lines brought in from history get a fresh
@@ -197,8 +197,8 @@ and the Edge Function, is still to build.
   current release on 2026-10-20), TypeScript, expo-router. Metro watches
   `../shared` for the modules the app may import.
 - Logic lives in `mobile/src/lib/` with no React Native imports. Its tests sit
-  in `tests/` as `.test.mjs` files, because vitest only collects
-  `tests/**/*.test.mjs` (vitest.config.mjs) and the push hook only picks out
+  in `tests/` as `.test.mts` files, because vitest only collects
+  `tests/**/*.test.mts` (vitest.config.mjs) and the push hook only picks out
   that shape (scripts/lib/tests-the-push-runs.mjs). GitHub's workflow also
   installs `mobile/` and type-checks it.
 - EAS credentials never enter git; the public check already refuses
@@ -249,9 +249,9 @@ email or by a public link.
    for anyone (w-6633e825a7, step 3), the privacy and terms pages
    (w-7a670f07bb; today they say nothing is hosted, and they must also name
    the copy of each computer's settings the phone reads, which carries no
-   paths and no instructions, shared/phone-settings.mjs), and an installed desktop
+   paths and no instructions, shared/phone-settings.mts), and an installed desktop
    app that can sign in to the cloud (`loadCloudConfig` in
-   main/team/session.mjs answers null when packaged). Without them, a stranger
+   main/team/session.mts answers null when packaged). Without them, a stranger
    who downloads the app has nothing to connect it to.
 7. **The submission.** Name, subtitle, description and keywords; 6.9-inch
    iPhone screenshots of the real app; privacy policy and support addresses;

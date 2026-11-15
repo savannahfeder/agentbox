@@ -159,7 +159,7 @@ export const SETUPS = [
     home: { '.zshrc': 'export CLAUDE_CONFIG_DIR="$HOME/.config/claude"\n' },
     expect: NORMAL,
     // Found by this setup on its first run: workers ran on an empty ~/.claude.
-    // Fixed in main/account-discovery.mjs (effectiveProfiles reads the shell's folder).
+    // Fixed in main/account-discovery.mts (effectiveProfiles reads the shell's folder).
   },
 
   // ----------------------------------------------------------------- Codex --
@@ -326,7 +326,7 @@ export function layCodexHome(setup, { home, url }) {
   return dir;
 }
 
-/** The fake accounts each login holds, so main/account-discovery.mjs sees two subscriptions, not one. */
+/** The fake accounts each login holds, so main/account-discovery.mts sees two subscriptions, not one. */
 const account = (i) => ({ oauthAccount: { emailAddress: `setup-${i}@verify.invalid`, accountUuid: `verify-setup-account-${i}` } });
 
 /**

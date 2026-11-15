@@ -181,7 +181,7 @@ const measured = (list?: string[] | null) => (list ?? []).filter((o) => o !== '?
  * Light, however it was learned: `l` measured on its own, `c` only as part of
  * a chain. Read the same everywhere, so `c` changes no verdict; it is there to
  * be counted. Pinned by
- * tests/the-record-says-whether-it-learned-light-from-a-chain.test.mjs.
+ * tests/the-record-says-whether-it-learned-light-from-a-chain.test.mts.
  */
 const isLight = (o: string) => o === 'l' || o === 'c';
 

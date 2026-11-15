@@ -20,7 +20,7 @@
 // to reach the Mac's opinion is to have pressed the tile that says so.
 //
 // THIS FILE IS THE ONLY PLACE IN THE RENDERER THAT MAY READ THE MACHINE, and
-// tests/theme-choice.test.mjs holds every other file to that. Two functions do
+// tests/theme-choice.test.mts holds every other file to that. Two functions do
 // it, `machineTheme` and `onMachineTheme`, and both are named for what they read
 // so a grep for the Mac lands here.
 //

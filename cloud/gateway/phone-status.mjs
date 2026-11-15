@@ -1,4 +1,4 @@
-import { cloudSessionId } from '../../shared/cloud-kit.mjs';
+import { cloudSessionId } from '../../shared/cloud-kit.mts';
 
 const segment = (v) => typeof v === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(v);
 const address = (p) => p && /^[0-9a-f]{12}$/.test(p.device ?? '') && segment(p.project) && segment(p.item);

@@ -3,7 +3,7 @@
 // PowerPoint". What is picked is App.tsx's `multiSel`, the same set the list's
 // select boxes fill, so ⌘K, E, L and Escape act on it with no board copy of
 // any of them. Pure, so the rules are pinned by
-// tests/the-board-picks-several-threads-by-click-or-by-dragging-a-box.test.mjs.
+// tests/the-board-picks-several-threads-by-click-or-by-dragging-a-box.test.mts.
 
 import { edgeScroll } from './row-drag';
 

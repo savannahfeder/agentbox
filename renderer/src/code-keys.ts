@@ -47,7 +47,7 @@ export const CHANGE_OWNS = new Set([
  * or of the one before, or null at either end. `starts` are where each change
  * begins in the column, in order; `top` is where the column is scrolled. The
  * slack makes ] on a change go to the next one rather than the same one
- * (tests/the-next-change-is-one-key-away.test.mjs).
+ * (tests/the-next-change-is-one-key-away.test.mts).
  */
 export function nextChange(starts: number[], top: number, dir: 1 | -1, slack = 4): number | null {
   if (dir > 0) return starts.find((s) => s > top + slack) ?? null;

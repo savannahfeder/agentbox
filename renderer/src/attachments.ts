@@ -4,7 +4,7 @@
 // the message view renders them).
 import { useCallback, useState } from 'react';
 import { turnedName } from '../../shared/picture-formats.mts';
-import { MAX_SENT_WORDS, sizeWords, tooBigToSend } from '../../shared/carried-files.mjs';
+import { MAX_SENT_WORDS, sizeWords, tooBigToSend } from '../../shared/carried-files.mts';
 
 export interface PendingAttachment {
   name: string;

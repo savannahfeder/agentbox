@@ -11,7 +11,7 @@
 // version, not a hundred. Both pass on when that copy leaves.
 import * as Y from 'yjs';
 import * as aw from 'y-protocols/awareness';
-import { AWARENESS, HELLO, ROOM, SYNC, UPDATE, frame, jsonFrame, readFrame, syncReply } from '../../shared/live/wire.mjs';
+import { AWARENESS, HELLO, ROOM, SYNC, UPDATE, frame, jsonFrame, readFrame, syncReply } from '../../shared/live/wire.mts';
 
 const MAX_FRAME = 8 * 1024 * 1024;
 

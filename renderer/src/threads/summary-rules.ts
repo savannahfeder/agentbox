@@ -5,11 +5,11 @@
 //
 // The summary itself (the three lines and their stand-ins) and the four states
 // are shared with the Mac that publishes cards, so they live in
-// shared/thread-cards.mjs and are only read here.
+// shared/thread-cards.mts and are only read here.
 import type { Person, ThreadStateWord, WorkItem } from '../types';
-import { shownToPeople, shownToTeam } from '../../../shared/thread-cards.mjs';
-import { waitParts } from '../../../shared/thread-waits.mjs';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownToPeople, shownToTeam } from '../../../shared/thread-cards.mts';
+import { waitParts } from '../../../shared/thread-waits.mts';
+import { shownTitle } from '../../../shared/thread-title.mts';
 
 export const SUMMARY_FIELDS = ['problem', 'progress', 'solution'] as const;
 export type SummaryField = (typeof SUMMARY_FIELDS)[number];
@@ -139,7 +139,7 @@ export function updatedWord(
 /** What an id this Mac does not hold reads as: a teammate's private thread, or one since deleted. */
 export const UNSEEN_THREAD = 'A thread you cannot see';
 
-/** A link on a card that names a person or their thread (shared/thread-waits.mjs), by first name. */
+/** A link on a card that names a person or their thread (shared/thread-waits.mts), by first name. */
 export function linkPerson(id: string, byId?: ReadonlyMap<string, Person>): string | null {
   const w = waitParts(id);
   if (w.kind === 'thread') return null;
@@ -195,11 +195,11 @@ export function ownerName(item: Pick<WorkItem, 'createdBy'>, me: string | null, 
  * WHO SEES A THREAD, BY THE RULE AND NOT BY THE WORD ON DISK (2026-10-01).
  * Her threads from before she joined carry no visibility at all, and the panel
  * read that as Team on every one of them while the Team page showed none. So
- * it asks the same rule the Team page does (shared/thread-cards.mjs
+ * it asks the same rule the Team page does (shared/thread-cards.mts
  * shownToTeam), and an old thread nobody shared reads "Only you".
  */
 // And a thread with no word of its own reads as its project does
-// (shared/thread-cards.mjs projectSeenBy, w-b989839656).
+// (shared/thread-cards.mts projectSeenBy, w-b989839656).
 export function whoSees(item: Pick<WorkItem, 'visibility' | 'visibleTo' | 'createdAt'>, since: number | null, product?: { personal?: boolean; seenBy?: string; seenByPeople?: string[] } | null): Seen {
   if (!shownToTeam(item, since, product)) return 'private';
   return shownToPeople(item, product).length ? 'people' : 'team';

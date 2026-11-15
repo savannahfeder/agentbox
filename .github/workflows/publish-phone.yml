@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -33,7 +33,7 @@ jobs:
         run: |
           node --input-type=module -e 'import fs from "node:fs"; fs.writeFileSync("cloud/team.config.json", process.env.PHONE_SITE_CONFIG)'
           npm run phone:build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: phone-site
           path: phone-site/
@@ -53,10 +53,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: phone-site
           path: phone-site/
@@ -75,7 +75,7 @@ jobs:
         env:
           CHROME: /usr/bin/google-chrome
         run: node scripts/verify-phone-dismissal.mjs https://app.agentbox.ac phone-verification
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: phone-verification

@@ -2,7 +2,7 @@
 //
 // `vitest related <files>` runs every test that imports what changed, which
 // for a core file here is most of the suite: 362 of the 1,869 test files reach
-// main/engine-bin.mjs. That set is the right one to run and the wrong one to
+// main/engine-bin.mts. That set is the right one to run and the wrong one to
 // wait for, so over the cap this hands back the test files that are most about
 // the change and leaves the rest to GitHub, which runs the whole suite on
 // every push.
@@ -29,7 +29,7 @@ import { testsThatImport } from './tests-that-import.mjs';
 // three minutes it is allowed.
 export const GATE_CAP = 60;
 
-const isTest = (f) => /(^|\/)tests\/.+\.test\.mjs$/.test(f);
+const isTest = (f) => /(^|\/)tests\/.+\.test\.m[jt]s$/.test(f);
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** How often a test file says the name of any of these files. */

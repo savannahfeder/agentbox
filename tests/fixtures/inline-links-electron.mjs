@@ -2,7 +2,7 @@
 import { app, BrowserWindow } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { waitFor } from '../waiting.mjs';
+import { waitFor } from '../waiting.mts';
 const dir = process.argv[2];
 app.setPath('userData', path.join(dir, 'profile'));
 app.commandLine.appendSwitch('disable-gpu');

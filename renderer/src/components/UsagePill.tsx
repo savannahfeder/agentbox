@@ -32,7 +32,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { headlineLimit, limitRows, limitsStillRunning, limitsToShow, usageSentence } from '../../../shared/usage.mts';
 import { agoQuiet } from '../format';
 import type { Usage } from '../types';
-import { engineLabel } from '../../../shared/engines.mjs';
+import { engineLabel } from '../../../shared/engines.mts';
 
 // It is the one threshold and it is deliberately high: a corner that shouts at
 // half is a corner that is shouting all day. Stated as what is SPENT, like

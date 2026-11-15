@@ -15,9 +15,10 @@
 // outranks a prose hit. Nothing is dropped for ranking low.
 
 import { searchText } from './format';
-import { fold, withHumps, wordStart } from '../../shared/word-match.mjs';
+import { fold, withHumps, wordStart } from '../../shared/word-match.mts';
 import { rowSummary, SUMMARY_BUDGET } from './list-rules';
 import { ticketQuery } from './ticket-references';
+import { isCause } from '../../shared/causes.mts';
 
 export interface Searchable {
   id: string;
@@ -35,7 +36,7 @@ export interface Searchable {
 }
 
 // How well a row matched sets only the order. The list prints no headings for
-// it (tests/a-result-list-has-no-headings.test.mjs).
+// it (tests/a-result-list-has-no-headings.test.mts).
 export interface SearchHit<T> {
   item: T;
   // The sentence the query was found in, ready for the row's summary line.
@@ -107,7 +108,8 @@ function haystack(i: Searchable): Hay {
   // The list draws the label (rowTitle, list-rules.ts) with the title under it,
   // so both are searched.
   const title = squash(fold(withHumps([i.label, i.title].filter(Boolean).join(' . '))));
-  const body = searchText(i.body);
+  // A cause row's body is its lead's brief, not something anyone said.
+  const body = isCause(i) ? '' : searchText(i.body);
   const result = searchText(i.result);
   const note = searchText(i.note);
   const answer = searchText(i.answer);

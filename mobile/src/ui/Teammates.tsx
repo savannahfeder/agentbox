@@ -11,7 +11,7 @@ import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import { mateDraft, useDraft } from '../lib/drafts';
 import { groupName, groupsInOrder } from '../lib/groups';
 import { answersMessage } from '../../../renderer/src/teammates/chat-lines';
-import { teammateIdOf } from '../../../shared/teammates.mjs';
+import { teammateIdOf } from '../../../shared/teammates.mts';
 import { asideOf, matesInOrder, nowLine, questionsInThread, waitsOnYou } from '../lib/teammates';
 import { appStore } from '../platform/persist';
 import { Markdown } from './Markdown';

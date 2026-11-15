@@ -8,7 +8,7 @@
 //      run worked in, and the change records it as a short path like
 //      `renderer/src/api.ts`, which on its own does not say which checkout.
 //      So a change now carries `roots` and each file carries `abs`
-//      (main/code-change.mjs). This finds the file from those and refuses if it
+//      (main/code-change.mts). This finds the file from those and refuses if it
 //      cannot, rather than guessing at a path and writing over a stranger's.
 //   2. WHAT IS ON THE SCREEN IS NOT THE WHOLE FILE. The splice back into the
 //      real bytes is pure and lives in renderer/src/code-edit.ts; by the time
@@ -20,9 +20,9 @@
 // checkout is the run's and not the app's.
 import fsDefault from 'node:fs';
 import path from 'node:path';
-import { artifactRoots } from './artifact-path.mjs';
+import { artifactRoots } from './artifact-path.mts';
 import { isInside } from './doc-file.mts';
-import type { ArtifactProduct } from './artifact-path.mjs';
+import type { ArtifactProduct } from './artifact-path.mts';
 
 export type CodeFs = Pick<typeof fsDefault, 'statSync' | 'existsSync' | 'readFileSync' | 'writeFileSync'>;
 

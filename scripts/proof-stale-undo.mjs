@@ -96,7 +96,7 @@ await h.call('Page.addScriptToEvaluateOnNewDocument', {
 // bridge write. WHAT IT DOES NOT PROVE is the browser's focus routing: the event
 // has no element behind it, so it arrives as though her caret were on the body.
 // That is the state these rounds are about. A press into a text field is a
-// different question and `typing-owns-the-keyboard.test.mjs` is where it lives.
+// different question and `typing-owns-the-keyboard.test.mts` is where it lives.
 const press = async (k) => {
   await h.evaluate(`window.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true })), 1`);
 };

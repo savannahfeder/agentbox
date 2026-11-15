@@ -1,8 +1,8 @@
 // A PowerPoint deck, one slide at a time: its words and pictures where the file
-// puts them (shared/pptx-slides.mjs). Hands the slide in view to whoever holds it.
+// puts them (shared/pptx-slides.mts). Hands the slide in view to whoever holds it.
 // Every slide also sits small in a strip under it, to see the whole deck and jump.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { readDeck, type Deck } from '../../../shared/pptx-slides.mjs';
+import { readDeck, type Deck } from '../../../shared/pptx-slides.mts';
 import { FilePager } from './FilePager';
 import { spotIn } from './PinMarks';
 import './file-views.css';

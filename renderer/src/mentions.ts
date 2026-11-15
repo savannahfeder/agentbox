@@ -3,7 +3,7 @@
 // over chips, cards and coloured tags on 2026-10-11 (w-a3a7d1a1ec): the icon
 // says what kind of thing it is, the name says which, and the full path waits
 // in the hover title rather than sitting orange in the sentence.
-import { sourceReference } from './source-reference.mjs';
+import { sourceReference } from './source-reference.ts';
 import { isMediaPath } from './artifact-paths';
 
 export type MentionKind = 'thread' | 'folder' | 'page' | 'doc' | 'image' | 'code' | 'media' | 'link' | 'file';

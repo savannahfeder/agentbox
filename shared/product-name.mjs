@@ -18,7 +18,7 @@
 //      name into package.json, which Electron reads before any of our code
 //      runs and so cannot import this file.
 //
-//   Nothing else. `tests/the-app-is-named-in-one-place.test.mjs` fails if step
+//   Nothing else. `tests/the-app-is-named-in-one-place.test.mts` fails if step
 //   3 is skipped, and it fails if a new literal of the name is typed into the
 //   code by hand instead of read from here.
 //

@@ -11,7 +11,7 @@
 // and a silence is not one: the question waits for her rather than being
 // answered by a clock.
 //
-// EVERY TOUCH OF THE SPOOL GOES THROUGH main/approvals.mjs, which is where the
+// EVERY TOUCH OF THE SPOOL GOES THROUGH main/approvals.mts, which is where the
 // rule that this directory is worker-writable is written down and enforced --
 // nothing opened through a link, nothing opened that is not a regular file,
 // every write landed by rename. It used to be bare `fs` here, and the audit
@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import readline from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
-import { answerIsHers, appendSpoolLine, cardDigest, readSpoolJson, removeSpoolEntry, spoolEntryExists, writeSpoolFile } from './approvals.mjs';
+import { answerIsHers, appendSpoolLine, cardDigest, readSpoolJson, removeSpoolEntry, spoolEntryExists, writeSpoolFile } from './approvals.mts';
 
 const POLL_MS = 2_000;
 
@@ -78,7 +78,7 @@ export function serveApprovals({ env = process.env, input = process.stdin, outpu
   // read and anything secret given here is a secret the forger has. This is the
   // PUBLIC half of a pair whose private half never leaves Agentbox's process: it
   // verifies and it cannot sign, which is exactly why it can travel this way.
-  // main/approvals.mjs holds the whole argument, including what it does not
+  // main/approvals.mts holds the whole argument, including what it does not
   // close.
   const PUBLIC_KEY = env.ZERO_APPROVALS_PUBKEY;
   // Closed when its run has gone: a question still waiting stops at once.
@@ -133,7 +133,7 @@ export function serveApprovals({ env = process.env, input = process.stdin, outpu
           // AND IT IS NOT A DENY EITHER, which matters as much: denying on an
           // unreadable answer would let one worker force a No onto another's
           // card, losing her Allow in silence. The file goes and the question
-          // goes on waiting, exactly as main/codex-approvals.mjs's own sweep
+          // goes on waiting, exactly as main/codex-approvals.mts's own sweep
           // does, and her real answer still lands when she gives it.
           if (!answerIsHers(id, answer, PUBLIC_KEY)) {
             removeSpoolEntry(SPOOL, answerName);
@@ -187,9 +187,10 @@ export function serveApprovals({ env = process.env, input = process.stdin, outpu
   }
 
   // One audit line per decision; the request/answer pair leaves the spool.
+  // Only reached past the `!SPOOL` refusal at the top of the request.
   function finish(id: string, request: ApprovalRequest, answer: unknown) {
-    appendSpoolLine(SPOOL, 'log.jsonl', `${JSON.stringify({ ...request, answer, decidedAt: Date.now() })}\n`);
-    for (const f of [`${id}.request.json`, `${id}.answer.json`]) removeSpoolEntry(SPOOL, f);
+    appendSpoolLine(SPOOL!, 'log.jsonl', `${JSON.stringify({ ...request, answer, decidedAt: Date.now() })}\n`);
+    for (const f of [`${id}.request.json`, `${id}.answer.json`]) removeSpoolEntry(SPOOL!, f);
   }
 
   const rl = readline.createInterface({ input });

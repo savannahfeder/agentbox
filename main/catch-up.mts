@@ -26,7 +26,7 @@ export function catchUpPrompt(item: CatchUpItem | null | undefined) {
     'Reply with one JSON object and nothing else:',
     '{',
     '  "title": "3 to 7 words naming the work, sentence case",',
-    '  "context": "what this conversation is about and where it stands, 2 or 3 sentences, 45 words at most",',
+    '  "context": "what this conversation is about, for someone who has forgotten it: what the person asked for and why, in their words, 2 or 3 sentences, 45 words at most; where it stands goes in said, not here",',
     '  "ask": "the one thing the person needs to decide now, as a plain question naming the choice, under 15 words",',
     '  "said": "2 to 3 short sentences on what you found or did and what you propose",',
     '  "options": ["three options: the next steps the person could pick, the one the agent would recommend first, each under 12 words"]',

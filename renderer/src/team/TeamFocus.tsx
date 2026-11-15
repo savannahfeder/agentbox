@@ -5,14 +5,14 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import type { Product, WorkItem } from '../types';
 import { api } from '../api';
-import { isGivenTask, isShared, heldByAPerson, taskGiver } from '../../../shared/team-rules.mjs';
+import { isGivenTask, isShared, heldByAPerson, taskGiver } from '../../../shared/team-rules.mts';
 import { isDirect, peopleInConversation, peopleToAdd } from '../threads/page-rules';
-import { shownPriority } from '../../../shared/rank.mjs';
+import { shownPriority } from '../../../shared/rank.mts';
 import { priorityIdOf, priorityLabelOf } from '../priority';
 import { Face, TeamContext, dueWords, firstName, type TeamView } from './people';
 import { agentOnTask } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
 export function teamHeld(item: WorkItem, team: TeamView | null): boolean {
@@ -162,7 +162,8 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
     setBusy(false);
     if (!out.ok) setError(out.error ?? 'That did not work.');
   };
-  const ask = (item.body ?? item.title).split('\n').find((l) => l.trim())?.replace(/\*\*/g, '').trim() ?? item.title;
+  // Where it stands now, which is the agent's last word when there is one, not the first ask.
+  const ask = (item.result || item.body || item.title).split('\n').find((l) => l.trim())?.replace(/\*\*/g, '').trim() ?? item.title;
   return <div className="opt-strip">
     {!isGivenTask(item, team?.products.get(item.product)) && <div className="opt-head opt-head-ask"><span>{ask}</span></div>}
     {choices.map(({ label, route: r }, i) => <button key={r} className="opt-row" disabled={busy} onClick={() => route(r)}>

@@ -22,6 +22,7 @@ import {
   ENGINE_NAME, chatChoices, chatsHeadline, FIRST_RUN_STEP, firstRunOf, folderChoices, foundLine, ideasFor, installGate, isSend, listKey, previousScreen, projectsToMake, readyEngines, setupWord, signedOutEngines, stepsFor, typedAhead,
   type Engine, type FolderChoice, type Screen, type Step,
 } from '../first-run-classic';
+import { runningSetup } from '../first-run';
 import './first-run.css';
 import './first-run-classic.css';
 
@@ -159,6 +160,20 @@ export function ClassicFirstRun({ snap, home, onDone }: {
     return () => clearInterval(tick);
   }, [setup]);
 
+  // A setup the app is running that this screen did not see start.
+  useEffect(() => {
+    const look = async () => {
+      const found = runningSetup(await Promise.all([
+        api.engineSetup('status', 'claude').catch(() => null),
+        api.engineSetup('status', 'codex').catch(() => null),
+      ]));
+      if (found) setSetup((had) => (installGate(had).running ? had : found));
+    };
+    void look();
+    window.addEventListener('focus', look);
+    return () => window.removeEventListener('focus', look);
+  }, []);
+
   const chats = useMemo(() => chatChoices(threads ?? [], { home }), [threads, home]);
   const steps = stepsFor({ chats: chats.length });
   const backTo = previousScreen(screen, { chats: chats.length });
@@ -219,6 +234,7 @@ export function ClassicFirstRun({ snap, home, onDone }: {
   }, [hasReady, threads, chats.length, go]);
 
   const startSetup = useCallback(async (engine: Engine) => {
+    setSetup({ engine, phase: 'checking', error: null });
     const s = await api.engineSetup('start', engine).catch(() => null);
     setSetup({ engine, phase: s?.phase ?? 'installing', error: s?.error ?? null });
   }, []);

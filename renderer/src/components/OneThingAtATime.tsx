@@ -14,7 +14,7 @@ import '../one-thing-at-a-time.css';
 import './doc-reading.css';
 import { TeammateMark } from '../teammates/TeammatesRail';
 import { clock, dayHeading } from '../thread-history';
-import { shownName } from '../../../shared/artifact-marks.mjs';
+import { shownName } from '../../../shared/artifact-marks.mts';
 import type { Teammate } from '../types';
 
 /** What this page reads in place rather than as a tile: a page an agent made, a note, or a table. */

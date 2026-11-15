@@ -5,7 +5,7 @@ import { PLANS } from '../../cloud/gateway/plans.mjs';
 import type { Speech, SpeechEvents } from './dictation';
 
 type Plans = Record<string, { agents: number }>;
-type SettingsRow = { updated_at?: string; settings?: { workspace?: { plan?: unknown } } };
+type SettingsRow = { updated_at?: string; settings?: { workspace?: { plan?: unknown } | null } | null };
 
 /** True on a paid Agentbox Cloud plan, as the computer heard from most recently read it. */
 export function dictationAllowed(rows: SettingsRow[]): boolean {
@@ -54,7 +54,7 @@ const LIVED_MS = 1000;
 // heard nothing this long is given up on, with the words kept.
 export const DEAF_MS = 8000;
 
-type Timers = { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: any): void };
+type Timers = { setTimeout(fn: () => void, ms: number): unknown; clearTimeout(id: unknown): void };
 
 /** The browser's recogniser as a Speech, or null where it has none. */
 export function webSpeech(win: Win, { now = Date.now, timers = globalThis as unknown as Timers }: { now?: () => number; timers?: Timers } = {}): Speech | null {

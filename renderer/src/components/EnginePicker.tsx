@@ -20,7 +20,7 @@
 // comes off the snapshot, from `Supervisor#engineChoices`, which asks the
 // capability gate before it asks the machine. A picker that asked
 // `availableEngines` itself would offer Codex on a Mac where the supervisor is
-// about to refuse it — shared/engines.mjs names that outcome as "its own kind of
+// about to refuse it — shared/engines.mts names that outcome as "its own kind of
 // lie" — so the renderer is handed the answer and never derives one.
 //
 // THE PICK IS ABOUT THE NEXT RUN. Every turn is a fresh headless spawn, so there
@@ -28,7 +28,7 @@
 // task up, and nothing about a run already going.
 
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_ENGINE, engineLabel, type Engine } from '../../../shared/engines.mjs';
+import { DEFAULT_ENGINE, engineLabel, type Engine } from '../../../shared/engines.mts';
 import { useKeepInWindow } from '../keep-in-window';
 
 export function EnginePicker({ value, choices, onChange, title, onOpenChange }: {

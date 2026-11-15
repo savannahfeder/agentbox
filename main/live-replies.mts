@@ -67,6 +67,10 @@ export interface ReplySupervisor {
   _saveState(): unknown;
   redeliverAnswer(item: ReplyItem, answer: string | null | undefined): unknown;
   deliverMidflightReply(item: ReplyItem, files: null): unknown;
+  /** Answer the sign-in card the run is waiting on, so the wait ends and the reply can be taken. */
+  endSignInWait?(product: string, id: string): unknown;
+  /** Whether a file sent from a card is waiting to go with this thread's next cloud run. */
+  hasFilesForCloud?(id: string): boolean;
 }
 
 export interface ReplyPayload {
@@ -92,7 +96,10 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
   // Between turns a slash command, a new permission mode or a teammate's word
   // is saved instead, and the tick ends the wait so a new run takes it.
   const between = !!session?.between && typeof supervisor.nextReplyBrief === 'function';
+  // A file sent from a card goes only with a new cloud run, so its reply never
+  // goes into the open one: the tick ends that session and the next run takes both.
   const live = !later && session?.product === product && typeof session.child?.steer === 'function'
+    && !supervisor.hasFilesForCloud?.(id)
     && !(from && (session.remoteIdle || session.between))
     && !(session?.between && (permissionMode != null || String(answer ?? '').trimStart().startsWith('/')))
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
@@ -102,6 +109,9 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
     if (!live) return;
     if (permissionMode != null) throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
     if (answer.trimStart().startsWith('/') && !session.remoteIdle) throw Error('Wait for the current turn to finish before running a slash command.');
+    // An agent waiting on a sign-in card calls sign_in again every 50 seconds,
+    // so its step never ends and a reply queued behind it is never taken.
+    if (!session.remoteIdle && !between && !from) supervisor.endSignInWait?.(product, id);
     // A held Remote Control conversation is sitting idle rather than working,
     // and the slash commands it takes stop being commands once prose is wrapped
     // round them. Both reach it exactly as typed.

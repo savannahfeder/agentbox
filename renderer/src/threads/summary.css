@@ -80,6 +80,7 @@
 .ts-files-notes { flex: none; font-size: 12px; color: var(--text-faint); }
 .ts-done.ts-place { width: 30px; padding: 0; justify-content: center; position: relative; }
 .ts-done.ts-place .ts-place-dot { position: absolute; top: 4px; right: 4px; margin: 0; }
+.ts-done.ts-place-off svg { opacity: .7; }
 .ts-place.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-place-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: -2px; }
 .th-pop.ts-place-pop { top: calc(100% + 8px); right: 0; width: 440px; font-size: 13px; }

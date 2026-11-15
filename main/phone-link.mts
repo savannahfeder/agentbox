@@ -34,7 +34,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import webpush from 'web-push';
-import { phoneBanner, shouldSpeak } from '../shared/notify-rules.mjs';
+import { phoneBanner, shouldSpeak } from '../shared/notify-rules.mts';
 import { createHandler, sameKey } from './serve.mts';
 import type { IpcHandler, PictureRule, PushListener } from './serve.mts';
 import { Name } from '../shared/product-name.mjs';
@@ -239,7 +239,7 @@ export function createPhoneLink({ file, channels, listeners, dist, files = null,
   const key = () => saved.key;
   // What the alerts know: the inbox count the desktop last drew, the arrivals
   // not yet told, and whether a burst has been told already (the desktop's
-  // own rule, shared/notify-rules.mjs: once, then again only for a card).
+  // own rule, shared/notify-rules.mts: once, then again only for a card).
   let count = 0;
   const unseen = new Map<string, PhoneArrival>();
   let timer: NodeJS.Timeout | null = null;

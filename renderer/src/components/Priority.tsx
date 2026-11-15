@@ -15,7 +15,7 @@
 // chord went with the hint.
 
 import { useEffect, useRef, useState } from 'react';
-import { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityId } from '../priority';
+import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityIdOf, priorityLabelOf, priorityValueOf, type PriorityChoice, type PriorityId } from '../priority';
 import { useKeepInWindow } from '../keep-in-window';
 
 export { PRIORITIES, priorityIdOf, priorityLabelOf, priorityValueOf };
@@ -33,7 +33,9 @@ export type { PriorityId };
 // showing: low is one bar, medium two, high three, urgent four, and the fourth
 // is taller than anything else in the family. Nowhere in the app is there an
 // exclamation mark in a box any more.
-export function PriorityIcon({ id }: { id: PriorityId }) {
+export function PriorityIcon({ id }: { id: PriorityChoice }) {
+  // Agent decides: the three bars with none filled in.
+  if (!id) return <span className="prio-bars p0"><i /><i /><i /></span>;
   if (id === 'urgent') return <span className="prio-bars p4"><i /><i /><i /><i /></span>;
   const filled = id === 'low' ? 1 : id === 'medium' ? 2 : 3;
   return <span className={`prio-bars p${filled}`}><i /><i /><i /></span>;
@@ -53,10 +55,13 @@ export function PriorityIcon({ id }: { id: PriorityId }) {
  * exactly how the composer and the dock drifted apart the first time. Same
  * value, same drawer, same keys; only the trigger differs.
  */
-export function PriorityPicker({ value, set = false, onChange, title, variant = 'tag', onOpenChange }: {
-  value: PriorityId;
+export function PriorityPicker({ value, set = false, onChange, title, variant = 'tag', onOpenChange, agent = false }: {
+  /** Null is Agent decides, which only a picker passed `agent` shows. */
+  value: PriorityChoice;
   set?: boolean;
-  onChange: (id: PriorityId) => void;
+  onChange: (id: PriorityChoice) => void;
+  /** Offer Agent decides above the four levels: the new task cards only. */
+  agent?: boolean;
   title?: string;
   /** 'chip' is the new thread card's chip, its bars beside the word. */
   variant?: 'tag' | 'word' | 'chip';
@@ -72,10 +77,13 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
   // a div there is not phrasing content. CSS gives both variants their display.
   const wrap = useRef<HTMLSpanElement>(null);
   useKeepInWindow(wrap, open);
+  const rows: { id: PriorityChoice; label: string }[] = agent
+    ? [{ id: null, label: AGENT_DECIDES.label }, ...PRIORITIES]
+    : [...PRIORITIES];
 
   useEffect(() => {
     if (!open) return;
-    setCursor(Math.max(0, PRIORITIES.findIndex((p) => p.id === value)));
+    setCursor(Math.max(0, rows.findIndex((p) => p.id === value)));
     // Pointerdown, not click: a click that lands on the textarea should close
     // the drawer AND put the caret where it was aimed, not be eaten closing it.
     const away = (e: PointerEvent) => {
@@ -85,7 +93,7 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
     return () => document.removeEventListener('pointerdown', away);
   }, [open, value]);
 
-  const pick = (id: PriorityId) => { onChange(id); setOpen(false); };
+  const pick = (id: PriorityChoice) => { onChange(id); setOpen(false); };
 
   const asWord = variant === 'word';
   const asChip = variant === 'chip';
@@ -94,9 +102,9 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
     <span className={asWord || asChip ? 'compose-word-wrap' : 'prio-wrap'} ref={wrap}>
       {open && (
         <span className="prio-menu" role="listbox" aria-label="Priority">
-          {PRIORITIES.map((p, i) => (
+          {rows.map((p, i) => (
             <button
-              key={p.id}
+              key={p.id ?? AGENT_DECIDES.id}
               role="option"
               aria-selected={p.id === value}
               className={`prio-menu-row ${i === cursor ? 'cursor' : ''} ${p.id === value ? 'on' : ''}`}
@@ -118,7 +126,7 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
           open ? 'open' : '',
         ].filter(Boolean).join(' ')}
         title={title ?? 'Priority'}
-        aria-label={asChip ? `Priority: ${priorityLabelOf(value)}` : undefined}
+        aria-label={asChip ? `Priority: ${choiceLabelOf(value)}` : undefined}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -131,9 +139,9 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
             return;
           }
           if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); }
-          if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => (c + 1) % PRIORITIES.length); }
-          if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => (c - 1 + PRIORITIES.length) % PRIORITIES.length); }
-          if (e.key === 'Enter') { e.preventDefault(); pick(PRIORITIES[cursor].id); }
+          if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => (c + 1) % rows.length); }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => (c - 1 + rows.length) % rows.length); }
+          if (e.key === 'Enter') { e.preventDefault(); pick(rows[cursor].id); }
         }}
       >
         {/* The word carries no icon. Bars inside a line of prose are the
@@ -141,7 +149,7 @@ export function PriorityPicker({ value, set = false, onChange, title, variant = 
             sentence's whole job is that every glyph in it sits on one
             baseline at one size. */}
         {asChip ? <span className="tc-prio"><PriorityIcon id={value} /></span> : !asWord && <PriorityIcon id={value} />}
-        {asChip ? <span className="tc-chip-word">{priorityLabelOf(value)}</span> : priorityLabelOf(value)}
+        {asChip ? <span className="tc-chip-word">{choiceLabelOf(value)}</span> : choiceLabelOf(value)}
       </button>
     </span>
   );

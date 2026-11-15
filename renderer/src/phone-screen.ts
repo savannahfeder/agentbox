@@ -304,7 +304,7 @@ export function installPhoneScreen() {
   // only listens where Safari's would not fire.
   // iPhone's own flag for the home-screen app, as phone-alerts.ts reads it.
   // Not a media query: nothing in the window reads the machine that way
-  // (tests/theme-choice.test.mjs). Android's back gesture is the system's and
+  // (tests/theme-choice.test.mts). Android's back gesture is the system's and
   // already lands on the history step above, so it needs nothing from here.
   const standalone = (navigator as { standalone?: boolean }).standalone === true;
   if (!standalone) return;

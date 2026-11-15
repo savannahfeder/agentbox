@@ -21,7 +21,7 @@
 // the message; the label is derived again on save, which is also the only
 // reason the Scheduled row cannot go stale while the instruction moves.
 //
-// AND THE INSTRUCTION IS THE BRIEF. `main/repeats.mjs` serves each run with
+// AND THE INSTRUCTION IS THE BRIEF. `main/repeats.mts` serves each run with
 // `rule.body ?? rule.title`, so what is in this box is literally what tomorrow
 // morning's session is told. The line under it says so in those words.
 
@@ -32,7 +32,7 @@ import remarkGfm from 'remark-gfm';
 import type { RepeatRule, WorkItem } from '../types';
 import { ago, dayLabel, stamp } from '../format';
 import { joinMessage } from '../message-split';
-import { isCleanRun, nextRunAt, periodKey, ruleIdOf, ruleLabel } from '../../../shared/repeats.mjs';
+import { isCleanRun, nextRunAt, periodKey, ruleIdOf, ruleLabel } from '../../../shared/repeats.mts';
 
 export interface RunRow {
   id: string;
@@ -225,7 +225,7 @@ function RuleComposer({ message, onSave, onClose }: {
       <div className="compose-sentence">
         <span className="compose-clauses">
           {/* WHAT THE BOX ACTUALLY IS, in the app's own terms. A run is briefed
-              with this text and nothing else (`main/repeats.mjs`), so the
+              with this text and nothing else (`main/repeats.mts`), so the
               sentence can say it plainly instead of describing a field. */}
           <span className="dim">Every run after this one reads this.</span>
         </span>

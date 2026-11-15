@@ -495,6 +495,41 @@ export function resumeTo(
   opts: { now?: () => number; window?: number } = {},
 ): () => void {
   if (!el || !(top > 0)) return () => {};
+  return reachFor(el, () => top, opts);
+}
+
+/**
+ * BRING ONE THING ON THE PAGE INTO VIEW AND KEEP IT THERE WHILE THE PAGE
+ * SETTLES, the way `resumeTo` holds a place. A close raises its question on the
+ * turn that filed the task and unfolds the thread above it in the same press;
+ * a plain scrollIntoView lost to the stick, which pinned the growing page back
+ * to its end, so the question was never seen.
+ */
+export function bringIntoView(
+  el: HTMLElement | null,
+  target: () => Element | null,
+  opts: { now?: () => number; window?: number; block?: 'center' | 'nearest' } = {},
+): () => void {
+  if (!el) return () => {};
+  const block = opts.block ?? 'center';
+  return reachFor(el, () => {
+    const t = target();
+    if (!t?.isConnected) return null;
+    const box = el.getBoundingClientRect();
+    const r = t.getBoundingClientRect();
+    const top = r.top - box.top + el.scrollTop;
+    if (block === 'center') return Math.round(top - (el.clientHeight - r.height) / 2);
+    if (r.top >= box.top && r.bottom <= box.bottom) return Math.round(el.scrollTop);
+    return Math.round(r.top < box.top || r.height > el.clientHeight ? top : top + r.height - el.clientHeight);
+  }, opts, false);
+}
+
+function reachFor(
+  el: HTMLElement,
+  aim: () => number | null,
+  opts: { now?: () => number; window?: number },
+  stopOnArrival = true,
+): () => void {
   const now = opts.now ?? (() => Date.now());
   const window_ = opts.window ?? RESUME_WINDOW_MS;
   const started = now();
@@ -506,10 +541,13 @@ export function resumeTo(
 
   const reach = () => {
     if (!live) return;
-    const want = Math.min(top, bottomOf(el));
+    const top = aim();
+    if (top === null) return;
+    const want = Math.max(0, Math.min(top, bottomOf(el)));
     if (Math.round(el.scrollTop) !== want) el.scrollTop = want;
     // Arrived. A page that grows further from here is hers to follow or not.
-    if (want >= top) release();
+    // A thing on the page is followed for the whole window: what grows is above it.
+    if (stopOnArrival && want >= top) release();
   };
 
   // HER HAND ENDS IT, and here it really does have to be her gestures rather

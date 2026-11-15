@@ -10,10 +10,10 @@
 // underneath. The inbox count, the dock badge and the thread mask all read the
 // whole box, so narrowing what she sees never changes what the app believes is
 // waiting. It also means the menu can count every choice honestly, off the same
-// rows. `tests/a-box-can-be-filtered-by-project-priority-or-agent.test.mjs`.
+// rows. `tests/a-box-can-be-filtered-by-project-priority-or-agent.test.mts`.
 
-import { engineLabel } from '../../shared/engines.mjs';
-import { shownPriority } from '../../shared/rank.mjs';
+import { engineLabel } from '../../shared/engines.mts';
+import { shownPriority } from '../../shared/rank.mts';
 import { PRIORITIES, priorityIdOf, type PriorityId } from './priority';
 import { isTroubleRow } from './trouble-row';
 import type { WorkItem } from './types';
@@ -51,7 +51,7 @@ export function harnessOf(item: Pick<WorkItem, 'labels'> & { engine?: string | n
 
 type Row = Pick<WorkItem, 'product' | 'priority' | 'labels'> & { engine?: string | null; wrote?: WorkItem['wrote'] };
 
-// THE LEVEL IT RUNS AT, which is the level the row shows (shared/rank.mjs
+// THE LEVEL IT RUNS AT, which is the level the row shows (shared/rank.mts
 // shownPriority). `direct` names the conversation projects, whose level is the
 // message sorter's and is read as it is.
 function matchesPart(item: Row, f: BoxFilter, part: FilterPart, direct?: ReadonlySet<string>): boolean {

@@ -1,0 +1,160 @@
+// THE SUMMARY NAMES ITS THREAD, SHOWS WHAT YOU CAN CHANGE, AND SAYS WHO
+// REALLY SEES IT.
+//
+// Three things the founder reported on the first build of the panel
+// (w-e731ca9376, 2026-10-01), each pinned here:
+//   - Looking at the panel alone, she could not tell which thread it was
+//     about. It now opens with the thread's name, the same one the inbox row
+//     shows (rowTitle: the label before the title).
+//   - She had to try hard to click Urgent before she noticed it changed
+//     anything: the only hint was a dotted underline on hover. Every field she
+//     can change now answers the pointer with a wash, a pointer cursor and a
+//     small caret or pencil; the ones she cannot change (Status, Owner,
+//     Project) carry none of it, so the difference reads at a glance.
+//     Project stays read-only on purpose: nothing in the store moves a thread
+//     from one project's ledger to another, and a menu here would have to
+//     invent that.
+//   - None of her hundreds of threads from before she joined is on the Team
+//     page (shared/thread-cards.mts shownToTeam), but the panel still said
+//     "Team" on every one of them, because it read the word on disk rather
+//     than the rule. It says "Only you" now, and changing it writes 'team' or
+//     'private' through the same threadEdit path as every other field.
+// Drawn with react-dom/server, so these are the real components.
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { SummaryPanel } from '../renderer/src/threads/Summary.tsx';
+import { whoSees, VISIBILITY_WORD } from '../renderer/src/threads/summary-rules.ts';
+globalThis.React = React;
+
+const NOW = Date.now();
+const DAY = 86_400_000;
+const SINCE = NOW - 7 * DAY; // she joined the team a week ago
+const item = (o = {}) => ({
+  id: 'w-acme', product: 'northwind', productName: 'Northwind', status: 'open', kind: 'directive', labels: ['founder'],
+  title: 'Can you send Acme their renewal terms by Thursday? Their contract ends on the 14th.',
+  label: 'Acme renewal terms', priority: 7, epoch: 0, claim: null, createdAt: NOW - DAY, updatedAt: NOW - DAY, ...o,
+});
+const team = { state: { since: SINCE, signedIn: true }, me: 'p-me', byId: new Map(), products: new Map() };
+const draw = (it, t = team) => renderToStaticMarkup(React.createElement(SummaryPanel, { item: it, items: [it], team: t }));
+const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const between = (html, a, b) => html.slice(html.indexOf(`>${a}<`), html.indexOf(`>${b}<`));
+const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', import.meta.url), 'utf8');
+const src = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', import.meta.url), 'utf8');
+
+describe('the panel opens with the thread’s name', () => {
+  // It opened the panel until w-b38e975e2c moved it under the properties,
+  // directly over Problem, so the words read as one block.
+  // CHANGED 2026-10-04 (w-922f66bb06): the name opens the panel and the
+  // properties sit at its foot, Priority second. It was properties first.
+  // The heading carries a pencil since it renames the thread (w-ab3d51dc7d),
+  // so these read the name up to that pencil.
+  // The name is inside .ts-title-text since w-c9da359466: the clamp moved
+  // off the click target so its padding could not leak a fourth line.
+  const named = (html) => html.match(/<span class="ts-title-text">([^<]*)<svg class="ts-pen"/)?.[1];
+  it('says the name the row shows, the label, first and over the three lines', () => {
+    const html = draw(item());
+    expect(named(html)).toBe('Acme renewal terms');
+    expect(html).toMatch(/<\/svg><\/span><\/h2><div class="ts-sec">/);
+    expect(text(html)).toMatch(/^Acme renewal terms Context .* Status In progress Priority \w+ Owner You Project Northwind/);
+  });
+  it('falls back to the title on a thread with no label', () => {
+    expect(named(draw(item({ label: undefined })))).toBe('Send Acme their renewal terms by Thursday');
+  });
+  it('treats a blank label as no label, the way the row does', () => {
+    expect(named(draw(item({ label: '   ', title: 'Pricing page' })))).toBe('Pricing page');
+  });
+});
+
+describe('what you can change looks changeable, and what you cannot does not', () => {
+  const html = draw(item());
+  it('draws Priority and Visible to as buttons that carry a caret', () => {
+    for (const [from, to] of [['Priority', 'Owner'], ['Visible to', null]]) {
+      const cell = to ? between(html, from, to) : html.slice(html.indexOf(`>${from}<`));
+      expect(cell).toMatch(/<button[^>]*class="ts-prop-btn"/);
+      expect(cell).toContain('ts-caret');
+    }
+  });
+  // AND STATUS JOINED THEM ON 2026-10-01: a thread can be marked done from a
+  // dropdown on its Status row. It is a
+  // button only where there is something to set and somebody to set it with,
+  // which is what `onFinish` is; this file draws the panel without that prop,
+  // so Status is a plain word here and stays below with Owner and Project.
+  // The dropdown itself is tests/the-status-row-marks-a-thread-done.test.mts.
+  it('draws Owner and Project as plain words: no button, no caret', () => {
+    for (const [from, to] of [['Owner', 'Project'], ['Project', 'Visible to']]) {
+      const cell = between(html, from, to);
+      expect(cell.length).toBeGreaterThan(0);
+      expect(cell).not.toContain('<button');
+      expect(cell).not.toContain('ts-caret');
+    }
+  });
+  it('leaves Status a plain word when nothing is handed in to close the thread', () => {
+    const cell = between(html, 'Status', 'Priority');
+    expect(cell.length).toBeGreaterThan(0);
+    expect(cell).not.toContain('<button');
+    expect(cell).not.toContain('ts-caret');
+  });
+  // An empty line is not drawn at all since w-54e9c7243f, so both are written
+  // here; and since later on that thread there are two, Context and Done.
+  it('puts a pencil on Context and on Done', () => {
+    const all = draw(item({ problem: 'Terms are late.', progress: 'Drafted.', solution: 'Sent.' }));
+    expect(all.match(/class="ts-line[^"]*"[^>]*>.*?ts-pen/g)).toHaveLength(2);
+  });
+  // CHANGED 2026-10-13 (w-ab3d51dc7d): the words you type in place answer
+  // with the pencil and a text cursor, and no wash; the menus keep theirs
+  // (a-thread-can-be-renamed-and-the-crumb-goes-back-one-level.test.mts).
+  it('answers the pointer on a changeable field with its mark, and a wash only on a menu', () => {
+    expect(css).toMatch(/\.ts-prop-btn \{[^}]*cursor: pointer/);
+    expect(css).toMatch(/\.ts-prop-btn:hover[^{]*\{[^}]*background: var\(--wash\)/);
+    expect(css).not.toMatch(/\.ts-line:hover \{[^}]*background/);
+    expect(css).toMatch(/\.ts-line \{[^}]*cursor: text/);
+    expect(css).toMatch(/\.ts-caret, \.ts-pen \{[^}]*opacity: 0/);
+    expect(css).toMatch(/\.ts-prop-btn:hover \.ts-caret/);
+    expect(css).toMatch(/\.ts-line:hover \.ts-pen/);
+  });
+  it('gives a read-only value no hover at all', () => {
+    expect(css).not.toMatch(/\.ts-value:hover/);
+  });
+  // The name was read-only until w-ab3d51dc7d; it renames now, so it answers
+  // the pointer the way the lines do, and only as a button.
+  it('gives the name the lines\' pencil, since it renames', () => {
+    expect(css).not.toMatch(/\.ts-title:hover/);
+    expect(css).toMatch(/\.ts-title\[role="button"\]:hover \.ts-pen/);
+  });
+  it('keeps the old dotted underline off the changeable fields', () => {
+    expect(css).not.toMatch(/\.ts-prop-btn:hover \{[^}]*text-decoration/);
+  });
+});
+
+describe('Visible to says who really sees it', () => {
+  it('reads Only you on a thread from before you joined that nobody shared', () => {
+    expect(text(draw(item({ createdAt: SINCE - DAY })))).toMatch(/Visible to Only you/);
+  });
+  it('reads Team on a thread started after you joined', () => {
+    expect(text(draw(item({ createdAt: SINCE + DAY })))).toMatch(/Visible to Team/);
+  });
+  it('reads Team on an old thread you shared by hand', () => {
+    expect(text(draw(item({ createdAt: SINCE - DAY, visibility: 'team' })))).toMatch(/Visible to Team/);
+  });
+  it('reads Only you on a new thread you made private', () => {
+    expect(text(draw(item({ createdAt: SINCE + DAY, visibility: 'private' })))).toMatch(/Visible to Only you/);
+  });
+  it('the boundary: a thread started the moment you joined is the team’s', () => {
+    expect(whoSees(item({ createdAt: SINCE }), SINCE)).toBe('team');
+    expect(whoSees(item({ createdAt: SINCE - 1 }), SINCE)).toBe('private');
+  });
+  it('keeps the old rule with nobody signed in', () => {
+    expect(whoSees(item({ createdAt: 5 }), null)).toBe('team');
+    // Three words since w-41ff964775: the team, a few people, or nobody.
+    expect(VISIBILITY_WORD).toEqual({ team: 'Team', people: 'Chosen people', private: 'Only you' });
+  });
+  it('writes the choice through threadEdit as team or private, from a menu that shows both', () => {
+    expect(src).toMatch(/menu === 'visibility' &&/);
+    expect(src).toMatch(/void save\(\{ visibility: v \}\)/);
+  });
+  it('uses no em dash anywhere', () => {
+    expect(draw(item())).not.toContain('—');
+  });
+});

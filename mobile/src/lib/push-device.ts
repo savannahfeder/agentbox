@@ -1,5 +1,5 @@
 // This phone's alert address, left in push_devices for your own computers to
-// send to (main/phone-alerts.mjs), and taken back when alerts go off.
+// send to (main/phone-alerts.mts), and taken back when alerts go off.
 import type { CloudClient } from '../../../renderer/src/cloud-rest';
 
 export const ALERTS_KEY = 'agentbox-alerts';

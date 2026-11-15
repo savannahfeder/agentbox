@@ -10,7 +10,7 @@
 // a chat first; asking rows are what the old Codex watch was removed for.
 import { productsForThread } from '../shared/codex-import.mts';
 import type { CodexThreadLike } from '../shared/codex-import.mts';
-import { isShared } from '../shared/team-rules.mjs';
+import { isShared } from '../shared/team-rules.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import type { HomesSupervisor } from './agent-homes.mts';
 import { outsideAgentsMode } from './settings.mts';

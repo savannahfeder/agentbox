@@ -61,10 +61,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-// THE RECIPE ITSELF LIVES IN ONE PLACE NOW (shared/fresh-user-home.mjs), because
+// THE RECIPE ITSELF LIVES IN ONE PLACE NOW (shared/fresh-user-home.mts), because
 // the app can do this to itself from ⌘K since 2026-08-23 and two copies of a
 // rule about CFFIXED_USER_HOME is exactly how one of them goes quietly wrong.
-import { HOMES, existingHomes, makeHome, prepareHome, freshEnv } from '../shared/fresh-user-home.mjs';
+import { HOMES, existingHomes, makeHome, prepareHome, freshEnv } from '../shared/fresh-user-home.mts';
 // AND THE OTHER HALF IS WHICH APP TO OPEN (scripts/fresh-user-target.mjs). On
 // Linux there is no bundle to find, so this command used to stop there.
 import { freshUserTarget } from './fresh-user-target.mjs';

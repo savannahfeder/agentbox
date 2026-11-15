@@ -10,10 +10,11 @@ import { firstName, TeamContext } from '../team/people';
 import { ArtifactView, NO_MARKS } from '../components/ArtifactView';
 import { FileCover } from '../components/FileCover';
 import { SearchIcon } from '../components/SearchIcon';
+import { SAYS_UNDO } from '../toast-parts';
 import type { LedgerLine } from '../thread-history';
 import type { DragEvent } from 'react';
-import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
-import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, KIND_ONE, KIND_PLURAL, kindsIn, missingWords, needsReview, scratchLine, shownName, sortFiles, versionWord, type FileSort } from './files-shown';
+import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
+import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, needsReview, onMacOf, scratchLine, shownName, sizeWords, sortFiles, versionWord, type FileSort } from './files-shown';
 import './files-place.css';
 
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
@@ -85,6 +86,7 @@ function CodeFace({ file }: { file: PlacedFile }) {
 function Face({ file, whose }: { file: PlacedFile; whose: string | null }) {
   const [size, setSize] = useState('');
   const [broken, setBroken] = useState(false);
+  if (file.cloud) return file.poster ? <FileCover kind="image" opened={file.poster} onSize={() => {}} /> : <div className="fp-face-empty">{file.kind ? KIND_ONE[file.kind] : 'File'}</div>;
   // Says what is true rather than a bare kind on an empty tile.
   if (!file.opened || broken) return <div className="fp-face-empty">{whose ? `On ${whose}'s computer` : 'Not on this computer yet'}</div>;
   if (file.kind === 'page') return <PageFace file={file} />;
@@ -141,8 +143,9 @@ function NameBox({ placeholder, start = '', onDone, onCancel }: { placeholder: s
 const MENU_ROOM = 300;
 
 /** A file's menu, or a group's: where it can go in its project. */
-function MoveMenu({ file, name, keys, folders, act, onNewFolder }: {
+function MoveMenu({ file, name, keys, folders, act, onNewFolder, onTrash }: {
   file: PlacedFile; name?: string; keys?: string[]; folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (name: string) => void;
+  onTrash?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [naming, setNaming] = useState(false);
@@ -177,6 +180,44 @@ function MoveMenu({ file, name, keys, folders, act, onNewFolder }: {
       {naming
         ? <div className="fp-menu-new"><NameBox placeholder="Folder name" onCancel={() => setNaming(false)} onDone={(name) => { setOpen(false); setNaming(false); onNewFolder(name); }} /></div>
         : <button type="button" role="menuitem" className="fp-menu-item" onClick={() => setNaming(true)}>New folder</button>}
+      {onTrash && !naming && <>
+        <div className="fp-menu-gap" role="separator" />
+        <button type="button" role="menuitem" className="fp-menu-item" onClick={() => { setOpen(false); onTrash(); }}>
+          Move to the Trash<span className="fp-menu-aside">{sizeWords(file.movable ?? 0)}</span>
+        </button>
+      </>}
+    </div>}
+  </div>;
+}
+
+/** The quiet total, and its menu: what this place takes, and the ways to free it. */
+function TotalMenu({ where, onMac, older, sort, onSort, onOlder, onChoose, cloud, onCloud }: {
+  where: string; onMac: number; older: number; sort: FileSort; onSort: (s: FileSort) => void;
+  onOlder: () => void; onChoose: () => void;
+  cloud: FilesCloudStatus | null; onCloud: (paid: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const box = useClosesOutside(open, () => setOpen(false));
+  const paid = !!cloud?.cap;
+  const pick = (fn: () => void) => () => { setOpen(false); fn(); };
+  return <div className="fp-total-box" ref={box}>
+    <button type="button" className={`fp-total${open ? ' is-on' : ''}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <DiskGlyph />{sizeWords(onMac)} on this {MACHINE}
+    </button>
+    {open && <div className="fp-menu fp-total-menu" role="menu">
+      <div className="fp-menu-head">{where} uses {sizeWords(onMac)} of this {MACHINE}</div>
+      <button type="button" role="menuitem" className="fp-menu-item" onClick={pick(() => onSort(sort === 'size' ? 'recent' : 'size'))}>
+        {sort === 'size' ? 'Show the newest first' : 'Show the biggest first'}
+      </button>
+      <div className="fp-menu-gap" role="separator" />
+      {older > 0 && <button type="button" role="menuitem" className="fp-menu-item" onClick={pick(onOlder)}>
+        Move older versions to the Trash<span className="fp-menu-aside">{sizeWords(older)}</span>
+      </button>}
+      <button type="button" role="menuitem" className="fp-menu-item" onClick={pick(onChoose)}>Choose files to move to the Trash</button>
+      <div className="fp-menu-gap" role="separator" />
+      <button type="button" role="menuitem" className="fp-menu-item" onClick={pick(() => onCloud(paid))}>
+        Keep files in the cloud<span className="fp-menu-aside">{paid ? (cloud!.on ? 'On' : 'Off') : 'Pro'}</span>
+      </button>
     </div>}
   </div>;
 }
@@ -224,13 +265,19 @@ function useSlot(id: string) {
   return el;
 }
 
-function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder }: {
+function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, onTrash, chosen = null, unmovable = false }: {
   file: PlacedFile; list: boolean; now: number; me: string | null; nameOf: (id: string) => string; onOpen: () => void;
   folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (file: PlacedFile, name: string) => void;
+  onTrash: (file: PlacedFile) => void;
+  /** While files are being chosen: whether this one is. */
+  chosen?: boolean | null;
+  /** Being chosen, and not Files' to move. */
+  unmovable?: boolean;
 }) {
   const v = versionWord(file);
   const approved = file.approvedBy.length > 0;
-  const words = [v, changedBy(file, { me, nameOf }), file.at ? ago(file.at, now) : null].filter(Boolean).join('  ·  ');
+  const words = [v, changedBy(file, { me, nameOf }), file.at ? ago(file.at, now) : null, !file.cloud && file.bytes != null ? sizeWords(file.bytes) : null].filter(Boolean).join('  ·  ');
+  const said = <>{words}{file.cloud && <>{words ? '  ·  ' : ''}<span className="fp-in-cloud"><CloudGlyph />In the cloud</span></>}</>;
   const marks = <>
     {file.open > 0 && <span className="fp-open" title={`${file.open} open ${file.open === 1 ? 'comment' : 'comments'}`}><CommentGlyph />{file.open}</span>}
     {approved && <span className="fp-approved" title={`Approved by ${file.approvedBy.map((id) => (id === me ? 'you' : nameOf(id ?? ''))).join(', ')}`}><i aria-hidden="true" />Approved</span>}
@@ -238,22 +285,24 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder }
   </>;
   const name = shownName(file);
   const whose = !file.opened && file.by && file.by !== me ? nameOf(file.by) : null;
-  return <div className={list ? 'fp-line' : 'fp-tile'} draggable={!!file.project} onDragStart={(e) => { e.dataTransfer.setData(DRAGGED, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
-    <button type="button" className="fp-open-file" onClick={onOpen} aria-label={`Open ${file.name}`} title={name === file.name ? undefined : file.name}>
+  const choosing = chosen !== null || unmovable;
+  return <div className={`${list ? 'fp-line' : 'fp-tile'}${file.cloud ? ' is-in-cloud' : ''}${chosen ? ' is-chosen' : ''}${unmovable ? ' is-unmovable' : ''}`} draggable={!!file.project && !choosing} onDragStart={(e) => { e.dataTransfer.setData(DRAGGED, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
+    {chosen !== null && <span className="fp-check" aria-hidden="true">{chosen && <CheckGlyph />}</span>}
+    <button type="button" className="fp-open-file" onClick={onOpen} aria-label={choosing ? `${chosen ? 'Unchoose' : 'Choose'} ${file.name}` : `Open ${file.name}`} aria-pressed={choosing ? !!chosen : undefined} title={name === file.name ? undefined : file.name}>
       {list
         ? <>
           <span className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
           <span className="fp-name">{name}</span>
           <span className="fp-line-marks">{marks}</span>
-          <span className="fp-meta-words">{words}</span>
+          <span className="fp-meta-words">{said}</span>
         </>
         : <>
           <span className={`fp-face fp-face-${file.kind ?? 'file'}`}><Face file={file} whose={whose} /></span>
           <span className="fp-name">{name}</span>
-          <span className="fp-meta"><span className="fp-meta-words">{words}</span>{marks}</span>
+          <span className="fp-meta"><span className="fp-meta-words">{said}</span>{marks}</span>
         </>}
     </button>
-    {file.project && <MoveMenu file={file} folders={folders} act={act} onNewFolder={(n) => onNewFolder(file, n)} />}
+    {file.project && !choosing && <MoveMenu file={file} folders={folders} act={act} onNewFolder={(n) => onNewFolder(file, n)} onTrash={file.movable ? () => onTrash(file) : undefined} />}
   </div>;
 }
 
@@ -283,6 +332,10 @@ const MoreGlyph = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="cu
 const PenGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M3 13l.7-2.8 7-7a1.2 1.2 0 0 1 1.7 0l.4.4a1.2 1.2 0 0 1 0 1.7l-7 7z" strokeLinejoin="round" /></svg>;
 const GridGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2.5" y="2.5" width="4.4" height="4.4" rx="1.1" /><rect x="9.1" y="2.5" width="4.4" height="4.4" rx="1.1" /><rect x="2.5" y="9.1" width="4.4" height="4.4" rx="1.1" /><rect x="9.1" y="9.1" width="4.4" height="4.4" rx="1.1" /></svg>;
 const ListGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h10" strokeLinecap="round" /></svg>;
+
+const DiskGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2" y="4" width="12" height="8" rx="1.5" /><path d="M4.5 9.5h3" strokeLinecap="round" /><circle cx="11.2" cy="9.5" r=".6" fill="currentColor" stroke="none" /></svg>;
+const CloudGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4.6 12.2h6.9a2.6 2.6 0 0 0 .3-5.2 3.8 3.8 0 0 0-7.3.9 2.2 2.2 0 0 0 .1 4.3z" strokeLinejoin="round" /></svg>;
+const CheckGlyph = () => <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8.3l3 3 6-6.6" /></svg>;
 
 const CommentGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" /></svg>;
 
@@ -329,7 +382,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
       if (fresh) setView(fresh);
       return null;
     } : undefined}
-    missingSays={(by) => missingWords(by && by !== team?.me && team?.byId.get(by) ? firstName(team.byId.get(by)!) : null)}
+    missingSays={(by) => (view?.coming ? 'is on its way back from the cloud.' : missingWords(by && by !== team?.me && team?.byId.get(by) ? firstName(team.byId.get(by)!) : null))}
     editGoes={editsTo?.kind === 'shared' ? `Sent to ${team?.byId.get(editsTo.ownerId ?? '') ? firstName(team.byId.get(editsTo.ownerId!)!) : 'whoever made it'}.` : undefined}
     onOutside={(src) => { void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error || 'That file could not be opened.'); }); }}
     onClose={onClose}
@@ -342,14 +395,48 @@ const PlaceGlyph = ({ kind }: { kind: FileSentIn['kind'] }) => (kind === 'chat'
   ? <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" /></svg>
   : <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" strokeLinecap="round" /></svg>);
 
-export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
+export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoable, onSettings }: {
   /** The project's page, or null for every file. */
   project: string | null;
   onProject: (project: string | null) => void;
   now: number;
   onPlace: (p: FileSentIn) => void;
   onNotice: (words: string) => void;
+  /** Puts a Move to the Trash on the app's Z. */
+  onUndoable?: (entry: { label: string; undoes: string; run: () => Promise<void | { refused: string }> }) => void;
+  /** Settings › Files, or the plans when files are not kept in the cloud. */
+  onSettings?: (pane: 'files' | 'cloud') => void;
 }) {
+  const [chosen, setChosen] = useState<Set<string> | null>(null);
+  const [cloud, setCloud] = useState<FilesCloudStatus | null>(null);
+  useEffect(() => { let live = true; void api.filesCloud().then((c) => { if (live) setCloud(c); }); return () => { live = false; }; }, []);
+  useEffect(() => {
+    if (!chosen) return;
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setChosen(null); } };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, [chosen !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+  const trash = (keys: string[], what: string, older = false) => {
+    onNotice(`Moving ${what} to the Trash…`);
+    void api.filesPlaceTrash({ keys, older }).then((r) => {
+      readAgain();
+      if (!r.ok) { onNotice(r.error || 'Those files could not be moved to the Trash.'); return; }
+      if (!r.moved) { onNotice('Nothing here could be moved to the Trash.'); return; }
+      const undo = r.undo && onUndoable ? r.undo : null;
+      if (undo) {
+        onUndoable!({
+          label: `Back from the Trash: ${what}`,
+          undoes: `put ${what} back`,
+          run: async () => {
+            const back = await api.filesPlaceUntrash(undo);
+            readAgain();
+            if (!back.ok) return { refused: back.error || 'Those files are in the Trash now. Put them back from there.' };
+          },
+        });
+      }
+      onNotice(`Moved ${what} to the Trash. Empty the Trash to get the ${sizeWords(r.bytes)} back.${undo ? SAYS_UNDO : ''}`);
+    });
+  };
   const team = useContext(TeamContext);
   const list = useFilesList(true) ?? null;
   const [query, setQuery] = useState('');
@@ -406,8 +493,21 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
   const projectCards = looking || project ? [] : all.projects;
   // Folders go one level deep.
   const canNest = !folders.find((f) => f.id === folder)?.parent;
-  const tile = (f: PlacedFile) => <Tile key={f.key} file={f} list={asList} now={now} me={team?.me ?? null} nameOf={nameOf} onOpen={() => setOpenKey(f.key)} folders={folders} act={(p) => { void act(p); }}
+  const choose = (f: PlacedFile) => setChosen((was) => {
+    const next = new Set(was);
+    if (next.has(f.key)) next.delete(f.key); else next.add(f.key);
+    return next;
+  });
+  const tile = (f: PlacedFile) => <Tile key={f.key} file={f} list={asList} now={now} me={team?.me ?? null} nameOf={nameOf} folders={folders} act={(p) => { void act(p); }}
+    onOpen={() => (!chosen ? setOpenKey(f.key) : f.movable ? choose(f) : undefined)}
+    chosen={chosen && f.movable ? chosen.has(f.key) : null}
+    unmovable={!!chosen && !f.movable}
+    onTrash={(file) => trash([file.key], shownName(file))}
     onNewFolder={(file, name) => { void act({ do: 'make', project: file.project ?? '', name }).then((r) => { if (r.ok && r.folder) move(file.key, r.folder); }); }} />;
+  const used = onMacOf(below);
+  const where = folders.find((f) => f.id === folder)?.name ?? project ?? 'Files';
+  const chosenFiles = chosen ? below.filter((f) => chosen.has(f.key)) : [];
+  const chosenBytes = chosenFiles.reduce((s, f) => s + (f.movable ?? 0), 0);
   const empty = looking ? 'No file matches.'
     : folder ? 'Nothing in this folder yet.'
       : project ? `No files in ${project} yet.` : 'Nothing in Files yet.';
@@ -438,7 +538,17 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
           onKeyDown={(e) => { if (e.key === 'Escape' && query) { e.stopPropagation(); setQuery(''); } }} />
       </label>
     </div>
-    <div className="fp-tools">
+    {chosen ? <div className="fp-tools fp-choosing">
+      <span className="fp-chosen-words">{chosen.size ? `${chosen.size} chosen  ·  ${sizeWords(chosenBytes)}` : 'Choose files to move to the Trash'}</span>
+      <div className="fp-views">
+        <button type="button" className="fp-kind" onClick={() => setChosen(null)}>Cancel</button>
+        <button type="button" className="fp-trash-go" disabled={!chosen.size} onClick={() => {
+          const keys = [...chosen];
+          setChosen(null);
+          trash(keys, keys.length === 1 ? shownName(chosenFiles[0]) : `${keys.length} files`);
+        }}>Move to the Trash</button>
+      </div>
+    </div> : <div className="fp-tools">
       <div className="fp-kinds" role="group" aria-label="Show">
         {kinds.length > 1 && <>
           <button type="button" className={`fp-kind${kind === null && !review ? ' is-on' : ''}`} aria-pressed={kind === null && !review} onClick={() => { setKind(null); setReview(false); }}>All</button>
@@ -447,16 +557,24 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice }: {
         {(reviewing > 0 || review) && <button type="button" className={`fp-kind${review ? ' is-on' : ''}`} aria-pressed={review} onClick={() => setReview(!review)}>Needs review</button>}
       </div>
       <div className="fp-views">
+        {used.onMac > 0 && <TotalMenu where={where} onMac={used.onMac} older={used.older} sort={sort} onSort={setSort}
+          onOlder={() => {
+            const keys = below.filter((f) => (f.older ?? 0) > 0).map((f) => f.key);
+            trash(keys, 'the older versions', true);
+          }}
+          onChoose={() => setChosen(new Set())}
+          cloud={cloud} onCloud={(paid) => onSettings?.(paid ? 'files' : 'cloud')} />}
         <div className="fp-switch" role="group" aria-label="Sort">
           <button type="button" className={`fp-kind${sort === 'recent' ? ' is-on' : ''}`} aria-pressed={sort === 'recent'} onClick={() => setSort('recent')}>Recent</button>
           <button type="button" className={`fp-kind${sort === 'name' ? ' is-on' : ''}`} aria-pressed={sort === 'name'} onClick={() => setSort('name')}>Name</button>
+          {sort === 'size' && <button type="button" className="fp-kind is-on" aria-pressed="true" onClick={() => setSort('recent')}>Size</button>}
         </div>
         <div className="fp-switch" role="group" aria-label="View">
           <button type="button" className={`fp-kind fp-view-icon${asList ? '' : ' is-on'}`} aria-pressed={!asList} aria-label="Grid" title="Grid" onClick={() => setAsList(false)}><GridGlyph /></button>
           <button type="button" className={`fp-kind fp-view-icon${asList ? ' is-on' : ''}`} aria-pressed={asList} aria-label="List" title="List" onClick={() => setAsList(true)}><ListGlyph /></button>
         </div>
       </div>
-    </div>
+    </div>}
     {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders">
       {projectCards.map((p) => <FolderCard key={p} folder={{ name: p }} count={filesBelow(all.files, folders, { project: p, folder: null }).length} onOpen={() => onProject(p)} />)}
       {cards.map((f) => <FolderCard key={f.id} folder={f} count={countIn(f.id)} onOpen={() => setFolderId(f.id)}

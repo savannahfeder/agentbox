@@ -2,7 +2,7 @@
 // a PDF's first page, a film's opening frame, a picture. Each says how long it
 // is (`onSize`) so the tile can put it under the face.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { readDeck, type Deck } from '../../../shared/pptx-slides.mjs';
+import { readDeck, type Deck } from '../../../shared/pptx-slides.mts';
 import { coverFit, coverPageWidth } from '../artifact-pins';
 import { useFilmPoster } from '../film-poster';
 import { fetchableFileUrl } from '../phone-files';

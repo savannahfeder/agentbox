@@ -11,6 +11,8 @@
 }
 
 .chat-msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 14px; }
+/* A chat's files line up with its words, not its faces: the face and its gap, as the timeline does. */
+.focus:has(> .focus-body .thread.is-chat) > .message-files { margin-left: 42px; width: calc(100% - 42px); }
 .chat-gutter { grid-column: 1; grid-row: 1 / span 3; padding-top: 2px; }
 /* Every part under the name is told its column. The chips were not, and under a
    long message, which folds and so draws one line more, they dropped into the

@@ -1,8 +1,8 @@
 // What the team shipped this week: your threads the team can read, and your
 // teammates' cards. A thread only finished is not on it.
-import { shippedAtOf, shownToPeople, shownToTeam } from '../../../shared/thread-cards.mjs';
+import { shippedAtOf, shownToPeople, shownToTeam } from '../../../shared/thread-cards.mts';
 import type { Product, ThreadCard, WorkItem } from '../types';
-import { shownTitle } from '../../../shared/thread-title.mjs';
+import { shownTitle } from '../../../shared/thread-title.mts';
 
 const DAY = 86_400_000;
 

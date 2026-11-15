@@ -1,6 +1,6 @@
 // The rules behind Settings > Project priority (components/ProjectPriority.tsx).
 //
-// The order itself and what it is worth are shared/rank.mjs, and nothing here
+// The order itself and what it is worth are shared/rank.mts, and nothing here
 // re-derives them. This only answers the page's own questions: which projects
 // it lists, and what the full order becomes after a drop or a nudge.
 //
@@ -10,7 +10,7 @@
 // out against the FULL order, so those rows keep the place they already had
 // rather than falling out of it.
 
-import { moveProduct, rankProducts } from '../../shared/rank.mjs';
+import { moveProduct, rankProducts } from '../../shared/rank.mts';
 
 export { rankProducts };
 
@@ -56,7 +56,7 @@ export function nudge(full: readonly string[], shown: readonly string[], slug: s
 
 /**
  * Where a dragged row lands in a single column: the first row whose middle is
- * below the pointer, or the end. shared/rank.mjs's `landingIndex` is for
+ * below the pointer, or the end. shared/rank.mts's `landingIndex` is for
  * wrapped chips and reads the X axis too, which in one column would make the
  * right half of a row mean "after it".
  */

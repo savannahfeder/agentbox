@@ -23,7 +23,7 @@
 // THIS SET SAID "the shapes the CLAUDE CLI uses" AND HAD NEVER BEEN POINTED AT
 // CODEX. It is right about Codex anyway, and that is measured rather than
 // assumed. On 2026-09-05 `codex app-server` (codex-cli 0.148.0) was driven the
-// way main/codex-app-server.mjs drives it, with CODEX_HOME pointed at an empty
+// way main/codex-app-server.mts drives it, with CODEX_HOME pointed at an empty
 // directory so there was no auth.json and the real ~/.codex login was neither
 // read nor written. The turn retried ten times and failed with
 //
@@ -61,7 +61,7 @@
 // to her subscription and never to a key (CLAUDE.md), so passing that advice on
 // would be this app telling her to do the one thing it refuses to do.
 import { NAME, Name } from '../shared/product-name.mjs';
-import { harnessDefinition } from './harness-definitions.mjs';
+import { harnessDefinition } from './harness-definitions.mts';
 import { instantIn, resetDay, wallIn } from './usage.mts';
 
 // A CLAUDE CODE TOO OLD FOR THE LINE AGENTBOX STARTS IT WITH. Its argument
@@ -218,7 +218,7 @@ const INTERRUPTED = [
 // offline laptop prints.
 //
 // The fix is a setting the person's terminal already has, and since
-// main/shell-path.mjs the app reads it from their shell profile at launch, so
+// main/shell-path.mts the app reads it from their shell profile at launch, so
 // the sentence says to put it there and reopen the app.
 const NETWORK = [
   /self[- ]signed certificate/i,
@@ -267,6 +267,8 @@ const MODEL_NOT_ON_PLAN = [
   /model is not supported when using codex with a chatgpt account/i,
   /not a model the plan of the codex account/i,
   /not a model the codex on this computer knows/i,
+  // Claude Code 2.1.321, for a model it does not know or the login cannot use.
+  /there's an issue with the selected model/i,
 ];
 
 // Ours too, from `codexEffortRefusal`.
@@ -314,7 +316,7 @@ export function troubleCause(raw: unknown): string {
 // 2.1.293 told a lapsed personal Max login "Your organization has disabled
 // Claude subscription access for Claude Code" (2026-10-11), the same line a
 // workspace policy prints, so the text alone cannot tell them apart. The
-// login's own file can: `plan` is main/claude-plan.mjs's reading of it, and
+// login's own file can: `plan` is main/claude-plan.mts's reading of it, and
 // `ended` is its billing gone to "none". Anything else keeps its cause.
 // A LOGIN THAT RAN OUT AND ONE NOBODY EVER MADE REFUSE IN THE SAME WORDS, and
 // the second is what somebody who skipped setup meets: "Sign that account back
@@ -818,9 +820,11 @@ function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }: { 
 
 // NO SENTENCE HERE OFFERS ANOTHER ACCOUNT (w-dac993a554). There used to be an
 // `elsewhere` flag: another signed-in login had room, or had the model, so the
-// line promised the move instead of the wait. Nothing moves work between
-// accounts any more, so a limit is named with the hour it resets and a model no
-// plan includes is answered with another model.
+// line promised the move instead of the wait. The app moves off a Claude
+// account at its limit by itself when another has room
+// (`Supervisor#_moveOffALimitedAccount`), so a limit still on a row has nowhere
+// to go: it is named with the hour it resets. A model no plan includes is
+// answered with another model.
 //
 // `planEnded` is when the account's paid ChatGPT plan ended (main/codex-account.mts
 // `codexPlanEnded`), which is why its list lacks `model`.

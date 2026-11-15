@@ -11,6 +11,9 @@
    The invariant that matters: what the user sees is what lands on disk.
    Everything the editor can produce must serialize to markdown that parses
    back to the same document, or formatting silently mutates between visits. */
+import type { JSONContent } from '@tiptap/core';
+
+type PmMark = NonNullable<JSONContent['marks']>[number];
 
 export function normalizeNewlines(md: string): string {
   return md.replace(/\r\n?/g, '\n');
@@ -43,7 +46,9 @@ function splitRow(line: string): string[] {
   return cells;
 }
 
-type PmNode = Record<string, any>;
+type PmNode = JSONContent;
+// A list as buildListTree makes it: every list and every item has its content array.
+type ListNode = PmNode & { content: (PmNode & { content: PmNode[] })[] };
 
 /*
  * ── inline: markdown text -> PM text nodes ──
@@ -68,7 +73,7 @@ const INLINE_RE = new RegExp(
   'g',
 );
 
-const withMark = (nodes: PmNode[], mark: PmNode): PmNode[] =>
+const withMark = (nodes: PmNode[], mark: PmMark): PmNode[] =>
   nodes.map((n) => ({ ...n, marks: [...(n.marks || []), mark] }));
 
 export function inlineToPm(text: string): PmNode[] {
@@ -174,7 +179,7 @@ function buildListTree(items: ListItemFlat[]): PmNode[] {
   let pos = 0;
   const level = (minIndent: number): PmNode[] => {
     const nodes: PmNode[] = [];
-    let cur: PmNode | null = null;
+    let cur: ListNode | null = null;
     let curKind = '';
     const base = items[pos].indent;
     while (pos < items.length && items[pos].indent >= minIndent) {
@@ -409,9 +414,9 @@ const MARK_ORDER = ['underline', 'strike', 'bold', 'italic', 'link'] as const;
 // What identifies a mark for grouping: a link is only the same mark as its
 // neighbour when it points at the same place.
 function markKey(node: PmNode, type: string): string | null {
-  const mark = (node.marks || []).find((m: any) => m.type === type);
+  const mark = (node.marks || []).find((m: PmMark) => m.type === type);
   if (!mark) return null;
-  return type === 'link' ? `link:${(mark as any).attrs?.href ?? ''}` : type;
+  return type === 'link' ? `link:${mark.attrs?.href ?? ''}` : type;
 }
 
 function wrapMark(type: string, body: string, href: string): string {
@@ -429,7 +434,7 @@ function runMd(nodes: PmNode[], depth: number): string {
     return nodes.map((n) => {
       if (n.type === 'hardBreak') return '\n';
       const s: string = n.text || '';
-      return (n.marks || []).some((m: any) => m.type === 'code') ? '`' + s + '`' : s;
+      return (n.marks || []).some((m: PmMark) => m.type === 'code') ? '`' + s + '`' : s;
     }).join('');
   }
   const type = MARK_ORDER[depth];
@@ -473,7 +478,7 @@ function fenceFor(code: string): string {
   return '`'.repeat(Math.max(3, longest + 1));
 }
 
-const LIST_TYPES = new Set(['bulletList', 'orderedList', 'taskList']);
+const LIST_TYPES: ReadonlySet<string | undefined> = new Set(['bulletList', 'orderedList', 'taskList']);
 
 // One list node -> markdown lines. Child lists indent by the parent marker's
 // width; hardBreaks inside an item become continuation lines at that indent.

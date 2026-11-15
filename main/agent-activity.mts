@@ -1,7 +1,7 @@
 // Ephemeral, local status from matched tool start/end events. A persisted trace
 // is history and cannot prove a command is still running. Nothing here executes
 // commands, records reasoning, or changes worker permissions.
-import { commandWork, isBookkeeping, plainCommand, shortPath } from '../shared/work-lines.mjs';
+import { commandWork, isBookkeeping, plainCommand, shortPath } from '../shared/work-lines.mts';
 import type { BackgroundTask } from './claude-input.mts';
 
 export interface ActiveTool { id: string; label: string; detail: string; startedAt: number; background?: boolean }
@@ -67,7 +67,7 @@ function toolLabel(name: string, input: Record<string, unknown>): [string, unkno
   if (name === 'Bash') {
     // WHAT IT IS DOING, IN WORDS, when the whole command is recognised. The
     // line under a running row is the same event as the line in the thread
-    // above it, read in the present tense (`doing`, shared/work-lines.mjs).
+    // above it, read in the present tense (`doing`, shared/work-lines.mts).
     const plain = commandWork(command);
     if (plain) return [`${plain.doing} ${plain.subject}`.trim(), input.command ?? ''];
     return ['Running ' + (plainCommand(command) || 'command'), input.command ?? ''];

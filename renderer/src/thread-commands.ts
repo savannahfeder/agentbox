@@ -155,7 +155,7 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
     });
   }
   if (f.open?.change) rows.push({ id: 'code', label: 'View code changes', keywords: 'code changes diff files what changed', does: { act: 'code' } });
-  if (f.place) {
+  if (f.place && f.place !== 'off') {
     rows.push({
       id: 'place',
       label: PLACE_ROW[f.place].label,

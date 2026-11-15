@@ -77,7 +77,7 @@ function occurrences(lines: string[], block: string[]): number[] {
  *
  * A block that appears more than once takes the FIRST place it appears, and
  * that is deliberate rather than a shrug: a repeated block means every copy is
- * the same text, so the first is as right as any other, and refusing would make
+ * the same text, so the first is as right as the rest, and refusing would make
  * short hunks unsaveable. A block that appears NOWHERE is a refusal, because
  * then there is no honest place to put the user's words.
  *

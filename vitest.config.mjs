@@ -36,7 +36,16 @@ export function workersFor({ memBytes, cpus }) {
   return Math.max(1, Math.min(byMemory, (Number(cpus) || 1) - 1));
 }
 
-export const SUITE_INCLUDE = ['tests/**/*.test.mjs'];
+/**
+ * Each worker's heap ceiling, in MB. Without one V8 lets a worker grow to
+ * about 4 GB on a 16 GB Mac before it dies, and five such workers once filled
+ * the swap (tests/a-test-worker-stops-at-its-memory-ceiling).
+ */
+export const WORKER_HEAP_MB = 1536;
+
+// .test.mjs still runs so a test written the old way is not skipped in silence;
+// tests/every-test-is-typescript fails until it is renamed.
+export const SUITE_INCLUDE = ['tests/**/*.test.mts', 'tests/**/*.test.mjs'];
 
 export const SUITE_EXCLUDE = [
   ...configDefaults.exclude,
@@ -52,11 +61,14 @@ export default defineConfig({
     include: SUITE_INCLUDE,
     exclude: SUITE_EXCLUDE,
     // Every test file gets its own throwaway ~/.astral, so nothing in the suite
-    // can touch the real one. See tests/agentbox-home.setup.mjs.
-    setupFiles: ['tests/agentbox-home.setup.mjs'],
+    // can touch the real one. See tests/agentbox-home.setup.mts.
+    setupFiles: ['tests/agentbox-home.setup.mts'],
     // `--maxWorkers`, `--no-file-parallelism` and VITEST_MAX_FORKS still win.
     maxWorkers: workersFor({ memBytes: os.totalmem(), cpus: os.availableParallelism?.() ?? os.cpus().length }),
     minWorkers: 1,
+    // In NODE_OPTIONS, not execArgv: the app starts its worker threads with
+    // process.execArgv, and Node refuses a thread whose flags set the heap.
+    env: { NODE_OPTIONS: [process.env.NODE_OPTIONS, `--max-old-space-size=${WORKER_HEAP_MB}`].filter(Boolean).join(' ') },
     // ROOM FOR A MAC THAT IS NEVER IDLE (w-c121bd85e6, 2026-10-04). Vitest's
     // defaults, 5 s for a test and 10 s for a hook, are written for a laptop
     // running one suite. A dozen agents share this one, and the end-to-end
@@ -67,7 +79,7 @@ export default defineConfig({
     //
     // Nothing fast is slowed by this: a test that finishes in 40 ms still
     // finishes in 40 ms, and only a test that is genuinely stuck pays the
-    // wait. Tests that wait on real work should wait with tests/waiting.mjs,
+    // wait. Tests that wait on real work should wait with tests/waiting.mts,
     // whose deadline sits under these so that its message — which names what
     // the test was waiting for — is the one that gets shown.
     testTimeout: 60_000,

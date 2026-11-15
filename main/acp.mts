@@ -15,7 +15,7 @@
  * tool is not offered to anyone because this file works; see docs/harnesses.md.
  *
  * THE RULES IT EXISTS TO KEEP, every one of them a lesson
- * main/codex-app-server.mjs paid for first:
+ * main/codex-app-server.mts paid for first:
  *
  * - A PERMISSION REQUEST IS ALWAYS ANSWERED. The agent is blocked on us while
  *   it waits, so a dropped answer is not a missing card, it is a task parked

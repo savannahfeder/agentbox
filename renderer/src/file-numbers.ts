@@ -1,8 +1,8 @@
-// A thread's files as their version lines number them (main/files-place.mjs lineFor).
+// A thread's files as their version lines number them (main/files-place.mts lineFor).
 import { useEffect, useMemo, useState } from 'react';
 import { api } from './api';
 import type { FileLine } from './types';
-import { lineAsThread } from '../../shared/artifact-marks.mjs';
+import { lineAsThread } from '../../shared/artifact-marks.mts';
 
 /** `follow` reads again on every change the app reports; without it, only when the thread says more. */
 export function useFileLine(product: string, id: string, said: number, follow = true): ReturnType<typeof lineAsThread> {

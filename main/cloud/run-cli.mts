@@ -12,14 +12,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { cloudRun, IMPORT_FAILED, LOGIN_TROUBLE } from './run.mts';
-import type { CloudKit, CodexAsk, NewThreadAsk, SignalSource } from './run.mts';
+import type { CloudKit, CodexAsk, CodexHere, NewThreadAsk, SignalSource } from './run.mts';
 import type { Readable, Writable } from 'node:stream';
-import { NEW_THREAD, NEW_THREAD_CODEX } from '../../shared/cloud-kit.mjs';
+import { NEW_THREAD, NEW_THREAD_CODEX } from '../../shared/cloud-kit.mts';
 import { cloudClients } from './clients.mts';
 import type { CloudConfig } from './clients.mts';
-import { readCloudConfig, readCloudKey, imageCapsToTry, noteImageCaps } from './config.mjs';
-import { pickCloudLogin, markCloudLogin, loginObjectKey, cloudAccountsFrom, cloudAccountFrom, cloudLoginInUse, noCloudAccountSentence } from './logins.mts';
-import { keysCarried } from './keys.mjs';
+import { readCloudConfig, readCloudKey, imageCapsToTry, noteImageCaps } from './config.mts';
+import { pickCloudLogin, markCloudLogin, loginObjectKey, cloudAccountsFrom, cloudAccountFrom, cloudLoginInUse, cloudLoginStateForARun, noCloudAccountSentence } from './logins.mts';
+import { keysCarried } from './keys.mts';
 
 // SIGNED AS THE CLOUD RUNS' OWN USER AND NOBODY ELSE. AWS's libraries read
 // keys from the environment before they read a named profile, so an app
@@ -42,6 +42,13 @@ export function loginsCarriedBy(engine: string, { only = null, prefer = null, ho
   if (engine !== 'claude') return [];
   const codex = pickCloudLogin('codex', { only, prefer, ...(home ? { home } : {}) });
   return codex ? [{ engine: 'codex', id: codex.id, key: loginObjectKey('codex', codex.id) }] : [];
+}
+
+/** What a Claude run's note says about Codex there: carried, or why not. Null for a Codex run. */
+export function codexInTheRun(engine: string, carried: { engine: string }[], { only = null, prefer = null, home, now }: { only?: string[] | null; prefer?: string | null; home?: string; now?: number } = {}): CodexHere | null {
+  if (engine !== 'claude') return null;
+  if (carried.some((l) => l.engine === 'codex')) return { carried: true };
+  return { carried: false, ...cloudLoginStateForARun('codex', { only, prefer, ...(home ? { home } : {}), ...(now ? { now } : {}) }) };
 }
 
 /**
@@ -86,7 +93,7 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
   // in the sandbox, on the Codex login CODEX_HOME names.
   // `--agentbox-kit <claude's argv>`: leave this thread's next turn ready
   // for the cloud server to start with the computer shut, and start nothing
-  // (shared/cloud-kit.mjs, Supervisor#_writeKit).
+  // (shared/cloud-kit.mts, Supervisor#_writeKit).
   const importOnly = args[0] === '--agentbox-import-only';
   const kitOnly = args[0] === '--agentbox-kit';
   // A kit for a Codex thread: `--agentbox-kit --agentbox-codex app-server`.
@@ -105,12 +112,15 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
     kit = kitFrom(env);
     if (!kit) { say('no kit: the thread, its project, this computer or the reply\'s place was not named'); return 1; }
   }
+  const carry = { only: cloudAccountsFrom(env), prefer: cloudAccountFrom(env, 'codex') };
+  const also = rec ? loginsCarriedBy(engine, carry) : [];
   return cloudRun({
     importOnly,
     kit,
     engine,
     login: rec ? { engine, id: rec.id, key: loginObjectKey(engine, rec.id) } : null,
-    also: rec ? loginsCarriedBy(engine, { only: cloudAccountsFrom(env), prefer: cloudAccountFrom(env, 'codex') }) : [],
+    also,
+    codexHere: rec ? codexInTheRun(engine, also, carry) : null,
     keys: keysCarried(),
     // A missing or refused login is marked so the menu asks for a new sign-in;
     // an expired Codex one is left for the supervisor to renew.

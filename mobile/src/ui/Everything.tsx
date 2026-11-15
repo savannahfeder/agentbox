@@ -8,8 +8,8 @@ import Svg, { Path } from 'react-native-svg';
 import { readTeam } from '../../../renderer/src/phone-team';
 import { cardOpens } from '../../../renderer/src/team/everything/whose-board';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
-import type { ThreadCard } from '../../../renderer/src/types';
-import { cardsDrawn, cardsShown, CARDS_PER_ROW, mateRunsOf, personCardsOf, phoneMembers, teamRunsOf, THREAD_CARDS_SELECT, threadCardOf, type Member } from '../lib/everything';
+import type { ThreadCard, WorkItem } from '../../../renderer/src/types';
+import { cardsDrawn, cardsShown, CARDS_PER_ROW, mateRunsOf, personCardsOf, phoneMembers, teamRunsOf, THREAD_CARDS_SELECT, threadCardOf, type Member, type ThreadCardRow } from '../lib/everything';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
@@ -159,7 +159,7 @@ export function CardSheet({ card, who, close }: { card: ThreadCard | null; who: 
 
 /** `mine` is your own work, drawn by the page; `row` draws one of your threads as the list does; `mineTabs` sit in your bar. */
 export function EverythingPlace({ mine, mineTabs, row, openGroup }: {
-  mine: ReactNode; mineTabs?: ReactNode; row: (item: any, first: boolean) => ReactNode; openGroup: (roomId: string) => void;
+  mine: ReactNode; mineTabs?: ReactNode; row: (item: WorkItem, first: boolean) => ReactNode; openGroup: (roomId: string) => void;
 }) {
   const c = useCloud();
   const g = useGroups();
@@ -174,7 +174,7 @@ export function EverythingPlace({ mine, mineTabs, row, openGroup }: {
   useEffect(() => {
     if (!cloud) return undefined;
     const read = () => {
-      cloud.select('thread_cards', THREAD_CARDS_SELECT).then((rows) => { setCards(rows.map(threadCardOf)); setTrouble(null); }, (err) => setTrouble(message(err)));
+      cloud.select('thread_cards', THREAD_CARDS_SELECT).then((rows) => { setCards((rows as ThreadCardRow[]).map(threadCardOf)); setTrouble(null); }, (err) => setTrouble(message(err)));
       readTeam(cloud).then((got) => setPeople(got.team?.people ?? []), () => { /* the team's group still names them */ });
     };
     read();
@@ -183,7 +183,7 @@ export function EverythingPlace({ mine, mineTabs, row, openGroup }: {
   }, [cloud]);
   const mates = c.team?.view.list;
   const members = useMemo(() => phoneMembers({
-    meId, rooms: g.state.rooms, messages: g.state.messages as any, teamPeople: people, cards, mates: mates ?? [], items: c.view.items, running: c.view.running, store: appStore,
+    meId, rooms: g.state.rooms, messages: g.state.messages, teamPeople: people, cards, mates: mates ?? [], items: c.view.items, running: c.view.running, store: appStore,
   }), [meId, g.state.rooms, g.state.messages, people, cards, mates, c.view.items, c.view.running]);
   const member = members.find((m) => m.key === picked) ?? members[0];
   const key = member?.key ?? 'me';
@@ -218,8 +218,8 @@ export function EverythingPlace({ mine, mineTabs, row, openGroup }: {
 
   let space: ReactNode = mine;
   if (member?.kind === 'mate') {
-    const items = mateRunsOf(c.view.items as any[], member.key.slice('mate:'.length), dayStart);
-    space = items.length ? <ScrollView style={{ flex: 1 }}>{items.map((i: any, n: number) => row(i, n === 0))}</ScrollView> : <Empty>Nothing on its plate. Message it to hand it something.</Empty>;
+    const items = mateRunsOf(c.view.items, member.key.slice('mate:'.length), dayStart);
+    space = items.length ? <ScrollView style={{ flex: 1 }}>{items.map((i: WorkItem, n: number) => row(i, n === 0))}</ScrollView> : <Empty>Nothing on its plate. Message it to hand it something.</Empty>;
   } else if (member?.kind === 'person') {
     const id = member.key.slice('person:'.length);
     const theirs = personCardsOf(cards, id, dayStart);
@@ -227,9 +227,9 @@ export function EverythingPlace({ mine, mineTabs, row, openGroup }: {
       ? <ScrollView style={{ flex: 1 }}>{theirs.map((x, n) => <CardRow key={x.threadId} card={x} first={n === 0} now={c.now} open={() => setOpen(x)} />)}</ScrollView>
       : <Empty>{`${member.name.split(' ')[0]} has no threads shared with the team right now.`}</Empty>;
   } else if (member?.team) {
-    const runs = teamRunsOf(cards, c.view.items as any[], members.filter((m) => m.kind === 'person').map((m) => m.key.slice('person:'.length)), members.filter((m) => m.kind === 'mate').map((m) => m.key.slice('mate:'.length)), dayStart);
+    const runs = teamRunsOf(cards, c.view.items, members.filter((m) => m.kind === 'person').map((m) => m.key.slice('person:'.length)), members.filter((m) => m.kind === 'mate').map((m) => m.key.slice('mate:'.length)), dayStart);
     space = runs.length
-      ? <ScrollView style={{ flex: 1 }}>{runs.map((r: any, n: number) => (r.card
+      ? <ScrollView style={{ flex: 1 }}>{runs.map((r, n: number) => (r.card
         ? <CardRow key={r.card.threadId} card={r.card} who={nameOf(r.card.personId)} first={n === 0} now={c.now} open={() => setOpen(r.card)} />
         : row(r.item, n === 0)))}</ScrollView>
       : <Empty>Nobody on the team is running anything they share right now.</Empty>;

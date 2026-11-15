@@ -3,7 +3,7 @@
 //
 // Three facts per agent and they are different facts. `runAt` is a moment she
 // named and it passes on its own. It used to be a watermark compared against
-// the session's own activity; `putAway` in shared/agents.mjs carries the whole
+// the session's own activity; `putAway` in shared/agents.mts carries the whole
 // story of why it is not. Neither sends anything, and neither touches the
 // process — both are about her inbox.
 //
@@ -15,7 +15,7 @@
 // Unlike the other two this one is not only about her inbox — it is the record
 // of a thing she did — but it is kept here for the same reason they are: there
 // is no ledger an agent row could be written to. It is compared against the
-// session's own `statusAt` (`tookHerReply` in shared/agents.mjs), so a session
+// session's own `statusAt` (`tookHerReply` in shared/agents.mts), so a session
 // that comes back to a stop AFTER she spoke ends the reply rather than this
 // having to expire.
 //
@@ -30,15 +30,15 @@
 // it away from the only thing it is about.
 //
 // Nothing here fires. The moment is a predicate the reader asks about every
-// measurement (`putOff` in shared/agents.mjs), so a moment missed while the
+// measurement (`putOff` in shared/agents.mts), so a moment missed while the
 // laptop was shut is simply past when the lid opens, and the row is back.
 
 import fs from 'node:fs';
 import path from 'node:path';
 // Imported rather than re-derived: what identifies an agent is a rule, and
 // there is one copy of it.
-import { agentKey } from '../shared/agents.mjs';
-import type { AgentLike } from '../shared/agents.d.mts';
+import { agentKey } from '../shared/agents.mts';
+import type { AgentLike } from '../shared/agents.mts';
 
 export interface SpokeTurn { at: number; text: string }
 

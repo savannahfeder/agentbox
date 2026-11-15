@@ -15,13 +15,15 @@ import type { ModelPick } from '../threads/composer-rules';
 import type { EffortChoice } from '../effort';
 
 export function ReplyModel({
-  label, pick, onPick, recent, every, more, labelOf, engineLabel, engineTags = false,
+  label, level = null, pick, onPick, recent, every, more, labelOf, engineLabel, engineTags = false,
   effortRows, effortLit, onEffort, title, openAtStart = false, onOpenChange, chip = false,
 }: {
   /** Drawn as the new thread card's chip. */
   chip?: boolean;
   /** The word on the line, the model's own name. */
   label: string;
+  /** The thread's level, after the name. A narrow reply bar leaves it to the menu (narrow-conversation.css). */
+  level?: string | null;
   pick: ModelPick;
   onPick: (p: ModelPick) => void;
   recent: readonly ModelPick[];
@@ -129,7 +131,9 @@ export function ReplyModel({
             wrap.current?.querySelector<HTMLElement>('[data-item].on, [data-item]')?.focus();
           }
         }}
-      >{label}</button>
+      >{chip
+        ? <span className="tc-chip-label">{label}{level && <span className="tc-chip-level"> · {level}</span>}</span>
+        : <>{label}{level && ` · ${level}`}</>}</button>
     </span>
   );
 }

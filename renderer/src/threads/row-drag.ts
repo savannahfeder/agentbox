@@ -5,7 +5,7 @@
 // The row is lifted and rides the pointer; the rows it passes slide aside to
 // open its new slot; letting go hands the row, the one it now sits in front
 // of and the rows as they were drawn to the caller, which works out the place
-// (`dropPlaces`, shared/rank.mjs). Escape puts it back. Pointer events and the
+// (`dropPlaces`, shared/rank.mts). Escape puts it back. Pointer events and the
 // whole window listening until the press ends, the way the board's columns are
 // carried (Pages.tsx), because the browser's own drag and drop draws a ghost
 // and cancels when the list redraws under it.

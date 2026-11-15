@@ -24,7 +24,7 @@ export const isCodexRow = (item: WorkItem | null | undefined): boolean => !!item
  w-d883b38446.
 
    IT WAS NEAR THE BOTTOM, AND THAT IS MEASURED. The inbox sorts on the score
-   in shared/rank.mjs: the user's running order over projects is worth a
+   in shared/rank.mts: the user's running order over projects is worth a
    hundred points a step and the row's own priority breaks ties, with recency
    only after that. A conversation lands in the project whose folder it ran in
    (`whereThreadLands`), and an import comes in at the default priority of 5.

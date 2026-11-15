@@ -77,7 +77,7 @@ type Given = { assignee?: string; createdBy?: string | null; status: string };
 
 /** What you are waiting on a person for: tasks you gave them that are not done. */
 export function youWaitOn<T extends Given>(items: readonly T[], me: string | null, personId: string): T[] {
-  return items.filter((i) => i.assignee === personId && i.status !== 'done' && (!i.createdBy || i.createdBy === me));
+  return items.filter((i) => i.assignee === personId && i.status !== 'done' && !!me && i.createdBy === me);
 }
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;

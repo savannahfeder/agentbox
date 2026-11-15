@@ -1,5 +1,5 @@
 // WHO A THREAD SENT TO AUTO WENT TO, as one line under the person's words
-// (shared/auto-route.mjs, designs/w-b5f23cff71 84 to 88). It says who took it
+// (shared/auto-route.mts, designs/w-b5f23cff71 84 to 88). It says who took it
 // and why, or asks her to pick when Auto could not tell, and gives it to
 // someone else in one press. It never says more than that: no plan, no orders.
 import { useContext, useState } from 'react';

@@ -40,6 +40,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { IMG_SCHEME, IMG_SCHEMES, isScheme } from '../shared/schemes.mts';
+import { plainWindowsPath, urlPathOf, windowsFileOf } from '../shared/file-url-path.mts';
 
 // The name is read rather than typed, and every spelling this app has used is
 // still answered: a product's logo is kept in the store as a url on this
@@ -61,34 +62,39 @@ const PICTURES = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.b
 const MEDIA = new Set(['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.mp4', '.mov', '.m4v', '.webm']);
 
 /** The url the renderer draws, for a picture already resolved on disk. */
-export function imgUrl(file: unknown) {
-  if (typeof file !== 'string' || !path.isAbsolute(file)) return null;
-  // Segment by segment: encodeURIComponent would eat the separators, and
-  // encodeURI would leave '#' and '?' in a filename to be read as url syntax.
-  const parts = file.split('/').filter(Boolean).map(encodeURIComponent);
-  return `${IMG_SCHEME}://${IMG_HOST}/${parts.join('/')}`;
+export function imgUrl(file: unknown, platform: string = process.platform) {
+  const at = urlPathOf(file, platform);
+  return at === null ? null : `${IMG_SCHEME}://${IMG_HOST}${at}`;
 }
 
 /** The file a request under this scheme is asking for, or null if it is not one. */
-export function imgPath(url: unknown) {
+export function imgPath(url: unknown, platform: string = process.platform) {
   let parsed;
   try { parsed = new URL(String(url)); } catch { return null; }
   if (!isScheme(IMG_SCHEMES, parsed.protocol)) return null;
+  if (platform === 'win32') return windowsFileOf(parsed.pathname);
   let file;
   try { file = decodeURIComponent(parsed.pathname); } catch { return null; }
   if (!file.startsWith('/')) return null;
   // A climb written into the url is normalised away here rather than trusted to
   // the root check below.
-  const normal = path.normalize(file);
-  return path.isAbsolute(normal) ? normal : null;
+  const normal = path.posix.normalize(file);
+  return path.posix.isAbsolute(normal) ? normal : null;
 }
 
 /** Is `file` inside `dir`, without /a/bc counting as inside /a/b. */
-function inside(dir: string | null | undefined, file: string | null | undefined) {
+export function inside(dir: string | null | undefined, file: string | null | undefined, platform: string = process.platform) {
   if (!dir || !file) return false;
-  const d = path.resolve(dir);
-  const f = path.resolve(file);
-  return f === d || f.startsWith(d + path.sep);
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  // Windows names are blind to the case of A to Z. Only those letters are
+  // folded, since a letter JavaScript lowers may be a different name on disk.
+  const fold = platform === 'win32' ? (s: string) => s.replace(/[A-Z]/g, (c) => c.toLowerCase()) : (s: string) => s;
+  const d = fold(p.resolve(dir));
+  const f = fold(p.resolve(file));
+  // A drive root resolves with its separator already on the end. A root at the
+  // top of a drive, like a project kept on D:\, holds every file on that drive.
+  const under = /^[a-z]:\\$/.test(d) ? d : d + p.sep;
+  return f === d || f.startsWith(under);
 }
 
 const MEDIA_TYPES: Record<string, string> = {
@@ -159,9 +165,13 @@ export async function mediaResponse(file: string, rangeHeader: unknown, { piece 
 }
 
 /** Is this a picture the window is allowed to draw? Pure, so it is testable. */
-export function servable(file: unknown, roots: (string | null | undefined)[] | null | undefined) {
-  if (typeof file !== 'string' || !path.isAbsolute(file)) return false;
-  const ext = path.extname(file).toLowerCase();
+export function servable(file: unknown, roots: (string | null | undefined)[] | null | undefined, platform: string = process.platform) {
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  if (typeof file !== 'string' || !p.isAbsolute(file)) return false;
+  // Some callers pass a path that never went through windowsFileOf, so it is
+  // held to the same shape here: a drive, and names Windows opens as written.
+  if (platform === 'win32' && (!/^[A-Za-z]:[\\/]/.test(file) || !plainWindowsPath(file))) return false;
+  const ext = p.extname(file).toLowerCase();
   if (!PICTURES.has(ext) && !MEDIA.has(ext)) return false;
-  return (roots ?? []).some((root) => inside(root, file));
+  return (roots ?? []).some((root) => inside(root, file, platform));
 }
