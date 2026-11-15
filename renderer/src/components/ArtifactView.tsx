@@ -32,7 +32,7 @@ import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { useLiveSession, useLiveTicket } from '../live/live-session';
 import { FileNoteCard } from './FileNoteCard';
-import { LinkNotes, linkNotesOnTheFile, useLinkNotes } from './LinkNotes';
+import { LINK_REPLIED, LinkNotes, linkNotesOnTheFile, linkReplyChip, linkReplyWords, quotedWords, useLinkNotes, type LinkReplyTo } from './LinkNotes';
 import { NoteGlyph } from './NoteGlyphs';
 import { NotesHead, NotesSection, ReturnGlyph } from './NotesSidebar';
 import { ShareLink, canShareFile } from './ShareLink';
@@ -145,6 +145,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const [sending, setSending] = useState(false);
   const [justSent, setJustSent] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [toLink, setToLink] = useState<LinkReplyTo | null>(null);
   const [found, setFound] = useState<Found>('looking');
   const [pictures, setPictures] = useState<PendingAttachment[]>([]);
   const { attaching, collect } = useAttaching();
@@ -223,7 +224,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     draftOf.current = version?.id ? { file: version.id, holding: kept.holding } : null;
     setWords(kept.words); setDraftPlace(kept.place); setAsking(null);
     setNamed(people.filter((p) => kept.words.includes(`@${firstName(p)}`)));
-    setHere(null); setReplyingTo(null); setFound('looking'); setJustSent(null);
+    setHere(null); setReplyingTo(null); setToLink(null); setFound('looking'); setJustSent(null);
   }, [version?.id]);
   useEffect(() => {
     const d = draftOf.current;
@@ -558,20 +559,21 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   useEffect(() => {
     if (editing && family && editing.fam !== family.key) void endSitting();
   }, [family?.key]);
-  const liveQuotes = useMemo(() => [...notesHere, ...carried].flatMap((n) => (n.place.kind === 'quote' && !n.resolved ? [{ id: n.id, text: n.place.text }] : [])), [notesHere, carried]);
+  const liveQuotes = useMemo(() => quotedWords([...notesHere, ...carried]), [notesHere, carried]);
+  const linkQuotes = useMemo(() => quotedWords(linkDrawn), [linkDrawn]);
   const [goneQuotes, setGoneQuotes] = useState<string[]>([]);
   const noteGone = useCallback((ids: string[]) => setGoneQuotes((was) => (was.join() === ids.join() ? was : ids)), []);
   useEffect(() => { setGoneQuotes([]); }, [version?.id]);
   const draftQuote = placeNow.kind === 'quote' ? placeNow.text : null;
   const paintEditor = (root: HTMLElement) => {
-    const found = paintQuotes(root, liveQuotes, activeId, draftQuote);
+    const found = paintQuotes(root, [...liveQuotes, ...linkQuotes], activeId, draftQuote);
     editRanges.current = found;
     if (canPaintQuotes()) noteGone(liveQuotes.filter((q) => !found.has(q.id)).map((q) => q.id));
   };
   useEffect(() => {
     const root = editPane.current?.querySelector<HTMLElement>('.ProseMirror');
     if (editing && root) paintEditor(root);
-  }, [editing, draftQuote, activeId, quotesKey(liveQuotes)]);
+  }, [editing, draftQuote, activeId, quotesKey(liveQuotes), quotesKey(linkQuotes)]);
   // A press on words a comment is about opens that comment, as it does when reading.
   const pickInEditor = (e: ReactMouseEvent) => {
     if (window.getSelection()?.isCollapsed === false) return;
@@ -580,7 +582,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     for (const [id, range] of editRanges.current) {
       if (!range.isPointInRange(caret.startContainer, caret.startOffset)) continue;
       const n = [...notesHere, ...carried].find((x) => x.id === id);
-      if (n) pickNote(n);
+      if (n) pickNote(n); else setActiveId(id);
       return;
     }
   };
@@ -618,6 +620,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       e.preventDefault();
       if (link) setLink(null);
       else if (asking) setAsking(null);
+      else if (toLink) setToLink(null);
       else if (replyingTo) setReplyingTo(null);
       // Not a pin first: a click on a picture drops one, and Escape then seemed to do nothing.
       else leave();
@@ -671,7 +674,17 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     setTrouble(got.length < all.length ? 'Only pictures can go on a note.' : null);
     if (got.length) setPictures((was) => [...was, ...got]);
   };
+  const sendToLink = async () => {
+    const typed = words.trim();
+    if (!toLink || !typed || sending) return;
+    setSending(true);
+    const ok = await linkNotes.reply(typed);
+    setSending(false);
+    if (!ok) { setTrouble('That reply did not reach the link page.'); return; }
+    setWords(''); setToLink(null); setJustSent(LINK_REPLIED);
+  };
   const onBoxKey = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (toLink && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void sendToLink(); return; }
     if (asking && askingFor.length) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel + 1) % askingFor.length }); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel - 1 + askingFor.length) % askingFor.length }); return; }
@@ -830,14 +843,16 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
               </button>
             )}
             {showSettled && settled.map(card)}
-            <LinkNotes comments={linkNotes.comments} reply={linkNotes.reply} activeId={activeId} onGo={(place, at) => { setActiveId(at); setGo({ place, at: Date.now() }); }} />
+            <LinkNotes comments={linkNotes.comments} activeId={activeId} replyingTo={toLink?.id ?? null}
+              onGo={(place, at) => { setActiveId(at); setGo({ place, at: Date.now() }); }}
+              onReply={(to) => { setToLink(to); setJustSent(null); requestAnimationFrame(() => box.current?.focus()); }} />
             {offers.comment && hint && !draftPlace && !openNotes.length && !linkNotes.comments.length && !(showSettled && settled.length) && (
               <div className="av-empty"><NoteGlyph name="pin" /><span>{hint}</span></div>
             )}
           </div>
           {(offers.comment || trouble) && <div className="av-foot">
             {trouble && <p className="av-trouble" role="alert">{trouble}</p>}
-            {offers.comment && <form className="av-write" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+            {offers.comment && <form className="av-write" onSubmit={(e) => { e.preventDefault(); void (toLink ? sendToLink() : send()); }}>
               {asking && askingFor.length > 0 && (
                 <div className="av-names" role="listbox">
                   {askingFor.map((p, i) => (
@@ -850,7 +865,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
               <div className="av-write-box" onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}
                 onDragOver={canAddPictures ? (e) => e.preventDefault() : undefined}
                 onDrop={canAddPictures ? (e) => { e.preventDefault(); void addPictures(e.dataTransfer.files); } : undefined}>
-                <textarea ref={box} rows={2} value={words} placeholder={canTag ? 'Add a note, or @ your agent' : 'Add a note'} aria-label="Comment"
+                <textarea ref={box} rows={2} value={words} placeholder={toLink ? 'Your reply' : canTag ? 'Add a note, or @ your agent' : 'Add a note'} aria-label={toLink ? linkReplyWords(toLink) : 'Comment'}
                   onChange={(e) => onWords(e.target.value, e.target.selectionStart)}
                   onFocus={() => setHold((n) => n + 1)}
                   onPaste={canAddPictures ? async (e) => {
@@ -862,11 +877,18 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                   onKeyDown={onBoxKey} />
                 <AttachRow attachments={pictures} attaching={attaching} onRemove={(i) => setPictures((was) => was.filter((_, j) => j !== i))} />
                 <div className="av-write-foot">
-                  {canAddPictures && <>
+                  {canAddPictures && !toLink && <>
                     <button type="button" className="av-write-picture" title="Add a picture" aria-label="Add a picture" onClick={() => pictureInput.current?.click()}><NoteGlyph name="picture" /></button>
                     <input ref={pictureInput} type="file" accept="image/*" multiple hidden onChange={async (e) => { await addPictures(e.target.files); e.target.value = ''; }} />
                   </>}
-                  {chip && (
+                  {toLink ? (
+                    <span className="av-chip">
+                      <NoteGlyph name="reply" />
+                      <span className="av-chip-words">{linkReplyChip(toLink)}</span>
+                      <button type="button" className="av-chip-off" aria-label="Write a note instead" title="Write a note instead"
+                        onClick={() => { setToLink(null); box.current?.focus(); }}><CrossIcon /></button>
+                    </span>
+                  ) : chip && (
                     <span className="av-chip">
                       {pinned(placeNow) && <NoteGlyph name="pin" />}
                       <span className="av-chip-words">{chip}</span>
@@ -874,9 +896,13 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                         onClick={() => { setDraftPlace(null); setWholeAsked(followsTheFile); }}><CrossIcon /></button>
                     </span>
                   )}
-                  <button type="submit" className="av-btn av-write-send" aria-label={buttonWords === 'Comment' ? 'Send comment' : buttonWords} disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
-                    {buttonWords === justSent ? <><NoteGlyph name="check" />{justSent}</> : buttonWords === 'Comment' ? <ReturnGlyph /> : <><NoteGlyph name="send" />{buttonWords}</>}
-                  </button>
+                  {toLink ? (
+                    <button type="submit" className="av-btn av-write-send" disabled={!words.trim() || sending}><NoteGlyph name="reply" />Reply</button>
+                  ) : (
+                    <button type="submit" className="av-btn av-write-send" aria-label={buttonWords === 'Comment' ? 'Send comment' : buttonWords} disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
+                      {buttonWords === justSent ? <><NoteGlyph name="check" />{justSent}</> : buttonWords === 'Comment' ? <ReturnGlyph /> : <><NoteGlyph name="send" />{buttonWords}</>}
+                    </button>
+                  )}
                 </div>
               </div>
             </form>}
