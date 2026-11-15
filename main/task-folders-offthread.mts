@@ -17,13 +17,12 @@
 // thread, jobs in order, so folder work is serialised exactly as it was.
 //
 // A JOB SOMEBODY IS WAITING ON GOES FIRST (2026-11-15). The thread is still
-// fed one job at a time, so git never runs two at once, but the queue is kept
-// here rather than in the thread's mailbox, and `restoreTaskFolder` (a thread
-// whose agent cannot start until it answers) goes ahead of the tidying up.
-// Measured on her Mac with 18 agents and 50 folders: every agent that finished
-// queued a full sweep, `listTaskFolders` alone was 32 s of it, and new threads
-// sat behind them for minutes saying the copy "is taking much longer than it
-// should". tests/a-new-thread-gets-its-folder-before-the-tidying-up pins it.
+// fed one job at a time, so git never runs two at once, but `restoreTaskFolder`
+// (a thread whose agent cannot start until it answers) goes ahead of the
+// tidying up. Measured on her Mac with 18 agents and 50 folders: every agent
+// that finished queued a full sweep, `listTaskFolders` alone was 32 s of it,
+// and new threads sat behind them for minutes saying the copy "is taking much
+// longer than it should". tests/a-new-thread-gets-its-folder-before-the-tidying-up.
 //
 // IF THE THREAD CANNOT START, THE JOB RUNS HERE, the old way. A packaged build
 // reads its code out of an asar archive, and a folder made slowly is better
@@ -50,15 +49,22 @@ const JOBS = new Set<string>([
   'inventoryWorktrees', 'strayWorktrees', 'pruneMissingWorktrees',
 ]);
 
+/** A folder job that ran past its deadline and was given up on. */
+export class FolderJobTimedOut extends Error {
+  readonly timedOut = true;
+}
+
+/** From when a job is handed to the thread, not from when it was asked for: waiting in line is not being stuck. */
+const jobDeadline = () => Number(process.env.AGENTBOX_FOLDER_JOB_MS) || 5 * 60_000;
+
 /** Jobs a thread is waiting on to start its agent: they skip the tidying up. */
 const SOMEBODY_WAITS = new Set<string>(['restoreTaskFolder']);
 
 let worker: Worker | null = null;
 let broken = false;
 let seq = 0;
-const waiting = new Map<number, FolderJobRequest>();
-/** Not yet handed to the thread, oldest first. */
-const queued: Array<FolderJobRequest & { id: number }> = [];
+const queue: FolderJobRequest[] = [];
+let current: { id: number; job: FolderJobRequest; timer: NodeJS.Timeout } | null = null;
 
 function runHere({ name, args, resolve, reject }: FolderJobRequest) {
   try { resolve((folders[name] as (...args: unknown[]) => unknown)(...args)); } catch (error) { reject(error); }
@@ -67,48 +73,74 @@ function runHere({ name, args, resolve, reject }: FolderJobRequest) {
 function giveUp() {
   broken = true;
   worker = null;
-  const left = [...waiting.values(), ...queued.splice(0)];
-  waiting.clear();
+  const left = [...(current ? [current.job] : []), ...queue];
+  if (current) clearTimeout(current.timer);
+  current = null;
+  queue.length = 0;
   for (const job of left) runHere(job);
 }
 
-/** Hand the thread its next job if it has none: a waited-on one first, else the oldest. */
-function sendNext() {
-  if (!worker || waiting.size || !queued.length) return;
-  const urgent = queued.findIndex((job) => SOMEBODY_WAITS.has(job.name));
-  const [job] = queued.splice(urgent === -1 ? 0 : urgent, 1);
-  waiting.set(job.id, job);
-  worker.ref();
-  worker.postMessage({ id: job.id, name: job.name, args: job.args });
+// The stuck thread cannot be interrupted while it sits in a child process; the
+// child's own deadline ends that. It is let go, and the line moves on without it.
+function abandon(stuck: Worker) {
+  if (worker === stuck) worker = null;
+  stuck.unref();
+  stuck.terminate().catch(() => {});
 }
 
 function thread(): Worker | null {
   if (worker || broken) return worker;
+  let w: Worker;
   try {
-    worker = new Worker(new URL('./task-folders-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
+    w = new Worker(new URL('./task-folders-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
   } catch (error) {
     console.warn('zero: task folders will be made on the main thread:', (error as Error).message);
     broken = true;
     return null;
   }
-  worker.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
-    const job = waiting.get(id);
-    if (!job) return;
-    waiting.delete(id);
-    sendNext();
-    if (!waiting.size) worker?.unref();
+  worker = w;
+  w.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
+    if (worker !== w || current?.id !== id) return;
+    const { job, timer } = current;
+    clearTimeout(timer);
+    current = null;
     if (ok) job.resolve(value); else job.reject(new Error(error));
+    next();
   });
-  worker.on('error', (error: Error) => {
+  w.on('error', (error: Error) => {
+    if (worker !== w) return;
     console.warn('zero: the task folder thread failed:', error.message);
     giveUp();
   });
-  worker.on('exit', () => { if (worker) giveUp(); });
+  w.on('exit', () => { if (worker === w) giveUp(); });
   // Holding the process open only while a job is out, so a finished job is never
   // the reason the app, or a test run, stays up. After the listeners, because
   // adding a 'message' listener refs the port again.
-  worker.unref();
-  return worker;
+  w.unref();
+  return w;
+}
+
+function next() {
+  if (current) return;
+  const urgent = queue.findIndex((j) => SOMEBODY_WAITS.has(j.name));
+  const [job] = queue.splice(urgent === -1 ? 0 : urgent, 1);
+  if (!job) { worker?.unref(); return; }
+  const w = thread();
+  if (!w) { runHere(job); next(); return; }
+  const id = ++seq;
+  const limit = jobDeadline();
+  const timer = setTimeout(() => {
+    if (current?.id !== id) return;
+    current = null;
+    const minutes = Math.max(1, Math.round(limit / 60_000));
+    console.warn(`zero: a ${job.name} folder job ran past ${limit} ms; starting a fresh folder thread`);
+    abandon(w);
+    job.reject(new FolderJobTimedOut(`making this thread's folder took more than ${minutes} minute${minutes === 1 ? '' : 's'}, so it was stopped`));
+    next();
+  }, limit);
+  current = { id, job, timer };
+  w.ref();
+  w.postMessage({ id, name: job.name, args: job.args });
 }
 
 /** Run one of task-folders.mts's exports without blocking this thread. */
@@ -116,9 +148,8 @@ export function folderJob<N extends FolderJobName>(name: N, ...args: Parameters<
   if (!JOBS.has(name)) return Promise.reject(new Error(`not a folder job: ${name}`));
   return new Promise<unknown>((resolve, reject) => {
     const job: FolderJobRequest = { name, args, resolve, reject };
-    const w = thread();
-    if (!w) { runHere(job); return; }
-    queued.push({ ...job, id: ++seq });
-    sendNext();
+    if (!thread()) { runHere(job); return; }
+    queue.push(job);
+    next();
   }) as Promise<Awaited<ReturnType<(typeof folders)[N]>>>;
 }
