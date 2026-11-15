@@ -3011,6 +3011,7 @@ export default function App() {
   const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;
   useEffect(() => {
     const root = document.documentElement;
+    if (sky) root.dataset.sky = sky.id; else delete root.dataset.sky;
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
     else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }
   }, [sky]);
