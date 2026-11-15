@@ -1146,6 +1146,11 @@ export class Store {
     return workItemsDisk.updateWorkItem(dir, id, { status: 'blocked' }, { source: 'system' });
   }
 
+  repliedOnALink(slug: string, id: string, linkReply: { file: string; text: string }) {
+    if (!this.readItem(slug, id)) return null;
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { linkReply }, { source: 'founder' });
+  }
+
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN, because laying it into the
   // task folder would have undone work done there (main/cloud/run.mts
   // `park`). Said as a note; the row waits for her, and loses `ship`, so the

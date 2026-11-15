@@ -2888,7 +2888,14 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:file-links', linkCall(async (_arg, team) => team.fileLinks()));
   ipcMain.handle('zero:file-link-stop', linkCall(async ({ token }, team) => { await team.stopFileLink(String(token ?? '')); return {}; }));
   ipcMain.handle('zero:file-link-comments', linkCall(async ({ token }, team) => ({ comments: await team.fileLinkComments(String(token ?? '')) })));
-  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text, place }, team) => ({ comments: await team.commentOnFileLink(String(token ?? ''), text, place ?? null) })));
+  // Sent from a thread, the reply also answers the link comments waiting on it, so it leaves Needs you.
+  ipcMain.handle('zero:file-link-comment', linkCall(async ({ token, text, place, product, thread, src }, team) => {
+    const comments = await team.commentOnFileLink(String(token ?? ''), text, place ?? null);
+    if (product && typeof thread === 'string' && typeof src === 'string') {
+      try { store.repliedOnALink(product, thread, { file: path.basename(familyKeyOf(src)), text: String(text ?? '').trim() }); } catch (err) { console.error(`link reply on ${thread}: ${(err as Error).message}`); }
+    }
+    return { comments };
+  }));
 
   // A FILE SOMEONE SHARED WITH THIS PERSON, brought into one of their projects
   // as their own copy on a thread that runs nothing until they write to it.
