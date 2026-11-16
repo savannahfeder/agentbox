@@ -4,16 +4,21 @@
 // copy with only Codex. The thread said "Nothing has been done. Pick a Codex
 // model to continue", yet the inbox showed it Queued, "an agent starts as soon
 // as one is free", for 26 minutes. `spawnWorker` refuses such a row on every
-// tick and leaves it open, and `status()` listed it in `queued`, never in
-// `stalled`, so the list rules kept it In progress. Measured here on the
-// supervisor's status for both directions, and for the rows that must still
-// read Queued.
+// tick and leaves it open, `status()` listed it in `queued`, and the list rules
+// did not know its sentence, so they kept it In progress. It is not a dead run
+// either: "the agent stopped, try again" would be wrong, since another try is
+// refused the same way. Measured on the supervisor's status for both
+// directions, on the list rules with the row as the store has it, and on the
+// rows that must still read Queued.
 import { describe, it, expect, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { foldWorkItems } from '../shared/work-items.mts';
+import { modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
+import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules.ts';
+import { offersTryAgain } from '../renderer/src/try-again.ts';
 
 const OPENED = '2026-09-04T00:00:00Z';
 const AFTER = Date.parse('2026-11-16T18:00:00Z');
@@ -49,16 +54,42 @@ function statusOn({ claude, codex }: { claude: boolean; codex: boolean }, item: 
 }
 
 describe('a thread this computer would run on the other agent', () => {
-  it('a Codex model on a computer with only Claude Code is stopped, not queued', () => {
+  it('a Codex model on a computer with only Claude Code is not queued, nor called stopped', () => {
     const s = statusOn({ claude: true, codex: false }, row({ engine: 'codex', model: 'gpt-5.6-sol' }));
-    expect(s.stalled).toContain('w-model');
     expect(s.queued).not.toContain('w-model');
+    expect(s.stalled).not.toContain('w-model');
   });
 
-  it('a Claude Code model on a computer with only Codex is stopped, not queued', () => {
+  it('a Claude Code model on a computer with only Codex is not queued, nor called stopped', () => {
     const s = statusOn({ claude: false, codex: true }, row({ engine: 'claude', model: 'opus' }));
-    expect(s.stalled).toContain('w-model');
     expect(s.queued).not.toContain('w-model');
+    expect(s.stalled).not.toContain('w-model');
+  });
+});
+
+describe('its sentence puts it in Needs you', () => {
+  const ANSWERED = AFTER + 60_000;
+  const refused = {
+    id: 'w-model', product: 'p', title: 'write the article', status: 'open', labels: ['founder'], engine: 'claude', model: 'opus',
+    answer: 'Can I read the article?',
+    result: modelForAnotherEngineSentence({ asked: 'Claude Code', model: 'opus', running: 'Codex' }),
+    wrote: { answer: { ts: ANSWERED, source: 'founder' }, result: { ts: ANSWERED + 1_000, source: 'agent' } },
+  };
+  const now = ANSWERED + 26 * 60_000;
+
+  it('in Needs you, out of In progress', () => {
+    expect(belongsInInbox(refused, { now })).toBe(true);
+    expect(belongsInProgress(refused, { now })).toBe(false);
+  });
+
+  it('with no Try again, which would be refused the same way', () => {
+    expect(offersTryAgain(refused, { queued: [], now })).toBe(false);
+  });
+
+  it('back In progress once the person writes again', () => {
+    const again = { ...refused, answer: 'Use GPT-6.1-Sol', model: 'gpt-6.1-sol', engine: 'codex', wrote: { ...refused.wrote, answer: { ts: now, source: 'founder' } } };
+    expect(belongsInInbox(again, { now })).toBe(false);
+    expect(belongsInProgress(again, { now })).toBe(true);
   });
 });
 

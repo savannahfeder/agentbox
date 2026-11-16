@@ -135,7 +135,7 @@ import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importe
 import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
-import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mts';
+import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown, modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
 import { machineryPath, storeRootEnv } from './store/home.mts';
@@ -3189,7 +3189,7 @@ export class Supervisor {
     const running = engineLabel(engine);
     try {
       this.store.recordSessionResult(item.product, item.id, {
-        result: `This task chose ${asked} model "${item.model}", but this computer would run it with ${running}. Nothing has been done. Pick a ${running} model to continue, or use a computer with ${asked}.`,
+        result: modelForAnotherEngineSentence({ asked, model: String(item.model), running }),
         status: 'open',
       });
     } catch (e) { console.warn('zero: could not say the model is for another engine:', (e as Error).message); }
@@ -8831,16 +8831,14 @@ export class Supervisor {
           || this._pushedByHer(i) || this._resumeQueue.has(i.id))
         .map((i) => i.id);
       for (const id of this._recovering ?? []) if (heldBySweep(id) && !this._comingHome?.has(id) && !queued.includes(id)) queued.push(id);
-      // `spawnWorker` turns these away on every tick until the model changes.
+      // `spawnWorker` turns these away on every tick until the model changes, and
+      // its sentence puts them in Needs you (`gaveUpOnTheAnswer`).
       const byId = new Map(allThreads().map((i) => [i.id, i]));
       const refused = queued.filter((id) => {
         const i = byId.get(id);
         return !!i?.model && !!this._modelIsForEngineOtherThan(i, this._engineFor(i));
       });
-      if (refused.length) {
-        queued = queued.filter((id) => !refused.includes(id));
-        for (const id of refused) if (!stalled.includes(id)) stalled.push(id);
-      }
+      if (refused.length) queued = queued.filter((id) => !refused.includes(id));
     } catch {}
     if (this.paused) queued = [];
     // Queued rows whose run is being set up or was asked for by name (Try
