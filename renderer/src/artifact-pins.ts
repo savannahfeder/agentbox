@@ -233,6 +233,9 @@ export function notesToSendTheAgentAnywhere(marks: FileMarks, families: Readonly
   return { ids, elsewhere, elsewhereKind: allPictures ? 'picture' : 'file' };
 }
 
+/** Send all sits beside Approve, off the page being read; a film or a picture keeps its bar under the stage. */
+export const sendAllBesideTheNotes = (kind: string | null): boolean => kind !== 'film' && kind !== 'image';
+
 /** The bar under the file: how many comments wait, and how many of them are on another file. */
 export function unsentWords(total: number, elsewhere: number, kind: 'picture' | 'file'): string {
   const head = `${total} ${total === 1 ? 'comment' : 'comments'} not sent to your agent`;

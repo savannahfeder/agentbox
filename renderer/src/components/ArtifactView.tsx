@@ -13,7 +13,7 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
+import { hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
@@ -408,6 +408,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
   const unsent = withAgent ? notesToSendTheAgentAnywhere(marks, families, version?.id ?? null, people, me) : { ids: [], elsewhere: 0, elsewhereKind: 'picture' as const };
   const sendAll = () => toAgent(unsent.ids);
+  const sendBeside = sendAllBesideTheNotes(kind);
+  const canSendAll = offers.comment && unsent.ids.length > 0;
   const sendNotes = withAgent && version ? notesToSendTheAgent(marks, withItsAgent(family!.versions, version), family!.versions.length, people, me) : [];
   const pressSend = () => toAgent(sendNotes);
   const waitingHere = offers.comment ? openNotes.filter((n) => sendNotes.includes(n.id)) : [];
@@ -826,7 +828,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
             <button type="button" className="av-step av-prev" disabled={!stepTo(-1)} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
             <button type="button" className="av-step av-next" disabled={!stepTo(1)} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
-          {offers.comment && unsent.ids.length > 0 && !link && (
+          {canSendAll && !sendBeside && !link && (
             <div className="av-unsent-bar" role="status">
               <span className="av-unsent-dot" aria-hidden="true" />
               <span>{unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)}</span>
@@ -837,17 +839,18 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0 || linkNotes.comments.length > 0) && <aside className="av-side" aria-label="Notes">
           <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
-          {(offers.approve || othersApproved.length > 0 || earlier) && (
+          {(offers.approve || othersApproved.length > 0 || earlier || (canSendAll && sendBeside)) && (
             <div className="av-verdict">
               <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
                 {othersApproved.length > 0 ? `${othersApproved.map((a) => nameOf(a.by)).join(', ')} approved`
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
+              {canSendAll && sendBeside && <button type="button" className="av-btn av-unsent-send" title={unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
               {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>
           )}
           <div className="av-list">
-            {waitingHere.length > 0 && <NotesSection word="Unsent" send={{ count: sendNotes.length, onSend: () => void pressSend() }} />}
+            {waitingHere.length > 0 && <NotesSection word="Unsent" send={sendBeside ? undefined : { count: sendNotes.length, onSend: () => void pressSend() }} />}
             {waitingHere.map(card)}
             {waitingHere.length > 0 && sentAlready.length > 0 && <NotesSection word="Sent" />}
             {sentAlready.map(card)}
