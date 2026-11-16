@@ -51,7 +51,7 @@ describe('what stays a reply', () => {
 
 it('the press goes the way E does, naming that its work stays off main', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  expect(app).toMatch(/leavesItOnTheBranch\(option\.text\)\) \{ await markDone\(item, \{ unshippedOk: true \}\); return; \}/);
+  expect(app).toMatch(/leavesItOnTheBranch\(option\.text\)\) \{ await markDone\(item, \{ unshippedOk: true, chosen: true \}\); return; \}/);
 });
 
 describe('a note on a file, and your Done', () => {

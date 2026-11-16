@@ -5630,7 +5630,7 @@ export default function App() {
     // "Close this task" is done here, the way E does it, and never sent: as a
     // reply it would reopen the row and start a run to close it (format.ts).
     if (closesTheTask(option.text)) { await markDone(item, { chosen: true }); return; }
-    if (leavesItOnTheBranch(option.text)) { await markDone(item, { unshippedOk: true }); return; }
+    if (leavesItOnTheBranch(option.text)) { await markDone(item, { unshippedOk: true, chosen: true }); return; }
     // THROWING THE WORK AWAY ASKS FIRST (F-84, ./discard-asks-first.ts). One
     // click sent it, the pane moved on, and the pointer came down on the next
     // thread's "Ship it". Every other press here is a reply or a close and Z
