@@ -20,6 +20,8 @@ import { NAME } from '../../../shared/product-name.mjs';
 import { accountLabel, engineWord, pageToOpen, type CloudAccount, type CloudMode, type CloudSignIn, type CloudStatus } from '../cloud-menu';
 import { SETUP, WHERE_ROWS, activeSignIn, addingRows, doneAsksWhere, mayFinish, signInView } from '../cloud-setup';
 import { CloudPlanCards } from './CloudPlanCards';
+import { ProTrialOffer, type TrialState } from './ProTrialOffer';
+import { offersProTrial, startProTrial } from '../pro-trial';
 import { setupStep } from '../cloud-setup-step';
 import type { PaidPlan } from '../cloud-upgrade';
 import type { CloudPlan } from '../types';
@@ -82,7 +84,7 @@ function SignIn({ s, existing, as = null }: { s: CloudSignIn; existing: boolean;
   </div>;
 }
 
-export function CloudSetup({ cloud, onMode, onClose, signInAs = null, plan = null }: {
+export function CloudSetup({ cloud, onMode, onClose, signInAs = null, plan = null, team }: {
   cloud: CloudStatus;
   onMode: (mode: CloudMode) => void;
   onClose: () => void;
@@ -90,6 +92,8 @@ export function CloudSetup({ cloud, onMode, onClose, signInAs = null, plan = nul
   signInAs?: string | null;
   /** Agentbox Cloud's plan as last read; unpaid, the screen asks for it first. */
   plan?: CloudPlan | null;
+  /** On the team build: whether this person is on a team, which decides whether Pro's free week is offered. */
+  team?: { on: boolean; name: string | null };
 }) {
   const accounts = cloud.accounts || [];
   // PAY FIRST (../cloud-setup-step.ts): no account is asked for until the
@@ -108,6 +112,14 @@ export function CloudSetup({ cloud, onMode, onClose, signInAs = null, plan = nul
     setOpening(null);
     if (!out.ok) { setPayErr(out.message || 'Stripe could not be opened. Try again.'); return; }
     setWaiting(id);
+  };
+  const trial = !!team && offersProTrial(planNow, team.on);
+  const [trialState, setTrialState] = useState<TrialState>('idle');
+  const startTrial = async () => {
+    setPayErr(null); setTrialState('opening');
+    const out = await startProTrial({ hasTeam: !!team?.on, name: team?.name });
+    if (!out.ok) { setTrialState('idle'); setPayErr(out.message); return; }
+    setTrialState('waiting'); setWaiting('pro');
   };
   useEffect(() => {
     if (!cloud.managed) return undefined;
@@ -172,8 +184,9 @@ export function CloudSetup({ cloud, onMode, onClose, signInAs = null, plan = nul
   } else if (step === 'pay') {
     body = <div className="fr-stack fr-stack-folders">
       <h1 className="fr-page">{SETUP.payHead}</h1>
-      <p className="fr-lede">{waiting ? <><Busy />{SETUP.payWaitLede}</> : SETUP.payLede}</p>
-      <div className="cs-plans"><CloudPlanCards plan={planNow} opening={opening} waiting={waiting} onChoose={(id) => void pay(id)} /></div>
+      <p className="fr-lede">{waiting ? <><Busy />{SETUP.payWaitLede}</> : trial ? SETUP.trialLede : SETUP.payLede}</p>
+      {trial && <div className="cs-trial"><ProTrialOffer state={trialState} onStart={() => void startTrial()} /></div>}
+      <div className="cs-plans"><CloudPlanCards plan={planNow} opening={opening} waiting={trialState === 'idle' ? waiting : null} onChoose={(id) => void pay(id)} /></div>
       {payErr && <p className="cs-pay-err" role="alert">{payErr}</p>}
     </div>;
   } else if (where) {

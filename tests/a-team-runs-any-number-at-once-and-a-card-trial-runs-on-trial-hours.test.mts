@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
-import { PLANS, TEAM, FREE } from '../cloud/gateway/plans.mjs';
+import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { stripeClient } from '../cloud/gateway/stripe.mjs';
 import { cloudPlanOf } from '../main/cloud/account.mts';
@@ -110,11 +110,11 @@ describe('a team runs any number of cloud agents at once', () => {
     expect(cloudPlanOf(me)).toMatchObject({ plan: 'team', unlimited: true, agents: null });
   });
 
-  it('someone with no team still runs two free agents at once', async () => {
+  it('someone with no team and no plan runs none', async () => {
     const { startMany } = setup({ onTeam: false });
     const out = await startMany(A);
-    expect(out.filter((b) => b.ok)).toHaveLength(FREE.agents);
-    expect(out[FREE.agents]).toMatchObject({ ok: false, error: 'agents' });
+    expect(out.filter((b) => b.ok)).toHaveLength(0);
+    expect(out[0]).toMatchObject({ ok: false, error: 'plan' });
   });
 });
 

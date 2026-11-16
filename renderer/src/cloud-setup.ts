@@ -54,6 +54,7 @@ export const SETUP = {
   loadingLede: 'Checking your account…',
   payHead: 'Choose a plan',
   payLede: 'Pay on Stripe, then add the Claude or Codex account it runs on.',
+  trialLede: 'Try Pro free for 7 days, then add the Claude or Codex account it runs on.',
   payWaitLede: 'Finish paying in your browser. This moves on by itself once you’ve paid.',
   menuBroken: 'A cloud account needs to sign in again.',
   menuFix: 'Fix',

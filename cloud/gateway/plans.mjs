@@ -1,7 +1,9 @@
 // What each cloud plan allows (docs/cloud/PLAN.md, Plans). `agents` is how
 // many run in the cloud at once; `hoursPerMonth` is the agent-hours behind it
 // (null would mean none set, and such a plan cannot be given). Someone with no
-// plan (`none`) runs on FREE until it is spent. Hours are the owner's
+// plan (`none`) runs nothing in the cloud unless their team's trial or seats
+// pay for it: there are no free hours (the owner, 2026-11-16, in favour of the
+// 7-day Pro trial below). Hours are the owner's
 // (2026-10-20), against a measured $0.07 an agent-hour (scripts/cloud-usage.mjs).
 export const PLANS = Object.freeze({
   none: Object.freeze({ agents: 0, hoursPerMonth: 0, filesGB: 0 }),
@@ -12,10 +14,6 @@ export const PLANS = Object.freeze({
   // every customer shares.
   max: Object.freeze({ agents: 200, unlimited: true, hoursPerMonth: 3000, dollarsPerMonth: 200, filesGB: 2048 }),
 });
-
-// Every account's first cloud hours, once and never again (the owner,
-// 2026-11-06). Two at once, because ten would spend five hours in thirty minutes.
-export const FREE = Object.freeze({ agents: 2, hours: 5 });
 
 // A team's cloud (the owner, 2026-11-06; 7 days since 2026-11-10): free from
 // the day it was made, 50 hours a member (10 until 2026-11-13: "10 cloud hours

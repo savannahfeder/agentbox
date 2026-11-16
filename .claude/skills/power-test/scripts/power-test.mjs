@@ -9,7 +9,6 @@
 //     --stand-ins "<the person's words agreeing>"      stand-in Claude Code instead, only with their explicit say-so for this run
 //     --cloud                                          every thread in this Mac's cloud (implies --real); the Mac sleeps and shuts under the runs
 //     --cloud-accounts a@x.com,b@y.com                 the cloud accounts the copies may spend, of those signed in (default all)
-//     --free-hours 0.5                                 with --stand-in-cloud: start on the Free plan with that many hours
 //     --chaos none|light|normal|heavy                  what goes wrong around them (default normal)
 //     --stuck                                          for a stretch, most stand-in agents get stuck on one shared cause (needs --stand-ins)
 //     --round-minutes 20                               one tester session, before it is started again with its diary
@@ -83,11 +82,9 @@ const standInCloud = flag('stand-in-cloud');
 const fresh = flag('fresh');
 if (standInCloud && cloud) stop('--stand-in-cloud is the stand-ins\' own cloud; it cannot go with --cloud.');
 if (flag('stand-in-codex')) stop('--stand-in-codex is gone: the agents are real unless the person agreed to stand-ins (--stand-ins "<their words>").');
-const freeHours = opt('free-hours');
 // `owner:0.3,member:0.3`, one per person in --who order: each copy on a team's trial in that role.
 const cloudTeams = (opt('cloud-team') || '').split(',').filter(Boolean);
 if (cloudTeams.length && !standInCloud) stop('--cloud-team puts the stand-in cloud\'s account on a team: add --stand-in-cloud.');
-if (freeHours && !standInCloud) stop('--free-hours starts the stand-in cloud\'s account on the Free plan: add --stand-in-cloud.');
 let mode;
 try { mode = agentMode({ standIns: args.includes('--stand-ins') ? (opt('stand-ins') ?? '') : null, standInCloud, cloud }); } catch (err) { stop(err.message); }
 // With stand-ins agreed, Codex stays real on the testers' own login wherever it can.
@@ -258,7 +255,7 @@ for (const person of people) {
   fs.mkdirSync(dir, { recursive: true });
   const shape = real ? [] : ['--logins', String(person.logins), ...(person.codex ? [] : ['--no-codex']), ...(person.codex && codexReal ? ['--real-codex', login.home] : [])];
   say(`${person.name}: starting a copy of the app shaped like their setup`);
-  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(fresh ? ['--fresh'] : []), ...(freeHours ? ['--free-hours', freeHours] : []), ...(cloudTeams[people.indexOf(person)] ? ['--cloud-team', cloudTeams[people.indexOf(person)]] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(teamFiles[person.slug] ? ['--team', teamFiles[person.slug]] : []), ...(alpha ? ['--alpha', alpha] : []));
+  const up = await live(name, 'up', ...(real ? ['--real'] : []), ...(cloud ? ['--cloud'] : []), ...(standInCloud ? ['--stand-in-cloud'] : []), ...(fresh ? ['--fresh'] : []), ...(cloudTeams[people.indexOf(person)] ? ['--cloud-team', cloudTeams[people.indexOf(person)]] : []), ...(cloudAccounts ? ['--cloud-accounts', cloudAccounts] : []), ...shape, '--projects', person.projects.join(','), ...(team ? ['--team', team] : []), ...(teamFiles[person.slug] ? ['--team', teamFiles[person.slug]] : []), ...(alpha ? ['--alpha', alpha] : []));
   fs.writeFileSync(path.join(dir, 'up.log'), up.out);
   const stateFile = path.join(instanceDir(name), 'instance.json');
   const state = readJson(stateFile);

@@ -624,6 +624,10 @@ export const api = {
       if (params.get('team') === 'signedout') {
         base.team = { configured: false, canSignIn: true, started: true, signedIn: false, signingIn: null, me: null, team: null, people: [], cards: [], lastSyncAt: null, error: null };
       }
+      // &team=solo: the team build, signed in, on no team yet, so Pro's free week is offered.
+      if (params.get('team') === 'solo') {
+        base.team = { configured: true, canSignIn: true, started: true, signedIn: true, signingIn: null, me: null, team: null, people: [], cards: [], lastSyncAt: null, error: null };
+      }
       // &usagestale: a Codex reading six hours old whose five hour window has ended.
       if (params.has('usagestale')) {
         const now = Date.now();
@@ -1765,11 +1769,9 @@ export const api = {
   async cloudAccountReopen(): Promise<void> { await window.zero?.cloudAccountReopen?.(); },
   async cloudAccountSignOut(): Promise<void> { await window.zero?.cloudAccountSignOut?.(); },
   async cloudAccountPlan(): Promise<CloudPlan> {
-    // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used;
-    // &cloudplan=free someone on the free hours, 1 running and 1.5 of 5 used.
+    // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used.
     if (useFixtures) {
       if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
-      if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
       // &cloudplan=team-trial|team-trial-card|team: on a team of 3, its trial 5 days from its end
       // (with the card in, not yet charged), or 3 seats paid for.
       if (['team-trial', 'team-trial-card', 'team'].includes(params.get('cloudplan') ?? '')) {
@@ -1786,7 +1788,6 @@ export const api = {
         const team = { trial, endsAt: trial ? Date.now() + 5 * 86_400_000 : null, seats: trial && !card ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: null, running: people[0].running, hours: each, usedSeconds: people[0].usedSeconds, people };
         return { signedIn: true, plan: 'team', unlimited: true, agents: null, hoursPerMonth: team.hours, running: team.running, usedSeconds: team.usedSeconds, billing: null, team };
       }
-      if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
       return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
     }
     return (await window.zero?.cloudAccountPlan?.()) ?? { signedIn: false };

@@ -852,7 +852,8 @@ export default function App() {
   const [setupPlan, setSetupPlan] = useState<Plan | null>(null);
   // THE CLOUD'S OWN SETUP SCREEN, opened from the cloud menu's Set up, or by
   // choosing to run in the cloud before it is set up (components/CloudSetup).
-  const [cloudSetupOpen, setCloudSetupOpen] = useState(false);
+  // ?fixtures=1&cloudsetup opens it on load, so a screenshot can reach it.
+  const [cloudSetupOpen, setCloudSetupOpen] = useState(() => { const q = new URLSearchParams(location.search); return q.has('fixtures') && q.has('cloudsetup'); });
   // Settings › Phone's own sign-in, for a build whose team version is off.
   const [phoneSignInOpen, setPhoneSignInOpen] = useState(false);
   // Share's "Sign in", pressed inside a file opened big (ShareLink.tsx).
@@ -9307,6 +9308,7 @@ export default function App() {
           }}
           cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? {
             signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); },
+            team: snap.team?.configured ? { on: !!snap.team.team, name: snap.team.me?.name ?? null } : undefined,
             // The preview has no team of its own, so it draws one from api.ts.
             teamPlan: (page) => {
               const known = snap.team?.people?.length ? { people: snap.team.people, meId: snap.team.me?.id ?? null } : api.fixtureTeamPeople();
@@ -9665,6 +9667,7 @@ export default function App() {
         <CloudSetup
           cloud={snap.cloud}
           plan={cloudPlan}
+          team={snap.team?.configured ? { on: !!snap.team.team, name: snap.team.me?.name ?? null } : undefined}
           signInAs={cloudSignInAs}
           onMode={(mode) => { void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
           onClose={() => { setCloudSetupOpen(false); setCloudSignInAs(null); }}

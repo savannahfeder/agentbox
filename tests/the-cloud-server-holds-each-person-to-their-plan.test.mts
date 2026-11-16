@@ -22,7 +22,7 @@ const HOUR = 60 * 60_000;
 // pro plan with hours stand in for them.
 const SET = { ...PLANS, test: { agents: 2, hoursPerMonth: 5 }, pro: { agents: 10, hoursPerMonth: 100 } };
 
-function setup({ startAnswer = { ok: true }, answer = () => ({ ok: true }), plans = SET, free } = {}) {
+function setup({ startAnswer = { ok: true }, answer = () => ({ ok: true }), plans = SET } = {}) {
   let clock = Date.UTC(2026, 9, 19, 12, 0, 0);
   const sent = [];
   const objects = memoryObjects();
@@ -47,7 +47,6 @@ function setup({ startAnswer = { ok: true }, answer = () => ({ ok: true }), plan
     whoIs: async (t) => (t === 'session-of-a' ? { id: A } : null),
     now: () => clock,
     plans,
-    ...(free ? { free } : {}),
   });
   let key;
   const call = async (method, path, body) => {
@@ -223,14 +222,13 @@ describe('signing in', () => {
   });
 });
 
-// The owner's call, 2026-10-20 (w-6633e825a7): no free cloud hours. Five
-// hours go in half an hour with ten agents, which sells the cloud short, and
-// the moment someone reaches for the cloud is the moment they will pay. The
-// app itself is the free part.
+// The owner's call, 2026-10-20 (w-6633e825a7), and again on 2026-11-16 after
+// eleven days of 5 free hours: no free cloud hours. The app itself is the free
+// part, and Pro's 7-day trial is how the cloud is tried
+// (tests/a-new-cloud-account-gets-no-free-hours-and-is-offered-the-pro-trial).
 describe('someone with no plan', () => {
-  // The free hours are tests/every-new-cloud-account-gets-five-free-hours.
-  it('past the free hours, is asked to choose a plan before any run starts, and nothing is started', async () => {
-    const { gw, sent } = setup({ free: { agents: 2, hours: 0 } });
+  it('is asked to choose a plan before any run starts, and nothing is started', async () => {
+    const { gw, sent } = setup();
     const key = (await gw.handle({ method: 'POST', path: '/v1/devices', headers: { authorization: 'Bearer session-of-a' }, body: JSON.stringify({ acceptedTerms: TERMS_VERSION }) })).body.key;
     const r = await gw.handle({ method: 'POST', path: '/v1/invoke', headers: { authorization: `Bearer ${key}` }, body: JSON.stringify({ sessionId: 'run-1', payload: { action: 'start', runId: 'r1' } }) });
     expect(r.body).toMatchObject({ ok: false, error: 'plan' });
@@ -247,7 +245,7 @@ describe('someone with no plan', () => {
     expect(sent.map((s) => s.payload?.action)).toEqual(['signin']);
   });
 
-  it('the real plans have no free plan: the free hours are kept apart from them', () => {
+  it('the real plans have no free plan', () => {
     expect(Object.keys(PLANS).sort()).toEqual(['max', 'none', 'plus', 'pro']);
     expect(PLANS.none).toEqual({ agents: 0, hoursPerMonth: 0, filesGB: 0 });
   });

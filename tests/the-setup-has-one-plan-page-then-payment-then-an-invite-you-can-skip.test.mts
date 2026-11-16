@@ -26,6 +26,7 @@ import { cloudFromTeamSignIn, cloudPlan } from '../main/cloud/account.mts';
 
 const read = (f: string) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const split = read('renderer/src/components/SetupSplit.tsx');
+const trial = read('renderer/src/pro-trial.ts');
 const show = read('renderer/src/components/ProShowcase.tsx');
 const base = { chats: 3, team: true, teammates: false, project: true, signedIn: false };
 
@@ -71,8 +72,8 @@ describe('the plan page', () => {
     expect(show).not.toMatch(/\d+ at once|agentsPerSeat/);
   });
   it('starts Pro by making the team, then opening its checkout, and goes on to invite once it is paid', () => {
-    expect(split).toMatch(/const made = await api\.teamCreate\(teamNameFor\(me\?\.name\)\);/);
-    expect(split).toMatch(/await api\.cloudAccountPay\('team'\)/);
+    expect(split).toMatch(/await startProTrial\(\{ hasTeam, name: me\?\.name/);
+    expect(trial).toMatch(/const made = await api\.teamCreate\(teamNameFor\(name\)\);[\s\S]*await api\.cloudAccountPay\('team'\)/);
     expect(split).toMatch(/if \(live && paid\) \{ live = false; setPayState\('idle'\); setPlan\('pro'\); next\(\); \}/);
   });
   // The first walk that got a payment through was moved on again every three seconds, past the look and the last page.
@@ -81,7 +82,8 @@ describe('the plan page', () => {
     expect(split).toMatch(/if \(payState !== 'waiting'\) return undefined;/);
   });
   it('signs the account it just made in to the cloud before it asks for payment', () => {
-    expect(split).toMatch(/await api\.cloudAccountFromTeam\(!signedInAtStart\)/);
+    expect(split).toMatch(/acceptTerms: !signedInAtStart \}\)/);
+    expect(trial).toMatch(/const cloud = await api\.cloudAccountFromTeam\(acceptTerms\);[\s\S]*api\.teamCreate[\s\S]*api\.cloudAccountPay/);
   });
 });
 
