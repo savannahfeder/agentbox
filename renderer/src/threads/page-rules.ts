@@ -5,7 +5,7 @@
 // the rows are ordered, how "Updated" is said, and what goes in each board
 // column for the Team, where your own threads come from this Mac and your
 // teammates' from the cards their Macs publish.
-import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mts';
+import { handedOn, shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mts';
 import type { Seen } from './summary-rules';
 import { hiddenUntil, placedAt } from '../list-rules';
 import type { AgentVoice, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
@@ -990,6 +990,11 @@ export function workAudience(item: WorkItem, product: Product | undefined | null
   if (!isDirect(product) || !isWorkThread(item)) return null;
   const ids = othersIn(item, product!, me);
   return ids.length ? `with ${ids.map(nameOf).join(', ')}` : null;
+}
+
+/** "given to Jordan Ellis" beside a thread handed on, which is closed but did not finish. */
+export function handedTo(item: { status?: string; answer?: string | null }): string | null {
+  return handedOn(item) ? `given to ${String(item.answer).slice('Given to '.length).replace(/\.$/, '')}` : null;
 }
 
 /** "Dev, Maya": the conversation itself is named for who is in it, unless someone renamed it. */
