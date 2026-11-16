@@ -165,7 +165,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (!flat.length) return;
     if (placedFor.current === press) {
       const same = placed?.held && at ? flat.find((x) => x.fi === at.fi && x.vi === at.vi) : undefined;
-      if (same && staysOnNewest({ kind: viewKind(same.v.path), wasNewest: newestInHand.current })) setAt({ fi: same.fi, vi: families[same.fi].versions.length - 1 });
+      const newest = same && families[same.fi].versions[families[same.fi].versions.length - 1];
+      if (same && newest && staysOnNewest({ kind: viewKind(same.v.path), wasNewest: newestInHand.current, samePath: newest.path === placed?.held?.path })) setAt({ fi: same.fi, vi: families[same.fi].versions.length - 1 });
       else if (same) setAt({ fi: same.fi, vi: same.vi });
       return;
     }
