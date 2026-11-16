@@ -25,6 +25,7 @@ import { instructionOf } from '../../shared/repeats.mts';
 import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
 import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
+import { shortTitle } from '../../shared/thread-title.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
@@ -655,7 +656,6 @@ function theAskComesFirst(events: ThreadEvent[]): ThreadEvent[] {
 // whenever the header is showing something else and the body does not already
 // contain it.
 function withTitleSaid(events: ThreadEvent[], title: string | null, label: string | null): ThreadEvent[] {
-  const named = (label ?? '').trim();
   const said = (title ?? '').trim();
   if (!said) return events;
   // Her rows open twice, the system's stamp and then her own line; the one
@@ -663,6 +663,8 @@ function withTitleSaid(events: ThreadEvent[], title: string | null, label: strin
   const bodied = events.findIndex((e) => e.field === 'body');
   const i = bodied >= 0 ? bodied : events.findIndex((e) => /opened this$/.test(e.said));
   if (i < 0) return events;
+  // What the header shows: the app's name for the thread, or, on your own until it has one, a few words cut from the title.
+  const named = (label ?? '').trim() || (events[i].who === 'you' ? shortTitle(said) : '');
   // AND A THREAD TYPED AS ONE LINE HAS NOTHING ELSE TO SAY (w-326fb83c0e). It
   // is saved as a title with no body, so until the app writes the row a short
   // name — fifteen seconds to a minute — the rule above left the opening

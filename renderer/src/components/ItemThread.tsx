@@ -227,7 +227,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // worker writes, because losing the messages she just went looking for every
   // eight seconds is the same fault wearing a timer.
   const [whole, setWhole] = useState(false);
-  useEffect(() => { setWhole(!!kept?.whole); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setWhole(kept ? !!kept.whole : false); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // The regular read below has only the newest runs; the middle needs them all.
   const [everyRun, setEveryRun] = useState<TraceSession[]>([]);
   useEffect(() => {
@@ -240,7 +240,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     return () => { live = false; };
   }, [item.product, item.id, whole]);
   const [earlierOpen, setEarlierOpen] = useState(false);
-  useEffect(() => { setEarlierOpen(!!kept?.earlier); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setEarlierOpen(kept ? !!kept.earlier : false); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Not keyed on the thread: on the render that changes thread these still hold
   // the last one's, and writing them then would file them under the new one.
   useEffect(() => { keepPlace(place, { earlier: earlierOpen, whole }); }, [earlierOpen, whole]); // eslint-disable-line react-hooks/exhaustive-deps

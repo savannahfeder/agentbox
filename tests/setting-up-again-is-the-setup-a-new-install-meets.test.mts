@@ -45,6 +45,6 @@ describe('the setup, when it can be left', () => {
     expect(flow).toMatch(/else if \(onLeave && e\.key === 'Escape'\) \{ e\.preventDefault\(\); onLeave\(\); \}/);
   });
   it('lets Back on the first step go back to the welcome', () => {
-    expect(split).toMatch(/const back = !finished && \(at > 0 \|\| p\.onBack\)/);
+    expect(split).toMatch(/const back = backTo !== null \|\| p\.onBack \? \(\) => \{ setError\(null\); if \(backTo !== null\) setAt\(backTo\); else p\.onBack\?\.\(\); \} : null;/);
   });
 });

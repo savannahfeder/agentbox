@@ -24,7 +24,7 @@ describe('the Inbox sky', () => {
 });
 
 describe('in light themes', () => {
-  it('the Inbox stays plain, with no sky', () => {
-    expect(app).toMatch(/const skyOnInbox = !!sky && sky\.dark && !homeShown &&/);
+  it('the Inbox wears a sky only when that sky was drawn for it', () => {
+    expect(app).toMatch(/const skyOnInbox = wearsInboxSky\(sky\) && !homeShown &&/);
   });
 });
