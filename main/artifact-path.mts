@@ -187,9 +187,10 @@ const whole = (fs: ArtifactFs): typeof fsDefault => fs as typeof fsDefault;
 // in that time is not found.
 const SLOW_WALK_KEEPS = 10;
 export const HUNT_KEPT_AT_MOST_MS = 30_000;
-const keptFor = (k: WalkEntry) => k.watched
-    ? (k.dirty ? 0 : WATCHED_WALK_KEPT_MS)
-    : Math.min(HUNT_KEPT_AT_MOST_MS, Math.max(HUNT_FRESH_MS, k.took * SLOW_WALK_KEEPS));
+const timedFor = (k: WalkEntry) => Math.min(HUNT_KEPT_AT_MOST_MS, Math.max(HUNT_FRESH_MS, k.took * SLOW_WALK_KEEPS));
+// A changed folder still waits out the timed window: one something keeps writing
+// into (a render's frames) would otherwise be walked again on every look.
+const keptFor = (k: WalkEntry) => k.watched && !k.dirty ? WATCHED_WALK_KEPT_MS : timedFor(k);
 // One walk per tree at a time: a name asked while it runs waits on it, even past
 // its window. A look that must be current waits for it and then walks again,
 // since the running walk may have read a folder before the file was there.

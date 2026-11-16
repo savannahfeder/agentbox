@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact, WATCHED_WALK_KEPT_MS, stopWatchingFolders } from '../main/artifact-path.mts';
+import { resolveArtifact, HUNT_FRESH_MS, WATCHED_WALK_KEPT_MS, stopWatchingFolders } from '../main/artifact-path.mts';
 
 const onMac = process.platform === 'darwin';
 let root: string; let docs: string; let reads: string[];
@@ -54,8 +54,8 @@ describe.runIf(onMac)('on a Mac', () => {
     expect((await look('late.png', t)).ok).toBe(false);
     await new Promise((r) => setTimeout(r, 300));
     put(path.join(docs, 'designs', 'w-2', 'late.png'));
-    expect(await until(async () => (await look('late.png', Date.now())).ok)).toBe(true);
-  });
+    expect(await until(async () => (await look('late.png', Date.now())).ok, HUNT_FRESH_MS + 3000)).toBe(true);
+  }, HUNT_FRESH_MS + 8000);
 
   it('is not listed again for changes inside folders the walk skips', async () => {
     const t = Date.now();
