@@ -8,7 +8,7 @@
 //                                                      the copies' agents are the real Claude Code and Codex on this computer's plans
 //     --stand-ins "<the person's words agreeing>"      stand-in Claude Code instead, only with their explicit say-so for this run
 //     --cloud                                          every thread in this Mac's cloud (implies --real); the Mac sleeps and shuts under the runs
-//     --cloud-accounts a@x.com,b@y.com                 the cloud accounts the copies may spend, of those signed in (default all)
+//     --cloud-accounts a@x.com,codex:b@y.com           the cloud accounts the copies may spend, of those signed in (default all); engine: names one engine's
 //     --free-hours 0.5                                 with --stand-in-cloud: start on the Free plan with that many hours
 //     --chaos none|light|normal|heavy                  what goes wrong around them (default normal)
 //     --stuck                                          for a stretch, most stand-in agents get stuck on one shared cause (needs --stand-ins)

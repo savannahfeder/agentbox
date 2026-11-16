@@ -131,7 +131,9 @@ export function cloudAccountKeys(emails, { home = os.homedir() } = {}) {
   for (const engine of ['claude', 'codex']) {
     for (const r of listCloudLogins(engine, { home })) {
       const name = String(r.email || (engine === 'claude' ? nameForOrganization(r.org, here) : '') || '').toLowerCase();
-      if (want.includes(name)) { keys.push(r.key); found.add(name); }
+      // `codex:<email>` names that engine's account alone: one email can sign in to both.
+      const hit = [name, `${engine}:${name}`].find((n) => want.includes(n));
+      if (hit) { keys.push(r.key); found.add(hit); }
     }
   }
   return { keys, missing: want.filter((e) => !found.has(e)) };
