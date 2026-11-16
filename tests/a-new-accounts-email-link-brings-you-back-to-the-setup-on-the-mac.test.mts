@@ -32,11 +32,14 @@ const follow = (url: string) => new Promise<{ status: number; page: string }>((r
 const json = (o: unknown) => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } });
 const tokenAnswer = { access_token: 'a1', refresh_token: 'r1', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user: { id: 'u-1', email: 'new@example.com', aud: 'authenticated' } };
 
-async function signingUp({ phoneSite }: { phoneSite?: string } = {}) {
+async function signingUp({ phoneSite, confirmedAlready = false }: { phoneSite?: string; confirmedAlready?: boolean } = {}) {
   vi.stubGlobal('fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
     asked.push({ url, body: String(init?.body ?? '') });
     if (url.includes('/auth/v1/token?grant_type=pkce')) return json(tokenAnswer);
+    if (url.includes('/auth/v1/token?grant_type=password')) {
+      return confirmedAlready ? json(tokenAnswer) : new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'Email not confirmed' }), { status: 400, headers: { 'content-type': 'application/json' } });
+    }
     return json({ id: 'u-1', email: 'new@example.com' });
   });
   const port = await freePort();
@@ -78,16 +81,41 @@ describe('following the link', () => {
     expect(tab.page).toContain('Your email is confirmed');
     expect(await signedIn).toBeTruthy();
     expect(asked.some((a) => a.url.includes('grant_type=pkce') && JSON.parse(a.body).auth_code === 'abc')).toBe(true);
+    expect(asked.some((a) => a.url.includes('grant_type=password'))).toBe(false);
   });
 
-  it('says why in the browser, and signs nothing in, when the link has run out', async () => {
-    const { out, returnUrl } = await signingUp();
+  // A tester (2026-11-16) opened the link once to see where it went, and the click after got
+  // "Email link is invalid or has expired"; measured on the live database, a second open of one
+  // link gets exactly that. Mail scanners that open links first do the same to a person.
+  it('a link already opened once still finishes: the first open confirmed the address, so the password signs in', async () => {
+    const { out, returnUrl } = await signingUp({ confirmedAlready: true });
     const signedIn = out!.confirmed!();
-    signedIn.catch(() => {});
+    const tab = await follow(`${returnUrl}?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`);
+    expect(tab.status).toBe(200);
+    expect(tab.page).toContain('Your email is confirmed');
+    expect(await signedIn).toBeTruthy();
+    const pw = asked.find((a) => a.url.includes('grant_type=password'))!;
+    expect(JSON.parse(pw.body)).toMatchObject({ email: 'new@example.com', password: 'pw-123456' });
+  });
+
+  it('the same with nothing in the address at all, as when the reason rides after the #', async () => {
+    const { out, returnUrl } = await signingUp({ confirmedAlready: true });
+    const signedIn = out!.confirmed!();
+    expect((await follow(returnUrl)).status).toBe(200);
+    expect(await signedIn).toBeTruthy();
+  });
+
+  it('says why in the browser when the address is not confirmed, and keeps waiting for a good link', async () => {
+    const { out, returnUrl } = await signingUp();
+    let done = false;
+    const signedIn = out!.confirmed!().then((b) => { done = true; return b; });
     const tab = await follow(`${returnUrl}?error_description=Email+link+is+invalid+or+has+expired`);
     expect(tab.status).toBe(400);
     expect(tab.page).toContain('Email link is invalid or has expired');
-    await expect(signedIn).rejects.toThrow('Email link is invalid or has expired');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(done).toBe(false);
+    expect((await follow(`${returnUrl}?code=abc`)).status).toBe(200);
+    expect(await signedIn).toBeTruthy();
   });
 
   it('leaves other addresses on the port alone', async () => {

@@ -250,15 +250,18 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       if (!configured) throw new Error('this build has no team cloud configured');
       const c = await getClient();
       const returnUrl = cloudConfig.signInReturn || SIGN_IN_RETURN;
+      const account = { email: String(email ?? '').trim(), password: String(password ?? '') };
       const { data, error } = await c.auth.signUp({
-        email: String(email ?? '').trim(),
-        password: String(password ?? ''),
+        ...account,
         options: { data: { full_name: String(name ?? '').trim() || undefined }, emailRedirectTo: returnUrl },
       });
       if (error) throw new Error(plainAuthError(error.message));
       if (data?.session) return { backend: supabaseBackend(c) };
+      // A link opened once before, by the person or a mail scanner, comes back spent, yet that first
+      // open confirmed the address, so the password from this sign-up now signs in.
+      const rescue = async () => !(await c.auth.signInWithPassword(account)).error;
       // As long as the link lives (cloud/supabase/config.toml, otp_expiry).
-      const { over } = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log });
+      const { over } = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log, rescue });
       over.catch(() => {});
       return { confirm: true, confirmed: () => over.then(() => supabaseBackend(c)), stopWaiting: () => { cancelGoogleSignIn(); } };
     },

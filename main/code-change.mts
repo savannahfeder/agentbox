@@ -526,7 +526,9 @@ export function readChange(file: string): SavedChange {
 export type ChangeSummary = Omit<SavedChange, 'files'> & { files: Omit<ChangedFile, 'hunks'>[] };
 
 const summaries = new Map<string, { mtimeMs: number; size: number; summary: ChangeSummary }>();
-const KEEP_SUMMARIES = 200;
+// The phone reads up to 300 threads a project on every pass, in the same
+// order; a cache smaller than that misses on every read. A summary is ~10 KB.
+const KEEP_SUMMARIES = 2000;
 
 /**
  * A saved change without its rows, for the readers that poll it while a run
@@ -536,7 +538,11 @@ const KEEP_SUMMARIES = 200;
 export function readChangeSummary(file: string): ChangeSummary {
   const st = fs.statSync(file);
   const hit = summaries.get(file);
-  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.summary;
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) {
+    summaries.delete(file);
+    summaries.set(file, hit);
+    return hit.summary;
+  }
   const { files, ...rest } = readChange(file);
   const summary: ChangeSummary = { ...rest, files: files.map(({ hunks: _rows, ...f }) => f) };
   summaries.delete(file);

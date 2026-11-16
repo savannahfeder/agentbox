@@ -47,6 +47,9 @@ interface ReturnOptions {
   log?: (line: string) => void;
   begin: (done: Promise<void>) => Promise<void>;
   take: (code: string) => Promise<void>;
+  /** Another way to finish when the browser comes back without a usable code. A wait that has one
+   *  also keeps listening after a failed visit, since the next visit may still bring a good code. */
+  rescue?: () => Promise<boolean>;
 }
 
 /** Stop whatever is waiting on the return address, if anything is. True if one was. */
@@ -62,7 +65,7 @@ export function cancelGoogleSignIn(): boolean {
  * caller are both told. `begin` is what sends the person to the browser in the
  * first place, and runs only once the address is held.
  */
-async function returningFromTheBrowser({ returnUrl, timeoutMs, what, failedTitle, landed, timedOut, log = () => {}, begin, take }: ReturnOptions): Promise<{ over: Promise<void> }> {
+async function returningFromTheBrowser({ returnUrl, timeoutMs, what, failedTitle, landed, timedOut, log = () => {}, begin, take, rescue }: ReturnOptions): Promise<{ over: Promise<void> }> {
   const url = new URL(returnUrl);
   const port = Number(url.port);
   if (url.hostname !== '127.0.0.1' || !port) throw new Error(`the sign-in return address must be on 127.0.0.1 with a port, not ${returnUrl}`);
@@ -83,9 +86,18 @@ async function returningFromTheBrowser({ returnUrl, timeoutMs, what, failedTitle
     const code = here.searchParams.get('code');
     const problem = here.searchParams.get('error_description') || here.searchParams.get('error');
     log(`team: ${what}: the browser came back ${code ? 'with a code' : `without one (${problem || 'no reason given'})`}`);
+    const failed = async (why: string, error: unknown) => {
+      if (rescue && await rescue().catch(() => false)) {
+        log(`team: ${what}: finished another way`);
+        page(res, 200, landed.title, landed.line);
+        finish.resolve();
+        return;
+      }
+      page(res, 400, failedTitle, why);
+      if (!rescue) finish.reject(error);
+    };
     if (!code) {
-      page(res, 400, failedTitle, problem || `Go back to ${Name} and try again.`);
-      finish.reject(new Error(problem || `${what} came back without a code`));
+      await failed(problem || `Go back to ${Name} and try again.`, new Error(problem || `${what} came back without a code`));
       return;
     }
     try {
@@ -93,8 +105,7 @@ async function returningFromTheBrowser({ returnUrl, timeoutMs, what, failedTitle
       page(res, 200, landed.title, landed.line);
       finish.resolve();
     } catch (error) {
-      page(res, 400, failedTitle, (error as Error).message);
-      finish.reject(error);
+      await failed((error as Error).message, error);
     }
   });
 
@@ -182,13 +193,14 @@ export async function waitForTheConfirmationLink(options: ConfirmationOptions): 
   return (await listenForTheConfirmationLink(options)).over;
 }
 
-type ConfirmationOptions = { client: SupabaseClient; returnUrl: string; timeoutMs?: number; log?: (line: string) => void };
+type ConfirmationOptions = { client: SupabaseClient; returnUrl: string; timeoutMs?: number; log?: (line: string) => void; rescue?: () => Promise<boolean> };
 
 /** The same wait, answering as soon as the address is held, so a link followed at once still finds it. */
-export async function listenForTheConfirmationLink({ client, returnUrl, timeoutMs = 15 * 60 * 1000, log = () => {} }: ConfirmationOptions): Promise<{ over: Promise<void> }> {
+export async function listenForTheConfirmationLink({ client, returnUrl, timeoutMs = 15 * 60 * 1000, log = () => {}, rescue }: ConfirmationOptions): Promise<{ over: Promise<void> }> {
   return returningFromTheBrowser({
     returnUrl,
     timeoutMs,
+    rescue,
     log,
     what: 'email confirmation',
     failedTitle: 'Confirming your email did not finish',
