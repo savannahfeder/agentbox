@@ -391,6 +391,17 @@ export function previewCloud(now = () => Date.now()) {
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
   // `?scene=away`: a computer last online three hours ago, with no cloud to carry on.
   if (scene === 'away') rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now() - 180 * 60_000).toISOString() }));
+  // `?scene=gone`: an older computer, last online days ago, still holding threads that were waiting their turn.
+  if (scene === 'gone') {
+    const OLD = '9f8e7d6c5b4a';
+    const day = (d: number) => new Date(now() - d * 24 * 60 * MIN).toISOString();
+    rows.projects.push({ device: OLD, project: 'todo', name: 'Web Todo', updated_at: day(1) });
+    ['Add a due date to each todo', 'Dark mode for the list', 'Sync todos between tabs'].forEach((title, n) => {
+      const id = `w-0ld00000${n}0`;
+      const at = now() - (n + 2) * 24 * 60 * MIN;
+      rows.threads.push({ device: OLD, project: 'todo', item: id, updated_at: day(n + 2), snapshot: { v: 3, wait: { state: 'queued' }, history: [], olderLines: 0, item: { id, kind: 'directive', labels: ['founder'], priority: 0, status: 'open', title, createdAt: at, updatedAt: at } as WorkItem } });
+    });
+  }
   // `?scene=computers`: projects from two other computers, off for days, beside this one's.
   if (scene === 'computers') {
     const days = (n: number) => new Date(now() - n * 24 * 3600_000).toISOString();
