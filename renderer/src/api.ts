@@ -656,7 +656,7 @@ export const api = {
     try { await window.zero?.looking?.({ product: at?.product ?? null, id: at?.id ?? null }); } catch { /* the card simply stays where it was */ }
   },
 
-  async refreshUsage(engine: 'claude' | 'codex' = 'claude'): Promise<{ ok: boolean; reading?: Usage; error?: string }> {
+  async refreshUsage(engine: 'claude' | 'codex' = 'claude', { ask = false }: { ask?: boolean } = {}): Promise<{ ok: boolean; reading?: Usage; error?: string }> {
     if (useFixtures) {
       if (params.get('account') === 'unreadable') return { ok: false, error: USAGE_UNREADABLE };
       if (codexMonth && engine === 'codex') return { ok: true, reading: { engine, limits: codexMonth, profile: 'default', at: Date.now() } };
@@ -664,7 +664,7 @@ export const api = {
       return reading ? { ok: true, reading: { ...structuredClone(reading), profile: 'default', at: Date.now() } } : { ok: false, error: 'No usage reading yet.' };
     }
     if (!window.zero?.refreshUsage) return { ok: false, error: RESTART_NOTE };
-    try { return await window.zero.refreshUsage({ engine }); }
+    try { return await window.zero.refreshUsage({ engine, ask }); }
     catch { return { ok: false, error: USAGE_UNREADABLE }; }
   },
 
@@ -818,7 +818,8 @@ export const api = {
     if (!zero?.bringSharedFile) return { ok: false, error: `quit and reopen ${NAME} to bring in shared files` };
     return zero.bringSharedFile(p);
   },
-  async fileLinkComment(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+  /** With `product`, `thread` and `src`, the reply also answers that thread's link comments. */
+  async fileLinkComment(p: { token: string; text: string; place?: NotePlace | null; product?: string; thread?: string; src?: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
     const zero = window.zero;
     if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
     return zero.fileLinkComment(p);
@@ -1122,7 +1123,7 @@ export const api = {
   async teamSeen(p: { product: string; id: string }): Promise<boolean> { try { return !!(await window.zero?.teamSeen?.(p)); } catch { return false; } },
   async teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMoveToThread(p)); },
   async teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessageMate(p)); },
-  async teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
+  async teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
   async teamTaskBrief(p: { product: string; id: string }) { return window.zero!.teamTaskBrief(p); },
   async teamContinueBrief(p: { personId: string; threadId: string }) { return window.zero!.teamContinueBrief(p); },
   async teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamContinued(p)); },
@@ -1176,7 +1177,7 @@ export const api = {
     return out?.moving ?? (out?.ok ? ids.length : 0);
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem | null> {
+  async compose(p: { product: string; title: string; body?: string; label?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the
@@ -1794,6 +1795,12 @@ export const api = {
     const zero = laterBridge();
     if (!zero?.cloudAccountPay) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountPay({ plan });
+  },
+  /** Signs this computer in to the cloud with the team sign-in it already has. */
+  async cloudAccountFromTeam(acceptTerms: boolean): Promise<{ ok: boolean; error?: string; message?: string }> {
+    const zero = laterBridge();
+    if (!zero?.cloudAccountFromTeam) return { ok: false, message: RESTART_NOTE };
+    return zero.cloudAccountFromTeam({ acceptTerms });
   },
   async cloudAccountBilling(): Promise<{ ok: boolean; error?: string; message?: string }> {
     const zero = window.zero;

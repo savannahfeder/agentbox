@@ -70,7 +70,10 @@ describe('a throwaway home with no agents', () => {
     const blank = prepareHome(makeHome(new Date('2026-08-23T06:12:00Z')), { realHome, withAgents: false });
     expect(blank.claudeBin).toBe(true);
     expect(blank.keychain).toBe(true);
-    expect(fs.existsSync(path.join(blank.home, '.claude'))).toBe(false);
+    // An empty folder of its own, never a link to hers: a home with no ~/.claude
+    // reads as never set up, and the copy then ran on Codex (2026-11-12).
+    expect(fs.lstatSync(path.join(blank.home, '.claude')).isSymbolicLink()).toBe(false);
+    expect(fs.readdirSync(path.join(blank.home, '.claude'))).toEqual([]);
 
     for (const dir of [blank.home, realHome]) fs.rmSync(dir, { recursive: true, force: true });
   });

@@ -254,6 +254,7 @@ contextBridge.exposeInMainWorld('zero', {
   cloudAccountSignOut: () => ipcRenderer.invoke('zero:cloud-account-sign-out'),
   cloudAccountPlan: () => ipcRenderer.invoke('zero:cloud-account-plan'),
   cloudAccountPay: (payload) => ipcRenderer.invoke('zero:cloud-account-pay', payload),
+  cloudAccountFromTeam: (payload) => ipcRenderer.invoke('zero:cloud-account-from-team', payload),
   cloudAccountBilling: () => ipcRenderer.invoke('zero:cloud-account-billing'),
   cloudAccountTeamBilling: () => ipcRenderer.invoke('zero:cloud-account-team-billing'),
   cloudClipboardCode: () => ipcRenderer.invoke('zero:cloud-clipboard-code'),

@@ -90,7 +90,7 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
   await mergeWhatMoved();
   if (runsEveryTest(git('diff', '--name-status', `${PUBLIC}/main`, 'HEAD'))) {
     say('the hook runs every test for this push, because it deletes code or changes what every test depends on.');
-    shipEndsBy = began + 58 * 60_000;
+    shipEndsBy = began + 118 * 60_000;
   }
   say(`pushing to ${PUBLIC} main (attempt ${attempt} of ${ATTEMPTS}). The hook runs the tests and the public check now.`);
   // ROOM FOR THE WHOLE TEST RUN TO COME BACK THROUGH HERE. The only test run a

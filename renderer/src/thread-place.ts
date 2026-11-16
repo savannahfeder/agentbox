@@ -68,6 +68,7 @@ export function leavePlace(key: string, news: number, parts: Parts): void {
 }
 
 /** Where to put her back, or null to open the thread as new. */
+
 export function placeToReturnTo(key: string, news: number): ThreadPlace | null {
   const kept = all().get(key);
   if (!kept || kept.news === undefined) return null;

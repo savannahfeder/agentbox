@@ -191,9 +191,13 @@ describe('what a demo never shows', () => {
     });
     made.push(out.home);
     expect(out.ok).toBe(true);
-    // Checked through the link, not on it: `~/.claude` really is on this Mac,
-    // so a link that had been made would resolve and this would go red.
-    expect(fs.existsSync(path.join(out.home, '.claude'))).toBe(false);
+    // A home with Claude Code is given an empty folder of its own, so the app does not read
+    // Claude Code as never set up (shared/fresh-user-home.mts). Empty, and no link to hers.
+    const folder = path.join(out.home, '.claude');
+    if (fs.existsSync(folder)) {
+      expect(fs.lstatSync(folder).isSymbolicLink()).toBe(false);
+      expect(fs.readdirSync(folder)).toEqual([]);
+    }
   });
 
   it('carries nothing about the person running it in anything it writes', () => {

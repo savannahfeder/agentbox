@@ -133,15 +133,16 @@ export const realItem = (aliases: Aliases, product: string, id: string) => (alia
  * hers in the thread, marked as waiting. What her computer turned down says
  * why, for a day after it did (second review, finding 9).
  */
-export function phoneView(rows: PhoneRows, now = Date.now()) {
+export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly { device: string; name: string }[] = []) {
   const names = new Map(rows.projects.map((p) => [phoneSlug(p.device, p.project), p.name]));
   // Each project's stand-in folders, so a path in a message finds its file here (cloud-files.ts).
   const places = cloudPlaces(rows.threads, phoneSlug);
   // Two computers' projects of the same name, told apart by which computer.
   const twice = new Set(rows.projects.map((p) => p.name).filter((n, i, all) => all.indexOf(n) !== i));
+  const computerOf = (device: string) => computers.find((c) => c.device === device)?.name || device.slice(0, 4);
   const products = rows.projects.map((p) => {
     const slug = phoneSlug(p.device, p.project);
-    return { slug, name: twice.has(p.name) ? `${p.name} (${p.device.slice(0, 4)})` : p.name, dir: places.get(slug)?.dir ?? '', oneLiner: '', repoPath: places.get(slug)?.repo ?? '' };
+    return { slug, name: twice.has(p.name) ? `${p.name} (${computerOf(p.device)})` : p.name, dir: places.get(slug)?.dir ?? '', oneLiner: '', repoPath: places.get(slug)?.repo ?? '' };
   });
   const items = new Map<string, PhoneItem>();
   const screenId = new Map<string, string>();

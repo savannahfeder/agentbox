@@ -355,6 +355,17 @@ export function previewCloud(now = () => Date.now()) {
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
   // `?scene=away`: a computer last online three hours ago, with no cloud to carry on.
   if (scene === 'away') rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now() - 180 * 60_000).toISOString() }));
+  // `?scene=computers`: projects from two other computers, off for days, beside this one's.
+  if (scene === 'computers') {
+    const days = (n: number) => new Date(now() - n * 24 * 3600_000).toISOString();
+    rows.projects.push(
+      { device: '0d99e1f2a3b4', project: 'my-workspace', name: 'My Workspace', updated_at: days(3) },
+      { device: '0d99e1f2a3b4', project: 'web-todo', name: 'Web Todo', updated_at: days(3) },
+      { device: 'ac08b1c2d3e4', project: 'my-workspace', name: 'My Workspace', updated_at: days(9) },
+      { device: 'ac08b1c2d3e4', project: 'sandbox-1', name: 'Sandbox 1', updated_at: days(9) },
+    );
+    rows.projects.sort((a, b) => a.name.localeCompare(b.name));
+  }
   // `?scene=copies`: one task sent to Claude Code and again to Codex.
   if (scene === 'copies') {
     const stuck = rows.threads.find((t) => t.item === 'w-2b3c4d5e6f');
@@ -436,10 +447,11 @@ export function previewCloud(now = () => Date.now()) {
       const group = groups.select(table, query);
       if (group) return group;
       joined();
+      if (table === 'phone_projects' && scene === 'computers') return rows.projects.map((p) => (p.device === DEV ? { ...p, updated_at: new Date(now()).toISOString() } : p));
       if (table === 'phone_projects') return rows.projects;
       if (table === 'phone_threads') return rows.threads;
       if (table === 'phone_commands') return /taken_at=is\.null/.test(query) ? rows.commands.filter((c) => !c.taken_at) : rows.commands.filter((c) => c.taken_at);
-      if (table === 'phone_settings') return [structuredClone(settings)];
+      if (table === 'phone_settings') return [structuredClone(settings), ...(scene === 'computers' ? [{ ...structuredClone(settings), device: '0d99e1f2a3b4', name: 'Studio Mac', updated_at: rows.projects.find((p) => p.device === '0d99e1f2a3b4')?.updated_at ?? '' }] : [])];
       if (table === 'team_members') return /person_id=eq/.test(query) ? [{ team_id: team.team.id }] : team.members;
       if (table === 'teams') return [team.team];
       if (table === 'people') return team.people.filter((p) => team.members.some((m) => m.person_id === p.id));
