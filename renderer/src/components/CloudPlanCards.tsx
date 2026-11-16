@@ -18,10 +18,8 @@ export function CloudPlanCards({ plan, onChoose, opening = null, waiting = null 
         <div key={c.id} className={`cloud-plan${c.current ? ' mine' : ''}${waiting === c.id && !c.current ? ' waiting' : ''}`}>
           <div className="cloud-plan-head"><span>{c.name}</span>{c.current && <span className="cloud-plan-mine">Your plan</span>}</div>
           <div className="cloud-plan-price">{c.price}<span> a month</span></div>
-          <div className="cloud-plan-slots">{c.slots}</div>
-          <div className="cloud-plan-where">running in the cloud</div>
-          <div className="cloud-plan-hours">{c.hours}</div>
-          <div className="cloud-plan-files">{c.files}</div>
+          <div className="cloud-plan-line">{c.agents}</div>
+          <div className="cloud-plan-line">{c.hours}</div>
           {c.current && plan ? (
             <div className="cloud-plan-use">
               <span>{usageLine(plan)}</span>

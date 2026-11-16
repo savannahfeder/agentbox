@@ -1,9 +1,9 @@
-// A NEW CLOUD ACCOUNT GETS NO FREE HOURS, AND IS OFFERED PRO'S FREE WEEK.
+// A NEW CLOUD ACCOUNT GETS NO FREE HOURS.
 //
 // From 2026-11-06 every account had 5 free cloud hours, two agents at once.
 // On 2026-11-16 the owner asked to "get rid of 5 free hours per free account,
-// instead we encourage ppl to try the paid trial": Pro's 7 days, 50 hours a
-// person. Measured on the stand-in gateway below: before this change a new
+// instead we encourage ppl to try the paid trial"
+// (tests/every-cloud-plan-starts-with-7-days-free). Measured on the stand-in gateway below: before this change a new
 // account with no plan started a run and /v1/me carried `free`, and the app
 // drew a Free plan with 5 hours on Settings › Plan and Billing.
 import { describe, it, expect } from 'vitest';
@@ -13,7 +13,6 @@ import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { cloudPlanOf } from '../main/cloud/account.mts';
 import { setupStep } from '../renderer/src/cloud-setup-step.ts';
 import { cloudOffer, planSummary } from '../renderer/src/cloud-upgrade.ts';
-import { offersProTrial } from '../renderer/src/pro-trial.ts';
 import { PRO_PITCH } from '../renderer/src/setup-split.ts';
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -125,22 +124,12 @@ describe('the app', () => {
     expect(setupStep({ managed: true, plan: { signedIn: true, plan: 'none' } })).toBe('pay');
   });
 
-  it('Plan and Billing has no Free plan to summarise, so it shows the offer and the plans', () => {
+  it('Plan and Billing has no Free plan to summarise, so it shows the plans', () => {
     expect(planSummary({ signedIn: true, ...server() } as never)).toBeNull();
   });
 
-  it('offers Pro\'s free week to someone with no plan who is on no team', () => {
-    const none = { signedIn: true, plan: 'none' as const };
-    expect(offersProTrial(none, false)).toBe(true);
-    // A team had its week; a paid plan needs none; signed out, nothing is known yet.
-    expect(offersProTrial(none, true)).toBe(false);
-    expect(offersProTrial({ signedIn: true, plan: 'pro' }, false)).toBe(false);
-    expect(offersProTrial({ signedIn: true, plan: 'team' }, false)).toBe(false);
-    expect(offersProTrial({ signedIn: false }, false)).toBe(false);
-    expect(offersProTrial(null, false)).toBe(false);
-  });
-
-  it('says the free week in the words of the setup\'s Pro page', () => {
+  // Each plan's own free week is tests/every-cloud-plan-starts-with-7-days-free.
+  it('the setup\'s Pro page still offers its free week', () => {
     expect(PRO_PITCH.cta).toBe('Try Pro free for 7 days');
     expect(PRO_PITCH.trial).toEqual({ label: 'First 7 days', price: 'Free', line: '50 cloud hours to try' });
   });

@@ -53,7 +53,11 @@ export function cloudOffer({ cloud, plan, waiting, macFull }: {
   return null;
 }
 
-export interface PlanCard { id: PaidPlan; name: string; price: string; slots: string; hours: string; files: string; current: boolean; button: string | null }
+export interface PlanCard {
+  id: PaidPlan; name: string; price: string; slots: string; hours: string; files: string; current: boolean; button: string | null;
+  /** What runs at once, and the month's hours, as the card says them. */
+  agents: string;
+}
 
 const filesWords = (gb: number) => `${gb >= 1024 ? `${n(gb / 1024)} TB` : `${n(gb)} GB`} of files in the cloud`;
 
@@ -61,6 +65,7 @@ export function planCards(plan: CloudPlan | null): PlanCard[] {
   const mine = paidOf(plan);
   // Off a plan set by hand, another plan is a first purchase, not a switch.
   const verb = mine && plan?.billing !== 'given' ? 'Switch to' : 'Choose';
+  const offer = mine ? null : plan?.trialOffer ?? null;
   return ORDER.map((id) => {
     const p = PLANS[id];
     return {
@@ -69,7 +74,9 @@ export function planCards(plan: CloudPlan | null): PlanCard[] {
       hours: `${n(p.hoursPerMonth)} hours a month`,
       files: filesWords(p.filesGB),
       current: mine === id,
-      button: mine === id ? null : `${verb} ${NAME[id]}`,
+      // The trial's hours on the button, since they grow with the plan.
+      button: mine === id ? null : offer ? `Try free · ${n(offer.hours[id])} hours` : `${verb} ${NAME[id]}`,
+      agents: p.unlimited ? 'Unlimited agents' : `${p.agents} agents`,
     };
   });
 }
@@ -89,18 +96,27 @@ export function planSummary(plan: CloudPlan | null): PlanSummary | null {
   const running = plan.running ?? 0;
   const hoursAll = plan.hoursPerMonth ?? PLANS[mine].hoursPerMonth;
   const manage = cloudBilling(plan).row;
+  const trial = plan.trial;
   return {
     name: `${Name} Cloud ${NAME[mine]}`,
-    price: `$${PLANS[mine].dollarsPerMonth} a month`,
-    who: manage ? 'Billed monthly by Stripe' : 'Set up for you, nothing to pay',
+    price: trial ? 'Free trial' : `$${PLANS[mine].dollarsPerMonth} a month`,
+    who: trial ? `then $${PLANS[mine].dollarsPerMonth} a month` : manage ? 'Billed monthly by Stripe' : 'Set up for you, nothing to pay',
     manage,
-    period: 'This month', change: 'Change plan',
+    period: trial ? 'Your trial' : 'This month', change: 'Change plan',
     agents: plan.unlimited
       ? { line: `${running} running, no limit`, percent: 0 }
       : { line: `${running} of ${plan.agents ?? 0} running`, percent: Math.min(100, Math.round((running / Math.max(1, plan.agents ?? 1)) * 100)) },
-    hours: { label: 'Hours used', line: `${n(Math.floor((plan.usedSeconds ?? 0) / 3600))} of ${n(hoursAll)} hours`, percent: usedPercent(plan) },
+    hours: trial
+      ? trialLeft(trial.hours, trial.usedSeconds)
+      : { label: 'Hours used', line: `${n(Math.floor((plan.usedSeconds ?? 0) / 3600))} of ${n(hoursAll)} hours`, percent: usedPercent(plan) },
   };
 }
+
+// The trial's hours never renew, so it says what is left; rounded up, so 0 means none.
+const trialLeft = (hours: number, usedSeconds: number) => {
+  const left = Math.max(0, hours * 3600 - usedSeconds) / 3600;
+  return { label: 'Trial hours left', line: `${n(Math.min(hours, Math.ceil(left * 10) / 10))} of ${n(hours)}`, percent: hours > 0 ? Math.round((left / hours) * 100) : 0 };
+};
 
 
 /** Whether Settings › Plan and Billing offers Stripe's billing page, and what it says instead. */

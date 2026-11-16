@@ -9308,7 +9308,6 @@ export default function App() {
           }}
           cloudPlans={snap.cloud?.managed || snap.cloud?.offered ? {
             signedIn: !!snap.cloud?.managed, onSignIn: () => { setSettingsOpen(false); setCloudSetupOpen(true); },
-            team: snap.team?.configured ? { on: !!snap.team.team, name: snap.team.me?.name ?? null } : undefined,
             // The preview has no team of its own, so it draws one from api.ts.
             teamPlan: (page) => {
               const known = snap.team?.people?.length ? { people: snap.team.people, meId: snap.team.me?.id ?? null } : api.fixtureTeamPeople();
@@ -9667,7 +9666,6 @@ export default function App() {
         <CloudSetup
           cloud={snap.cloud}
           plan={cloudPlan}
-          team={snap.team?.configured ? { on: !!snap.team.team, name: snap.team.me?.name ?? null } : undefined}
           signInAs={cloudSignInAs}
           onMode={(mode) => { void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
           onClose={() => { setCloudSetupOpen(false); setCloudSignInAs(null); }}

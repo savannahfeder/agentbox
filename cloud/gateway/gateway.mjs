@@ -10,7 +10,7 @@
 // in tests, and behind a plain HTTP server (gatewayServer).
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { PLANS, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE, FILES_LAPSE_DAYS } from './plans.mjs';
+import { PLANS, PLAN_TRIAL, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE, FILES_LAPSE_DAYS } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
 import { isKeyObject } from '../../shared/cloud-keys.mts';
@@ -165,7 +165,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const usedNow = (rec, t) => (rec.used[month(t)] || 0) + ownRuns(rec).reduce((sum, s) => sum + (t - Math.max(s.at, monthStart(t))) / 1000, 0);
   // With no plan of their own, runs spend the team's hours or none.
   const noPlan = (rec) => !planOf(rec).agents;
-  const ownOver = (rec, t) => planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600;
+  // A plan in its free week runs on the trial's hours, counted once, not the
+  // month's; so does one whose first charge has failed (past_due, never paid).
+  const inTrial = (rec) => !!PLAN_TRIAL.hours[rec.plan]
+    && (rec.stripe?.status === 'trialing' || (rec.stripe?.status === 'past_due' && rec.stripe.paid === false));
+  const trialUsedNow = (rec, t) => (rec.trialUsed || 0) + ownRuns(rec).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
+  const ownOver = (rec, t) => (inTrial(rec) ? trialUsedNow(rec, t) >= PLAN_TRIAL.hours[rec.plan] * 3600
+    : planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600);
   // TEAMS. Each member has hours of their own, as a seat is one person's plan
   // (the owner, 2026-11-08): the trial's, once, or a seat's, each month. They
   // are kept in the member's own record, so a member is held to them as to a plan.
@@ -245,7 +251,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const byMonth = { ...rec.teamUsed?.[s.team] };
       for (const [m, secs] of secondsByMonth(s.at, at)) byMonth[m] = (byMonth[m] || 0) + secs;
       rec.teamUsed = { ...rec.teamUsed, [s.team]: byMonth };
-    } else if (charged) for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
+    } else if (charged) {
+      for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
+      if (inTrial(rec)) rec.trialUsed = (rec.trialUsed || 0) + Math.max(0, (at - s.at) / 1000);
+    }
     if (!stoppingOf(rec).some((e) => e.sid === sid)) rec.stopping = [...stoppingOf(rec), { sid, tries: 0 }];
     if (charged) {
       rec.unrecorded = [...(rec.unrecorded || []), {
@@ -383,6 +392,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       billing: whoBills(rec),
       filesCap: filesCapOf(rec, tm),
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
+      ...(inTrial(rec) ? { trial: { hours: PLAN_TRIAL.hours[rec.plan], usedSeconds: Math.min(PLAN_TRIAL.hours[rec.plan] * 3600, Math.round(trialUsedNow(rec, t))) } } : {}),
+      ...(stripe && !rec.stripe?.subscription ? { trialOffer: { days: PLAN_TRIAL.days, hours: { ...PLAN_TRIAL.hours } } } : {}),
       // Hours and agents are this person's own; `people` is every member's, this one's included.
       ...(tm ? { team: {
         trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: null, running: teamRunning(tm, rec),
@@ -401,7 +412,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // Why a run spending these hours cannot start now, or null when it can.
   function paysRefusal(rec, plan, pays, team, t) {
     if (pays === 'own') {
-      if (ownOver(rec, t)) return { ok: false, error: 'hours', message: `This month's ${plan.hoursPerMonth} cloud hours are used.` };
+      if (ownOver(rec, t)) {
+        return { ok: false, error: 'hours', message: inTrial(rec)
+          ? `Your ${PLAN_TRIAL.hours[rec.plan]} trial hours are used. ${rec.plan[0].toUpperCase()}${rec.plan.slice(1)}'s ${plan.hoursPerMonth.toLocaleString('en-US')} hours a month start when the trial ends.`
+          : `This month's ${plan.hoursPerMonth} cloud hours are used.` };
+      }
       if (ownRuns(rec).length >= plan.agents) {
         return { ok: false, error: 'agents', message: plan.unlimited ? `${plan.agents} cloud agents are running, the most one account can run at once.` : `All ${plan.agents} of your cloud agents are running.` };
       }
@@ -792,7 +807,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     };
     const was = await settle(rec.checkout, rec.checkout?.plan === plan);
     if (was) return was;
-    const made = await stripe.checkout({ person, plan, customer: rec.stripe?.customer, successUrl: `${base}/v1/paid?plan=${plan}`, cancelUrl: `${base}/v1/paid?cancelled=1` });
+    // The free week is for someone who never had a subscription.
+    const trialEnd = rec.stripe?.subscription ? null : now() + PLAN_TRIAL.days * DAY_MS;
+    const made = await stripe.checkout({ person, plan, customer: rec.stripe?.customer, trialEnd, successUrl: `${base}/v1/paid?plan=${plan}`, cancelUrl: `${base}/v1/paid?cancelled=1` });
     // Another press may have opened one while this one was being made.
     let raced = null;
     await update(person, (r) => {
@@ -840,8 +857,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     await update(person, (rec) => {
       // An old subscription ending leaves alone a newer one that pays.
       if (!pays && rec.stripe?.subscription && rec.stripe.subscription !== sub.id && PAYING.has(rec.stripe.status)) return;
+      // As a team's: a past_due recorded before `paid` was kept is a renewal's retry.
+      const was = rec.stripe?.subscription === sub.id ? rec.stripe : null;
+      const paid = sub.status === 'active' || !!was && (was.paid === true || was.status === 'active' || (was.paid === undefined && was.status === 'past_due'));
       rec.plan = plan;
-      rec.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, at: now() };
+      rec.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, at: now() };
       if (pays) delete rec.checkout;
     });
     log(`${person} is on ${plan} (Stripe ${sub.status})`);

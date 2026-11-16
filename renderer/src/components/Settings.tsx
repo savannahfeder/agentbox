@@ -45,8 +45,6 @@ import { accountLabel, cloudAccountInUse, cloudRunsLine, cloudToggleTarget, coun
 import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
-import { ProTrialOffer, type TrialState } from './ProTrialOffer';
-import { offersProTrial, startProTrial } from '../pro-trial';
 import type { CloudPlan, FilesCloudStatus, TeamBillingDetails } from '../types';
 import { MACHINE, sizeWords } from '../files/files-shown';
 import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-words';
@@ -1006,7 +1004,7 @@ export interface TeamPlanPage {
   onPay: () => void; onManage: () => void; onInvite?: () => void;
 }
 
-function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite, team }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void; team?: { on: boolean; name: string | null } }) {
+function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void }) {
   const [plan, setPlan] = useState<CloudPlan | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
@@ -1067,16 +1065,6 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite, team }: { sign
     if (!out.ok) { setBillSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
     void read();
   };
-  const [trialState, setTrialState] = useState<TrialState>('idle');
-  const startTrial = async () => {
-    if (!signedIn) { onSignIn(); return; }
-    setSaid(null); setTrialState('opening');
-    const out = await startProTrial({ hasTeam: !!team?.on, name: team?.name });
-    if (!out.ok) { setTrialState('idle'); setSaid(out.message); return; }
-    setTrialState('waiting');
-    setWaitingFor(planKey(plan));
-  };
-  const trial = !!team && offersProTrial(plan, team.on);
   const bill = cloudBilling(plan);
   const cards = <CloudPlanCards plan={plan} opening={opening} waiting={waitingFor ? chosen : null} onChoose={(id) => void choose(id)} />;
   const lines = (
@@ -1123,18 +1111,8 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite, team }: { sign
       </Page>
     );
   }
-  // No plan and no team: Pro's free week first, the plans under it.
-  if (trial) {
-    return (
-      <Page title="Plan and Billing" lede="Every thread needs a slot to run in. Your computer has a few. The cloud adds more.">
-        <Group id="cloud-trial" label="Pro" bare><ProTrialOffer state={trialState} onStart={() => void startTrial()} /></Group>
-        {lines}
-        <Group id="cloud-plans" label="All plans" bare><div className="bill-cards">{cards}</div></Group>
-      </Page>
-    );
-  }
   return (
-    <Page title="Plan and Billing" lede="Every thread needs a slot to run in. Your computer has a few. The cloud adds more.">
+    <Page title="Plan and Billing" lede={plan?.trialOffer ? `Every plan starts with ${plan.trialOffer.days} days free.` : 'Every thread needs a slot to run in. Your computer has a few. The cloud adds more.'}>
       {cards}
       {lines}
       <Group id="cloud-counts" label="How the cloud counts" bare>
@@ -1780,7 +1758,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   onCloudSignIn?: (key: string | null, email: string | null) => void;
   /** Agentbox Cloud's plans, where this copy offers it: the Cloud page. */
   /** `teamPlan`: a team's own Plan and Billing page, handed in like `teamPane` so this screen holds no team code. */
-  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; team?: { on: boolean; name: string | null } } | null;
+  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode } | null;
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -2317,7 +2295,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
 
         {/* TEAM MANAGEMENT (w-8415594d19). It does not wait on `model`, because
             nothing on it comes from the settings file. */}
-        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan} team={cloudPlans.team}
+        {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan}
           onInvite={teamPane ? () => setPane('team') : undefined} />}
 
         {model && w && pane === 'files' && (

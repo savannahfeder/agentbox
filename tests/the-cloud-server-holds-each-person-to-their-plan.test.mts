@@ -224,8 +224,8 @@ describe('signing in', () => {
 
 // The owner's call, 2026-10-20 (w-6633e825a7), and again on 2026-11-16 after
 // eleven days of 5 free hours: no free cloud hours. The app itself is the free
-// part, and Pro's 7-day trial is how the cloud is tried
-// (tests/a-new-cloud-account-gets-no-free-hours-and-is-offered-the-pro-trial).
+// part, and each plan's 7-day trial is how the cloud is tried
+// (tests/every-cloud-plan-starts-with-7-days-free).
 describe('someone with no plan', () => {
   it('is asked to choose a plan before any run starts, and nothing is started', async () => {
     const { gw, sent } = setup();

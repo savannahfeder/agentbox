@@ -422,10 +422,15 @@ at AgentCore's published rates. The plan limits are set from these.
 - No free cloud hours (the owner, 2026-11-16: "get rid of 5 free hours per
   free account, instead we encourage ppl to try the paid trial"). From
   2026-11-06 every account had 5 hours once; they are gone, and a run left
-  going on them ends at the next call. Someone with no plan and no team is
-  offered Pro's 7-day trial (the team plan's trial, below) on the setup's Pro
-  page, the cloud setup and Settings › Plan and Billing. Sign-in is the app's
-  own sign-in page.
+  going on them ends at the next call. Sign-in is the app's own sign-in page.
+- Every paid plan starts with 7 days free, once per person: a checkout for
+  someone who never had a subscription carries Stripe's `trial_end`. "We
+  don't want to disincentivize people from using the more expensive plans"
+  (the owner, 2026-11-16), so the trial's hours are an eighth of the plan's
+  month: Pro 50, Plus 150, Max 375 (`PLAN_TRIAL`). They are counted once in
+  `trialUsed`, and a trial whose first charge fails (past_due, never paid)
+  stays on them, as a team's does. At $0.07 an agent-hour a whole Max trial
+  costs about $26.
 
 ### The team plan (the owner, 2026-11-06; to build for 2026-11-17)
 

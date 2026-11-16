@@ -45,7 +45,7 @@ describe('the plan cards', () => {
   it('are three, side by side, each with its price, agents and hours', () => {
     expect((html.match(/class="cloud-plan"/g) || []).length).toBe(3);
     const t = text(html);
-    for (const s of ['$40', '$100', '$200', '+10 agent slots', '+25 agent slots', 'Unlimited agent slots', '400 hours a month', '1,200 hours a month', '3,000 hours a month']) expect(t).toContain(s);
+    for (const s of ['$40', '$100', '$200', '10 agents', '25 agents', 'Unlimited agents', '400 hours a month', '1,200 hours a month', '3,000 hours a month']) expect(t).toContain(s);
   });
   it('each with its own button to choose it', () => {
     expect(text(html)).toMatch(/Choose Pro.*Choose Plus.*Choose Max/);

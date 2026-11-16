@@ -906,6 +906,10 @@ export interface CloudPlan {
   hoursPerMonth?: number;
   running?: number;
   usedSeconds?: number;
+  /** A paid plan in its free week: the trial's hours, which replace the month's until Stripe charges. */
+  trial?: { hours: number; usedSeconds: number };
+  /** Before any subscription: every paid plan's free week, and each plan's trial hours. */
+  trialOffer?: { days: number; hours: { pro: number; plus: number; max: number } };
   /** The team's hours: a trial until `endsAt`, or `seats` paid for; `seats` in a trial means the card is in and not yet charged. */
   /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {

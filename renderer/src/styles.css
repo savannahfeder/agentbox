@@ -6910,8 +6910,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 /* Paying first: Settings' three plan cards, side by side, on the setup screen. */
 .cs-plans { width: 760px; max-width: calc(100vw - 96px); }
 .cs-plans .cloud-plans { margin-top: 8px; }
-.cs-trial { width: 760px; max-width: calc(100vw - 96px); margin-top: 8px; text-align: left; }
-.cs-trial + .cs-plans .cloud-plans { margin-top: 12px; }
 .cs-pay-err { margin: 14px 0 0; font-size: 13px; color: var(--text); }
 .cs-row.fresh { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .cs-row-mark { display: flex; align-items: center; justify-content: center; color: var(--text); }
@@ -9449,35 +9447,22 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    cloud-slots/20). Your plan is outlined in the accent; the others carry the
    button that changes to them. */
 .set-group.cloud-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 36px; }
-.cloud-plan { display: flex; flex-direction: column; align-items: flex-start; padding: 18px 18px 18px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: color-mix(in srgb, var(--text) 3%, transparent); min-height: 196px; }
+.cloud-plan { display: flex; flex-direction: column; align-items: flex-start; padding: 18px 18px 18px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: color-mix(in srgb, var(--text) 3%, transparent); }
 .cloud-plan.mine { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .cloud-plan.waiting { border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong)); }
 .cloud-plan-head { display: flex; justify-content: space-between; width: 100%; font: 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); }
 .cloud-plan-mine { color: var(--accent); }
 .cloud-plan-price { margin-top: 12px; font-size: 28px; letter-spacing: -0.02em; color: var(--text); }
 .cloud-plan-price span { font-size: 13px; letter-spacing: 0; color: var(--text-faint); }
-.cloud-plan-slots { margin-top: 18px; font-size: 17px; color: var(--text); }
-.cloud-plan-where { margin-top: 2px; font-size: 13px; color: var(--text-faint); }
-.cloud-plan-hours { margin: 2px 0 18px; font-size: 13px; color: var(--text-faint); }
-.cloud-plan-hours:has(+ .cloud-plan-files) { margin-bottom: 0; }
-.cloud-plan-files { margin: 2px 0 18px; font-size: 13px; color: var(--text-faint); }
+.cloud-plan-line { margin-top: 4px; font-size: 13px; color: var(--text-dim); }
+.cloud-plan-price + .cloud-plan-line { margin-top: 6px; }
+.cloud-plan-line:last-of-type { margin-bottom: 22px; }
 .cloud-plan-go { margin-top: auto; }
 .cloud-plan-use { margin-top: auto; width: 100%; font-size: 12.5px; color: var(--text-dim); }
 .cloud-plan-bar { display: block; height: 2px; margin-top: 8px; background: var(--line); }
 .cloud-plan-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .cloud-counts { margin: 0; padding: 4px 0 0 18px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); user-select: text; -webkit-user-select: text; }
 .cloud-plans-say { margin: 14px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); user-select: text; -webkit-user-select: text; }
-/* Pro's free week for someone with no plan: the setup's free week beside the paid month (setup-split.css .ss-pricing). */
-.pt { border: 1px solid var(--line); border-radius: 10px; background: var(--wash); }
-.pt-pricing { display: grid; grid-template-columns: 1fr 1fr; }
-.pt-pricing > div { display: flex; flex-direction: column; gap: 6px; padding: 18px 18px 16px; }
-.pt-pricing > div + div { border-left: 1px solid var(--line); }
-.pt-label { font: 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); }
-.pt-price { display: flex; align-items: baseline; height: 34px; font-size: 28px; line-height: 34px; font-weight: 400; letter-spacing: -0.02em; color: var(--text); }
-.pt-price small { margin-left: 6px; font-size: 13px; letter-spacing: 0; color: var(--text-faint); }
-.pt-line { font-size: 13px; color: var(--text-dim); }
-.pt-acts { display: flex; align-items: center; gap: 14px; padding: 14px 18px 18px; border-top: 1px solid var(--line); }
-.pt-terms { font-size: 12.5px; color: var(--text-faint); }
 
 /* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }
