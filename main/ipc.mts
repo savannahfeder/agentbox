@@ -1124,6 +1124,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     try {
       const out = await team.signUp(email, password, name);
       push();
+      // The setup waits on "Check your email" and moves on by itself once this signs in.
+      void team.confirmation()?.then((ok) => {
+        if (ok) { try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ } }
+        push();
+      });
       return { ok: true, team: teamNow(), confirm: !!out?.confirm };
     } catch (err) {
       return { ok: false, error: String((err as Error)?.message ?? err), team: teamNow() };

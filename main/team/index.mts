@@ -187,7 +187,7 @@ export interface TeamSession {
   cancelSignIn?(): boolean | void;
   signInWithPassword?(email: string, password: string): Promise<TeamBackend>;
   adoptSession?(session: { supabaseUrl: string; access_token: string; refresh_token: string } | null): Promise<TeamBackend | null>;
-  signUp?(account: { email: string; password: string; name: string }): Promise<{ backend?: TeamBackend; confirm?: boolean } | null | undefined>;
+  signUp?(account: { email: string; password: string; name: string; log?: (line: string) => void }): Promise<{ backend?: TeamBackend; confirm?: boolean; confirmed?: () => Promise<TeamBackend>; stopWaiting?: () => void } | null | undefined>;
   signOut?(): Promise<unknown>;
   /** The cloud as nobody, for what anyone may read: a shared file's link. */
   anyone?(): Promise<TeamBackend | null>;
@@ -396,6 +396,7 @@ export function createTeamService({
   // `canSignIn` survives teamForWindow, so a build with Multiplayer off still asks.
   let state: TeamState = { ...EMPTY, configured: !!session?.configured, canSignIn: !!session?.configured, settling: !!session?.configured, phoneSite: site, phoneSiteQr: null };
   let backend: TeamBackend | null = null;
+  let confirming: Promise<boolean> | null = null;
   let sync: ReturnType<typeof createTeamSync> | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
   let unsubscribe: (() => void) | null = null;
@@ -931,13 +932,19 @@ export function createTeamService({
       return state;
     },
 
-    /** A new account: signed in at once, or { confirm: true } until the email is confirmed. */
+    /** A new account: signed in at once, or { confirm: true } and `confirmation` signs in once the email's link is followed. */
     async signUp(email: string, password: string, name: string) {
       if (!session?.signUp) throw new Error('this build cannot make accounts');
-      const out = await session.signUp({ email, password, name });
+      const out = await session.signUp({ email, password, name, log });
       if (out?.backend) { await signedIn(out.backend); return state; }
+      confirming = out?.confirmed
+        ? out.confirmed().then(async (b) => { await signedIn(b); return true; }, (err) => { log(`team: email confirmation: ${err?.message ?? err}`); return false; })
+        : null;
       return { ...state, confirm: true };
     },
+
+    /** True once the waiting confirmation link has signed this Mac in; null when none waits. */
+    confirmation: () => confirming,
 
     async signOut() {
       stopLoop();

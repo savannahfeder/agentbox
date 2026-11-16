@@ -53,11 +53,10 @@ const TERMS_URL = 'https://agentbox.ac/terms';
 const PRIVACY_URL = 'https://agentbox.ac/privacy';
 // WHAT THE CONFIRMATION LINK IS FOR (F-99, w-aaedc8f711). It used to say the
 // link signed you in, right after you had chosen a password, which reads like
-// a passwordless link. It confirms the address; the cloud's link comes back to
-// this computer's own listener, so the app carries on with nothing to press.
-export const checkEmailLede = (email: string, cloud: boolean) => (cloud
-  ? `We sent a link to ${email}. Follow it on this computer to confirm your address, and ${Name} carries on from there.`
-  : `We sent a link to ${email}. Follow it to confirm your address, then sign in here.`);
+// a passwordless link. It confirms the address; the link comes back to this
+// computer's own listener, so the app carries on with nothing to press.
+export const checkEmailLede = (email: string) =>
+  `We sent a link to ${email}. Follow it on this computer to confirm your address, and ${Name} carries on from there.`;
 const TermsLinks = () => <>the <a href={TERMS_URL} onClick={(e) => { e.preventDefault(); window.open(TERMS_URL, '_blank'); }}>Terms</a> and the <a href={PRIVACY_URL} onClick={(e) => { e.preventDefault(); window.open(PRIVACY_URL, '_blank'); }}>Privacy policy</a></>;
 
 export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', inSetup = false, onBack, primaryRef, termsAt = null, onClose, onSignedIn }: {
@@ -230,7 +229,7 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
   const lede = mode === 'reset' ? 'We will email you a link to open on this computer.'
     : mode === 'reset-sent' ? `We sent a link to ${email}. Open it on this computer.`
     : mode === 'new-password' ? 'You will be signed in with it.'
-    : mode === 'check-email' ? checkEmailLede(email, cloud)
+    : mode === 'check-email' ? checkEmailLede(email)
     // NO LINE UNDER THE HEADING ON THE CLOUD'S CARD (2026-10-26): "it just
     // feels a little cluttered with text". The heading says what the card is
     // for, and the two tabs keep the same height without it.

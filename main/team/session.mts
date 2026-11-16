@@ -14,7 +14,7 @@ import { CLOUD_ADDRESS, PHONE_SITE } from '../../shared/cloud-address.mts';
 import { runningAsAFreshUser } from '../../shared/fresh-user-home.mts';
 import { supabaseBackend } from './supabase-backend.mts';
 import { standinSession } from './standin-backend.mts';
-import { signInWithGoogle, cancelGoogleSignIn } from './sign-in.mts';
+import { signInWithGoogle, cancelGoogleSignIn, listenForTheConfirmationLink } from './sign-in.mts';
 import { plainAuthError } from './auth-words.mts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { TeamBackend, TeamSession } from './index.mts';
@@ -33,6 +33,8 @@ export interface CloudConfig {
   operator?: string;
   governingLaw?: string;
 }
+
+const SIGN_IN_RETURN = 'http://127.0.0.1:54783/auth/callback';
 
 export interface CloudConfigLookup { packaged?: boolean; home?: string; env?: NodeJS.ProcessEnv }
 
@@ -224,7 +226,7 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
     async signIn({ onUrl, log }: { onUrl?: (url: string) => void; log?: (line: string) => void } = {}) {
       if (!configured) throw new Error('this build has no team cloud configured');
       const c = await getClient();
-      await signInWithGoogle({ client: c, openExternal, onUrl, log, returnUrl: cloudConfig.signInReturn || 'http://127.0.0.1:54783/auth/callback' });
+      await signInWithGoogle({ client: c, openExternal, onUrl, log, returnUrl: cloudConfig.signInReturn || SIGN_IN_RETURN });
       return supabaseBackend(c);
     },
 
@@ -241,32 +243,24 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
 
     // A new account. With email confirmation on (the hosted project's setting)
     // there is no session until the link in the email is followed, so this
-    // answers { confirm: true } and the page says to check the inbox.
-    async signUp({ email, password, name }) {
+    // answers { confirm: true } and the page says to check the inbox. The link
+    // comes back to this Mac's sign-in address, held from now until it is
+    // followed or the link expires, and `confirmed` is that sign-in.
+    async signUp({ email, password, name, log = () => {} }) {
       if (!configured) throw new Error('this build has no team cloud configured');
-      // The plain kind of email link, which the phone website can finish; this
-      // Mac's own client would ask for a code only this Mac could spend.
-      const { createClient } = await import('@supabase/supabase-js');
-      const plain = createClient(cloudConfig.url, cloudConfig.anonKey, {
-        global: { fetch: withDeadline() },
-        auth: { flowType: 'implicit', persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
-      const { data, error } = await plain.auth.signUp({
+      const c = await getClient();
+      const returnUrl = cloudConfig.signInReturn || SIGN_IN_RETURN;
+      const { data, error } = await c.auth.signUp({
         email: String(email ?? '').trim(),
         password: String(password ?? ''),
-        options: {
-          data: { full_name: String(name ?? '').trim() || undefined },
-          // Else the email's link goes to the database's default, this Mac's sign-in listener, dead outside a sign-in.
-          // The allowed list reads site/**, which a bare host without its slash does not match.
-          emailRedirectTo: typeof cloudConfig.phoneSite === 'string' ? new URL(cloudConfig.phoneSite).href : undefined,
-        },
+        options: { data: { full_name: String(name ?? '').trim() || undefined }, emailRedirectTo: returnUrl },
       });
       if (error) throw new Error(plainAuthError(error.message));
-      if (!data?.session) return { confirm: true };
-      const c = await getClient();
-      const { error: kept } = await c.auth.setSession(data.session);
-      if (kept) throw new Error(plainAuthError(kept.message));
-      return { backend: supabaseBackend(c) };
+      if (data?.session) return { backend: supabaseBackend(c) };
+      // As long as the link lives (cloud/supabase/config.toml, otp_expiry).
+      const { over } = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log });
+      over.catch(() => {});
+      return { confirm: true, confirmed: () => over.then(() => supabaseBackend(c)), stopWaiting: () => { cancelGoogleSignIn(); } };
     },
 
     // The session an Agentbox Cloud sign-in made (main/cloud/account.mts), so

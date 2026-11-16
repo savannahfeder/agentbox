@@ -178,13 +178,15 @@ export async function signInWithGoogle({ client, openExternal, returnUrl, timeou
  * because nothing in this app waits for ever, least of all on the one address
  * the whole app signs in through.
  */
-export async function waitForTheConfirmationLink({ client, returnUrl, timeoutMs = 15 * 60 * 1000, log = () => {} }: {
-  client: SupabaseClient;
-  returnUrl: string;
-  timeoutMs?: number;
-  log?: (line: string) => void;
-}): Promise<void> {
-  const { over } = await returningFromTheBrowser({
+export async function waitForTheConfirmationLink(options: ConfirmationOptions): Promise<void> {
+  return (await listenForTheConfirmationLink(options)).over;
+}
+
+type ConfirmationOptions = { client: SupabaseClient; returnUrl: string; timeoutMs?: number; log?: (line: string) => void };
+
+/** The same wait, answering as soon as the address is held, so a link followed at once still finds it. */
+export async function listenForTheConfirmationLink({ client, returnUrl, timeoutMs = 15 * 60 * 1000, log = () => {} }: ConfirmationOptions): Promise<{ over: Promise<void> }> {
+  return returningFromTheBrowser({
     returnUrl,
     timeoutMs,
     log,
@@ -198,7 +200,6 @@ export async function waitForTheConfirmationLink({ client, returnUrl, timeoutMs 
       if (error) throw new Error(plainAuthError(error.message));
     },
   });
-  return over;
 }
 
 /**
