@@ -46,7 +46,7 @@ describe('the frame', () => {
     expect(css).toMatch(/\.tour-frame button \{[^}]*-webkit-app-region: no-drag;/);
   });
   it('lets you skip the walkthrough from the bar', () => {
-    expect(frame).toMatch(/<button type="button" className="tf-skip" onClick=\{onSkip\}>\{finished \? 'Close' : 'Skip walkthrough'\}<\/button>/);
+    expect(frame).toMatch(/<button type="button" className="tf-skip" onClick=\{onSkip\}>\{finished \? <>Close <kbd className="tf-key">↵<\/kbd><\/> : 'Skip walkthrough'\}<\/button>/);
     expect(app).toMatch(/onSkip=\{\(\) => setTour\(finishing \? closeFinish\(tour!\) : skipTour\(tour!\)\)\}/);
   });
 });

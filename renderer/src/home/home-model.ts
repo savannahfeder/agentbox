@@ -7,12 +7,6 @@ export function greeting(hour: number, name?: string | null): string {
   return first ? `${part}, ${first}` : part;
 }
 
-/** In place of the time of day, once the walkthrough's last tip has gone (../tour.ts saysFinished). */
-export function finishedHello(name?: string | null): string {
-  const first = name?.trim().split(/\s+/)[0];
-  return first ? `You finished the walkthrough, ${first}` : 'You finished the walkthrough';
-}
-
 const DAY = 86_400_000;
 
 /** Things finished on each of the last seven days, oldest first and today

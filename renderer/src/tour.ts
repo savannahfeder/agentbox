@@ -18,10 +18,8 @@ export interface Tour {
   urgent?: boolean;
   /** The one practice thread the walkthrough runs on, in a practice project nothing real is behind. */
   practice?: TourPractice;
-  /** The last tip is up on Home: you finished, and a real thread starts here. */
+  /** The last tip is up on Home, saying you finished. Never read back, so a reload ends it. */
   finishing?: boolean;
-  /** Home's greeting says you finished, from that tip going until a first real thread is sent. */
-  greets?: boolean;
 }
 
 export interface TourPractice { slug: string; item?: string; replies: number; answered?: number }
@@ -89,25 +87,20 @@ export function finishLesson(t: Tour, l: Lesson): Tour {
   if (t.done.includes(l)) return t;
   const next = { ...t, done: [...t.done, l] };
   // The lesson that ends the walkthrough starts its last word.
-  return !tourOver(t) && tourOver(next) ? { ...next, finishing: true, greets: true } : next;
+  return !tourOver(t) && tourOver(next) ? { ...next, finishing: true } : next;
 }
 export const tourFinishing = (t: Tour | null): boolean => !!t && !!t.finishing && tourOver(t);
 export const closeFinish = (t: Tour): Tour => ({ ...t, finishing: false });
-/** A real thread sent once the walkthrough is over: the last tip has been done, and nothing more is said. */
-export const firstThreadSent = (t: Tour): Tour => ((t.finishing || t.greets) && tourOver(t) ? { ...t, finishing: false, greets: false } : t);
-/** Not while the tip that says the same sentence is up: one screen says a thing once. */
-export const saysFinished = (t: Tour | null): boolean => !!t && !!t.greets && !t.finishing && tourOver(t);
+const BARE_MODIFIERS = ['Meta', 'Control', 'Alt', 'Shift', 'CapsLock'];
+/** Any key ends the last tip, except a modifier on its way to a chord. */
+export const keyEndsFinish = (key: string): boolean => !BARE_MODIFIERS.includes(key);
+type Press = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>;
+/** ↵ alone is the key the last tip names: it closes the tip and reaches nothing else. */
+export const keyClosesFinish = (e: Press): boolean => e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
 
-type Edges = { left: number; top: number; width: number; height: number };
-/** The last tip: a ring round Home's box with even room, and the card above the greeting on its left edge. */
-export function finishedPlace(box: Edges, hello: { left: number; top: number }, cardHeight: number) {
-  const ROOM = 6;
-  return {
-    glow: { x: box.left - ROOM, y: box.top - ROOM, w: box.width + 2 * ROOM, h: box.height + 2 * ROOM },
-    left: hello.left,
-    top: Math.max(12, hello.top - 20 - cardHeight),
-  };
-}
+/** The last tip stands above Home's greeting, on its left edge. */
+export const finishedPlace = (hello: { left: number; top: number }, cardHeight: number) =>
+  ({ left: hello.left, top: Math.max(12, hello.top - 20 - cardHeight) });
 export const lessonOf = (s: TourStep): Lesson =>
   s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s === 'inPalette' ? 'palette' : s === 'startHere' ? 'start' : s;
 
@@ -223,7 +216,7 @@ export function readTour(store: Store): Tour | null {
     const p = t.practice && typeof t.practice.slug === 'string'
       ? { practice: { slug: t.practice.slug, ...(typeof t.practice.item === 'string' ? { item: t.practice.item } : {}), replies: Number(t.practice.replies) || 0, ...(t.practice.answered ? { answered: Number(t.practice.answered) } : {}) } }
       : {};
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.finishing ? { finishing: true } : {}), ...(t.greets ? { greets: true } : {}) };
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p };
   } catch { return null; }
 }
 
