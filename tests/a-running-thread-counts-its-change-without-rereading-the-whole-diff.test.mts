@@ -91,7 +91,7 @@ describe('the summary of a saved change', () => {
 describe('who asks for which', () => {
   it('the handler answers a summary when asked for one', () => {
     const ipc = source('main/ipc.mts');
-    expect(ipc).toMatch(/summary \? readChangeSummary\(found\.path\) : readChange\(found\.path\)/);
+    expect(ipc).toMatch(/if \(summary\) return \{ ok: true, change: readChangeSummary\(found\.path\) \};\s*const change = readChange\(found\.path\)/);
   });
 
   it('the readers that poll or only count ask for the summary', () => {

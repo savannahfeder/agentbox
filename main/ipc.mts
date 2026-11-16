@@ -3,7 +3,8 @@ import {submitReply} from './live-replies.mts';
 import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mts';
 import { leftByAMove } from '../shared/move-thread.mts';
 import { moveThread } from './move-thread.mts';
-import { whereTheWorkStands } from './git-change.mts';
+import { whereTheWorkStands, type WorkStands } from './git-change.mts';
+import { gitJob } from './git-change-offthread.mts';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mts';
 import { projectSeenBy } from '../shared/thread-cards.mts';
@@ -52,7 +53,7 @@ import { linkCopyOf, linkKindOf, linkSource } from './file-link.mts';
 import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
-import { readChange, readChangeSummary } from './code-change.mts';
+import { readChange, readChangeSummary, withStandsNow } from './code-change.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
@@ -2943,7 +2944,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     });
     if (!found.ok) return found;
     try {
-      return { ok: true, change: summary ? readChangeSummary(found.path) : readChange(found.path) };
+      if (summary) return { ok: true, change: readChangeSummary(found.path) };
+      const change = readChange(found.path);
+      // Only the pane's read, which draws "not committed"; the summary is polled.
+      const prod = store.listProducts().find((p) => p.slug === product);
+      let folder: string | null = null;
+      try { folder = prod?.repoPath && change.item ? taskFolderPath(supervisor.productFolder(prod), change.item) : null; } catch { folder = null; }
+      const now = folder && fsWatch.existsSync(folder)
+        ? await (gitJob('whereTheWorkStands', folder) as Promise<WorkStands>).catch(() => null)
+        : null;
+      return { ok: true, change: withStandsNow(change, now) };
     } catch (e) {
       return { ok: false, error: `that change could not be read (${(e as Error).message})` };
     }

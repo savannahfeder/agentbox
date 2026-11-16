@@ -23,7 +23,7 @@ interface GitJobRequest {
 }
 
 const change = { ...git, saveRunChange } as unknown as Record<string, Job>;
-const JOBS = new Set(['snapshotRepo', 'saveRunChange']);
+const JOBS = new Set(['snapshotRepo', 'saveRunChange', 'whereTheWorkStands']);
 
 let worker: Worker | null = null;
 let broken = false;
