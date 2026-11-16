@@ -160,7 +160,9 @@ function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   // Something she said after scheduling it runs now, and its answer is hers to read now.
   const spokeSince = (i.wrote?.answer?.ts ?? 0) > (i.wrote?.runAt?.ts ?? 0);
   const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
-  const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
+  // A pick lifts Later with no write of its own, so an answer after it lifts it here.
+  const answered = !!liveAnswer(i) && (i.wrote?.answer?.ts ?? 0) > (i.wrote?.snoozedUntil?.ts ?? 0);
+  const reminder = i.wrote?.snoozedUntil?.source === 'founder' && !answered ? i.snoozedUntil ?? 0 : 0;
   return Math.max(mine, reminder, legacySnooze);
 }
 
