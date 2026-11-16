@@ -11923,8 +11923,12 @@ export class Supervisor {
     const refuse = (reason: string, engine: string | null = null) => this._noteNotStarting(item, reason, engine ?? forcedEngine);
     if (this._heldFromStarting(item)) { refuse('held'); return; }
     // The app is merging its branch into main, which takes seconds and ends in
-    // an answer or a move to this computer (`_mergeHome`).
-    if (this._mergingHome?.has(item?.id)) return;
+    // an answer or a move to this computer (`_mergeHome`). A reply the queue
+    // marked for this start stays owed, or nothing ever carries it.
+    if (this._mergingHome?.has(item?.id)) {
+      if (continuation && item?.answer) this.redeliverAnswer(item, item.answer);
+      return;
+    }
     // Every other way in (a resume on wake, a held thread's retry) meets the
     // same rule as the queue: a run started in a dark wake dies at the next.
     if (this.asleep()) {
