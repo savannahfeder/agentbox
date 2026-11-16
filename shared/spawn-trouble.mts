@@ -342,7 +342,7 @@ export function refineCause(cause: string, plan: { ended?: unknown } | null | un
 // Both wordings are real: the CLI's own line is "resets 6pm" and the API's is
 // "Your weekly limit resets at 4pm", so the "at" is optional.
 function resetClock(raw: unknown): { h: number; min: number; offset: number | null } | null {
-  const m = /resets\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*(?:\(\s*(?:UTC|GMT)\s*(?:([+-])(\d{1,2})(?::?(\d{2}))?)?\s*\))?/i
+  const m = /(?:resets|try again)\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*(?:\(\s*(?:UTC|GMT)\s*(?:([+-])(\d{1,2})(?::?(\d{2}))?)?\s*\))?/i
     .exec(String(raw ?? ''));
   if (!m) return null;
   const zoned = /\(\s*(?:UTC|GMT)/i.test(m[0]);

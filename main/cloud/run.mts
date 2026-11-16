@@ -457,6 +457,20 @@ export function limitInResultLine(line: string, now: number = Date.now()) {
   return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
 }
 
+// The same for a Codex turn relayed from the cloud: its code goes in front, as
+// main/codex-session.mts `troubleText` does, so the classifier reads it too.
+export function codexLimitInLine(line: string, now: number = Date.now()) {
+  let msg: { method?: string; params?: { turn?: { status?: string; error?: { message?: unknown; codexErrorInfo?: unknown } } } } | null;
+  try { msg = JSON.parse(line); } catch { return null; }
+  if (msg?.method !== 'turn/completed' && msg?.method !== 'turn/failed') return null;
+  const turn = msg.params?.turn;
+  if (!turn || (turn.status ?? 'failed') !== 'failed') return null;
+  const info = turn.error?.codexErrorInfo;
+  const text = `${typeof info === 'string' && info !== 'other' ? `${info}: ` : ''}${String(turn.error?.message ?? '')}`;
+  if (troubleCause(text) !== 'at-limit') return null;
+  return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
+}
+
 // A Codex turn that failed because the cloud's sign-in was refused, off one
 // relayed app-server frame. The cloud only checks a Codex sign-in's expiry, so
 // this is how a refused one is found out.
@@ -1737,6 +1751,8 @@ export async function cloudRun({
       codexLine = codexLine.slice(i + 1);
       if (!line.includes('"turn/')) continue;
       if (codexLoginRefusedInLine(line)) loginTrouble = { state: 'refused', id: login?.id ?? null };
+      const until = codexLimitInLine(line);
+      if (until) { try { onLimit({ until }); } catch { /* noted elsewhere */ } }
     }
   }
   async function sayWhatWasLost() {
