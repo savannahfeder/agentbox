@@ -10,6 +10,7 @@ import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClo
 import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
 import { chord } from '../this-keyboard';
+import { pointerMoved } from '../sidebar-shrinks';
 
 // The search glass drawn at the sidebar's stroke, like Feedback's plane.
 function SearchGlyph() {
@@ -124,7 +125,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   // A pointer passing over on its way somewhere else does not open it.
   const hoverAt = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hover = rail && onHover ? {
-    onMouseEnter: () => { hoverAt.current = setTimeout(() => onHover(true), 140); },
+    onMouseMove: (e: { movementX: number; movementY: number }) => { if (hoverAt.current || !pointerMoved(e)) return; hoverAt.current = setTimeout(() => onHover(true), 140); },
     onMouseLeave: () => { if (hoverAt.current) clearTimeout(hoverAt.current); hoverAt.current = null; onHover(false); },
   } : {};
   const me = team?.signedIn ? team.me : null;

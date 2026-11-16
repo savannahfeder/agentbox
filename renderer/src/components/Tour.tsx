@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -45,6 +45,8 @@ const SAY: Record<TourStep, { words: JSX.Element; side: Side }> = {
   urgent: { words: <>Urgent threads move up your list, and their agents start first</>, side: 'below-right' },
 };
 const PRACTICE_SEND = <>Press <K k={CMD} /><K k="↵" /> to send this practice thread</>;
+const PRACTICE_WORKING = <>Your agent is working. It moves to Needs you when it has something for you</>;
+const PRACTICE_OPEN = <>Agents land here when they need you. Press <K k="↵" /> to open this one</>;
 /** The urgent tip asks for nothing, so it goes by itself. */
 const URGENT_MS = 6000;
 
@@ -67,11 +69,13 @@ const firstRow = (running: boolean) => {
   return rows.find((r) => r.classList.contains('selected')) ?? rows[0] ?? null;
 };
 
+const practiceRow = (id: string) => document.querySelector<HTMLElement>(`.list-pane .row[data-item-id="${id}"]:not([data-catching-up])`);
+
 const urgentCell = () => document.querySelector<HTMLElement>('.list-pane .row.selected .th-cell-prio.urgent');
 
 const needsYouTab = () => document.querySelector<HTMLElement>('.tm-tab[data-hint="state-tab"]');
 
-function targetsOf(step: TourStep): HTMLElement[] {
+function targetsOf(step: TourStep, practiceId: string | null = null): HTMLElement[] {
   const card = document.querySelector('.tc-card');
   const one = (el: Element | null | undefined) => (el ? [el as HTMLElement] : []);
   switch (step) {
@@ -83,9 +87,9 @@ function targetsOf(step: TourStep): HTMLElement[] {
     case 'pick': return one(card?.querySelector('[data-tour="ideas"]'));
     case 'write': return one(card?.querySelector('textarea'));
     case 'send': return one(card?.querySelector('.tc-send'));
-    case 'working': return one(firstRow(true));
+    case 'working': return one(practiceId ? practiceRow(practiceId) : firstRow(true));
     case 'answered': return one(needsYouTab());
-    case 'open': return one(firstRow(false));
+    case 'open': return one(practiceId ? practiceRow(practiceId) : firstRow(false));
     case 'choose': return one(document.querySelector('.opt-row')?.parentElement);
     case 'reply': return one(document.querySelector('.dock-pill'));
     case 'close': return one(document.querySelector('.ts-done'));
@@ -137,7 +141,7 @@ function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   return { x, y, w: Math.max(...rs.map((r) => r.right)) - x, h: Math.max(...rs.map((r) => r.bottom)) - y };
 }
 
-function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean, answering: boolean): TourScreen {
+function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean, answering: boolean, practiceId: string | null = null): TourScreen {
   const card = document.querySelector<HTMLElement>('.tc-card');
   return {
     composer: !card ? 'none' : card.classList.contains('tc-inline') ? 'inline' : 'card',
@@ -147,6 +151,7 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
     view,
     rows: document.querySelectorAll(ROWS).length,
     running: document.querySelectorAll('.list-pane .row[data-item-id] .s-running').length,
+    practice: !!practiceId && !!practiceRow(practiceId),
     waiting: Number(needsYouTab()?.querySelector('b')?.textContent) || 0,
     thread,
     preparing: stillPreparing({ thread, onPage: !!document.querySelector('.one-catching-up'), ready: document.querySelectorAll(ROWS).length, writing: document.querySelectorAll('.list-pane .row[data-catching-up]').length }),
@@ -162,10 +167,39 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
 
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
-export function Tour({ tour, practice = false, answering = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
+type Finished = ReturnType<typeof finishedPlace>;
+/** The walkthrough's last word, on Home's box: you finished, and a real thread starts here. */
+export function TourFinished({ covered }: { covered: boolean }) {
+  const [at, setAt] = useState<Finished | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const read = () => {
+      const box = document.querySelector('.hm-start .tc-card')?.getBoundingClientRect();
+      const hello = document.querySelector('.hm-hello')?.getBoundingClientRect();
+      const h = cardRef.current?.offsetHeight ?? 0;
+      const next = covered || !box?.width || !hello || !h ? null : finishedPlace(box, hello, h);
+      setAt((was) => (same(was?.glow ?? null, next?.glow ?? null) && was?.left === next?.left && was?.top === next?.top ? was : next));
+    };
+    read();
+    const t = setInterval(read, 120);
+    return () => clearInterval(t);
+  }, [covered]);
+  return (
+    <>
+      {at && <div className="tour-glow tour-glow-box" style={{ left: at.glow.x, top: at.glow.y, width: at.glow.w, height: at.glow.h }} aria-hidden="true" />}
+      <div ref={cardRef} className="tour-card" role="status" style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}>
+        <span className="tour-say">You finished the walkthrough. Type your first real thread and press <K k={CMD} /><K k="↵" /></span>
+      </div>
+    </>
+  );
+}
+
+export function Tour({ tour, practice = false, practiceId = null, answering = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
   tour: TourState | null;
   /** Home's box holds the walkthrough's practice task. */
   practice?: boolean;
+  /** The practice thread's id once it is sent: the list tips are about its row and no other. */
+  practiceId?: string | null;
   /** The practice thread on screen is waiting for its answer. */
   answering?: boolean;
   view: string;
@@ -194,6 +228,9 @@ export function Tour({ tour, practice = false, answering = false, view, thread, 
   const before = useRef<TourScreen | null>(null);
   const countedSteps = useRef(new Set<number>());
   const live = tourLive(tour);
+  // A lesson learned by a press is written a beat after the press. What the app wrote in between
+  // (the pick it has just counted as a reply) must still be there, so the write starts from what is saved.
+  const learnSoon = (l: Lesson) => setTimeout(() => { const saved = readTour(localStorage) ?? tour; if (saved) onChange(finishLesson(saved, l)); }, 0);
   const point = useRef(onPoint);
   point.current = onPoint;
   const walked = useRef(false);
@@ -230,7 +267,7 @@ export function Tour({ tour, practice = false, answering = false, view, thread, 
   useEffect(() => {
     if (!live || !tour) { if (shown.current) { shown.current = null; setStep(null); } return undefined; }
     const read = () => {
-      const screen = readScreen(view, thread, covered, palette, answering);
+      const screen = readScreen(view, thread, covered, palette, answering, practiceId);
       const rawStep = tourStep(tour, screen);
       // Told to go and explore, nobody is then asked to come back and watch.
       const wanted = rawStep === 'working' && tried ? null : rawStep;
@@ -253,7 +290,8 @@ export function Tour({ tour, practice = false, answering = false, view, thread, 
         shownAt.current = Date.now();
         setStep(next);
         // A tip read and gone because the screen it asked for came is not shown again.
-        if (was && seenFor >= SEEN_MS && !covered && learnedBy(was, before.current, screen)) {
+        // Going to Needs you is not opening the practice thread: its tip there is still to come.
+        if (was && seenFor >= SEEN_MS && !covered && !(practiceId && was === 'answered') && learnedBy(was, before.current, screen)) {
           onChange(finishLesson(tour, lessonOf(was)));
           return;
         }
@@ -263,20 +301,22 @@ export function Tour({ tour, practice = false, answering = false, view, thread, 
         const id = firstRow(false)?.dataset.itemId;
         if (id) point.current(id);
       }
-      const b = next ? boxOf(next, targetsOf(next)) : null;
+      if (practiceId && (next === 'open' || next === 'working') && !walked.current) point.current(practiceId);
+      const b = next ? boxOf(next, targetsOf(next, practiceId)) : null;
       if (!same(boxNow.current, b)) { boxNow.current = b; setBox(b); }
     };
     read();
     const t = setInterval(read, 120);
     return () => clearInterval(t);
-  }, [live, tour, view, thread, covered, palette, answering, onChange, tried]);
+  }, [live, tour, view, thread, covered, palette, answering, onChange, tried, practiceId]);
 
   // THE CARD, beside the glow, kept inside the window.
   useEffect(() => {
     const c = cardRef.current;
     if (!box || !step || !c) { if (cardNow.current) { cardNow.current = null; setCardAt(null); } return; }
     const w = c.offsetWidth, h = c.offsetHeight;
-    const side = SAY[step].side;
+    // Under the practice row's name, where the tip before it stood.
+    const side = step === 'open' && practiceId ? 'below' : SAY[step].side;
     let left = side === 'below-right' ? box.x + box.w - w : box.x;
     let top = side === 'above' ? box.y - GAP - h : box.y + box.h + GAP;
     // On the page the suggestions hang under Send: below it the card covers the first, above it your words.
@@ -289,8 +329,9 @@ export function Tour({ tour, practice = false, answering = false, view, thread, 
     if (step === 'palette' || (step === 'urgent' && !urgentCell())) {
       const pane = document.querySelector('.list-pane')?.getBoundingClientRect();
       left = pane ? pane.left + (pane.width - w) / 2 : (window.innerWidth - w) / 2;
-      // Under the tabs on a list; on a thread, in the empty middle of its header line.
-      top = document.querySelector('.tm-tab') ? box.y + box.h + 3 * GAP : box.y + (box.h - h) / 2;
+      // In the empty middle of the line: a list's tabs or a thread's header. Under the tabs when they reach it.
+      const tabsEnd = [...document.querySelectorAll('.tm-tab')].at(-1)?.getBoundingClientRect().right ?? null;
+      top = tabsEnd !== null && !fitsBesideTabs(tabsEnd, left, GAP) ? box.y + box.h + 3 * GAP : box.y + (box.h - h) / 2;
     }
     left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
     top = Math.max(12, Math.min(top, window.innerHeight - h - 12));
@@ -316,16 +357,15 @@ export function Tour({ tour, practice = false, answering = false, view, thread, 
     const down = (e: PointerEvent) => {
       if (!onTarget(e.target)) return;
       if (IN_THE_BOX.includes(step) || step === 'busy' || step === 'palette' || step === 'gettingReady' || step === 'inPalette') return;
-      setTimeout(() => onChange(finishLesson(tour, lessonOf(step))), 0);
+      learnSoon(lessonOf(step));
     };
     const key = (e: KeyboardEvent) => {
-      // After the press has reached the app: saving now redraws it first, and the press is lost.
-      const later = (t: TourState) => setTimeout(() => onChange(t), 0);
       const typing = (e.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]');
       // The app holds the first E on a thread waiting on an answer, so it counts only once the thread has gone.
       // A close is counted when the app closes the thread (THREAD_CLOSED below); the first E on a waiting thread is held.
       if (!typing && closesThread(e, thread)) return;
-      if (!typing && keyLearns(step, e)) { later(finishLesson(tour, lessonOf(step))); return; }
+      // After the press has reached the app: saving now redraws it first, and the press is lost.
+      if (!typing && keyLearns(step, e)) { learnSoon(lessonOf(step)); return; }
     };
     window.addEventListener('pointerdown', down, true);
     window.addEventListener('keydown', key, true);
@@ -351,7 +391,7 @@ export function Tour({ tour, practice = false, answering = false, view, thread, 
       {step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
-        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : step === 'send' && practice ? PRACTICE_SEND : SAY[step].words}</span>
+        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : step === 'send' && practice ? PRACTICE_SEND : step === 'working' && practiceId ? PRACTICE_WORKING : step === 'open' && practiceId ? PRACTICE_OPEN : SAY[step].words}</span>
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
         {step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick={openNotifySettings}>Didn’t see it? Open settings</button>}
       </div>

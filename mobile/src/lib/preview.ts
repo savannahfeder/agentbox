@@ -29,7 +29,9 @@ export function previewRows(now = Date.now()): PhoneRows {
   const roundNote = "Three versions of the inbox are in the folder below. I'd go with the quiet one: it reads fastest at arm's length.\n\n~/docs/agentbox/designs/w-8b9c0d1e2f/\n\nWhat each one changes is in `designs/w-8b9c0d1e2f/inbox-versions.md`, and `designs/w-8b9c0d1e2f/compare.html` sets them side by side.\n\nThe walk-through is a short film: `designs/w-8b9c0d1e2f/walkthrough.mp4`\n\nThe threads I drew them from are in `designs/w-8b9c0d1e2f/threads.csv`, and the counts in `designs/w-8b9c0d1e2f/counts.json`.\n\nThe full recording, `recordings/session.mov`, is too big for the phone.\n\n## Options\n1. Go with the quiet one (recommended)\n2. Try a fourth version";
   const stuckAsk = 'Threads stuck on a Codex limit should land in Needs you.';
   const stuckNote = 'I found where a run that hits its limit is put back. Two ways to fix it:\n\n- Mark it stopped, so it shows in Needs you with the reason.\n- Retry on another account first, and only then show it.\n\n## Options\n1. Mark it stopped (recommended)\n2. Retry on another account first';
-  const meterResult = 'Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
+  const fizzAsk = 'Make fizz(15) return FizzBuzz and add a test.';
+  const fizzResult = 'fizz(15) now returns FizzBuzz, with a test for 3, 5 and 15. Committed as 9dfb76a; the working tree is clean.';
+  const meterResult ='Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
   const qualityNote = '**Sign-up fails on a slow connection.**\n\nOn a throttled connection the email step gives up after 10 seconds and the form clears what you typed. The fix keeps your words and waits 30 seconds.\n\n## Options\n1. Ship the fix (recommended)\n2. Show me the steps first';
   return {
     projects: [
@@ -62,6 +64,11 @@ export function previewRows(now = Date.now()): PhoneRows {
           [60, '[Bash] npx vitest run tests/account-meter.test.mts'], [56, 'The test passes and the meter reads "resets 6:19pm".'],
         ].map(([m, said]) => `${new Date(at(m as number)).toISOString().slice(11, 19)}  ${said}`).join('\n') }],
       }),
+      // A finished run that left a commit and offered nothing: the app asks Ship it (shared/phone-snapshot.mts `phoneChangeOf`).
+      thread('site', { id: 'w-5e6f7a8b9d', title: 'Make fizz(15) say FizzBuzz', status: 'open', priority: 0, engine: 'codex', body: fizzAsk, result: fizzResult, createdAt: at(30), updatedAt: at(3), wrote: { body: her(at(30)), result: agent(at(3)) } }, [
+        { ts: at(30), source: 'founder', patch: { body: fizzAsk } },
+        { ts: at(3), source: 'agent', patch: { result: fizzResult } },
+      ], { change: { plus: 13, minus: 1, files: [{ path: 'src/fizz.js', plus: 2, minus: 1 }, { path: 'test/fizz.test.js', plus: 11, minus: 0 }], committed: true, uncommitted: false, knowsYou: true } }),
       thread('agentbox', { id: 'w-4d5e6f7a8b', title: 'Draw the sign-in screen', status: 'claimed', priority: 5, body: 'Draw five sign-in screens on the real app.', createdAt: at(40), updatedAt: at(2), wrote: { body: her(at(40)) } }, [
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
@@ -371,7 +378,8 @@ export function previewCloud(now = () => Date.now()) {
     const stuck = rows.threads.find((t) => t.item === 'w-2b3c4d5e6f');
     if (stuck) rows.threads.push({ ...stuck, item: 'w-2b3c4d5e70', snapshot: { ...stuck.snapshot, item: { ...stuck.snapshot.item, id: 'w-2b3c4d5e70', engine: 'codex' } as WorkItem } });
   }
-  let signedIn = scene !== 'signed-out' && !walking;
+  // `?scene=ran-out`: the sign-in page after the cloud refused to renew the sign-in.
+  let signedIn = scene !== 'signed-out' && scene !== 'ran-out' && !walking;
   const settings = previewSettings(now());
   // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.
   if (scene === 'codex') (settings.settings.workspace as PreviewWorkspace).engine = 'codex';
@@ -503,6 +511,7 @@ export function previewCloud(now = () => Date.now()) {
     async finishGoogle() { signedIn = true; signedInAt = now(); return session()!; },
     async askPasswordReset() {},
     resetAsked: () => false,
+    lapsed: () => (scene === 'ran-out' && !signedIn ? 'you@example.com' : null),
     async finishReset() { signedIn = true; signedInAt = now(); return session()!; },
     async setPassword() {},
     signOut() { signedIn = false; },

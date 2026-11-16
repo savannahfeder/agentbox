@@ -16,6 +16,9 @@ import { herTurnEnds, herTurnStarts } from '../../../renderer/src/her-turns';
 import { filedOnTurn } from '../../../renderer/src/filed-in-thread';
 import { approvableFiled, doItHereWords, threadsMade } from '../../../renderer/src/threads-made';
 import { closeAsk } from '../../../renderer/src/close-asks-first';
+import { figuresFrom } from '../../../renderer/src/change-figures';
+import { referencedFiles } from '../../../renderer/src/referenced-files';
+import { changedFiles, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom } from '../../../renderer/src/ship-offer';
 import { conversationGap, gapIndex } from '../../../shared/agents.mts';
 import { groupWork } from '../../../shared/work-lines.mts';
 import type { AgentSaid, AgentWork, ThreadStateWord, WorkItem } from '../../../renderer/src/types';
@@ -101,6 +104,13 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const waitingFiled = filed.filter((f) => f.approve);
 
   const outcome = built.outcome ? { ...built.outcome, text: clean(built.outcome.text) } : null;
+  // What the last run changed, and the decision the desktop asks over it when the agent offered none (Focus.tsx `shipAsk`).
+  const change = (view.changes ?? {})[`${product}/${id}`] ?? null;
+  const figures = change ? figuresFrom(change) : null;
+  const dir = view.products.find((p) => p.slug === product)?.dir || null;
+  const shipAsk = !item.waitsForMac && shipOfferLive(item, { change: !!figures, running: !!session })
+    ? shipOfferFor(standingFrom(change), onlyNamedFiles(changedFiles(change), referencedFiles(item.result, item.note, item.body, item.answer, { dir }), dir))
+    : null;
   return {
     item,
     title: rowTitle(item),
@@ -119,9 +129,10 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     // A result an agent finished the thread on leads unlabelled (ItemThread.tsx).
     outcome: outcome && { ...outcome, label: resultLeads(item) && outcome.field === 'result' ? null : outcome.field === 'result' ? 'Result' : 'Latest checkpoint' },
     after: [...built.after, ...receiptsFor(view, product, id)].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)),
-    options: (live ? itemOptions(item) : []) as ParsedOption[],
+    options: (live ? itemOptions(item) : shipAsk?.options ?? []) as ParsedOption[],
     // The question the options answer, the options card's heading (OptionsOffer.tsx).
-    ask: live ? askHeading(item) : '',
+    ask: live ? askHeading(item) : shipAsk?.headed ? shipAsk.ask : '',
+    change: figures && change ? { ...figures, list: change.files, more: change.more ?? 0 } : null,
     parent,
     filed,
     filedOnTurn: placed.onTurn,

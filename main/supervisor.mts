@@ -167,6 +167,7 @@ import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
 import { claudeModelRows } from './claude-models.mts';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 import { CodexUsage, codexAccountReadings } from './codex-usage.mts';
+import { askCodexForUsage } from './codex-usage-on-refresh.mts';
 import { codexBackAt } from '../shared/codex-usage.mts';
 import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadParams } from './codex-session.mts';
 import type { CodexServerClient, ConnectionServer, ConnectionServers } from './codex-session.mts';
@@ -764,6 +765,8 @@ export interface SupervisorStore {
   recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
+  /** Who is signed in on this computer; absent on a store with no team. */
+  author?(): string | null;
   catchUpItem(slug: string, id: string, opts: { label?: string; problem?: string; result?: string }): unknown;
   routeItem(slug: string, id: string, patch: Record<string, unknown>): unknown;
   prioritizeItem(slug: string, id: string, value: unknown): unknown;
@@ -1398,6 +1401,7 @@ export class Supervisor {
   declare _lastFastExit: { at: number; cause: string; raw: string } | null | undefined;
   declare _lastStartAt: number | undefined;
   declare _lastParkSweep: number | undefined;
+  declare _sweeps: Map<string, { running: Promise<number>; next?: Promise<number> }> | undefined;
   declare _asleepQueue: { item: WorkItem; continuation: boolean }[] | undefined;
 
   declare _memoryLog: MemoryLog | undefined;
@@ -3456,7 +3460,7 @@ export class Supervisor {
     try { if (cloudWorkPending(taskFolderPath(base, item.id))) return null; } catch { /* no folder */ }
     try {
       const out = await folderJob('releaseTaskFolder', base, item.id);
-      await this.parkClosedFolders(product);
+      await this._sweepSoon(product);
       return out;
     } catch (error) {
       console.warn('zero: could not tidy the task folders:', (error as Error).message);
@@ -3704,8 +3708,34 @@ export class Supervisor {
     if (now - (this._lastParkSweep ?? 0) < Supervisor.PARK_SWEEP_MS) return;
     this._lastParkSweep = now;
     (async () => {
-      for (const product of this.store.listProducts()) await this.parkClosedFolders(product);
+      for (const product of this.store.listProducts()) await this._sweepSoon(product);
     })().catch((error) => console.warn('zero: could not put the finished folders away:', error.message));
+  }
+
+  /**
+   * ONE SWEEP OF A PROJECT AT A TIME, AND AT MOST ONE MORE BEHIND IT
+   * (2026-11-15). Every agent that finished used to start its own full sweep,
+   * and with 18 agents and 50 folders on her Mac one sweep was 32 s of
+   * `listTaskFolders` before it put a single folder away. They stacked up on the
+   * one folder thread faster than they drained, and new threads waited behind
+   * them for minutes. Now an agent finishing during a sweep shares a single
+   * follow-up with every other one that finishes meanwhile, so the folder it
+   * freed is still looked at, once. tests/finished-agents-share-one-tidy-up.
+   */
+  _sweepSoon(product: Product): Promise<number> {
+    const key = this.productFolder(product);
+    this._sweeps ??= new Map();
+    const now = this._sweeps.get(key);
+    if (now) {
+      now.next ??= now.running.catch(() => {}).then(() => this._sweepSoon(product));
+      return now.next;
+    }
+    const entry: { running: Promise<number>; next?: Promise<number> } = {
+      running: this.parkClosedFolders(product)
+        .finally(() => { if (this._sweeps?.get(key) === entry) this._sweeps.delete(key); }),
+    };
+    this._sweeps.set(key, entry);
+    return entry.running;
   }
 
   // A CLOSED THREAD WHOSE WORK NEVER REACHED MAIN COMES BACK, ONCE
@@ -4914,7 +4944,7 @@ export class Supervisor {
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
-      .filter((i) => wantsName(i) && !(now - (this._nameMisses.get(key(i)) ?? -Infinity) < NAME_RETRY_MS))
+      .filter((i) => wantsName(i, this.store.author?.() ?? null) && !(now - (this._nameMisses.get(key(i)) ?? -Infinity) < NAME_RETRY_MS))
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
     if (!next) return undefined;
     this._naming = true;
@@ -10784,8 +10814,15 @@ export class Supervisor {
     // had every task sent to a Claude Code that could not run. Both answers
     // come from the sign-in check (main/engine-setup.mts); until it has
     // answered, nothing moves.
-    const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true;
+    const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true && !this._addedClaudeSignedIn();
     return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
+  }
+
+  /** The launch check only asks the default login, so a signed-in added account must be counted here. */
+  _addedClaudeSignedIn() {
+    const home = this.config.home || os.homedir();
+    const dflt = path.join(home, '.claude');
+    return this._profiles().some((p) => p !== 'default' && path.resolve(p) !== dflt && !!accountIdentity(p, { home }));
   }
 
   /** What runs when nobody chose: Claude Code, or Codex on a Mac without it. */
@@ -11687,6 +11724,34 @@ export class Supervisor {
   /** The same, read again rather than off the cache (`CodexUsage.refreshNow`). */
   refreshCodexUsage() {
     return this._codexUsage().refreshNow();
+  }
+
+  /**
+   * Refresh on Settings › Codex: ask Codex for the live figure, then read as
+   *  `refreshCodexUsage` does. A failed ask leaves the last reading in place.
+   *  An app-server started only for this is closed again once it has answered. */
+  async askCodexUsage() {
+    const home = this._codexUsageHome();
+    if (this.config.codexBin && home) {
+      const already = this._codexServers?.get(home);
+      const startedHere = !already || already.client.isClosed();
+      let entry: CodexServerEntry | null = null;
+      try {
+        entry = this._codexServer(home);
+        const server = entry;
+        const answer = await askCodexForUsage(async (method, params) => { await server.handshake; return server.client.request(method, params); });
+        this._codexUsage().took(answer, home);
+      } catch (e) {
+        console.warn(`zero: codex usage refresh: ${(e as Error)?.message ?? e}`);
+      } finally {
+        const working = [...this.sessions.values()].some((s) => s.engine === 'codex' && !s.cloud && this._codexProfileHome(s.profile ?? 'default') === home);
+        if (startedHere && entry && !working && !entry.loaded?.size && this._codexServers?.get(home) === entry) {
+          this._codexServers.delete(home);
+          entry.client.close('Usage read; nothing else is running on this login');
+        }
+      }
+    }
+    return this.refreshCodexUsage();
   }
 
   /** Every Codex login's own reading, for the Settings page. */

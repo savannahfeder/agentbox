@@ -313,7 +313,7 @@ export default function Threads() {
   const [, setSkippedAt] = useState(0);
   const skipped = !!c.connect && waitSkipped(appStore, c.connect.email);
   const skip = () => { if (c.connect) skipWait(appStore, c.connect.email); setSkippedAt(Date.now()); };
-  const notice = c.status ? { message: c.status, next: c.statusNext } : waitNotice(c.connect);
+  const notice = c.status ? { message: c.status, next: null } : waitNotice(c.connect);
   const next = c.preview && !walking ? null : nextSetup({
     signedIn: c.signedIn, started: !c.loading, connect: !!c.connect && !skipped, noticeAnswered: !!c.notice,
     alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere: alertsHere || walking,

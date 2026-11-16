@@ -152,8 +152,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   // Codex level belongs to the model, so a remembered `ultra` on a model that
   // stops at `xhigh` is not sent. The memory is kept for when the model changes back.
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, engine));
-  const pickEffort = (id: string | null) => { setEffort(id); writeLastEffort(id, undefined, engine); };
-  const effortRows = effortChoicesFor(engine, model, { codexModels: codexModels ?? [], codexDefault: codexModelDefault ?? null });
+  const pickEffort = (id: string | null) => { setEffort(id); writeLastEffort(id, undefined, engine); };  const effortRows = effortChoicesFor(engine, model, { codexModels: codexModels ?? [], codexDefault: codexModelDefault ?? null });
   const effortOn = effortPicked(effort, effortRows) ? effort : null;
   // What the card opened with, frozen on the first render. The level and model
   // are remembered across cards, so only a difference from this shows the user

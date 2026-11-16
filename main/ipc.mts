@@ -506,12 +506,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     },
   });
 
-  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE }: { engine?: string } = {}) => {
+  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE, ask = false }: { engine?: string; ask?: boolean } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage refresh is only available in the main app window.');
-    // Codex is asked of this computer and not of OpenAI; main/codex-usage.mts
-    // says why there is no explicit read.
+    // Codex asks OpenAI only when the person pressed Refresh (`ask`); opening
+    // the page reads what this computer already has.
     if (engine !== DEFAULT_ENGINE) {
-      const reading = supervisor.refreshCodexUsage();
+      const reading = ask ? await supervisor.askCodexUsage() : supervisor.refreshCodexUsage();
       return reading ? { ok: true, reading: { engine, ...reading } } : { ok: false, error: 'Codex has reported no usage on this computer yet.' };
     }
     const result = await usage.refreshNow();
@@ -522,7 +522,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   const accountUsage = new AccountUsage({
     bin: () => config.claudeBin ?? null,
     env: () => supervisor._workerEnv(DEFAULT_ENGINE),
-    onReading: (profile, reading) => supervisor.noteUsageReading(profile, reading),
+    onReading: (profile, reading) => {
+      supervisor.noteUsageReading(profile, reading);
+      usage.adopt({ ...reading, profile });
+    },
     identity: (profile) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
   });
   ipcMain.handle('zero:account-usage', async (event, { refresh = false, engine = DEFAULT_ENGINE }: { refresh?: boolean; engine?: string } = {}) => {
@@ -1139,9 +1142,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:team-give-task', teamCall(({ to, title, body, priority, due, files, visibility, visibleTo, blockedBy }: { to: string; title?: string; body?: string; priority?: number; due?: unknown; files?: AttachmentFile[]; visibility?: string; visibleTo?: string[]; blockedBy?: unknown }) => team!.giveTask(to, { title, body, priority, due, files, visibility, visibleTo, blockedBy })));
   // Only a thread nothing is running on: closing one with an agent on it would
   // leave that agent writing into a thread its owner has given away.
-  ipcMain.handle('zero:team-hand-on', teamCall(async ({ product, id, to }: { product: string; id: string; to: string }) => {
+  ipcMain.handle('zero:team-hand-on', teamCall(async ({ product, id, to, note }: { product: string; id: string; to: string; note?: string }) => {
     if (supervisor.status().running?.some((r) => r.itemId === id)) throw new Error('An agent is still on this thread. Stop it, then give it.');
-    const made = await team!.handOn({ product, id, to });
+    const made = await team!.handOn({ product, id, to, note });
     supervisor.setThreadPins({ [id]: null });
     return made;
   }));
@@ -1316,7 +1319,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     await team!.syncNow();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac }: ComposeInput & { product: string; onMac?: unknown }) => {
+  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac, label }: ComposeInput & { product: string; onMac?: unknown; label?: unknown }) => {
     const out = store.composeItem(product, {
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
@@ -1347,6 +1350,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // fields cannot be corrected separately.
       model: supervisor.modelOffered(engine, model),
     });
+    // A thread a task was handed to an agent in keeps the task's name, so the namer leaves it.
+    if (typeof label === 'string' && label.trim() && out?.id) store.nameItem(product, out.id, label);
     // Before the wake below, so its first run cannot start in the cloud.
     if (onMac === true && out?.id) supervisor.setThreadOnMac({ [out.id]: true });
     // A real thread ends the walk's hold on agents (`Supervisor#sentByThem`).
@@ -2205,6 +2210,19 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return plan;
   });
   ipcMain.handle('zero:cloud-account-pay', (_e, { plan }: { plan?: string } = {}) => cloudCall('payForCloud', { plan }));
+  // The setup makes a team account one step before it offers Pro, and the payment is the cloud's.
+  ipcMain.handle('zero:cloud-account-from-team', async (_e, { acceptTerms }: { acceptTerms?: unknown } = {}) => {
+    try {
+      const home = supervisor.config.home || os.homedir();
+      const { cloudAccountConfig, cloudFromTeamSignIn } = await import('./cloud/account.mts');
+      const { loadCloudConfig } = await import('./team/session.mts');
+      const out = await cloudFromTeamSignIn({ config: cloudAccountConfig(supervisor.appDir, { home }), teamUrl: loadCloudConfig(supervisor.appDir)?.url, token: (await team?.liveToken?.()) ?? null, acceptTerms: acceptTerms === true, home });
+      push();
+      return out;
+    } catch (err) {
+      return { ok: false, error: 'unreachable', message: `The cloud did not answer: ${(err as Error)?.message || err}` };
+    }
+  });
   ipcMain.handle('zero:cloud-account-billing', () => cloudCall('openCloudBilling'));
   ipcMain.handle('zero:cloud-account-team-billing', () => cloudCall('cloudTeamBilling'));
 

@@ -2,7 +2,6 @@
 // place of the app, one card for each line on the left (PRO_PITCH in
 // ../setup-split.ts), in the same order. Styles are in ./setup-split.css.
 import { useEffect, useRef } from 'react';
-import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import { drawSky, skyTheme } from '../home/sky';
 import { useDarkWindow } from '../home/home-settings';
 
