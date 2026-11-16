@@ -103,7 +103,9 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   const saveTimer = useRef<number | null>(null);
   const asVersions = useRef(versions);
   asVersions.current = versions;
-  useEffect(() => { lastMtime.current = mtime; }, [mtime]);
+  // Unsaved words keep the time of the file they were written over, so a
+  // newer file read in under them is a conflict at save, not overwritten.
+  useEffect(() => { if (!dirty.current) lastMtime.current = mtime; }, [mtime]);
 
   // Until the room has answered, the file's own words show, so nothing blanks.
   const collab = live?.synced ? live : null;

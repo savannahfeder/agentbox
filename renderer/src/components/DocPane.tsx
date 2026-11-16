@@ -47,7 +47,8 @@ import { familyOfName } from '../../../shared/artifact-marks.mts';
 import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
-import { crumbParts, docKind, docName, isPlainText, paneCanSave, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
+import { crumbParts, docKind, docName, FOLLOW_FILE_MS, isPlainText, newerOnDisk, paneCanSave, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
+import { askAtMostEvery } from '../ask-at-most-every';
 import { opening, pictureUrl, seenAt } from '../picture';
 import { fetchableFileUrl } from '../phone-files';
 import { DocText } from './DocText';
@@ -266,6 +267,24 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
     }
     return () => { live = false; };
   }, [doc.product, doc.src, src, kind, looks, thread]);
+
+  // An agent can rewrite the open file in place, and a cloud run's copy lands
+  // after its answer, so the pane reads it again while the app changes.
+  const shownMtime = useRef(0);
+  shownMtime.current = mtime;
+  useEffect(() => {
+    if (kind !== 'markdown' && kind !== 'text' && kind !== 'table') return;
+    let live = true;
+    const follow = askAtMostEvery(FOLLOW_FILE_MS, () => {
+      void api.readDoc({ product: doc.product, src: doc.src, thread }).then((r) => {
+        if (!live || !shownMtime.current || !newerOnDisk(shownMtime.current, r)) return;
+        setText(r.text ?? '');
+        setMtime(r.mtime ?? 0);
+      }).catch(() => {});
+    });
+    const off = api.onChanged(follow.changed);
+    return () => { live = false; follow.stop(); off?.(); };
+  }, [doc.product, doc.src, kind, thread]);
 
   // FULLY RESIZABLE, hers. The pointer is captured on the divider, so a fast
   // drag over the document's own iframe does not lose the grip — an iframe eats

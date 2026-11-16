@@ -103,7 +103,8 @@ describe('the pane beside a thread', () => {
   it('asks for the file in the thread it was opened from', () => {
     const pane = source('renderer/src/components/DocPane.tsx');
     expect(pane).toMatch(/api\.resolveDoc\(\{ product: doc\.product, src: doc\.src, thread \}\)/);
-    expect(pane.match(/api\.readDoc\(\{ product: doc\.product, src: doc\.src, thread \}\)/g)).toHaveLength(2);
+    expect(pane.match(/api\.readDoc\(\{ product: doc\.product, src: doc\.src, thread \}\)/g)).toHaveLength(3);
+    expect(pane.match(/api\.readDoc\(/g)).toHaveLength(3);
     expect(source('renderer/src/App.tsx')).toMatch(/<DocPane\s+doc=\{openDoc\}\s+thread=\{focused && focused\.product === openDoc\.product/);
   });
 
