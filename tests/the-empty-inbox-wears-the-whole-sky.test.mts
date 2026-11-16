@@ -60,9 +60,12 @@ describe('the empty Inbox sky', () => {
     expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) > \.inbox-sky-head \{ display: none; \}/);
   });
 
+  // The light purple sky alone sets its box on a frosted card
+  // (the-light-purple-skys-empty-inbox-sets-its-box-on-frosted-glass).
   it('cuts nothing out of the sky and lays nothing over it', () => {
+    const others = css.split('\n').filter((l) => !l.startsWith(':root[data-sky-frame="dusk-light"]')).join('\n');
     expect(css).not.toMatch(/\.inbox-sky-zero[^{]*\{[^}]*mask-image/);
-    expect(css).not.toMatch(/\.inbox-sky-zero\)[^{]*\{[^}]*(text-shadow|background)/);
+    expect(others).not.toMatch(/\.inbox-sky-zero\)[^{]*\{[^}]*(text-shadow|background)/);
   });
 
   // "font is a bit hard to read", pinned on the placeholder: it was --text-faint straight on the dots.
