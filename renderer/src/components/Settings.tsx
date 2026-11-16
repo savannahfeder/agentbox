@@ -1037,6 +1037,7 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
     const out = await api.cloudAccountPay(id);
     setOpening(null);
     if (!out.ok) { setSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
+    if (out.where === 'started') { void read(); return; }
     setChosen(id);
     setSwitching(out.where === 'billing');
     setWaitingFor(planKey(plan));
@@ -1084,6 +1085,7 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
   }
   // THE PLAN YOU PAY FOR, FOUND UNDER BILLING (the founder's pick of five, 2026-10-25).
   const sum = planSummary(plan);
+  const paidPlan = (['pro', 'plus', 'max'] as const).find((p) => p === plan?.plan) ?? null;
   if (sum) {
     const meter = (label: string, m: { line: string; percent: number }) => (
       <div className="bill-meter">
@@ -1100,7 +1102,9 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
               <div className="bill-plan">{sum.name}</div>
               <div className="bill-price">{sum.price} · {billSaid ?? sum.who}</div>
             </div>
-            {sum.manage && <button type="button" className="set-ghost" onClick={() => void billing()}>Manage billing</button>}
+            {sum.start && paidPlan
+              ? <button type="button" className="set-ghost" disabled={!!opening} onClick={() => void choose(paidPlan)}>{opening ? 'Starting…' : sum.start}</button>
+              : sum.manage && <button type="button" className="set-ghost" onClick={() => void billing()}>Manage billing</button>}
           </div>
         </Group>
         <Group id="cloud-use" label={sum.period} bare>
@@ -1112,12 +1116,12 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
     );
   }
   return (
-    <Page title="Plan and Billing" lede="Every thread needs a slot to run in. Your computer has a few. The cloud adds more.">
+    <Page title="Plan and Billing" lede={plan?.trialOffer ? `Every plan starts with ${plan.trialOffer.days} days free and ${plan.trialOffer.hours} cloud hours.` : 'Your computer runs a few threads at once. The cloud runs the rest.'}>
       {cards}
       {lines}
       <Group id="cloud-counts" label="How the cloud counts" bare>
         <ul className="cloud-counts">
-          <li>Each slot runs one agent in the cloud, on top of the ones your computer runs.</li>
+          <li>Agents in the cloud run on top of the ones your computer runs, as many at once as you like.</li>
           <li>Time counts only while an agent is working. Waiting for your reply is free.</li>
           <li>Past a plan's hours, threads wait for your computer until the month turns.</li>
         </ul>

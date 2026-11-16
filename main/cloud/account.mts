@@ -31,9 +31,7 @@ export interface GatewayBody {
   message?: string;
   url?: unknown;
   where?: unknown;
-  /** On `/v1/me`: the plan, and the free hours a new account starts with. */
   plan?: unknown;
-  free?: FreeHours;
   [field: string]: unknown;
 }
 
@@ -300,22 +298,19 @@ function signedIn(env: NodeJS.ProcessEnv, home: string): { gateway: string; key:
   return key ? { gateway: gateway!, key } : null;
 }
 
-type FreeHours = { agents: number; hours: number; usedSeconds: number };
 type TeamHours = { hours: number; usedSeconds: number; running: number };
 
 /**
- * No plan reads as the hours a run would spend next, so every screen draws them
- * like a plan: a team's (`team`), spent or not, since they replace the free
- * hours; otherwise the free hours (`free`) while some are left.
+ * No plan of one's own reads as the team's hours (`team`), spent or not, so
+ * every screen draws them like a plan. A server from before 2026-11-16 may
+ * still send free hours (`free`); they are not a plan and read as none.
  */
-export function cloudPlanOf<T extends { [field: string]: unknown }>(me: T): T | (T & { plan: 'free' | 'team'; agents: number | null; hoursPerMonth: number; usedSeconds: number }) {
+export function cloudPlanOf<T extends { [field: string]: unknown }>(me: T): T | (T & { plan: 'team'; agents: null; hoursPerMonth: number; usedSeconds: number }) {
   if (me.plan !== 'none') return me;
   const tm = me.team as TeamHours | undefined;
   // A team has no limit at once; its hours are the limit.
   if (tm) return { ...me, plan: 'team', unlimited: true, agents: null, hoursPerMonth: tm.hours, usedSeconds: tm.usedSeconds, running: tm.running };
-  const f = me.free as FreeHours | undefined;
-  if (!f || f.usedSeconds >= f.hours * 3600) return me;
-  return { ...me, plan: 'free', agents: f.agents, hoursPerMonth: f.hours, usedSeconds: f.usedSeconds };
+  return me;
 }
 
 /** The plan, its agents and hours, and what is used, as the server counts them. */
@@ -324,7 +319,7 @@ export async function cloudPlan({ env = process.env, home = os.homedir() }: Stor
   if (!at) return { signedIn: false };
   const me = await ask(at.gateway, '/v1/me', { key: at.key });
   if (me.status === 401) forgetCloudKey(at.key, env, home);
-  return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody & { free?: FreeHours }) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
+  return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
 }
 
 /** What this person keeps in the cloud and may, or null while that cannot be known: then nothing is sent or deleted. */
@@ -370,6 +365,8 @@ async function openStripe(route: string, body: unknown, openExternal: (url: stri
   if (!at) return { ok: false, error: 'signed-out', message: `Sign in to ${Name} Cloud first.` };
   const out = await ask(at.gateway, route, { method: 'POST', key: at.key, body });
   if (out.status !== 200) return { ok: false, error: out.body.error || 'refused', message: out.body.message || `the cloud said ${out.status}` };
+  // A plan started from its trial is charged on the card Stripe holds: no page to open.
+  if (out.body.where === 'started') return { ok: true, where: 'started' };
   if (typeof out.body.url !== 'string' || !STRIPE_PAGE.test(out.body.url)) return { ok: false, error: 'not-stripe', message: 'The cloud answered with a page that is not Stripe\'s.' };
   await openExternal(out.body.url);
   return { ok: true, ...(out.body.where ? { where: out.body.where } : {}) };

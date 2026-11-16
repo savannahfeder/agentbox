@@ -10,7 +10,7 @@
 // in tests, and behind a plain HTTP server (gatewayServer).
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { FREE, PLANS, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE, FILES_LAPSE_DAYS } from './plans.mjs';
+import { PLANS, PLAN_TRIAL, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE, FILES_LAPSE_DAYS } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
 import { isKeyObject } from '../../shared/cloud-keys.mts';
@@ -133,7 +133,7 @@ export function memoryObjects() {
   };
 }
 
-export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, free = FREE, teamPlan = TEAM, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
+export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, teamPlan = TEAM, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
   // The phone's replies with the computer shut (./phone.mjs): { db, runFiles, sendPush }.
   phone = null,
   // The database (./phone.mjs supabaseRest), where who is subscribed is read
@@ -159,15 +159,19 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const recOf = async (person) => ({ ...fresh(), ...(await readJson(personKey(person))) });
 
   const live = (rec, kind) => Object.values(rec.live).filter((s) => s.kind === kind);
-  // A run spends its person's plan, their team's hours (`s.team`) or their free hours (`s.free`).
-  const ownRuns = (rec) => live(rec, 'run').filter((s) => !s.free && !s.team);
+  // A run spends its person's plan or their team's hours (`s.team`).
+  const ownRuns = (rec) => live(rec, 'run').filter((s) => !s.team);
   // A run going counts against this month only for its time in this month.
   const usedNow = (rec, t) => (rec.used[month(t)] || 0) + ownRuns(rec).reduce((sum, s) => sum + (t - Math.max(s.at, monthStart(t))) / 1000, 0);
-  // With no plan, runs spend the team's hours or the free hours, which never come back.
-  const onFree = (rec) => !planOf(rec).agents;
-  const freeUsedNow = (rec, t) => (rec.freeUsed || 0) + live(rec, 'run').filter((s) => s.free).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
-  const freeSpent = (rec, t) => freeUsedNow(rec, t) >= free.hours * 3600;
-  const ownOver = (rec, t) => planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600;
+  // With no plan of their own, runs spend the team's hours or none.
+  const noPlan = (rec) => !planOf(rec).agents;
+  // A plan in its free week runs on the trial's hours, counted once, not the
+  // month's; so does one whose first charge has failed (past_due, never paid).
+  const inTrial = (rec) => !!plans[rec.plan]?.agents
+    && (rec.stripe?.status === 'trialing' || (rec.stripe?.status === 'past_due' && rec.stripe.paid === false));
+  const trialUsedNow = (rec, t) => (rec.trialUsed || 0) + ownRuns(rec).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
+  const ownOver = (rec, t) => (inTrial(rec) ? trialUsedNow(rec, t) >= PLAN_TRIAL.hours * 3600
+    : planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600);
   // TEAMS. Each member has hours of their own, as a seat is one person's plan
   // (the owner, 2026-11-08): the trial's, once, or a seat's, each month. They
   // are kept in the member's own record, so a member is held to them as to a plan.
@@ -176,7 +180,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const teamUsedOf = (rec, id, trial, t) => (trial ? rec.teamTrialUsed?.[id] || 0 : rec.teamUsed?.[id]?.[month(t)] || 0)
     + live(rec, 'run').filter((s) => s.team === id && !!s.trial === trial).reduce((sum, s) => sum + (t - (trial ? s.at : Math.max(s.at, monthStart(t)))) / 1000, 0);
   // A team's run ends once its person's own hours are spent; the sweep ends it when the trial or the team does.
-  const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : s.free ? freeSpent(rec, t) : onFree(rec) || ownOver(rec, t));
+  const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : noPlan(rec) || ownOver(rec, t));
   // `people`: every member's own use, for the owner's page; a start needs only this person's.
   // A TEAM PAYS FOR THE PEOPLE ON IT: one seat when it starts, one more when
   // somebody accepts an invitation, one fewer when somebody leaves. Stripe is
@@ -242,18 +246,20 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     delete rec.live[sid];
     rec.retired = { ...(rec.retired || {}), [sid]: at };
     const charged = s.kind === 'run' && why !== 'not-started';
-    if (charged && s.free) rec.freeUsed = (rec.freeUsed || 0) + Math.max(0, (at - s.at) / 1000);
-    else if (charged && s.team && s.trial) rec.teamTrialUsed = { ...rec.teamTrialUsed, [s.team]: (rec.teamTrialUsed?.[s.team] || 0) + Math.max(0, (at - s.at) / 1000) };
+    if (charged && s.team && s.trial) rec.teamTrialUsed = { ...rec.teamTrialUsed, [s.team]: (rec.teamTrialUsed?.[s.team] || 0) + Math.max(0, (at - s.at) / 1000) };
     else if (charged && s.team) {
       const byMonth = { ...rec.teamUsed?.[s.team] };
       for (const [m, secs] of secondsByMonth(s.at, at)) byMonth[m] = (byMonth[m] || 0) + secs;
       rec.teamUsed = { ...rec.teamUsed, [s.team]: byMonth };
-    } else if (charged) for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
+    } else if (charged) {
+      for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
+      if (inTrial(rec)) rec.trialUsed = (rec.trialUsed || 0) + Math.max(0, (at - s.at) / 1000);
+    }
     if (!stoppingOf(rec).some((e) => e.sid === sid)) rec.stopping = [...stoppingOf(rec), { sid, tries: 0 }];
     if (charged) {
       rec.unrecorded = [...(rec.unrecorded || []), {
         key: `ledger/runs/${ctx.person}/${month(at)}/${sid}-${s.at}.json`,
-        sessionId: sid, runId: s.runId, startedAt: s.at, endedAt: at, seconds: Math.max(0, Math.round((at - s.at) / 1000)), why, ...(s.free ? { free: true } : {}), ...(s.team ? { team: s.team } : {}),
+        sessionId: sid, runId: s.runId, startedAt: s.at, endedAt: at, seconds: Math.max(0, Math.round((at - s.at) / 1000)), why, ...(s.team ? { team: s.team } : {}),
       }];
     }
     ctx.ended.push(sid);
@@ -386,8 +392,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       billing: whoBills(rec),
       filesCap: filesCapOf(rec, tm),
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
-      // Apart from the plan, so an app from before the free hours still reads no plan.
-      ...(onFree(rec) ? { free: { agents: free.agents, hours: free.hours, usedSeconds: Math.min(free.hours * 3600, Math.round(rec.freeUsed || 0)) } } : {}),
+      ...(inTrial(rec) ? { trial: { hours: PLAN_TRIAL.hours, usedSeconds: Math.min(PLAN_TRIAL.hours * 3600, Math.round(trialUsedNow(rec, t))) } } : {}),
+      ...(stripe && !rec.stripe?.subscription ? { trialOffer: { days: PLAN_TRIAL.days, hours: PLAN_TRIAL.hours } } : {}),
       // Hours and agents are this person's own; `people` is every member's, this one's included.
       ...(tm ? { team: {
         trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: null, running: teamRunning(tm, rec),
@@ -400,14 +406,17 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     };
   }
 
-  // Which hours a run spends: the person's plan, else their team's while it has a
-  // trial or seats (which replace the free hours, spent or not), else their free hours.
-  const paysFor = (rec, team) => (!onFree(rec) ? 'own' : team ? 'team' : 'free');
+  // Which hours a run spends: the person's plan, else their team's while it has a trial or seats.
+  const paysFor = (rec, team) => (!noPlan(rec) ? 'own' : team ? 'team' : 'none');
 
   // Why a run spending these hours cannot start now, or null when it can.
   function paysRefusal(rec, plan, pays, team, t) {
     if (pays === 'own') {
-      if (ownOver(rec, t)) return { ok: false, error: 'hours', message: `This month's ${plan.hoursPerMonth} cloud hours are used.` };
+      if (ownOver(rec, t)) {
+        return { ok: false, error: 'hours', message: inTrial(rec)
+          ? `Your ${PLAN_TRIAL.hours} trial hours are used. Start ${rec.plan[0].toUpperCase()}${rec.plan.slice(1)} now for its ${plan.hoursPerMonth.toLocaleString('en-US')} hours a month.`
+          : `This month's ${plan.hoursPerMonth} cloud hours are used.` };
+      }
       if (ownRuns(rec).length >= plan.agents) {
         return { ok: false, error: 'agents', message: plan.unlimited ? `${plan.agents} cloud agents are running, the most one account can run at once.` : `All ${plan.agents} of your cloud agents are running.` };
       }
@@ -420,8 +429,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         return { ok: false, error: 'hours', message: `${team.trial ? `Your ${h} trial hours` : `This month's ${h} cloud hours`} are used.${next}` };
       }
     } else {
-      if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
-      if (live(rec, 'run').filter((s) => s.free).length >= free.agents) return { ok: false, error: 'agents', message: 'Both of your free cloud agents are running.' };
+      return { ok: false, error: 'plan', message: 'Choose a cloud plan to run agents there.' };
     }
     return null;
   }
@@ -439,7 +447,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (stoppingOf(rec).some((e) => e.sid === sid) || rec.retired?.[sid] !== undefined) return { ok: false, error: 'busy', message: 'this session has ended; a new run takes a new one' };
     // Changed terms hold back what begins something new; a run going finishes.
     if (rec.terms?.version !== termsVersion) return { ok: false, error: 'terms', terms: termsVersion, message: `accept the terms of ${termsVersion} first` };
-    // Which hours this run spends: the person's plan, then their team's, then their free hours.
+    // Which hours this run spends: the person's plan, then their team's.
     let pays = null;
     if (kind === 'run') {
       const plan = planOf(rec);
@@ -451,7 +459,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       return { ok: false, error: 'signins', message: `${SIGNINS_AT_ONCE} sign-ins are already waiting.` };
     }
     const nonce = crypto.randomUUID();
-    rec.live[sid] = { kind, runId: typeof runId === 'string' ? runId : null, at: t, nonce, ...(pays === 'free' ? { free: true } : {}), ...(pays === 'team' ? { team: team.id, trial: team.trial } : {}) };
+    rec.live[sid] = { kind, runId: typeof runId === 'string' ? runId : null, at: t, nonce, ...(pays === 'team' ? { team: team.id, trial: team.trial } : {}) };
     return { ok: true, nonce, fresh: true };
   }
 
@@ -649,8 +657,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (op !== 'head' && key.startsWith('logins/') && !savesAKey) throw new Refusal(403, 'not-yours-to-touch', 'a sign-in is never read or written from a Mac');
     const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
     if (op === 'put') {
-      const team = onFree(rec) ? await teamOrNone(person, now()) : null;
-      const refusal = onFree(rec) && paysRefusal(rec, planOf(rec), paysFor(rec, team), team, now());
+      const team = noPlan(rec) ? await teamOrNone(person, now()) : null;
+      const refusal = noPlan(rec) && paysRefusal(rec, planOf(rec), paysFor(rec, team), team, now());
       if (refusal && refusal.error !== 'agents') throw new Refusal(403, refusal.error, refusal.message);
       if (rec.storage?.full) throw new Refusal(403, 'storage', `Your cloud storage is full (${gib(storageBytes)} GB). It empties as runs older than a week are deleted.`);
       const until = now() + s * 1000;
@@ -779,6 +787,15 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const base = hostOf(headers);
     const toBilling = async (customer) => ({ url: await stripe.billing({ customer, returnUrl: `${base}/v1/paid?billing=1` }), where: 'billing' });
     const rec = await recOf(person);
+    // The plan in its trial, asked for again, starts now: Stripe ends the trial
+    // and charges at once. A card that declines is mended on the billing page.
+    if (inTrial(rec) && rec.plan === plan && rec.stripe.subscription) {
+      const sub = await stripe.endTrial(rec.stripe.subscription);
+      if (sub?.status !== 'active') return toBilling(rec.stripe.customer);
+      await update(person, (r) => { if (r.stripe?.subscription === sub.id) r.stripe = { ...r.stripe, status: 'active', paid: true, at: now() }; });
+      log(`${person} started ${plan} before its trial ended`);
+      return { where: 'started' };
+    }
     // A change of plan is confirmed on the billing page, opened at that change.
     if (PAYING.has(rec.stripe?.status)) {
       if (rec.plan === plan || !rec.stripe.subscription) return toBilling(rec.stripe.customer);
@@ -799,7 +816,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     };
     const was = await settle(rec.checkout, rec.checkout?.plan === plan);
     if (was) return was;
-    const made = await stripe.checkout({ person, plan, customer: rec.stripe?.customer, successUrl: `${base}/v1/paid?plan=${plan}`, cancelUrl: `${base}/v1/paid?cancelled=1` });
+    // The free week is for someone who never had a subscription.
+    const trialEnd = rec.stripe?.subscription ? null : now() + PLAN_TRIAL.days * DAY_MS;
+    const made = await stripe.checkout({ person, plan, customer: rec.stripe?.customer, trialEnd, successUrl: `${base}/v1/paid?plan=${plan}`, cancelUrl: `${base}/v1/paid?cancelled=1` });
     // Another press may have opened one while this one was being made.
     let raced = null;
     await update(person, (r) => {
@@ -847,8 +866,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     await update(person, (rec) => {
       // An old subscription ending leaves alone a newer one that pays.
       if (!pays && rec.stripe?.subscription && rec.stripe.subscription !== sub.id && PAYING.has(rec.stripe.status)) return;
+      // As a team's: a past_due recorded before `paid` was kept is a renewal's retry.
+      const was = rec.stripe?.subscription === sub.id ? rec.stripe : null;
+      const paid = sub.status === 'active' || !!was && (was.paid === true || was.status === 'active' || (was.paid === undefined && was.status === 'past_due'));
       rec.plan = plan;
-      rec.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, at: now() };
+      rec.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, at: now() };
       if (pays) delete rec.checkout;
     });
     log(`${person} is on ${plan} (Stripe ${sub.status})`);
@@ -984,7 +1006,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (rec.disabled) return { ok: false, error: 'disabled' };
     if (rec.terms?.version !== termsVersion) return { ok: false, error: 'terms' };
     if ((await readJson(SWITCH))?.paused) return { ok: false, error: 'paused' };
-    const team = onFree(rec) ? await teamOrNone(person, t) : null;
+    const team = noPlan(rec) ? await teamOrNone(person, t) : null;
     const pays = paysFor(rec, team);
     const refusal = paysRefusal(rec, planOf(rec), pays, team, t);
     return refusal ? { ok: false, error: refusal.error } : { ok: true };

@@ -13,6 +13,8 @@ import { cloudShowcase, PRO_PITCH, setupSteps, teamPaid } from '../renderer/src/
 import { TEAM } from '../cloud/gateway/plans.mjs';
 
 const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
+// Starting the trial is shared with Settings and the cloud setup.
+const trial = fs.readFileSync(new URL('../renderer/src/pro-trial.ts', import.meta.url), 'utf8');
 
 describe('where the purchase page comes', () => {
   // 2026-11-12: it is the plan step itself, straight after the account; a second page three steps on read as the offer made twice.
@@ -87,7 +89,8 @@ describe('when the page moves on', () => {
 describe('the page on screen', () => {
   it('opens the team’s checkout and waits for the cloud to say it is paid', () => {
     expect(split).toMatch(/\} else if \(step === 'plan'\) \{/);
-    expect(split).toMatch(/await api\.cloudAccountPay\('team'\)/);
+    expect(split).toMatch(/await startProTrial\(\{ hasTeam, name: me\?\.name, acceptTerms: !signedInAtStart \}\)/);
+    expect(trial).toMatch(/await api\.cloudAccountPay\('team'\)/);
     expect(split).toMatch(/const paid = teamPaid\(await api\.cloudAccountPlan\(\)\); if \(live && paid\) \{ live = false; setPayState\('idle'\); setPlan\('pro'\); next\(\); \}/);
   });
   it('lists what Pro brings, and can be skipped', () => {
@@ -100,6 +103,6 @@ describe('the page on screen', () => {
     expect(split).toMatch(/if \(typing && enter === 'to-email'\) \{ e\.preventDefault\(\); document\.querySelector<HTMLInputElement>\('\.setup-split input\[data-ss-enter="add"\]'\)\?\.focus\(\); return; \}/);
   });
   it('makes the team as Pro starts, before anyone is invited, since its seats are what is paid for', () => {
-    expect(split).toMatch(/if \(!hasTeam\) \{\n      const made = await api\.teamCreate\(teamNameFor\(me\?\.name\)\);/);
+    expect(trial).toMatch(/if \(!hasTeam\) \{\n    const made = await api\.teamCreate\(teamNameFor\(name\)\);[\s\S]*await api\.cloudAccountPay\('team'\)/);
   });
 });

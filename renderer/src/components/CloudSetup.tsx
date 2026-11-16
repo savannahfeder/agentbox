@@ -172,7 +172,7 @@ export function CloudSetup({ cloud, onMode, onClose, signInAs = null, plan = nul
   } else if (step === 'pay') {
     body = <div className="fr-stack fr-stack-folders">
       <h1 className="fr-page">{SETUP.payHead}</h1>
-      <p className="fr-lede">{waiting ? <><Busy />{SETUP.payWaitLede}</> : SETUP.payLede}</p>
+      <p className="fr-lede">{waiting ? <><Busy />{SETUP.payWaitLede}</> : planNow?.trialOffer ? SETUP.trialLede : SETUP.payLede}</p>
       <div className="cs-plans"><CloudPlanCards plan={planNow} opening={opening} waiting={waiting} onChoose={(id) => void pay(id)} /></div>
       {payErr && <p className="cs-pay-err" role="alert">{payErr}</p>}
     </div>;

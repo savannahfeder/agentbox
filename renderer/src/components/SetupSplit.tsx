@@ -15,8 +15,9 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, cloudShowcase, heldPress, inviteCursor, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamNameFor, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, cloudShowcase, heldPress, inviteCursor, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
+import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
 import { PERK_ICONS, ProShowcase } from './ProShowcase';
@@ -180,16 +181,9 @@ export function SetupSplit(p: SetupSplitProps) {
   const pay = useCallback(async () => {
     if (plan === 'pro') { next(); return; }
     setPayState('opening'); setError(null);
-    const stop = (why: string) => { setPayState('idle'); setError(why); };
     // The account step signed in to the team; the payment is the cloud's. Terms were named on that step, and only there.
-    const cloud = await api.cloudAccountFromTeam(!signedInAtStart);
-    if (!cloud.ok) { stop(cloud.message || 'The cloud did not answer. Try again.'); return; }
-    if (!hasTeam) {
-      const made = await api.teamCreate(teamNameFor(me?.name));
-      if (!made.ok) { stop(made.error ?? 'The team was not made.'); return; }
-    }
-    const out = await api.cloudAccountPay('team');
-    if (!out.ok) { stop(out.message || 'Stripe could not be opened. Try again.'); return; }
+    const out = await startProTrial({ hasTeam, name: me?.name, acceptTerms: !signedInAtStart });
+    if (!out.ok) { setPayState('idle'); setError(out.message); return; }
     setPayState('waiting');
   }, [plan, next, signedInAtStart, hasTeam, me?.name]);
   useEffect(() => {

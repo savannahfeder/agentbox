@@ -24,7 +24,7 @@ interface LaterBridge {
   gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
   gitHubCloudSignIn?(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }>;
   signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }>;
-  cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
+  cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing' | 'started'; error?: string; message?: string }>;
   cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
 }
 const laterBridge = () => window.zero as (Omit<NonNullable<Window['zero']>, keyof LaterBridge> & LaterBridge) | undefined;
@@ -1766,10 +1766,13 @@ export const api = {
   async cloudAccountSignOut(): Promise<void> { await window.zero?.cloudAccountSignOut?.(); },
   async cloudAccountPlan(): Promise<CloudPlan> {
     // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used;
-    // &cloudplan=free someone on the free hours, 1 running and 1.5 of 5 used.
+    // &cloudplan=pro-trial the same Pro in its free week, 12 of its 50 hours used (&spent=1: all 50).
     if (useFixtures) {
-      if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
-      if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
+      if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: true, agents: null, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
+      if (params.get('cloudplan') === 'pro-trial') {
+        const used = (params.has('spent') ? 50 : 12) * 3600;
+        return { signedIn: true, plan: 'pro', unlimited: true, agents: null, hoursPerMonth: 400, running: params.has('spent') ? 0 : 2, usedSeconds: used, billing: 'stripe', trial: { hours: 50, usedSeconds: used } };
+      }
       // &cloudplan=team-trial|team-trial-card|team: on a team of 3, its trial 5 days from its end
       // (with the card in, not yet charged), or 3 seats paid for.
       if (['team-trial', 'team-trial-card', 'team'].includes(params.get('cloudplan') ?? '')) {
@@ -1786,12 +1789,12 @@ export const api = {
         const team = { trial, endsAt: trial ? Date.now() + 5 * 86_400_000 : null, seats: trial && !card ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: null, running: people[0].running, hours: each, usedSeconds: people[0].usedSeconds, people };
         return { signedIn: true, plan: 'team', unlimited: true, agents: null, hoursPerMonth: team.hours, running: team.running, usedSeconds: team.usedSeconds, billing: null, team };
       }
-      if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
-      return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
+      // No plan yet: every plan's free week is offered, as the server offers it before any subscription.
+      return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, trialOffer: { days: 7, hours: 50 } };
     }
     return (await window.zero?.cloudAccountPlan?.()) ?? { signedIn: false };
   },
-  async cloudAccountPay(plan: 'pro' | 'plus' | 'max' | 'team'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
+  async cloudAccountPay(plan: 'pro' | 'plus' | 'max' | 'team'): Promise<{ ok: boolean; where?: 'checkout' | 'billing' | 'started'; error?: string; message?: string }> {
     const zero = laterBridge();
     if (!zero?.cloudAccountPay) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountPay({ plan });
