@@ -400,6 +400,37 @@ export function bringBackUnsent(item: ItemRef, replies: InFlightReply[], lines: 
   return back;
 }
 
+type History = { ok: boolean; lines: Parameters<typeof landedIn>[1] };
+
+/** Waits before each look after the first; a reply still not in its thread after the last is put back. */
+export const UNSENT_CHECKS_MS = [0, 30_000, 90_000];
+
+/**
+ * bringBackUnsent, after looking more than once: just after a restart a sent
+ * reply's write can still be on its way, or the history unreadable, and one
+ * look put such a reply back in the box while it reached the agent too.
+ */
+export async function bringBackWhenSure(
+  item: ItemRef,
+  replies: InFlightReply[],
+  read: () => Promise<History>,
+  waiting: () => string[],
+  { checks = UNSENT_CHECKS_MS, wait = (ms: number) => new Promise<void>((r) => { setTimeout(r, ms); }), store }: { checks?: number[]; wait?: (ms: number) => Promise<void>; store?: DraftStore } = {},
+): Promise<number> {
+  let left = replies;
+  for (let i = 0; i < checks.length; i++) {
+    if (checks[i] > 0) await wait(checks[i]);
+    const still = new Set(readInFlight(item, backing(store)).map((r) => r.at));
+    left = left.filter((r) => still.has(r.at));
+    if (!left.length) return 0;
+    const history = await read().catch((): History => ({ ok: false, lines: [] }));
+    if (i === checks.length - 1) return bringBackUnsent(item, left, history.ok ? history.lines : [], waiting(), store);
+    if (!history.ok) continue;
+    for (const r of left) if (landedIn(r, history.lines, waiting())) replyLanded(item, r.at, store);
+  }
+  return 0;
+}
+
 // ---------------------------------------------------------------------------
 // THE NEW TASK CARD'S DRAFT
 //

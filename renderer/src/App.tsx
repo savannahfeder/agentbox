@@ -88,7 +88,7 @@ import { announcesMove, announcesUpdate, isUpdateRow, CHECK_SAY, updateLook } fr
 import { ago, closesTheTask, leavesItOnTheBranch, discardsTheChange, itemOptions, liveOption, needsYourWords, offerIsLive, parseRepeat, type ParsedOption } from './format';import { discardAsk } from './discard-asks-first';
 import {
   draftKey, hasDraft, readDraft, restoreDraft, restoreFailedDraft, readComposeDraft, restoreComposeDraft, saveDraft, clearComposeDraft,
-  markReplyInFlight, replyLanded, repliesInFlight, bringBackUnsent,
+  markReplyInFlight, replyLanded, repliesInFlight, bringBackWhenSure,
   type SentDraft, type ComposeDraft,
 } from './drafts';
 import { approvalStage, approvalClickAllowed, cardChord, cardReplyChord, pressWithin } from './approval-stage';
@@ -5519,9 +5519,8 @@ export default function App() {
       const still = new Set((repliesInFlight().find((r) => r.product === left.product && r.id === left.id)?.replies ?? []).map((r) => r.at));
       const replies = left.replies.filter((r) => still.has(r.at));
       if (!replies.length) return;
-      const history = await api.itemHistory({ product: left.product, id: left.id }).catch(() => ({ ok: false, lines: [] }));
-      const waiting = (phoneWaitingRef.current ?? []).filter((w) => w.product === left.product && w.id === left.id).map((w) => w.text);
-      const back = bringBackUnsent(left, replies, history.ok ? history.lines : [], waiting);
+      const waiting = () => (phoneWaitingRef.current ?? []).filter((w) => w.product === left.product && w.id === left.id).map((w) => w.text);
+      const back = await bringBackWhenSure(left, replies, () => api.itemHistory({ product: left.product, id: left.id }), waiting);
       if (back) toastRef.current(back === 1 ? 'Your reply didn’t send. It’s back in the box.' : `${back} replies didn’t send. They’re back in the box.`, { product: left.product, id: left.id });
     }, Math.max(0, Math.max(...left.replies.map((r) => r.at)) + UNDO_GRACE_MS + 5000 - Date.now())));
     return () => timers.forEach(clearTimeout);
