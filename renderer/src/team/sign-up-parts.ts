@@ -25,3 +25,7 @@ export function partMissing(part: SignUpPart, { name, email, password }: Fields)
 }
 
 export const partReady = (part: SignUpPart, fields: Fields): boolean => !partMissing(part, fields);
+
+/** Enter on a good email with no password typed yet is a move to the password, not a mistake to name. */
+export const goesToPassword = (gap: Missing | null, password: string, inEmail: boolean): boolean =>
+  gap?.field === 'password' && !password && inEmail;

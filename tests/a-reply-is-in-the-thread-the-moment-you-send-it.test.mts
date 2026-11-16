@@ -72,7 +72,8 @@ describe('a picked option', () => {
     // The window's restore, the later undo's restore, and the failed write.
     expect(picked).toContain('const takeBack = (): Restored => { letGo(); return null; };');
     expect(picked).toContain('restore: takeBack,');
-    expect(picked).toMatch(/, takeBack, !movesOn\(item\)/);
+    // The walkthrough's practice thread stays put too, so its next tip has a thread to point at.
+    expect(picked).toMatch(/, takeBack, isTourPractice\(tourRef\.current, item\) \|\| !movesOn\(item\)/);
     expect(picked).toMatch(/catch \(error\) \{ letGo\(\); throw error; \}/);
     expect(picked).toMatch(/setTimeout\(letGo, LANDED_MS\)/);
   });

@@ -226,6 +226,7 @@ export interface ArtifactMark {
   do: 'note' | 'reply' | 'resolve' | 'reopen' | 'approve' | 'unapprove' | 'seen' | 'sent' | 'toagent' | 'edit';
   id?: string;
   file?: string;
+  v?: number;
   path?: string;
   place?: NotePlace;
   text?: string;
@@ -415,6 +416,8 @@ export interface ThreadTalk {
   at: number;
   /** A note's file version, and the note it opens at (a reply's is the note it answers). */
   file?: string;
+  /** The version number the note was written on, when it said. */
+  v?: number;
   note?: string;
   /** Whom a note or reply is for: the file's owner, whom it names, the writer of the note it answers. A comment is for the thread's owner. */
   to?: string[];
@@ -885,6 +888,8 @@ export interface TeamBillingInvoice { at: number; amount: number; status: 'paid'
 export interface TeamBillingDetails {
   periodStart: number | null; periodEnd: number | null;
   nextAt: number | null; nextAmount: number | null;
+  /** Set when the plan was cancelled: the day it ends, with no bill after it. */
+  endsAt?: number | null;
   card: { brand: string; last4: string } | null;
   email: string | null;
   invoices: TeamBillingInvoice[];
@@ -1734,7 +1739,7 @@ declare global {
       // The thread on screen, or null anywhere that is not one thread. Optional:
       // a preload from before this channel existed simply never says.
       looking?(p: { product: string | null; id: string | null }): Promise<boolean>;
-      refreshUsage?(p?: { engine?: 'claude' | 'codex' }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
+      refreshUsage?(p?: { engine?: 'claude' | 'codex'; ask?: boolean }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
       accountUsage?(p: { refresh?: boolean; engine?: 'claude' | 'codex' }): Promise<{ readings: AccountUsageReading[] }>;
       // Whether a screen reader is running, which is what decides xterm's
       // accessibility tree. Optional: a preload from before this channel
@@ -1768,7 +1773,7 @@ declare global {
       setThreadOnMac?(p: { onMac: Record<string, boolean | null> }): Promise<unknown>;
       moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; label?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
       answerRouteOffer?(p: { product: string; id: string; make: boolean }): Promise<{ ok: true; made: string | null }>;
       // Feedback to the Agentbox team (main/feedback.mts). Optional: an older
@@ -1830,7 +1835,7 @@ declare global {
       teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult>;
       teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult>;
       teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult>;
-      teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult>;
+      teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult>;
       teamTaskBrief(p: { product: string; id: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[] }>;
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;
@@ -1935,6 +1940,8 @@ declare global {
       // interrupted, and how many are waiting on her because their session was
       // gone. Startup's version of it rides on bootInfo instead.
       onRecovered?(fn: (r: { text: string }) => void): () => void;
+      // A thread opened on the phone, and when.
+      onSeenOnPhone?(fn: (s: { id: string; at: number }) => void): () => void;
       // ⌘R is about to reload: write what the grace window is holding first.
       onWriteHeld?(fn: () => Promise<void>): () => void;
       // What arrived. The page does not choose the words and does not choose
@@ -1969,7 +1976,7 @@ declare global {
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
-      fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
+      fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null; product?: string; thread?: string; src?: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkAccess?(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }>;
       fileLinkPeople?(p: { token: string }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
       fileLinkPerson?(p: { token: string; email: string; can: LinkCan | null }): Promise<{ ok: boolean; error?: string; people?: LinkPerson[] }>;
@@ -2022,6 +2029,7 @@ declare global {
       cloudAccountSignOut?(): Promise<unknown>;
       cloudAccountPlan?(): Promise<CloudPlan>;
       cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
+      cloudAccountFromTeam?(p: { acceptTerms: boolean }): Promise<{ ok: boolean; error?: string; message?: string }>;
       cloudAccountBilling?(): Promise<{ ok: boolean; error?: string; message?: string }>;
       cloudClipboardCode?(): Promise<{ code: string | null }>;
     };

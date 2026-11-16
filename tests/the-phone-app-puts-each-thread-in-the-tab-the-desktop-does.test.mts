@@ -91,16 +91,22 @@ describe('the four tabs', () => {
 });
 
 describe('the order', () => {
-  it('runs by project, then priority, then the newest, as the desktop draws it', () => {
-    const asks = (id, project, priority, updatedAt) => ({ id, project, priority, updatedAt, status: 'blocked', result: '?', wrote: { body: her(NOW - 9e6), result: agent(updatedAt) } });
-    const t = tabsOf(rows([
-      asks('w-b1', 'beta', 9, NOW - 1000),
-      asks('w-a1', 'alpha', 0, NOW - 5000),
-      asks('w-a2', 'alpha', 7, NOW - 9000),
-      asks('w-a3', 'alpha', 7, NOW - 2000),
-    ]));
+  const asks = (id, project, priority, updatedAt) => ({ id, project, priority, updatedAt, status: 'blocked', result: '?', wrote: { body: her(NOW - 9e6), result: agent(updatedAt) } });
+  const four = rows([
+    asks('w-b1', 'beta', 9, NOW - 1000),
+    asks('w-a1', 'alpha', 0, NOW - 5000),
+    asks('w-a2', 'alpha', 7, NOW - 9000),
+    asks('w-a3', 'alpha', 7, NOW - 2000),
+  ]);
+
+  it('runs by your running order of projects, then priority, then the newest, as the desktop draws it', () => {
+    const t = phoneTabs({ ...phoneView(four, NOW), projectOrder: [phoneSlug(DEV, 'alpha'), phoneSlug(DEV, 'beta')] }, NOW);
     // A project's place outranks any priority: Beta's Urgent sits under all of Alpha.
     expect(ids(t.inbox)).toEqual(['w-a3', 'w-a2', 'w-a1', 'w-b1']);
+  });
+
+  it('with no running order, runs by priority across projects', () => {
+    expect(ids(tabsOf(four).inbox)).toEqual(['w-b1', 'w-a3', 'w-a2', 'w-a1']);
   });
 
   it('Done runs newest finished first', () => {

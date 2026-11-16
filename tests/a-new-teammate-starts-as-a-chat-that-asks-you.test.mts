@@ -18,7 +18,8 @@ const read = (f) => fs.readFileSync(new URL(`../renderer/src/${f}`, import.meta.
 
 describe('what a new teammate offers to take on', () => {
   it('is each starter as a short ask, leaving out one already on your team', () => {
-    expect(starterAsks([]).map((a) => a.ask)).toEqual(STARTERS.map((s) => s.ask));
+    // Every starter but the Chief of staff, which is no longer offered (tests/no-chief-of-staff-is-made-for-you).
+    expect(starterAsks([]).map((a) => a.ask)).toEqual(STARTERS.filter((s) => s.starter !== 'chief').map((s) => s.ask));
     expect(starterAsks([]).find((a) => a.starter === 'support').ask).toBe('Answer user emails');
     const asks = starterAsks([{ starter: 'quality', name: 'Quality lead' }, { starter: null, name: 'Support lead' }]).map((a) => a.starter);
     expect(asks).not.toContain('quality');

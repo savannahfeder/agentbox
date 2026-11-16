@@ -1286,9 +1286,12 @@ export function statusOf(teammate: { id: string; paused?: boolean }, items: read
 /** What a new teammate says first, with the starters as answers to tap. */
 export const GREETING = 'Hi. What should I take off your plate? Pick one, or tell me in your own words.';
 
+/** Kept so a Chief of staff made before 2026-11-15 still reads; never offered (w-bb45118b10). */
+const RETIRED_STARTERS = ['chief'];
+
 /** The starters a new teammate offers: those whose job or name nobody on the team has yet. */
 export function starterAsks(team: readonly { starter?: string | null; name?: string }[] = []): { starter: string; ask: string; name: string; role: string }[] {
-  return STARTERS.filter((s) => !team.some((t) => t.starter === s.starter || t.name === s.name))
+  return STARTERS.filter((s) => !RETIRED_STARTERS.includes(s.starter) && !team.some((t) => t.starter === s.starter || t.name === s.name))
     .map((s) => ({ starter: s.starter, ask: s.ask, name: s.name, role: s.role }));
 }
 

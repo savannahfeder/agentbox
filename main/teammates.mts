@@ -549,7 +549,7 @@ export class Teammates {
     } catch (err) {
       this.noteTrouble(`The offer of a teammate failed: ${(err as Error).message}`, now);
     }
-    if (chief) team = this._chiefOnce(team, now);
+    if (chief) team = this._pauseTheChiefOnce(team, now);
     if (!team.length) return [];
     team = this._namedByRole(team, now);
     const mine = (items ?? []).filter((i) => teammateIdOf(i));
@@ -733,19 +733,20 @@ export class Teammates {
     if (!already) writeChat(this.dir(), { kind: 'act', from: teammateId, verb, text }, now);
   }
 
-  // A Chief of staff from the start, made once: one you remove stays gone, and
-  // one is not made beside a primary you already have.
-  _chiefOnce(team: Teammate[], now: number): Teammate[] {
-    const marker = path.join(this.dir(), 'chief-made');
-    if (fs.existsSync(marker)) return team;
-    if (!team.some((t) => t.primary)) {
-      if (!this._product(null)) return team;
-      const chief = this.create({ starter: 'chief' }, now);
-      this.start(chief.id, now);
-    }
-    fs.mkdirSync(this.dir(), { recursive: true });
-    fs.writeFileSync(marker, `${now}\n`);
-    return this.list(now);
+  // No Chief of staff is made any more. The one the app made for you (at the
+  // time it wrote in `chief-made`) is paused once, keeping its history; one you
+  // made, or started again after this, is yours.
+  _pauseTheChiefOnce(team: Teammate[], now: number): Teammate[] {
+    const dir = this.dir();
+    const paused = path.join(dir, 'chief-paused');
+    if (fs.existsSync(paused)) return team;
+    let madeAt = NaN;
+    try { madeAt = Number(fs.readFileSync(path.join(dir, 'chief-made'), 'utf8').trim()); } catch { /* never made one */ }
+    const chief = Number.isFinite(madeAt) ? team.find((t) => t.starter === 'chief' && t.createdAt === madeAt && !t.endedAt) : null;
+    if (chief && !chief.paused) this.update(chief.id, { paused: true }, now);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(paused, `${now}\n`);
+    return chief ? this.list(now) : team;
   }
 
   // Teammates go by their role. Ones made with a person's name are renamed
@@ -1048,6 +1049,7 @@ export class Teammates {
     return [
       '## You are the primary employee',
       "You are the person's main point of contact: the one teammate they talk to. Work reaches you three ways: they write to you, Auto gives you a thread it could not place (two teammates fit, or it spans several jobs), or it is your check-in.",
+      "- A question, research or anything they asked of you: do it yourself in this run, and answer what they asked. Work they only mentioned in passing is not an ask: never offer to hand it on.",
       "- One teammate's job: hand it over with team_pass, with the person's words and what done looks like, and say in one line who has it. When this run started with the person's own words it starts at once; otherwise it waits for their yes. The result reaches their inbox from that teammate; do not relay it.",
       '- Several jobs: split it, one owner for each piece and one team_pass each. Never two teammates on the same piece.',
       "- Small, or nobody's job: do it yourself in this run.",

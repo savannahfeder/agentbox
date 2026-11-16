@@ -1,7 +1,7 @@
 // Team and Files were plain while Home and the Inbox wore the sky, so the app
 // read as two themes. Measured on the stand-in team (scripts/lib/groups-stage.mjs)
 // with the dark orange sky: Team and Files had no sky at all. They now draw the
-// Inbox's header sky, on dark skies only, and never on a phone.
+// Inbox's header sky, wherever the Inbox wears one, and never on a phone.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
 
@@ -15,8 +15,8 @@ describe('Team and Files under a sky', () => {
     expect(rule).toContain('filesShown');
   });
 
-  it('only on a dark sky, and never on a phone', () => {
-    expect(rule).toMatch(/^const skyOnPlace = !!sky && sky\.dark && !onPhone\(\) &&/);
+  it('only on a sky that wears the Inbox, and never on a phone', () => {
+    expect(rule).toMatch(/^const skyOnPlace = wearsInboxSky\(sky\) && !onPhone\(\) &&/);
   });
 
   it('not on Connections', () => {

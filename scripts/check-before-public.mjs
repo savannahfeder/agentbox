@@ -300,23 +300,29 @@ function runModel(input) {
   });
 }
 
-export async function reviewByModel(files, maxChunks = 8) {
+export function linesForTheModel(files) {
   const CHUNK = 120 * 1024;
   const chunks = [''];
   for (const [file, lines] of files) {
     for (const [n, text] of lines) {
+      if (ALLOW.test(text)) continue;
       const row = `${file}:${n}: ${text.slice(0, 400)}\n`;
       if (chunks.at(-1).length + row.length > CHUNK) chunks.push('');
       chunks[chunks.length - 1] += row;
     }
   }
-  const work = chunks.filter(Boolean).slice(0, maxChunks);
+  return chunks.filter(Boolean);
+}
+
+export async function reviewByModel(files, maxChunks = 8) {
+  const chunks = linesForTheModel(files);
+  const work = chunks.slice(0, maxChunks);
   if (!work.length) return { findings: [], ran: true, skipped: 0 };
   // Eight at a time, so a whole-tree read does not start eighty sessions at once.
   const results = [];
   for (let i = 0; i < work.length; i += 8) results.push(...await Promise.all(work.slice(i, i + 8).map(runModel)));
   if (results.some((r) => r === null)) return { findings: results.flat().filter(Boolean), ran: false, skipped: 0 };
-  return { findings: results.flat(), ran: true, skipped: Math.max(0, chunks.filter(Boolean).length - work.length) };
+  return { findings: results.flat(), ran: true, skipped: Math.max(0, chunks.length - work.length) };
 }
 
 // ---------------------------------------------------------------------------

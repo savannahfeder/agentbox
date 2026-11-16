@@ -12,5 +12,10 @@ config.watchFolders = [path.join(repo, 'shared'), path.join(repo, 'renderer', 's
 config.resolver.nodeModulesPaths = [path.join(__dirname, 'node_modules')];
 // The shared code the app reads is TypeScript in .mts files now, imported by that name.
 if (!config.resolver.sourceExts.includes('mts')) config.resolver.sourceExts.push('mts');
+// On the web preview Metro takes obscenity's `import` build, a wrapper that reads an undefined default; the phones take its CommonJS one.
+const resolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, name, platform) => (name === 'obscenity'
+  ? { type: 'sourceFile', filePath: path.join(__dirname, 'node_modules', 'obscenity', 'dist', 'index.js') }
+  : (resolveRequest ?? context.resolveRequest)(context, name, platform));
 
 module.exports = config;

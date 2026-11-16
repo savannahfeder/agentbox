@@ -262,7 +262,7 @@ describe('1. the first practice task is fiction about a named pretend app', () =
     for (const row of PRACTICE_ROWS.filter((r) => !r.waiting)) {
       expect(row.title).toMatch(/^[A-Z]\w+ed\b|^The\b/);
     }
-    expect(PRACTICE_ANSWER).toMatch(/^Done,/);
+    expect(PRACTICE_ANSWER).toMatch(/^Done\./);
   });
 
   it('stays short enough to be a row title as well as a card', () => {
