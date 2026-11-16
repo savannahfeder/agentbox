@@ -977,7 +977,7 @@ async function createWindow() {
     if (!model || typeof model !== 'object') return null;
     // A cloud that does not answer leaves the list empty rather than holding the copy back.
     const listed = (await Promise.resolve(phoneChannels.get('zero:file-links')?.({ sender: null }, {})).catch(() => null)) as { ok?: boolean; links?: unknown[] } | null | undefined;
-    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone(), links: listed?.ok ? listed.links : [] };
+    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone(), links: listed?.ok ? listed.links : [], seen: ipc.seenForPhone() };
   };
   updater.start();
   // A task the app just shipped moved main: look now rather than in half an

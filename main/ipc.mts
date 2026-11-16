@@ -8,6 +8,7 @@ import { gitJob } from './git-change-offthread.mts';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mts';
 import { projectSeenBy } from '../shared/thread-cards.mts';
+import { phoneSeenOf } from '../shared/phone-settings.mts';
 import { createEngineSetup, engineSetUpHere } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
 // process derives from files and answers. Pushes go one way: "state changed,
@@ -553,6 +554,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     try { codex = supervisor.codexAccountUsage(); } catch { /* no Codex reading */ }
     return { claude, codex };
   };
+  let seenHere: Record<string, number> = {};
+  const seenForPhone = () => seenHere;
 
   // Agents this run has already counted. In memory on purpose: a fresh launch
   // seeing the same agent again is a fresh fact about the app being used.
@@ -1039,6 +1042,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:phone-seen', (_e, { id, at }: { product?: string; id?: string; at?: number } = {}) => {
     if (typeof id !== 'string' || !id || !(Number(at) > 0)) return { ok: false, error: 'not a thread opened on the phone' };
     if (!window.isDestroyed()) window.webContents.send('zero:seen-on-phone', { id, at: Number(at) });
+    return { ok: true };
+  });
+  // And what the window has opened, for the phone's dots (phoneSettingsOf).
+  ipcMain.handle('zero:seen-here', (_e, { seen }: { seen?: unknown } = {}) => {
+    seenHere = phoneSeenOf(seen);
     return { ok: true };
   });
 
@@ -3102,5 +3110,5 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const hash = keeper?.hashAt(file);
     return hash ? keeper!.bringBack(hash) : Promise.resolve(false);
   };
-  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone, comeBackAt };
+  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone, seenForPhone, comeBackAt };
 }
