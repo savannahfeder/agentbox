@@ -117,7 +117,7 @@ import { ClipGlyph, SendGlyph } from './reply-glyphs';
 import { bringIntoView, resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
 import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
-import { MOVED_PX, THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw } from '../pick-settles';
+import { THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw, stripUnderThePointer } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
 import { recapFor } from '../recap';
@@ -1801,17 +1801,14 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // every render, because nothing else here knows the pane has scrolled under
   // a hand that is not moving.
   const stripRef = useRef<HTMLDivElement>(null);
-  const overStrip = useRef(false);
-  const stripTop = useRef<number | null>(null);
+  const strip = useRef(stripUnderThePointer()).current;
+  const stripTopNow = () => stripRef.current?.getBoundingClientRect().top ?? null;
+  const onStripOver = (over: boolean) => { if (over) strip.enter(stripTopNow()); else strip.leave(); };
   const [stripMovedAt, setStripMovedAt] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const top = stripRef.current?.getBoundingClientRect().top ?? null;
-    const was = stripTop.current;
-    stripTop.current = top;
-    if (top === null || was === null) return;
-    if (overStrip.current && Math.abs(top - was) >= MOVED_PX) setStripMovedAt(Date.now());
+    if (strip.jumped(stripTopNow())) setStripMovedAt(Date.now());
   });
-  useEffect(() => { setStripMovedAt(null); overStrip.current = false; }, [item.id]);
+  useEffect(() => { setStripMovedAt(null); strip.leave(); }, [item.id]);
   // The keys are not aimed at a place on the screen, so they are untouched.
   const pickByClick = (n: number) => {
     if (!clickLandsOnTheRowYouSaw(stripMovedAt, Date.now())) {
@@ -2413,7 +2410,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             selectedOption={selectedOption} selRef={selRef}
             onPick={pickByClick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
             setPeek={setPeek} setAskPeek={setAskPeek}
-            stripRef={stripRef} onOver={(over) => { overStrip.current = over; }}
+            stripRef={stripRef} onOver={onStripOver}
           />
         ))}
 
@@ -2603,7 +2600,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               selectedOption={selectedOption} selRef={selRef}
               onPick={pickByClick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
               setPeek={setPeek} setAskPeek={setAskPeek}
-              stripRef={stripRef} onOver={(over) => { overStrip.current = over; }}
+              stripRef={stripRef} onOver={onStripOver}
               bare={!shipAsk?.headed}
             />
             <ChoicesFold onFold={foldChoices} />
@@ -2634,7 +2631,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               selectedOption={selectedOption} selRef={selRef}
               onPick={pickByClick} onOptionEnter={onOptionEnter} onAskEnter={onAskEnter}
               setPeek={setPeek} setAskPeek={setAskPeek}
-              stripRef={stripRef} onOver={(over) => { overStrip.current = over; }}
+              stripRef={stripRef} onOver={onStripOver}
             />
           ))}
           {/* NO REPLY BOX ON THE TROUBLE ROW EITHER, and for the same reason as
