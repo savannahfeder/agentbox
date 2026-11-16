@@ -622,6 +622,11 @@ export const api = {
         const queued = base.items.filter((i) => /^(Can the welcome email|Bring back a list)/.test(i.title)).map((i) => i.id);
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
+      // &longwait has a Later thread wait on a long free-typed name, as long as a wait can be.
+      if (params.has('longwait')) {
+        const row = base.items.find((i) => i.title.startsWith('Name the five card rarities'));
+        if (row) base.items.push({ ...row, id: 'w-longwait', title: 'Pay the card art studio', label: undefined, parent: undefined, blockedBy: ['name:the signed vendor contract and the legal review of part 4'], wrote: { blockedBy: { ts: Date.now() - 3_600_000, source: 'founder' } } });
+      }
       }
       // &team=signedout: a build that can sign in, with nobody signed in and no team.
       if (params.get('team') === 'signedout') {

@@ -1158,12 +1158,12 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
               "waiting" chip beside the project with it: Queued is the same
               fact in the place every card now says it. */}
           <div className="m">{e.task
-            ? <><span className="s">{e.task.unread && <i className="ev-new" aria-label="New" />}{e.task.word}</span>{e.task && dueWords(e.item?.due) && <span className="p tm-due-word">{dueWords(e.item?.due)}</span>}</>
-            : onThem ? <span className="s">{onThem}</span>
-            : waitWord ? <span className="s">{waitWord}</span>
-            : e.card?.shippedAt ? <span className="s">Shipped</span>
+            ? <><span className="s">{e.task.unread && <i className="ev-new" aria-label="New" />}<span className="sw">{e.task.word}</span></span>{e.task && dueWords(e.item?.due) && <span className="p tm-due-word">{dueWords(e.item?.due)}</span>}</>
+            : onThem ? <span className="s"><span className="sw">{onThem}</span></span>
+            : waitWord ? <span className="s"><span className="sw">{waitWord}</span></span>
+            : e.card?.shippedAt ? <span className="s"><span className="sw">Shipped</span></span>
             : status && (saysOnCard(status, e.item!, e.state) || (status !== drawn))
-            ? <span className="s"><StatusMark status={status} />{status.word}</span>
+            ? <span className="s"><StatusMark status={status} /><span className="sw">{status.word}</span></span>
             : e.live && <RunningMark cloud={!!e.item && cloudIds.has(e.item.id)} />}{prio && <PriorityMark id={prio} />}{e.project && <span className="p">{e.project}</span>}
             {withOthers && <Face person={personOf(team, e.ownerId)} me={e.ownerId === me} />}</div>
         </button>;
