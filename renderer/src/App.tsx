@@ -8745,6 +8745,7 @@ export default function App() {
             {openDoc && (
               <ArtifactSurface target={teamShown ? teamBody : artifactBody}><DocPane
                 doc={openDoc}
+                thread={focused && focused.product === openDoc.product && !openDoc.readOnly ? focused.id : undefined}
                 roots={docRoots}
                 focusControlStyle={reviewLab ? focusControlStyle : 'corners-bare'}
                 headerTarget={artifactView === 'focus' ? artifactHeader : null}

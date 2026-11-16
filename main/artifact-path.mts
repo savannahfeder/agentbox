@@ -339,17 +339,52 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
     return hits.find((hit) => threadNames(own.dir, hit.id, base))?.file ?? null;
 }
 // A finished thread's folder is given back, and work that came home from the
-// cloud may never have had one: its files are then only on its branch. A copy
-// is read out for viewing.
+// cloud may never have had one. Until its branch is merged, the file there is
+// newer than the checkout's copy of the same name. A copy is read out for viewing.
 const readFromGit = promisify(execFile);
-async function fileOnThreadBranch(repoPath: string | null | undefined, raw: string, thread: unknown): Promise<string | null> {
+const gitOut = async (repoPath: string, args: string[]): Promise<Buffer> => (await readFromGit('git', ['-C', repoPath, ...args], { encoding: 'buffer', timeout: 5_000, maxBuffer: 64 * 1024 * 1024 })).stdout;
+// One git call per repository per look, however many threads ask.
+function unmergedTips(repoPath: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<Map<string, string>> {
+    const branches = `refs/heads/${path.posix.dirname(taskBranch('w-0'))}/`;
+    return freshly(`unmerged:${repoPath}`, fs, now, async () => {
+        const out = await gitOut(repoPath, ['for-each-ref', '--no-merged=HEAD', '--format=%(objectname) %(refname:lstrip=2)', branches]).catch(() => Buffer.alloc(0));
+        return new Map(String(out).split('\n').filter(Boolean).map((line) => {
+            const [tip, name] = line.split(' ');
+            return [name, tip] as [string, string];
+        }));
+    }, fresh);
+}
+// Keyed by commit, so a copy never goes stale.
+const branchCopies = new Map<string, Promise<string | null>>();
+async function fileOnThreadBranch(repoPath: string | null | undefined, raw: string, thread: unknown, fs: ArtifactFs, now: number, fresh: boolean): Promise<string | null> {
     if (!repoPath || path.isAbsolute(raw) || raw.split('/').includes('..') || !thread || !THREAD_ID.test(String(thread)))
         return null;
+    const tip = (await unmergedTips(repoPath, fs, now, fresh)).get(taskBranch(thread));
+    if (!tip)
+        return null;
+    const key = `${repoPath}\0${tip}\0${raw}`;
+    const kept = await branchCopies.get(key);
+    if (kept && fsDefault.existsSync(kept))
+        return kept;
+    if (branchCopies.size > 256)
+        branchCopies.clear();
+    const copying = copyFromCommit(repoPath, tip, raw, String(thread));
+    branchCopies.set(key, copying);
+    return copying;
+}
+async function copyFromCommit(repoPath: string, tip: string, raw: string, thread: string): Promise<string | null> {
     try {
-        const { stdout } = await readFromGit('git', ['-C', repoPath, 'show', `${taskBranch(thread)}:${raw}`], { encoding: 'buffer', timeout: 5_000, maxBuffer: 64 * 1024 * 1024 });
-        const copy = path.join(os.tmpdir(), 'agentbox-branch-files', createHash('sha1').update(repoPath).digest('hex').slice(0, 12), String(thread), raw);
+        // Only a file the thread's own commits touched: the rest of its branch is
+        // main as it was when the thread began, older than the checkout's copy.
+        // An answer names a file it committed by its name as often as by its path.
+        const changed = String(await gitOut(repoPath, ['log', '--format=', '--name-only', '-z', `HEAD..${tip}`])).split('\0').map((f) => f.trim()).filter(Boolean);
+        const file = changed.find((f) => f === raw) ?? changed.find((f) => f.endsWith(`/${raw}`));
+        if (!file)
+            return null;
+        const bytes = await gitOut(repoPath, ['show', `${tip}:${file}`]);
+        const copy = path.join(os.tmpdir(), 'agentbox-branch-files', createHash('sha1').update(repoPath).digest('hex').slice(0, 12), thread, tip.slice(0, 12), file);
         await fsDefault.promises.mkdir(path.dirname(copy), { recursive: true });
-        await fsDefault.promises.writeFile(copy, stdout);
+        await fsDefault.promises.writeFile(copy, bytes);
         return copy;
     }
     catch {
@@ -455,6 +490,11 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
         ? path.join(own.repoPath, '.claude', 'worktrees', String(thread)) : null;
     if (mine)
         candidates.unshift(path.join(mine, raw));
+    if (mine && !fs.existsSync(mine)) {
+        const onBranch = await fileOnThreadBranch(own?.repoPath, raw, thread, fs, now, fresh);
+        if (onBranch)
+            return withCarry({ ok: true, path: onBranch });
+    }
     for (const full of candidates) {
         if (fs.existsSync(full))
             return withCarry({ ok: true, path: full });
@@ -484,9 +524,6 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
         const inCheckout = await fileInCheckout({ dir: own.dir, repoPath: own.repoPath }, raw, thread, fs, now, fresh);
         if (inCheckout)
             return withCarry({ ok: true, path: inCheckout });
-        const onBranch = await fileOnThreadBranch(own.repoPath, raw, thread);
-        if (onBranch)
-            return withCarry({ ok: true, path: onBranch });
     }
     // The sender said there is nothing behind this word: no tile, no waiting.
     if (carried?.quiet)

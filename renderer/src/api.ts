@@ -908,7 +908,7 @@ export const api = {
 
   // Hand a file to the operating system, the way every link on a card already
   // does. The pane's first mark, and what a png or a pdf still does.
-  async openArtifactExternally(p: { product: string; src: string }): Promise<{ ok: boolean; error?: string }> {
+  async openArtifactExternally(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.openArtifact) { window.open(p.src, '_blank'); return { ok: true }; }
     return zero.openArtifact(p);
