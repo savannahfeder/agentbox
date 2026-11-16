@@ -80,10 +80,11 @@ async function sweep(note: KeyNote, storage: KeyStorage): Promise<void> {
 export async function saveCloudKey(
   name: string,
   value: unknown,
-  { storage, home = os.homedir(), now = Date.now(), label = null }: { storage: KeyStorage; home?: string; now?: number; label?: string | null } = {} as { storage: KeyStorage },
+  { storage, home = os.homedir(), now = Date.now(), label = null, replace = true }: { storage: KeyStorage; home?: string; now?: number; label?: string | null; replace?: boolean } = {} as { storage: KeyStorage },
 ): Promise<{ name: string; savedAt: number }> {
   const refused = keyNameRefused(name);
   if (refused) throw new Error(refused);
+  if (!replace && readNote(home).keys[name]?.id) throw new Error(`${name} is already saved. To replace it, ask for it with request_cloud_key, which shows them a card.`);
   const v = typeof value === 'string' ? value.trim() : '';
   if (!v) throw new Error('Paste the key first.');
   if (v.length > KEY_VALUE_MAX) throw new Error('That is longer than any key; check what was pasted.');

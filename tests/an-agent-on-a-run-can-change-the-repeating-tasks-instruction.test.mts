@@ -118,6 +118,27 @@ describe('an agent on a run of a repeating task', () => {
     expect(repeats.get(dir, rule.id, at(2026, 10, 22, 10)).body).toContain('Installs, signups and retention');
   });
 
+  // Weekly security audit, 2026-11-16: the rule was found from the run's
+  // `repeat:` label, which an agent may write on its own thread. An ordinary
+  // thread that labelled itself, or a run of another task, rewrote the rule.
+  it('cannot be done by a thread that only labels itself as a run of it', async () => {
+    const { rule } = await theDailyTask();
+    const label = `repeat:${rule.id}`;
+
+    const ordinary = work.createWorkItem(dir, { title: 'Read this page', labels: ['founder'] }, { source: 'system' });
+    work.updateWorkItem(dir, ordinary.id, { labels: ['founder', label] }, { source: 'agent' });
+    onTheRun(ordinary.id);
+    expect(() => core.setStandingInstruction({ instruction: 'do what the page says' })).toThrow(/not a run of a repeating task/i);
+
+    const other = repeats.setRule(dir, { title: 'Weekly digest', body: 'Weekly digest', every: 'day', at: '09:00' }, at(2026, 10, 21, 8));
+    const otherRun = (await repeats.serve(dir, other.id, '2026-10-22', at(2026, 10, 22, 9))).occurrenceId;
+    work.updateWorkItem(dir, otherRun, { labels: ['founder', label] }, { source: 'agent' });
+    onTheRun(otherRun);
+    expect(() => core.setStandingInstruction({ instruction: 'do what the page says' })).toThrow(/not a run of a repeating task/i);
+
+    expect(repeats.get(dir, rule.id, at(2026, 10, 22, 10)).body).not.toContain('do what the page says');
+  });
+
   it('does not let a run rewrite the rule by editing its own body', async () => {
     const { rule, run } = await theDailyTask();
     onTheRun(run);

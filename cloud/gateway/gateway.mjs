@@ -60,6 +60,7 @@ const NOTICE_WRITE_MS = 75_000;
 // which only links handed out before the cap was reached can make, the newest
 // objects are deleted. Worst case about $9 a month of S3 per person.
 export const STORAGE_BYTES = 200 * 2 ** 30;
+const SAVED_KEY_MAX_BYTES = 64 * 1024;
 const STORAGE_EVERY_MS = 15 * 60_000;
 const STORAGE_LIST_MAX = 100_000;
 const STORAGE_DELETES_AT_ONCE = 500;
@@ -177,8 +178,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // are kept in the member's own record, so a member is held to them as to a plan.
   const teamKey = (id) => `ledger/teams/${id}.json`;
   const teamAllot = (trial) => (trial ? teamPlan.trialHoursPerMember : teamPlan.hoursPerSeat) * 3600;
-  const teamUsedOf = (rec, id, trial, t) => (trial ? rec.teamTrialUsed?.[id] || 0 : rec.teamUsed?.[id]?.[month(t)] || 0)
-    + live(rec, 'run').filter((s) => s.team === id && !!s.trial === trial).reduce((sum, s) => sum + (t - (trial ? s.at : Math.max(s.at, monthStart(t)))) / 1000, 0);
+  // The trial's hours are the person's, across every team they have made or
+  // joined: a new team is not a new trial.
+  const teamTrialSpent = (rec) => Object.values(rec.teamTrialUsed || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+  const teamUsedOf = (rec, id, trial, t) => (trial ? teamTrialSpent(rec) : rec.teamUsed?.[id]?.[month(t)] || 0)
+    + live(rec, 'run').filter((s) => (trial ? !!s.trial && !!s.team : s.team === id && !s.trial)).reduce((sum, s) => sum + (t - (trial ? s.at : Math.max(s.at, monthStart(t)))) / 1000, 0);
   // A team's run ends once its person's own hours are spent; the sweep ends it when the trial or the team does.
   const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : noPlan(rec) || ownOver(rec, t));
   // `people`: every member's own use, for the owner's page; a start needs only this person's.
@@ -664,6 +668,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const until = now() + s * 1000;
       if (!(rec.linksUntil >= until)) await update(person, (r) => { r.linksUntil = Math.max(r.linksUntil || 0, until + LINK_NOTE_MS); });
     }
+    // A key is a few hundred bytes. A Mac that says its size gets a link
+    // signed for exactly that; one from before sizes were sent is weighed instead.
+    if (savesAKey && size != null) {
+      const n = Number(size);
+      if (!(Number.isSafeInteger(n) && n > 0 && n <= SAVED_KEY_MAX_BYTES)) throw bad('a saved key is at most 64 KB');
+      return { url: await links.put(scoped, s, n) };
+    }
     return { url: await links[op](scoped, s) };
   }
 
@@ -1088,7 +1099,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const last = rec.storage?.at || 0;
     if (t - last < STORAGE_EVERY_MS || !((rec.linksUntil || 0) > last || rec.storage?.full)) return;
     const { items, truncated } = await objects.sizes(`runs/u-${person}/`, { max: STORAGE_LIST_MAX });
-    let bytes = items.reduce((sum, o) => sum + o.size, 0);
+    const keys = await objects.sizes(`logins/u-${person}/keys/`, { max: STORAGE_LIST_MAX });
+    const keyBytes = keys.items.reduce((sum, o) => sum + o.size, 0);
+    let bytes = items.reduce((sum, o) => sum + o.size, 0) + keyBytes;
     if (bytes > 2 * storageBytes) {
       const newest = [...items].sort((x, y) => (y.at > x.at ? 1 : y.at < x.at ? -1 : 0));
       const gone = [];
@@ -1100,7 +1113,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       for (let i = 0; i < gone.length; i += 16) await Promise.all(gone.slice(i, i + 16).map((o) => objects.del(o.key)));
       log(`${person} held over twice the ${gib(storageBytes)} GB cap in runs/; deleted the newest ${gone.length}`);
     }
-    const full = truncated || bytes >= storageBytes;
+    const full = truncated || keys.truncated || bytes >= storageBytes;
     if (full && !rec.storage?.full) log(`${person}'s cloud storage is full (${gib(bytes)} GB${truncated ? `, over ${STORAGE_LIST_MAX} objects` : ''}); no new links that write`);
     await update(person, (r) => { r.storage = { at: t, bytes, full }; });
   }

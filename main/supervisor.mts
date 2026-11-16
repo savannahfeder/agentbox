@@ -4823,7 +4823,7 @@ export class Supervisor {
       const quietSince = session.lastOutputAt ?? session.startedAt ?? now;
       if (now - quietSince < HUNG_QUIET_MS) continue;
       // Silent because it waits on a card in front of the person.
-      if (!lapsed && (asking ??= new Set(listPending(this.config.storeRoot).map((r) => r?.item))).has(id)) continue;
+      if (!lapsed && (asking ??= new Set(listPending(this.config.storeRoot, { drawn: false }).map((r) => r?.item))).has(id)) continue;
       this._hungReaps ??= {};
       const key = `${item.product}:${id}`;
       const last = this._hungReaps[key];
@@ -5688,7 +5688,7 @@ export class Supervisor {
     const candidates = [...this.sessions.values()]
       .filter((s) => this._movesToCloud(s, byId.get(s.itemId) ?? null))
       .filter((s) => asked(s) || !(now - (this._movedToCloudAt?.[s.itemId] ?? 0) < MOVE_TO_CLOUD_AGAIN_MS))
-      .filter((s) => !(asking ??= new Set(listPending(this.config.storeRoot).map((r) => r?.item))).has(s.itemId))
+      .filter((s) => !(asking ??= new Set(listPending(this.config.storeRoot, { drawn: false }).map((r) => r?.item))).has(s.itemId))
       .sort((a, b) => asked(b) - asked(a) || (b.startedAt ?? 0) - (a.startedAt ?? 0));
     for (const s of candidates) {
       if (starts <= 0 || room <= 0) break;
