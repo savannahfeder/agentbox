@@ -5718,7 +5718,8 @@ export class Supervisor {
     this._handedBack.add(item.id);
     (this._movedWhy ??= {})[item.id] = { why: 'handed-back', detail: handBackWhat(session.result) };
     this._releaseUnsettledReplies(item);
-    if (!this._mergeHome(item, session.result, cwd, session.startedAt ?? 0)) this._moveToMac(item.id);
+    // A cloud run stays open between turns: what this turn carried is what came before the turn.
+    if (!this._mergeHome(item, session.result, cwd, session.turnStartedAt ?? session.startedAt ?? 0)) this._moveToMac(item.id);
     return true;
   }
 
