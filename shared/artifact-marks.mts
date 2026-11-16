@@ -16,7 +16,8 @@ export type NotePlace =
   | { kind: 'whole'; x?: undefined; y?: undefined };
 
 export type Mark =
-  | { do: 'note'; id: string; file: string; place: NotePlace; text: string; mentions?: string[]; owner?: string; wait?: boolean }
+  /** `v`: the version number on screen when it was written; `file` alone does not always say it. */
+  | { do: 'note'; id: string; file: string; v?: number; place: NotePlace; text: string; mentions?: string[]; owner?: string; wait?: boolean }
   | { do: 'reply'; id: string; on: string; file: string; text: string }
   | { do: 'resolve' | 'reopen'; on: string; in?: string }
   | { do: 'approve' | 'unapprove'; file: string; owner?: string }
@@ -211,8 +212,9 @@ export function cleanMark(raw: unknown): Mark | undefined {
       const text = typeof value.text === 'string' ? value.text.trim().slice(0, MAX_NOTE_CHARS) : '';
       if (!id || !file || !place || !text) return undefined;
       const mentions = Array.isArray(value.mentions) ? [...new Set(value.mentions.map(shortId).filter(Boolean) as string[])].slice(0, MAX_NAMED) : [];
+      const v = Number.isInteger(value.v) && (value.v as number) >= 1 && (value.v as number) <= 9999 ? value.v as number : null;
       // `wait`: held for Send rather than told to the agent as it is added.
-      return { do: 'note', id, file, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}), ...(value.wait === true ? { wait: true } : {}) };
+      return { do: 'note', id, file, ...(v ? { v } : {}), place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}), ...(value.wait === true ? { wait: true } : {}) };
     }
     case 'reply': {
       const id = shortId(value.id);

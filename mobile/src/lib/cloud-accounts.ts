@@ -38,15 +38,16 @@ export function computerAccounts<A, B>(w: LocalCopy<A, B>, engine: Engine): (A |
   return (engine === 'claude' ? w.accounts : w.codexAccounts) ?? [];
 }
 
-/** What a login's row is called: its email, else its name, else "Claude account", never "Not signed in" over "Signed in". */
-export const loginLabel = (a: { email: string | null; name?: string | null }, engine: Engine, index: number, total: number) =>
-  a.email ?? a.name ?? accountName({ engine, index, total });
+/** What a login's row is called: its email, else its name, else "Not signed in" as the desktop says, else "Claude account". */
+export const loginLabel = (a: { email: string | null; name?: string | null; signedIn?: boolean }, engine: Engine, index: number, total: number) =>
+  a.email ?? a.name ?? (a.signedIn === false ? 'Not signed in' : accountName({ engine, index, total }));
 
-/** What Settings' front page says beside Claude Code or Codex: the login in use, or how many the page lists. */
-export function accountsAside(local: readonly { chosen: boolean; email: string | null }[] | undefined, cloudOnly: number): string | undefined {
+/** What Settings' front page says beside Claude Code or Codex: the login in use, or how many signed-in ones the page lists. */
+export function accountsAside(local: readonly { chosen: boolean; email: string | null; signedIn?: boolean }[] | undefined, cloudOnly: number): string | undefined {
   const chosen = local?.find((a) => a.chosen)?.email;
   if (chosen) return chosen;
-  const n = (local?.length ?? 0) + cloudOnly;
+  const n = (local ?? []).filter((a) => a.signedIn !== false).length + cloudOnly;
+  if (!n && local?.length) return 'Not signed in';
   return n ? `${n} account${n === 1 ? '' : 's'}` : undefined;
 }
 

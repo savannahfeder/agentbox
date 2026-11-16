@@ -10,8 +10,8 @@ import { runningAsAFreshUser } from './fresh-user-home.mts';
 import { runningAsADemo } from './demo-world.mts';
 
 export const ARMS: string[] = ['tour', 'classic'];
-// The share of new installs that get the new first run ('tour'). 0 until it is approved; 0.5 restarts the test.
-export const TOUR_SHARE = 0;
+// The share of new installs that get the new first run ('tour'). All of them since it was approved; 0.5 restarts the test.
+export const TOUR_SHARE = 1;
 const FILE = 'onboarding-arm';
 
 export function readArm(dir: string | null | undefined): string | null {

@@ -4,15 +4,15 @@ import type { Lesson } from '../tour';
 import { walkPlace } from '../setup-split';
 import './tour-frame.css';
 
-export function TourFrame({ done, now, onSkip }: { done: readonly Lesson[]; now: Lesson | null; onSkip: () => void }) {
+export function TourFrame({ done, now, finished = false, onSkip }: { done: readonly Lesson[]; now: Lesson | null; finished?: boolean; onSkip: () => void }) {
   const { at, of } = walkPlace(done, now);
   return (
-    <div className="tour-frame" role="navigation" aria-label="Walkthrough">
+    <div className={`tour-frame${finished ? ' tf-done' : ''}`} role="navigation" aria-label="Walkthrough">
       <div className="tf-steps">
-        {Array.from({ length: of }, (_, i) => <i key={i} className={i < at - 1 ? 'tf-was' : i === at - 1 ? 'tf-is' : ''} />)}
-        <span>Walkthrough {at} of {of}</span>
+        {Array.from({ length: of }, (_, i) => <i key={i} className={finished || i === at - 1 ? 'tf-is' : i < at - 1 ? 'tf-was' : ''} />)}
+        <span>{finished ? 'Walkthrough done' : `Walkthrough ${at} of ${of}`}</span>
       </div>
-      <button type="button" className="tf-skip" onClick={onSkip}>Skip walkthrough</button>
+      <button type="button" className="tf-skip" onClick={onSkip}>{finished ? 'Close' : 'Skip walkthrough'}</button>
     </div>
   );
 }

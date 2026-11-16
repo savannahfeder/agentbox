@@ -55,7 +55,7 @@ import { practiceRefusal, noProjectYet } from '../compose-says';
 import { onCloudPhone } from '../phone-screen';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
-import { startingEngine, writeLastEngine } from '../engines';
+import { ENGINE_CHOSEN, startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
 import { ideasFor, type Idea } from '../first-run';
 import { readRule, repeatsLine } from '../format';
@@ -67,7 +67,7 @@ import {
   allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
-  dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInvited, type ToSection,
+  dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInTo, findInvited, type ToSection,
   agentOnThisWork, atOffers, atWordAt, cardDraftPlace, cardDraftToKeep, handedFromLabel, withoutAtWord,
   startingWhen, whenOnDraft, whenToSend, whenWords,
   type AtOffer, type HandFrom, type Harness, type Keyboard, type ModelPick, type SendAs, type SendWhen, type Visibility,
@@ -123,6 +123,8 @@ export interface ComposeStart {
   attachments?: PendingAttachment[];
   /** The message this card was opened from, when it was handed to an agent. */
   handFrom?: HandFrom;
+  /** The task's name, which the thread keeps while its first line still says it. */
+  named?: string;
   /** The teammate's thread this one carries on: labelled on the new thread, and its owner told once it is sent. */
   continueFrom?: { personId: string; threadId: string };
   /** The project it starts in, ahead of the default. */
@@ -359,6 +361,16 @@ export function ThreadComposer({
     if (pick.engine === 'claude' && !claudeOffered && codexOffered) setPick({ engine: 'codex', model: readLastModel(undefined, 'codex', codexDefault) ?? defaultModelFor('codex', codexDefault) });
   }, [codexOffered, claudeOffered]);
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, pick.engine));
+  // The setup asks which agent while this box is already open behind it.
+  useEffect(() => {
+    const chosen = (e: Event) => {
+      const engine: Harness = startingEngine(String((e as CustomEvent).detail ?? ''), engines);
+      setPick({ engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) });
+      setEffort(readLastEffort(undefined, engine));
+    };
+    addEventListener(ENGINE_CHOSEN, chosen);
+    return () => removeEventListener(ENGINE_CHOSEN, chosen);
+  });
   const pickModel = (p: ModelPick) => {
     setPick(p);
     writeLastEngine(p.engine);
@@ -658,6 +670,7 @@ export function ThreadComposer({
           ...(when.start ? { start: when.start } : {}),
           ...harness,
           ...(team ? sharingFields(visibility, chosenHere) : {}),
+          ...(initial?.named && message.title === initial.named ? { label: initial.named } : {}),
           ...(onAuto || initial?.handFrom || initial?.continueFrom ? { labels: [
             ...(onAuto ? [AUTO_LABEL] : []),
             ...(initial?.handFrom ? [handedFromLabel(initial.handFrom.product, initial.handFrom.id)] : []),
@@ -857,6 +870,23 @@ export function ThreadComposer({
     return false;
   };
 
+  const toFound = findInTo(query, { auto: autoHere, agents, mates: agentMates ?? [] });
+  const matesHere = !!agentMates && !!onToTeammate;
+  const sections = toSections({
+    people: !!team && (others.length > 0 || !!team.state.sent?.length),
+    auto: toFound.auto,
+    agents: agents.length ? toFound.agents.length > 0 : toFound.agent,
+    mates: matesHere && (toFound.mates.length > 0 || toFound.someoneNew),
+    adding,
+  });
+  const firstFound = (): (() => void) | null => {
+    if (found[0]) return () => chooseTo(found[0].id);
+    if (adding) return null;
+    if (sections.includes('auto')) return chooseAuto;
+    if (sections.includes('agents')) return agents.length ? () => { chooseAgent(toFound.agents[0].id); chooseTo('agent'); } : () => chooseTo('agent');
+    if (sections.includes('mates') && toFound.mates[0]) return () => chooseMate(toFound.mates[0].id);
+    return null;
+  };
   const toSection = (s: ToSection) => s === 'auto' ? (
         <button key="auto" type="button" data-item className={`tc-row ${onAuto ? 'on' : ''}`} onPointerMove={hover} onClick={chooseAuto}>
           <AutoFace /><span className="tc-row-label">Auto</span><small className="tc-row-aside">picks who when you send</small>
@@ -866,7 +896,7 @@ export function ThreadComposer({
           always drawn where it has one. Picking an agent is picking where the
           task runs, so it moves the model with it (`chooseAgent`). */
       : s === 'agents' ? (agents.length
-        ? agents.map((a) => (
+        ? toFound.agents.map((a) => (
           <button key={a.id} type="button" data-item className={`tc-row ${!person && !mate && !onAuto && pick.engine === a.id ? 'on' : ''}`}
             onPointerMove={hover} onClick={() => { chooseAgent(a.id); chooseTo('agent'); }}>
             <AgentFace /><span className="tc-row-label">{a.label}</span>
@@ -878,16 +908,17 @@ export function ThreadComposer({
           </button>
         ))
       : s === 'mates' ? (<Fragment key="mates">
-        <span className="tc-sep" />
         <span className="tc-menu-head">Teammates</span>
-        {(agentMates ?? []).map((t) => (
+        {toFound.mates.map((t) => (
           <button key={t.id} type="button" data-item className={`tc-row ${mate === t.id ? 'on' : ''}`} onPointerMove={hover} onClick={() => chooseMate(t.id)}>
             <TeammateMark t={t} /><span className="tc-row-label">{t.name}</span>{t.role && <small className="tc-row-aside">{t.role}</small>}
           </button>
         ))}
-        <button type="button" data-item className={`tc-row ${mate === 'new' ? 'on' : ''}`} onPointerMove={hover} onClick={() => chooseMate('new')}>
-          <i className="tq tq-sm tq-hash" aria-hidden="true">+</i><span className="tc-row-label">Someone new</span><small className="tc-row-aside">makes a teammate for this</small>
-        </button>
+        {toFound.someoneNew && (
+          <button type="button" data-item className={`tc-row ${mate === 'new' ? 'on' : ''}`} onPointerMove={hover} onClick={() => chooseMate('new')}>
+            <i className="tq tq-sm tq-hash" aria-hidden="true">+</i><span className="tc-row-label">Someone new</span><small className="tc-row-aside">makes a teammate for this</small>
+          </button>
+        )}
       </Fragment>)
       : (<Fragment key="people">
         <span className="tc-menu-head">People</span>
@@ -897,7 +928,7 @@ export function ThreadComposer({
           placeholder="Find a person"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && query.trim() && found[0]) { e.preventDefault(); chooseTo(found[0].id); } }}
+          onKeyDown={(e) => { const pick = query.trim() && e.key === 'Enter' ? firstFound() : null; if (pick) { e.preventDefault(); pick(); } }}
         />
         {found.map((p) => (
           <button key={p.id} type="button" data-item className={`tc-row ${to === p.id ? 'on' : ''}`} onPointerMove={hover} onClick={() => chooseTo(p.id)}>
@@ -909,12 +940,16 @@ export function ThreadComposer({
             <Face name={e} /><span className="tc-row-label">{e}</span><small className="tc-row-aside">Invited, not joined yet</small>
           </div>
         ))}
-        {!found.length && !invitedFound.length && <span className="tc-none">Nobody on the team matches that.</span>}
-        {!adding && <span className="tc-sep" />}
+        {!found.length && !invitedFound.length && sections.length === 1 && <span className="tc-none">Nobody on the team matches that.</span>}
       </Fragment>);
   const toMenu = (
     <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
-      {toSections({ people: !!team && (others.length > 0 || !!team.state.sent?.length), auto: autoHere, mates: !!agentMates && !!onToTeammate, adding }).map(toSection)}
+      {sections.map((s, i) => (
+        <Fragment key={s}>
+          {i > 0 && (s === 'mates' || sections[i - 1] === 'people') && <span className="tc-sep" />}
+          {toSection(s)}
+        </Fragment>
+      ))}
     </div>
   );
 

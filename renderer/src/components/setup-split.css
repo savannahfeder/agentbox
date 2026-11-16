@@ -33,6 +33,11 @@
 .setup-split .ss-steps i { width: 16px; height: 2px; background: color-mix(in srgb, var(--text) 12%, transparent); }
 .setup-split .ss-steps i.ss-was { background: color-mix(in srgb, var(--text) 40%, transparent); }
 .setup-split .ss-steps i.ss-is { background: var(--text); }
+/* A step already passed is pressed to go back to it: the same dash, with room for a pointer. */
+.setup-split .ss-steps button { position: relative; width: 16px; height: 18px; margin: -2px 0; padding: 0; border: 0; background: none; cursor: pointer; }
+.setup-split .ss-steps button::before { content: ''; position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: color-mix(in srgb, var(--text) 40%, transparent); }
+.setup-split .ss-steps button:hover::before { background: var(--text); }
+.setup-split .ss-steps button:disabled { cursor: default; }
 .setup-split .ss-steps span { margin-left: 12px; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
 
 .setup-split .ss-body { position: absolute; left: clamp(48px, 6vw, 112px); right: 40px; max-width: 560px; top: 50%; transform: translateY(-50%);

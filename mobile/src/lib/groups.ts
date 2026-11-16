@@ -3,15 +3,16 @@
 import { TABS, type TabId } from './tabs';
 import type { Room, RoomCard, RoomMessage } from '../../../renderer/src/types';
 
-export type PlaceId = TabId | 'everything' | 'chats';
+export type PlaceId = TabId | 'everything' | 'chats' | 'files';
 
 /**
  * The tabs: the four, or with a team on (Groups or AI teammates) Needs you,
  * Everything else, which holds your In progress, Later and Done as your card's
- * work (threads/Pages.tsx `StateTabsRow`), and Chats.
+ * work (threads/Pages.tsx `StateTabsRow`), and Chats. Files is last in both.
  */
 export function bottomTabs(team: boolean): { id: PlaceId; label: string }[] {
-  return team ? [TABS[0], { id: 'everything', label: 'Everything else' }, { id: 'chats', label: 'Chats' }] : [...TABS];
+  const files = { id: 'files' as const, label: 'Files' };
+  return team ? [TABS[0], { id: 'everything', label: 'Everything else' }, { id: 'chats', label: 'Chats' }, files] : [...TABS, files];
 }
 
 export const LAST_GROUP_KEY = 'groups.last';
@@ -91,4 +92,12 @@ export function onWords(c: RoomCard): string {
   if (c.away) return 'Not on Groups yet';
   if (c.agents) return c.workingOn ?? c.bio ?? 'Private thread';
   return c.status ?? 'Not running';
+}
+
+/** A picked file's name as a chat keeps it: its own letters, made unique, so two IMG_0001.jpg never meet. */
+export function roomFileName(name: string, now = Date.now()): string {
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot + 1).replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toLowerCase() : '';
+  const base = (dot > 0 ? name.slice(0, dot) : name).replace(/[^A-Za-z0-9_.-]+/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, 100) || 'file';
+  return `${base}-${now.toString(36)}${ext ? `.${ext}` : ''}`;
 }
