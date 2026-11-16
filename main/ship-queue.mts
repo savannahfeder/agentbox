@@ -93,7 +93,7 @@ export interface ShipQueueOptions {
   isLive: (item: ShipItem) => boolean;
   liveSince?: (item: ShipItem) => number | null;
   handBack?: (item: ShipItem, reply: string) => void;
-  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] }) => Promise<ShipRun>;
+  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; base?: string | null }) => Promise<ShipRun>;
   // The GitHub sign-in saved on this computer, for the push (main/github-push-sign-in.mts).
   pushSignIn?: () => { env: Record<string, string>; config: [string, string][] } | null;
   afterShip?: (shipped: { item: ShipItem; product: ShipProduct; sha: string | null }) => void;
@@ -350,19 +350,24 @@ export function failureNote(output: unknown) {
   return `${SHIP_FAILED}${said.slice(0, 300)}`;
 }
 
-/**
- * The base checkout's hooks, read off the task folder's shared git dir. The
- * ship runs with cwd = the task folder, whose core.hooksPath may be the
- * relative 'scripts/hooks' resolving to the branch's own, worker-edited copy.
- * Pinning the base copy here is what keeps the gate the branch cannot change.
- */
-function baseHooksPath(cwd: string) {
-  return new Promise<string | null>((resolve) => {
-    execFile('git', ['-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000 }, (err, stdout) => {
-      const common = err ? '' : String(stdout).trim();
-      resolve(common ? path.resolve(common, '..', 'scripts', 'hooks') : null);
-    });
+const commonDirOf = (dir: string) => new Promise<string | null>((resolve) => {
+  execFile('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000 }, (err, stdout) => {
+    resolve(err ? null : realOrNull(String(stdout).trim()));
   });
+});
+
+/**
+ * The base checkout's hooks. The ship runs with cwd = the task folder, whose
+ * core.hooksPath may be the relative 'scripts/hooks' resolving to the branch's
+ * own, worker-edited copy, and whose `.git` file the worker can point at a
+ * repository of its own. So given the approved checkout, a task folder that
+ * does not share its git dir is not shipped, and the hooks are that checkout's.
+ */
+async function baseHooksPath(cwd: string, base: string | null): Promise<{ hooks: string | null } | null> {
+  const task = await commonDirOf(cwd);
+  if (!base) return { hooks: task ? path.resolve(task, '..', 'scripts', 'hooks') : null };
+  const approved = await commonDirOf(base);
+  return approved && task === approved ? { hooks: path.resolve(approved, '..', 'scripts', 'hooks') } : null;
 }
 
 /** `pairs` as git reads config from the environment. */
@@ -386,9 +391,11 @@ export function stopShips() {
   for (const [pid, markQuit] of runningShips) { markQuit(); signalShip(pid, 'SIGTERM'); }
 }
 
-export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000 }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number } = {}): Promise<ShipRun> {
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000, base = null }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number; base?: string | null } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
-  const hooks = await baseHooksPath(cwd);
+  const gate = await baseHooksPath(cwd, base);
+  if (!gate) return { code: 1, out: 'ship: this task folder is not a worktree of the checkout that ships it, so it was not shipped.' };
+  const { hooks } = gate;
   const baseGate = gitConfigEnv([...(hooks ? [['core.hooksPath', hooks] as [string, string]] : []), ...gitConfig]);
   return new Promise<ShipRun>((resolve) => {
     let out = '';
@@ -597,7 +604,8 @@ export class ShipQueue {
     try { signIn = this.pushSignIn(); } catch (e) { this.log.warn?.('zero: could not read the GitHub sign-in:', (e as Error).message); }
     try {
       const env = { ...(red.length ? { AGENTBOX_RED_ON_MAIN: red.join('\n') } : {}), ...signIn?.env };
-      ran = await this.run(script, cwd, Object.keys(env).length ? { env: { ...process.env, ...env }, ...(signIn ? { gitConfig: signIn.config } : {}) } : undefined);
+      const base = product?.repoPath ? path.resolve(product.repoPath) : null;
+      ran = await this.run(script, cwd, { base, ...(Object.keys(env).length ? { env: { ...process.env, ...env }, ...(signIn ? { gitConfig: signIn.config } : {}) } : {}) });
     } finally {
       giveBack?.();
     }

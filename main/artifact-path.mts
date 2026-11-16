@@ -395,12 +395,29 @@ async function copyFromCommit(repoPath: string, tip: string, raw: string, thread
         // An answer names a file it committed by its name as often as by its path.
         const changed = String(await gitOut(repoPath, ['log', '--format=', '--name-only', '-z', `HEAD..${tip}`])).split('\0').map((f) => f.trim()).filter(Boolean);
         const file = changed.find((f) => f === raw) ?? changed.find((f) => f.endsWith(`/${raw}`));
-        if (!file)
+        // A fetched branch can carry a tree entry named "..", which git lists as
+        // part of the path and path.join would climb out of the copies with.
+        if (!file || file.split('/').some((p) => p === '' || p === '.' || p === '..'))
             return null;
         const bytes = await gitOut(repoPath, ['show', `${tip}:${file}`]);
-        const copy = path.join(os.tmpdir(), 'agentbox-branch-files', createHash('sha1').update(repoPath).digest('hex').slice(0, 12), thread, tip.slice(0, 12), file);
+        const copy = path.join(fsDefault.realpathSync(os.tmpdir()), 'agentbox-branch-files', createHash('sha1').update(repoPath).digest('hex').slice(0, 12), thread, tip.slice(0, 12), file);
+        // A link planted on the way in a shared tmp would carry the write elsewhere.
+        const unlinked = (dir: string) => fsDefault.realpathSync(dir) === dir;
+        let there = path.dirname(copy);
+        while (!fsDefault.existsSync(there))
+            there = path.dirname(there);
+        if (!unlinked(there))
+            return null;
         await fsDefault.promises.mkdir(path.dirname(copy), { recursive: true });
-        await fsDefault.promises.writeFile(copy, bytes);
+        if (!unlinked(path.dirname(copy)))
+            return null;
+        const out = await fsDefault.promises.open(copy, fsDefault.constants.O_WRONLY | fsDefault.constants.O_CREAT | fsDefault.constants.O_TRUNC | fsDefault.constants.O_NOFOLLOW);
+        try {
+            await out.writeFile(bytes);
+        }
+        finally {
+            await out.close();
+        }
         return copy;
     }
     catch {

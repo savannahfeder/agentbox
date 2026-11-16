@@ -11,6 +11,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { run } from './exec.mts';
 import { commonGitDirOf, markerPath } from './marker.mts';
+import { HOOK_FREE } from '../hook-free-git.mts';
 import type { MarkerFolder } from './marker.mts';
 import type { CloudStorage } from './managed.mts';
 
@@ -132,6 +133,7 @@ export async function sendConversation(storage: CloudStorage, file: string, { re
   // Hashed and sent from one copy, so the key always names what was sent.
   const copy = path.join(os.tmpdir(), `agentbox-conversation-${crypto.randomUUID()}.jsonl`);
   try {
+    if (!fs.lstatSync(file).isFile()) throw new Error(`${path.basename(file)} is not a plain file, so it is not sent`);
     fs.copyFileSync(file, copy, fs.constants.COPYFILE_FICLONE);
     let had: SentRecord | null = null;
     try { had = record ? JSON.parse(fs.readFileSync(record, 'utf8')) : null; } catch { /* none yet */ }
@@ -184,7 +186,7 @@ export async function sendConversation(storage: CloudStorage, file: string, { re
   }
 }
 
-const git = (cwd: string, args: string[]) => run('git', args, { cwd }) as Promise<string>;
+const git = (cwd: string, args: string[]) => run('git', [...HOOK_FREE, ...args], { cwd }) as Promise<string>;
 const gitOk = (cwd: string, args: string[]) => git(cwd, args).then(() => true, () => false);
 
 async function mergeBase(cwd: string) {
