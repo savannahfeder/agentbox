@@ -44,7 +44,7 @@
           "assistant",
           "notifications"
         ],
-        "releaseNotes": "The first version on the App Store.",
+        "releaseNotes": "When an agent finishes, see what it changed and ship it or discard it.\nNeeds you is now in the same order as Agentbox on your computer.\nA running thread shows Stop right away.\nProjects are grouped by computer, and you can see which computers are off.\nThe app opens offline with the inbox it last read, and a message sent without internet goes out when you're back online.\nMany smaller fixes.",
         "marketingUrl": "https://agentbox.ac",
         "supportUrl": "https://app.agentbox.ac/support",
         "privacyPolicyUrl": "https://app.agentbox.ac/privacy"
