@@ -183,8 +183,17 @@ For a first run, a tutorial or any screen a person meets first:
   four; a dark Mac switched to light halfway through; a team with someone on
   it. A browser copy cannot show the Mac's own windows, banners or
   appearance, so before you show the person, open the desktop app
-  (`npm run fresh -- --with-agents`) and click through every screen
-  yourself, in dark and in light.
+  (`npm run fresh -- --with-agents --team`) and click through every screen
+  yourself, in dark and in light. Open it for the person the same way:
+  without `--team` the window has no account, plan or invite step, and
+  without `--with-agents` no chats to bring in, which the founder took for
+  a broken product (2026-11-12).
+- **Walk it by keyboard before any tester does.**
+  `node .claude/skills/verify-agentbox/scripts/walk-first-run.mjs <out dir> [dark|light]`
+  presses through every setup step and every walkthrough tip on a copy
+  with chats, both agents and a team cloud, pictures each screen, and stops
+  at the first one that does not come. Its first walk found three steps
+  that never came, which a tester would have been stuck behind.
 
 ## What it does not cover yet
 

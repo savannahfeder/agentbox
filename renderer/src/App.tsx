@@ -37,7 +37,7 @@ import { cameBackFromACrash, keepHeldWriter, RELOADED_AFTER_A_CRASH } from './af
 import { isTroubleRow, troubleRow } from './trouble-row';
 import { importAnswer, isImportRow, isNotImportedRow, justImported, type ImportChoice } from './import-row';
 import { lookedAtNow, needsYouLit } from './needs-you';
-import { arrivedAt, isUnread, readMoves, waitingSince } from './unread';
+import { arrivedAt, isUnread, readMoves, seenElsewhere, waitingSince } from './unread';
 import { readWhenTheySeeIt } from './read-what-you-saw';
 import { Focus } from './components/Focus';
 import { TicketItems } from './components/TicketReference';
@@ -184,10 +184,10 @@ import { ClassicFirstRun, OpenLesson } from './components/FirstRunClassic';
 import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, type Lesson } from './first-run-classic';
 import { useLessonPlace } from './lesson-position';
 import { ideasFor, runOfRule } from './first-run';
-import { Tour } from './components/Tour';
+import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, THREAD_CLOSED, finishLesson, firstTask, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, firstThreadSent, saysFinished, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
@@ -277,8 +277,8 @@ import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
-import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme } from './home/sky';
-import { busiestFirst, engineLetter, engineName, engineOnRow, greeting, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
+import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sky';
+import { busiestFirst, engineLetter, engineName, finishedHello, greeting, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
@@ -1593,6 +1593,7 @@ export default function App() {
   // THE WALKTHROUGH'S PRACTICE THREAD IS ANSWERED BY THE STORE, as the practice
   // tutorial's is: two seconds after it is sent, and after each reply lands.
   const tourPractice = tourLive(tour) ? tour!.practice ?? null : null;
+  const practiceAnswering = !!tourPractice?.item && focused?.id === tourPractice.item && (tourPractice.answered ?? 0) <= tourPractice.replies;
   const practiceRow = tourPractice?.item ? snap?.items.find((i) => i.id === tourPractice.item && i.product === tourPractice.slug) ?? null : null;
   const practiceDue = !!tourPractice?.item && (tourPractice.answered ?? 0) <= tourPractice.replies
     && (tourPractice.replies === 0 || (!!practiceRow && replyWritten(practiceRow)));
@@ -1605,7 +1606,7 @@ export default function App() {
       if (!live || !tourRef.current?.practice) return;
       setTour({ ...tourRef.current, practice: { ...tourRef.current.practice, answered: p.replies + 1 } });
       await refresh();
-    }, ANSWER_AFTER_MS);
+    }, p.replies ? ANSWER_AFTER_MS : PRACTICE_RUN_MS);
     return () => { live = false; clearTimeout(t); };
   }, [practiceDue, tourPractice?.replies]); // eslint-disable-line react-hooks/exhaustive-deps
   // And it goes with the walkthrough, finished or skipped.
@@ -3004,7 +3005,8 @@ export default function App() {
   // no skies.
   const homeOn = !onPhone();
   // THE WALKTHROUGH'S FRAME: the app inset, with its bar above, until the tips end (components/TourFrame.tsx).
-  const tourFramed = !fresh && homeOn && tourLive(tour);
+  const tourFramed = !fresh && homeOn && (tourLive(tour) || tourFinishing(tour));
+  const finishing = !fresh && tourFinishing(tour);
   useEffect(() => {
     const root = document.documentElement;
     if (tourFramed) root.dataset.tourFrame = ''; else delete root.dataset.tourFrame;
@@ -3018,8 +3020,7 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
-    else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }
-  }, [sky]);
+    else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }  }, [sky]);
   // GLASS (Alpha features): only a window main/window-glass.mts can blur behind goes see-through.
   const glassOn = !!snap?.alpha?.glass && !onPhone();
   useEffect(() => {
@@ -3884,6 +3885,10 @@ export default function App() {
     setSeen((s) => { const c = new Set(s); c.delete(item.id); return c; });
     setSeenAt((m) => ({ ...m, [item.id]: 0 }));
   }, []);
+  useEffect(() => window.zero?.onSeenOnPhone?.(({ id, at }) => {
+    setSeen((s) => (s.has(id) ? s : new Set(s).add(id)));
+    setSeenAt((m) => seenElsewhere(m, id, at) as Record<string, number>);
+  }), []);
   // An answer that lands on the thread you are READING is read already, and
   // only that one: `readWhenTheySeeIt` asks whether it was on the screen at
   // all, and waits for the scroll that brings it there (./read-what-you-saw,
@@ -5666,6 +5671,8 @@ export default function App() {
     const letGo = () => setSending((q) => q.filter((s) => s !== mine));
     const takeBack = (): Restored => { letGo(); return null; };
     await deferCommit(item, async () => {
+      // The pick lands a few seconds after the press, and E may have closed the thread in between: build on what is saved, not on what this press saw.
+      if (isTourPractice(tourRef.current, item)) { const t = practiceReplied(readTour(localStorage) ?? tourRef.current!); setTour(t); tourRef.current = t; }
       try { await api.answer({ product: item.product, id: item.id, answer, ...(status ? { status } : {}) }); }
       catch (error) { letGo(); throw error; }
       setTimeout(letGo, LANDED_MS);
@@ -5680,7 +5687,9 @@ export default function App() {
       // "Sent", because the arrow says where the answer went and nothing said
       // what happened to it: "Option 1 → Practice" was read off the QA box as
       // meaning nothing.
-    }, pickSentWords(option.text, rowTitle(item)), takeBack, !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid);
+    }, pickSentWords(option.text, rowTitle(item)), takeBack, isTourPractice(tourRef.current, item) || !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid,
+    // Nothing real is sent from the practice thread, so nothing is held back for an undo: its agent answers at once.
+    isTourPractice(tourRef.current, item) ? 0 : undefined);
   }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds]);
   // The discard question is raised inside `pickOption` and answered by
   // `answerCloseAsk`, which is made above it.
@@ -7403,6 +7412,15 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [signInGate]);
 
+  // The walkthrough's last word is said on Home, and leaving Home ends it (components/Tour.tsx).
+  const finishOnHome = useRef(false);
+  useEffect(() => {
+    if (!finishing) { finishOnHome.current = false; return; }
+    if (!homeOn) { setTour(closeFinish(tourRef.current!)); return; }
+    if (!finishOnHome.current) { if (homeHere) finishOnHome.current = true; else { setModal(null); openView('inbox'); setHomeOpen(true); } return; }
+    if (!homeHere) setTour(closeFinish(tourRef.current!));
+  }, [finishing, homeHere]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // THE SAME SCREEN, held for the beat it takes ⌘R to put her back where she
   // was, so the reload never shows her the inbox on its way to the task. Its
   // own line above the boot check rather than another clause inside it: on a
@@ -7522,13 +7540,13 @@ export default function App() {
     const mates = teammatesUi.list.filter((t) => !t.paused && t.status !== 'draft' && item.routed?.to !== `mate:${t.id}`);
     return [...people, ...mates.map((t) => ({ id: `mate:${t.id}`, name: t.name }))];
   };
-  const giveThread = async (item: WorkItem, to: GiveTo) => {
+  const giveThread = async (item: WorkItem, to: GiveTo, note = '') => {
     if (to.id.startsWith('mate:')) {
       await api.routeThread({ product: item.product, id: item.id, to: to.id }).then(() => showToast(`Given to ${to.name}`), (err) => showToast(String(err?.message ?? err)));
       return;
     }
     showToast(sendingTo(to.name.split(/\s+/)[0] || to.name));
-    const out = await api.teamHandOn({ product: item.product, id: item.id, to: to.id });
+    const out = await api.teamHandOn({ product: item.product, id: item.id, to: to.id, ...(note.trim() ? { note: note.trim() } : {}) });
     showToast(out.ok ? handedToWhom(to.name) : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
     if (out.ok) await refresh();
   };
@@ -7668,7 +7686,7 @@ export default function App() {
   // The sidebar's Search row and ⌘K search threads on a desktop; a phone has
   // neither, so only there does the list draw a magnifier, and it opens ⌘K.
   const searchInTheList = onPhone() ? () => setModal('palette') : undefined;
-  const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks && !tourLive(tour), pointedAt: railOpen });
+  const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks, pointedAt: railOpen });
   // A teammate's direct record is one of your groups, so Groups is the page it is on.
   const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
   const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
@@ -7755,7 +7773,7 @@ export default function App() {
   const inboxCount = inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length });
   const inboxHere = !homeShown && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focused && !focusedRepeat
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
-  const rowEngine = (i: WorkItem) => engineOnRow(i, { engines: snap?.engines, running: snap?.supervisor?.running });
+  const engineFacts = { running: snap?.supervisor?.running, engines: snap?.engines };
   const homeNeeds: NeedsRow[] = homeShown ? homeNeedsRows(needsList, {
     nameOf: (id) => team?.byId.get(id)?.name ?? '',
     item: (i) => {
@@ -7763,7 +7781,7 @@ export default function App() {
       const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
       // A conversation's record is named for nobody; the row's sender says who it is with.
       const project = directSlugs.has(i.product) ? '' : i.productName;
-      return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i)), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+      return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
     },
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : busiestFirst(members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
@@ -7779,7 +7797,10 @@ export default function App() {
       state: teamRowState({ agents: m.agents, waitingOnYou: waiting }), week, total: week.reduce((a, b) => a + b, 0),
     };
   }));
-  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => ({ key: `${i.product}/${i.id}`, letter: engineLetter(rowEngine(i)), title: rowTitle(i), line: `${engineName(rowEngine(i))} · ${i.productName}`, at: sentAtOf(i) })) : [];
+  const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => {
+    const engine = rowEngine(i, engineFacts);
+    return { key: `${i.product}/${i.id}`, letter: engineLetter(engine), title: rowTitle(i), line: `${engineName(engine)} · ${i.productName}`, at: sentAtOf(i) };
+  }) : [];
   const homeOpenRow = (key: string) => {
     const entry = needsList.find((e) => e.key === key);
     if (!entry) return;
@@ -7792,11 +7813,10 @@ export default function App() {
       follow: (n, card) => { changeFollows((was) => markTold(was, n)); openTeammateCard(card); },
     });
   };
-  // Light themes keep the Inbox plain; only dark ones wear its sky.
-  const skyOnInbox = !!sky && sky.dark && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+  const skyOnInbox = wearsInboxSky(sky) && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evPick;
   // Team and Files wear the same sky over their header.
-  const skyOnPlace = !!sky && sky.dark && !onPhone() && (chatsPlaceShown || filesShown);
+  const skyOnPlace = wearsInboxSky(sky) && !onPhone() && (chatsPlaceShown || filesShown);
   const tasksShown = teamMode && tasksOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const firstNameOf = (id: string) => team?.byId.get(id)?.name?.split(/\s+/)[0] ?? 'Someone';
   const tasksPage = (title?: string) => snap ? <TasksPage title={title} keys={!modal} me={team?.me ?? null} nameOf={firstNameOf} picked={tasksPick} onPicked={setTasksPick}
@@ -8306,11 +8326,11 @@ export default function App() {
                   running, which is when a row's line about what stopped it
                   points here. */}
               {planWords && !snap.supervisor.running?.length && !run && !focused && !focusedRepeat && !teammatesShown && <PlanBar words={planWords} onSetup={setSetupPlan} />}
-              {homeShown && sky && <SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />}
+              {homeShown && sky && <SkyBackdrop art={sky.home ?? sky.art} from={sky.dark || sky.home ? 40 : 150} span={sky.dark || sky.home ? 300 : 240} />}
               {skyOnInbox && sky && <InboxSky art={sky.art} />}
               {skyOnPlace && sky && <InboxSky art={sky.art} />}
               {homeShown ? (
-                <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
+                <HomePage hello={!fresh && saysFinished(tour) ? finishedHello(snap.team?.me?.name ?? null) : greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
                   needs={homeNeeds} needsCount={needsList.length} inboxCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
@@ -8375,7 +8395,7 @@ export default function App() {
                   // its page.
                   onHandToAgent={handToAgent}
                   giveTo={giveToFor(focused)}
-                  onGive={(to) => { void giveThread(focused, to); }}
+                  onGive={(to, note) => { void giveThread(focused, to, note); }}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}
                   waitChoices={waitsFor(focused)}
@@ -8544,6 +8564,7 @@ export default function App() {
                     ...factsFor(fleet, focused.id),
                     running: snap.supervisor.running.length,
                     capacity: snap.supervisor.capacity,
+                    answering: practiceAnswering,
                     inProgress: belongsInProgress(focused, { deferredUntil: dueAt(focused), now, live: liveIds.has(focused.id), shipping: shippingIds.has(focused.id), stopped: stalledIds.has(focused.id) }),
                   }}
                   stoppable={!walking && stoppableNow(focused)}
@@ -8879,15 +8900,16 @@ export default function App() {
               await refresh();
               return;
             }
-            // The walkthrough's practice thread: no toast and no undo, and it opens.
+            // The walkthrough's practice thread: no toast and no undo.
+            // It goes to In progress like any thread, and is opened from the inbox.
             if (tourTask && made?.id && made.product === tourTask && tourLive(tourRef.current)) {
               setTour(withPractice(tourRef.current!, { slug: tourTask, item: made.id }));
               rememberProject(beforePractice.current);
-              const after = await refresh();
-              const row = after?.items.find((i) => i.id === made.id && i.product === made.product);
-              if (row) setFocused(row);
+              await refresh();
+              setHomeOpen(false); setFocused(null); setView('progress'); setSelected(0);
               return;
             }
+            if (made?.id && tourRef.current) setTour(firstThreadSent(tourRef.current));
             if (how?.kind === 'message') {
               const said = firstNames(how.toMany ?? [how.to ?? '']);
               // Named for O, like a new thread (w-5513afd09a). No Z: a message
@@ -9452,9 +9474,10 @@ export default function App() {
         }}
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
-      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} onSkip={() => setTour(skipTour(tour!))} />, document.body)}
-      {!fresh && <Tour tour={tour} practice={!!tourTask} view={view} thread={!!focused}
-        answering={!!tourPractice?.item && focused?.id === tourPractice.item && (tourPractice.answered ?? 0) <= tourPractice.replies}
+      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
+      {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} />}
+      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
+        answering={practiceAnswering}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
         onChange={setTour}

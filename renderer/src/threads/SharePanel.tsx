@@ -1,7 +1,7 @@
 // The panels Share… opens under the thread's dots, drawn with the menu's own
 // parts (.th-menu, .row-i) so they sit where its rows were.
-import { useState } from 'react';
-import { Face } from '../team/people';
+import { useContext, useState } from 'react';
+import { Face, TeamContext } from '../team/people';
 import type { Person } from '../types';
 import { firstName, matchPeople, type SeenBy } from './share-rules';
 import './share.css';
@@ -109,6 +109,24 @@ export function SendSheet({ people, start, link, onCopy, onSend }: {
       <div className="sh-foot">
         {link && <button type="button" className="th-new sh-ghost" onClick={onCopy}><LinkMark />Copy link</button>}
         <button type="button" className="th-new sh-go" disabled={!to.length} onClick={send}>Send to inbox</button>
+      </div>
+    </div>
+  );
+}
+
+/** After a person is picked under "Give it to someone else": what you want from them, then it goes. */
+export function GiveSheet({ to, onGive }: { to: { id: string; name: string }; onGive: (note: string) => void }) {
+  const [note, setNote] = useState('');
+  const team = useContext(TeamContext);
+  const first = to.name.split(/\s+/)[0] || to.name;
+  return (
+    <div className="th-menu ts-more-menu sh-send" role="dialog" aria-label={`Give it to ${first}`}>
+      <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
+      <textarea className="sh-note" autoFocus placeholder="Add a note" value={note} aria-label="Add a note" rows={2}
+        onChange={(e) => setNote(e.target.value)}
+        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onGive(note.trim()); } }} />
+      <div className="sh-foot">
+        <button type="button" className="th-new sh-go" onClick={() => onGive(note.trim())}>Give to {first}</button>
       </div>
     </div>
   );

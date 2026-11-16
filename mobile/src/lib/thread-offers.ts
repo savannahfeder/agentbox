@@ -12,6 +12,7 @@ import { updatedWord } from '../../../renderer/src/threads/summary-rules';
 import { offersTryAgain } from '../../../renderer/src/try-again';
 import { whyItCannotMove } from '../../../shared/move-thread.mts';
 import { shownPriority } from '../../../shared/rank.mts';
+import { stoppedByHer } from '../../../shared/answers.mts';
 import { ruleIdOf } from '../../../shared/repeats.mts';
 import { doneSteps, summaryOf } from '../../../shared/thread-cards.mts';
 import type { RunningSession, WorkItem } from '../../../renderer/src/types';
@@ -111,6 +112,9 @@ export function liveOf(item: WorkItem, { session, inProgress, now, cloud: _cloud
   if (waits.stalled && !session && item.status !== 'done' && !item.agent) {
     const line = item.answer && item.answer !== '(withdrawn)' ? STOPPED.waiting : STOPPED.line;
     return { state: 'stalled' as const, working: false, line, word: STOPPED.word, more: 0, span: null, rows: [] };
+  }
+  if (!session && !item.agent && stoppedByHer(item)) {
+    return { state: 'stopped' as const, working: false, line: 'You stopped the agent. Reply to redirect it, or send it back.', word: 'You stopped this', more: 0, span: null, rows: [] };
   }
   const live = liveLine(item, { session: session as RunningSession | null, inProgress, now, ...waits });
   if (!live) return null;

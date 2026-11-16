@@ -116,6 +116,12 @@ export function shortTitle(opening: string | null | undefined): string {
   let t = plain(text);
   if (!t) return '';
   t = t.replace(GREETING, '').replace(ASK, '').replace(LOOK, '').replace(CANNOT, 'Cannot ');
+  // One word before a colon ("M19-B1:", "Bug:") tags the thread; the name is what follows.
+  const tag = /^([^\s:]{1,24}):\s+(\S.*)$/.exec(t);
+  if (tag) {
+    const rest = shortTitle(tag[2]);
+    if (rest) return `${tag[1]}: ${rest}`;
+  }
   // The first sentence, then its first clause.
   t = firstSentenceOf(t);
   t = t.split(/\s*(?:[,;:(]|\s[-–—]\s|—)\s*/)[0] || t;
