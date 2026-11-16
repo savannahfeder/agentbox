@@ -5,7 +5,6 @@
 
 import { itemThread } from '../../../renderer/src/item-thread';
 import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type ParsedOption } from '../../../renderer/src/format';
-import { rowTitle } from '../../../renderer/src/list-rules';
 import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
 import { askHeading } from '../../../renderer/src/ask-line';
 import { phoneHistory, phoneRuns, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
@@ -113,7 +112,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     : null;
   return {
     item,
-    title: rowTitle(item),
+    title: pageTitle(item),
     projectName: view.products.find((p) => p.slug === product)?.name ?? '',
     running: !!session,
     session,

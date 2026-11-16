@@ -1159,6 +1159,11 @@ export const api = {
     if (useFixtures || !window.zero?.setThreadPins) return;
     await window.zero.setThreadPins({ pins });
   },
+  // What this window has opened, so the phone reads those threads as read too.
+  async seenHere(seen: Record<string, number>): Promise<void> {
+    if (useFixtures || !window.zero?.seenHere) return;
+    try { await window.zero.seenHere({ seen }); } catch { /* the dots on the phone wait for the next open */ }
+  },
 
   /** Keep a thread on this Mac (true), send it to the cloud (false), or leave it to the cloud setting (null). */
   async setThreadOnMac(onMac: Record<string, boolean | null>): Promise<void> {

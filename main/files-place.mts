@@ -634,14 +634,31 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const now = chainsNow(files);
     const project = projectKey(f.project);
     if (!now.shared.has(project)) now.shared.set(project, audienceOf(f.project) !== 'private');
-    if (now.byKey.has(f.key)) return now.byKey.get(f.key)!;
     const shared = now.shared.get(project);
     const sig = `${now.productsSig}\0${shared}\0${fileSig(f)}`;
-    const kept = keptChains.get(f.key);
-    if (kept && kept.sig === sig && Date.now() < kept.until && (kept.line === null || kept.line === lineSig(f.key))) {
-      now.byKey.set(f.key, kept.value);
-      return kept.value;
+    let had = now.byKey.get(f.key);
+    if (!had) {
+      const kept = keptChains.get(f.key);
+      if (!(kept && kept.sig === sig && Date.now() < kept.until && (kept.line === null || kept.line === lineSig(f.key)))) return buildChain(f, sig, shared, now);
+      had = kept.value;
+      now.byKey.set(f.key, had);
     }
+    const held = had;
+    // An agent writing over the same path changes nothing the sig reads.
+    return held.then(async (was) => {
+      if (await bytesUnmoved(was.chain)) return was;
+      const latest = now.byKey.get(f.key)!;
+      return latest !== held ? latest : buildChain(f, sig, shared, now);
+    });
+  }
+  async function bytesUnmoved(chain: readonly LinedVersion[]): Promise<boolean> {
+    for (const v of chain) {
+      if (!v.opened || !v.hash) continue;
+      if ((await bytesOf(v.opened).catch(() => null))?.hash !== v.hash) return false;
+    }
+    return true;
+  }
+  function buildChain(f: PlacedFile, sig: string, shared: boolean | undefined, now: Chains): Promise<Lined> {
     filesOfInternals.chains += 1;
     const value = lineChain(f, shared, now.products);
     const entry = { sig, line: null as string | null, until: Date.now() + CHAIN_KEEP_MS, value };

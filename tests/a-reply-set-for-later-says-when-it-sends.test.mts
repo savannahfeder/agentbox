@@ -12,6 +12,7 @@
 // two founder lines a few milliseconds apart, the words first since the same
 // day's fix (tests/a-reply-can-wait-for-a-time.test.mts).
 
+import { showsWhenItComesBack } from '../renderer/src/list-rules.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -177,7 +178,8 @@ describe('the button under a waiting reply', () => {
   });
 
   it('is not offered on a closed thread', () => {
-    expect(focus).toMatch(/const scheduledHere = item\.status !== 'done' && \(scheduledUntil \?\? 0\) > 0;/);
+    expect(focus).toMatch(/const scheduledHere = showsWhenItComesBack\(item, scheduledUntil, answered\);/);
+    expect(showsWhenItComesBack({ status: 'done', snoozedUntil: 0 }, Date.now() + 60_000, false)).toBe(false);
     expect(focus).not.toMatch(/\(scheduledUntil \?\? 0\) > 0 && (!!)?onUnschedule/);
   });
 });

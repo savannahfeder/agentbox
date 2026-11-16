@@ -80,10 +80,10 @@ describe('which files a thread names', () => {
 });
 
 describe('uploading them', () => {
-  it('lists a file only once it is online, then by its name there', async () => {
+  it('lists a file as coming until it is online, then by its name there', async () => {
     put(path.join(docs, 'designs', 'w-aaaaaaaaaa', 'a.png'), 'picture');
     const { up, stored, tick } = uploader();
-    expect(up.manifest('t', snap('a.png'), { dir: docs, updatedAt: T, base: '1' })).toBe(null);
+    expect(up.manifest('t', snap('a.png'), { dir: docs, updatedAt: T, base: '1' })).toEqual({ files: { 'designs/w-aaaaaaaaaa/a.png': { s: 7, soon: true } } });
     await up.kick();
     expect([...stored.keys()]).toEqual([`${sha('picture')}.png`]);
     tick(6 * 60_000);
@@ -247,7 +247,7 @@ describe('the thread\'s copy', () => {
       stateFile: path.join(home, 'state.json'),
     });
     await inbox.syncOnce();
-    expect(sent[0].snapshot.attached).toBeUndefined();
+    expect(sent[0].snapshot.attached.files).toEqual({ 'designs/w-aaaaaaaaaa/a.png': { s: 3, soon: true } });
     await inbox.filesSettled();
     sent.length = 0;
     now += 6 * 60_000;

@@ -61,6 +61,8 @@ export interface PhoneSettingsCopy {
   projects: PhoneProjectCopy[];
   repeats?: RepeatRule[];
   teammates?: { list: Partial<Teammate>[]; chat: TeamChatLine[]; runs: TeamRunLine[]; trouble?: string };
+  /** When the computer's window last opened each thread, by id (shared/phone-settings.mts phoneSeenOf). */
+  seen?: Record<string, number>;
 }
 export interface SettingsRow { device: string; name: string; updated_at: string; settings: PhoneSettingsCopy }
 export interface Reading { value: unknown; waiting: boolean; refused: string | null }

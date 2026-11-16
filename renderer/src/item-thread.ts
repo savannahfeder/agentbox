@@ -32,7 +32,7 @@
 
 import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mts';
 import { said, traceLines } from './terminal';
-import { handsBack } from '../../shared/cloud-hand-back.mts';
+import { handsBack, withoutHandBack } from '../../shared/cloud-hand-back.mts';
 import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mts';
 import type { TraceSession } from './notes';
 import { pickedLine, threadEvents, withRuns, type LedgerLine, type ThreadEvent } from './thread-history';
@@ -613,6 +613,15 @@ export function itemThread(
     }
     if (event.message && event.words) {
       const isAnswer = event.who === 'agent' && (event.field === 'result' || event.field === 'note');
+      if (isAnswer && handsBack(event.words)) {
+        const rest = withoutHandBack(event.words);
+        if (!rest) {
+          const movedJustBefore = placed.some(({ node: n }) => 'kind' in n && n.kind === 'work' && n.verb === 'moved' && n.at <= event.at && event.at - n.at < 10 * 60_000);
+          if (!movedJustBefore) placed.push({ node: { kind: 'work', at: event.at, verb: 'moved', subject: 'to this Mac', output: '', lines: 0, failed: false }, run: null, answer: null });
+          continue;
+        }
+        event.words = rest;
+      }
       placed.push({
         node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}), ...(event.sendsAt ? { sendsAt: event.sendsAt } : {}) },
         run: null,

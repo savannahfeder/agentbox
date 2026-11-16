@@ -290,7 +290,7 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     const withIt = now && canSend ? sentWithTheNote(goes, waiting.filter((n) => !n.saving).map((n) => n.id), id) : [];
     const kept = { words, quote, spot, pictures };
     const pin = spot ? { pin: pinNotes.length + 1 } : {};
-    setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions, owner: null, uid: null, wait: true, saving: true, ...pin }]);
+    setPending((was) => [...was, { id, file: version.id, v: version.n, place, text, by: me, ts: Date.now(), mentions, owner: null, uid: null, wait: true, saving: true, ...pin }]);
     setWords(''); setQuote(null); setSpot(null); setPictures([]); setTrouble(null);
     const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, v: version.n, place, text, wait: true, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) } })
       .catch((err: Error) => ({ ok: false, error: err.message }));

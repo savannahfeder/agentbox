@@ -341,6 +341,7 @@ contextBridge.exposeInMainWorld('zero', {
   setProductOrder: (payload) => ipcRenderer.invoke('zero:set-product-order', payload),
   setThreadPlaces: (payload) => ipcRenderer.invoke('zero:set-thread-places', payload),
   setThreadPins: (payload) => ipcRenderer.invoke('zero:set-thread-pins', payload),
+  seenHere: (payload) => ipcRenderer.invoke('zero:seen-here', payload),
   setThreadOnMac: (payload) => ipcRenderer.invoke('zero:set-thread-on-mac', payload),
   moveToCloud: (payload) => ipcRenderer.invoke('zero:move-to-cloud', payload),
   setProductHidden: (payload) => ipcRenderer.invoke('zero:set-product-hidden', payload),

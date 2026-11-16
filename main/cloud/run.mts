@@ -379,7 +379,7 @@ const CODEX_WHY: Record<string, (until?: string) => [why: string, fix: string]> 
 export function codexNote({ carried, state = null, until = null }: CodexHere) {
   const [why, fix] = (CODEX_WHY[state ?? ''] ?? CODEX_WHY.none)(until ? clock(until) : 'later');
   const opening = carried
-    ? 'Codex here is signed in to the cloud\'s Codex account, which their computer keeps and renews. Before anything long runs on Codex, try one tiny request (`codex exec --skip-git-repo-check \'Reply ok\'`): `codex login status` says signed in even when OpenAI refuses the sign-in. If it is refused,'
+    ? 'Codex here is signed in to the cloud\'s Codex account, which their computer keeps and renews. Before anything long runs on Codex, try one tiny request (`codex exec --skip-git-repo-check \'Reply ok\' < /dev/null`): `codex login status` says signed in even when OpenAI refuses the sign-in. Run every `codex exec` with `< /dev/null`, or it waits for input that never comes. If it is refused,'
     : `Codex is signed out on this machine, because ${why}. Whatever the work,`;
   return [
     opening,
@@ -453,6 +453,20 @@ export function limitInResultLine(line: string, now: number = Date.now()) {
   try { msg = JSON.parse(line); } catch { return null; }
   if (msg?.type !== 'result' || msg.is_error !== true) return null;
   const text = String(msg.result ?? '');
+  if (troubleCause(text) !== 'at-limit') return null;
+  return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
+}
+
+// The same for a Codex turn relayed from the cloud: its code goes in front, as
+// main/codex-session.mts `troubleText` does, so the classifier reads it too.
+export function codexLimitInLine(line: string, now: number = Date.now()) {
+  let msg: { method?: string; params?: { turn?: { status?: string; error?: { message?: unknown; codexErrorInfo?: unknown } } } } | null;
+  try { msg = JSON.parse(line); } catch { return null; }
+  if (msg?.method !== 'turn/completed' && msg?.method !== 'turn/failed') return null;
+  const turn = msg.params?.turn;
+  if (!turn || (turn.status ?? 'failed') !== 'failed') return null;
+  const info = turn.error?.codexErrorInfo;
+  const text = `${typeof info === 'string' && info !== 'other' ? `${info}: ` : ''}${String(turn.error?.message ?? '')}`;
   if (troubleCause(text) !== 'at-limit') return null;
   return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
 }
@@ -1737,6 +1751,8 @@ export async function cloudRun({
       codexLine = codexLine.slice(i + 1);
       if (!line.includes('"turn/')) continue;
       if (codexLoginRefusedInLine(line)) loginTrouble = { state: 'refused', id: login?.id ?? null };
+      const until = codexLimitInLine(line);
+      if (until) { try { onLimit({ until }); } catch { /* noted elsewhere */ } }
     }
   }
   async function sayWhatWasLost() {

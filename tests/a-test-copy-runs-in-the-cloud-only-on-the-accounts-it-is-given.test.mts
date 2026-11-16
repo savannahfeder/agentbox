@@ -89,6 +89,19 @@ describe('the list a run carries', () => {
     expect(missing).toEqual(['nobody@example.com']);
   });
 
+  // 2026-11-15: the person's Codex login and their busiest Claude plan share
+  // one email, so naming the Codex account by email gave the copies that
+  // Claude plan too, and it was the one the cloud picks first.
+  it('names one engine\'s account only, when the email carries that engine', () => {
+    const { keys, missing } = cloudAccountKeys(['codex:Fresh@example.com', 'claude:work@example.com'], { home });
+    expect(keys.sort()).toEqual(['acct-b', 'acct-c']);
+    expect(missing).toEqual([]);
+  });
+
+  it('says an engine-named email is missing when only the other engine has it', () => {
+    expect(cloudAccountKeys(['codex:work@example.com'], { home }).missing).toEqual(['codex:work@example.com']);
+  });
+
   it('is read by the cloud run from the run\'s own environment', () => {
     expect(loginForCloudRun('claude', { AGENTBOX_CLOUD_ACCOUNTS: 'work@example.com' }, { home, now: 3000 }).rec.email).toBe('work@example.com');
     const cli = fs.readFileSync(path.join(import.meta.dirname, '..', 'main', 'cloud', 'run-cli.mts'), 'utf8');
