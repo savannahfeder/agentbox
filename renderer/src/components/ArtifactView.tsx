@@ -20,7 +20,7 @@ import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
 import { ArtifactStage, StageLink, StageProject, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
-import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding } from '../comment-drafts';
+import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding, type MovedDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { noteWithPictures } from '../note-pictures';
 import { AttachRow } from './AttachRow';
@@ -225,17 +225,14 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   placeInHand.current = draftPlace;
   // The version your own save just made, which the comment being written moves onto.
   const savedTo = useRef<string | null>(null);
-  useEffect(() => {
+  const movedBySave = (): MovedDraft | null => {
     const was = draftOf.current;
-    const carry = !!version?.id && savedTo.current === version.id && !!was && (!!wordsNow.current.trim() || !!placeInHand.current);
+    const saved = !!version?.id && savedTo.current === version.id;
     savedTo.current = null;
-    const ref = { product, thread, file: version?.id ?? '', across };
-    let kept = openCommentDraft(ref);
-    if (carry && was) {
-      const draft = { words: wordsNow.current, place: placeInHand.current };
-      keepCommentDraft({ ...ref, file: was.file }, { words: '', place: null }, was.holding);
-      kept = { ...draft, holding: keepCommentDraft(ref, draft, kept.holding) };
-    }
+    return saved && was ? { from: was.file, holding: was.holding, draft: { words: wordsNow.current, place: placeInHand.current } } : null;
+  };
+  useEffect(() => {
+    const kept = openCommentDraft({ product, thread, file: version?.id ?? '', across }, undefined, movedBySave());
     draftOf.current = version?.id ? { file: version.id, holding: kept.holding } : null;
     setWords(kept.words); setDraftPlace(kept.place); setAsking(null);
     setNamed(people.filter((p) => kept.words.includes(`@${firstName(p)}`)));
@@ -305,12 +302,6 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (!out.ok) setTrouble(out.error ?? words);
     else setTrouble(null);
     return !out.ok;
-  };
-
-  // After the redraw, with the caret at the end, so the next key lands in the box.
-  const writeAbout = (p: NotePlace | null) => {
-    setWholeAsked(false); setDraftPlace(p);
-    requestAnimationFrame(() => { const el = box.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
   };
 
   const pickNote = (note: FileNote) => {
@@ -766,7 +757,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       go={editable ? go : null}
       hold={hold}
       showResolved={showSettled}
-      onPlace={editable ? writeAbout : undefined}
+      onPlace={editable ? (p) => { setWholeAsked(false); setDraftPlace(p); box.current?.focus(); } : undefined}
       onPick={editable ? (id2) => { const n = [...notesHere, ...carried].find((x) => x.id === id2); if (n) pickNote(n); else if (linkDrawn.some((x) => x.id === id2)) setActiveId(id2); } : undefined}
       onHere={editable ? (p) => {
         setHere(p); setWholeAsked(false);
@@ -826,7 +817,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
               {liveTicket !== undefined && <DocText product={product} src={editing.base.path} text={incoming ?? editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
                 versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base), focus: typing }} />}
-              {offers.comment && <SelectionBar page={editPane} onComment={(quote) => writeAbout({ kind: 'quote', text: quote })} />}
+              {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>
           )}
           {version && waitingForEditor && <OpeningWait name={version.name} kind="markdown" />}

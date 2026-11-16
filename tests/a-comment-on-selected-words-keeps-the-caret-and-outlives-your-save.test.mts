@@ -1,7 +1,7 @@
 // Reported: after highlighting words in a document and pressing Comment, the
 // cursor was not in the note box. Measured in the real file view in Chromium on
-// Linux, the box did take the caret, so the press now lets go of the page's
-// words before the box takes the caret, and the box takes it after the redraw.
+// Linux, the box did take the caret, so the press now only lets go of the
+// page's words before the box takes the caret rather than after.
 //
 // Measured on the same view, a worse loss on the way there: type in the
 // document, highlight words, press Comment, write the note, and the document's
@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
+import { openCommentDraft, readCommentDraft, readLooseDraft } from '../renderer/src/comment-drafts';
 const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch {}
@@ -62,7 +63,6 @@ const open = async (hash = '') => {
   await page.addScriptTag({ content: bundle });
   await page.locator('.ProseMirror').waitFor();
 };
-beforeEach(async () => { if (browserAvailable) await open(); });
 
 const selectAndComment = async (words) => {
   await page.evaluate((words) => {
@@ -81,6 +81,7 @@ const box = () => page.locator('.av-write textarea');
 const chip = () => page.locator('.av-chip-words');
 
 describe.skipIf(!browserAvailable)('Comment on highlighted words', () => {
+  beforeEach(async () => { await open(); });
   it('puts the caret in the note box, so keys typed next land there', async () => {
     await selectAndComment('Coding agents work');
     await expect.poll(() => page.evaluate(() => document.activeElement?.matches('.av-write textarea'))).toBe(true);
@@ -109,5 +110,33 @@ describe.skipIf(!browserAvailable)('Comment on highlighted words', () => {
     await page.getByRole('button', { name: 'Older version' }).click();
     await expect.poll(() => page.locator('.av-of').textContent()).toBe('v1 of 2');
     expect(await chip().count()).toBe(0);
+  });
+});
+
+describe('the drafts behind it', () => {
+  const store = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, String(v)); }, removeItem: (k) => { m.delete(k); } }; };
+  const V2 = { product: 'p', thread: 't', file: 'answers-v2.md', across: 'p:t' };
+  const V3 = { ...V2, file: 'answers-v3.md' };
+  const QUOTE = { kind: 'quote', text: 'Coding agents work' };
+
+  it('a quoted comment moves onto the version the save made, and leaves the old one', () => {
+    const s = store();
+    const kept = openCommentDraft(V3, s, { from: V2.file, holding: 'file', draft: { words: 'More detail', place: QUOTE } });
+    expect(kept).toMatchObject({ words: 'More detail', place: QUOTE, holding: 'file' });
+    expect(readCommentDraft(V3, s)).toEqual({ words: 'More detail', place: QUOTE });
+    expect(readCommentDraft(V2, s).words).toBe('');
+  });
+
+  it('loose words stay loose', () => {
+    const s = store();
+    const kept = openCommentDraft(V3, s, { from: V2.file, holding: 'loose', draft: { words: 'Overall, shorter', place: null } });
+    expect(kept).toMatchObject({ words: 'Overall, shorter', holding: 'loose' });
+    expect(readLooseDraft(V3, s).words).toBe('Overall, shorter');
+  });
+
+  it('an empty box moves nothing, and the version reads its own draft', () => {
+    const s = store();
+    s.setItem(`zero.commentdraft.p:t:${V3.file}`, JSON.stringify({ words: 'Kept on v3', place: QUOTE }));
+    expect(openCommentDraft(V3, s, { from: V2.file, holding: 'file', draft: { words: '  ', place: null } }).words).toBe('Kept on v3');
   });
 });
