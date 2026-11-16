@@ -10,33 +10,6 @@
 :root[data-theme="light"][data-sky-frame] body,
 :root[data-theme="light"][data-sky-frame] .app.workspace-layout { background: var(--sky-frame) !important; }
 
-/* The dark purple sky's own ground: the warm Ash and its orange glow read as
-   brown under purple. Neutral, on Ash's own steps (panel +14, raised +21,
-   hover +20, selected +29, hairline +44, strong hairline +56), still off black. */
-html:root[data-sky="dusk"] {
-  --skin-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'><defs><pattern id='d' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='1.15' fill='white' fill-opacity='0.05'/></pattern><radialGradient id='g' cx='0.72' cy='0.28' r='0.7'><stop offset='0' stop-color='%23693CB9' stop-opacity='0.06'/><stop offset='1' stop-color='%23693CB9' stop-opacity='0'/></radialGradient></defs><rect width='100%' height='100%' fill='%23151517'/><rect width='100%' height='100%' fill='url(%23g)'/><rect width='100%' height='100%' fill='url(%23d)'/></svg>");
-  --bg: #151517;
-  --surface: #232325;
-  --bg-raised: #2a2a2c;
-  --bg-hover: #29292b;
-  --bg-selected: #323234;
-  --pop: #313133;
-  --skin-pane: rgba(35, 35, 38, 0.55);
-  --skin-pane-line: #414143;
-  --skin-solid: #232325;
-  --line: #414143;
-  --line-strong: #4d4d4f;
-  --text: #ededef;
-  --text-dim: #c2c2c7;
-  --text-faint: #9e9ea5;
-  --agent-ink: #7c7c83;
-  --doc-page: #232325;
-  --doc-page-held: #232325;
-  --code-ground: #1d1d1f;
-  --work-fill: rgba(35, 35, 37, 0.9);
-  --on-solid: #151517;
-}
-
 .app.home-shown > .topbar { visibility: hidden; border-bottom-color: transparent; }
 .app.sky-shown .list-pane, .app.sky-shown .list-pane .th-table { background: transparent; }
 
