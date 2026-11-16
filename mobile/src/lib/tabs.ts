@@ -31,7 +31,7 @@ export const TABS: { id: TabId; label: string }[] = [
 ];
 
 // `projectOrder` is your running order of projects (phoneProjectOrder), never the list's own order.
-type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued'>> & { projectOrder?: string[] };
+type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'stranded'>> & { projectOrder?: string[] };
 
 /** Each computer's running order of projects (the desktop's `supervisor.productOrder`), from its newest settings copy. */
 export function phoneProjectOrder(rows: readonly { device: string; settings?: { workspace?: { productOrder?: unknown } } | null }[]): string[] {
@@ -61,6 +61,8 @@ export interface Row {
   toApprove: string;
   /** Sent from a phone and not yet taken by the computer: "Queued" (renderer/src/status-word.ts). */
   queued: boolean;
+  /** Waiting on a computer that is away while another of yours is online: "Computer offline", in Needs you. */
+  away: boolean;
   /** High or Urgent, marked on the row; Low and Medium are most threads, so they go unmarked. */
   priority: 'high' | 'urgent' | null;
   /** "Claude Code" or "Codex", only when a row of the same title runs on the other one. */
@@ -122,17 +124,17 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const waitingOn = (i: WorkItem) => waitsThatCanEnd(i, byId);
   const hiddenAt = (i: WorkItem) => hiddenUntil(i);
   const owed = threadsOwedAnAnswer(items, now);
+  const inProgress = (i: WorkItem) => (hiddenAt(i) <= now || live.has(i.id)) && belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
+  const strandedIds = new Set(view.stranded ?? []);
+  const stranded = new Set(items.filter((i) => strandedIds.has(i.id) && inProgress(i)).map((i) => i.id));
 
   const inbox = items.filter((i) => {
     if (live.has(i.id) && !stillAsksYou(i)) return false;
-    if (owed.has(i.id)) return true;
+    if (owed.has(i.id) || stranded.has(i.id)) return true;
     return belongsInInbox(i, { deliveredThrough: DELIVERED_THROUGH, hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i) });
   });
   const needsYou = new Set(inbox.map((i) => i.id));
-  const progress = inProgressTab(items.filter((i) => {
-    if (hiddenAt(i) > now && !live.has(i.id)) return false;
-    return belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
-  }), inbox);
+  const progress = inProgressTab(items.filter(inProgress), inbox);
   const snoozed = items.filter((i) => (notStarted(i) || isProposal(i) || hiddenAt(i) > now || (waitsInLater(i, waitingOn(i)) && !live.has(i.id)))
     && (i.status !== 'done' || i.wrote?.status?.source !== 'founder'));
   const done = items.filter((i) => !needsYou.has(i.id) && !live.has(i.id) && i.status === 'done');
@@ -154,7 +156,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const row = (i: WorkItem, tab: TabId): Row => ({
     key: `${i.product}/${i.id}`, id: i.id, product: i.product, title: rowTitle(i), projectName: names.get(i.product) ?? '',
     when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(rowTime(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
-    held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id), item: i,
+    held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id) && !stranded.has(i.id), away: stranded.has(i.id), item: i,
     priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)), agent: agentOf(i),
   });
   const drawn = (list: WorkItem[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map((i) => row(i, tab));

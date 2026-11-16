@@ -46,7 +46,7 @@ import { runOfClaim, cloudCard } from '../shared/cloud-kit.mts';
 import { isCarried } from '../shared/cloud-carry.mts';
 import { heldForUndo } from '../shared/phone-undo.mts';
 import type { CarriedCommand, CarriedReply } from '../shared/cloud-carry.mts';
-import type { PhoneWait, TeammatesViewSeen } from '../shared/phone-snapshot.mts';
+import type { PhoneWait, SnapshotRun, TeammatesViewSeen } from '../shared/phone-snapshot.mts';
 import type { SettingChange, SettingsModel } from '../shared/phone-settings.mts';
 import { leftByAMove } from '../shared/move-thread.mts';
 
@@ -171,6 +171,7 @@ export interface PhoneInboxOptions {
   projects: () => PhoneProject[];
   listItems: (slug: string) => PhoneItem[];
   historyOf: (slug: string, id: string, options?: { all?: boolean }) => (PhoneHistoryLine | null)[];
+  runsOf?: (slug: string, id: string) => SnapshotRun[];
   apply: (command: PhoneCommand) => Promise<ChannelResult | null | undefined>;
   stateFile: string;
   home?: string;
@@ -247,6 +248,8 @@ export function createPhoneInbox({
   projects,
   listItems, // (slug) -> folded rows
   historyOf, // (slug, id, { all }) -> the thread's history lines (store.readHistory); all of them when asked
+  // (slug, id) -> its runs' logs. Read only when a copy is rebuilt: a new run writes its pickup to the history.
+  runsOf = () => [],
   apply, // async (command) -> the handler's answer; throws to refuse
   stateFile,
   home = os.homedir(),
@@ -426,7 +429,7 @@ export function createPhoneInbox({
         const was = built.get(sk);
         // Only the run or its files moved: the copy of the row and its lines is the one already made.
         let base = was?.inputs === inputs ? was.base : null;
-        const made = () => (base ??= build(item, history, SNAPSHOT_LIMITS, { home }));
+        const made = () => (base ??= build(item, history, SNAPSHOT_LIMITS, { home, runs: runsOf(p.slug, item.id) }));
         const files = uploads && p.dir ? uploads.manifest(sk, made as () => ThreadSnapshot, { dir: p.dir, repoPath: p.repoPath, updatedAt: item.updatedAt ?? 0, base: inputs }) : null;
         if (was && was.inputs === inputs && was.live === live && was.files === files && was.askKey === askKey && was.waitKey === waitKey && was.changeKey === changeKey && state.sent[sk] === was.key) continue;
         let snap: Record<string, unknown> = live ? { ...made(), live } : made();

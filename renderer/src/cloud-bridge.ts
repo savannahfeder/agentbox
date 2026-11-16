@@ -25,7 +25,7 @@ import { SEND_MAX_BYTES, sendFiles, sentFileName } from './phone-sends-files';
 import { LINK_RENEW_MS, fileOnPhone, linkForFile, linkOfEntry as linkOfName, objectsToSign, phonePage, renewLinks, type Links } from './phone-links';
 import { BUCKET, cloudPlaces, findFile, findFolder, installCloudFiles, type Place } from './cloud-files';
 import {
-  LIVE_FOR_MS, NOT_HERE, PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneConnectState, phoneHistory, phoneSlug, phoneStatusLine,
+  LIVE_FOR_MS, NOT_HERE, PROJECTS_SELECT, cloudCarriesOn, macSeenOf, phoneConnectState, phoneHistory, phoneRuns, phoneSlug, phoneStatusLine,
   phoneView, readCommands, readSettingsRows, readThreads, splitSlug, type Aliases, type PhoneRows,
 } from './phone-rows';
 import { dictationAllowed, setDictationAllowed } from './web-speech';
@@ -346,7 +346,7 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
     // Whether Claude Code or Codex has an update is the computer's to say;
     // starting one is the computer's to do.
     agentUpdate: async (p: { action?: string }) => { if (p?.action === 'start') throw new Error(NOT_HERE); return null; },
-    sessionTrace: async () => ({ sessions: [] }),
+    sessionTrace: async ({ product, id }: { product: string; id: string }) => ({ sessions: phoneRuns(rows, product, id, aliases) }),
     settingsRead: () => readWebSettings(),
     setWorkspaceSetting: (p: { key: string; value: unknown }) => changeSetting({ scope: 'workspace', key: p?.key, value: p?.value }),
     setProjectSetting: (p: { product: string; key: string; value: unknown }) => changeSetting({ scope: 'project', product: p?.product, key: p?.key, value: p?.value }),
