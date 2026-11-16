@@ -8,13 +8,13 @@ import { color, corner, size } from './theme';
 
 const notices = noticeDismissal(appStore);
 
-export function StatusNotice({ message }: { message?: string | null }) {
+export function StatusNotice({ message, next }: { message?: string | null; next?: string | null }) {
   const hidden = useSyncExternalStore(notices.subscribe, () => !message || notices.hidden(message), () => false);
   if (!message || hidden) return null;
   return (
     <View accessibilityRole="alert" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, marginHorizontal: size.inset, marginBottom: 2, paddingLeft: 12, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.lineStrong }}>
       <T style={{ flex: 1, paddingVertical: 9, fontSize: 13, lineHeight: 18.2, color: color.dim }}>
-        {message}
+        {message}{!!next && <T style={{ fontSize: 13, lineHeight: 18.2, color: color.faint }}>{` ${next}`}</T>}
       </T>
       <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notice" onPress={() => notices.dismiss(message)}
         style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>

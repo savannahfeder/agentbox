@@ -24,6 +24,7 @@
 // path is wrong would break every link into the app's own repo, which is not a
 // product at all.
 import fsDefault from 'node:fs';
+import type { FSWatcher } from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { machineryDir } from './store/home.mts';
@@ -92,7 +93,7 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'session
 // mentions the moment it opens, so the walk has to outlive that burst; a
 // picture that lands later is found by the next look, which comes after this.
 export const HUNT_FRESH_MS = 5000;
-interface WalkEntry { at: number; fs: ArtifactFs; value: Promise<unknown>; running: boolean; took: number; again?: Promise<unknown> }
+interface WalkEntry { at: number; fs: ArtifactFs; value: Promise<unknown>; running: boolean; took: number; again?: Promise<unknown>; watched?: boolean; dirty?: boolean }
 const walks = new Map<string, WalkEntry>();
 // How many of a walk's folder reads wait on the disk at once. The app's other
 // disk reads share four threads with these, and a walk that asked for every
@@ -105,9 +106,18 @@ export const WALK_GIVES_UP_MS = 60_000;
 // of the four disk threads until it returns, so later walks skip the folder
 // rather than spending another thread on it.
 const stuck = new Set<string>();
-// Every file name in one tree, read without holding the main process.
-async function walkNames(tree: string, fs: ArtifactFs): Promise<Map<string, string[]>> {
-    const names = new Map<string, string[]>();
+// Every file name in one tree, read without holding the main process. A file is
+// kept as its name and its folder's index, not a joined path, which made the
+// index ten times the size.
+interface TreeNames { dirs: string[]; at: Map<string, number | number[]> }
+const pathsNamed = (names: TreeNames, base: string): string[] => {
+    const at = names.at.get(base);
+    if (at === undefined)
+        return [];
+    return (typeof at === 'number' ? [at] : at).map((i) => path.join(names.dirs[i]!, base));
+};
+async function walkNames(tree: string, fs: ArtifactFs): Promise<TreeNames> {
+    const names: TreeNames = { dirs: [], at: new Map() };
     const queue: { dir: string; depth: number }[] = [{ dir: tree, depth: 0 }];
     const out = new Set<string>();
     let reading = 0;
@@ -136,18 +146,24 @@ async function walkNames(tree: string, fs: ArtifactFs): Promise<Map<string, stri
             catch { /* gone or unreadable */ }
             out.delete(dir);
             stuck.delete(dir);
+            let here = -1;
             for (const e of entries) {
                 if (e.name.startsWith('.'))
                     continue;
-                const full = path.join(dir, e.name);
                 if (e.isDirectory()) {
                     if (!SKIP.has(e.name) && depth < 6)
-                        queue.push({ dir: full, depth: depth + 1 });
+                        queue.push({ dir: path.join(dir, e.name), depth: depth + 1 });
+                    continue;
                 }
-                else if (names.has(e.name))
-                    names.get(e.name)!.push(full);
+                if (here < 0)
+                    here = names.dirs.push(dir) - 1;
+                const had = names.at.get(e.name);
+                if (had === undefined)
+                    names.at.set(e.name, here);
+                else if (typeof had === 'number')
+                    names.at.set(e.name, [had, here]);
                 else
-                    names.set(e.name, [full]);
+                    had.push(here);
             }
             reading -= 1;
             waiting.splice(0).forEach((r) => r());
@@ -171,32 +187,86 @@ const whole = (fs: ArtifactFs): typeof fsDefault => fs as typeof fsDefault;
 // in that time is not found.
 const SLOW_WALK_KEEPS = 10;
 export const HUNT_KEPT_AT_MOST_MS = 30_000;
+const keptFor = (k: WalkEntry) => k.watched
+    ? (k.dirty ? 0 : WATCHED_WALK_KEPT_MS)
+    : Math.min(HUNT_KEPT_AT_MOST_MS, Math.max(HUNT_FRESH_MS, k.took * SLOW_WALK_KEEPS));
 // One walk per tree at a time: a name asked while it runs waits on it, even past
 // its window. A look that must be current waits for it and then walks again,
 // since the running walk may have read a folder before the file was there.
 // Each key is only ever read by the one caller that wrote it, so its value comes back as that caller's T.
-function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T | Promise<T>, fresh = false): Promise<T> {
+function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T | Promise<T>, fresh = false, watched = false): Promise<T> {
     const kept = walks.get(key);
     if (kept && kept.fs === fs && kept.running && fresh) {
-        kept.again ??= kept.value.then(() => freshly(key, fs, now, read, true));
+        kept.again ??= kept.value.then(() => freshly(key, fs, now, read, true, watched));
         return kept.again as Promise<T>;
     }
-    const keptFor = (k: WalkEntry) => Math.min(HUNT_KEPT_AT_MOST_MS, Math.max(HUNT_FRESH_MS, k.took * SLOW_WALK_KEEPS));
     if (kept && kept.fs === fs && (kept.running || (!fresh && now - kept.at < keptFor(kept))))
         return kept.value as Promise<T>;
     const started = performance.now();
-    const entry: WalkEntry = { at: now, fs, value: Promise.resolve(), running: true, took: 0 };
+    const entry: WalkEntry = { at: now, fs, value: Promise.resolve(), running: true, took: 0, watched, dirty: false };
     const value = Promise.resolve(read()).finally(() => {
         entry.running = false;
         entry.took = performance.now() - started;
+        // A walk past its window answers nobody, so its index is not kept in memory.
+        setTimeout(() => {
+            if (walks.get(key) !== entry)
+                return;
+            walks.delete(key);
+            watchers.get(key)?.close();
+            watchers.delete(key);
+        }, keptFor(entry)).unref?.();
     });
     entry.value = value;
     walks.set(key, entry);
-    if (walks.size > 32)
-        walks.delete(walks.keys().next().value!);
+    if (walks.size > 32) {
+        const oldest = walks.keys().next().value!;
+        walks.delete(oldest);
+        watchers.get(oldest)?.close();
+        watchers.delete(oldest);
+    }
     return value;
 }
-const namesIn = (tree: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<Map<string, string[]>> => freshly(tree, fs, now, () => walkNames(tree, fs), fresh);
+// On a Mac one FSEvents watch per tree is cheap, so a tree's list is kept until
+// something the walk would see changes, and redone after this long regardless.
+// Elsewhere a recursive watch is one watcher per folder, so the timed rule stays.
+export const WATCHED_WALK_KEPT_MS = 10 * 60_000;
+const watchers = new Map<string, FSWatcher>();
+// Whether a change at `rel` (inside the tree) can change what walkNames lists.
+function walkSees(rel: string): boolean {
+    const parts = rel.split(path.sep);
+    return parts.length <= 7 && !parts.some((p) => p.startsWith('.') || SKIP.has(p));
+}
+function watchTree(tree: string, fs: ArtifactFs): boolean {
+    if (fs !== fsDefault || process.platform !== 'darwin')
+        return false;
+    if (watchers.has(tree))
+        return true;
+    const dirty = () => { const kept = walks.get(tree); if (kept) kept.dirty = true; };
+    try {
+        const w = fsDefault.watch(tree, { recursive: true, persistent: false }, (_event, file) => {
+            if (file == null || walkSees(String(file)))
+                dirty();
+        });
+        w.on('error', () => {
+            w.close();
+            watchers.delete(tree);
+            dirty();
+        });
+        watchers.set(tree, w);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+/** Closes every folder watch; for tests and quitting. */
+export function stopWatchingFolders(): void {
+    for (const w of watchers.values())
+        w.close();
+    watchers.clear();
+    walks.clear();
+}
+const namesIn = (tree: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<TreeNames> => freshly(tree, fs, now, () => walkNames(tree, fs), fresh, watchTree(tree, fs));
 // Hunt the file down by NAME inside one product's trees, newest match wins.
 // Workers write links relative to whatever directory they were standing in, so
 // a fixed root list will always miss some of them, and every miss cost her a
@@ -206,7 +276,7 @@ async function huntByName(base: string, trees: readonly string[], fs: ArtifactFs
     let best: { full: string; m: number; fits: boolean } | null = null;
     const tail = raw.includes('/') ? `${path.sep}${raw.split('/').join(path.sep)}` : null;
     for (const tree of trees) {
-        for (const full of (await namesIn(tree, fs, now, fresh)).get(base) ?? []) {
+        for (const full of pathsNamed(await namesIn(tree, fs, now, fresh), base)) {
             let m;
             try {
                 m = (await fs.promises.stat(full)).mtimeMs;

@@ -38,6 +38,7 @@ import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
 import { ALERTS_ASKED_KEY, FIRST_RUN, nextSetup } from '../lib/first-run';
+import { skipWait, waitNotice, waitSkipped } from '../lib/computer-wait';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
 import { PEN } from '../lib/overlays';
@@ -309,8 +310,12 @@ export default function Threads() {
   const c = useCloud();
   // The first run's steps after sign-in, in order (lib/first-run.ts); the computer's is drawn here.
   const walking = c.preview && previewWalksFirstRun();
+  const [, setSkippedAt] = useState(0);
+  const skipped = !!c.connect && waitSkipped(appStore, c.connect.email);
+  const skip = () => { if (c.connect) skipWait(appStore, c.connect.email); setSkippedAt(Date.now()); };
+  const notice = c.status ? { message: c.status, next: null } : waitNotice(c.connect);
   const next = c.preview && !walking ? null : nextSetup({
-    signedIn: c.signedIn, started: !c.loading, connect: !!c.connect, noticeAnswered: !!c.notice,
+    signedIn: c.signedIn, started: !c.loading, connect: !!c.connect && !skipped, noticeAnswered: !!c.notice,
     alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere: alertsHere || walking,
   });
   useEffect(() => {
@@ -350,7 +355,7 @@ export default function Threads() {
   const setDisplay = (d: Display) => { setDisplayRaw(d); writeDisplay('inbox', d, appStore); };
   // Not kept between launches, as the desktop's filter is not.
   const [agent, setAgent] = useState<Harness | null>(null);
-  const order = useMemo(() => c.view.products.map((p) => p.slug), [c.view.products]);
+  const order = c.view.projectOrder;
   const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order, agent), [c.tabs, display, c.now, order, agent]);
   const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now, agent) : null), [teamMode, display, c.view, c.tabs, c.now, agent]);
   // Your card's board: your own threads, and what waits on you is Needs you, so it is no column (whose-board.ts).
@@ -412,7 +417,7 @@ export default function Threads() {
   const penUp = c.view.approvals.length > 0;
   // The empty inbox draws the form itself, so it needs no pen.
   const inboxEmpty = tab === 'inbox' && rows.length === 0 && hidden === 0 && !c.loading && !mentionsShown;
-  if (c.connect) return <ComputerWait email={c.connect.email} signOut={c.signOut} />;
+  if (c.connect && !skipped) return <ComputerWait email={c.connect.email} signOut={c.signOut} skip={skip} />;
   if (onChats) {
     return (
       <Wall>
@@ -474,7 +479,7 @@ export default function Threads() {
         <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
-      <StatusNotice message={c.status} />
+      <StatusNotice message={notice?.message} next={notice?.next} />
       {onEverything
         ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
         : board ? <Board columns={board} foot={foot} /> : list}

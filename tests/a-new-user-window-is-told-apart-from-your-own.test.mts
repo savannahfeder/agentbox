@@ -56,7 +56,7 @@ describe('the window a throwaway copy opens', () => {
   });
 
   it('is what the window is actually built with', () => {
-    expect(main).toContain("import { newUserWindow } from './new-user-window.mts'");
+    expect(main).toMatch(/import \{[^}]*\bnewUserWindow\b[^}]*\} from '\.\/new-user-window\.mts'/);
     expect(main).toMatch(/window = new BrowserWindow\(\{[\s\S]{0,400}\.\.\.newUserWindow\(/);
   });
 

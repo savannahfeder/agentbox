@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import { phoneStatusLine } from '../renderer/src/phone-rows';
 
 const notice = fs.readFileSync(new URL('../mobile/src/ui/StatusNotice.tsx', import.meta.url), 'utf8');
+const inbox = fs.readFileSync(new URL('../mobile/src/app/index.tsx', import.meta.url), 'utf8');
 const NOW = 1_800_000_000_000;
 const HOUR = 3_600_000;
 
@@ -24,9 +25,9 @@ describe('the away notice', () => {
     expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - HOUR, cloud: true }, NOW))
       .toBe('Your computer is off. Replies carry on in Agentbox Cloud.');
   });
-
-  it('draws no second instruction under its words', () => {
-    expect(notice).not.toMatch(/next/);
+  it('has no second line; only the no-computer notice carries one', () => {
+    expect(inbox).toMatch(/const notice = c\.status \? \{ message: c\.status, next: null \} : waitNotice\(c\.connect\);/);
+    expect(inbox).toMatch(/<StatusNotice message=\{notice\?\.message\} next=\{notice\?\.next\} \/>/);
     expect(notice).not.toMatch(/Wake it/);
   });
 });

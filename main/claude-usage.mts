@@ -148,6 +148,20 @@ export class ClaudeUsage {
     return this._last ? { limits: this._last.limits, at: this._last.at, profile: this._last.profile } : null;
   }
 
+  /**
+   * Take a reading of the account in use that someone else made (Settings
+   * reads each login with its own reader). While Codex is the corner's agent
+   * this reader is only peeked at, so without this Claude Code never reached
+   * the sidebar.
+   */
+  adopt(reading: { profile: string; at?: number; limits?: UsageLimit[] | null }) {
+    if (!reading.limits?.length || reading.at == null) return;
+    if (reading.profile !== this._syncProfile()) return;
+    if (this._last && this._last.at >= reading.at) return;
+    this._last = { limits: reading.limits, at: reading.at, zone: localZone(), profile: reading.profile };
+    this._onChange();
+  }
+
   /** Drop the last reading, so nothing serves it again. */
   forget() {
     this._last = null;

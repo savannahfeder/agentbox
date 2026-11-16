@@ -51,7 +51,7 @@ import { phoneWaitsOf } from '../shared/phone-snapshot.mts';
 import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
-import { newUserWindow } from './new-user-window.mts';
+import { newUserTitle, newUserWindow } from './new-user-window.mts';
 import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
@@ -509,6 +509,7 @@ async function createWindow() {
   let phoneSettings: (() => unknown) | null = null;
   // Every installed build has a cloud now, so the keychain is asked only once
   // a sign-in is read or kept, not at launch.
+  let retitle = () => {};
   const team = cloudConfig ? createTeamService({
     session: supabaseSession({
       cloudConfig,
@@ -524,7 +525,7 @@ async function createWindow() {
     stateFile: teamStateFile(config.storeRoot),
     // The window's push is declared further down and wired once the window
     // exists; until then a change has nobody to tell.
-    onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
+    onChange: () => { try { pushUpdate(); retitle(); } catch { /* no window yet */ } },
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
     wontStart: () => supervisor.status(),
@@ -826,6 +827,13 @@ async function createWindow() {
   // renderer/index.html carries the app's name, so a throwaway copy went back
   // to saying "Agentbox" as soon as it drew anything.
   window.on('page-title-updated', (e) => e.preventDefault());
+  retitle = () => {
+    if (!window || window.isDestroyed()) return;
+    const me = team?.state().me;
+    const title = newUserTitle({ fresh: runningAsAFreshUser(), name: NAME, account: team?.state().signedIn ? me?.email || me?.name : null });
+    if (title && window.getTitle() !== title) window.setTitle(title);
+  };
+  retitle();
 
   keepThePageAlive({
     window,
