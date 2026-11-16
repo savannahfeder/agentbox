@@ -57,7 +57,7 @@ const READS = new Set([
   'cloudClipboardCode', 'projectInstructionsRead', 'codeFile', 'railNote',
   'agentConversation', 'phoneLink', 'teamStatus',
   // Where she dragged a row or a project to: kept on this page, not sent.
-  'setThreadPlaces', 'setProductOrder', 'setProductHidden',
+  'setThreadPlaces', 'setProductOrder', 'setProductHidden', 'seenHere',
 ]);
 // The reads whose callers take a field off the answer: each gets an empty
 // answer of its own shape, not null (tests/the-done-tab-opens-on-the-web-app).

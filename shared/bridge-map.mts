@@ -245,6 +245,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   setProductOrder: 'zero:set-product-order',
   setThreadPlaces: 'zero:set-thread-places',
   setThreadPins: 'zero:set-thread-pins',
+  seenHere: 'zero:seen-here',
   setThreadOnMac: 'zero:set-thread-on-mac',
   moveToCloud: 'zero:move-to-cloud',
   setProductHidden: 'zero:set-product-hidden',
