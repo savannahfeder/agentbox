@@ -198,7 +198,7 @@ export function TourFinished({ covered, onDone }: { covered: boolean; onDone: ()
   }, [covered]);
   return (
     <div ref={cardRef} className="tour-card" role="status" style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}>
-      <span className="tour-say">That’s the walkthrough. Press <K k="↵" /> to finish</span>
+      <span className="tour-say">You finished the walkthrough. Press <K k="↵" /> to close</span>
     </div>
   );
 }

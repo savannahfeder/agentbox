@@ -180,7 +180,7 @@ try {
   await key('Enter');
   await see('walkthrough-urgent', /Urgent threads move up your list/i);
   // The last word is said on Home's box, under a bar that reads done.
-  await see('walkthrough-done', /WALKTHROUGH DONE Close.*That’s the walkthrough\. Press ↵ to finish/i);
+  await see('walkthrough-done', /WALKTHROUGH DONE Close ↵.*You finished the walkthrough\. Press ↵ to close/i);
   if (!await page.evaluate(`!!document.querySelector('.hm-hello') && !document.querySelector('.tour-glow')`)) throw new Error('the last tip is up, but not on Home, or something on Home is still ringed in gold');
   // ↵ is the tip's own key: it closes the tip, and Home's box, which has the cursor, gets no new line from it.
   const inBox = `(() => { const t = document.querySelector('.hm-start .tc-card textarea, .hm-start .tc-card [contenteditable="true"]'); return t ? String(t.value ?? t.innerText) : null; })()`;

@@ -12,7 +12,7 @@ export function TourFrame({ done, now, finished = false, onSkip }: { done: reado
         {Array.from({ length: of }, (_, i) => <i key={i} className={finished || i === at - 1 ? 'tf-is' : i < at - 1 ? 'tf-was' : ''} />)}
         <span>{finished ? 'Walkthrough done' : `Walkthrough ${at} of ${of}`}</span>
       </div>
-      <button type="button" className="tf-skip" onClick={onSkip}>{finished ? 'Close' : 'Skip walkthrough'}</button>
+      <button type="button" className="tf-skip" onClick={onSkip}>{finished ? <>Close <kbd className="tf-key">↵</kbd></> : 'Skip walkthrough'}</button>
     </div>
   );
 }

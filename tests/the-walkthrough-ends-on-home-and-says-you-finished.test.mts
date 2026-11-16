@@ -109,15 +109,24 @@ describe('the window', () => {
   it('keeps the bar above the app through the finishing moment, reading done, with Close where Skip was', () => {
     expect(app).toContain('const tourFramed = !fresh && homeOn && (tourLive(tour) || tourFinishing(tour));');
     expect(frame).toContain("<span>{finished ? 'Walkthrough done' : `Walkthrough ${at} of ${of}`}</span>");
-    expect(frame).toContain("{finished ? 'Close' : 'Skip walkthrough'}");
+    expect(frame).toContain("{finished ? <>Close <kbd className=\"tf-key\">↵</kbd></> : 'Skip walkthrough'}");
     expect(app).toMatch(/<TourFrame done=\{tour!\.done\} now=\{tourNow\} finished=\{finishing\} onSkip=\{\(\) => setTour\(finishing \? closeFinish\(tour!\) : skipTour\(tour!\)\)\} \/>/);
+  });
+  it('shows the same key beside Close, as a key and only once the walkthrough is done', () => {
+    const css = read('renderer/src/components/tour-frame.css');
+    expect(css).toMatch(/\.tour-frame \.tf-key \{[^}]*border: 1px solid rgba\(var\(--tour-gold\), \.7\); border-radius: 6px;/);
+    expect(css).toMatch(/\.tour-frame\.tf-done \.tf-skip \{ display: inline-flex; align-items: center; gap: 8px; color: var\(--text\); \}/);
+    expect(frame.match(/tf-key/g)).toHaveLength(1);
   });
   it('goes to Home for it, and ends it when you leave Home', () => {
     expect(app).toContain("if (!finishOnHome.current) { if (homeHere) finishOnHome.current = true; else { setModal(null); openView('inbox'); setHomeOpen(true); } return; }");
     expect(app).toContain('if (!homeHere) setTour(closeFinish(tourRef.current!));');
   });
-  it('says that was the walkthrough and names the one key that finishes it, above Home’s greeting', () => {
-    expect(tour).toContain('That’s the walkthrough. Press <K k="↵" /> to finish');
+  // Their pick of five drawn in the running app: the tip alone above the
+  // greeting, in these words, "and then it would be nice if the close in the
+  // top corner also had a little enter icon beside it".
+  it('says you finished and names the one key that closes it, above Home’s greeting', () => {
+    expect(tour).toContain('You finished the walkthrough. Press <K k="↵" /> to close');
     expect(tour).not.toContain('Type your first real thread');
     expect(tour).toContain("document.querySelector('.hm-hello')");
     expect(app).toMatch(/\{finishing && <TourFinished covered=\{/);
