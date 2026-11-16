@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveArtifact, HUNT_FRESH_MS, WATCHED_WALK_KEPT_MS, stopWatchingFolders } from '../main/artifact-path.mts';
+import { resolveArtifact, HUNT_FRESH_MS, HUNT_KEPT_AT_MOST_MS, WATCHED_WALK_KEPT_MS, stopWatchingFolders } from '../main/artifact-path.mts';
 
 const onMac = process.platform === 'darwin';
 let root: string; let docs: string; let reads: string[];
@@ -21,8 +21,17 @@ const look = (src: string, now: number) => resolveArtifact({ src, product: 'ours
 const until = async (fn: () => Promise<boolean>, ms = 5000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 100)); } return fn(); };
 const walksOf = (dir: string) => reads.filter((d) => d === dir).length;
 // macOS can deliver a notice for a file written just before the watch began (the
-// setup's own files), which costs one more listing. Let that pass, then count.
-const settled = async (t: number) => { await look('b.md', t); await new Promise((r) => setTimeout(r, 1000)); await look('b.md', t); reads.length = 0; };
+// setup's own files), which costs one more listing once the timed window is up.
+// Let that pass, then count from the time of the last listing.
+const settled = async (t: number) => {
+  await look('b.md', t);
+  await new Promise((r) => setTimeout(r, 1000));
+  const later = t + HUNT_KEPT_AT_MOST_MS + 1;
+  await look('b.md', later);
+  const at = walksOf(docs) > 1 ? later : t;
+  reads.length = 0;
+  return at;
+};
 
 beforeEach(() => {
   root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'listed-once-')));
@@ -42,8 +51,7 @@ describe.runIf(onMac)('on a Mac', () => {
   });
 
   it('does not list an unchanged folder again a minute later', async () => {
-    const t = Date.now();
-    await settled(t);
+    const t = await settled(Date.now());
     expect((await look('missing.png', t + 60_000)).ok).toBe(false);
     expect((await look('a.png', t + 5 * 60_000)).ok).toBe(true);
     expect(walksOf(docs)).toBe(0);
@@ -58,8 +66,7 @@ describe.runIf(onMac)('on a Mac', () => {
   }, HUNT_FRESH_MS + 8000);
 
   it('is not listed again for changes inside folders the walk skips', async () => {
-    const t = Date.now();
-    await settled(t);
+    const t = await settled(Date.now());
     put(path.join(docs, 'node_modules', 'x', 'index.js'));
     put(path.join(docs, '.git', 'objects', 'ab'));
     await new Promise((r) => setTimeout(r, 1500));
@@ -68,8 +75,7 @@ describe.runIf(onMac)('on a Mac', () => {
   });
 
   it('is listed again after ten minutes even with nothing said', async () => {
-    const t = Date.now();
-    await settled(t);
+    const t = await settled(Date.now());
     await look('missing.png', t + WATCHED_WALK_KEPT_MS + 1);
     expect(walksOf(docs)).toBe(1);
   });
