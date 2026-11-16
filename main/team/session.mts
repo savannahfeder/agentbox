@@ -257,10 +257,26 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       });
       if (error) throw new Error(plainAuthError(error.message));
       if (data?.session) return { backend: supabaseBackend(c) };
+      const at = String(email ?? '').trim();
       // As long as the link lives (cloud/supabase/config.toml, otp_expiry).
-      const { over } = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log });
-      over.catch(() => {});
-      return { confirm: true, confirmed: () => over.then(() => supabaseBackend(c)), stopWaiting: () => { cancelGoogleSignIn(); } };
+      const listen = async () => {
+        const held = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log });
+        held.over.catch(() => {});
+        return held;
+      };
+      let { over } = await listen();
+      return {
+        confirm: true,
+        confirmed: () => over.then(() => supabaseBackend(c)),
+        stopWaiting: () => { cancelGoogleSignIn(); },
+        // Sent before the wait is replaced, so a refused send leaves the earlier link's wait as it was.
+        // The new code replaces the old one in the client, so only the newest link signs in.
+        async resend() {
+          const { error: refused } = await c.auth.resend({ type: 'signup', email: at, options: { emailRedirectTo: returnUrl } });
+          if (refused) throw new Error(plainAuthError(refused.message));
+          ({ over } = await listen());
+        },
+      };
     },
 
     // The session an Agentbox Cloud sign-in made (main/cloud/account.mts), so
