@@ -4,6 +4,7 @@ import { instructionOf, isCleanRun } from '../../shared/repeats.mts';
 import { teammateIdOf } from '../../shared/teammates.mts';
 import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../../shared/answers.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
+import { asksToClose } from '../../shared/asks-to-close.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
@@ -127,17 +128,10 @@ export function gaveUpOnTheAnswer(i: InboxItem): boolean {
   return saysARunGotNowhere(i.result);
 }
 
-// A clause of her last words asked for the close and the agent's done came
-// after them: that done is hers, as if she had pressed E. The close has to
-// open the clause or follow and/then/please/can you, so "don't close this
-// task" and "why did you close this thread" are not asks.
-const ASKS_TO_CLOSE = /(?:^|\b(?:and|then|please|just|can you|could you|you can)\s+)close (?:this|the) (?:task|thread)(?:\s+(?:please|now))?$/i;
+// Her last words asked for the close and the agent's done came after them:
+// that done is hers, as if she had pressed E.
 function closedAsSheAsked(i: InboxItem): boolean {
-  const answer = liveAnswer(i);
-  if (!answer) return false;
-  const words = answer.replace(/^option \d+:\s*/i, '').replace(/\s*\(recommended\)\s*/i, '');
-  const asked = words.split(/[,;.!?\n]+/).some((clause) => ASKS_TO_CLOSE.test(clause.trim()));
-  return asked && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity);
+  return asksToClose(liveAnswer(i)) && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity);
 }
 
 // Who deferred a row decides what the deferral means. A future runAt an agent

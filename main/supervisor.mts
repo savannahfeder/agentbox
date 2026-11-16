@@ -193,6 +193,7 @@ import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-
 import { MemoryLog } from './memory-log.mts';
 import { StartBudget, cloudStartPressure } from './cloud/start-budget.mts';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
+import { asksToClose } from '../shared/asks-to-close.mts';
 import type { MergeHomeResult } from './cloud/merge-home.mts';
 import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mts';
 import { LeftoverCleaner } from './leftovers.mts';
@@ -5769,8 +5770,11 @@ export class Supervisor {
     delete this._movedWhy?.[item.id];
     try {
       const fresh = this.store.readItem?.(item.product, item.id);
-      this.store.recordSessionResult?.(item.product, item.id, { result: mergedSentence(merge), status: null });
-      if (fresh && (!fresh.answer || (answerTs(fresh) ?? 0) <= startedAt)) {
+      const carried = !!fresh && (!fresh.answer || (answerTs(fresh) ?? 0) <= startedAt);
+      // "Merge it and close the thread": the merge was the last of what it asked.
+      const status = carried && asksToClose(fresh!.answer) ? 'done' : null;
+      this.store.recordSessionResult?.(item.product, item.id, { result: mergedSentence(merge), status });
+      if (fresh && carried) {
         this._handledAnswers.add(this._answerKey(fresh));
         if (fresh.answer) this.store.settleAnswer?.(item.product, item.id, answerTs(fresh));
       }
