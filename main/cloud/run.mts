@@ -379,7 +379,7 @@ const CODEX_WHY: Record<string, (until?: string) => [why: string, fix: string]> 
 export function codexNote({ carried, state = null, until = null }: CodexHere) {
   const [why, fix] = (CODEX_WHY[state ?? ''] ?? CODEX_WHY.none)(until ? clock(until) : 'later');
   const opening = carried
-    ? 'Codex here is signed in to the cloud\'s Codex account, which their computer keeps and renews. Before anything long runs on Codex, try one tiny request (`codex exec --skip-git-repo-check \'Reply ok\'`): `codex login status` says signed in even when OpenAI refuses the sign-in. If it is refused,'
+    ? 'Codex here is signed in to the cloud\'s Codex account, which their computer keeps and renews. Before anything long runs on Codex, try one tiny request (`codex exec --skip-git-repo-check \'Reply ok\' < /dev/null`): `codex login status` says signed in even when OpenAI refuses the sign-in. Run every `codex exec` with `< /dev/null`, or it waits for input that never comes. If it is refused,'
     : `Codex is signed out on this machine, because ${why}. Whatever the work,`;
   return [
     opening,
