@@ -70,7 +70,8 @@ async function teamOf(owner: string, name: string) {
   await as(owner, `insert into public.team_members (team_id, person_id, role) values ($1, $2, 'owner')`, [team, owner]);
   return team;
 }
-const waiting = async () => (await db.query(`select email from public.team_invites_to_email(50)`)).rows.map((r) => (r as { email: string }).email);
+// Sorted: two rows made in the same instant tie on created_at.
+const waiting = async () => (await db.query(`select email from public.team_invites_to_email(50)`)).rows.map((r) => (r as { email: string }).email).sort();
 // The function's claim and its giving back after a failed send, as it makes them.
 const claim = (email: string) => db.query(`update public.team_invites set emailed_at = now() where email = $1 and emailed_at is null`, [email]);
 const giveBack = (email: string) => db.query(`update public.team_invites set emailed_at = null where email = $1`, [email]);
@@ -165,7 +166,7 @@ describe('sending', () => {
     expect(await invite(DANA, team, 'bounces@example.test')).toBeNull();
     expect(await invite(DANA, team, 'arrives@example.test')).toBeNull();
     for (let i = 0; i < 2; i++) { await claim('bounces@example.test'); await giveBack('bounces@example.test'); }
-    expect(await waiting()).toEqual(['bounces@example.test', 'arrives@example.test']);
+    expect(await waiting()).toEqual(['arrives@example.test', 'bounces@example.test']);
     await claim('bounces@example.test'); await giveBack('bounces@example.test');
     expect(await waiting()).toEqual(['arrives@example.test']);
   });
