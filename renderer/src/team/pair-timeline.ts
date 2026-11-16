@@ -57,12 +57,12 @@ const SAME_REPLY_MS = 10 * 60 * 1000;
 const said = (s: string) => s.trim().replace(/\s+/g, ' ');
 
 /** A note's file as people say it: its name and version. */
-export function fileLabel(file: string): string {
+export function fileLabel(file: string, v?: number): string {
   const [, id, mark, num] = /^(.*?)(?:([#@])(\d+))?$/.exec(file)!;
   const name = id.split('/').pop() || id;
   // A version saved under a new name, `report-v2.md`, is report.md's v2 in the review too.
   const named = baseName(name) !== name ? numberInName(name) : null;
-  return `${named ? baseName(name) : name} v${mark === '@' ? num : named ?? num ?? '1'}`;
+  return `${named ? baseName(name) : name} v${v ?? (mark === '@' ? num : named ?? num ?? '1')}`;
 }
 
 export function pairTimeline({ me, other, rooms, messages, directItems, talk, titleOf }: PairInput): PairEntry[] {
@@ -97,7 +97,7 @@ export function pairTimeline({ me, other, rooms, messages, directItems, talk, ti
     if (!pair.has(c.by) || !(c.to ?? [c.owner]).includes(to)) continue;
     if (c.kind === 'note') {
       if (!c.file || !c.note) continue;
-      out.push({ key: `note:${c.id}`, at: c.at, kind: 'note', by: c.by, to, text: c.text, where: { label: fileLabel(c.file), open: { to: 'file', owner: c.owner, threadId: c.threadId, file: c.file, note: c.note } } });
+      out.push({ key: `note:${c.id}`, at: c.at, kind: 'note', by: c.by, to, text: c.text, where: { label: fileLabel(c.file, c.v), open: { to: 'file', owner: c.owner, threadId: c.threadId, file: c.file, note: c.note } } });
     } else {
       out.push({ key: `comment:${c.id}`, at: c.at, kind: 'comment', by: c.by, to: c.owner, text: c.text, where: { label: `on ${titleOf(c.owner, c.threadId) ?? 'a thread'}`, open: { to: 'thread', owner: c.owner, threadId: c.threadId } } });
     }

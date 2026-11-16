@@ -20,7 +20,8 @@ const toNoAccount = () => router.push('/no-account');
 
 export default function SignIn() {
   const c = useCloud();
-  const [email, setEmail] = useState('');
+  const lapsed = c.cloud?.lapsed() ?? null;
+  const [email, setEmail] = useState(lapsed ?? '');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export default function SignIn() {
         <Bars at="account" />
         <AppMark size={36} />
         <Head style={{ marginTop: 28 }}>Sign in</Head>
-        <Lede>Use the account from Agentbox on your computer.</Lede>
+        <Lede>{lapsed === null ? 'Use the account from Agentbox on your computer.' : 'Your sign-in ran out. Sign in again to carry on.'}</Lede>
         {!c.cloud && !c.preview && <Lede>This build was made without the cloud's address, so it cannot sign in.</Lede>}
         <View style={{ gap: 16, marginTop: 28 }}>
           <Field label="Email" testID="sign-in-email" value={email} onChangeText={edited(setEmail)} keyboardType="email-address" textContentType="emailAddress" autoComplete="email" />

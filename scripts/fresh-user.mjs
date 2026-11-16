@@ -53,6 +53,7 @@
 // Usage:
 //   npm run fresh                  a brand new user, every time
 //   npm run fresh -- --with-agents  same, plus the Claude Code sessions already on this Mac
+//   npm run fresh -- --with-agents --team  the first run a download gets: those, and the team cloud's account, plan and invite steps
 //   npm run fresh -- --keep         reopen the last one, to carry on where you left off
 //   npm run fresh -- --list         show the throwaway homes on disk
 //   npm run fresh -- --clean        delete them all
@@ -64,7 +65,7 @@ import { fileURLToPath } from 'node:url';
 // THE RECIPE ITSELF LIVES IN ONE PLACE NOW (shared/fresh-user-home.mts), because
 // the app can do this to itself from ⌘K since 2026-08-23 and two copies of a
 // rule about CFFIXED_USER_HOME is exactly how one of them goes quietly wrong.
-import { HOMES, existingHomes, makeHome, prepareHome, freshEnv } from '../shared/fresh-user-home.mts';
+import { HOMES, existingHomes, makeHome, prepareHome, freshEnv, teamConfigToUse } from '../shared/fresh-user-home.mts';
 // AND THE OTHER HALF IS WHICH APP TO OPEN (scripts/fresh-user-target.mjs). On
 // Linux there is no bundle to find, so this command used to stop there.
 import { freshUserTarget } from './fresh-user-target.mjs';
@@ -112,10 +113,12 @@ if (args.has('--keep')) {
 // app could not already write.
 const { claudeBin, keychain } = prepareHome(home, { withAgents: args.has('--with-agents') });
 
+const team = args.has('--team') ? teamConfigToUse({ repo }) : null;
+
 const child = spawn(found.bin, found.args, {
   detached: true,
   stdio: 'ignore',
-  env: freshEnv(home),
+  env: { ...freshEnv(home), ...(team ? { AGENTBOX_TEAM_CONFIG: team } : {}) },
 });
 child.unref();
 
@@ -127,6 +130,9 @@ console.log(`Opening ${found.app} as a brand new user, ${age}.`);
 console.log(`Its whole world is ${home} — settings, config and store.`);
 console.log(`Your own Agentbox keeps running and nothing of yours was read or changed.`);
 if (found.needsBuild) console.log('Note: the screen has not been built here, so run `npm run build` and open it again.');
+if (args.has('--team') && !team) console.log('Note: no team config on this computer, so the window has no account, plan or invite step.');
+const cloud = team || process.env.AGENTBOX_TEAM_CONFIG;
+if (!cloud || !args.has('--with-agents')) console.log(`Note: this window has ${[!cloud && 'no account, plan or invite step', !args.has('--with-agents') && 'no chats to bring in'].filter(Boolean).join(' and ')}. The first run a download gets is \`npm run fresh -- --with-agents --team\`.`);
 if (!claudeBin) console.log('Note: Claude Code is not at ~/.local/bin/claude, so agents will not run.');
 if (!keychain && process.platform === 'darwin') console.log('Note: no ~/Library/Keychains, so Claude Code will say it is not logged in.');
 // The hint has to name the command she actually typed. Run through npm it is

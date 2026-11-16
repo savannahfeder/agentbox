@@ -761,7 +761,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onHandToAgent?: (item: WorkItem, message?: AgentTurn) => void;
   /** Who this thread can be handed on to, for its menu. */
   giveTo?: readonly { id: string; name: string }[];
-  onGive?: (to: { id: string; name: string }) => void;
+  onGive?: (to: { id: string; name: string }, note: string) => void;
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shippedMark?: boolean | null;
   onShipped?: (on: boolean) => void;

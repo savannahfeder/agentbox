@@ -4,7 +4,11 @@
 //   node workday.mjs --who founder,new-user [--minutes 30] [--stretches 2 | --pace [--hours 10]]
 //                    [--engine codex|external] [--model <id>] [--focus "what to lean on"]
 //                    [--codex-home ~/.codex-2] [--target 90] [--url <preview address>]
-//                    [--out <folder>] [--detach]
+//                    [--out <folder>] [--detach] [--iphone [--build-url <simulator .tar.gz>]]
+//
+// --iphone gives each tester an iPhone simulator on one of GitHub's Macs
+// (iphones.mjs) in place of the browser preview, started again whenever it
+// has gone.
 //
 // Each person (../../power-test/people) gets a folder with two commands,
 // `phone` (phone.mjs, the app at an iPhone's size) and `diary` (the power
@@ -33,6 +37,7 @@ rerunWithStripTypes(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(here, '../../../..');
 const PHONE = path.join(here, 'phone.mjs');
+const IPHONE = path.join(here, 'iphone.mjs');
 const DIARY = path.resolve(here, '../../power-test/scripts/diary.mjs');
 const MIN = 60_000;
 const SEVERITY = ['broken', 'wrong', 'slow', 'confusing'];
@@ -44,7 +49,7 @@ export function testerArgv(engine, { dir, prompt, model = null, last, sandboxed 
 }
 
 /** What a tester is told: who they are, the phone in their hand, and what others already found. */
-export function phonePrompt(person, { dir, minutes, focus = null, logged = [] }) {
+export function phonePrompt(person, { dir, minutes, focus = null, logged = [], iphone = false }) {
   return [
     `You are ${person.name}, ${person.role}. Stay in their shoes for this whole session.`,
     '', person.text, '',
@@ -53,7 +58,7 @@ export function phonePrompt(person, { dir, minutes, focus = null, logged = [] })
     ...(focus ? ['', `Lean on this today: ${focus}`] : []),
     '',
     '## Your two commands, run from this folder',
-    `- \`${path.join(dir, 'phone')}\`: open, look, tap <n|"words">, hold <n|"words">, type "<text>", press <key>, swipe up|down|left|right, shot <name>, away <minutes>, reload. The phone is already open; start with look. Choosing a photo or file hands over a sample picture or note, as picking from your library would.`,
+    `- \`${path.join(dir, 'phone')}\`: open, look, tap <n|"words">,${iphone ? '' : ' hold <n|"words">,'} type "<text>", press <key>, swipe up|down|left|right,${iphone ? ' home,' : ''} shot <name>, away <minutes>, reload. The phone is already open; start with look.${iphone ? ' It is a real iPhone, with its own keyboard and alerts; a command can take a few seconds.' : ' Choosing a photo or file hands over a sample picture or note, as picking from your library would.'}`,
     `- \`${path.join(dir, 'diary')}\`: note "<what you did and how it felt>", issue --severity broken|wrong|slow|confusing --title "…" --steps "…" --expected "…" --actual "…" --shot <name>, again <n> "<what you saw>", time.`,
     '',
     'Write in the diary as you go, not at the end: a session can be stopped at any moment. Take a shot before logging an issue and name it in --shot. Open a shot when you need to see the screen rather than its words.',
@@ -144,6 +149,21 @@ export function writeReport(root, { people, dirs, stretch, minutes, engine, stat
   return ranked.length;
 }
 
+/** A tester's iPhone: the one in their folder while it answers, else a new one. */
+export async function keepIPhone(dir, { read, alive, stop, start, write }) {
+  const now = read(dir);
+  if (now && await alive(now)) return { phone: now, fresh: false };
+  if (now) await stop(now).catch(() => {});
+  const phone = await start();
+  write(dir, phone);
+  return { phone, fresh: true };
+}
+
+/** How long a new iPhone is asked to stay: what is left of the day, at most the 5 hours a GitHub job can hold one after building. */
+export function iphoneHours(deadline, now = Date.now()) {
+  return Math.max(0.5, Math.min(5, Math.ceil(((deadline - now) / 3_600_000) * 2) / 2));
+}
+
 /** What the testers lean on: the person's own focus, then what reached the phone this week. */
 export function focusFor(given, reached) {
   const week = reached.length ? `These reached the phone this week, so try each: ${reached.join(', ')}` : null;
@@ -152,6 +172,8 @@ export function focusFor(given, reached) {
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
+  // The phones this workday opens end with it, even if it is killed outright (cdp.mjs launchChrome).
+  process.env.AGENTBOX_TEST_RUN_PID = String(process.pid);
   const args = process.argv.slice(2);
   const opt = (n, f = null) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : f; };
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);
@@ -181,8 +203,14 @@ if (isMain) {
     process.exit(0);
   }
 
+  const iphone = args.includes('--iphone');
+  const HAND = iphone ? IPHONE : PHONE;
+  const iphones = iphone ? await import(path.join(here, 'iphones.mjs')) : null;
+  const repo = iphone ? (opt('repo') || await iphones.repoHere()) : null;
+  if (iphone && !repo) { console.error('workday: --iphone needs the GitHub repository; pass --repo owner/name.'); process.exit(1); }
+
   // The preview, built once per version of mobile/ and served from here.
-  let url = opt('url');
+  let url = opt('url') ?? (iphone ? `iPhones on GitHub's Macs (${repo})` : null);
   if (!url) {
     const [mobile, renderer, shared] = execFileSync('git', ['-C', REPO, 'rev-parse', 'HEAD:mobile', 'HEAD:renderer', 'HEAD:shared'], { encoding: 'utf8' }).trim().split('\n');
     const tree = previewKeyOf({ mobile, renderer, shared });
@@ -212,14 +240,11 @@ if (isMain) {
       }).listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}/`));
     });
   }
-  const sandboxed = engine === 'codex' && codexCanSandbox();
-  say(`${people.map((p) => p.name).join(', ')} on the phone app at ${url}, ${minutes}-minute stretches on ${engine === 'codex' ? `Codex at ${codexHome} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}` : 'testers started by hand'}. Evidence: ${root}`);
-
   const dirs = Object.fromEntries(people.map((p) => {
     const dir = path.join(root, p.slug);
     fs.mkdirSync(dir, { recursive: true });
     const q = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
-    for (const [cmd, script] of [['phone', PHONE], ['diary', DIARY]]) {
+    for (const [cmd, script] of [['phone', HAND], ['diary', DIARY]]) {
       fs.writeFileSync(path.join(dir, cmd), `#!/bin/sh\nexport PHONE_OUT=${q(dir)} PHONE_URL=${q(url)} POWER_OUT=${q(dir)}\nexec ${q(process.execPath)} ${q(script)} "$@"\n`, { mode: 0o755 });
     }
     return [p.slug, dir];
@@ -238,16 +263,25 @@ if (isMain) {
 
   // Before anything else is awaited: a stop while the phone's week is read still leaves a report.
   let stretch = 0;
+  let noIPhones = 0;
   const report = (state) => writeReport(root, { people, dirs, stretch, minutes, engine, state });
+  // A GitHub Mac held for nobody keeps a runner from the next push's tests, so every way out lets the iPhones go.
+  const letIPhonesGo = () => (iphone
+    ? Promise.race([Promise.all(people.map((p) => iphones.stopIPhone(iphones.readPhone(dirs[p.slug])).catch(() => {}))), new Promise((r) => setTimeout(r, 30_000))])
+    : Promise.resolve());
   for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
-    process.once(signal, () => {
+    process.once(signal, async () => {
       say(`stopped by ${signal} after ${stretch} stretch${stretch === 1 ? '' : 'es'}`);
       for (const c of children) { try { c.kill('SIGTERM'); } catch { /* gone */ } }
-      for (const p of people) spawnSync(process.execPath, [PHONE, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url }, timeout: 10_000 });
+      for (const p of people) spawnSync(process.execPath, [HAND, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url }, timeout: 10_000 });
       say(`report: ${path.join(root, 'report.md')} (${report(signal)} issues so far)`);
+      await letIPhonesGo();
       process.exit(1);
     });
   }
+  // Only once the handlers are in: whoever reads this line may stop the day straight away.
+  const sandboxed = engine === 'codex' && codexCanSandbox();
+  say(`${people.map((p) => p.name).join(', ')} on the phone app at ${url}, ${minutes}-minute stretches on ${engine === 'codex' ? `Codex at ${codexHome} (${login.plan ?? 'plan unknown'}, ${login.why})${sandboxed ? '' : ', without Codex\'s sandbox, which this machine refuses'}` : 'testers started by hand'}. Evidence: ${root}`);
 
   let reached = [];
   try { reached = await (await import(path.join(REPO, 'scripts/phone-parity.mjs'))).newOnThePhone(7); } catch (err) { say(`could not read what reached the phone this week: ${err.message}`); }
@@ -272,6 +306,21 @@ if (isMain) {
       await new Promise((r) => setTimeout(r, 10 * MIN));
       continue;
     }
+    if (iphone) {
+      const had = await Promise.all(people.map(async (person) => {
+        try {
+          const { phone, fresh } = await keepIPhone(dirs[person.slug], {
+            read: iphones.readPhone, alive: iphones.alive, stop: iphones.stopIPhone, write: iphones.writePhone,
+            start: () => { say(`${person.name}: asking GitHub for an iPhone (the first one for a new version of the app builds it, up to an hour)`); return iphones.startIPhone({ repo, hours: iphoneHours(deadline), buildUrl: opt('build-url'), say: (s) => say(`${person.name}: ${s}`) }); },
+          });
+          if (fresh) say(`${person.name}: iPhone ready, ${phone.runUrl}`);
+          return true;
+        } catch (err) { say(`${person.name}: no iPhone: ${err.message}`); return false; }
+      }));
+      noIPhones = had.some(Boolean) ? 0 : noIPhones + 1;
+      if (noIPhones >= 3) { say('three tries in a row brought no iPhone for anyone, so the day stops here; the reasons are above'); break; }
+      if (!had.some(Boolean)) { await new Promise((r) => setTimeout(r, 5 * MIN)); continue; }
+    }
     stretch += 1;
     const ends = Date.now() + minutes * MIN;
     const logged = rankIssues(diaries()).map((i, k) => ({ ...i, n: k + 1 }));
@@ -279,9 +328,9 @@ if (isMain) {
     await Promise.all(people.map(async (person) => {
       const dir = dirs[person.slug];
       fs.writeFileSync(path.join(dir, 'clock.json'), JSON.stringify({ round: stretch, roundEnd: ends, deadline: Math.min(deadline, ends) }));
-      const opened = await run(process.execPath, [PHONE, 'open'], { env: { ...process.env, PHONE_OUT: dir, PHONE_URL: url } });
+      const opened = await run(process.execPath, [HAND, 'open'], { env: { ...process.env, PHONE_OUT: dir, PHONE_URL: url } });
       if (opened.code !== 0) { say(`${person.name}: the phone did not open: ${opened.out.slice(-300)}`); return; }
-      const prompt = phonePrompt(person, { dir, minutes, focus, logged });
+      const prompt = phonePrompt(person, { dir, minutes, focus, logged, iphone });
       if (engine === 'external') {
         const file = path.join(dir, `stretch-${stretch}.prompt.md`);
         fs.writeFileSync(file, prompt);
@@ -294,10 +343,11 @@ if (isMain) {
       fs.writeFileSync(path.join(dir, `stretch-${stretch}.log`), r.out);
       say(`${person.name}: stretch ${stretch} ended (${r.code === 0 ? 'ok' : `exit ${r.code}`})`);
     }));
-    for (const p of people) await run(process.execPath, [PHONE, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url } });
+    for (const p of people) await run(process.execPath, [HAND, 'close'], { env: { ...process.env, PHONE_OUT: dirs[p.slug], PHONE_URL: url } });
     report('running');
   }
 
+  await letIPhonesGo();
   const n = report('done');
   say(`report: ${path.join(root, 'report.md')} (${n} issue${n === 1 ? '' : 's'})`);
   process.exit(0);

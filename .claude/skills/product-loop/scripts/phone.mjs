@@ -143,7 +143,7 @@ if (isMain) {
     const profile = path.join(os.tmpdir(), 'agentbox-phone-profiles', crypto.createHash('sha1').update(out).digest('hex').slice(0, 12));
     fs.mkdirSync(profile, { recursive: true });
     if (freeProfile(profile)) await new Promise((r) => setTimeout(r, 500));
-    const { chrome, wsUrl } = await launchChrome({ profile, detached: true, width: IPHONE.width, height: IPHONE.height });
+    const { chrome, wsUrl } = await launchChrome({ profile, detached: true, width: IPHONE.width, height: IPHONE.height, activity: path.join(out, 'actions.jsonl') });
     const t = await connect(wsUrl, { width: IPHONE.width, height: IPHONE.height });
     await asPhone(t);
     fs.writeFileSync(FILE, JSON.stringify({ wsUrl, targetId: t.targetId, pid: chrome.pid }));

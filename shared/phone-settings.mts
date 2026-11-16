@@ -123,9 +123,14 @@ interface CodexAccountModel {
   email?: string | null;
   name?: string | null;
   plan?: string | null;
+  planNamed?: boolean;
   signedIn?: boolean;
   chosen?: boolean;
 }
+
+/** A plan id with no proper name is Codex's word, quoted, as the desktop's `accountSay` says it. */
+const codexPlanLine = (a: CodexAccountModel): string | null =>
+  !a.plan ? null : a.planNamed === false ? `Codex says “${a.plan}”` : a.plan;
 
 /** The window's own IPC channel for a change, and what it is handed: an object, or a bare value such as Pause's boolean. */
 export type SettingRoute = [string, unknown];
@@ -472,12 +477,13 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
       memoryGate: { on: !!gate.on, slots: gate.slots ?? null, slotsAuto: gate.slotsAuto ?? null, slotsMax: gate.slotsMax ?? null, now: gate.now ?? null, reading: memoryReadingOf(gate.reading) },
       leftovers: { on: !!w.leftovers?.on, now: w.leftovers?.now ?? null },
       accounts: (w.accounts ?? []).map((a) => ({
-        id: accountIdOf(a.profile), email: a.email ?? null, chosen: !!a.chosen, state: a.state,
+        // The desktop's rule (Settings.tsx agentStory): a Claude login is signed in once it has an address.
+        id: accountIdOf(a.profile), email: a.email ?? null, signedIn: !!a.email, chosen: !!a.chosen, state: a.state,
         note: a.trouble?.note ?? null, resetsAt: a.trouble?.resetsAt ?? null, plan: a.plan?.label ?? null, running: a.running ?? 0,
         usage: usageFor(model.usage?.claude, a.profile),
       })),
       codexAccounts: (w.codex?.accounts ?? []).map((a) => ({
-        id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: a.plan ?? null, signedIn: !!a.signedIn, chosen: !!a.chosen,
+        id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: codexPlanLine(a), signedIn: !!a.signedIn, chosen: !!a.chosen,
         usage: usageFor(model.usage?.codex, a.profile),
       })),
       // Not `source`: it names the file on this computer.

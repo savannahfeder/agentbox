@@ -26,7 +26,7 @@ const inboxSky = read('home/InboxSky.tsx');
 
 describe('the empty Inbox sky', () => {
   it('is drawn where Home draws it, from the top of the card, the streak not moved', () => {
-    expect(app).toContain('<SkyBackdrop art={sky.art} from={sky.dark ? 40 : 150} span={sky.dark ? 300 : 240} />');
+    expect(app).toContain('<SkyBackdrop art={sky.home ?? sky.art} from={sky.dark || sky.home ? 40 : 150} span={sky.dark || sky.home ? 300 : 240} />');
     expect(inboxSky).toMatch(/shape === 'zero'\) \{ drawSky\(canvas, art, \{ from: 40, span: 300, dpr, quiet: words\(\) \}\); return; \}/);
   });
 
@@ -66,8 +66,9 @@ describe('the empty Inbox sky', () => {
   });
 
   // "font is a bit hard to read", pinned on the placeholder: it was --text-faint straight on the dots.
-  it('draws the placeholder and the chips a step brighter', () => {
-    expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-text::placeholder \{ color: var\(--text-dim\); \}/);
+  // Then "the gray just blends right in": both are the text colour now (w-f1a1d4c9db).
+  it('draws the placeholder and the chips in the text colour', () => {
+    expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-text::placeholder \{ color: var\(--text\); \}/);
     expect(css).toMatch(/\.app:has\(> \.inbox-sky-zero\) \.th-start \.tc-chip \{ color: var\(--text\); \}/);
   });
 });
