@@ -49,6 +49,7 @@ export interface ReplySession {
   /** A cloud session between turns, waiting for this reply. */
   between?: boolean;
   engine?: string;
+  ranOn?: { model: string | null; effort: string | null };
   sessionId?: string;
   lastLiveReply?: ReplyItem | null;
   exitFailed?: boolean;
@@ -83,6 +84,14 @@ export interface ReplyPayload {
   answer?: unknown;
   /** A reply set for later: written down now, handed to no session. */
   later?: boolean;
+  /** The engine, model or effort picked with this reply; absent when none was. */
+  moves?: { engine?: string | null; model?: string | null; effort?: string | null };
+}
+
+function movesOff(session: ReplySession, moves: ReplyPayload['moves']): boolean {
+  if (!moves) return false;
+  const differs = (picked: string | null | undefined, on: string | null | undefined) => picked !== undefined && (picked || null) !== (on || null);
+  return differs(moves.engine, session.engine) || differs(moves.model, session.ranOn?.model) || differs(moves.effort, session.ranOn?.effort);
 }
 
 export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, commit: () => Promise<ReplyItem | null | undefined> | ReplyItem | null | undefined) {
@@ -93,7 +102,7 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
   const previous = sends.get(key) ?? Promise.resolve();
   const session = supervisor.sessions?.get(id);
   // A reply set for later waits in the ledger for its time, never in a session.
-  // Between turns a slash command, a new permission mode or a teammate's word
+  // Between turns a slash command, a new permission mode or model, or a teammate's word
   // is saved instead, and the tick ends the wait so a new run takes it.
   const between = !!session?.between && typeof supervisor.nextReplyBrief === 'function';
   // A file sent from a card goes only with a new cloud run, so its reply never
@@ -101,7 +110,7 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
   const live = !later && session?.product === product && typeof session.child?.steer === 'function'
     && !supervisor.hasFilesForCloud?.(id)
     && !(from && (session.remoteIdle || session.between))
-    && !(session?.between && (permissionMode != null || String(answer ?? '').trimStart().startsWith('/')))
+    && !(session?.between && (permissionMode != null || String(answer ?? '').trimStart().startsWith('/') || movesOff(session, payload.moves)))
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.

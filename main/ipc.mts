@@ -981,7 +981,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const withNotes = product && id && !later && status !== 'done'
       ? replyWithWaitingNotes({ store, product, id, answer, me: teamMe(), nameOf: noteBy, people: teamPeople() })
       : null;
-    const out = await submitReply(supervisor,{product,id,answer:withNotes?.answer ?? answer,status,permissionMode,now:!!now,later},()=>{
+    const moves = engine !== undefined || model !== undefined || effort !== undefined ? { engine, model, effort } : undefined;
+    const out = await submitReply(supervisor,{product,id,answer:withNotes?.answer ?? answer,status,permissionMode,now:!!now,later,moves},()=>{
       const said = withNotes
         ? store.answerItem(product, id, { answer: withNotes.answer, fromNotes: withNotes.fromNotes, typed: answer as string, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone })
         : store.answerItem(product, id, { answer, status, priority, permissionMode, engine, model, effort, inReplyTo: thread, fromPhone });
