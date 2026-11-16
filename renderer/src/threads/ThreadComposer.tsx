@@ -61,9 +61,10 @@ import { ideasFor, type Idea } from '../first-run';
 import { readRule, repeatsLine } from '../format';
 import { fitMenu } from '../keep-in-window';
 import { ModelMenu } from './ModelMenu';
+import { dropRank, useFitRow } from './fit-row';
 import { useThreadMentions } from '../components/ThreadMentions';
 import {
-  agentChoices, agentWordFor, autoOffered,
+  agentChoices, toOffered, autoOffered,
   allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
@@ -387,13 +388,8 @@ export function ThreadComposer({
     writeLastEffort(next, undefined, pick.engine);
   };
   const labelOf = (p: ModelPick) => engineModelLabel(p.engine, p.model, modelOpts);
-  // WHO IS ABOUT TO GET THIS, by name, and the rows To offers. Both are empty
-  // words on a Mac with one coding agent, where they read exactly as before.
-  const agents = agentChoices(engineRows);
-  const engineTags = agents.length > 0;
-  const chooseAgent = (engine: Harness) => {
-    pickModel({ engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) });
-  };
+  // Recent rows say which agent runs them, where there are two.
+  const engineTags = agentChoices(engineRows).length > 0;
   const recent = useMemo(
     () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered }),
     [items, codexModels, codexDefault, codexOffered, claudeOffered],
@@ -585,6 +581,8 @@ export function ThreadComposer({
   // Long project names fade rather than end in an ellipsis, which was turned
   // down twice on the old card; only a name that really overflows fades.
   const projName = useRef<HTMLSpanElement>(null);
+  const fitBar = useRef<HTMLDivElement>(null);
+  useFitRow(fitBar, inline);
   const [projCut, setProjCut] = useState(false);
   useLayoutEffect(() => {
     const el = projName.current;
@@ -870,12 +868,15 @@ export function ThreadComposer({
     return false;
   };
 
-  const toFound = findInTo(query, { auto: autoHere, agents, mates: agentMates ?? [] });
+  // One Agent row, never one per program: the model picks which runs it.
+  const toFound = findInTo(query, { auto: autoHere, agents: [], mates: agentMates ?? [] });
+  const peopleHere = !!team && (others.length > 0 || !!team.state.sent?.length);
   const matesHere = !!agentMates && !!onToTeammate;
+  const toShown = toOffered({ people: peopleHere, auto: autoHere, mates: matesHere, chosen: !!person || !!mate });
   const sections = toSections({
-    people: !!team && (others.length > 0 || !!team.state.sent?.length),
+    people: peopleHere,
     auto: toFound.auto,
-    agents: agents.length ? toFound.agents.length > 0 : toFound.agent,
+    agents: toFound.agent,
     mates: matesHere && (toFound.mates.length > 0 || toFound.someoneNew),
     adding,
   });
@@ -883,7 +884,7 @@ export function ThreadComposer({
     if (found[0]) return () => chooseTo(found[0].id);
     if (adding) return null;
     if (sections.includes('auto')) return chooseAuto;
-    if (sections.includes('agents')) return agents.length ? () => { chooseAgent(toFound.agents[0].id); chooseTo('agent'); } : () => chooseTo('agent');
+    if (sections.includes('agents')) return () => chooseTo('agent');
     if (sections.includes('mates') && toFound.mates[0]) return () => chooseMate(toFound.mates[0].id);
     return null;
   };
@@ -892,21 +893,11 @@ export function ThreadComposer({
           <AutoFace /><span className="tc-row-label">Auto</span><small className="tc-row-aside">picks who when you send</small>
         </button>
       )
-      /* ONE ROW PER AGENT WHERE THIS MAC HAS TWO, and the one row it has
-          always drawn where it has one. Picking an agent is picking where the
-          task runs, so it moves the model with it (`chooseAgent`). */
-      : s === 'agents' ? (agents.length
-        ? toFound.agents.map((a) => (
-          <button key={a.id} type="button" data-item className={`tc-row ${!person && !mate && !onAuto && pick.engine === a.id ? 'on' : ''}`}
-            onPointerMove={hover} onClick={() => { chooseAgent(a.id); chooseTo('agent'); }}>
-            <AgentFace /><span className="tc-row-label">{a.label}</span>
-          </button>
-        ))
-        : (
+      : s === 'agents' ? (
           <button key="agent" type="button" data-item className={`tc-row ${person || mate || onAuto ? '' : 'on'}`} onPointerMove={hover} onClick={() => chooseTo('agent')}>
             <AgentFace /><span className="tc-row-label">Agent</span>
           </button>
-        ))
+        )
       : s === 'mates' ? (<Fragment key="mates">
         <span className="tc-menu-head">Teammates</span>
         {toFound.mates.map((t) => (
@@ -1094,7 +1085,7 @@ export function ThreadComposer({
      the bars below: two copies of the same four words is how the composer and
      the reply dock drifted apart the first time (components/Priority.tsx). */
   const priorityChip = (
-    <span className="tc-anchor" ref={anchor('priority')}>
+    <span className="tc-anchor" ref={anchor('priority')} data-drop={inline ? dropRank('priority') : undefined}>
       <button type="button" data-trigger className={`tc-chip ${open === 'priority' ? 'open' : ''}`} title="Priority"
         aria-haspopup="listbox" aria-expanded={open === 'priority'} onClick={() => toggle('priority')} onKeyDown={triggerKeys('priority')}>
         <PrioGlyph id={prio} />{choiceLabelOf(prio)}
@@ -1243,12 +1234,12 @@ export function ThreadComposer({
   // the bar on the page.
   const trigger = (key: MenuKey) => `${inline ? 'tc-chip' : 'tc-word'} ${open === key ? 'open' : ''}`;
   const fields: { label: string; node: ReactNode }[] = [
-    { label: 'To', node: (
-      <span className="tc-anchor" ref={anchor('to')}>
+    ...(toShown ? [{ label: 'To', node: (
+      <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person ? dropRank('to') : undefined}>
         <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'}
           onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
           {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : inline ? null : onAuto ? <AutoFace /> : <AgentFace />}
-          <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : agentWordFor(engineRows, pick.engine)}</span>
+          <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>
         </button>
         {extra.map((p) => (
           <span key={p.id} className="tc-also">
@@ -1262,7 +1253,7 @@ export function ThreadComposer({
         )}
         {open === 'to' && toMenu}
       </span>
-    ) },
+    ) }] : []),
     ...(rows.includes('sendAs') ? [{ label: 'Send As', node: sendAsChoice }] : []),
     ...(rows.includes('subject') ? [{ label: 'Subject', node: (
       <input className="tc-subject" value={subject} aria-label="Subject" spellCheck
@@ -1291,7 +1282,7 @@ export function ThreadComposer({
       </span>
     ) }] : []),
     ...(rows.includes('model') ? [{ label: 'Model', node: (
-      <span className="tc-anchor" ref={anchor('model')}>
+      <span className="tc-anchor" ref={anchor('model')} data-drop={inline ? dropRank('model') : undefined}>
         <button type="button" data-trigger className={trigger('model')} aria-haspopup="listbox" aria-expanded={open === 'model'}
           onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
           <span className="tc-word-text">{labelOf(pick)}</span>
@@ -1449,7 +1440,7 @@ export function ThreadComposer({
         {!talk.on && talk.problem && <div className="tc-note">{talk.problem}</div>}
 
         {person ? (
-          <div className="tc-bar">
+          <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
             {taskToMany && <span className="tc-why">A task goes to one person.</span>}
             {team && sendAs === 'task' && (
@@ -1470,18 +1461,18 @@ export function ThreadComposer({
                 already says. The chip is the task card's own, because a message
                 lands in a list sorted by the same four words. */}
             {priorityChip}
-            <button type="button" className="tc-icon" title="Attach files" aria-label="Attach files" onClick={() => fileRef.current?.click()}>
+            <button type="button" className="tc-icon" title="Attach files" aria-label="Attach files" data-drop={inline ? dropRank('attach') : undefined} onClick={() => fileRef.current?.click()}>
               <ClipIcon />
             </button>
             <input ref={fileRef} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />
             <span className="tc-send solo">
               <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={`Send · ${SEND}`}>
-                Send <kbd>{SEND}</kbd>
+                Send <kbd data-drop={inline ? dropRank('send-keys') : undefined}>{SEND}</kbd>
               </button>
             </span>
           </div>
         ) : mate ? (
-          <div className="tc-bar">
+          <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
             {mate === 'new' && (
               <span className="tc-anchor" ref={anchor('project')}>
@@ -1495,12 +1486,12 @@ export function ThreadComposer({
             )}
             <span className="tc-send solo">
               <button type="button" className="tc-send-main" disabled={!text.trim() || sending} onClick={() => void send()} title={`Send · ${SEND}`}>
-                Send <kbd>{SEND}</kbd>
+                Send <kbd data-drop={inline ? dropRank('send-keys') : undefined}>{SEND}</kbd>
               </button>
             </span>
           </div>
         ) : (
-          <div className="tc-bar">
+          <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
             <span className="tc-anchor" ref={anchor('project')} data-tour="project">
               <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
@@ -1522,7 +1513,7 @@ export function ThreadComposer({
               </span>
             )}
             {talk.on ? <Listening talk={talk} /> : (
-            <button type="button" className="tc-icon" title="Attach files" aria-label="Attach files" onClick={() => fileRef.current?.click()}>
+            <button type="button" className="tc-icon" title="Attach files" aria-label="Attach files" data-drop={inline ? dropRank('attach') : undefined} onClick={() => fileRef.current?.click()}>
               <ClipIcon />
             </button>
             )}
@@ -1542,7 +1533,7 @@ export function ThreadComposer({
             )}
             <span className="tc-send" ref={anchor('later')}>
               <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? `Send · ${SEND}`}>
-                Send <kbd>{SEND}</kbd>
+                Send <kbd data-drop={inline ? dropRank('send-keys') : undefined}>{SEND}</kbd>
               </button>
               {/* A picked time is said here, on the half that changes it. */}
               <button type="button" data-trigger className={`tc-send-caret${when ? ' set' : ''}`} disabled={sending}

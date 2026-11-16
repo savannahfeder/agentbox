@@ -207,6 +207,8 @@ const THREAD: Record<string, Rule> = {
   resume: yes,
   redeliver: yes,
   moveTo: (v: unknown) => typeof v === 'string' && SLUG.test(v),
+  // When the phone opened it, so the window's unread dot goes too.
+  seen: (v: unknown) => Number.isInteger(v) && (v as number) > 0,
 };
 const THREAD_ID = /^[\w-]{1,120}$/;
 
@@ -219,6 +221,7 @@ function threadRoute(p: SettingChange): SettingRoute {
     case 'resume': return ['zero:resume-items', { ids: [p.item] }];
     case 'redeliver': return ['zero:redeliver', at];
     case 'moveTo': return ['zero:move-item', { ...at, to: p.value }];
+    case 'seen': return ['zero:phone-seen', { ...at, at: p.value }];
     // The desktop's "Not shipped after all" writes 0.
     case 'shippedAt': return ['zero:thread-edit', { ...at, patch: { shippedAt: p.value ?? 0 } }];
     default: return ['zero:thread-edit', { ...at, patch: { [p.key]: p.value } }];

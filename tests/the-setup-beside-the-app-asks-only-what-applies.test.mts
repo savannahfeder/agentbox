@@ -89,8 +89,9 @@ describe('the AI teammates offered', () => {
     { starter: 'maintainer', name: 'Maintainer', ask: 'Fix what gets filed' },
     { starter: 'marketing', name: 'Marketing lead', ask: 'Post about what we build' },
   ];
+  // The Chief of staff is no longer offered (tests/no-chief-of-staff-is-made-for-you).
   it('offers the engineering jobs first and only real starters', () => {
-    expect(starterChoices(starters).map((s) => s.starter)).toEqual(['quality', 'maintainer', 'chief']);
+    expect(starterChoices(starters).map((s) => s.starter)).toEqual(['quality', 'maintainer']);
   });
   it('offers nothing when every starter is already on the team', () => {
     expect(starterChoices([])).toEqual([]);
@@ -288,8 +289,9 @@ describe('the walkthrough on Home', () => {
   // like our home screen". The suggestions stay in the New thread dialog and
   // the empty inbox; Home keeps its own look and the tip asks for words.
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  // Nor anywhere else since 2026-11-16: "We don't need suggestions anymore."
   it('offers no suggestions in the box on Home', () => {
-    expect(app).toMatch(/ideas=\{[^}]*!\(homeShown && modal !== 'compose'\)[^}]*\? FIRST_IDEAS : null\}/);
+    expect(app).not.toMatch(/ideas=\{/);
   });
 });
 

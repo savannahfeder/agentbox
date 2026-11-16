@@ -501,6 +501,21 @@ function restand(file: string, change: MergedChange): null {
   return null;
 }
 
+/**
+ * The saved change with where its folder stands now. The saved answer is from
+ * the end of the last round, so a round that commits would otherwise go on
+ * showing "not committed" until it exits. A fact the folder cannot answer
+ * keeps the saved one.
+ */
+export function withStandsNow<T extends Partial<WorkStands>>(change: T, now: WorkStands | null | undefined): T {
+  if (!now) return change;
+  return {
+    ...change,
+    committed: now.committed ?? change.committed,
+    uncommitted: now.uncommitted ?? change.uncommitted,
+  };
+}
+
 /** Read a change back off disk for the pane. */
 export function readChange(file: string): SavedChange {
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as SavedChange | null;

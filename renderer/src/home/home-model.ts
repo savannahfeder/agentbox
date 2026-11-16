@@ -7,12 +7,6 @@ export function greeting(hour: number, name?: string | null): string {
   return first ? `${part}, ${first}` : part;
 }
 
-/** In place of the time of day, once the walkthrough's last tip has gone (../tour.ts saysFinished). */
-export function finishedHello(name?: string | null): string {
-  const first = name?.trim().split(/\s+/)[0];
-  return first ? `You finished the walkthrough, ${first}` : 'You finished the walkthrough';
-}
-
 const DAY = 86_400_000;
 
 /** Things finished on each of the last seven days, oldest first and today
@@ -98,6 +92,14 @@ export type TeamRowState = 'working' | 'waiting' | 'quiet';
 export function teamRowState({ agents, waitingOnYou }: { agents: number | null; waitingOnYou: boolean }): TeamRowState {
   if (waitingOnYou) return 'waiting';
   return agents ? 'working' : 'quiet';
+}
+
+/** A Home row is on the Needs you card or the In progress card; a running thread is never in Needs you. */
+export function homeRowOpens<E extends { key: string }, I>(key: string, needs: readonly E[], progress: readonly I[], keyOf: (item: I) => string): { entry: E } | { item: I } | null {
+  const entry = needs.find((e) => e.key === key);
+  if (entry) return { entry };
+  const item = progress.find((i) => keyOf(i) === key);
+  return item ? { item } : null;
 }
 
 const STATE_RANK: Record<TeamRowState, number> = { waiting: 0, working: 1, quiet: 2 };

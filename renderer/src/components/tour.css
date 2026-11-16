@@ -8,8 +8,6 @@
   box-shadow: 0 0 44px 2px rgba(var(--tour-gold), .42);
   animation: tour-in .25s ease both;
 }
-/* Round a whole card, standing off it: the card's own corner plus the room. */
-.tour-glow-box { border-radius: 12px; }
 .tour-card { animation: tour-in .25s ease both; }
 @keyframes tour-in { from { opacity: 0; } to { opacity: 1; } }
 

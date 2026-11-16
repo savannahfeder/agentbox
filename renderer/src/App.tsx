@@ -37,7 +37,7 @@ import { cameBackFromACrash, keepHeldWriter, RELOADED_AFTER_A_CRASH } from './af
 import { isTroubleRow, troubleRow } from './trouble-row';
 import { importAnswer, isImportRow, isNotImportedRow, justImported, type ImportChoice } from './import-row';
 import { lookedAtNow, needsYouLit } from './needs-you';
-import { arrivedAt, isUnread, readMoves, waitingSince } from './unread';
+import { arrivedAt, isUnread, readMoves, seenElsewhere, waitingSince } from './unread';
 import { readWhenTheySeeIt } from './read-what-you-saw';
 import { Focus } from './components/Focus';
 import { TicketItems } from './components/TicketReference';
@@ -183,11 +183,11 @@ import { FirstRunFlow } from './components/FirstRun';
 import { ClassicFirstRun, OpenLesson } from './components/FirstRunClassic';
 import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, type Lesson } from './first-run-classic';
 import { useLessonPlace } from './lesson-position';
-import { ideasFor, runOfRule } from './first-run';
+import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, firstThreadSent, saysFinished, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
@@ -278,13 +278,12 @@ import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sky';
-import { busiestFirst, engineLetter, engineName, finishedHello, greeting, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
+import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
 import { BackForward } from './components/BackForward';
 
-const FIRST_IDEAS = ideasFor();
 
 /** Which first run this install shows (shared/onboarding-arm.mts). */
 type Arm = 'tour' | 'classic';
@@ -1211,7 +1210,12 @@ export default function App() {
   // The tutorial on the inbox that follows it (components/Tour.tsx).
   const [tour, setTourState] = useState<TourState | null>(() => readTour(localStorage));
   const [tourNow, setTourNow] = useState<TourLesson | null>(null);
-  const setTour = useCallback((t: TourState) => { saveTour(localStorage, t); setTourState(t); }, []);
+  // Cleared before the state changes: the box remounts on the new key and reads its draft while rendering.
+  const setTour = useCallback((t: TourState) => {
+    if (!tourLive(t) && practiceDraftLeft(readComposeDraft().text)) clearComposeDraft();
+    saveTour(localStorage, t);
+    setTourState(t);
+  }, []);
   const tourRef = useRef(tour);
   tourRef.current = tour;
   // The project Home's box pointed at before the walkthrough's practice thread.
@@ -3881,6 +3885,10 @@ export default function App() {
     setSeen((s) => { const c = new Set(s); c.delete(item.id); return c; });
     setSeenAt((m) => ({ ...m, [item.id]: 0 }));
   }, []);
+  useEffect(() => window.zero?.onSeenOnPhone?.(({ id, at }) => {
+    setSeen((s) => (s.has(id) ? s : new Set(s).add(id)));
+    setSeenAt((m) => seenElsewhere(m, id, at) as Record<string, number>);
+  }), []);
   // An answer that lands on the thread you are READING is read already, and
   // only that one: `readWhenTheySeeIt` asks whether it was on the screen at
   // all, and waits for the scroll that brings it there (./read-what-you-saw,
@@ -7412,6 +7420,12 @@ export default function App() {
     if (!finishOnHome.current) { if (homeHere) finishOnHome.current = true; else { setModal(null); openView('inbox'); setHomeOpen(true); } return; }
     if (!homeHere) setTour(closeFinish(tourRef.current!));
   }, [finishing, homeHere]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Keys and clicks end it in components/Tour.tsx; with neither, it goes after a beat.
+  useEffect(() => {
+    if (!finishing || !homeHere) return;
+    const gone = setTimeout(() => { if (tourRef.current?.finishing) setTour(closeFinish(tourRef.current)); }, FINISH_MS);
+    return () => clearTimeout(gone);
+  }, [finishing, homeHere]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // THE SAME SCREEN, held for the beat it takes ⌘R to put her back where she
   // was, so the reload never shows her the inbox on its way to the task. Its
@@ -7794,10 +7808,12 @@ export default function App() {
     return { key: `${i.product}/${i.id}`, letter: engineLetter(engine), title: rowTitle(i), line: `${engineName(engine)} · ${i.productName}`, at: sentAtOf(i) };
   }) : [];
   const homeOpenRow = (key: string) => {
-    const entry = needsList.find((e) => e.key === key);
-    if (!entry) return;
-    openNeedsEntry(entry, {
-      item: (item) => { openedFromHome.current.add(keyOf(item)); setFocused(item); markSeen(item); },
+    const opens = homeRowOpens(key, needsList, progressTab, keyOf);
+    const openItem = (item: WorkItem) => { openedFromHome.current.add(keyOf(item)); setFocused(item); markSeen(item); };
+    if (!opens) return;
+    if ('item' in opens) { openItem(opens.item); return; }
+    openNeedsEntry(opens.entry, {
+      item: openItem,
       card: (card) => openTeammateCard(card),
       // A click on an invitation opens it, as its Inbox row does; joining is its own button there.
       lead: (l) => { if (l.mention) roomsUi.openMention(l.mention); else openInvite(); },
@@ -8322,7 +8338,7 @@ export default function App() {
               {skyOnInbox && sky && <InboxSky art={sky.art} />}
               {skyOnPlace && sky && <InboxSky art={sky.art} />}
               {homeShown ? (
-                <HomePage hello={!fresh && saysFinished(tour) ? finishedHello(snap.team?.me?.name ?? null) : greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
+                <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
                   needs={homeNeeds} needsCount={needsList.length} inboxCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
@@ -8801,7 +8817,6 @@ export default function App() {
              reads; everything else about the card is the card anybody uses. */
           initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : tourTask ? { body: `${TASK_TITLE}\n\n${TASK_BODY}`, product: tourTask } : composeInitial}
           scripted={walkCard || tourTask ? { labels: [FIRST_RUN_LABEL] } : null}
-          ideas={!walkCard && showIdeas(tour) && !(homeShown && modal !== 'compose') ? FIRST_IDEAS : null}
           askFolder={firstTask(tour) && !tourTask}
           onOpenConversation={openConversation}
           toChat={oneChat ? (id, words, files) => roomsUi.startChat(id, team?.byId.get(id)?.name ?? 'Chat', words, files) : undefined}
@@ -8901,7 +8916,6 @@ export default function App() {
               setHomeOpen(false); setFocused(null); setView('progress'); setSelected(0);
               return;
             }
-            if (made?.id && tourRef.current) setTour(firstThreadSent(tourRef.current));
             if (how?.kind === 'message') {
               const said = firstNames(how.toMany ?? [how.to ?? '']);
               // Named for O, like a new thread (w-5513afd09a). No Z: a message
@@ -9467,7 +9481,7 @@ export default function App() {
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
       {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
-      {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} />}
+      {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
       {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
         answering={practiceAnswering}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}

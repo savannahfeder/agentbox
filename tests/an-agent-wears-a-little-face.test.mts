@@ -53,10 +53,9 @@ describe('where an agent is drawn', () => {
   it('the new-task card never leaves the square empty, in the To line or its menu', () => {
     const card = src('threads', 'ThreadComposer.tsx');
     expect(card).not.toMatch(/className="tc-agent"[^>]*\/>/);
-    // The word on the To line, and every agent row under it: one per coding
-    // agent where this Mac has two, and the single "Agent" row where it has
-    // one (w-e1a42f6b21).
-    expect(card.match(/<AgentFace \/>/g)?.length).toBe(3);
+    // The word on the To line, and the one "Agent" row under it. The model
+    // picks the program, so there is no row per coding agent (2026-11-15).
+    expect(card.match(/<AgentFace \/>/g)?.length).toBe(2);
     // The rule the count is a proxy for: no row names an agent bare.
     for (const row of card.match(/<button[\s\S]*?<\/button>/g) ?? []) {
       if (/tc-row-label">(\{a\.label\}|Agent)</.test(row)) expect(row).toContain('<AgentFace />');

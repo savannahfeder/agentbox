@@ -28,4 +28,16 @@ describe('the end of the tutorial', () => {
     const fn = app.slice(app.indexOf('const finishRun = useCallback'), app.indexOf('\n  }, [', app.indexOf('const finishRun = useCallback')));
     expect(fn).toMatch(/if \(practiceDraftLeft\(readComposeDraft\(\)\.text\)\) clearComposeDraft\(\);/);
   });
+
+  // QA, 2026-11-15: "Skip walkthrough" on the tour over the inbox left the
+  // practice task in Home's box with a real project picked. Every way the tour
+  // ends goes through setTour, so the clear is there, before the state moves.
+  it('clears it when the walkthrough over the inbox is skipped or ends', () => {
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    const at = app.indexOf('const setTour = useCallback');
+    const fn = app.slice(at, app.indexOf('}, []);', at));
+    expect(fn).toMatch(/if \(!tourLive\(t\) && practiceDraftLeft\(readComposeDraft\(\)\.text\)\) clearComposeDraft\(\);/);
+    expect(fn.indexOf('clearComposeDraft')).toBeLessThan(fn.indexOf('setTourState(t)'));
+    expect(app).not.toMatch(/setTourState\((?!t\))/);
+  });
 });

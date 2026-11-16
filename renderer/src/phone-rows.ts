@@ -258,8 +258,11 @@ export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly
       said(String(c.payload?.text ?? ''));
       if (!refused && takenAt === null && !cloud) queue(id as string);
       // Answered, as the window marks a row the moment she sends, so it is In
-      // progress until her Mac takes it and its own copy says what happened.
-      if (row && !refused && (!sent || copyAt < takenAt!)) items.set(key, { ...row, status: statusForReply(row.status) ?? row.status, answer: String(c.payload?.text ?? ''), wrote: { ...row.wrote, answer: { ts: at, source: 'founder' } }, updatedAt: at });
+      // progress until her Mac takes it and its own copy says what happened:
+      // her words, or the agent answering after them. A copy stamped later can
+      // still be one built before her answer landed.
+      const answeredSince = Number(row?.wrote?.result?.ts) > at;
+      if (row && !refused && (!sent || copyAt < takenAt! || !answeredSince)) items.set(key, { ...row, status: statusForReply(row.status) ?? row.status, answer: String(c.payload?.text ?? ''), wrote: { ...row.wrote, answer: { ts: at, source: 'founder' } }, updatedAt: at });
     }
     else if (refused && c.item && (c.kind === 'close' || c.kind === 'snooze')) {
       said(c.kind === 'close' ? 'Close this thread' : Number(c.payload?.until) > 0 ? 'Move to Later' : 'Bring back from Later');

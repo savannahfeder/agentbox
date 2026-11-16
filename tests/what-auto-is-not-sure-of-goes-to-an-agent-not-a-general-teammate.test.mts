@@ -1,16 +1,14 @@
-// YOUR PRIMARY EMPLOYEE TAKES WHAT AUTO IS NOT SURE OF (w-cb18598d2f).
+// WHAT AUTO IS NOT SURE OF GOES TO AN AGENT, NOT A GENERAL TEAMMATE (w-bb45118b10).
 //
-// Grok Bot's first bot is a primary one: "Your primary Bot is your main point
-// of contact. It checks in with you on its own and coordinates work with your
-// other Bots." The person wanted the same, but not in front of every thread:
-// "That would certainly cost extra and slow down miscellaneous threads ...
-// Maybe auto-routing is just like that in case it's undecided."
-//
-// So Auto keeps its one quick question to the small model. A clear answer goes
-// where it always went: the teammate whose job it is, or an agent for a
-// one-off. Only what Auto cannot place goes to the primary employee: two
-// teammates fit, no usable answer came back, or the ask spans several jobs.
-// Before, the first of those asked the person and the second went to an agent.
+// Since w-cb18598d2f, what Auto could not place went to the primary employee,
+// which for most people was the Chief of staff. On 2026-11-15 a plain research
+// task for a YC interview went there and needed five corrections. The person:
+// "if you have a general agent like a Chief of staff, it almost has no utility.
+// I found the performance to be much worse." They chose to remove it and send
+// Auto's unsure cases to an ordinary agent. So a primary no longer takes what
+// Auto is unsure of: no usable answer goes to an agent, and two teammates that
+// both fit ask you, as without a primary. The model can still name a primary
+// you made yourself for an ask that spans several jobs.
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,7 +34,7 @@ vi.mock('node:child_process', async (importActual) => {
 });
 
 const { Supervisor } = await import('../main/supervisor.mts');
-const { AUTO_LABEL, AGENT_WHY, FAILED_WHY, NOBODY_WHY, PRIMARY_WHY, PRIMARY_TIE_WHY, routePrompt, readRoute, routeCandidates } = await import('../shared/auto-route.mts');
+const { AUTO_LABEL, AGENT_WHY, FAILED_WHY, NOBODY_WHY, routePrompt, readRoute, routeCandidates } = await import('../shared/auto-route.mts');
 
 const mate = (id, name, extra = {}) => ({ id, name, role: null, job: `${name}'s job.`, status: 'active', paused: false, duties: [], ...extra });
 const video = mate('t-video', 'Video producer');
@@ -88,16 +86,15 @@ describe('with a primary employee', () => {
     expect(await route([0, '0 | -\n'])).toMatchObject({ labels: ['founder'], routed: { to: 'agent', why: AGENT_WHY } });
   });
 
-  it('two teammates that both fit go to the primary instead of asking you', async () => {
+  it('two teammates that both fit ask you, rather than going to the primary', async () => {
     const p = await route([0, '1,2 | Both have worked on the captions.\n']);
-    expect(p.labels).toEqual(['founder', 'teammate:t-chief']);
-    expect(p.routed).toMatchObject({ to: 'mate:t-chief', why: PRIMARY_TIE_WHY });
-    expect(p.routed.ask).toBeUndefined();
+    expect(p.labels).not.toContain('teammate:t-chief');
+    expect(p.routed.ask).toEqual(['mate:t-video', 'mate:t-growth']);
   });
 
-  it('no usable answer goes to the primary, saying so', async () => {
+  it('no usable answer goes to an ordinary agent, not the primary', async () => {
     for (const reply of [[1, ''], [0, 'I think the video one.\n']]) {
-      expect(await route(reply)).toMatchObject({ labels: ['founder', 'teammate:t-chief'], routed: { to: 'mate:t-chief', why: PRIMARY_WHY } });
+      expect(await route(reply)).toMatchObject({ labels: ['founder'], routed: { to: 'agent', why: FAILED_WHY } });
     }
   });
 

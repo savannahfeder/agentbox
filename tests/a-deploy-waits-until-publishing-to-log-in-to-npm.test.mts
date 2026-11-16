@@ -121,10 +121,10 @@ describe('npm authentication during deployment', () => {
     expect(run.count('node', 'scripts/publish-download.mjs')).toBe(1);
     expect(run.count('node', 'scripts/cloud-setup.mjs')).toBe(1);
     expect(run.count('node', 'scripts/cloud-gateway-setup.mjs')).toBe(1);
-    // Not finished, and it says npm is the part left and how to get it next time.
+    // Not finished, and it says npm is the part left and the command that puts it there.
     expect(run.exitCode).toBe(1);
     expect(run.messages.some((l) => /✗ npm/.test(l) && l.includes('0.9.0'))).toBe(true);
-    expect(run.messages.some((l) => l.includes('npm login'))).toBe(true);
+    expect(run.messages.some((l) => l.includes('npm run deploy -- --npm'))).toBe(true);
     expect(run.messages.some((l) => /✓ website download/.test(l))).toBe(true);
   });
 

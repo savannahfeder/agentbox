@@ -110,7 +110,7 @@ export function lookChoices(current: string, skies: boolean): string[] {
 }
 
 type StarterLike = { starter: string; name: string; ask: string };
-const ENGINEERING = ['quality', 'maintainer', 'chief'];
+const ENGINEERING = ['quality', 'maintainer'];
 /** The starters an engineering team wants, from the ones not yet on the team. */
 export function starterChoices<T extends StarterLike>(left: T[]): T[] {
   return ENGINEERING.map((id) => left.find((s) => s.starter === id)).filter((s): s is T => !!s);
