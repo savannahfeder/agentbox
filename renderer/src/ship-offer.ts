@@ -200,4 +200,4 @@ export function shipOfferLive(item: Finished, { change, running }: { change: boo
 
 // The agent's last word that the work has landed or that no decision is left. The
 // change the run left says nothing about what happened to it after.
-const NOTHING_LEFT = /^\s*merged\b|\bnothing (?:is )?left (?:for you )?to (?:decide|do)\b|\bnothing (?:more )?for you to (?:decide|do)\b|\bno decision (?:is )?(?:needed|left)\b/i;
+const NOTHING_LEFT = /^\s*(?:\*\*)?\s*(?:merged|already on (?:main|master)\b)\b|\bnothing (?:is )?left (?:for you )?to (?:decide|do)\b|\bnothing (?:more )?for you to (?:decide|do)\b|\bno decision (?:is )?(?:needed|left)\b/i;
