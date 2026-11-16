@@ -9868,7 +9868,7 @@ export default function App() {
         }} />
       )}
       {urgentShownRow && cornerHeaderTarget && createPortal(
-        <UrgentReady row={urgentShownRow} onOpen={openUrgentReady} />,
+        <UrgentReady row={urgentShownRow} onOpen={openUrgentReady} onClose={() => setUrgentReady(null)} />,
         cornerHeaderTarget,
       )}
       {toast && (() => {

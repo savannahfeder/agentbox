@@ -4505,23 +4505,41 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 @keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
-/* AN URGENT THREAD THAT ARRIVED, in the top bar until it is opened
-   (./components/UrgentReady). Square, no fill, accent only on the dot and the word. */
+/* AN URGENT THREAD THAT ARRIVED, in the top bar until it is opened, closed or
+   its time runs out (./components/UrgentReady). No fill, accent only on the dot
+   and the word. The close takes the O key's place on hover, at its width, so
+   nothing moves under the pointer. */
 .ur {
-  display: inline-flex; align-items: center; gap: 8px;
-  order: -1; height: 30px; max-width: 420px; min-width: 0; margin-right: 6px; padding: 0 8px 0 10px;
-  background: none; border: 1px solid var(--line); border-radius: var(--tag-radius);
-  font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center;
+  order: -1; height: 30px; max-width: 420px; min-width: 0; margin-right: 6px;
+  border: 1px solid var(--line); border-radius: var(--tag-radius);
+  font-size: 13px; color: var(--text); white-space: nowrap;
+  animation: ur-goes linear forwards;
 }
+.ur:hover { animation-play-state: paused; }
+@keyframes ur-goes { 0%, 97% { opacity: 1; } 100% { opacity: 0; } }
+.ur-open {
+  display: inline-flex; align-items: center; gap: 8px; height: 100%; min-width: 0; padding: 0 8px 0 10px;
+  background: none; border: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.ur:hover .ur-open { padding-right: 0; }
+.ur:hover .ur-kbd { display: none; }
+.ur-close { display: none; }
+.ur:hover .ur-close {
+  display: grid; place-items: center; flex: none; width: 18px; height: 18px; margin: 0 8px;
+  padding: 0; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer;
+}
+.ur .ur-close:hover { color: var(--text); }
+.ur-close svg { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
 .ur-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--chip-ask); animation: ur-arrive 1.2s ease-in-out 3; }
 @keyframes ur-arrive { 50% { opacity: .25; } }
 .ur-word { flex: none; color: var(--chip-ask); font-weight: 500; }
 .ur-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ur-kbd {
   flex: none; font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-faint);
-  border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 4px; line-height: 15px;
+  box-sizing: border-box; width: 18px; text-align: center;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); line-height: 15px;
 }
-.ur:hover .ur-kbd { color: var(--text); border-color: var(--text-faint); }
 
 /* WHERE A REPLY WENT, above the reply box of the thread it moved her to
    (./components/SentLine). The box's own width and hairline, square, one
