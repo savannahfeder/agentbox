@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const RUNS = new Set([
-  '.command', '.tool', '.terminal', '.app', '.workflow', '.action', '.prefpane', '.saver', '.qlgenerator', '.kext', '.bundle', '.plugin',
+  '.command', '.tool', '.terminal', '.term', '.app', '.workflow', '.action', '.prefpane', '.saver', '.qlgenerator', '.kext', '.bundle', '.plugin',
   '.fileloc', '.webloc', '.inetloc', '.scpt', '.scptd', '.applescript', '.pkg', '.mpkg', '.jar', '.osax',
 ]);
 

@@ -57,8 +57,9 @@ function ruleBehindThisRun({ env = process.env, now = Date.now() }: RunOptions =
   const item = readWorkItem(project.dir, itemId, now);
   if (!item) throw new Error(`no thread ${itemId} in ${project.name}`);
 
+  // The label is one an agent can write on its own thread; the id is the app's.
   const ruleId = ruleIdOf(item);
-  if (!ruleId) {
+  if (!ruleId || !itemId.startsWith(`${ruleId}-`)) {
     throw new Error(`${itemId} is not a run of a repeating task, so it has no standing instruction to change`);
   }
   const rule = rules.get(project.dir, ruleId, now);

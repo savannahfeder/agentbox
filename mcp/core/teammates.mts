@@ -187,7 +187,8 @@ function answeredInThread(item: WorkItem | null | undefined): boolean {
 function answeredSince(dir: string, id: string): boolean {
   const { messages } = readChat(dir);
   const asked = messages.filter((m) => m.kind === 'msg' && m.from === YOU && m.setup && (m.to ?? []).includes(id)).at(-1);
-  return messages.some((m) => m.kind === 'msg' && m.from === YOU && !m.setup && (m.to ?? []).includes(id) && m.ts > (asked?.ts ?? 0));
+  // A line a thread wrote for you (`via`) is that thread's word, not your yes.
+  return messages.some((m) => m.kind === 'msg' && m.from === YOU && !m.via && !m.setup && (m.to ?? []).includes(id) && m.ts > (asked?.ts ?? 0));
 }
 
 // What a change to these says in the chat, so you can see it saved.
