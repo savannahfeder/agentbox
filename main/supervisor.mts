@@ -6038,13 +6038,16 @@ export class Supervisor {
     // at all to "where does this one go". A continuation bypasses the slot
     // check by design (her answer outranks the cap), so this is reachable with
     // the account resting, and a pick of `undefined` there would hand a spawn
-    // a CLAUDE_CONFIG_DIR of undefined rather than her default login.
+    // a CLAUDE_CONFIG_DIR of undefined rather than her default login. The
+    // fallback is the one account, resting or not: the folder called 'default'
+    // can be another login, and a run there reads as her having switched
+    // (`_accountMovedOn`), which woke a capped thread every tick.
     const live = this._liveProfilesFor(which);
     // A CODEX ACCOUNT STILL BEING ADDED IS NOT WHERE WORK GOES. Add account
     // lists the new home before its sign-in finishes, and a thread handed to
     // it dies on arrival.
     const signedIn = live.filter(p => harnessFor(which).signedIn(this, p));
-    let pool = signedIn.length ? signedIn : live.length ? live : ['default'];
+    let pool = signedIn.length ? signedIn : live.length ? live : [this._profilesFor(which)[0] ?? 'default'];
     // AND NOT A LOGIN WHOSE PLAN LACKS THE MODEL (w-f1c00e679d). A weekend's
     // sprint on gpt-6.1-sol was handed to a free-plan Codex login twice and
     // died in two seconds both times. When the account does not have it, the
