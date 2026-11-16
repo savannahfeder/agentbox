@@ -99,7 +99,7 @@ import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifa
 import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, readDraftWhen, saveDraftWhen, type SentDraft } from '../drafts';
 import { ReplyLater } from './ReplyLater';
-import { effortSaid, pickOnTheRow, pickToSend, replyOpensOn } from '../reply-pick';
+import { effortSaid, modelShown, pickOnItsWay, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, threadToOpen } from '../team/chat-threads';
 import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
@@ -1120,11 +1120,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // same pick the composer's sentence has, so there is one place it is chosen.
   // Not on a running agent's row (a message goes straight into it) or on a
   // message to a person (no agent reads it).
+  const shownModel = modelShown(item, runningEngine ?? null, sending);
   const modelWord = !agent && !direct
-    // Through `pickOnTheRow`, because a cleared model is stored as '' and this
-    // read it with `??`: the pill then drew no model word at all, on every
-    // thread she had ever changed the model of (../reply-pick.ts).
-    ? engineModelLabel(runningEngine ?? null, pickOnTheRow(item).model, { codexModels, codexDefault: codexModelDefault })
+    ? engineModelLabel(shownModel.engine, shownModel.model, { codexModels, codexDefault: codexModelDefault })
     : null;
   const [openModel, setOpenModel] = useState(false);
   useEffect(() => { if (!replyOpen) setOpenModel(false); }, [replyOpen]);
@@ -2665,7 +2663,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
+            <DockComposer key={`${item.product}:${item.id}`} item={item} onItsWay={pickOnItsWay(sending)} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -2859,8 +2857,10 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false, f
   );
 }
 
-function DockComposer({ item, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null }: {
+function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null }: {
   item: WorkItem;
+  /** The pick of a reply still on its way here, until the row carries it. */
+  onItsWay?: ReplyPick | null;
   /** The agent whose message this answers, named in place of its owner. */
   answering?: string | null;
   /** "Message" on the Chats page, as a group's box says it. */
@@ -2986,20 +2986,20 @@ function DockComposer({ item, runningMode, runningEngine, codexModels = [], code
      mid-flight. On a row with a worker already on it this sets what picks up the
      turn after, and the drawer's own sentence is the only promise made.
   */
-  const [touched, setTouched] = useState(() => replyOpensOn(item, readDraftPick(item)).touched);
-  const [model, setModel] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item)).pick.model);
-  const [effort, setEffort] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item)).pick.effort);
+  const [touched, setTouched] = useState(() => replyOpensOn(item, readDraftPick(item), onItsWay).touched);
+  const [model, setModel] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item), onItsWay).pick.model);
+  const [effort, setEffort] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item), onItsWay).pick.effort);
   // AND WHICH CODING AGENT, now the menu offers both (w-e1a42f6b21). Null is
   // the row's own, which main resolved and handed down as `runningEngine`; a
   // value here is a pick that MOVES the thread, and the session cannot follow
   // it. It is kept with the model, so a fold loses neither.
-  const [engineChosen, setEngine] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item)).pick.engine ?? null);
+  const [engineChosen, setEngine] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item), onItsWay).pick.engine ?? null);
   // ON THE ROW'S IDENTITY ONLY, the rule the mode below already follows and
   // for the reason spelled out there: a snapshot arriving mid-sentence must
   // not overwrite a pick she just made. The dependency list is pinned by
   // tests/the-reply-box-keeps-the-model-you-picked-when-it-folds.
   useEffect(() => {
-    const opens = replyOpensOn(item, readDraftPick(item));
+    const opens = replyOpensOn(item, readDraftPick(item), onItsWay);
     setTouched(opens.touched);
     setModel(opens.pick.model);
     setEffort(opens.pick.effort);

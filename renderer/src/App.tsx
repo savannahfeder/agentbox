@@ -5268,7 +5268,7 @@ export default function App() {
       // not taken it yet. Everything below can take a minute and none of it is
       // hers to wait for.
       const at = Date.now();
-      const mine = { product: item.product, id: item.id, at, text, held: holdsReplies(onPhone()) };
+      const mine = { product: item.product, id: item.id, at, text, held: holdsReplies(onPhone()), ...(pick ? { pick } : {}) };
       // The same message once the window has closed. TWO OBJECTS RATHER THAN A
       // FIELD WRITTEN IN PLACE, because the queue is identified by identity
       // below and React only redraws on a new one.
@@ -5427,7 +5427,7 @@ export default function App() {
     const stay = staysOnTheTask(item, text, engine) || talking || !movesOn(item) || isTourPractice(tourRef.current, item);
     // Held, and so saying "press Z to undo", only where it really is held: a
     // phone writes it at once and has no Z (./phone-holds).
-    const mine = { product: item.product, id: item.id, at: Date.now(), text, held: holdsReplies(onPhone()) };
+    const mine = { product: item.product, id: item.id, at: Date.now(), text, held: holdsReplies(onPhone()), ...(pick ? { pick } : {}) };
     // EVERY REPLY IS DRAWN AT ONCE, including one that moves her on: O
     // follows it back, and the thread must already hold it (w-388be0a968).
     setSending((q) => [...q, mine]);

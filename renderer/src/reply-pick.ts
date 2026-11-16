@@ -53,9 +53,34 @@ export function pickOnTheRow(item: { model?: string | null; effort?: string | nu
 export function replyOpensOn(
   item: { model?: string | null; effort?: string | null } | null | undefined,
   kept: ReplyPick | null,
+  onItsWay: ReplyPick | null = null,
 ): { pick: ReplyPick; touched: boolean } {
-  if (kept) return { pick: { model: kept.model, effort: kept.effort }, touched: true };
+  if (kept) return { pick: withEngine(kept), touched: true };
+  // The row carries a sent pick only once the undo hold is over and the next
+  // snapshot lands; until then the box shows what went, without writing it again.
+  if (onItsWay) return { pick: withEngine(onItsWay), touched: false };
   return { pick: pickOnTheRow(item), touched: false };
+}
+
+function withEngine(p: ReplyPick): ReplyPick {
+  return { model: p.model, effort: p.effort, ...(p.engine ? { engine: p.engine } : {}) };
+}
+
+/** The pick the newest reply still on its way to this row went with. */
+export function pickOnItsWay(sending: readonly { pick?: ReplyPick; refused?: string }[] | null | undefined): ReplyPick | null {
+  const going = (sending ?? []).filter((s) => !s.refused && s.pick);
+  return going.length ? going[going.length - 1].pick! : null;
+}
+
+/** The agent and model the folded reply box names. */
+export function modelShown(
+  item: { model?: string | null } | null | undefined,
+  runningEngine: string | null,
+  sending: readonly { pick?: ReplyPick; refused?: string }[] | null | undefined,
+): { engine: string | null; model: string | null } {
+  const going = pickOnItsWay(sending);
+  if (!going) return { engine: runningEngine, model: pickOnTheRow(item).model };
+  return { engine: going.engine ?? runningEngine, model: going.model };
 }
 
 /**

@@ -39,6 +39,7 @@ import { pickedLine, threadEvents, withRuns, type LedgerLine, type ThreadEvent }
 import type { AgentEvent, AgentSaid, AgentTurn, AgentWork } from './types';
 import { liftReplies } from './team/chat-threads';
 import type { UndoMark } from './undo-marks';
+import type { ReplyPick } from './reply-pick';
 
 // `[Read] strategy/art-style.md` — how the supervisor writes a tool call into a
 // trace (`traceStreamLine`, main/supervisor.mts). The name is the tool and the
@@ -113,6 +114,8 @@ export interface PendingSaid {
   cloud?: boolean;
   // Taken, and its thread's copy has not shown it yet (renderer/src/phone-rows.ts `copyShows`).
   sent?: boolean;
+  // The model and agent it went with, until the row carries them (./reply-pick.ts).
+  pick?: ReplyPick;
 }
 
 /** Whether something sent to this row is on its way, which answers any card on it. */

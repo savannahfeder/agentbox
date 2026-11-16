@@ -94,8 +94,8 @@ describe('the wiring from the reply box is present in the source', () => {
     // Through `replyOpensOn`, which is where the '' the store writes to clear a
     // model stopped being read as a model whose name is the empty string
     // (tests/a-reply-goes-out-on-the-model-you-picked).
-    expect(focus).toContain('const [model, setModel] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item)).pick.model);');
-    expect(focus).toContain('const [effort, setEffort] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item)).pick.effort);');
+    expect(focus).toContain('const [model, setModel] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item), onItsWay).pick.model);');
+    expect(focus).toContain('const [effort, setEffort] = useState<string | null>(() => replyOpensOn(item, readDraftPick(item), onItsWay).pick.effort);');
   });
 
   it('sends it only on a deliberate pick', () => {
