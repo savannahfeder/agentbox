@@ -8848,12 +8848,16 @@ export class Supervisor {
     const cannotStart: Record<string, { why: string; tool: string }> = {};
     try {
       const now = Date.now();
+      const byId = new Map(allThreads().map((i) => [i.id, i]));
       for (const id of queued) {
         const prep = this._preparing?.get(id);
         const n = prep?.folderSince && now - prep.folderSince >= SLOW_FOLDER_MS
           ? { why: 'slow-folder', engine: prep.engine, at: now }
           : this._notStarting?.get(id);
         if (!n || now - n.at > 2 * POLL_MS || !SAID_WHY_NOT_STARTED.has(n.why)) continue;
+        // Said of the tool the thread ran on before it was switched.
+        const row = byId.get(id);
+        if (n.engine && row && engineOf(this._engineFor(row)) !== n.engine) continue;
         cannotStart[id] = { why: n.why, tool: engineLabel(n.engine ?? DEFAULT_ENGINE) };
       }
     } catch {}
