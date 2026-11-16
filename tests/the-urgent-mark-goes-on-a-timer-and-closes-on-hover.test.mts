@@ -59,13 +59,17 @@ describe('the close', () => {
   });
 
   // "People who go to click that might accidentally close the message": the
-  // close took the O key's place on hover. It now sits on the mark's top
-  // right corner, off the layout, and the O key stays where it is.
-  it('sits on the top right corner, off the layout, and the O key stays', () => {
+  // close took the O key's place on hover. Then a ringed badge on the top
+  // right corner "looks ugly. needs to be more lowkey". It now takes the
+  // dot's place, bare and faint, off the layout, and the O key stays.
+  it('takes the dot’s place, bare and faint, and the O key stays', () => {
     expect(rule('.ur')).toMatch(/position: relative/);
     expect(rule('.ur-close')).toMatch(/position: absolute/);
-    expect(rule('.ur-close')).toMatch(/top: -\d+px/);
-    expect(rule('.ur-close')).toMatch(/right: -\d+px/);
+    expect(rule('.ur-close')).toMatch(/left: \d+px/);
+    expect(rule('.ur-close')).toMatch(/border: 0/);
+    expect(rule('.ur-close')).toMatch(/background: none/);
+    expect(rule('.ur-close')).toMatch(/color: var\(--text-faint\)/);
+    expect(rule('.ur:hover .ur-dot')).toMatch(/visibility: hidden/);
     expect(css).not.toMatch(/\.ur:hover \.ur-kbd \{[^}]*display: none/);
     expect(css).not.toMatch(/\.ur:hover \.ur-open \{/);
     expect(html).toContain('>O</kbd>');

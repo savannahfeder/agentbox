@@ -18,7 +18,7 @@ export function UrgentReady({ row, onOpen, onClose }: { row: WorkItem; onOpen: (
         <span className="ur-dot" /><span className="ur-word">Urgent</span><span className="ur-title">{rowTitle(row)}</span><kbd className="ur-kbd">O</kbd>
       </button>
       <button type="button" className="ur-close" aria-label="Close" onClick={onClose}>
-        <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><path d="M1 1 L7 7 M7 1 L1 7" /></svg>
+        <svg width="7" height="7" viewBox="0 0 8 8" aria-hidden="true"><path d="M1 1 L7 7 M7 1 L1 7" /></svg>
       </button>
     </div>
   );
