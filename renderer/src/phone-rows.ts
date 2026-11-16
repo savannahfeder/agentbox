@@ -4,7 +4,7 @@
 // one copy of every rule.
 
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
-import { madeHere, phoneChoices, WAIT_STATES } from '../../shared/phone-snapshot.mts';
+import { madeHere, phoneChoices, WAIT_STATES, type PhoneChange } from '../../shared/phone-snapshot.mts';
 import { runOfClaim } from '../../shared/cloud-kit.mts';
 import { isCarried } from '../../shared/cloud-carry.mts';
 import { Name } from '../../shared/product-name.mjs';
@@ -24,6 +24,7 @@ export interface PhoneSnapshot {
   live?: { at: number; since?: number; where?: string; movable?: boolean; doing?: { label?: string; startedAt?: number }[] } | null;
   wait?: { state: string; tool?: string; until?: number } | null;
   attached?: Attached;
+  change?: PhoneChange;
 }
 /** What a command carries, as JSON from the database: which fields depend on `kind`. */
 export interface CommandPayload {
@@ -157,6 +158,8 @@ export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly
   const used = new Set<string>();
   const running: RunningSession[] = [];
   const waits = new Map<string, { state: string; tool?: string; until?: number }>();
+  // What each thread's last run changed, by `${product}/${id}` as the phone names them.
+  const changes: Record<string, PhoneChange> = {};
   const threads =[...rows.threads].sort((a, b) => `${a.device}/${a.project}`.localeCompare(`${b.device}/${b.project}`));
   for (const t of threads) {
     const slug = phoneSlug(t.device, t.project);
@@ -194,6 +197,8 @@ export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly
     // Why the computer has not started it, in its own words (shared/phone-snapshot.mts phoneWaitsOf).
     const wait = t.snapshot.wait;
     if (wait && typeof wait === 'object' && WAIT_STATES.includes(wait.state)) waits.set(id, wait);
+    const change = t.snapshot.change;
+    if (change && typeof change === 'object' && Array.isArray(change.files)) changes[`${slug}/${id}`] = change;
   }
   const waiting: Waiting[] = [];
   // Threads that start when the computer takes what was sent, or that the
@@ -277,7 +282,7 @@ export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly
       } as PhoneItem);
     }
   }
-  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards };
+  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards, changes };
 }
 
 /** What one thread's live line is told of the computer's queue, off the view (the phone app's thread page). */
