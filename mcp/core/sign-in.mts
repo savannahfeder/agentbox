@@ -56,6 +56,13 @@ export function keepAfterSignIn(service: string, { finishing = false }: { finish
   return { keep: { name, ...(read ? { read } : {}) }, message: `${when} ${why} ${how} and call sign_in with this ask and keep { name: '${name}', value: the token }.` };
 }
 
+/** The keys a known service's sign-in may be kept under, or null for one not on the list. */
+export function keyNamesFor(service: string): string[] | null {
+  const n = plain(service);
+  const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
+  return svc ? svc.keys.map((k) => k.name) : null;
+}
+
 export interface SignInRequest { service?: string; url?: string; code?: string; why?: string; asksForCode?: boolean; ask?: string; finished?: boolean }
 export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'landed' | 'code' | 'skipped' | 'replied'; ask: string; url?: string; code?: string; message: string }
 

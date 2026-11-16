@@ -80,16 +80,18 @@ describe('the screen, the chord and the Agents menu', () => {
 
   it('all read the one order, so ⌘Y answers the card being read', () => {
     // The snapshot the card is drawn from.
-    expect(ipc).toMatch(/cardsInFront\(approvals\.listPending\(config\.storeRoot\), looking\)/);
+    // The draw and the press read the same order; only the draw records what
+    // an Allow signs (tests/a-quick-allow-signs-the-card-drawn-not-the-file-at-the-press).
+    expect(ipc).toMatch(/const pendingApprovals = \(\) => cardsInFront\(approvals\.listPending\(config\.storeRoot, \{ drawn: false \}\), looking\)/);
     expect(ipc).toMatch(/approvals: sendingApprovals\(\)/);
-    expect(ipc).toMatch(/const sendingApprovals = \(\) => \{\n\s*const cards = pendingApprovals\(\);/);
+    expect(ipc).toMatch(/const sendingApprovals = \(\) => \{\n\s*const cards = cardsInFront\(approvals\.listPending\(config\.storeRoot\), looking\);/);
     // And nothing that answers for this screen reaches past it for the spool's
     // own order. Two readings are left and neither is a card in front: the stub
     // that stands in until the IPC surface exists, before which nothing can
     // have been pressed, and the phone, which draws every card as a list of its
     // own and has no thread open on this computer.
     expect(main.match(/approvals\.listPending\(/g)).toHaveLength(2);
-    expect(main).toMatch(/let cardInFront(?:: [^\n]*?)? = \(\) => approvals\.listPending\(config\.storeRoot\)\[0\]/);
+    expect(main).toMatch(/let cardInFront(?:: [^\n]*?)? = \(\) => approvals\.listPending\(config\.storeRoot, \{ drawn: false \}\)\[0\]/);
     expect(main).toMatch(/cardInFront = \(\) => ipc\.pendingApprovals\(\)\[0\]/);
   });
 

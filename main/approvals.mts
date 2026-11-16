@@ -76,8 +76,8 @@ export function approvalPublicKey(): string {
 //
 // The digest is of what was displayed, not of the file at answer time: a
 // re-read lets a worker flip the file between a harmless body and the real one.
-// `listPending` is the only reader, and every caller acts on or draws exactly
-// what it returned, so the digest taken there is the card she saw.
+// `listPending` is the only reader, and only a read that draws the card
+// (`drawn`, the default) records its digest, so that digest is the card she saw.
 //
 // The digest itself is shared/approval-card.mts, so the cloud server takes the
 // same one of a card it puts on the phone.
@@ -280,7 +280,7 @@ function bornAt(dir: string, name: string): { ctime: bigint; ino: bigint } {
   } catch { return { ctime: 2n ** 63n, ino: 2n ** 63n }; } // gone or unreadable: never in front of something real
 }
 
-export function listPending(storeRoot: string, { now = Date.now }: { now?: () => number } = {}): ApprovalRequest[] {
+export function listPending(storeRoot: string, { now = Date.now, drawn = true }: { now?: () => number; drawn?: boolean } = {}): ApprovalRequest[] {
   const dir = spoolDir(storeRoot);
   let files: string[] = [];
   try { files = fs.readdirSync(dir); } catch { return []; }
@@ -324,8 +324,10 @@ export function listPending(storeRoot: string, { now = Date.now }: { now?: () =>
     // `answer` signs this digest, so her press authorises the card she saw.
     // Kept from the last successful read, because an unreadable file also
     // leaves her screen, so the old digest is still the last card she saw.
+    // Only a read that draws the card sets it: a read at the press (the chord,
+    // the menu) may find a body the worker swapped in after the draw.
     if (request) {
-      seen.card = cardDigest(request);
+      if (drawn) seen.card = cardDigest(request);
       pending.push({ request, seq: seen.seq });
     }
   }

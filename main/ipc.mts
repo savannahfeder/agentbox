@@ -429,11 +429,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // answer in THIS process, ahead of the page: reading a different order from
   // the one on screen means ⌘Y allows a command nobody was reading.
   let looking: { product: string | null; id: string } | null = null;
-  const pendingApprovals = () => cardsInFront(approvals.listPending(config.storeRoot), looking);
+  // Read at a press (the chord, the menu): finds the card, signs nothing new.
+  const pendingApprovals = () => cardsInFront(approvals.listPending(config.storeRoot, { drawn: false }), looking);
   // When each card was first sent to the window, so a chord in its first moment answers nothing (shared/card-settles.mts).
   const sentAt = new Map<string, number>();
   const sendingApprovals = () => {
-    const cards = pendingApprovals();
+    const cards = cardsInFront(approvals.listPending(config.storeRoot), looking);
     const now = Date.now();
     for (const id of [...sentAt.keys()]) if (!cards.some((c) => c.id === id)) sentAt.delete(id);
     for (const c of cards) if (!sentAt.has(c.id)) sentAt.set(c.id, now);
