@@ -15,7 +15,8 @@ import { dayAndTime, firstRealLine } from '../format';
 import { threadState } from '../../../shared/thread-cards.mts';
 import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
-import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
+import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, taskGiver, whatWaits, type TeamRow } from '../../../shared/team-rules.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 import { taskWords } from '../team/company';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { localDate } from '../local-dates';
@@ -992,9 +993,23 @@ export function workAudience(item: WorkItem, product: Product | undefined | null
   return ids.length ? `with ${ids.map(nameOf).join(', ')}` : null;
 }
 
-/** "given to Jordan Ellis" beside a thread handed on, which is closed but did not finish. */
+/** Whom a thread was handed to: it is closed, but it did not finish. */
 export function handedTo(item: { status?: string; answer?: string | null }): string | null {
-  return handedOn(item) ? `given to ${String(item.answer).slice('Given to '.length).replace(/\.$/, '')}` : null;
+  return handedOn(item) ? String(item.answer).slice('Given to '.length).replace(/\.$/, '') : null;
+}
+
+export function handedInitials(name: string): string {
+  const words = name.split(/\s+/).filter(Boolean);
+  return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)).toUpperCase();
+}
+
+/** The task a thread became when it was handed on: its link leads back here, from the one who gave it. */
+export function taskHandedFrom<T extends TeamRow & { id: string; body?: string | null }>(items: readonly T[], threadId: string, me: string | null = null): T | null {
+  return items.find((t) => {
+    if (!isTaskRow(t)) return false;
+    const giver = taskGiver(t);
+    return (!me || giver === me) && handedFrom(t.body, giver)?.id === threadId;
+  }) ?? null;
 }
 
 /** "Dev, Maya": the conversation itself is named for who is in it, unless someone renamed it. */
