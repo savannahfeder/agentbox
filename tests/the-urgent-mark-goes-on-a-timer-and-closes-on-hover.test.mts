@@ -53,14 +53,21 @@ describe('the close', () => {
     expect(html).toMatch(/<button[^>]*class="ur-close"[^>]*aria-label="Close"/);
   });
 
-  it('shows only on hover, where the O key was', () => {
+  it('shows only on hover', () => {
     expect(rule('.ur-close')).toMatch(/display: none/);
     expect(rule('.ur:hover .ur-close')).toMatch(/display: grid/);
-    expect(rule('.ur:hover .ur-kbd')).toMatch(/display: none/);
   });
 
-  it('is not shown with the pointer away, so the O key still says how to open it', () => {
-    expect(rule('.ur-kbd')).not.toMatch(/display: none/);
+  // "People who go to click that might accidentally close the message": the
+  // close took the O key's place on hover. It now sits on the mark's top
+  // right corner, off the layout, and the O key stays where it is.
+  it('sits on the top right corner, off the layout, and the O key stays', () => {
+    expect(rule('.ur')).toMatch(/position: relative/);
+    expect(rule('.ur-close')).toMatch(/position: absolute/);
+    expect(rule('.ur-close')).toMatch(/top: -\d+px/);
+    expect(rule('.ur-close')).toMatch(/right: -\d+px/);
+    expect(css).not.toMatch(/\.ur:hover \.ur-kbd \{[^}]*display: none/);
+    expect(css).not.toMatch(/\.ur:hover \.ur-open \{/);
     expect(html).toContain('>O</kbd>');
   });
 
