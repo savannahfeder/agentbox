@@ -1940,6 +1940,8 @@ declare global {
       // interrupted, and how many are waiting on her because their session was
       // gone. Startup's version of it rides on bootInfo instead.
       onRecovered?(fn: (r: { text: string }) => void): () => void;
+      // A thread opened on the phone, and when.
+      onSeenOnPhone?(fn: (s: { id: string; at: number }) => void): () => void;
       // ⌘R is about to reload: write what the grace window is holding first.
       onWriteHeld?(fn: () => Promise<void>): () => void;
       // What arrived. The page does not choose the words and does not choose

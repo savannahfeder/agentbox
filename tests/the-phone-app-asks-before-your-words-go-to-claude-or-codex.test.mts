@@ -11,7 +11,7 @@
 // words to an agent, so they never wait for it.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { needsNotice, readNotice, NOTICE_KEY } from '../mobile/src/lib/ai-notice';
+import { needsNotice, noticeFor, readNotices, NOTICE_KEY } from '../mobile/src/lib/ai-notice';
 
 const read = (p) => fs.readFileSync(new URL(`../mobile/src/${p}`, import.meta.url), 'utf8');
 
@@ -26,6 +26,7 @@ describe('what waits for a yes', () => {
 
 describe('the answer kept on the phone', () => {
   it('reads a yes with its moment, a no, and nothing', () => {
+    const readNotice = (raw) => noticeFor(readNotices(raw), 'user-a');
     expect(readNotice(JSON.stringify({ agreed: 1792700000000 }))).toEqual({ agreed: 1792700000000 });
     expect(readNotice(JSON.stringify({ declined: 1792700000000 }))).toEqual({ declined: 1792700000000 });
     expect(readNotice(null)).toBeNull();

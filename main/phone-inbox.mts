@@ -643,7 +643,7 @@ export function createPhoneInbox({
                 const ownAlerts = cmd.kind === 'setting' && !!alerts?.takesSetting(ready.payload);
                 const out: ChannelResult | null | undefined = ownAlerts ? await alerts!.setting(ready.payload as AlertsChange) : await apply(ready);
                 if (cmd.kind === 'new' && typeof out?.id === 'string') state.made[madeHere(cmd.id)] = { id: out.id, at: now() };
-                if (cmd.kind === 'setting' && !ownAlerts) changedSettings = true;
+                if (cmd.kind === 'setting' && !ownAlerts && (ready.payload as { key?: string } | null)?.key !== 'seen') changedSettings = true;
                 outcome = 'done';
               } catch (err) {
                 outcome = `refused: ${String((err as Thrown)?.message || err).slice(0, 200)}`;

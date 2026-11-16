@@ -5,7 +5,7 @@ import { macAway, macSeenOf } from '../../../renderer/src/phone-rows';
 import type { PhoneRows } from '../../../renderer/src/phone-rows';
 import type { LedgerLine } from '../../../renderer/src/thread-history';
 import type { WorkItem } from '../../../renderer/src/types';
-import { PREVIEW_ATTACHED, previewLink } from './preview-files.mjs';
+import { PREVIEW_ATTACHED, PREVIEW_FILM_ATTACHED, PREVIEW_PLAN_ATTACHED, PREVIEW_SCRIPT_ATTACHED, PREVIEW_SITE_ATTACHED, previewLink } from './preview-files.mjs';
 
 const DEV = '0a1b2c3d4e5f';
 const MIN = 60_000;
@@ -44,7 +44,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(300), source: 'founder', patch: { body: planAsk } },
         { ts: at(120), source: 'agent', patch: { note: 'Read the phone site and the team messaging code. Checking what App Review asks of an app like this next.' } },
         { ts: at(6), source: 'agent', patch: { status: 'done', result: planResult } },
-      ], { attached }),
+      ], { attached: PREVIEW_PLAN_ATTACHED }),
       thread('agentbox', { id: 'w-2b3c4d5e6f', title: 'Stuck threads should land in Needs you', status: 'blocked', priority: 5, body: stuckAsk, note: stuckNote, createdAt: at(90), updatedAt: at(14), wrote: { body: her(at(90)), status: agent(at(14)), note: agent(at(14)) } }, [
         { ts: at(90), source: 'founder', patch: { body: stuckAsk } },
         { ts: at(14), source: 'agent', patch: { status: 'blocked', note: stuckNote } },
@@ -57,6 +57,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(200), source: 'founder', patch: { body: 'I need to see when my limits reset.' } },
         { ts: at(52), source: 'agent', patch: { status: 'done', result: meterResult } },
       ], {
+        attached: PREVIEW_SITE_ATTACHED,
         // Its run's log, as main/phone-inbox.mts sends one (shared/phone-snapshot.mts `runs`).
         runs: [{ startedAt: at(70), text: [
           [69, "I'll start with where the meters are drawn."], [68, '[Read] renderer/src/components/AccountMeter.tsx'],
@@ -99,6 +100,7 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(60), source: 'agent', patch: { result: 'Here is a first draft.' } },
         { ts: at(25), source: 'founder', patch: { answer: 'Shorter, and open with the inbox.' } },
       ], {
+        attached: PREVIEW_SCRIPT_ATTACHED,
         approvals: [{ id: 'ap-preview-2', at: at(0.5), tool: 'Bash', input: { command: 'ffmpeg -i draft.mov -vf scale=1080:-2 draft-1080.mp4', description: 'Make a 1080p copy of the draft', cwd: '~/dev/launch-film' }, card: 'cHJldmlldy1jYXJkLTI' }],
       }),
       thread('site', { id: 'w-6f7a8b9c0d', title: 'Try a light theme for the phone', status: 'open', priority: 0, body: 'Try a light theme.', snoozedUntil: now + 20 * 60 * MIN, createdAt: at(800), updatedAt: at(700), wrote: { body: her(at(800)), snoozedUntil: her(at(700)) } }, [
@@ -118,7 +120,7 @@ export function previewRows(now = Date.now()): PhoneRows {
       ]),
       thread('film', { id: 'w-t1a2b3c4d5', title: 'Cut the launch film to 60 seconds', labels: ['founder', 'teammate:t-launch0001'], status: 'claimed', priority: 5, body: 'Cut the launch film to 60 seconds. Open on the inbox.', createdAt: at(21), updatedAt: at(1), wrote: { body: agent(at(21)) } }, [
         { ts: at(21), source: 'agent', patch: { body: 'Cut the launch film to 60 seconds. Open on the inbox.' } },
-      ], { live: { since: at(20), at: STILL_GOING, where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
+      ], { attached: PREVIEW_FILM_ATTACHED, live: { since: at(20), at: STILL_GOING, where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
       thread('agentbox', { id: 'w-7a8b9c0d1e', title: 'Rename the Display menu', status: 'done', priority: 0, body: 'Rename it to View.', result: 'Renamed.', createdAt: at(3000), updatedAt: at(1500), wrote: { body: her(at(3000)), result: agent(at(1600)), status: her(at(1500)) } }, [
         { ts: at(3000), source: 'founder', patch: { body: 'Rename it to View.' } },
         { ts: at(1600), source: 'agent', patch: { result: 'Renamed.' } },
@@ -260,7 +262,7 @@ export function previewGroups(now = Date.now()) {
   ].map(([id, agents, on, hours]) => ({ person_id: id, device: 'a1b2c3d4e5f6', agents_running: agents, working_on: on, working_private: false, working_at: at(4), hours_total: hours, updated_at: at(1) }));
   let n = 0;
   const msg = (room: string, by: string, when: string, body: string, extra: Record<string, unknown> = {}) =>
-    ({ id: `gm-${++n}`, room_id: room, by_person: by, body, in_reply_to: null, mentions: [], created_at: when, edited_at: null, deleted_at: null, ...extra });
+    ({ id: `gm-${++n}`, room_id: room, by_person: by, body, in_reply_to: null, mentions: [], created_at: when, edited_at: null as string | null, deleted_at: null as string | null, ...extra });
   const messages = [
     msg('r-team', 'p-2', iso(yesterday), 'Pushed the new sign-in screens. Five versions in the designs folder.'),
     msg('r-team', 'preview', iso(yesterday + 4 * MIN), 'Looking now. The quiet one reads best on a phone.'),
@@ -281,6 +283,11 @@ export function previewGroups(now = Date.now()) {
   messages.push(msg('r-team', 'p-3', at(46), 'Thanks.', { in_reply_to: sentence.id }));
   const reads = [{ room_id: 'r-team', read_at: at(20) }, { room_id: 'r-launch', read_at: at(100) }, { room_id: 'r-maya', read_at: at(130) }];
   messages.push(msg('r-launch', 'p-4', at(16), 'Here is the frame I mean. ![The opening frame](attachments/opening-frame.png)\n\nThe notes are in [cut-notes.pdf](attachments/cut-notes.pdf).'));
+  const reaction = (m: { id: string; room_id: string }, person: string, emoji: string, ago: number) => ({ message_id: m.id, room_id: m.room_id, person_id: person, emoji, is_on: true, updated_at: at(ago) });
+  const onIt = messages.find((m) => m.body === 'On it.')!;
+  const moving = messages.find((m) => m.body.startsWith('Morning.'))!;
+  const reactions = [reaction(onIt, 'p-3', '🙏', 48), reaction(moving, 'p-2', '👍', 30), reaction(moving, 'p-3', '👍', 29), reaction(moving, 'p-4', '🎉', 28)];
+  const files = new Map<string, string>();
   const cards = [
     { person_id: 'p-3', thread_id: 'w-card-1', title: 'Fix the login meter', project: 'Agentbox', state: 'running', priority: 5, problem: 'The meter shows the wrong reset time on Max accounts.', progress: 'Found where the time is read.', solution: null, visible: true, updated_at: at(10) },
     { person_id: 'p-2', thread_id: 'w-card-2', title: 'Pick the sign-in screen', project: 'Website', state: 'waiting', priority: 5, problem: 'Two sign-in screens are left.', progress: null, solution: null, visible: true, updated_at: at(25) },
@@ -298,8 +305,27 @@ export function previewGroups(now = Date.now()) {
       if (name === 'room_people') return members[args.r] ?? [];
       if (name === 'room_names') return (members[args.r] ?? []).map((id) => ({ person_id: id, name: profiles.find((p) => p.person_id === id)?.display_name ?? names[id], avatar_url: null, has_card: true }));
       if (name === 'mark_room_read') { const r = reads.find((x) => x.room_id === args.r); if (r && args.at > r.read_at) r.read_at = args.at; return null; }
+      if (name === 'react_room_message') {
+        const m = messages.find((x) => x.id === args.m);
+        if (!m) return null;
+        const was = reactions.find((x) => x.message_id === args.m && x.person_id === 'preview' && x.emoji === args.p_emoji);
+        if (was) Object.assign(was, { is_on: !!args.p_on, updated_at: new Date().toISOString() });
+        else reactions.push({ message_id: m.id, room_id: m.room_id, person_id: 'preview', emoji: args.p_emoji, is_on: !!args.p_on, updated_at: new Date().toISOString() });
+        return null;
+      }
+      if (name === 'edit_room_message') { const m = messages.find((x) => x.id === args.m); if (m) Object.assign(m, { body: args.p_body, mentions: args.p_mentions, edited_at: new Date().toISOString() }); return m ?? null; }
+      if (name === 'delete_room_message') { const m = messages.find((x) => x.id === args.m); if (m) m.deleted_at = new Date().toISOString(); return null; }
+      if (name === 'create_room') {
+        const id = `r-new-${rooms.length}`;
+        const people = args.p_people as unknown as string[];
+        rooms.push({ ...rooms[rooms.length - 1], id, name: args.p_name || '', kind: 'group', team_id: null, members: people.length, created_at: new Date().toISOString() });
+        members[id] = people;
+        reads.push({ room_id: id, read_at: new Date().toISOString() });
+        return id;
+      }
       return [];
     },
+    putFile(row: { room_id: string; name: string; data: string }) { files.set(`${row.room_id}/${row.name}`, row.data); return row; },
     select(table: string, query: string) {
       const q = new URLSearchParams(query);
       if (table === 'room_profiles') {
@@ -310,8 +336,11 @@ export function previewGroups(now = Date.now()) {
       if (table === 'room_presence') return presence;
       if (table === 'room_reads') return reads;
       if (table === 'thread_cards') return q.has('shipped_at') ? shipped : cards;
+      if (table === 'room_reactions') return reactions.filter((r) => `eq.${r.room_id}` === q.get('room_id') && (!q.get('updated_at')?.startsWith('gt.') || r.updated_at > q.get('updated_at')!.slice(3)));
+      const kept = files.get(`${q.get('room_id')?.slice(3)}/${q.get('name')?.slice(3)}`);
+      if (table === 'room_files' && kept) return [{ data: kept }];
       // A small drawing of a screen, as a stored file comes back.
-      if (table === 'room_files') return [{ data: 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
+      if (table === 'room_files') return [{ data:'iVBORw0KGgoAAAANSUhEUgAAADAAAAAkCAIAAABAJy5dAAAAXElEQVR42u3VsQ0AEBBAUWNYQcRORlGoLKqQsIJGIdpDJH7y68srLnfKWfNUChAgQIBGreSjAQIEiDsESApKMQibp1WvlwBtB+0N0AWQfIfmAF0A8ToAAQL0K6gDciTequifOckAAAAASUVORK5CYII=' }];
       if (table !== 'room_messages') return null;
       let rows = [...messages];
       const room = q.get('room_id')?.slice(3);
@@ -479,6 +508,7 @@ export function previewCloud(now = () => Date.now()) {
     },
     async insert(table: string, row: Record<string, unknown>) {
       if (table === 'room_messages') return groups.send(row as MessageRow);
+      if (table === 'room_files') return groups.putFile(row as { room_id: string; name: string; data: string });
       if (table === 'team_invites' && !team.invites.some((i) => i.email === row.email)) team.invites.push({ email: row.email as string });
       return row;
     },

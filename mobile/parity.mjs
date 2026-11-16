@@ -64,7 +64,7 @@ export const PARITY = {
   'palette:rank-*': { phone: P, find: 'Rank ${p.name} first' },
   'palette:group-*': { phone: P, find: 'group-${g.id}' },
   'palette:team-list-*': { phone: P, find: 'team-list-shipped', still: 'What shipped this week, but not Decisions, which the phone does not read' },
-  'palette:files-*': { missing: 'an index of the team\'s files carried to the phone' },
+  'palette:files-*': { phone: 'mobile/src/ui/FilesPlace.tsx', find: 'placeholder="Search files"', still: 'only files a thread or chat sent; no new documents, uploads, folders or trash from the phone' },
   'palette:teammate-*': { phone: P, find: 'mate-${t.id}' },
   'palette:teammate-pause-*': { phone: P, find: 'teammate-pause-${t.id}' },
   'palette:view-inbox': { phone: P, find: "id: 'inbox'" },

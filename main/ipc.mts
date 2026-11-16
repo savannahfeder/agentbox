@@ -1034,6 +1034,13 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return out;
   });
 
+  // A thread opened on the phone. Only the window keeps what has been read.
+  ipcMain.handle('zero:phone-seen', (_e, { id, at }: { product?: string; id?: string; at?: number } = {}) => {
+    if (typeof id !== 'string' || !id || !(Number(at) > 0)) return { ok: false, error: 'not a thread opened on the phone' };
+    if (!window.isDestroyed()) window.webContents.send('zero:seen-on-phone', { id, at: Number(at) });
+    return { ok: true };
+  });
+
   // PINNED THREADS (w-20323283e6): id to true, or null to unpin.
   ipcMain.handle('zero:set-thread-pins', (_e, { pins }: { pins: Record<string, boolean | null> }) => {
     supervisor.setThreadPins(pins);

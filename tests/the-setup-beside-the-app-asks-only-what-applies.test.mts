@@ -89,8 +89,9 @@ describe('the AI teammates offered', () => {
     { starter: 'maintainer', name: 'Maintainer', ask: 'Fix what gets filed' },
     { starter: 'marketing', name: 'Marketing lead', ask: 'Post about what we build' },
   ];
+  // The Chief of staff is no longer offered (tests/no-chief-of-staff-is-made-for-you).
   it('offers the engineering jobs first and only real starters', () => {
-    expect(starterChoices(starters).map((s) => s.starter)).toEqual(['quality', 'maintainer', 'chief']);
+    expect(starterChoices(starters).map((s) => s.starter)).toEqual(['quality', 'maintainer']);
   });
   it('offers nothing when every starter is already on the team', () => {
     expect(starterChoices([])).toEqual([]);
