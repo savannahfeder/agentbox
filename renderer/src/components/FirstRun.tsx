@@ -218,14 +218,15 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
     const by = new Map<string, string[]>();
     for (const t of picked) by.set(bare(t.folder), [...(by.get(bare(t.folder)) ?? []), t.id]);
     let n = 0;
-    for (const [folder, ids] of by) {
-      const p = await projectFor(folder, n++ > 0);
-      if (!p) continue;
-      await api.importThreads({ product: p.slug, threads: ids, land: 'inbox' }).catch(() => null);
-      // The first thread goes to where the newest chat ran, not to My Workspace.
-      if (n === 1) { try { localStorage.setItem(LAST_PRODUCT_KEY, p.slug); } catch { /* the box asks instead */ } onProject?.(p.slug); }
-    }
-    setBusy(false);
+    try {
+      for (const [folder, ids] of by) {
+        const p = await projectFor(folder, n++ > 0);
+        if (!p) continue;
+        await api.importThreads({ product: p.slug, threads: ids, land: 'inbox' }).catch(() => null);
+        // The first thread goes to where the newest chat ran, not to My Workspace.
+        if (n === 1) { try { localStorage.setItem(LAST_PRODUCT_KEY, p.slug); } catch { /* the box asks instead */ } onProject?.(p.slug); }
+      }
+    } finally { setBusy(false); }
     return picked.length;
   }, [busy, picked, projectFor, onProject]);
 
