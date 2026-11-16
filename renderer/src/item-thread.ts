@@ -663,7 +663,7 @@ export function itemThread(
   // would differ by a trailing space and print itself twice, one under the
   // other, for the rest of the run.
   if (live?.text) {
-    const now = said(live.text);
+    const now = said(withoutHandBack(live.text));
     const already = placed.some((p) => p.node.kind !== 'work'
       && p.node.who === 'it' && said(p.node.text ?? '') === now);
     if (now && !already) {
