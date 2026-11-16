@@ -39,6 +39,8 @@ async function signingUp({ resendRefused = false } = {}) {
     const url = String(input instanceof Request ? input.url : input);
     asked.push({ url, body: String(init?.body ?? '') });
     if (url.includes('/auth/v1/token?grant_type=pkce')) return json(tokenAnswer);
+    // An address not yet confirmed, so the password cannot rescue a failed link.
+    if (url.includes('/auth/v1/token?grant_type=password')) return json({ code: 400, error_code: 'email_not_confirmed', msg: 'Email not confirmed' }, 400);
     if (url.includes('/auth/v1/resend') && resendRefused) return json({ code: 429, error_code: 'over_email_send_rate_limit', msg: 'For security purposes, you can only request this after 42 seconds.' }, 429);
     return json({ id: 'u-1', email: 'new@example.com' });
   });
@@ -59,10 +61,9 @@ async function signingUp({ resendRefused = false } = {}) {
 describe('a new link, from the same sign-up', () => {
   it('after a link that failed, asks for another to this Mac and signs in when it is followed', async () => {
     const { out, returnUrl } = await signingUp();
-    const first = out.confirmed!();
-    first.catch(() => {});
+    const failed = out.failed!();
     await follow(`${returnUrl}?${expired}`);
-    await expect(first).rejects.toThrow(/invalid or has expired/);
+    expect(await failed).toMatch(/invalid or has expired/);
 
     await out.resend!();
     const resend = asked.find((a) => a.url.includes('/auth/v1/resend'))!;
@@ -92,12 +93,22 @@ describe('a new link, from the same sign-up', () => {
   it('says a refused resend in plain words, and an older link afterwards in plain words too', async () => {
     const { out, returnUrl } = await signingUp({ resendRefused: true });
     await expect(out.resend!()).rejects.toThrow('Too many tries just now. Wait a minute and try again.');
-    const still = out.confirmed!();
-    still.catch(() => {});
+    const failed = out.failed!();
     const tab = await follow(`${returnUrl}?code=abc`);
     expect(tab.page).toContain('That link is from an earlier email');
     expect(tab.page).not.toMatch(/PKCE|verifier/);
-    await expect(still).rejects.toThrow('That link is from an earlier email');
+    expect(await failed).toContain('That link is from an earlier email');
+    out.stopWaiting!();
+  });
+
+  it('a failed visit leaves the wait going, so a good link afterwards still signs in', async () => {
+    const { out, returnUrl } = await signingUp();
+    const signedIn = out.confirmed!();
+    const failed = out.failed!();
+    await follow(`${returnUrl}?${expired}`);
+    await failed;
+    await follow(`${returnUrl}?code=good`);
+    expect(await signedIn).toBeTruthy();
   });
 });
 
@@ -141,6 +152,21 @@ describe('the team service', () => {
     t.fail('Email link is invalid or has expired');
     expect(await waiting).toEqual({ ok: false, error: 'Email link is invalid or has expired' });
     expect(service.state().signedIn).toBe(false);
+  });
+
+  it('answers a failed visit at once, while a later good link still signs in', async () => {
+    const t = waitingSignUp();
+    let tell: (why: string) => void = () => {};
+    const session = { ...t.session, async signUp() { return { ...(await t.session.signUp()), failed: () => new Promise<string>((r) => { tell = r; }) }; } };
+    const service = await aService(session);
+    await service.signUp('new@example.com', 'pw-123456', 'Ada');
+    const waiting = service.confirmation()!;
+    tell('Email link is invalid or has expired');
+    expect(await waiting).toEqual({ ok: false, error: 'Email link is invalid or has expired' });
+    t.land();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(service.state().signedIn).toBe(true);
+    await service.signOut();
   });
 
   it('sends a new link and waits on it, and that link signs in', async () => {

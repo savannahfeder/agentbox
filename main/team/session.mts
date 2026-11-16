@@ -250,17 +250,21 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       if (!configured) throw new Error('this build has no team cloud configured');
       const c = await getClient();
       const returnUrl = cloudConfig.signInReturn || SIGN_IN_RETURN;
+      const account = { email: String(email ?? '').trim(), password: String(password ?? '') };
       const { data, error } = await c.auth.signUp({
-        email: String(email ?? '').trim(),
-        password: String(password ?? ''),
+        ...account,
         options: { data: { full_name: String(name ?? '').trim() || undefined }, emailRedirectTo: returnUrl },
       });
       if (error) throw new Error(plainAuthError(error.message));
       if (data?.session) return { backend: supabaseBackend(c) };
-      const at = String(email ?? '').trim();
+      // A link opened once before, by the person or a mail scanner, comes back spent, yet that first
+      // open confirmed the address, so the password from this sign-up now signs in.
+      const rescue = async () => !(await c.auth.signInWithPassword(account)).error;
+      // The wait goes on after a visit nothing could finish; the screen is still told why.
+      let failedVisit: (why: string) => void = () => {};
       // As long as the link lives (cloud/supabase/config.toml, otp_expiry).
       const listen = async () => {
-        const held = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log });
+        const held = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log, rescue, onFailed: (why) => failedVisit(why) });
         held.over.catch(() => {});
         return held;
       };
@@ -268,11 +272,12 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       return {
         confirm: true,
         confirmed: () => over.then(() => supabaseBackend(c)),
+        failed: () => new Promise<string>((resolve) => { failedVisit = resolve; }),
         stopWaiting: () => { cancelGoogleSignIn(); },
         // Sent before the wait is replaced, so a refused send leaves the earlier link's wait as it was.
         // The new code replaces the old one in the client, so only the newest link signs in.
         async resend() {
-          const { error: refused } = await c.auth.resend({ type: 'signup', email: at, options: { emailRedirectTo: returnUrl } });
+          const { error: refused } = await c.auth.resend({ type: 'signup', email: account.email, options: { emailRedirectTo: returnUrl } });
           if (refused) throw new Error(plainAuthError(refused.message));
           ({ over } = await listen());
         },

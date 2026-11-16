@@ -189,7 +189,7 @@ export interface TeamSession {
   cancelSignIn?(): boolean | void;
   signInWithPassword?(email: string, password: string): Promise<TeamBackend>;
   adoptSession?(session: { supabaseUrl: string; access_token: string; refresh_token: string } | null): Promise<TeamBackend | null>;
-  signUp?(account: { email: string; password: string; name: string; log?: (line: string) => void }): Promise<{ backend?: TeamBackend; confirm?: boolean; confirmed?: () => Promise<TeamBackend>; stopWaiting?: () => void; resend?: () => Promise<void> } | null | undefined>;
+  signUp?(account: { email: string; password: string; name: string; log?: (line: string) => void }): Promise<{ backend?: TeamBackend; confirm?: boolean; confirmed?: () => Promise<TeamBackend>; failed?: () => Promise<string>; stopWaiting?: () => void; resend?: () => Promise<void> } | null | undefined>;
   signOut?(): Promise<unknown>;
   /** The cloud as nobody, for what anyone may read: a shared file's link. */
   anyone?(): Promise<TeamBackend | null>;
@@ -399,16 +399,18 @@ export function createTeamService({
   let state: TeamState = { ...EMPTY, configured: !!session?.configured, canSignIn: !!session?.configured, settling: !!session?.configured, phoneSite: site, phoneSiteQr: null };
   let backend: TeamBackend | null = null;
   let confirming: Promise<Confirmation> | null = null;
-  let awaitingLink: { confirmed: () => Promise<TeamBackend>; resend?: () => Promise<void>; stopWaiting?: () => void } | null = null;
+  let awaitingLink: { confirmed: () => Promise<TeamBackend>; failed?: () => Promise<string>; resend?: () => Promise<void>; stopWaiting?: () => void } | null = null;
   const waitOnTheLink = () => {
     const waiting = awaitingLink!;
-    confirming = waiting.confirmed().then(
+    const ended: Promise<Confirmation> = waiting.confirmed().then(
       async (b) => { if (awaitingLink === waiting) awaitingLink = null; await signedIn(b); return { ok: true } as const; },
       (err) => {
         log(`team: email confirmation: ${err?.message ?? err}`);
         return { ok: false, error: String(err?.message ?? err), ...(err?.cancelled ? { cancelled: true } : {}) };
       },
     );
+    // A failed visit is answered at once; the wait itself goes on, and a good link still signs in.
+    confirming = waiting.failed ? Promise.race([ended, waiting.failed().then((error): Confirmation => ({ ok: false, error }))]) : ended;
   };
   let sync: ReturnType<typeof createTeamSync> | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -955,7 +957,7 @@ export function createTeamService({
       const out = await session.signUp({ email, password, name, log });
       if (out?.backend) { await signedIn(out.backend); return state; }
       awaitingLink?.stopWaiting?.();
-      awaitingLink = out?.confirmed ? { confirmed: out.confirmed, resend: out.resend, stopWaiting: out.stopWaiting } : null;
+      awaitingLink = out?.confirmed ? { confirmed: out.confirmed, failed: out.failed, resend: out.resend, stopWaiting: out.stopWaiting } : null;
       if (awaitingLink) waitOnTheLink(); else confirming = null;
       return { ...state, confirm: true };
     },
