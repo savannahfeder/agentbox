@@ -218,18 +218,17 @@ nothing new to pay for.
 
 ## Agentcloud
 
-A laptop runs a few agents before it slows down, and they stop when you close
-the lid. Agentcloud gives every agent its own computer in the cloud, so you can
-run far more at once and keep them going with your laptop shut.
+Agentcloud gives every agent its own computer in the cloud. Your laptop stops
+being the limit on how many run at once, and they keep working after you close
+it.
 
-<img src="docs/readme/agentcloud.webp" alt="A laptop running three agents shuts, and a grid fills to 200 agents running in Agentcloud, three of them lit because they need you" width="100%">
+<img src="docs/readme/agentcloud.webp" alt="Three agents share one laptop; the lid shuts and each one moves to its own cloud computer, and more computers join them, each running one agent" width="100%">
 
-- **Every agent gets its own computer.** A Linux machine with 2 cores and 8 GB
-  of memory, fresh for each run. The agent installs whatever it needs, and a
-  project's `.agentbox/cloud-setup.sh` runs before it starts.
-- **Hundreds at once.** We have run 200 at once on the real cloud, and none was
-  lost or started twice. The agents run on their own machines, not on your
-  Mac, so it stays fast.
+- **A whole machine for each agent.** Linux, 2 cores and 8 GB of memory, fresh
+  for every run. The agent installs whatever it needs, and a project's
+  `.agentbox/cloud-setup.sh` runs before it starts.
+- **Your Mac stays fast.** None of the agents run on it, so starting more never
+  slows it down.
 - **Close the laptop.** A cloud thread keeps working with the lid shut. Start
   new threads and answer the ones that need you from your phone, and the cloud
   picks them up.
