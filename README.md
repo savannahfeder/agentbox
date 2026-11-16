@@ -21,6 +21,7 @@
   <a href="#how-it-works">How it works</a> ·
   <a href="#what-matters-most-goes-first">Priorities</a> ·
   <a href="#built-for-the-keyboard">Keys</a> ·
+  <a href="#agentcloud">Agentcloud</a> ·
   <a href="#what-this-sends">Privacy</a> ·
   <a href="LICENSE">GPL-3.0</a>
 </p>
@@ -215,6 +216,38 @@ own subscription. When you first open it, it finds the agents you have already
 set up and offers to bring them in. There is no server, no account to make, and
 nothing new to pay for.
 
+## Agentcloud
+
+A laptop runs a few agents before it slows down, and they stop when you close
+the lid. Agentcloud gives every agent its own computer in the cloud, so you can
+run far more at once and keep them going with your laptop shut.
+
+<img src="docs/readme/agentcloud.webp" alt="A laptop running three agents shuts, and a grid fills to 200 agents running in Agentcloud, three of them lit because they need you" width="100%">
+
+- **Every agent gets its own computer.** A Linux machine with 2 cores and 8 GB
+  of memory, fresh for each run. The agent installs whatever it needs, and a
+  project's `.agentbox/cloud-setup.sh` runs before it starts.
+- **Hundreds at once.** We have run 200 at once on the real cloud, and none was
+  lost or started twice. The agents run on their own machines, not on your
+  Mac, so it stays fast.
+- **Close the laptop.** A cloud thread keeps working with the lid shut. Start
+  new threads and answer the ones that need you from your phone, and the cloud
+  picks them up.
+- **The same inbox.** Cloud threads sit beside the ones on your Mac and come
+  back the same way. What they make lands in your folder, ready to review.
+- **Your own plans.** Agents run on your Claude Code and Codex subscriptions,
+  never an API key. You sign in to each one through its own sign-in, inside the
+  cloud, and the login on your Mac is never copied there.
+- **You choose what goes.** Send everything to the cloud first, or only what
+  your Mac has no room for. Any thread can also start in the cloud, or move
+  there from its menu.
+- **It asks for your Mac when it needs it.** Xcode, the iOS simulator and files
+  that only your Mac has stay there. A thread that needs one of them asks, or
+  takes that one step on your Mac.
+
+Set it up from the cloud button in the app. Every account can try it for free.
+Agentbox works fully without it, and Agentcloud is the only part that is hosted.
+
 ---
 
 ## Reference
@@ -315,6 +348,11 @@ key, and it only happens in a packaged build.
 The thing that sends the most is not ours at all. This app drives Claude Code
 and Codex, so whatever a session reads and writes goes to Anthropic or OpenAI
 under their terms, exactly as it would if you ran those tools yourself.
+
+Agentcloud sends more, and only once you set it up. A thread that runs there
+takes a copy of its folder to its own cloud computer, and what it makes comes
+back. Without it, nothing of your work leaves your machine except through
+Claude Code and Codex.
 
 </details>
 
