@@ -222,7 +222,7 @@ Each agent runs on a Linux machine in the cloud with 8 GB of memory. Your
 laptop no longer limits how many run at once, and they keep working after you
 close it.
 
-<img src="docs/readme/agentcloud.webp" alt="Four rows in the inbox, each wired to its own cloud computer running its agent's commands; one finishes and its row asks to merge" width="100%">
+<img src="docs/readme/agentcloud.webp" alt="Four threads, each wired to its own computer whose screen shows that agent's commands; one finishes and its thread asks to merge" width="100%">
 
 - **Answer from your phone.** Start threads and reply to the ones that need
   you while your laptop is shut.
