@@ -5,7 +5,7 @@
 // the rows are ordered, how "Updated" is said, and what goes in each board
 // column for the Team, where your own threads come from this Mac and your
 // teammates' from the cards their Macs publish.
-import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mts';
+import { handedOn, shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mts';
 import type { Seen } from './summary-rules';
 import { hiddenUntil, placedAt } from '../list-rules';
 import type { AgentVoice, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
@@ -16,7 +16,8 @@ import { asksSomething } from '../../../shared/teammates.mts';
 import { threadState } from '../../../shared/thread-cards.mts';
 import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
-import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
+import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, taskGiver, whatWaits, type TeamRow } from '../../../shared/team-rules.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 import { taskWords } from '../team/company';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { localDate } from '../local-dates';
@@ -999,6 +1000,25 @@ export function workAudience(item: WorkItem, product: Product | undefined | null
   if (!isDirect(product) || !isWorkThread(item)) return null;
   const ids = othersIn(item, product!, me);
   return ids.length ? `with ${ids.map(nameOf).join(', ')}` : null;
+}
+
+/** Whom a thread was handed to: it is closed, but it did not finish. */
+export function handedTo(item: { status?: string; answer?: string | null }): string | null {
+  return handedOn(item) ? String(item.answer).slice('Given to '.length).replace(/\.$/, '') : null;
+}
+
+export function handedInitials(name: string): string {
+  const words = name.split(/\s+/).filter(Boolean);
+  return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)).toUpperCase();
+}
+
+/** The task a thread became when it was handed on: its link leads back here, from the one who gave it. */
+export function taskHandedFrom<T extends TeamRow & { id: string; body?: string | null }>(items: readonly T[], threadId: string, me: string | null = null): T | null {
+  return items.find((t) => {
+    if (!isTaskRow(t)) return false;
+    const giver = taskGiver(t);
+    return (!me || giver === me) && handedFrom(t.body, giver)?.id === threadId;
+  }) ?? null;
 }
 
 /** "Dev, Maya": the conversation itself is named for who is in it, unless someone renamed it. */
