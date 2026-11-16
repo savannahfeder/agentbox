@@ -1002,7 +1002,10 @@ export function nextVersionName(name: string, count: number): string {
 const spotWords = (n: Pick<FileNote, 'place' | 'pin'>): string => (unit(n.place.x)
   ? `${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y! * 100)}% down`
   : placeWords(n));
-const saveAsNext = (version: Pick<FileVersion, 'name'>, count: number): string => `save the result as ${nextVersionName(version.name, count)} beside the original, keeping the original as it is. Name the new file in your reply so it opens as the next version of ${baseName(version.name)}. The app gives every version its number, the same for everyone, so call it the next version, not a number of your own.`;
+// A second copy of a file the repository tracks would sit beside it in the code
+// (a test file run twice), and the app already shows new bytes at an old path
+// as the next version.
+const saveAsNext = (version: Pick<FileVersion, 'name'>, count: number): string => `If ${version.name} is tracked in your repository, change it where it is and commit it. Otherwise save the result as ${nextVersionName(version.name, count)} beside the original, keeping the original as it is. Name the new file in your reply so it opens as the next version of ${baseName(version.name)}. The app gives every version its number, the same for everyone, so call it the next version, not a number of your own.`;
 
 /** The open notes on this version not yet sent to the agent, as the words that send them. */
 export function notesForTheAgent(marks: Pick<FileMarks, 'notes'> | null | undefined, version: Pick<FileVersion, 'id' | 'path' | 'name'>, count: number, { nameOf = () => 'Someone' }: { nameOf?: NameOf } = {}): { text: string; ids: string[] } {
@@ -1011,7 +1014,7 @@ export function notesForTheAgent(marks: Pick<FileMarks, 'notes'> | null | undefi
     `Notes on ${version.path}:`,
     ...open.map((n) => [`- ${spotWords(n)}: ${n.text} (${nameOf(n.by)})`, ...(n.replies ?? []).map((r) => `  - ${r.text} (${nameOf(r.by)})`)].join('\n')),
     '',
-    `Make these changes and ${saveAsNext(version, count)}`,
+    `Make these changes. ${saveAsNext(version, count)}`,
   ].join('\n');
   return { text, ids: open.map((n) => n.id) };
 }
@@ -1027,7 +1030,7 @@ export function repliesForTheAgent(note: Pick<FileNote, 'place' | 'pin' | 'text'
     `${replies.length === 1 ? 'A reply' : 'Replies'} on the note at ${spotWords(note)} on ${version.path}, "${note.text}":`,
     ...replies.map((r) => `- ${r.text} (${nameOf(r.by)})`),
     '',
-    `If this asks for changes, make them and ${saveAsNext(version, count)}`,
+    `If this asks for changes, make them. ${saveAsNext(version, count)}`,
   ].join('\n');
 }
 
