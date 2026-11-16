@@ -11,10 +11,11 @@
 // Codex's figures ride the `codex app-server` THE FLEET IS ALREADY RUNNING:
 // they arrive unprompted as `account/rateLimits/updated` during a turn.
 //
-// AND NEVER ASK FOR ONE EITHER. This reader briefly
-// also sent an explicit rate-limits read down that pipe whenever its figure
-// went stale. It is deliberately gone, and this paragraph is here so the next
-// reader does not put it back as an obvious improvement.
+// AND NEVER ASK FOR ONE EITHER, EXCEPT WHEN SOMEONE PRESSES REFRESH. This reader
+// briefly sent an explicit rate-limits read whenever its figure went stale, and
+// that is deliberately gone. Since 2026-11-15 the Refresh button on Settings ›
+// Codex asks, and only it (main/codex-usage-on-refresh.mts), because a computer
+// that has not run Codex lately otherwise shows a figure days old.
 //
 //   IT IS NOT A LOCAL LOOKUP. Measured on this Mac 2026-09-05 against a real
 //   `codex app-server` 0.148.0 in a scratch CODEX_HOME with no credentials, that
@@ -29,19 +30,8 @@
 //   detail request timed out`. Local state does not time out, and has no
 //   snapshots to fail to return.
 //
-//   SO IT IS A NEW NETWORK CALL, and CLAUDE.md's rule on those is not
-//   negotiable: "Anything that leaves the machine... a new network call of any
-//   kind" means `legal/privacy.html` and `legal/terms.html` are edited IN THE
-//   SAME SESSION. Those pages live in the founder's store rather than in this
-//   repo, so that obligation cannot be discharged from a session working here,
-//   and shipping the call without it would break a stated law rather than bend
-//   one.
-//
-//   THE COST OF LIVING WITHOUT IT WAS MEASURED AND IS SMALL. The push is free
-//   and already arrives, so the corner fills a beat later -- once a Codex turn
-//   starts pushing -- rather than being asked for. And a workspace set to Codex
-//   with nothing running drew no corner either way, because there was no
-//   app-server there to ask.
+//   SO IT IS A NETWORK CALL, which the privacy and terms pages (in the site
+//   repository) have to name.
 //
 // SO THERE IS NO READING AT ALL UNTIL A TURN REPORTS ONE, AND THAT IS A NORMAL
 // TUESDAY rather than a failure. On a Mac where no Codex work has run the corner
@@ -208,6 +198,14 @@ export class CodexUsage {
     // it. There is one app-server per home and they all report through here.
     if (home !== this._home()) return false;
     return this._keep(mergeRateLimits(this._snapshot, params?.rateLimits), home);
+  }
+
+  /** The answer a Refresh press got from Codex (main/codex-usage-on-refresh.mts). */
+  took(answer: unknown, home: string | null): boolean {
+    if (home !== this._home()) return false;
+    const rateLimits = answer && typeof answer === 'object' ? (answer as { rateLimits?: unknown }).rateLimits : null;
+    if (!codexLimits(rateLimits).length) return false;
+    return this._keep(mergeRateLimits(this._snapshot, rateLimits), home);
   }
 
   _keep(snapshot: object, home: string | null): boolean {

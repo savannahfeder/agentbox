@@ -1,40 +1,33 @@
-// THE PHONE'S "COMPUTER IS AWAY" NOTICE SAYS WHAT TO DO NEXT.
+// THE PHONE'S "COMPUTER IS AWAY" NOTICE SAYS ONE THING TO DO NEXT.
 //
-// What broke (phone testers, 2026-11-08, three reports): "Your computer was
-// last online 3 hours ago. What you send waits for it." and nothing more, so a
-// tester on a train did not know whether to wait, wake the computer or do
-// something on the phone. Read from awayNext and the notice's source.
+// 2026-11-08: "What you send waits for it." and nothing more left a tester on
+// a train not knowing whether to wait, wake the computer or act on the phone.
+// The notice now ends "Open it to run what you send." A second line, "Wake it
+// to carry on, or set up Agentbox Cloud on it.", stayed under it, so it gave
+// two overlapping instructions, neither of which the phone can do, beside a
+// lone Dismiss (QA M-58, 2026-11-14).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { awayNext } from '../mobile/src/lib/computer-line';
+import { phoneStatusLine } from '../renderer/src/phone-rows';
 
 const notice = fs.readFileSync(new URL('../mobile/src/ui/StatusNotice.tsx', import.meta.url), 'utf8');
 const inbox = fs.readFileSync(new URL('../mobile/src/app/index.tsx', import.meta.url), 'utf8');
 const NOW = 1_800_000_000_000;
-const seen = (minutesAgo: number) => NOW - minutesAgo * 60_000;
+const HOUR = 3_600_000;
 
-describe('the next step under the notice', () => {
-  it('away with no cloud: wake it, or set up Agentbox Cloud on it', () => {
-    expect(awayNext({ error: null, macSeen: seen(180), cloud: false }, NOW))
-      .toBe('Wake it to carry on, or set up Agentbox Cloud on it.');
+describe('the away notice', () => {
+  it('says the one step: open Agentbox on the computer', () => {
+    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - HOUR, cloud: false }, NOW))
+      .toBe('Agentbox on your computer was last online 1 hour ago. Open it to run what you send.');
   });
-  it('away with the cloud carrying on: nothing to do, so nothing said', () => {
-    expect(awayNext({ error: null, macSeen: seen(180), cloud: true }, NOW)).toBeNull();
-  });
-  it('online: no notice, no next step', () => {
-    expect(awayNext({ error: null, macSeen: seen(0.5), cloud: false }, NOW)).toBeNull();
-  });
-  it('the phone itself offline: the notice is about the phone, not the computer', () => {
-    expect(awayNext({ error: 'fetch failed', macSeen: seen(180), cloud: false }, NOW)).toBeNull();
-  });
-  it('never connected: the inbox draws its own connect page, not this', () => {
-    expect(awayNext({ error: null, macSeen: 0, cloud: false }, NOW)).toBeNull();
-  });
-});
 
-describe('drawn', () => {
-  it('under the notice\'s words, and the inbox passes it', () => {
-    expect(notice).toMatch(/\{message\}\{!!next && <T[^>]*>\{` \$\{next\}`\}<\/T>\}/);
-    expect(inbox).toMatch(/<StatusNotice message=\{c\.status\} next=\{c\.statusNext\} \/>/);
+  it('with the cloud carrying on, asks for nothing', () => {
+    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - HOUR, cloud: true }, NOW))
+      .toBe('Your computer is off. Replies carry on in Agentbox Cloud.');
+  });
+  it('has no second line; only the no-computer notice carries one', () => {
+    expect(inbox).toMatch(/const notice = c\.status \? \{ message: c\.status, next: null \} : waitNotice\(c\.connect\);/);
+    expect(inbox).toMatch(/<StatusNotice message=\{notice\?\.message\} next=\{notice\?\.next\} \/>/);
+    expect(notice).not.toMatch(/Wake it/);
   });
 });

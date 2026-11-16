@@ -159,8 +159,28 @@
 /* The empty Inbox has no rows to keep clear, so its sky covers the card
    (InboxSky `zero`) in place of the header strip. */
 .app:has(> .inbox-sky-zero) > .inbox-sky-head { display: none; }
-.app:has(> .inbox-sky-zero) .th-start .tc-text::placeholder { color: var(--text-dim); }
+/* Greys sink into the dots, so the writing box over the sky is drawn white.
+   The menus are left alone: they sit on a solid card. Lines stay softer than
+   the words so the priority bars still tell off from on. */
+.app:has(> .inbox-sky-zero) .th-start :is(.tc-text, .tc-chip, .tc-icon, .tc-send) {
+  --text-dim: var(--text); --text-faint: var(--text);
+  --line: color-mix(in srgb, var(--text) 32%, transparent);
+  --line-strong: color-mix(in srgb, var(--text) 40%, transparent); }
+.app:has(> .inbox-sky-zero) .th-start .tc-text::placeholder { color: var(--text); }
 .app:has(> .inbox-sky-zero) .th-start .tc-chip { color: var(--text); }
+.app:has(> .inbox-sky-zero) .th-start .tc-send > button:disabled { opacity: 1; }
+.app:has(> .inbox-sky-zero) .th-start .tc-send kbd { opacity: 1; }
+/* The light purple sky's ink is dark plum on white, which white words cannot
+   clear, so there the box sits on Home's frosted card. The slot is widened by
+   the card's padding so the words keep the heading's left edge. */
+:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start > .th-clear-compose { width: 768px; }
+:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-card.tc-inline { width: 100%; padding: 22px 24px 20px; box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .78), rgba(255, 255, 255, .66));
+  backdrop-filter: blur(36px) saturate(1.05); -webkit-backdrop-filter: blur(36px) saturate(1.05);
+  border: 1px solid rgba(30, 22, 36, .12); border-radius: var(--artifact-corner);
+  box-shadow: inset 0 1px 0 #fff, 0 12px 36px rgba(30, 30, 60, .08); }
+:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-inline .tc-ideas { border: 0; border-top: 1px solid rgba(30, 22, 36, .08); margin: 18px -24px -20px; }
+:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-inline .tc-idea:last-child { border-radius: 0 0 var(--artifact-corner) var(--artifact-corner); }
 
 /* Team and Files wear the Inbox's sky; the Team list would cover it. */
 .app.sky-place .cx-list { background: transparent; }

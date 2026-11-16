@@ -1878,10 +1878,13 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   const [codexReading, setCodexReading] = useState<Usage | null>(null);
   const [codexReadings, setCodexReadings] = useState<AccountUsageReading[]>([]);
   const [codexRefreshing, setCodexRefreshing] = useState(false);
-  const refreshCodex = useCallback(async () => {
+  // Only the button asks Codex (and so OpenAI); opening the page reads what
+  // this computer has. The accounts are read after, so they carry the answer.
+  const refreshCodex = useCallback(async (ask = false) => {
     setCodexRefreshing(true);
     try {
-      const [r, readings] = await Promise.all([api.refreshUsage('codex'), api.accountUsage({ engine: 'codex' })]);
+      const r = await api.refreshUsage('codex', { ask });
+      const readings = await api.accountUsage({ engine: 'codex' });
       // A refusal draws nothing of its own: the empty row below already says
       // why there is nothing.
       if (r.ok && r.reading) setCodexReading(r.reading);
@@ -2065,7 +2068,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
     const lastRead = Math.max(0, ...tiles.map((a) => a.checkedAt ?? 0));
     const checked = lastRead ? usageCheckedAt(lastRead, now) : '';
     const busy = engine === 'codex' ? codexRefreshing : refreshing;
-    const refresh = () => void (engine === 'codex' ? refreshCodex() : readAccounts(true));
+    const refresh = () => void (engine === 'codex' ? refreshCodex(true) : readAccounts(true));
     const addAccount = async (a: Agent) => {
       const r = a.engine === 'codex' ? await api.addCodexAccount() : await api.addClaudeAccount();
       setAdding(r.ok ? { engine: a.engine, name: a.name, command: r.command } : { engine: a.engine, name: a.name, error: r.error });
@@ -2845,11 +2848,11 @@ function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'cl
   return (
     <>
       {list.map((a) => {
-        const live = picked && chosen(a);
+        const live = picked && chosen(a) && a.signedIn !== false;
         return (
           <ReadRow key={a.id} label={a.email ?? a.name ?? 'Not signed in'} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
             {live ? <span className="set-in-use">In use</span>
-              : list.length > 1 && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
+              : list.length > 1 && a.signedIn !== false && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
           </ReadRow>
         );
       })}

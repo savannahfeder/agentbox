@@ -11,7 +11,8 @@ import { hiddenUntil, placedAt } from '../list-rules';
 import type { AgentVoice, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { voiceName } from '../../../shared/agent-voice.mts';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
-import { dayAndTime, firstRealLine } from '../format';
+import { dayAndTime, firstRealLine, itemOptions } from '../format';
+import { asksSomething } from '../../../shared/teammates.mts';
 import { threadState } from '../../../shared/thread-cards.mts';
 import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
@@ -686,10 +687,18 @@ export const repeatsTheTab = (word: string, tab?: string): boolean => !!tab && !
  * agent thread waiting on you says Answered rather than nothing, so the row says
  * why it is there; a teammate waiting on you keeps their words.
  */
-export function cellUnderTab(word: string, tab: string | undefined, { fromPeople }: { fromPeople: boolean }): string | null {
+export function cellUnderTab(word: string, tab: string | undefined, { fromPeople, asks = false }: { fromPeople: boolean; asks?: boolean }): string | null {
   if (tab === 'inbox' && fromPeople) return word;
   if (!repeatsTheTab(word, tab)) return word;
-  return tab === 'inbox' ? 'Answered' : null;
+  if (tab !== 'inbox') return null;
+  return asks ? 'Waiting on you' : 'Answered';
+}
+
+/** The agent's newest word is a question with no options to pick, so only your words answer it. */
+export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined> }): boolean {
+  if (itemOptions(item).length) return false;
+  const said = (item.wrote?.note?.ts ?? 0) > (item.wrote?.result?.ts ?? 0) ? item.note : item.result;
+  return asksSomething(said);
 }
 
 /** The level a row names: none at Medium, which is what an unset thread runs at. */

@@ -639,6 +639,72 @@ export const DRIVES = {
     notInstalled: 'a restart of the installed app is a relaunch through open; this drive runs on the browser copy',
     run: (ctx) => interruptMidRun(ctx, 'quit'),
   },
+  'home-agrees-after-restart': {
+    what: 'quit and reopen the app while a Codex task is mid-run, then read Home and the Inbox in step every second: Home never says a thread is In progress while the Inbox has it in Needs you',
+    stubOnly: 'needs a worker slow enough to be caught mid-run',
+    notInstalled: 'a restart of the installed app is a relaunch through open; this drive runs on the browser copy',
+    budgetMs: 8 * 60_000,
+    async run({ tab, state, claim, capture, live, out }) {
+      const tok = `H${Date.now().toString(36)}`;
+      const engine = state.codexBin ? 'codex' : 'claude';
+      const title = `Capitalize ${tok} [[stub:slow:40000]] [[tok:${tok}]]`;
+      // Filed from Home's own box, the way the report did it.
+      await tab.until(`!!document.querySelector('section.hm-card')`, { why: 'Home to draw' });
+      await tab.press('n');
+      await tab.until(`document.activeElement?.matches('textarea.tc-text')`, { why: 'N to put the cursor in Home\'s box', ms: 8000 });
+      await tab.type(title);
+      if (engine === 'codex') {
+        await tab.evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Claude Code')?.click()`);
+        await tab.wait(500);
+        await tab.evaluate(`[...document.querySelectorAll('.tc-row')].find((b) => b.textContent.trim() === 'Codex')?.click()`);
+        await tab.wait(300);
+        await tab.evaluate(`document.querySelector('textarea.tc-text')?.focus()`);
+      }
+      await tab.press('Enter', ['ctrl']);
+      const row = await until(() => rows(state).find((r) => r.title === title && r.wrote?.title?.source === 'founder'), 10_000);
+      claim(row?.engine === engine || engine === 'claude', `the task went to ${engine}`, String(row?.engine));
+      await tab.wait(30_000);
+      await live.restart('quit');
+      const after = live.readState();
+      await tab.goto(after.url);
+      tab.errors.length = 0;
+      const short = title.slice(0, 20);
+      const readHome = async () => {
+        await tab.evaluate(`document.querySelector('[data-tab="home"]')?.click()`);
+        await tab.until(`!!document.querySelector('section.hm-card')`, { why: 'Home to draw', ms: 5000 }).catch(() => {});
+        return tab.evaluate(`(() => {
+        const card = document.querySelector('section.hm-card[aria-label="In progress"]');
+        return card ? { count: card.querySelector('.t em')?.textContent ?? '0', listed: card.innerText.includes(${JSON.stringify(short)}) } : null;
+      })()`);
+      };
+      const samples = [];
+      const deadline = Date.now() + 150_000;
+      let shot = 0;
+      while (Date.now() < deadline) {
+        const home = await readHome();
+        await tab.wait(250);
+        if (home?.listed && shot < 3) { shot += 1; await capture(`home-${shot}`); }
+        await tab.evaluate(`document.querySelector('[data-tab="inbox"]')?.click()`);
+        await tab.wait(200);
+        await clickTab(tab, /^in progress/i);
+        const inbox = await tab.evaluate(`({ listed: [...document.querySelectorAll('.row:not(.th-head)')].some((r) => r.innerText.includes(${JSON.stringify(short)})), empty: document.querySelector('.th-empty')?.innerText ?? null })`);
+        const r = rows(after).find((x) => x.id === row.id);
+        samples.push({ at: new Date().toISOString(), home, inbox, status: r?.status, claim: r?.claim ?? null, answered: String(r?.result ?? '').includes(tok) });
+        if (home?.listed !== inbox.listed) await capture(`disagree-${samples.length}`);
+        if (samples.at(-1).answered && !home?.listed && !samples.at(-1).inbox.listed && samples.length > 3) break;
+        await tab.wait(700);
+      }
+      fs.writeFileSync(path.join(out, 'home-samples.json'), JSON.stringify(samples, null, 1));
+      // Home is read a moment before the Inbox, so one reading can straddle the answer landing.
+      const differ = (s) => !!s.home?.listed !== !!s.inbox.listed;
+      const disagree = samples.filter((s, i) => differ(s) && i + 1 < samples.length && differ(samples[i + 1]));
+      claim(samples.length > 5, 'Home and the Inbox were read in step after the restart', `${samples.length} readings`);
+      claim(!disagree.length, 'Home and the Inbox never disagree on whether the thread is In progress for two readings running',
+        disagree.slice(0, 3).map((s) => `${s.at} home=${!!s.home?.listed} inbox=${s.inbox.listed} status=${s.status}`).join(' | '));
+      claim(samples.some((s) => s.answered), 'the task is answered once the app is back');
+      await capture('end');
+    },
+  },
   'ctrl-c-mid-run': {
     what: 'Control-C the terminal running the browser copy while a Claude and a Codex task are mid-run, then start it again: both still get exactly one answer',
     stubOnly: 'needs workers slow enough to be caught mid-run',

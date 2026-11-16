@@ -132,6 +132,8 @@ const commandOut = (r: CommandRow): CloudPhoneCommand => ({ id: r.id, owner: r.o
 
 // A time as text or as a Date, to the millisecond (Date.parse of a Date drops them).
 const msOf = (v: string | Date) => new Date(v).getTime();
+/** Storage's refusal of an upload for its size: 413, "exceeded the maximum allowed size". */
+export const isTooBig = (error: Partial<StorageFailure> | null | undefined) => String(error?.statusCode ?? error?.status ?? '') === '413' || /maximum allowed size|payload too large|too large/i.test(`${error?.message ?? ''} ${error?.error ?? ''}`);
 const commentOut = (r: CommentRow) => ({ id: r.id, owner: r.owner, threadId: r.thread_id, by: r.by_person, text: r.body, at: Date.parse(r.created_at) });
 
 export function supabaseBackend(client: SupabaseClient) {
@@ -690,7 +692,9 @@ export function supabaseBackend(client: SupabaseClient) {
     async putPhoneFile({ owner, device, name, data, type }: { owner?: string; device: string; name: string; data: Buffer; type: string | null }) {
       const me = await myId();
       const { error }: { error: StorageFailure | null } = await client.storage.from('phone-files').upload(`${owner ?? me}/${device}/${name}`, data, { contentType: type ?? 'application/octet-stream', upsert: false });
-      if (error && !/exists|duplicate/i.test(`${error.message} ${error.statusCode ?? ''}`) && String(error.statusCode) !== '409') throw new Error(`sending a file to your phone: ${error.message}`);
+      if (error && !/exists|duplicate/i.test(`${error.message} ${error.statusCode ?? ''}`) && String(error.statusCode) !== '409') {
+        throw Object.assign(new Error(`sending a file to your phone: ${error.message}`), { tooBig: isTooBig(error) });
+      }
     },
     // A picture her phone put in this computer's folder for a reply; null when it is not there.
     async getPhoneFile({ owner, device, name }: { owner?: string; device: string; name: string }) {

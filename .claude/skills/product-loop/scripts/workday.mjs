@@ -58,7 +58,7 @@ export function phonePrompt(person, { dir, minutes, focus = null, logged = [], i
     ...(focus ? ['', `Lean on this today: ${focus}`] : []),
     '',
     '## Your two commands, run from this folder',
-    `- \`${path.join(dir, 'phone')}\`: open, look, tap <n|"words">, type "<text>", press <key>, swipe up|down|left|right,${iphone ? ' home,' : ''} shot <name>, away <minutes>, reload. The phone is already open; start with look.${iphone ? ' It is a real iPhone, with its own keyboard and alerts; a command can take a few seconds.' : ''}`,
+    `- \`${path.join(dir, 'phone')}\`: open, look, tap <n|"words">,${iphone ? '' : ' hold <n|"words">,'} type "<text>", press <key>, swipe up|down|left|right,${iphone ? ' home,' : ''} shot <name>, away <minutes>, reload. The phone is already open; start with look.${iphone ? ' It is a real iPhone, with its own keyboard and alerts; a command can take a few seconds.' : ' Choosing a photo or file hands over a sample picture or note, as picking from your library would.'}`,
     `- \`${path.join(dir, 'diary')}\`: note "<what you did and how it felt>", issue --severity broken|wrong|slow|confusing --title "…" --steps "…" --expected "…" --actual "…" --shot <name>, again <n> "<what you saw>", time.`,
     '',
     'Write in the diary as you go, not at the end: a session can be stopped at any moment. Take a shot before logging an issue and name it in --shot. Open a shot when you need to see the screen rather than its words.',
@@ -172,6 +172,8 @@ export function focusFor(given, reached) {
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
+  // The phones this workday opens end with it, even if it is killed outright (cdp.mjs launchChrome).
+  process.env.AGENTBOX_TEST_RUN_PID = String(process.pid);
   const args = process.argv.slice(2);
   const opt = (n, f = null) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : f; };
   const say = (s) => console.log(`[${new Date().toTimeString().slice(0, 8)}] ${s}`);

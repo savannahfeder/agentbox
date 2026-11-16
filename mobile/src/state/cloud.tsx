@@ -23,11 +23,10 @@ import { toastParts } from '../../../renderer/src/toast-parts';
 import { clipToSentence } from '../../../renderer/src/list-rules';
 import { PHONE_UNDO_MS } from '../../../shared/phone-undo.mts';
 import { heldAnswers } from '../lib/held-answers';
-import { awayNext } from '../lib/computer-line';
 import type { Saved } from '../lib/attach';
 import type { Picked } from '../platform/pick';
 import { planFor, runSteps, type PressedItem, type Press, type Step } from '../lib/actions';
-import { needsNotice, NOTICE_KEY, noticeFor, readNotice, type Notice } from '../lib/ai-notice';
+import { needsNotice, NO_NOTICES, NOTICE_KEY, noticeFor, readNotices, signedOut, withAnswer, type KeptNotices } from '../lib/ai-notice';
 import { fresh, withDeadline } from '../lib/deadline';
 import { keptStore } from '../lib/kept';
 import { previewCloud } from '../lib/preview';
@@ -44,7 +43,7 @@ import { forgetDrafts } from '../lib/drafts';
 import { forgetCrash, keptCrash } from '../platform/crash';
 import { crashReport, reportsOn } from '../lib/crash-note';
 
-export type Cloud = Pick<CloudClient, 'session' | 'signedIn' | 'generation' | 'select' | 'insertCommand' | 'update' | 'putFile' | 'signFiles' | 'signInWithPassword' | 'signInWithIdToken' | 'signUp' | 'googleUrl' | 'finishGoogle' | 'askPasswordReset' | 'resetAsked' | 'finishReset' | 'setPassword' | 'signOut' | 'insert' | 'remove' | 'rpc' | 'listFiles' | 'removeFiles' | 'upsert'>;
+export type Cloud = Pick<CloudClient, 'session' | 'signedIn' | 'generation' | 'select' | 'insertCommand' | 'update' | 'putFile' | 'signFiles' | 'signInWithPassword' | 'signInWithIdToken' | 'signUp' | 'googleUrl' | 'finishGoogle' | 'askPasswordReset' | 'resetAsked' | 'lapsed' | 'finishReset' | 'setPassword' | 'signOut' | 'insert' | 'remove' | 'rpc' | 'listFiles' | 'removeFiles' | 'upsert'>;
 
 const EMPTY: PhoneRows = { projects: [], threads: [], commands: [] };
 const EVERY_MS = 5000;
@@ -150,7 +149,7 @@ function useCloudState() {
     return () => { clearInterval(timer); sub.remove(); };
   }, [cloud, signedIn, refresh]);
 
-  const shown = useMemo(() => phoneView(rows, now), [rows, now]);
+  const shown = useMemo(() => phoneView(rows, now, settingsRows), [rows, now, settingsRows]);
   // A permission answered on the phone and still inside its Undo leaves every list at once.
   const [heldIds, setHeldIds] = useState<ReadonlySet<string>>(() => new Set());
   const projectOrder = useMemo(() => phoneProjectOrder(settingsRows), [settingsRows]);
@@ -167,11 +166,17 @@ function useCloudState() {
     return () => { teamWatched.current -= 1; };
   }, [refresh]);
   const status = signedIn ? phoneStatusLine({ error: read.error, fetchedAt: read.fetchedAt, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }, now) : null;
-  const statusNext = signedIn ? awayNext({ error: read.error, macSeen: macSeenOf(rows.projects), cloud: cloudCarriesOn(rows.projects) }, now) : null;
   // No computer has sent this account a project yet: the inbox says how to connect one.
   const connect = phoneConnectState({ signedIn, started: !read.first, error: read.error, projects: rows.projects, email: cloud?.session()?.user.email });
   const [seen, setSeen] = useState(() => readSeen(appStore));
-  const markSeen = useCallback((item: { product: string; id: string }) => setSeen((s) => markSeenIn(s, item, appStore)), []);
+  const seenNow = useRef(seen);
+  seenNow.current = seen;
+  const seenSender = useRef<ReturnType<typeof phoneSender> | null>(null);
+  const markSeen = useCallback((item: Parameters<typeof isUnread>[0]) => {
+    // Its computer marks it read too, once, when it was unread here.
+    if (isUnread(item, seenNow.current)) void seenSender.current?.threadEdit({ product: item.product, id: item.id, patch: { seen: Date.now() } }).catch(() => {});
+    setSeen((s) => markSeenIn(s, item, appStore));
+  }, []);
   const markUnseen = useCallback((item: { product: string; id: string }) => setSeen((s) => markUnseenIn(s, item, appStore)), []);
   const unread = useCallback((item: { product: string; id: string }) => isUnread(item, seen), [seen]);
   const aliases = useRef(view.aliases);
@@ -180,6 +185,7 @@ function useCloudState() {
   const sender = useMemo(() => (cloud
     ? phoneSender({ client: cloud, rows: () => rowsNow.current, setRows, aliases: () => aliases.current, changed: () => setNow(Date.now()) })
     : null), [cloud, setRows]);
+  seenSender.current = sender;
 
   /** Says `text` on the toast; its Undo, when the text offers one, runs `undo`. */
   const say = useCallback((text: string, undo?: () => Promise<void>, goes?: Toast['goes']) => {
@@ -193,27 +199,31 @@ function useCloudState() {
    * `undone` runs after its Undo has worked, to put the words back.
    */
   // The yes before your words go to Claude Code or Codex (lib/ai-notice.ts).
-  const [notice, setNotice] = useState<Notice>(null);
+  const [notices, setNotices] = useState<KeptNotices>(NO_NOTICES);
   const [noticeRead, setNoticeRead] = useState(false);
   // This phone's alert address while alerts are on (lib/push-device.ts).
   const [alerts, setAlerts] = useState<KeptAlerts>(null);
   const alertsNow = useRef<KeptAlerts>(null);
   useEffect(() => {
     persist.read().then((kept) => {
-      setNotice(readNotice(kept[NOTICE_KEY]));
+      setNotices(readNotices(kept[NOTICE_KEY]));
       alertsNow.current = readAlerts(kept[ALERTS_KEY]);
       setAlerts(alertsNow.current);
     }).catch(() => {}).finally(() => setNoticeRead(true));
   }, []);
-  const me = signedIn ? cloud?.session()?.user.id ?? null : null;
-  const mine = noticeFor(notice, me);
+  // The client drops a session the cloud refuses at once; the state learns of it on the next read.
+  const live = signedIn && !!cloud?.signedIn();
+  const me = live ? cloud?.session()?.user.id ?? null : null;
+  const mine = noticeFor(notices, me);
   const agreed = !!mine && 'agreed' in mine;
   // Sends waiting on the notice's answer: a yes lets them go on, a no drops them.
   const noticeWaiters = useRef<Array<(yes: boolean) => void>>([]);
   const answerNotice = useCallback((yes: boolean) => {
-    const v = yes ? { agreed: Date.now(), by: me ?? undefined } : { declined: Date.now(), by: me ?? undefined };
-    setNotice(v);
-    void persist.write(NOTICE_KEY, JSON.stringify(v));
+    setNotices((kept) => {
+      const next = withAnswer(kept, me, yes ? { agreed: Date.now() } : { declined: Date.now() });
+      void persist.write(NOTICE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
     for (const go of noticeWaiters.current.splice(0)) go(yes);
   }, [me]);
   // The notice left unanswered: what waited goes no further, and the next send asks again.
@@ -431,11 +441,11 @@ function useCloudState() {
     settingsAt.current = -Infinity;
     setToast(null);
     setSignedIn(false);
-    if (notice && !('by' in notice && notice.by)) { setNotice(null); void persist.write(NOTICE_KEY, null).catch(() => {}); }
-  }, [cloud, setRows, keepAlerts, notice]);
+    if (notices.anyone) { const next = signedOut(notices); setNotices(next); void persist.write(NOTICE_KEY, JSON.stringify(next)).catch(() => {}); }
+  }, [cloud, setRows, keepAlerts, notices]);
 
   return {
-    cloud, opened, signedIn, rows, view, tabs, repeats, status, statusNext, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, answerApproval, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
+    cloud, opened, signedIn: live, rows, computers: settingsRows, view, tabs, repeats, status, loading: read.first, onlineAt: read.error ? 0 : read.fetchedAt, now, refresh, send, answerApproval, closeAll, laterAll, pressPicked, attach, fileOf, toast, say,
     team, teamPending, watchTeam, askTeammate, wanted, goTo: setWanted, takeWanted: () => setWanted(null), minimizedApproval, setMinimizedApproval, approvalRoom, setApprovalRoom,
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice: mine, noticeRead, agreed, answerNotice, leaveNotice, withdrawNotice: () => answerNotice(false),
