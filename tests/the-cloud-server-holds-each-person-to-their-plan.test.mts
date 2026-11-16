@@ -288,11 +288,12 @@ describe('Max runs unlimited agents at once', () => {
     expect(sent.filter((s) => s.payload?.action === 'start')).toHaveLength(200);
   });
 
-  it('a counted plan still says its number and is not unlimited', async () => {
+  // "We got rid of the agent slot limitation" (the owner, 2026-11-16): Pro and Plus are unlimited too.
+  it('Pro is unlimited at once as well, its hours the only limit', async () => {
     const s = setup({ plans: PLANS });
     await s.me();
     await s.gw.admin({ do: 'plan', person: A, plan: 'pro' });
-    expect(await s.me()).toMatchObject({ plan: 'pro', unlimited: false, agents: 10 });
+    expect(await s.me()).toMatchObject({ plan: 'pro', unlimited: true, agents: null });
   });
 });
 

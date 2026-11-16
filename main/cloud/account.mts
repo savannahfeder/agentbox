@@ -365,6 +365,8 @@ async function openStripe(route: string, body: unknown, openExternal: (url: stri
   if (!at) return { ok: false, error: 'signed-out', message: `Sign in to ${Name} Cloud first.` };
   const out = await ask(at.gateway, route, { method: 'POST', key: at.key, body });
   if (out.status !== 200) return { ok: false, error: out.body.error || 'refused', message: out.body.message || `the cloud said ${out.status}` };
+  // A plan started from its trial is charged on the card Stripe holds: no page to open.
+  if (out.body.where === 'started') return { ok: true, where: 'started' };
   if (typeof out.body.url !== 'string' || !STRIPE_PAGE.test(out.body.url)) return { ok: false, error: 'not-stripe', message: 'The cloud answered with a page that is not Stripe\'s.' };
   await openExternal(out.body.url);
   return { ok: true, ...(out.body.where ? { where: out.body.where } : {}) };

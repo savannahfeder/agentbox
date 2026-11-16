@@ -406,14 +406,13 @@ at AgentCore's published rates. The plan limits are set from these.
 
 ## Plans (decided 2026-10-13, numbers to be set from measured use)
 
-- Sold as "+N agent slots": agents running in the cloud at once, on top of
-  this Mac's. A monthly agent-hour limit sits behind each plan, high enough
-  that most people never reach it; past it, threads wait for the Mac.
-- Pro $40 +10 slots and 400 hours a month, Plus $100 +25 and 1,200 hours,
-  Max $200, unlimited at once, and 3,000 hours (the owner's hours,
-  2026-10-20, against a measured $0.07 an agent-hour). Max's unlimited has
-  a ceiling of 200 at once that is never shown, so one runaway loop cannot
-  take the AWS session limit every customer shares. No top-ups for now.
+- Sold by hours: no plan limits how many agents run at once ("we got rid of
+  the agent slot limitation", the owner, 2026-11-16; until then Pro ran 10
+  and Plus 25). Past a plan's monthly hours, threads wait for the Mac.
+- Pro $40 and 400 hours a month, Plus $100 and 1,200, Max $200 and 3,000
+  (the owner's hours, 2026-10-20, against a measured $0.07 an agent-hour).
+  Each has a ceiling of 200 at once that is never shown, so one runaway loop
+  cannot take the AWS session limit every customer shares. No top-ups for now.
 - A cloud hour is one agent working for one hour; waiting for a reply is
   free (a run ends with its turn). Each agent is its own machine, billed on
   what it uses, so packing agents onto one machine would not save money.
@@ -423,14 +422,18 @@ at AgentCore's published rates. The plan limits are set from these.
   free account, instead we encourage ppl to try the paid trial"). From
   2026-11-06 every account had 5 hours once; they are gone, and a run left
   going on them ends at the next call. Sign-in is the app's own sign-in page.
-- Every paid plan starts with 7 days free, once per person: a checkout for
-  someone who never had a subscription carries Stripe's `trial_end`. "We
-  don't want to disincentivize people from using the more expensive plans"
-  (the owner, 2026-11-16), so the trial's hours are an eighth of the plan's
-  month: Pro 50, Plus 150, Max 375 (`PLAN_TRIAL`). They are counted once in
-  `trialUsed`, and a trial whose first charge fails (past_due, never paid)
-  stays on them, as a team's does. At $0.07 an agent-hour a whole Max trial
-  costs about $26.
+- Every paid plan starts with 7 days free and 50 hours, once per person: a
+  checkout for someone who never had a subscription carries Stripe's
+  `trial_end` (`PLAN_TRIAL`). The hours are the same on every plan, so the
+  dearest plan is no way to more free hours ("We can't afford to give more
+  hours", the owner, 2026-11-16). They are counted once in `trialUsed`, and a
+  trial whose first charge fails (past_due, never paid) stays on them, as a
+  team's does.
+- Once the trial's hours are used, the app offers "Start Pro now" (in the
+  list when threads wait, and on Plan and Billing). It is a checkout for the
+  plan already in its trial, which the server answers by ending the trial on
+  Stripe (`trial_end: now`): Stripe charges the card it holds and the month's
+  hours open with no page to visit. A card that declines opens the billing page.
 
 ### The team plan (the owner, 2026-11-06; to build for 2026-11-17)
 

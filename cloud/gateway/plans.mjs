@@ -7,18 +7,19 @@
 // (2026-10-20), against a measured $0.07 an agent-hour (scripts/cloud-usage.mjs).
 export const PLANS = Object.freeze({
   none: Object.freeze({ agents: 0, hoursPerMonth: 0, filesGB: 0 }),
-  pro: Object.freeze({ agents: 10, hoursPerMonth: 400, dollarsPerMonth: 40, filesGB: 100 }),
-  plus: Object.freeze({ agents: 25, hoursPerMonth: 1200, dollarsPerMonth: 100, filesGB: 500 }),
-  // Sold as unlimited at once: the hours bound the cost. `agents` is a ceiling
+  // Every plan is unlimited at once: the hours bound the cost ("we got rid of
+  // the agent slot limitation", the owner, 2026-11-16). `agents` is a ceiling
   // never shown, so one runaway loop cannot take the AWS session limit that
   // every customer shares.
+  pro: Object.freeze({ agents: 200, unlimited: true, hoursPerMonth: 400, dollarsPerMonth: 40, filesGB: 100 }),
+  plus: Object.freeze({ agents: 200, unlimited: true, hoursPerMonth: 1200, dollarsPerMonth: 100, filesGB: 500 }),
   max: Object.freeze({ agents: 200, unlimited: true, hoursPerMonth: 3000, dollarsPerMonth: 200, filesGB: 2048 }),
 });
 
-// Every paid plan starts with 7 free days, once per person (the owner,
-// 2026-11-16). The trial's hours are an eighth of the plan's month, so a bigger
-// plan is still the better one to try.
-export const PLAN_TRIAL = Object.freeze({ days: 7, hours: Object.freeze({ pro: 50, plus: 150, max: 375 }) });
+// Every paid plan starts with 7 free days and 50 hours, once per person (the
+// owner, 2026-11-16). The same hours on every plan, so the dearest plan is no
+// way to more free hours; once they are used, the app offers to start the plan now.
+export const PLAN_TRIAL = Object.freeze({ days: 7, hours: 50 });
 
 // A team's cloud (the owner, 2026-11-06; 7 days since 2026-11-10): free from
 // the day it was made, 50 hours a member (10 until 2026-11-13: "10 cloud hours

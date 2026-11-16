@@ -167,10 +167,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const noPlan = (rec) => !planOf(rec).agents;
   // A plan in its free week runs on the trial's hours, counted once, not the
   // month's; so does one whose first charge has failed (past_due, never paid).
-  const inTrial = (rec) => !!PLAN_TRIAL.hours[rec.plan]
+  const inTrial = (rec) => !!plans[rec.plan]?.agents
     && (rec.stripe?.status === 'trialing' || (rec.stripe?.status === 'past_due' && rec.stripe.paid === false));
   const trialUsedNow = (rec, t) => (rec.trialUsed || 0) + ownRuns(rec).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
-  const ownOver = (rec, t) => (inTrial(rec) ? trialUsedNow(rec, t) >= PLAN_TRIAL.hours[rec.plan] * 3600
+  const ownOver = (rec, t) => (inTrial(rec) ? trialUsedNow(rec, t) >= PLAN_TRIAL.hours * 3600
     : planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600);
   // TEAMS. Each member has hours of their own, as a seat is one person's plan
   // (the owner, 2026-11-08): the trial's, once, or a seat's, each month. They
@@ -392,8 +392,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       billing: whoBills(rec),
       filesCap: filesCapOf(rec, tm),
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
-      ...(inTrial(rec) ? { trial: { hours: PLAN_TRIAL.hours[rec.plan], usedSeconds: Math.min(PLAN_TRIAL.hours[rec.plan] * 3600, Math.round(trialUsedNow(rec, t))) } } : {}),
-      ...(stripe && !rec.stripe?.subscription ? { trialOffer: { days: PLAN_TRIAL.days, hours: { ...PLAN_TRIAL.hours } } } : {}),
+      ...(inTrial(rec) ? { trial: { hours: PLAN_TRIAL.hours, usedSeconds: Math.min(PLAN_TRIAL.hours * 3600, Math.round(trialUsedNow(rec, t))) } } : {}),
+      ...(stripe && !rec.stripe?.subscription ? { trialOffer: { days: PLAN_TRIAL.days, hours: PLAN_TRIAL.hours } } : {}),
       // Hours and agents are this person's own; `people` is every member's, this one's included.
       ...(tm ? { team: {
         trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: null, running: teamRunning(tm, rec),
@@ -414,7 +414,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (pays === 'own') {
       if (ownOver(rec, t)) {
         return { ok: false, error: 'hours', message: inTrial(rec)
-          ? `Your ${PLAN_TRIAL.hours[rec.plan]} trial hours are used. ${rec.plan[0].toUpperCase()}${rec.plan.slice(1)}'s ${plan.hoursPerMonth.toLocaleString('en-US')} hours a month start when the trial ends.`
+          ? `Your ${PLAN_TRIAL.hours} trial hours are used. Start ${rec.plan[0].toUpperCase()}${rec.plan.slice(1)} now for its ${plan.hoursPerMonth.toLocaleString('en-US')} hours a month.`
           : `This month's ${plan.hoursPerMonth} cloud hours are used.` };
       }
       if (ownRuns(rec).length >= plan.agents) {
@@ -787,6 +787,15 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const base = hostOf(headers);
     const toBilling = async (customer) => ({ url: await stripe.billing({ customer, returnUrl: `${base}/v1/paid?billing=1` }), where: 'billing' });
     const rec = await recOf(person);
+    // The plan in its trial, asked for again, starts now: Stripe ends the trial
+    // and charges at once. A card that declines is mended on the billing page.
+    if (inTrial(rec) && rec.plan === plan && rec.stripe.subscription) {
+      const sub = await stripe.endTrial(rec.stripe.subscription);
+      if (sub?.status !== 'active') return toBilling(rec.stripe.customer);
+      await update(person, (r) => { if (r.stripe?.subscription === sub.id) r.stripe = { ...r.stripe, status: 'active', paid: true, at: now() }; });
+      log(`${person} started ${plan} before its trial ended`);
+      return { where: 'started' };
+    }
     // A change of plan is confirmed on the billing page, opened at that change.
     if (PAYING.has(rec.stripe?.status)) {
       if (rec.plan === plan || !rec.stripe.subscription) return toBilling(rec.stripe.customer);

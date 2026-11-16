@@ -133,7 +133,7 @@ describe('the webhook sets the plan from the subscription as Stripe has it now',
     stripe.subs.set('sub_1', sub('sub_1', 'active', 'pro'));
     const r = await webhook('checkout.session.completed', { id: 'cs_1', object: 'checkout.session', subscription: 'sub_1', client_reference_id: A });
     expect(r).toMatchObject({ status: 200, body: { received: true } });
-    expect(await me()).toMatchObject({ plan: 'pro', agents: 10, hoursPerMonth: 400 });
+    expect(await me()).toMatchObject({ plan: 'pro', unlimited: true, agents: null, hoursPerMonth: 400 });
     expect((await start(2)).body.ok).toBe(true);
   });
 
@@ -241,7 +241,7 @@ describe('setting Stripe up (scripts/stripe-setup.mjs)', () => {
   it('sells each paid plan at its price, and the plan with none is not sold', () => {
     expect(paidPlans().map(([plan, p]) => [plan, p.dollarsPerMonth])).toEqual([['pro', 40], ['plus', 100], ['max', 200]]);
     expect(productOf('max', PLANS.max)).toMatchObject({ name: 'Agentbox Cloud Max', description: 'Unlimited agents at once in the cloud, 3,000 hours a month', metadata: { agentbox_plan: 'max' } });
-    expect(productOf('pro', PLANS.pro).description).toBe('10 agents at once in the cloud, 400 hours a month');
+    expect(productOf('pro', PLANS.pro).description).toBe('Unlimited agents at once in the cloud, 400 hours a month');
   });
 
   it('keeps a price that still matches the plan, and replaces one that does not', () => {

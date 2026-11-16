@@ -908,8 +908,8 @@ export interface CloudPlan {
   usedSeconds?: number;
   /** A paid plan in its free week: the trial's hours, which replace the month's until Stripe charges. */
   trial?: { hours: number; usedSeconds: number };
-  /** Before any subscription: every paid plan's free week, and each plan's trial hours. */
-  trialOffer?: { days: number; hours: { pro: number; plus: number; max: number } };
+  /** Before any subscription: every paid plan's free week and its hours, the same on each. */
+  trialOffer?: { days: number; hours: number };
   /** The team's hours: a trial until `endsAt`, or `seats` paid for; `seats` in a trial means the card is in and not yet charged. */
   /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {
@@ -2028,7 +2028,7 @@ declare global {
       cloudAccountReopen?(): Promise<unknown>;
       cloudAccountSignOut?(): Promise<unknown>;
       cloudAccountPlan?(): Promise<CloudPlan>;
-      cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
+      cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing' | 'started'; error?: string; message?: string }>;
       cloudAccountFromTeam?(p: { acceptTerms: boolean }): Promise<{ ok: boolean; error?: string; message?: string }>;
       cloudAccountBilling?(): Promise<{ ok: boolean; error?: string; message?: string }>;
       cloudClipboardCode?(): Promise<{ code: string | null }>;

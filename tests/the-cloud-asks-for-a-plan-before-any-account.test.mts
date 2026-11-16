@@ -42,10 +42,11 @@ describe('which step the setup screen opens on', () => {
 
 describe('the plan cards', () => {
   const html = renderToStaticMarkup(React.createElement(CloudPlanCards, { plan: { signedIn: true, plan: 'none' }, onChoose: () => {} }));
-  it('are three, side by side, each with its price, agents and hours', () => {
+  it('are three, side by side, each with its price and hours, and no count of agents', () => {
     expect((html.match(/class="cloud-plan"/g) || []).length).toBe(3);
     const t = text(html);
-    for (const s of ['$40', '$100', '$200', '10 agents', '25 agents', 'Unlimited agents', '400 hours a month', '1,200 hours a month', '3,000 hours a month']) expect(t).toContain(s);
+    for (const s of ['$40', '$100', '$200', '400 hours a month', '1,200 hours a month', '3,000 hours a month']) expect(t).toContain(s);
+    expect(t).not.toMatch(/agents|slots/);
   });
   it('each with its own button to choose it', () => {
     expect(text(html)).toMatch(/Choose Pro.*Choose Plus.*Choose Max/);

@@ -35,14 +35,16 @@ export function cloudOffer({ cloud, plan, waiting, macFull }: {
   const waitingLine = waiting === 1 ? '1 thread is waiting.' : `${waiting} threads are waiting.`;
   const room = cloud.noRoom?.error;
   const paid = paidOf(plan);
-  if (paid && (room === 'hours' || room === 'agents')) {
-    const up = nextUp(paid);
-    const say = room === 'hours'
-      ? `This month's ${n(plan?.hoursPerMonth ?? PLANS[paid].hoursPerMonth)} hours are used up.`
-      : `All ${plan?.agents ?? PLANS[paid].agents} cloud agents are running.`;
-    const what = (p: PaidPlan) => (room === 'hours' ? `${n(PLANS[p].hoursPerMonth)} hours` : PLANS[p].unlimited ? 'unlimited at once' : `${PLANS[p].agents} at once`);
-    return { say, waiting: waitingLine, go: up ? { label: `Move to ${NAME[up]} · ${what(up)}`, act: 'pay', plan: up } : null };
+  // The trial's hours used: start the plan now, which opens its month.
+  if (paid && plan?.trial && room === 'hours') {
+    return { say: `Your ${n(plan.trial.hours)} trial hours are used.`, waiting: waitingLine, go: { label: `Start ${NAME[paid]} now · ${n(PLANS[paid].hoursPerMonth)} hours a month`, act: 'pay', plan: paid } };
   }
+  if (paid && room === 'hours') {
+    const up = nextUp(paid);
+    return { say: `This month's ${n(plan?.hoursPerMonth ?? PLANS[paid].hoursPerMonth)} hours are used up.`, waiting: waitingLine, go: up ? { label: `Move to ${NAME[up]} · ${n(PLANS[up].hoursPerMonth)} hours`, act: 'pay', plan: up } : null };
+  }
+  // No plan limits how many run at once; this is the ceiling one account shares with nobody.
+  if (paid && room === 'agents') return { say: `${PLANS[paid].agents} cloud agents are running, the most one account can run at once.`, waiting: waitingLine, go: null };
   if (!macFull) return null;
   // This computer, whatever it is: the app runs on Linux, and this sentence is
   // the one that asks for money.
@@ -54,9 +56,7 @@ export function cloudOffer({ cloud, plan, waiting, macFull }: {
 }
 
 export interface PlanCard {
-  id: PaidPlan; name: string; price: string; slots: string; hours: string; files: string; current: boolean; button: string | null;
-  /** What runs at once, and the month's hours, as the card says them. */
-  agents: string;
+  id: PaidPlan; name: string; price: string; hours: string; files: string; current: boolean; button: string | null;
 }
 
 const filesWords = (gb: number) => `${gb >= 1024 ? `${n(gb / 1024)} TB` : `${n(gb)} GB`} of files in the cloud`;
@@ -70,19 +70,18 @@ export function planCards(plan: CloudPlan | null): PlanCard[] {
     const p = PLANS[id];
     return {
       id, name: NAME[id], price: `$${p.dollarsPerMonth}`,
-      slots: p.unlimited ? 'Unlimited agent slots' : `+${p.agents} agent slots`,
       hours: `${n(p.hoursPerMonth)} hours a month`,
       files: filesWords(p.filesGB),
       current: mine === id,
-      // The trial's hours on the button, since they grow with the plan.
-      button: mine === id ? null : offer ? `Try free · ${n(offer.hours[id])} hours` : `${verb} ${NAME[id]}`,
-      agents: p.unlimited ? 'Unlimited agents' : `${p.agents} agents`,
+      button: mine === id ? null : offer ? `Try ${NAME[id]} free` : `${verb} ${NAME[id]}`,
     };
   });
 }
 
 export interface PlanSummary {
   name: string; price: string; who: string; manage: boolean;
+  /** In a trial: the button that ends it and starts the plan now. */
+  start: string | null;
   /** Over the meters, and over the cards. A team's plan has a page of its own (team/TeamBilling.tsx). */
   period: string; change: string | null;
   agents: { line: string; percent: number };
@@ -100,8 +99,9 @@ export function planSummary(plan: CloudPlan | null): PlanSummary | null {
   return {
     name: `${Name} Cloud ${NAME[mine]}`,
     price: trial ? 'Free trial' : `$${PLANS[mine].dollarsPerMonth} a month`,
-    who: trial ? `then $${PLANS[mine].dollarsPerMonth} a month` : manage ? 'Billed monthly by Stripe' : 'Set up for you, nothing to pay',
+    who: trial ? (trial.usedSeconds >= trial.hours * 3600 ? `Your ${n(trial.hours)} trial hours are used` : `then $${PLANS[mine].dollarsPerMonth} a month`) : manage ? 'Billed monthly by Stripe' : 'Set up for you, nothing to pay',
     manage,
+    start: trial ? `Start ${NAME[mine]} now` : null,
     period: trial ? 'Your trial' : 'This month', change: 'Change plan',
     agents: plan.unlimited
       ? { line: `${running} running, no limit`, percent: 0 }

@@ -109,6 +109,8 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
       return (await call('POST', '/v1/billing_portal/sessions', { customer, return_url: returnUrl, ...flow })).url;
     },
     subscription: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`),
+    // Ends a trial at once, which charges the first month now; answers the subscription as it then stands.
+    endTrial: (id) => call('POST', `/v1/subscriptions/${encodeURIComponent(id)}`, { trial_end: 'now' }),
     // A team's seats, set to the people on it. A seat added mid-month is charged for the rest of that month.
     async seats(id, quantity) {
       const item = (await call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`)).items?.data?.[0];
