@@ -51,8 +51,7 @@ export const NOBODY_WHY = 'You have no AI teammates working, so an agent took it
 export const FAILED_WHY = 'Auto could not decide, so an agent took it.';
 export const PICKED_WHY = 'You picked it.';
 // Read after "<primary> took this." on the thread.
-export const PRIMARY_WHY = 'Auto was not sure who should.';
-export const PRIMARY_TIE_WHY = 'Two teammates fit, so it decides who does the work.';
+export const PRIMARY_WHY = 'It needs several of your teammates.';
 
 /**
  * The teammates a thread can go to by their job: set up, not paused, not
@@ -63,14 +62,12 @@ export function routeCandidates<T extends RouteMate>(teammates: readonly T[] = [
 }
 
 /**
- * PURE. What Auto could not place goes to the primary when there is one: two
- * that fit, or no usable answer. A clear answer is left as it was.
+ * PURE. What Auto could not place goes to an ordinary agent, never to a
+ * general teammate, which did one-off work worse (w-bb45118b10). Two that fit
+ * still ask you.
  */
-export function orPrimary(decision: RouteDecision | null | undefined, primary: { id: string } | null | undefined): RouteDecision {
-  if (!primary) return decision ?? { to: 'agent', why: FAILED_WHY };
-  if (!decision) return { to: `mate:${primary.id}`, why: PRIMARY_WHY };
-  if (decision.ask) return { to: `mate:${primary.id}`, why: PRIMARY_TIE_WHY };
-  return decision;
+export function orAgent(decision: RouteDecision | null | undefined): RouteDecision {
+  return decision ?? { to: 'agent', why: FAILED_WHY };
 }
 
 const cut = (s: string | null | undefined, n: number) => {

@@ -182,7 +182,7 @@ import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.m
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel, smallModelPictures } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
-import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
+import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orAgent, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
@@ -5188,13 +5188,13 @@ export class Supervisor {
     let all: RouteMate[] = [];
     try { all = on ? this.store.teammates?.list?.(now) ?? [] : []; } catch { all = []; }
     const team = routeCandidates(all);
-    // What Auto cannot place goes to the primary, when there is one.
+    // A primary is offered only for an ask that spans several jobs; what Auto cannot place goes to an agent.
     const primary = primaryOf(all);
     let declined: string[] = [];
     try { declined = on ? this.store.teammates?.declinedRoles?.() ?? [] : []; } catch { declined = []; }
     const taken = [...all.flatMap((t) => [t.name, t.role ?? '']), ...declined].filter(Boolean);
     const write = (decision: RouteDecision | null) => {
-      const patch = routedPatch(next, orPrimary(decision, primary), { items, now: Date.now() });
+      const patch = routedPatch(next, orAgent(decision), { items, now: Date.now() });
       this.store.routeItem(next.product, next.id, patch);
       this.wake();
       return patch;
@@ -5202,7 +5202,7 @@ export class Supervisor {
     if (!on) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
     // With nobody to give it to, the thread starts at once; the question is
     // still asked, for the offer of a teammate, which follows on the thread.
-    const early = team.length ? null : routedPatch(next, orPrimary({ to: 'agent', why: NOBODY_WHY }, primary), { items, now: Date.now() });
+    const early = team.length ? null : routedPatch(next, { to: 'agent', why: NOBODY_WHY }, { items, now: Date.now() });
     if (early) { this.store.routeItem(next.product, next.id, early); this.wake(); }
     this._routing = true;
     let product: Product | null = null;
@@ -5220,7 +5220,7 @@ export class Supervisor {
         const offer = readOffer(answer, { taken });
         let routed = early?.routed;
         if (!early) {
-          const decision = orPrimary(readRoute(answer, team, primary), primary);
+          const decision = orAgent(readRoute(answer, team, primary));
           const toMate = decision.to?.startsWith('mate:') && decision.to !== (primary ? `mate:${primary.id}` : null);
           routed = write(decision).routed;
           if (decision.ask || toMate) return;
