@@ -134,7 +134,7 @@ import { ContinuedFrom, HandedFrom, OpenTeammateThread } from '../threads/Contin
 import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
-import { rowTitle } from '../list-rules';
+import { rowTitle, showsWhenItComesBack } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
 import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
@@ -2080,7 +2080,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     : <>{backButton}{bandLine}</>;
 
   // A closed thread has nothing to bring back, whatever time it still carries.
-  const scheduledHere = item.status !== 'done' && (scheduledUntil ?? 0) > 0;
+  const scheduledHere = showsWhenItComesBack(item, scheduledUntil, answered);
 
   // ANYTHING ADDED TO THIS ELEMENT RIDES BESIDE THE LITERAL, NEVER INSIDE IT.
   // `the way out of an opened task` finds this element by the literal string

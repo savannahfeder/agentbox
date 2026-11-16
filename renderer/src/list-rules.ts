@@ -490,6 +490,12 @@ export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
   return (i.snoozedUntil ?? 0) > now;
 }
 
+/** Whether a thread shows when it comes back. A word on its way (held for Z) lifts your Later before it is written. */
+export function showsWhenItComesBack(i: Pick<InboxItem, 'status' | 'snoozedUntil'>, scheduledUntil: number | undefined, onItsWay: boolean, now = Date.now()): boolean {
+  if (i.status === 'done' || !((scheduledUntil ?? 0) > 0)) return false;
+  return !(onItsWay && replyClearsSchedule(i as InboxItem, now));
+}
+
 export type ClickTarget = 'row' | 'box';
 export type ClickIntent = 'open' | 'toggle' | 'range';
 
