@@ -606,6 +606,9 @@ export const api = {
           base.cloud.movable = here;
           if (cloud === 'all') base.supervisor.whyNotCloud = Object.fromEntries(here.map((id) => [id, { at: 'mac' as const, why: 'moving' }]));
         }
+        // &movedhere draws the second running thread moved to this Mac after the cloud could not start it.
+        const second = base.supervisor.running[1];
+        if (params.has('movedhere') && second) base.supervisor.whyNotCloud = { ...base.supervisor.whyNotCloud, [second.itemId]: { at: 'mac' as const, why: 'cloud-refused' } };
       }
       // &cloud=managed draws Agentbox Cloud signed in through its server, and
       // &noroom=hours|agents the server saying it had no room a moment ago.
