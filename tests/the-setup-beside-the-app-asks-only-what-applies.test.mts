@@ -22,16 +22,16 @@ describe('which steps the setup shows', () => {
   // The founder (2026-11-09): "we are making login required so this is not a
   // logical flow, anything that requires login should come after that step".
   it('signs in as a step of its own, after the first one, before inviting', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'pay', 'teammates', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'teammates', 'look']);
   });
   it('skips the sign-in step for someone already signed in', () => {
-    expect(setupSteps({ chats: 0, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' })).toEqual(['folder', 'plan', 'invite', 'pay', 'look']);
+    expect(setupSteps({ chats: 0, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' })).toEqual(['folder', 'plan', 'invite', 'look']);
   });
   it('has no sign-in step on a build with no account to sign in to', () => {
     expect(setupSteps({ chats: 0, team: false, teammates: false, project: true, signedIn: false })).toEqual(['folder', 'look']);
   });
   it('shows every step on a team build with chats and teammates on', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: true, plan: 'pro' })).toEqual(['chats', 'plan', 'invite', 'pay', 'teammates', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: true, plan: 'pro' })).toEqual(['chats', 'plan', 'invite', 'teammates', 'look']);
   });
   it('asks for a folder instead of chats when this computer has none', () => {
     expect(setupSteps({ chats: 0, team: true, teammates: true, project: true })[0]).toBe('folder');
@@ -89,8 +89,9 @@ describe('the AI teammates offered', () => {
     { starter: 'maintainer', name: 'Maintainer', ask: 'Fix what gets filed' },
     { starter: 'marketing', name: 'Marketing lead', ask: 'Post about what we build' },
   ];
+  // The Chief of staff is no longer offered (tests/no-chief-of-staff-is-made-for-you).
   it('offers the engineering jobs first and only real starters', () => {
-    expect(starterChoices(starters).map((s) => s.starter)).toEqual(['quality', 'maintainer', 'chief']);
+    expect(starterChoices(starters).map((s) => s.starter)).toEqual(['quality', 'maintainer']);
   });
   it('offers nothing when every starter is already on the team', () => {
     expect(starterChoices([])).toEqual([]);

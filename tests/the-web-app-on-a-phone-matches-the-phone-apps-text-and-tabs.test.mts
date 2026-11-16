@@ -121,7 +121,9 @@ describe('the tabs on the phone app', () => {
     expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{onEverything \? 'everything' : tab\} counts=\{counts\} pick=\{setPlace\} team=\{teamMode\} \/>\}/);
     // And under Chats' own bar while it is open, never along the foot.
     expect(inbox).toMatch(/<ChatsPlace tabs=\{<Tabs on="chats"/);
-    expect(inbox.match(/<Tabs /g)).toHaveLength(2);
+    // And Files' own bar (2026-11-15).
+    expect(inbox).toMatch(/<FilesPlace tabs=\{<Tabs on="files"/);
+    expect(inbox.match(/<Tabs /g)).toHaveLength(3);
   });
   it('draw no line of their own; the picked word is underlined, as at the bottom', () => {
     // The look itself is in the-phone-apps-tabs-at-the-top-keep-the-bottom-bars-look.

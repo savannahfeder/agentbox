@@ -31,7 +31,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { cellUnderTab, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
+import { asksForYourWords, cellUnderTab, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -753,7 +753,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;
   // A cloud run that asked for a key is waiting on it, not finished (round one of the key power test).
   const wants = inNeedsYou && !cell.live && !waits && !peopleWaitOnYou ? needsWord(needsLeft(item, savedKeys)) : null;
-  const shownWord = wants ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou });
+  const shownWord = wants ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
   const status = shownWord === null ? undefined : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
   // people on a thread the team or chosen people can see, the lock on one only

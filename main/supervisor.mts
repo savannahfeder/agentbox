@@ -1,6 +1,7 @@
 import { currentActivity } from './agent-activity.mts';
 import { workerGitBrief, withWorkerGitBrief } from './worker-git.mts';
 import { harnessFor, supportsHarnessOperation } from './harnesses.mts';
+import { turnThatEnded, type EndedTurn } from '../shared/finished-turn.mts';
 import { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mts';
 import { NO_METERED_KEY } from './harnesses/claude.mts';
 export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mts';
@@ -167,6 +168,7 @@ import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
 import { claudeModelRows } from './claude-models.mts';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 import { CodexUsage, codexAccountReadings } from './codex-usage.mts';
+import { askCodexForUsage } from './codex-usage-on-refresh.mts';
 import { codexBackAt } from '../shared/codex-usage.mts';
 import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadParams } from './codex-session.mts';
 import type { CodexServerClient, ConnectionServer, ConnectionServers } from './codex-session.mts';
@@ -180,7 +182,7 @@ import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.m
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel, smallModelPictures } from './row-label.mts';
 import { catchUpRow, catchUpResult } from './catch-up.mts';
-import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orPrimary, NOBODY_WHY } from '../shared/auto-route.mts';
+import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orAgent, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
@@ -764,6 +766,8 @@ export interface SupervisorStore {
   recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
+  /** Who is signed in on this computer; absent on a store with no team. */
+  author?(): string | null;
   catchUpItem(slug: string, id: string, opts: { label?: string; problem?: string; result?: string }): unknown;
   routeItem(slug: string, id: string, patch: Record<string, unknown>): unknown;
   prioritizeItem(slug: string, id: string, value: unknown): unknown;
@@ -966,6 +970,7 @@ const POLL_MS = 15_000;
 // How long a cloud session stays open after answering, for a reply that then
 // reaches it in seconds rather than after a new machine's two minutes.
 export const WAIT_FOR_NEXT_REPLY_MS = 10 * 60_000;
+const TURN_TAIL_BYTES = 256 * 1024;
 // How often an agent may restart its own thread on a model or effort it chose.
 const SWITCH_RESTARTS = 3;
 const SWITCH_WINDOW_MS = 30 * 60_000;
@@ -3226,6 +3231,25 @@ export class Supervisor {
     return harnessFor(engineOf(rec.engine)).transcript(this, rec) as string | null;
   }
 
+  // The tail is enough: a finished turn is the transcript's last few lines, and
+  // a Codex rollout can run to tens of megabytes.
+  _turnThatEnded(item: WorkItem, ref: TranscriptRef): EndedTurn | null {
+    const live = this._liveSessions?.[item.id];
+    const rec = live?.sessionId === ref.sessionId ? { ...ref, cwd: live.cwd, cloud: live.cloud } : ref;
+    try {
+      const file = this.transcriptFile(rec);
+      if (!file) return null;
+      const fd = fs.openSync(file, 'r');
+      try {
+        const size = fs.fstatSync(fd).size;
+        const len = Math.min(size, TURN_TAIL_BYTES);
+        const buf = Buffer.alloc(len);
+        fs.readSync(fd, buf, 0, len, size - len);
+        return turnThatEnded(buf.toString('utf8'), engineOf(rec.engine));
+      } finally { fs.closeSync(fd); }
+    } catch { return null; }
+  }
+
   /* `rememberPersonalSession` and `personalSessionFor` were a pair here: one
      map of itemId -> session id, so that a reply on a personal row resumed the
      session that wrote what she was replying to. `_rowSessions` does exactly
@@ -4070,7 +4094,22 @@ export class Supervisor {
   // start over, which is the restart this whole path exists to avoid.
   // `after` is the account trouble that stopped it (`_noteStoppedByAccount`),
   // null for a sleep or a restart.
-  resumeBrief(item: WorkItem, { continuation, product = null, after = null }: { continuation?: boolean; product?: Product | null; after?: string | null } = {}) {
+  resumeBrief(item: WorkItem, { continuation, product = null, after = null, ended = null }: { continuation?: boolean; product?: Product | null; after?: string | null; ended?: EndedTurn | null } = {}) {
+    // A turn that had already ended has no step part-way through, and being
+    // asked to check one is what made it redo its checks (F-216).
+    if (ended) {
+      const parts = [
+        `${NAME} restarted after your last turn on this work item had already ended.`,
+        'Nothing was cut off, and this is that same session. Your answer was:',
+        '',
+        ended.text,
+        '',
+        'Do not re-read files, re-run checks or redo any step. Reply with that same',
+        'answer, word for word, and end your turn.',
+      ];
+      if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
+      return parts.join('\n');
+    }
     const why = after === 'at-limit'
       ? ['Your session on this work item stopped when the plan it runs on reached its',
         'usage limit. The limit has reset.']
@@ -4941,7 +4980,7 @@ export class Supervisor {
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
-      .filter((i) => wantsName(i) && !(now - (this._nameMisses.get(key(i)) ?? -Infinity) < NAME_RETRY_MS))
+      .filter((i) => wantsName(i, this.store.author?.() ?? null) && !(now - (this._nameMisses.get(key(i)) ?? -Infinity) < NAME_RETRY_MS))
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
     if (!next) return undefined;
     this._naming = true;
@@ -5149,13 +5188,13 @@ export class Supervisor {
     let all: RouteMate[] = [];
     try { all = on ? this.store.teammates?.list?.(now) ?? [] : []; } catch { all = []; }
     const team = routeCandidates(all);
-    // What Auto cannot place goes to the primary, when there is one.
+    // A primary is offered only for an ask that spans several jobs; what Auto cannot place goes to an agent.
     const primary = primaryOf(all);
     let declined: string[] = [];
     try { declined = on ? this.store.teammates?.declinedRoles?.() ?? [] : []; } catch { declined = []; }
     const taken = [...all.flatMap((t) => [t.name, t.role ?? '']), ...declined].filter(Boolean);
     const write = (decision: RouteDecision | null) => {
-      const patch = routedPatch(next, orPrimary(decision, primary), { items, now: Date.now() });
+      const patch = routedPatch(next, orAgent(decision), { items, now: Date.now() });
       this.store.routeItem(next.product, next.id, patch);
       this.wake();
       return patch;
@@ -5163,7 +5202,7 @@ export class Supervisor {
     if (!on) { write({ to: 'agent', why: NOBODY_WHY }); return undefined; }
     // With nobody to give it to, the thread starts at once; the question is
     // still asked, for the offer of a teammate, which follows on the thread.
-    const early = team.length ? null : routedPatch(next, orPrimary({ to: 'agent', why: NOBODY_WHY }, primary), { items, now: Date.now() });
+    const early = team.length ? null : routedPatch(next, { to: 'agent', why: NOBODY_WHY }, { items, now: Date.now() });
     if (early) { this.store.routeItem(next.product, next.id, early); this.wake(); }
     this._routing = true;
     let product: Product | null = null;
@@ -5181,7 +5220,7 @@ export class Supervisor {
         const offer = readOffer(answer, { taken });
         let routed = early?.routed;
         if (!early) {
-          const decision = orPrimary(readRoute(answer, team, primary), primary);
+          const decision = orAgent(readRoute(answer, team, primary));
           const toMate = decision.to?.startsWith('mate:') && decision.to !== (primary ? `mate:${primary.id}` : null);
           routed = write(decision).routed;
           if (decision.ask || toMate) return;
@@ -10065,7 +10104,8 @@ export class Supervisor {
     else {
       const kept = this._stoppedSessions?.[item.id];
       const after = resumeId && kept?.sessionId === resumeId ? kept.cause : null;
-      prompt = resumeId ? this.resumeBrief(item, { continuation, product, after }) : this.buildBrief(item, product, { continuation, engine });
+      const ended = resumeId && !after && !(continuation && item.answer) ? this._turnThatEnded(item, { sessionId: resumeId, engine, profile: resumeProfile }) : null;
+      prompt = resumeId ? this.resumeBrief(item, { continuation, product, after, ended }) : this.buildBrief(item, product, { continuation, engine });
     }
     // A BRANCH THE APP COULD NOT SHIP (main/ship-queue.mts) goes back to the
     // session that wrote it, and that is all it is told: it has everything
@@ -10811,8 +10851,15 @@ export class Supervisor {
     // had every task sent to a Claude Code that could not run. Both answers
     // come from the sign-in check (main/engine-setup.mts); until it has
     // answered, nothing moves.
-    const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true;
+    const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true && !this._addedClaudeSignedIn();
     return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
+  }
+
+  /** The launch check only asks the default login, so a signed-in added account must be counted here. */
+  _addedClaudeSignedIn() {
+    const home = this.config.home || os.homedir();
+    const dflt = path.join(home, '.claude');
+    return this._profiles().some((p) => p !== 'default' && path.resolve(p) !== dflt && !!accountIdentity(p, { home }));
   }
 
   /** What runs when nobody chose: Claude Code, or Codex on a Mac without it. */
@@ -11714,6 +11761,34 @@ export class Supervisor {
   /** The same, read again rather than off the cache (`CodexUsage.refreshNow`). */
   refreshCodexUsage() {
     return this._codexUsage().refreshNow();
+  }
+
+  /**
+   * Refresh on Settings › Codex: ask Codex for the live figure, then read as
+   *  `refreshCodexUsage` does. A failed ask leaves the last reading in place.
+   *  An app-server started only for this is closed again once it has answered. */
+  async askCodexUsage() {
+    const home = this._codexUsageHome();
+    if (this.config.codexBin && home) {
+      const already = this._codexServers?.get(home);
+      const startedHere = !already || already.client.isClosed();
+      let entry: CodexServerEntry | null = null;
+      try {
+        entry = this._codexServer(home);
+        const server = entry;
+        const answer = await askCodexForUsage(async (method, params) => { await server.handshake; return server.client.request(method, params); });
+        this._codexUsage().took(answer, home);
+      } catch (e) {
+        console.warn(`zero: codex usage refresh: ${(e as Error)?.message ?? e}`);
+      } finally {
+        const working = [...this.sessions.values()].some((s) => s.engine === 'codex' && !s.cloud && this._codexProfileHome(s.profile ?? 'default') === home);
+        if (startedHere && entry && !working && !entry.loaded?.size && this._codexServers?.get(home) === entry) {
+          this._codexServers.delete(home);
+          entry.client.close('Usage read; nothing else is running on this login');
+        }
+      }
+    }
+    return this.refreshCodexUsage();
   }
 
   /** Every Codex login's own reading, for the Settings page. */

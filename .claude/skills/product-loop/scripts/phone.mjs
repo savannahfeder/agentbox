@@ -4,6 +4,7 @@
 //   phone open                     the app on an iPhone-sized screen (once)
 //   phone look                     the screen's words, and numbered things to tap
 //   phone tap <n> | tap "<words>"  tap thing n from the last look, or the first whose words start so
+//   phone hold <n> | hold "<words>" press and hold it, as a thumb does for a message's menu
 //   phone type "<text>"            type into whatever has the cursor
 //   phone press <key>              Enter, Backspace, Escape…
 //   phone swipe up|down|left|right one swipe across the middle of the screen
@@ -26,6 +27,36 @@ rerunWithStripTypes(import.meta.url);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { launchChrome, connect, freeProfile } = await import(path.resolve(here, '../../verify-agentbox/scripts/cdp.mjs'));
+
+// Longer than any delayLongPress in the app (500 is React Native's default).
+export const HOLD_MS = 800;
+
+/** What a picker is handed: a picture when it asks for pictures, else a short note. */
+export function sampleFor(accept) {
+  return /image|video/.test(accept ?? '') ? { name: 'photo.png', type: 'image/png' } : { name: 'notes.txt', type: 'text/plain' };
+}
+
+// Headless Chrome opens no file chooser, so Expo's pickers (a click on a hidden
+// file input) would wait for ever. This answers that click with a sample.
+export const PICKER = `(() => { if (window.__phonePicker) return; window.__phonePicker = true;
+  const sampleFor = ${sampleFor.toString()};
+  document.addEventListener('click', async (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || input.type !== 'file') return;
+    e.preventDefault();
+    const s = sampleFor(input.getAttribute('accept'));
+    let blob = new Blob(['Notes from the phone test.\\n'], { type: s.type });
+    if (s.type === 'image/png') {
+      const c = document.createElement('canvas'); c.width = 600; c.height = 400; const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 600, 400); grad.addColorStop(0, '#2b2f3a'); grad.addColorStop(1, '#c4673a');
+      g.fillStyle = grad; g.fillRect(0, 0, 600, 400);
+      blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+    }
+    const dt = new DataTransfer(); dt.items.add(new File([blob], s.name, { type: s.type }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  }, true);
+})()`;
 
 export const IPHONE = {
   width: 393, height: 852, scale: 3,
@@ -78,7 +109,7 @@ export function targetScript(arg) {
   const n = Number(arg);
   const pick = Number.isInteger(n) && n > 0
     ? `document.querySelector('[data-phone-ref="${n}"]')`
-    : `[...document.querySelectorAll('[data-phone-ref]')].find((el) => (el.getAttribute('aria-label') || el.innerText || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(${JSON.stringify(String(arg).toLowerCase())}))`;
+    : `[...document.querySelectorAll('[data-phone-ref]')].find((el) => (el.getAttribute('aria-label') || el.innerText || el.getAttribute('placeholder') || '').replace(/\\s+/g, ' ').trim().toLowerCase().startsWith(${JSON.stringify(String(arg).toLowerCase())}))`;
   // A point of it something else covers is a tap on that something: try a few, and say so when all are covered.
   return `(() => { const el = ${pick}; if (!el) return null; el.scrollIntoView({ block: 'nearest' }); const r = el.getClientRects()[0] || el.getBoundingClientRect();
     const at = [[0.5, 0.5], [0.25, 0.5], [0.75, 0.5], [0.5, 0.25], [0.5, 0.75]].map(([fx, fy]) => ({ x: r.left + r.width * fx, y: r.top + r.height * fy }));
@@ -90,6 +121,8 @@ async function asPhone(t) {
   await t.call('Emulation.setDeviceMetricsOverride', { width: IPHONE.width, height: IPHONE.height, deviceScaleFactor: IPHONE.scale, mobile: true });
   await t.call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await t.call('Emulation.setUserAgentOverride', { userAgent: IPHONE.userAgent, platform: 'iPhone' });
+  await t.call('Page.addScriptToEvaluateOnNewDocument', { source: PICKER });
+  await t.evaluate(PICKER).catch(() => {});
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -126,19 +159,23 @@ if (isMain) {
     return t;
   }
   const look = async (t) => { await t.wait(700); console.log(await t.evaluate(LOOK)); };
-  const touch = (t, type, x, y) => t.call('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+  const touch = (t, type, x, y) => t.call('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' || type === 'touchCancel' ? [] : [{ x, y }] });
 
   try {
     if (verb === 'open') { const t = await launch(); await look(t); t.detach(); }
     else if (verb === 'look') { const t = await tab(); await look(t); t.detach(); }
-    else if (verb === 'tap') {
+    else if (verb === 'tap' || verb === 'hold') {
       const t = await tab();
       let at = await t.evaluate(targetScript(args.join(' ')));
       // Re-applying the phone's screen on connect can redraw the page and drop the last look's numbers.
       if (!at) { await t.evaluate(LOOK); at = await t.evaluate(targetScript(args.join(' '))); }
       if (!at) { console.log(`Nothing to tap called ${args.join(' ')}. Look again.`); t.detach(); process.exit(1); }
       if (at.covered) { console.log(`${args.join(' ')} is under something else on the screen. Close what covers it, then tap again.`); t.detach(); process.exit(1); }
-      await touch(t, 'touchStart', at.x, at.y); await touch(t, 'touchEnd', at.x, at.y);
+      await touch(t, 'touchStart', at.x, at.y);
+      if (verb === 'hold') await t.wait(HOLD_MS);
+      // A lifted touch here also fakes a click where the finger was, which lands
+      // on the menu the hold just opened and shuts it; iOS sends no click after a hold.
+      await touch(t, verb === 'hold' ? 'touchCancel' : 'touchEnd', at.x, at.y);
       await look(t); t.detach();
     } else if (verb === 'type') { const t = await tab(); await t.type(args.join(' ')); await look(t); t.detach(); }
     else if (verb === 'press') { const t = await tab(); await t.press(args[0]); await look(t); t.detach(); }
@@ -161,7 +198,7 @@ if (isMain) {
       const t = await tab(); console.log(`You put the phone down for ${Math.round(awayMs / 60_000)} minutes.`); await look(t); t.detach();
     } else if (verb === 'reload') { const t = await tab(); await t.goto(url); await look(t); t.detach(); }
     else if (verb === 'close') { const b = saved(); if (b && isRunning(b.pid)) process.kill(b.pid); fs.rmSync(FILE, { force: true }); console.log('Closed.'); }
-    else { console.log('usage: phone open | look | tap <n|"words"> | type "<text>" | press <key> | swipe up|down|left|right | shot <name> | away <minutes> | reload | close'); process.exit(2); }
+    else { console.log('usage: phone open | look | tap <n|"words"> | hold <n|"words"> | type "<text>" | press <key> | swipe up|down|left|right | shot <name> | away <minutes> | reload | close'); process.exit(2); }
     log();
     process.exit(0);
   } catch (err) {

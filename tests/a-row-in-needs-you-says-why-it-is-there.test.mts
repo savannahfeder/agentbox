@@ -27,6 +27,6 @@ describe('the Status word under a tab', () => {
   });
 
   it('is what the inbox row draws', () => {
-    expect(fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/threads/Pages.tsx'), 'utf8')).toMatch(/cellUnderTab\(worded\.word, tab, \{ fromPeople: !!waits \|\| peopleWaitOnYou \}\)/);
+    expect(fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/threads/Pages.tsx'), 'utf8')).toMatch(/cellUnderTab\(worded\.word, tab, \{ fromPeople: !!waits \|\| peopleWaitOnYou, asks: asksForYourWords\(item\) \}\)/);
   });
 });

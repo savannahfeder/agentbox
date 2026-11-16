@@ -123,9 +123,14 @@ interface CodexAccountModel {
   email?: string | null;
   name?: string | null;
   plan?: string | null;
+  planNamed?: boolean;
   signedIn?: boolean;
   chosen?: boolean;
 }
+
+/** A plan id with no proper name is Codex's word, quoted, as the desktop's `accountSay` says it. */
+const codexPlanLine = (a: CodexAccountModel): string | null =>
+  !a.plan ? null : a.planNamed === false ? `Codex says “${a.plan}”` : a.plan;
 
 /** The window's own IPC channel for a change, and what it is handed: an object, or a bare value such as Pause's boolean. */
 export type SettingRoute = [string, unknown];
@@ -202,6 +207,8 @@ const THREAD: Record<string, Rule> = {
   resume: yes,
   redeliver: yes,
   moveTo: (v: unknown) => typeof v === 'string' && SLUG.test(v),
+  // When the phone opened it, so the window's unread dot goes too.
+  seen: (v: unknown) => Number.isInteger(v) && (v as number) > 0,
 };
 const THREAD_ID = /^[\w-]{1,120}$/;
 
@@ -214,6 +221,7 @@ function threadRoute(p: SettingChange): SettingRoute {
     case 'resume': return ['zero:resume-items', { ids: [p.item] }];
     case 'redeliver': return ['zero:redeliver', at];
     case 'moveTo': return ['zero:move-item', { ...at, to: p.value }];
+    case 'seen': return ['zero:phone-seen', { ...at, at: p.value }];
     // The desktop's "Not shipped after all" writes 0.
     case 'shippedAt': return ['zero:thread-edit', { ...at, patch: { shippedAt: p.value ?? 0 } }];
     default: return ['zero:thread-edit', { ...at, patch: { [p.key]: p.value } }];
@@ -478,7 +486,7 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
         usage: usageFor(model.usage?.claude, a.profile),
       })),
       codexAccounts: (w.codex?.accounts ?? []).map((a) => ({
-        id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: a.plan ?? null, signedIn: !!a.signedIn, chosen: !!a.chosen,
+        id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: codexPlanLine(a), signedIn: !!a.signedIn, chosen: !!a.chosen,
         usage: usageFor(model.usage?.codex, a.profile),
       })),
       // Not `source`: it names the file on this computer.

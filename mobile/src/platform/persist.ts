@@ -11,7 +11,7 @@ import { syncStore, type KeyedStore } from '../lib/drafts';
 import type { Persist } from '../lib/kept';
 import type { InboxFile } from '../lib/last-inbox';
 
-const KEYS = ['agentbox-cloud-session', 'agentbox-cloud-verifier', 'agentbox-cloud-reset', ALERTS_KEY, NOTICE_KEY];
+const KEYS = ['agentbox-cloud-session', 'agentbox-cloud-verifier', 'agentbox-cloud-reset', 'agentbox-cloud-lapsed', ALERTS_KEY, NOTICE_KEY];
 
 export const persist: Persist = Platform.OS === 'web'
   ? {

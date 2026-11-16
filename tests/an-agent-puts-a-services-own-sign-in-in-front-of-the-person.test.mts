@@ -216,8 +216,8 @@ describe('the card', () => {
   // Two power testers read the card's "Done" as the thread's own Done beside it.
   it('opens the service, shows its code, and offers I\'ve signed in and Not now', () => {
     const html = draw({ id: 's-abcdef12', service: 'GitHub', url: LINK, code: 'ABCD-1234' });
-    expect(html).toContain('Sign in to GitHub');
-    expect(html).toContain('Open GitHub');
+    expect(html).toContain('Sign in at github.com');
+    expect(html).toContain('Open github.com');
     expect(html).toContain('ABCD-1234');
     expect(html).toContain('>I&#x27;ve signed in<');
     expect(html).not.toContain('>Done<');
