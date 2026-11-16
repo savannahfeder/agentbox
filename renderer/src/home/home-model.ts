@@ -94,6 +94,14 @@ export function teamRowState({ agents, waitingOnYou }: { agents: number | null; 
   return agents ? 'working' : 'quiet';
 }
 
+/** A Home row is on the Needs you card or the In progress card; a running thread is never in Needs you. */
+export function homeRowOpens<E extends { key: string }, I>(key: string, needs: readonly E[], progress: readonly I[], keyOf: (item: I) => string): { entry: E } | { item: I } | null {
+  const entry = needs.find((e) => e.key === key);
+  if (entry) return { entry };
+  const item = progress.find((i) => keyOf(i) === key);
+  return item ? { item } : null;
+}
+
 const STATE_RANK: Record<TeamRowState, number> = { waiting: 0, working: 1, quiet: 2 };
 
 /** Team this week, busiest first: whoever waits on you, then whoever is

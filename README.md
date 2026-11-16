@@ -21,6 +21,7 @@
   <a href="#how-it-works">How it works</a> ·
   <a href="#what-matters-most-goes-first">Priorities</a> ·
   <a href="#built-for-the-keyboard">Keys</a> ·
+  <a href="#agentcloud-gives-every-agent-its-own-computer">Agentcloud</a> ·
   <a href="#what-this-sends">Privacy</a> ·
   <a href="LICENSE">GPL-3.0</a>
 </p>
@@ -215,6 +216,26 @@ own subscription. When you first open it, it finds the agents you have already
 set up and offers to bring them in. There is no server, no account to make, and
 nothing new to pay for.
 
+## Agentcloud gives every agent its own computer
+
+Each agent runs on a Linux machine in the cloud with 8 GB of memory. Your
+laptop no longer limits how many run at once, and they keep working after you
+close it.
+
+<img src="docs/readme/agentcloud.webp" alt="Four threads, each wired to its own computer whose screen shows that agent's commands; one finishes and its thread asks to merge" width="100%">
+
+- **Answer from your phone.** Start threads and reply to the ones that need
+  you while your laptop is shut.
+- **The same inbox.** Cloud threads sit next to the ones on your Mac, and their
+  work comes back to your folder.
+- **Your own plans.** Agents run on the Claude Code and Codex plans you already
+  have, signed in inside the cloud. Your Mac's login never leaves your Mac.
+- **You choose what goes.** Send every thread to the cloud, or only the ones
+  your Mac has no room for.
+
+Agentcloud is optional, and every account can try it for free from the cloud
+button in the app.
+
 ---
 
 ## Reference
@@ -315,6 +336,10 @@ key, and it only happens in a packaged build.
 The thing that sends the most is not ours at all. This app drives Claude Code
 and Codex, so whatever a session reads and writes goes to Anthropic or OpenAI
 under their terms, exactly as it would if you ran those tools yourself.
+
+Agentcloud, once you turn it on, copies each cloud thread's folder to that
+thread's computer and brings back what it makes. Without it, your work leaves
+your machine only through Claude Code and Codex.
 
 </details>
 
