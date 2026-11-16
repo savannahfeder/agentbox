@@ -37,7 +37,8 @@ describe('the tip on the open practice thread', () => {
 
 describe('where the app says the answer is on the way', () => {
   it('is the practice thread on screen, answered fewer times than replied to', () => {
-    expect(app).toMatch(/answering=\{!!tourPractice\?\.item && focused\?\.id === tourPractice\.item && \(tourPractice\.answered \?\? 0\) <= tourPractice\.replies\}/);
+    expect(app).toContain('const practiceAnswering = !!tourPractice?.item && focused?.id === tourPractice.item && (tourPractice.answered ?? 0) <= tourPractice.replies;');
+    expect(app).toContain('answering={practiceAnswering}');
   });
   it('reaches the screen the tip reads', () => {
     expect(tip).toMatch(/answering: thread && answering,/);

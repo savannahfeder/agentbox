@@ -14,7 +14,7 @@ import { AppMark } from '../components/AppMark';
 import { onCloudPhone } from '../phone-screen';
 import { agreedHere, rememberAgreed } from './cloud-agreed';
 import { whatIsMissing, type Missing } from './what-is-missing';
-import { nextSignUpPart, partMissing, partReady, type SignUpPart } from './sign-up-parts';
+import { nextSignUpPart, goesToPassword, partMissing, partReady, type SignUpPart } from './sign-up-parts';
 import './sign-in.css';
 
 export const GoogleMark = () => (
@@ -254,7 +254,12 @@ export function SignInPage({ onSkip, signedOut = false, error: startError = null
     const ready = partReady(part, { name, email, password });
     const onward = (e?: FormEvent) => {
       e?.preventDefault();
-      if (!ready) { setMissing(partMissing(part, { name, email, password })); return; }
+      if (!ready) {
+        const gap = partMissing(part, { name, email, password });
+        if (!goesToPassword(gap, password, document.activeElement === emailField.current)) setMissing(gap);
+        if (gap) fieldOf[gap.field].current?.focus();
+        return;
+      }
       if (part === 'login') { void submit(); return; }
       step(1);
     };

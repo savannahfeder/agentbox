@@ -15,7 +15,8 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, SETUP_PLANS, cloudShowcase, setupPreview, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, cloudShowcase, heldPress, inviteCursor, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamNameFor, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
 import { PERK_ICONS, ProShowcase } from './ProShowcase';
@@ -71,6 +72,8 @@ export interface SetupSplitProps {
   /** Back from the first step, to the welcome. */
   onBack?: () => void;
   chats: SessionThread[];
+  /** The agents ready on this computer; with both, the setup asks which one starts your threads. */
+  engines?: readonly ('claude' | 'codex')[];
   ticks: Set<string>;
   onToggle: (id: string) => void;
   /** Brings the ticked chats in, making their projects; resolves to how many came in. */
@@ -100,7 +103,9 @@ export function SetupSplit(p: SetupSplitProps) {
   // Someone already on a team was asked to join it, not to pay for it.
   const onTeam = useRef(!!p.snap?.team?.team).current;
   const [plan, setPlan] = useState<SetupPlan>('free');
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam]);
+  const [engine, setEngine] = useState<'claude' | 'codex'>('claude');
+  const agents = p.engines?.length ?? 1;
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
@@ -127,18 +132,23 @@ export function SetupSplit(p: SetupSplitProps) {
     return () => { removeEventListener('resize', fit); root.removeAttribute('data-setup'); };
   }, []);
 
-  // The purchase page shows Pro on the right instead of the app (./ProShowcase.tsx).
+  // The plan page shows Pro on the right instead of the app (./ProShowcase.tsx).
   useEffect(() => {
     const root = document.documentElement;
-    if (step === 'pay') root.dataset.setupPro = ''; else delete root.dataset.setupPro;
+    if (step === 'plan') root.dataset.setupPro = ''; else delete root.dataset.setupPro;
     return () => { delete root.dataset.setupPro; };
   }, [step]);
 
   const next = useCallback(() => { setError(null); setAt((i) => i + 1); }, []);
   // Google finishes in the browser, so the step moves on when the account arrives.
   const signedIn = !!p.snap?.team?.signedIn;
-  useEffect(() => { if (step === 'account' && signedIn) next(); }, [step, signedIn, next]);
-  const back = !finished && (at > 0 || p.onBack) ? () => { setError(null); if (at > 0) setAt((i) => i - 1); else p.onBack?.(); } : null;
+  // The page says the account is made and so does the account arriving; the second to say so must not skip the plan.
+  const stepsNow = useRef(steps);
+  stepsNow.current = steps;
+  const pastAccount = useCallback(() => { setError(null); setAt((i) => (stepsNow.current[i] === 'account' ? i + 1 : i)); }, []);
+  useEffect(() => { if (step === 'account' && signedIn) pastAccount(); }, [step, signedIn, pastAccount]);
+  const backTo = stepBefore(steps, at, signedIn);
+  const back = backTo !== null || p.onBack ? () => { setError(null); if (backTo !== null) setAt(backTo); else p.onBack?.(); } : null;
 
   // ---- invite
   const me = p.snap?.team?.me;
@@ -146,36 +156,46 @@ export function SetupSplit(p: SetupSplitProps) {
   const [emails, setEmails] = useState<string[]>([]);
   const [typed, setTyped] = useState('');
   const addEmail = () => { const l = inviteList([...emails, typed]); if (l.length > emails.length) { setEmails(l); setTyped(''); } };
+  // The team was made when Pro started, under a name nobody chose: the box shows it to change.
+  const teamNow = p.snap?.team?.team?.name ?? '';
+  useEffect(() => { setTeamName(teamNow); }, [teamNow]);
   const sendInvites = useCallback(async () => {
     const list = inviteList([...emails, typed]);
-    // Pro's seats are bought for a team, so it is made even with nobody invited yet.
-    if (!list.length && (plan !== 'pro' || p.snap?.team?.team)) { next(); return; }
     setBusy(true); setError(null);
-    if (!p.snap?.team?.team) {
-      const name = teamName.trim();
-      if (!name) { setBusy(false); setError('Name your team first.'); return; }
-      const made = await api.teamCreate(name);
-      if (!made.ok) { setBusy(false); setError(made.error ?? 'The team was not made.'); return; }
+    const name = teamName.trim();
+    if (name && name !== teamNow) {
+      const renamed = await api.teamRename(name);
+      if (!renamed.ok) { setBusy(false); setError(renamed.error ?? 'The team was not renamed.'); return; }
     }
     let sent = 0;
     for (const e of list) { const r = await api.teamInvite(e); if (r.ok) sent++; else setError(r.error ?? `${e} was not invited.`); }
     setBusy(false);
     setDone((d) => ({ ...d, invited: d.invited + sent }));
     if (sent === list.length) next();
-  }, [emails, typed, teamName, p.snap?.team?.team, next, plan]);
+  }, [emails, typed, teamName, teamNow, next]);
 
-  // ---- Paying for Pro: the team's Stripe checkout in the browser, then wait for its seats.
+  // ---- Starting Pro: the cloud account, the team its seats are bought for, its Stripe checkout in the browser, then wait for the seats.
   const [payState, setPayState] = useState<'idle' | 'opening' | 'waiting'>('idle');
+  const hasTeam = !!p.snap?.team?.team;
   const pay = useCallback(async () => {
+    if (plan === 'pro') { next(); return; }
     setPayState('opening'); setError(null);
+    const stop = (why: string) => { setPayState('idle'); setError(why); };
+    // The account step signed in to the team; the payment is the cloud's. Terms were named on that step, and only there.
+    const cloud = await api.cloudAccountFromTeam(!signedInAtStart);
+    if (!cloud.ok) { stop(cloud.message || 'The cloud did not answer. Try again.'); return; }
+    if (!hasTeam) {
+      const made = await api.teamCreate(teamNameFor(me?.name));
+      if (!made.ok) { stop(made.error ?? 'The team was not made.'); return; }
+    }
     const out = await api.cloudAccountPay('team');
-    if (!out.ok) { setPayState('idle'); setError(out.message || 'Stripe could not be opened. Try again.'); return; }
+    if (!out.ok) { stop(out.message || 'Stripe could not be opened. Try again.'); return; }
     setPayState('waiting');
-  }, []);
+  }, [plan, next, signedInAtStart, hasTeam, me?.name]);
   useEffect(() => {
     if (payState !== 'waiting') return undefined;
     let live = true;
-    const look = async () => { const paid = teamPaid(await api.cloudAccountPlan()); if (live && paid) next(); };
+    const look = async () => { const paid = teamPaid(await api.cloudAccountPlan()); if (live && paid) { live = false; setPayState('idle'); setPlan('pro'); next(); } };
     const t = setInterval(() => void look(), 3000);
     return () => { live = false; clearInterval(t); };
   }, [payState, next]);
@@ -228,20 +248,28 @@ export function SetupSplit(p: SetupSplitProps) {
     if (got.path) void takeFolder(got.path);
   }, [takeFolder]);
 
+  useEffect(() => {
+    if (step !== 'invite') return;
+    document.querySelector<HTMLInputElement>(`.setup-split input[data-ss-enter="${inviteCursor(!!p.snap?.team?.team)}"]`)?.focus();
+  }, [step, signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
   // ---- the keyboard: Enter is always the primary button
   const primary = useRef<() => void>(() => {});
+  const choose = useRef<((by: 1 | -1) => void) | null>(null);
   const accountPrimary = useRef<(() => void) | null>(null);
   const [foot, setFoot] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // The folder picker hears its own keys.
       if (browsing) return;
+      // Enter held on the screen before this one must not answer this one too.
+      if (heldPress(e)) { e.preventDefault(); e.stopPropagation(); return; }
       const where = typingInSetup(e.target as Element | null);
       if (where === 'behind') { e.preventDefault(); (e.target as HTMLElement).blur?.(); }
       const typing = where === 'typing';
       e.stopPropagation();
       const panel = document.querySelector('.setup-split');
       const inSetup = !!(e.target as Element | null)?.closest?.('.setup-split, .ss-picker');
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !typing && choose.current) { e.preventDefault(); choose.current(e.key === 'ArrowDown' ? 1 : -1); return; }
       if (e.key === 'Tab') {
         if (!panel) return;
         const stops = [...panel.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
@@ -272,6 +300,7 @@ export function SetupSplit(p: SetupSplitProps) {
 
   // A step that draws no button of its own must not keep the last step's Enter.
   primary.current = step === 'account' ? () => accountPrimary.current?.() : () => {};
+  choose.current = null;
   let head: [string, string] = ['', ''];
   let body: ReactNode = null;
   if (step === 'chats') {
@@ -302,18 +331,8 @@ export function SetupSplit(p: SetupSplitProps) {
     </>;
   } else if (step === 'account') {
     // The app's own sign-in form, in this column: Google, email, or a new account. No skip; it is required.
-    body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={next} onBack={back ?? undefined} primaryRef={accountPrimary} termsAt={foot} /></div>;
+    body = <div className="ss-signin"><SignInPage purpose="team" startOn="sign-up" inSetup onSignedIn={pastAccount} onBack={back ?? undefined} primaryRef={accountPrimary} termsAt={foot} /></div>;
   } else if (step === 'plan') {
-    head = ['Pick a plan.', ''];
-    body = <>
-      <div className="ss-list ss-plans">
-        {SETUP_PLANS.map((pl) => <Row key={pl.id} face={<Check on={plan === pl.id} />} on={plan === pl.id} onClick={() => setPlan(pl.id)}
-          name={<>{pl.name}{pl.tag && <span className="ss-tag">{pl.tag}</span>}</>} sub={pl.sub}
-          end={<span className="ss-price"><b>{pl.price}</b>{pl.per && <small>{pl.per}</small>}</span>} />)}
-      </div>
-      <div className="ss-acts">{go('Continue', next)}</div>
-    </>;
-  } else if (step === 'pay') {
     head = [PRO_PITCH.head, ''];
     body = <>
       <div className="ss-perks">{PRO_PITCH.perks.map((k) => <div key={k.id} className="ss-perk"><span className="ss-perk-icon">{PERK_ICONS[k.id]}</span>{k.title}</div>)}</div>
@@ -322,8 +341,8 @@ export function SetupSplit(p: SetupSplitProps) {
         <div><span className="ss-pricing-label">{PRO_PITCH.paid.label}</span><b className="ss-pricing-price">{PRO_PITCH.paid.price}<small>{PRO_PITCH.paid.per}</small></b><span className="ss-pricing-line">{PRO_PITCH.paid.line}</span></div>
       </div>
       {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
-      <div className="ss-acts">{go(payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : PRO_PITCH.cta, () => void pay(), payState !== 'opening')}{quiet('Skip for now', next)}</div>
-      <p className="ss-price-line">{PRO_PITCH.terms}</p>
+      <div className="ss-acts">{go(plan === 'pro' ? 'Continue' : payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : PRO_PITCH.cta, () => void pay(), payState !== 'opening')}{plan !== 'pro' && quiet(PRO_PITCH.free, next)}</div>
+      {plan !== 'pro' && <p className="ss-price-line">{PRO_PITCH.terms}</p>}
     </>;
   } else if (step === 'invite') {
     head = ['Invite your team.', ''];
@@ -332,12 +351,12 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-acts">{go('Sign in', () => void api.teamSignIn())}{quiet('Just me for now', next)}</div>
     </> : <>
       <div className="ss-list">
-        {!p.snap?.team?.team && <div className="ss-row"><span className="ss-face"><Plus /></span><input className="ss-input" data-ss-enter="to-email" placeholder="Name your team" value={teamName} onChange={(e) => setTeamName(e.target.value)} /></div>}
+        <div className="ss-row"><span className="ss-face">{(teamName.trim()[0] ?? '').toUpperCase() || <Plus />}</span><input className="ss-input" data-ss-enter="to-email" placeholder="Name your team" value={teamName} onChange={(e) => setTeamName(e.target.value)} /></div>
         {emails.map((e) => <Row key={e} face={e[0].toUpperCase()} name={e} end={<span className="ss-dim"><Tick />Added</span>} />)}
         <div className="ss-row"><span className="ss-face ss-dash"><Plus /></span>
           <input className="ss-input" data-ss-enter="add" placeholder="Add by email…" value={typed} onChange={(e) => setTyped(e.target.value)} /></div>
       </div>
-      <div className="ss-acts">{go(emails.length || inviteList([typed]).length ? `Send ${inviteList([...emails, typed]).length === 1 ? '1 invite' : `${inviteList([...emails, typed]).length} invites`}` : 'Continue', () => void sendInvites(), true, 'Sending…')}{plan !== 'pro' && quiet('Just me for now', next)}</div>
+      <div className="ss-acts">{go(emails.length || inviteList([typed]).length ? `Send ${inviteList([...emails, typed]).length === 1 ? '1 invite' : `${inviteList([...emails, typed]).length} invites`}` : 'Continue', () => void sendInvites(), true, 'Sending…')}{quiet('Skip', next)}</div>
     </>;
   } else if (step === 'teammates') {
     head = ['Add your own AI teammates.', ''];
@@ -351,10 +370,21 @@ export function SetupSplit(p: SetupSplitProps) {
       </div>
       <div className="ss-acts">{go(count ? `Make ${count === 1 ? '1 teammate' : `${count} teammates`}` : 'Continue', () => void makeTeammates(), true, 'Making…')}{quiet('Skip for now', next)}</div>
     </>;
+  } else if (step === 'agent') {
+    head = ['Pick your agent.', ''];
+    choose.current = (by) => setEngine(nextChoice(['claude', 'codex'] as const, engine, by));
+    body = <>
+      <div className="ss-list">
+        {(['claude', 'codex'] as const).map((id) => <Row key={id} face={<span className="ss-ai">{id === 'claude' ? 'C' : 'X'}</span>} name={id === 'claude' ? 'Claude Code' : 'Codex'}
+          end={<Check on={engine === id} />} on={engine === id} onClick={() => setEngine(id)} />)}
+      </div>
+      <div className="ss-acts">{go('Continue', () => { void api.setWorkspaceSetting({ key: 'engine', value: engine }); writeLastEngine(engine === 'codex' ? 'codex' : null); dispatchEvent(new CustomEvent(ENGINE_CHOSEN, { detail: engine })); next(); })}</div>
+    </>;
   } else if (step === 'look') {
     head = ['Pick your look.', ''];
     if (!looksAt.current) looksAt.current = lookChoices(p.look, p.skies);
     const looks = looksAt.current;
+    choose.current = (by) => p.onLook(nextChoice(looks, p.look, by));
     body = <>
       <div className="ss-list">
         {looks.map((id) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={id === MATCH_SKY ? 'Orange in dark mode, green in light' : undefined}
@@ -367,7 +397,7 @@ export function SetupSplit(p: SetupSplitProps) {
     const lines = setUpLines(done);
     body = <>
       {lines.length > 0 && <div className="ss-list">{lines.map((l) => <Row key={l} face={<span className="ss-ok"><Tick /></span>} name={l} />)}</div>}
-      <div className="ss-acts">{go('Open your inbox', () => p.onDone(done.chats))}</div>
+      <div className="ss-acts">{go('Start the walkthrough', () => p.onDone(done.chats))}</div>
     </>;
   }
 
@@ -376,7 +406,9 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-left">
         <div className="ss-brand"><Mark />{Name}</div>
         <div className="ss-steps">
-          {steps.map((s, i) => <i key={s} className={i < at ? 'ss-was' : i === at ? 'ss-is' : ''} />)}
+          {steps.map((s, i) => (dashGoesBack(steps, i, at, signedIn)
+            ? <button type="button" key={s} className="ss-was" tabIndex={-1} disabled={busy} aria-label={`Back to step ${i + 1}`} onClick={() => { setError(null); setAt(i); }} />
+            : <i key={s} className={i < at ? 'ss-was' : i === at ? 'ss-is' : ''} />))}
           <span>{step ? stepLabel(steps, step) : 'All set'}</span>
         </div>
         <div className="ss-body" key={step ?? 'done'}>
@@ -388,7 +420,7 @@ export function SetupSplit(p: SetupSplitProps) {
         <div className="ss-foot" ref={setFoot} />
       </div>
 
-      <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your {Name} so far</div>{step === 'pay' && <ProShowcase agents={cloudShowcase(p.chats.map((t) => t.title))} team={p.snap?.team?.team?.name ?? null} />}</div>
+      <div className="ss-right" aria-hidden="true"><div className="ss-cap">Your {Name} so far</div>{step === 'plan' && <ProShowcase agents={cloudShowcase(p.chats.map((t) => t.title))} team={p.snap?.team?.team?.name ?? null} />}</div>
     </div>,
     document.body,
   )}

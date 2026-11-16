@@ -16,7 +16,7 @@ import { stamp } from '../../../renderer/src/format';
 import { isUrgentRow } from '../../../renderer/src/urgent-arrival';
 import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
-import type { phoneView } from '../../../renderer/src/phone-rows';
+import { phoneSlug, type phoneView } from '../../../renderer/src/phone-rows';
 import type { ThreadStateWord, WorkItem } from '../../../renderer/src/types';
 import { teammateIdOf } from '../../../shared/teammates.mts';
 import { keepsAgent, type Harness } from './agent-filter';
@@ -30,7 +30,21 @@ export const TABS: { id: TabId; label: string }[] = [
   { id: 'done', label: 'Done' },
 ];
 
-type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'stranded'>>;
+// `projectOrder` is your running order of projects (phoneProjectOrder), never the list's own order.
+type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'stranded'>> & { projectOrder?: string[] };
+
+/** Each computer's running order of projects (the desktop's `supervisor.productOrder`), from its newest settings copy. */
+export function phoneProjectOrder(rows: readonly { device: string; settings?: { workspace?: { productOrder?: unknown } } | null }[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const row of rows) {
+    if (seen.has(row.device)) continue;
+    seen.add(row.device);
+    const order = row.settings?.workspace?.productOrder;
+    for (const slug of Array.isArray(order) ? order : []) if (typeof slug === 'string' && slug) out.push(phoneSlug(row.device, slug));
+  }
+  return out;
+}
 export interface Row {
   key: string;
   id: string;
@@ -137,7 +151,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
     agentsByTitle.set(t, (agentsByTitle.get(t) ?? new Set()).add(harnessOf(i)));
   }
   const agentOf = (i: WorkItem) => ((agentsByTitle.get(rowTitle(i))?.size ?? 0) > 1 ? (harnessOf(i) === 'codex' ? 'Codex' : 'Claude Code') : null);
-  const order = view.products.map((p: { slug: string }) => p.slug);
+  const order = view.projectOrder ?? [];
   // Later says when a thread comes back, and leaves waiting a turn to In progress (Pages.tsx `back`).
   const row = (i: WorkItem, tab: TabId): Row => ({
     key: `${i.product}/${i.id}`, id: i.id, product: i.product, title: rowTitle(i), projectName: names.get(i.product) ?? '',
@@ -185,7 +199,7 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
   const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
   const columns = boardColumns({
     items: view.items.filter((i: WorkItem) => keepsAgent(i, agent)), products: view.products, display, now, me: null, live,
-    stateOf: (i) => state.get(i.id) ?? null, projectOrder: view.products.map((p: { slug: string }) => p.slug),
+    stateOf: (i) => state.get(i.id) ?? null, projectOrder: view.projectOrder ?? [],
   });
   // A card waiting its turn says Queued where the running mark would be (Pages.tsx `saysOnCard`).
   const queued = new Set(tabs.progress.filter((r) => r.queued).map((r) => r.id));

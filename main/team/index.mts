@@ -1222,7 +1222,7 @@ export function createTeamService({
      * in your hand rather than the app's, or Done would read it as news and put
      * it in your own Needs you.
      */
-    async handOn({ product: slug, id, to }: { product: string; id: string; to: string }) {
+    async handOn({ product: slug, id, to, note = '' }: { product: string; id: string; to: string; note?: string }) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const product = products().find((p) => p.slug === slug);
       const row = product ? store.readItem(slug, id) : null;
@@ -1234,7 +1234,8 @@ export function createTeamService({
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
-      const brief = [words, left].filter(Boolean).join('\n\n');
+      // What the giver wants from them comes first, over the thread's own words.
+      const brief = [String(note ?? '').trim(), words, left].filter(Boolean).join('\n\n');
       // The task leads back to the thread, opened to them as Share's Send opens it.
       const seen = seenNow(row, product, kept().getSince(state.me.id));
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));

@@ -49,6 +49,8 @@ ranks every issue, worst first, with pictures.
 | `--focus` | what shipped and wants leaning on | none |
 | `--out` | the run folder; on the cloud, the thread's designs folder, which outlives the machine | a folder under `/tmp` |
 | `--detach` | start in the background, in a session of its own, logging to `workday.log` in the run folder | off |
+| `--iphone` | each tester gets an iPhone simulator on one of GitHub's Macs instead of the browser preview (below) | off |
+| `--build-url` | with `--iphone`, a simulator build (.tar.gz) to install instead of the one the run builds | none |
 
 In the Agentbox cloud Codex signs in with the login the cloud carries and
 runs without its sandbox, so the workday runs there as it does on a Mac.
@@ -97,14 +99,21 @@ real use before it is called done.
    It covers every screen, word and flow at an iPhone's size. It does not
    cover the iOS keyboard, safe areas as iOS draws them, native modules
    (speech, the keychain, Sign in with Apple) or alerts.
-2. **The iOS simulator, on the Mac.** Needs Xcode and a development build
-   (`npx expo run:ios` in `mobile/`, because of expo-dev-client and the
-   native modules). XcodeBuildMCP gives an agent the simulator's hands:
-   build and run, describe the screen, tap by label, type, swipe,
-   screenshot. Add it to Codex as an MCP server
-   (`[mcp_servers.XcodeBuildMCP]`, `command = "npx"`,
-   `args = ["-y", "xcodebuildmcp@latest"]`) and give the tester those tools
-   in place of `phone`. Mac only; not built into `workday.mjs` yet.
+2. **An iPhone simulator on GitHub's Macs** (`--iphone`). Free, because the
+   repository is public, and nothing runs on the person's computer but the
+   tester. Each tester gets a run of `.github/workflows/iphone-for-testers.yml`:
+   one iPhone 16 with the preview build of the app (the same made-up threads,
+   now drawn by iOS, with its keyboard, safe areas and alerts). The tester's
+   `phone` is `iphone.mjs`, with the same commands plus `home`; they reach
+   `iphone-host.mjs` on that Mac through a Cloudflare quick tunnel, and it
+   answers only the key `iphones.mjs` made, whose sha256 is all the public
+   run sees. The first run for a new version of `mobile/`, `renderer/` or
+   `shared/` builds the app there (allow up to an hour); later runs take it
+   from GitHub's cache in minutes. A run holds its iPhone for at most 5
+   hours and lets it go after 40 idle minutes; the workday starts another
+   when one has gone, and lets every one go when it ends.
+   By hand: `node $L/iphones.mjs start --out <folder>`, then
+   `PHONE_OUT=<folder> node $L/iphone.mjs look`, and `iphones.mjs stop`.
 3. **A real phone, through TestFlight.** Only for alerts reaching the lock
    screen and Sign in with Apple. A person or the outside QA tester does it.
 
