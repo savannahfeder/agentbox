@@ -161,7 +161,7 @@ import { focusAtEnd } from '../focus-at-end';
 import type { Spot } from '../one-thing-at-a-time';
 import { ChoicesFold, ChoicesShow, QueueNav } from './OneThingAtATime';
 import { InlineTable, gridFromHast } from './TableView';
-import { foldKey, foldedKeys, toggleFold } from '../one-thing-at-a-time';
+import { foldKey, foldedKeys, toggleFold, pageTitle } from '../one-thing-at-a-time';
 import { watchForBlank } from '../blank-check';
 import { FittedImg } from './FittedImg';
 const needName = (n: Need) => (n.kind === 'sign-in' ? n.service.name : n.kind === 'key' ? (keyWords(n.what) ? `the ${keyWords(n.what)}` : n.name) : n.kind === 'file' ? (n.path.split('/').pop() ?? n.path) : `the ${n.about} code`);
@@ -2055,7 +2055,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           full at the top of the thread. */}
       {/* A conversation is named for the person in it, never for what the
           first message happened to be about. */}
-      <div className="keep-line-title" title={item.title}>{direct && !givenTask && !audience && talkFull ? talkFull : rowTitle(item)}</div>
+      <div className="keep-line-title" title={item.title}>{direct && !givenTask && !audience && talkFull ? talkFull : pageTitle(item)}</div>
       {theByline}
     </div>
   );
@@ -2069,7 +2069,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // Its name renames it (w-ab3d51dc7d), except a conversation, which is named
   // for the person in it.
   const named = direct && !givenTask && !audience && talkFull && !nameIsAPersons(item);
-  const threadName = named ? talkFull : rowTitle(item);
+  const threadName = named ? talkFull : pageTitle(item);
   const rename = (label: string) => api.threadEdit(item.product, item.id, { label }).then((r) => r.ok);
   // Every thread opened from a list wears it, summary or not, document open or not.
   const barContent = inChats
