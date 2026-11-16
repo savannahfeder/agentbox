@@ -12,6 +12,7 @@ import { statusForReply } from './list-rules';
 import { cloudPlaces, type Attached } from './cloud-files';
 import type { RunningSession, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
+import type { TraceSession } from './notes';
 import type { SettingsRow } from './phone-settings-view';
 
 /** A thread's copy as her computer wrote it (shared/phone-snapshot.mts threadSnapshot), read back as JSON. */
@@ -20,6 +21,7 @@ export interface PhoneSnapshot {
   item?: WorkItem;
   history?: LedgerLine[];
   olderLines?: number;
+  runs?: TraceSession[];
   approvals?: { id?: string; at?: number; tool?: string; card?: string | null; input?: Record<string, unknown> }[];
   live?: { at: number; since?: number; where?: string; movable?: boolean; doing?: { label?: string; startedAt?: number }[] } | null;
   wait?: { state: string; tool?: string; until?: number } | null;
@@ -365,11 +367,29 @@ export function approvalCommand(cards: Cards, p: { id: string; allow: boolean; n
   return { device: c.device, project: c.project, item: c.item, kind: 'approve', payload: { approval: p.id, allow: p.allow === true, ...(typeof p.note === 'string' && p.note ? { note: p.note } : {}), card: c.card } };
 }
 
-/** The thread's lines as her computer sent them, for the thread view. */
-export function phoneHistory(rows: PhoneRows, product: string, id: string, aliases: Aliases = {}) {
+const snapshotOf = (rows: PhoneRows, product: string, id: string, aliases: Aliases) => {
   const item = realItem(aliases, product, id);
-  const t = rows.threads.find((r) => phoneSlug(r.device, r.project) === product && r.item === item);
-  return { ok: true, lines: Array.isArray(t?.snapshot?.history) ? t.snapshot.history.map((l: LedgerLine) => ({ ...l, id })) : [] };
+  return rows.threads.find((r) => phoneSlug(r.device, r.project) === product && r.item === item)?.snapshot ?? null;
+};
+
+/** The logs of the thread's newest runs as her computer sent them, read as the desktop reads its own. */
+export function phoneRuns(rows: PhoneRows, product: string, id: string, aliases: Aliases = {}): TraceSession[] {
+  const runs = snapshotOf(rows, product, id, aliases)?.runs;
+  return Array.isArray(runs) ? runs.filter((r) => r && Number.isFinite(r.startedAt) && typeof r.text === 'string') : [];
+}
+
+/**
+ * The thread's lines as her computer sent them, for the thread view. The copy
+ * leaves out pickups, and a run is drawn under the pickup that started it
+ * (thread-history.ts withRuns), so each run sent gets one at its start.
+ */
+export function phoneHistory(rows: PhoneRows, product: string, id: string, aliases: Aliases = {}) {
+  const snapshot = snapshotOf(rows, product, id, aliases);
+  const lines: LedgerLine[] = Array.isArray(snapshot?.history) ? snapshot.history.map((l: LedgerLine) => ({ ...l, id })) : [];
+  const runs = phoneRuns(rows, product, id, aliases);
+  if (!runs.length) return { ok: true, lines };
+  const pickups: LedgerLine[] = runs.map((r) => ({ id, ts: r.startedAt, source: 'agent', claim: { holder: 'run', leaseUntil: r.startedAt } }));
+  return { ok: true, lines: [...lines, ...pickups].sort((a, b) => a.ts - b.ts) };
 }
 
 /** What one press on the phone leaves for her Mac, or null for a press that is not one of the four. */

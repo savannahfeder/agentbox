@@ -56,7 +56,15 @@ export function previewRows(now = Date.now()): PhoneRows {
       thread('site', { id: 'w-3c4d5e6f7a', title: 'Show when each account limit resets', status: 'done', priority: 0, engine: 'codex', body: 'I need to see when my limits reset.', result: meterResult, createdAt: at(200), updatedAt: at(52), wrote: { body: her(at(200)), status: agent(at(52)), result: agent(at(52)) } }, [
         { ts: at(200), source: 'founder', patch: { body: 'I need to see when my limits reset.' } },
         { ts: at(52), source: 'agent', patch: { status: 'done', result: meterResult } },
-      ], { attached: PREVIEW_SITE_ATTACHED }),
+      ], {
+        attached: PREVIEW_SITE_ATTACHED,
+        // Its run's log, as main/phone-inbox.mts sends one (shared/phone-snapshot.mts `runs`).
+        runs: [{ startedAt: at(70), text: [
+          [69, "I'll start with where the meters are drawn."], [68, '[Read] renderer/src/components/AccountMeter.tsx'],
+          [66, 'The reset time is already in the usage reply; the meter just never shows it.'], [64, '[Edit] renderer/src/components/AccountMeter.tsx'],
+          [60, '[Bash] npx vitest run tests/account-meter.test.mts'], [56, 'The test passes and the meter reads "resets 6:19pm".'],
+        ].map(([m, said]) => `${new Date(at(m as number)).toISOString().slice(11, 19)}  ${said}`).join('\n') }],
+      }),
       // A finished run that left a commit and offered nothing: the app asks Ship it (shared/phone-snapshot.mts `phoneChangeOf`).
       thread('site', { id: 'w-5e6f7a8b9d', title: 'Make fizz(15) say FizzBuzz', status: 'open', priority: 0, engine: 'codex', body: fizzAsk, result: fizzResult, createdAt: at(30), updatedAt: at(3), wrote: { body: her(at(30)), result: agent(at(3)) } }, [
         { ts: at(30), source: 'founder', patch: { body: fizzAsk } },
