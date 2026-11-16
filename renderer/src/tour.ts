@@ -18,7 +18,7 @@ export interface Tour {
   urgent?: boolean;
   /** The one practice thread the walkthrough runs on, in a practice project nothing real is behind. */
   practice?: TourPractice;
-  /** The last tip is up on Home: you finished, and a real thread starts here. */
+  /** The last tip is up on Home: you finished, and a real thread starts here. Never read back, so a reload ends it. */
   finishing?: boolean;
   /** Home's greeting says you finished, from that tip going until a first real thread is sent. */
   greets?: boolean;
@@ -93,6 +93,9 @@ export function finishLesson(t: Tour, l: Lesson): Tour {
 }
 export const tourFinishing = (t: Tour | null): boolean => !!t && !!t.finishing && tourOver(t);
 export const closeFinish = (t: Tour): Tour => ({ ...t, finishing: false });
+const BARE_MODIFIERS = ['Meta', 'Control', 'Alt', 'Shift', 'CapsLock'];
+/** Any key ends the last tip, except a modifier on its way to a chord. */
+export const keyEndsFinish = (key: string): boolean => !BARE_MODIFIERS.includes(key);
 /** A real thread sent once the walkthrough is over: the last tip has been done, and nothing more is said. */
 export const firstThreadSent = (t: Tour): Tour => ((t.finishing || t.greets) && tourOver(t) ? { ...t, finishing: false, greets: false } : t);
 /** Not while the tip that says the same sentence is up: one screen says a thing once. */
@@ -223,7 +226,7 @@ export function readTour(store: Store): Tour | null {
     const p = t.practice && typeof t.practice.slug === 'string'
       ? { practice: { slug: t.practice.slug, ...(typeof t.practice.item === 'string' ? { item: t.practice.item } : {}), replies: Number(t.practice.replies) || 0, ...(t.practice.answered ? { answered: Number(t.practice.answered) } : {}) } }
       : {};
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.finishing ? { finishing: true } : {}), ...(t.greets ? { greets: true } : {}) };
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.greets ? { greets: true } : {}) };
   } catch { return null; }
 }
 

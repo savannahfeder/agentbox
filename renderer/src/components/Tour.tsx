@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyEndsFinish, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -169,9 +169,19 @@ const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x
 
 type Finished = ReturnType<typeof finishedPlace>;
 /** The walkthrough's last word, on Home's box: you finished, and a real thread starts here. */
-export function TourFinished({ covered }: { covered: boolean }) {
+export function TourFinished({ covered, onDone }: { covered: boolean; onDone: () => void }) {
   const [at, setAt] = useState<Finished | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const done = useRef(onDone);
+  done.current = onDone;
+  useEffect(() => {
+    // After the press: a redraw in the middle of it took the key away from the app's own handler.
+    const end = () => setTimeout(() => done.current(), 0);
+    const anyKey = (e: KeyboardEvent) => { if (keyEndsFinish(e.key)) end(); };
+    document.addEventListener('keydown', anyKey, true);
+    document.addEventListener('pointerdown', end, true);
+    return () => { document.removeEventListener('keydown', anyKey, true); document.removeEventListener('pointerdown', end, true); };
+  }, []);
   useEffect(() => {
     const read = () => {
       const box = document.querySelector('.hm-start .tc-card')?.getBoundingClientRect();

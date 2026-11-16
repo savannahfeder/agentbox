@@ -66,11 +66,10 @@ describe('the finishing moment ends', () => {
     const sent = firstThreadSent(over);
     expect(firstThreadSent(sent)).toBe(sent);
   });
-  it('and is kept across a restart', () => {
+  // The tip itself is not: tests/the-finished-tip-goes-at-the-first-key-or-click.
+  it('and what the greeting says is kept across a restart', () => {
     const kept = new Map<string, string>();
     const store = { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => { kept.set(k, v); } };
-    saveTour(store, over);
-    expect(tourFinishing(readTour(store))).toBe(true);
     saveTour(store, closeFinish(over));
     expect(tourFinishing(readTour(store))).toBe(false);
     expect(saysFinished(readTour(store))).toBe(true);

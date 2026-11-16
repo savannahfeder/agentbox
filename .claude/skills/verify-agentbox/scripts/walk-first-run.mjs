@@ -182,8 +182,12 @@ try {
   // The last word is said on Home's box, under a bar that reads done.
   await see('walkthrough-done', /WALKTHROUGH DONE Close.*You finished the walkthrough\. Type your first real thread/i);
   if (!await page.evaluate(`!!document.querySelector('.hm-start .tc-card') && !!document.querySelector('.tour-glow')`)) throw new Error('the last tip is up, but not on Home with its box lit');
-  await page.evaluate(`document.querySelector('.tour-frame .tf-skip')?.click()`);
-  await page.until(`!document.querySelector('.tour-frame') && !document.querySelector('.tour-card')`, { ms: 15_000, why: 'Close to put the last tip away' });
+  // Nobody has to follow the tip or find Close: the first key puts it away, and still does what it was pressed for.
+  await key('k', [CHORD]);
+  await page.until(`!!document.querySelector('.palette-input')`, { ms: 3000, why: 'the first key after the walkthrough to still open the command bar' });
+  await page.until(`!document.querySelector('.tour-frame') && !document.querySelector('.tour-card') && !document.querySelector('.tour-glow')`, { ms: 3000, why: 'the first key pressed to put the last tip and its ring away' });
+  await key('Escape');
+  await page.until(`!document.querySelector('.palette-input')`, { ms: 3000, why: 'esc to close the command bar' });
   const hello = await page.evaluate(`document.querySelector('.hm-hello')?.innerText ?? ''`);
   if (hello !== 'You finished the walkthrough, Dana') throw new Error(`Home after the walkthrough does not say you finished. Its greeting is: ${hello || 'not there'}`);
   await see('home-after', /^$/);

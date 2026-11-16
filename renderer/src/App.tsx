@@ -9470,7 +9470,7 @@ export default function App() {
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
       {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
-      {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} />}
+      {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
       {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
         answering={practiceAnswering}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
