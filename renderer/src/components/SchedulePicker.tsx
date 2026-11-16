@@ -105,7 +105,7 @@ export function SchedulePicker<T>({
             </span>
           )}
         </div>
-        <div className="palette-list">
+        <div className="palette-list" role="listbox" aria-label={title}>
           {options.map((option, i) => (
             /* Hover follows the MOUSE MOVING, not the modal arriving. This
                opens under wherever the cursor already was, so onMouseEnter
@@ -115,6 +115,8 @@ export function SchedulePicker<T>({
             <div
               key={option.label}
               className={`palette-item ${!text && i === selected ? 'selected' : ''}`}
+              role="option"
+              aria-selected={!text && i === selected}
               onClick={() => onChoose(option.value, option.label.toLowerCase())}
               onMouseMove={() => setSelected(i)}
             >

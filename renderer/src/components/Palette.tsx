@@ -544,12 +544,14 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
             ? <button type="button" className="palette-cancel" onClick={onClose}>Cancel</button>
             : <button type="button" className="palette-esc" aria-label="Close" onClick={onClose}>esc</button>}
         </div>
-        <div className="palette-list" ref={listRef}>
+        <div className="palette-list" ref={listRef} role="listbox" aria-label="Results">
           {filtered.length === 0 && <div className="palette-empty">{emptyLine(query)}</div>}
           {filtered.map((c, i) => (<Fragment key={keys[i]}>
             {labels.has(i) && <div className="palette-section">{labels.get(i)}</div>}
             <div
               className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${i === selected ? 'selected' : ''}`}
+              role="option"
+              aria-selected={i === selected}
               onClick={c.run}
               onMouseMove={(e) => {
                 const at = { x: e.clientX, y: e.clientY };
