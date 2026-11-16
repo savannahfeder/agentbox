@@ -11,7 +11,7 @@ import { LiveMark } from '../components/LiveMark';
 import { createPortal } from 'react-dom';
 import { scrollerOf, useRowDrag } from './row-drag';
 import { chord } from '../this-keyboard';
-import type { Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
+import type { CloudPlan, Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, dueWords, firstName, personOf } from '../team/people';
 import { handedBy, taskWords } from '../team/company';
@@ -225,7 +225,7 @@ export function SearchButton({ onSearch }: { onSearch: () => void }) {
 }
 
 /** New thread, the cloud and the Display icon (and Search on the board), at the right of the Inbox header. */
-export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab, people, cloud, onCloudMode, onCloudWhenOn, onCloudSetUp, onCloudMove, filters = true, view = null, home = null }: {
+export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab, people, cloud, cloudPlan = null, onCloudMode, onCloudWhenOn, onCloudSetUp, onCloudMove, filters = true, view = null, home = null }: {
   /** With a team: which home the page draws, so the two can be compared. */
   home?: HomeChoice | null;
   /** False over a room, where there is no list to view or filter. */
@@ -239,6 +239,8 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
   /** Where threads run; no button at all on a Mac not set up for the cloud. */
   cloud?: CloudStatus | null; onCloudMode?: (mode: CloudMode) => void; onCloudWhenOn?: (mode: Exclude<CloudMode, 'mac'>) => void; onCloudSetUp?: () => void;
   onCloudMove?: (ids: string[]) => void;
+  /** Agentbox Cloud's plan as its server last said it, for the hours it counted. */
+  cloudPlan?: CloudPlan | null;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
@@ -254,7 +256,7 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
   return <div className="th-right">
     {onSearch && <SearchButton onSearch={onSearch} />}
     <button type="button" className="th-new" data-hint="new-task" onClick={onCompose} title="New thread (N)"><PenIcon />New thread</button>
-    {(cloud?.setUp || cloud?.offered) && <CloudButton cloud={cloud} onMode={onCloudMode} onWhenOn={onCloudWhenOn} onSetUp={onCloudSetUp} onMove={onCloudMove} />}
+    {(cloud?.setUp || cloud?.offered) && <CloudButton cloud={cloud} cloudPlan={cloudPlan} onMode={onCloudMode} onWhenOn={onCloudWhenOn} onSetUp={onCloudSetUp} onMove={onCloudMove} />}
     {filters && <span ref={(el) => { ref.current = el; }} style={{ position: 'relative', display: 'inline-flex' }}>
       <button type="button" className={`th-disp${worn ? ' faces' : ''}${open ? ' open' : ''}`}
         aria-label={whose ? `View and filters, showing ${whose}` : 'View and filters'} title={whose ? `${whose} · View and filters` : 'View and filters'}
@@ -281,7 +283,7 @@ const toggle = <T,>(list: T[], value: T) => (list.includes(value) ? list.filter(
 // (renderer/src/cloud-menu.ts, tests/the-cloud-button-chooses-where-threads-run).
 const CloudIcon = () => <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></svg>;
 
-function CloudButton({ cloud, onMode, onWhenOn, onSetUp, onMove }: { cloud: CloudStatus; onMode?: (mode: CloudMode) => void; onWhenOn?: (mode: Exclude<CloudMode, 'mac'>) => void; onSetUp?: () => void; onMove?: (ids: string[]) => void }) {
+function CloudButton({ cloud, cloudPlan, onMode, onWhenOn, onSetUp, onMove }: { cloud: CloudStatus; cloudPlan: CloudPlan | null; onMode?: (mode: CloudMode) => void; onWhenOn?: (mode: Exclude<CloudMode, 'mac'>) => void; onSetUp?: () => void; onMove?: (ids: string[]) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useOutside(open, () => setOpen(false));
   const count = cloudButtonCount(cloud);
@@ -366,7 +368,7 @@ function CloudButton({ cloud, onMode, onWhenOn, onSetUp, onMove }: { cloud: Clou
         <span className="th-cloud-setup-say">{SETUP.menuAccounts(countedAccounts(accounts).length)}</span>
         <button type="button" className="th-cloud-manage" onClick={goSetUp}>{SETUP.menuManage}</button>
       </span></div>
-      <div className="line"><span className="lab">This month</span><span className="th-cloud-use">{cloudMonthLine(cloud.month)}</span></div>
+      <div className="line"><span className="lab">This month</span><span className="th-cloud-use">{cloudMonthLine(cloud.month, cloudPlan)}</span></div>
       <div className="rule" />
       <div className="foot"><span>{cloudFootLine(cloud)}</span></div>
     </div>}
