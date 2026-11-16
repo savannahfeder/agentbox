@@ -127,6 +127,16 @@ export function gaveUpOnTheAnswer(i: InboxItem): boolean {
   return saysARunGotNowhere(i.result);
 }
 
+// Her last words ended by asking for the close and the agent's done came after
+// them: that done is hers, as if she had pressed E.
+const ENDS_BY_CLOSING = /(?:^|[,;.]\s*|\b(?:and|then)\s+)close (?:this|the) (?:task|thread)[.!]?$/i;
+function closedAsSheAsked(i: InboxItem): boolean {
+  const answer = liveAnswer(i);
+  if (!answer) return false;
+  const words = answer.replace(/^option \d+:\s*/i, '').replace(/\s*\(recommended\)\s*/i, '').trim();
+  return ENDS_BY_CLOSING.test(words) && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity);
+}
+
 // Who deferred a row decides what the deferral means. A future runAt an agent
 // wrote stops workers respawning (`isDue` in shared/work-items.mts) but does
 // not hide the row, or an agent could take its own question away from the
@@ -252,6 +262,7 @@ export function belongsInInbox(
     // `done` is the archive. A thread she spoke on is hers whoever filed it.
     if (!hers(i) && !liveAnswer(i)) return false;            // agent work she never touched is filed
     if (i.wrote?.status?.source === 'founder') return false; // she archived it herself
+    if (closedAsSheAsked(i)) return false;
     return (i.wrote?.status?.ts ?? i.updatedAt ?? 0) > deliveredThrough;
   }
   // A stopped row is in the inbox whatever its kind. This must come before the
