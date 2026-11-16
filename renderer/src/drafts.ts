@@ -478,6 +478,13 @@ export interface ComposeDraft {
   dropped: number;
   /** When Send was pressed on these words, while that send has not landed. */
   sendingAt?: number;
+  /** The agent and model picked on this card, so Undo gives back the card it sent. */
+  pick?: { engine: string; model: string };
+}
+
+/** The draft's own pick, where this Mac still offers its engine. */
+export function cardPick(d: ComposeDraft, offered: readonly string[]): { engine: string; model: string } | null {
+  return d.pick && offered.includes(d.pick.engine) ? d.pick : null;
 }
 
 export const COMPOSE_DRAFT_KEY = 'zero.draft.compose';
@@ -521,6 +528,7 @@ export function readComposeDraft(store?: DraftStore, place?: string): ComposeDra
   if (!parsed || typeof parsed !== 'object') return { ...EMPTY_COMPOSE_DRAFT };
   const d = parsed as Record<string, unknown>;
   const when = (d.when && typeof d.when === 'object' ? d.when : {}) as Record<string, unknown>;
+  const pick = (d.pick && typeof d.pick === 'object' ? d.pick : {}) as Record<string, unknown>;
   return {
     text: typeof d.text === 'string' ? d.text : '',
     attachments: (Array.isArray(d.attachments) ? d.attachments : []).map(attachmentOf).filter((a): a is DraftAttachment => !!a),
@@ -528,6 +536,7 @@ export function readComposeDraft(store?: DraftStore, place?: string): ComposeDra
     when: { runAt: typeof when.runAt === 'number' ? when.runAt : 0, repeat: when.repeat ?? null, ...(when.later === true ? { later: true } : {}) },
     dropped: typeof d.dropped === 'number' && d.dropped > 0 ? d.dropped : 0,
     ...(typeof d.sendingAt === 'number' ? { sendingAt: d.sendingAt } : {}),
+    ...(typeof pick.engine === 'string' && typeof pick.model === 'string' ? { pick: { engine: pick.engine, model: pick.model } } : {}),
   };
 }
 

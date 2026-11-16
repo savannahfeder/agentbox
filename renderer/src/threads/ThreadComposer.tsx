@@ -49,7 +49,7 @@ import { attachProblem, fromPaste, persistAttachments, useAttaching, type Pendin
 import { AttachRow } from '../components/AttachRow';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
 import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
-import { clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
+import { cardPick, clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
 import { codeProjectFor, LAST_PRODUCT_KEY, rememberedProject } from '../compose-project';
 import { practiceRefusal, noProjectYet } from '../compose-says';
 import { onCloudPhone } from '../phone-screen';
@@ -350,6 +350,8 @@ export function ThreadComposer({
   // carried silently into the next thread sent work to the wrong agent. Each
   // agent's own last model is still remembered.
   const remembered = (): ModelPick => {
+    const kept = cardPick(opened.current, engineRows.map((e) => e.id));
+    if (kept) return { engine: kept.engine as Harness, model: kept.model };
     const engine: Harness = startingEngine(workspaceEngine ?? null, engines);
     return { engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) };
   };
@@ -489,7 +491,7 @@ export function ThreadComposer({
   /* ------------------------------ draft --------------------------------- */
   // On every keystroke, every paste, every pick, the same draft the old card
   // kept, so an Escape or a reload never takes her words or her pictures.
-  const whatTheCardHolds = () => ({ text, attachments, priority: prio, when: whenOnDraft(when), dropped: 0 });
+  const whatTheCardHolds = () => ({ text, attachments, priority: prio, when: whenOnDraft(when), dropped: 0, pick: { engine: pick.engine, model: pick.model } });
   useEffect(() => {
     const kept = cardDraftToKeep(text, initial);
     const unchanged = seeded && !kept && attachments.length === (initial?.attachments?.length ?? 0);
@@ -499,7 +501,7 @@ export function ThreadComposer({
     if (composeDraftIsEmpty(draft) && readComposeDraft(undefined, place).sendingAt) return;
     const stored = saveComposeDraft(draft, undefined, place);
     setDropped(stored.dropped);
-  }, [text, attachments, prio, when]);
+  }, [text, attachments, prio, when, pick]);
   // What is sent is written down first, even a hand-off nobody changed, so a
   // send that fails still has its words to give back.
   const takeTheDraft = () => {
