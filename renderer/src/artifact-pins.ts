@@ -1,6 +1,6 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, threadFiles, unsentReplies, versionNamed, viewKind } from '../../shared/artifact-marks.mts';
+import { agentOfVersion, noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, threadFiles, unsentReplies, versionNamed, viewKind } from '../../shared/artifact-marks.mts';
 import type { FileVersion } from '../../shared/artifact-marks.mts';
 import { MAX_ZOOM } from './picture-view';
 import type { FileMarks, FileNote, NotePlace } from './types';
@@ -201,6 +201,12 @@ export function viewOffers(found: Found, signedIn: boolean): { approve: boolean;
 
 type Named = ReadonlyArray<{ id: string; name?: string | null }>;
 
+/** The version as Send reads it: a person's edit of an agent's file is still that agent's. */
+export function withItsAgent<V extends FileVersion>(versions: readonly FileVersion[], v: V): V {
+  const agent = agentOfVersion(versions, v.id);
+  return agent === null ? v : { ...v, agent };
+}
+
 /** Your own open comments on this version that Send hands your agent, and those it has with a reply of yours since. Main sends none on a file the agent did not make. */
 export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, count: number, people: Named, me: string | null): string[] {
   if (typeof version.agent !== 'string') return [];
@@ -217,7 +223,7 @@ export function notesToSendTheAgentAnywhere(marks: FileMarks, families: Readonly
   for (const family of families) {
     const open = family.versions.some((v) => v.id === here);
     for (const v of family.versions) {
-      const got = notesToSendTheAgent(marks, v, family.versions.length, people, me);
+      const got = notesToSendTheAgent(marks, withItsAgent(family.versions, v), family.versions.length, people, me);
       ids.push(...got);
       if (open || !got.length) continue;
       elsewhere += got.length;
