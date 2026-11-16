@@ -56,11 +56,19 @@ function restorePackageJson() {
 
 function stop(...lines) {
   restorePackageJson();
+  callBack('The deploy stopped. Terminal says why.');
   console.error(`\nNot finished.\n\n${lines.join('\n')}\n`);
   process.exit(1);
 }
 
 function say(line) { console.log(`\n→ ${line}`); }
+
+// The build is long enough to walk away from, so a step that needs the person
+// puts up a notification with a sound.
+function callBack(text) {
+  if (process.platform !== 'darwin') return;
+  quiet('osascript', ['-e', `display notification ${JSON.stringify(text)} with title "Agentbox deploy" sound name "Glass"`], 10_000);
+}
 
 function quiet(cmd, args, timeout = 30_000) {
   const r = spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', timeout, env: { ...process.env, AWS_PAGER: '' } });
@@ -96,7 +104,7 @@ if (!checkOnly && behind > 0 && !quiet('git', ['merge', '--ff-only', '--quiet', 
   stop('Could not bring this folder up to main. Run: git merge --ff-only refs/remotes/origin/main');
 }
 let commit = checkOnly ? quiet('git', ['rev-parse', 'refs/remotes/origin/main']).out : quiet('git', ['rev-parse', 'HEAD']).out;
-console.log(`  main is at ${commit.slice(0, 8)}${checkOnly && behind ? ` (this folder is ${behind} behind; a real run catches it up)` : ''}`);
+console.log(`  main is at ${commit.slice(0, 8)}, newest change: ${quiet('git', ['log', '-1', '--no-merges', '--format=%s', commit]).out}${checkOnly && behind ? ` (this folder is ${behind} behind; a real run catches it up)` : ''}`);
 
 // ---------------------------------------------------------------------------
 // 2. A VERSION NOBODY HAS USED. Both lists have to be readable: a guess here
@@ -139,6 +147,20 @@ function signIn(s, { required = true } = {}) {
   return false;
 }
 
+// npm's browser approval runs out when nobody is there (0.1.25: a 404 after
+// half an hour), so a failed publish waits for Enter and tries again.
+const NPM_TRIES = 3;
+function publishToNpm(v, cwd = repo) {
+  callBack(`npm needs you to approve publishing ${v}.`);
+  for (let attempt = 1; ; attempt++) {
+    if (live('npm', ['publish'], { AGENTBOX_PUBLISH_ANYWAY: '1' }, undefined, cwd)) return true;
+    if (attempt === NPM_TRIES) return false;
+    callBack(`npm did not publish ${v}. Press Enter in Terminal to try again.`);
+    console.log(`\n  npm did not publish; the reason is just above. Press Enter to try again (${NPM_TRIES - attempt} left), or wait 15 minutes to leave npm for later.`);
+    if (spawnSync('bash', ['-c', `read -r -t ${NPM_LOGIN_MS / 1000}`], { stdio: 'inherit' }).status !== 0) return false;
+  }
+}
+
 // A RELEASE THAT MISSED NPM. Running the whole deploy again would put out the
 // next version instead, so this publishes the one main says, from the commit
 // its release page says the Mac app was built from.
@@ -158,13 +180,12 @@ if (npmOnly) {
   if (!posthog) stop('No "posthogKey" in zero.config.json in this folder, so npx agentbox-app would count nobody.');
   signIn(npmSignIn);
   say(`publishing ${PACKAGE}@${mainVersion} from ${built.slice(0, 8)}, the commit its Mac app was built from`);
-  console.log('  npm may open a page to approve it. Approve it straight away: the approval runs out.');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `agentbox-npm-${mainVersion}-`));
   let published = false;
   if (quiet('git', ['worktree', 'add', '-q', '--detach', dir, built]).ok) {
     fs.symlinkSync(path.join(repo, 'node_modules'), path.join(dir, 'node_modules'));
     bakeTheKey(path.join(dir, 'package.json'));
-    published = live('npm', ['publish'], { AGENTBOX_PUBLISH_ANYWAY: '1' }, undefined, dir);
+    published = publishToNpm(mainVersion, dir);
   }
   quiet('git', ['worktree', 'remove', '--force', dir]);
   const now = quiet('npm', ['view', PACKAGE, 'version', '--prefer-online', '--fetch-timeout=20000'], 30_000).out;
@@ -336,7 +357,7 @@ if (signIn(npmSignIn, { required: false })) {
   bakeTheKey(pkgPath);
   packageWritten = true;
   say(`publishing ${PACKAGE}@${version} to npm (it may ask for a one-time code)`);
-  if (!live('npm', ['publish'], { AGENTBOX_PUBLISH_ANYWAY: '1' })) console.log('  ✗ npm did not publish; the reason is just above');
+  if (!publishToNpm(version)) console.log('  ✗ npm did not publish; the reason is just above');
 }
 restorePackageJson();
 
@@ -361,6 +382,7 @@ for (const l of lines) console.log(`  ${l.ok ? '✓' : '✗'} ${l.part.padEnd(17
 console.log(`  ${imageOk ? '✓' : '✗'} ${'cloud machine'.padEnd(17)} ${imageOk ? 'up to date' : 'not rebuilt'}`);
 if (lines.every((l) => l.ok) && imageOk) {
   console.log(`\nAgentbox ${version} is out everywhere. Restart Agentbox to run it yourself.`);
+  callBack(`Agentbox ${version} is out everywhere.`);
   console.log('');
 } else {
   stop('Not every place has the new version yet; the ✗ lines above say which.',

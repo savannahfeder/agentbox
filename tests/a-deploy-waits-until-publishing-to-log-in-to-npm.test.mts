@@ -52,6 +52,8 @@ function deploy({ signedIn = false, expireDuringBuild = false, buildOk = true,
         signedIn = loginOk && loginWorks;
         return loginOk ? ok() : failed;
       }
+      // Nobody presses Enter to retry a failed publish here; a-deploy-calls-you-back-when-npm-needs-you covers that.
+      if (command === 'bash') return failed;
       if (command === 'security') return ok('"Developer ID Application: Test (ABCDEFGHIJ)"');
       if (command === 'gh' && args[0] === 'api') return ok('true');
       if (command === 'gh' && args[0] === 'release') return ok('v1.0.0');

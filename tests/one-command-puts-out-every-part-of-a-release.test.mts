@@ -127,8 +127,7 @@ describe('the deploy script', () => {
     }
     expect(at("'scripts/release.mjs'")).toBeLessThan(at("'scripts/publish-download.mjs'"));
     expect(at("'scripts/publish-download.mjs'")).toBeLessThan(at("'scripts/cloud-gateway-setup.mjs'"));
-    // lastIndexOf: `--npm` publishes on its own earlier in the file.
-    expect(at("'scripts/cloud-gateway-setup.mjs'")).toBeLessThan(deploy.lastIndexOf("['publish']"));
+    expect(at("'scripts/cloud-gateway-setup.mjs'")).toBeLessThan(at('publishToNpm(version)'));
   });
 
   // w-6771163ced: file delivery reached main on 2026-10-28 and no cloud run
