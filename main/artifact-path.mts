@@ -23,9 +23,14 @@
 // That is the difference this file draws. Deciding for her that an explicit
 // path is wrong would break every link into the app's own repo, which is not a
 // product at all.
+import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fsDefault from 'node:fs';
 import type { FSWatcher } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
+import { taskBranch } from './task-folders.mts';
 import { performance } from 'node:perf_hooks';
 import { machineryDir } from './store/home.mts';
 import { writtenFileNamed } from './store/written-elsewhere.mts';
@@ -332,6 +337,24 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
     const hits = (await Promise.all(ids.map(within))).filter((hit) => hit !== null).sort((a, b) => b.at - a.at);
     return hits.find((hit) => threadNames(own.dir, hit.id, base))?.file ?? null;
 }
+// A finished thread's folder is given back, and work that came home from the
+// cloud may never have had one: its files are then only on its branch. A copy
+// is read out for viewing.
+const readFromGit = promisify(execFile);
+async function fileOnThreadBranch(repoPath: string | null | undefined, raw: string, thread: unknown): Promise<string | null> {
+    if (!repoPath || path.isAbsolute(raw) || raw.split('/').includes('..') || !thread || !THREAD_ID.test(String(thread)))
+        return null;
+    try {
+        const { stdout } = await readFromGit('git', ['-C', repoPath, 'show', `${taskBranch(thread)}:${raw}`], { encoding: 'buffer', timeout: 5_000, maxBuffer: 64 * 1024 * 1024 });
+        const copy = path.join(os.tmpdir(), 'agentbox-branch-files', createHash('sha1').update(repoPath).digest('hex').slice(0, 12), String(thread), raw);
+        await fsDefault.promises.mkdir(path.dirname(copy), { recursive: true });
+        await fsDefault.promises.writeFile(copy, stdout);
+        return copy;
+    }
+    catch {
+        return null;
+    }
+}
 function threadNames(dir: string, id: string, base: string): boolean {
     try {
         return readItemHistory(dir, id).some((l: ThreadLine | null) => ['body', 'answer', 'result', 'note'].some((k) => {
@@ -460,6 +483,9 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
         const inCheckout = await fileInCheckout({ dir: own.dir, repoPath: own.repoPath }, raw, thread, fs, now, fresh);
         if (inCheckout)
             return withCarry({ ok: true, path: inCheckout });
+        const onBranch = await fileOnThreadBranch(own.repoPath, raw, thread);
+        if (onBranch)
+            return withCarry({ ok: true, path: onBranch });
     }
     // The sender said there is nothing behind this word: no tile, no waiting.
     if (carried?.quiet)
