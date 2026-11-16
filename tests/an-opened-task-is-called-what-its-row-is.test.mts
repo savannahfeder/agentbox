@@ -35,8 +35,9 @@ const opening = (events) => events.find((e) => e.field === 'body') ?? events.fin
 describe('the header', () => {
   it('prints the name the row prints, with her title on hover', () => {
     // A conversation with a person is named for the person (2026-10-01); every
-    // other thread prints the name its row prints.
-    expect(focus).toMatch(/className="keep-line-title" title=\{item\.title\}>\{direct && !givenTask && !audience && talkFull \? talkFull : rowTitle\(item\)\}</);
+    // other thread prints the name its row prints, except a teammate's, whose
+    // row reads as its latest message (a-teammate-threads-name-stays-put-as-answers-arrive).
+    expect(focus).toMatch(/className="keep-line-title" title=\{item\.title\}>\{direct && !givenTask && !audience && talkFull \? talkFull : pageTitle\(item\)\}</);
   });
 });
 

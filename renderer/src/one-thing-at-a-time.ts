@@ -8,6 +8,7 @@ import { optionsFrom } from './format';
 import { instructionOf } from '../../shared/repeats.mts';
 import { rowTitle } from './list-rules';
 import { teammateIdOf } from '../../shared/teammates.mts';
+import { shownTitle } from '../../shared/thread-title.mts';
 
 export interface Spot { pos: number; total: number; index: number }
 
@@ -120,13 +121,13 @@ export function earlierThan(events: AgentEvent[], from: number): number {
 }
 
 /**
- * The page's name. A teammate's row is named after its answer's first line,
- * which would leave the page drawing that line twice or not at all under the
- * Context, so its page is named after what woke it; the answer is signed instead.
+ * The name of an open thread, in its header and on its page. A teammate's row
+ * is named after its answer's first line, which changes with every answer, so
+ * an open teammate thread is named the way any other thread is; the answer is
+ * signed instead.
  */
 export function pageTitle(item: Parameters<typeof rowTitle>[0]): string {
-  const own = (item.title ?? '').trim();
-  return teammateIdOf(item) && own ? own : rowTitle(item);
+  return teammateIdOf(item) && (item.title ?? '').trim() ? shownTitle(item) : rowTitle(item);
 }
 
 /** An answer opening with a line that is bold and nothing else wears it as its headline. */
