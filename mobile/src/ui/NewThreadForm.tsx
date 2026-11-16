@@ -10,7 +10,7 @@ import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
 import { ruleLabel } from '../../../shared/repeats.mts';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
-import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
+import { agentChoices, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { splitSlug } from '../../../renderer/src/phone-rows';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import type { Choices } from '../lib/actions';
@@ -205,7 +205,7 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
             <Pressable onPress={() => setSheet('to')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {mate && mate !== 'new' ? <TeammateMark t={mate} /> : mate === 'new' ? <TeammateMark t={null} /> : onAuto ? <AutoMark /> : null}
               {/* The row is the button; a second one inside it is a button in a button. */}
-              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentWordFor(agents.engines, engine)}</T>
+              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentChoices(agents.engines).find((e) => e.id === engine)?.label ?? 'Agent'}</T>
             </Pressable>
           )
           : <T style={{ fontSize: 15 }}>Agent</T>}
