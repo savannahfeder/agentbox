@@ -16,7 +16,7 @@ import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mts';
 import { answerFor, describeFor } from './first-run.mts';
 import { checkProjectFolder } from '../shared/project-folder-check.mts';
 import { SAME_PROJECT, carriedLines, leftByAMove, movedAway, movedHere, ranHere, splitForCompose, whatMoves, whyItCannotMove, type CarriedLine } from '../shared/move-thread.mts';
-import { agentSpokeSince, answerTs } from '../shared/answers.mts';
+import { agentSpokeSince, answerTs, laterHerWordLifts } from '../shared/answers.mts';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import {
   PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_CONTEXT, PRACTICE_DONE, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
@@ -604,6 +604,13 @@ export class Store {
     if (engine !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { engine: engine ?? '' }, { source: 'founder' });
     if (model !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { model: model ?? '' }, { source: 'founder' });
     if (effort !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { effort: effort ?? '' }, { source: 'founder' });
+    // Her word ends the Later she set, so a run finishing cannot bring it back.
+    // Written before the answer so a reply set for later can set its own time after.
+    if (answer && answer !== '(withdrawn)') {
+      const lifts = laterHerWordLifts(workItemsDisk.readWorkItem(dir, id));
+      if (lifts.runAt) item = workItemsDisk.updateWorkItem(dir, id, { runAt: 0 }, { source: 'founder' });
+      if (lifts.snoozedUntil) item = workItemsDisk.updateWorkItem(dir, id, { snoozedUntil: 0 }, { source: 'founder' });
+    }
     if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}), ...(voice ? { voice } : {}), ...(forAgent ? { forAgent } : {}), ...(fromNotes?.length ? { fromNotes } : {}), ...(fromNotes?.length && typed ? { typed } : {}) }, { source: 'founder' });
     // A REPLY ON A RUN THAT FINISHED QUIETLY MAKES IT NEWS AGAIN (w-5e3f2e047f).
     // A quiet run is kept out of her inbox, and a repeating task now opens on

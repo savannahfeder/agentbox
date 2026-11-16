@@ -102,7 +102,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
-import { filedByThePerson, wordWaits } from '../../shared/answers.mts';
+import { filedByThePerson, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
@@ -2157,13 +2157,14 @@ export default function App() {
   const agentMode = snap?.config?.outsideAgents ?? 'off';
 
   // Execution schedules gate work; inbox snoozes only gate her attention.
-  const dueAt = useCallback((i: WorkItem) => deferredUntil(i), []);
+  // A word held for Z lifts now what its write will lift (laterHerWordLifts).
+  const dueAt = useCallback((i: WorkItem) => (startingIds.has(i.id) && laterHerWordLifts(i).runAt ? 0 : deferredUntil(i)), [startingIds]);
 
   // When SHE put it away, which is a different question, and the difference is
   // the whole of parkedByAgent in list-rules: a moment an agent wrote brakes
   // workers and never hides a row from her. The rule itself is over there, pure
   // and pinned, so the inbox and Scheduled cannot read it two different ways.
-  const hiddenAt = useCallback((i: WorkItem) => hiddenUntil(i, snoozes[i.id] ?? 0), [snoozes]);
+  const hiddenAt = useCallback((i: WorkItem) => (startingIds.has(i.id) ? 0 : hiddenUntil(i, snoozes[i.id] ?? 0)), [snoozes, startingIds]);
   const returnAt = useCallback((i: WorkItem) => Math.max(dueAt(i), hiddenAt(i)), [dueAt, hiddenAt]);
 
   // THE TEAM, as the window reads it: who is signed in, their people, and
@@ -2648,11 +2649,11 @@ export default function App() {
     // AND A FIFTH (w-5244c90c33): a thread waiting on another one, unless a
     // session or the ship queue has it, which is In progress. A put-off one too.
     ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i)
-        || ((hiddenAt(i) > now || waitsInLater(i, waitingOn(i))) && !liveIds.has(i.id) && !shippingIds.has(i.id)))
+        || ((hiddenAt(i) > now || waitsInLater(i, waitingOn(i))) && !liveIds.has(i.id) && !shippingIds.has(i.id) && !pendingIds.has(i.id)))
       && (i.status !== 'done' || i.wrote?.status?.source !== 'founder')
       && (!scope || i.product === scope)),
     ...agentList.filter((r) => (r.runAt ?? 0) > now),
-  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, shippingIds, scope, now]);
+  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, shippingIds, pendingIds, scope, now]);
 
   // Repeating tasks. They are RULES, on their own channel, which is why nothing
   // in the item list rules has to know they exist. They are read up here, ahead
@@ -5441,6 +5442,8 @@ export default function App() {
     const wasScheduled = replyClearsSchedule(item, Date.now());
     const priorRunAt = item.runAt ?? 0;
     const priorSnooze = item.snoozedUntil ?? 0;
+    // The store lifts a time she set when the reply lands (laterHerWordLifts); Z puts it back.
+    const runLifted = !later && !waiting && laterHerWordLifts(item).runAt;
     if (stay) setFollowing({ product: item.product, id: item.id });
     const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
     await deferCommit(item, async () => {
@@ -5489,6 +5492,7 @@ export default function App() {
       }
       pushUndo({ label: 'Reply withdrawn, back in your inbox', undoes: 'take back that reply and stop the agent', restore, undid, run: async () => {
         if (later || waiting) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
+        if (runLifted) await api.schedule({ product: item.product, id: item.id, runAt: priorRunAt });
         if (wasScheduled && priorSnooze) await api.snooze({ product: item.product, id: item.id, snoozedUntil: priorSnooze });
         // `withdraw`: on the phone, take back the reply itself if her Mac has not taken it.
         if (!runStays) await window.zero?.stopSession?.({ product: item.product, id: item.id, withdraw: true });
@@ -8589,7 +8593,7 @@ export default function App() {
                     the sidebar places they used to be. With a team on, the
                     board is Everything else's, under the cards (evBoardEl). */}
                 {boardDrawn && !roomShown ? (<>
-                  <InboxBoard items={items} lead={boardLead} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
+                  <InboxBoard items={items} lead={boardLead} products={snap.products} display={inboxDisplay} now={now} stateOf={stateOfMine} projectOrder={projectOrder} laterRules={repeats.length}
                     cards={cards} picked={team ? picked : undefined}
                     onOpenCard={openTeammateCard}
                     selected={current} selectedCard={keyCard ? cardSel : null} columnOrder={columnOrder} onReorderColumns={reorderColumns}
