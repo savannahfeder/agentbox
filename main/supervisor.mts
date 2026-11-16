@@ -1363,6 +1363,8 @@ export class Supervisor {
   declare _fruitless: Record<string, FruitlessRecord>;
   declare _heldStarts: Record<string, HeldStart>;
   declare _deadStarts: Record<string, number[]>;
+  // The login that last refused each thread's run, and when.
+  declare _refusedOn: Record<string, { account: string; at: number }> | undefined;
   declare _carried: Record<string, CarriedMark>;
   declare _profileTrouble: Record<string, ProfileTrouble>;
   declare _profileCooldown: Record<string, number>;
@@ -1926,6 +1928,22 @@ export class Supervisor {
     if (!resetsAt || resetsAt <= now || (this._profileCooldown?.[key] ?? 0) >= now) return;
     this._profileCooldown[key] = resetsAt + LIMIT_RESET_GRACE_MS;
     (this._limitTries ??= new Map()).set(key, session);
+  }
+
+  // Her last word on this thread already had its try on the login, which
+  // refused it at a limit with a named reset; a reply elsewhere lifting that
+  // login's bench is not another try for this one.
+  _replyAlreadyTriedTheLimit(item: WorkItem) {
+    const refused = this._refusedOn?.[`${item.product}:${item.id}`];
+    if (!refused || refused.at < lastFounderWrite(item) || this._accountMovedOn(item, refused.account)) return false;
+    return this._namedLimitReset(refused.account) != null;
+  }
+
+  // The reset an account's limit named, while it is still ahead.
+  _namedLimitReset(key: string, now = Date.now()): number | null {
+    const trouble = this._profileTrouble?.[key];
+    if (trouble?.cause !== 'at-limit' || !trouble.resetsAt || trouble.resetsAt <= now) return null;
+    return trouble.resetsAt;
   }
 
   _noticeLimitTryLived() {
@@ -4548,7 +4566,12 @@ export class Supervisor {
     // and not one minute before. A second login with room used to wake it here
     // and the work moved there; it waits for its own account now
     // (w-dac993a554).
-    if (seen?.account && !this._profileResting(seen.account)) return 0;
+    // A reply on any thread lifts the bench for one try, and that try belongs
+    // to the thread replied on: this one, untouched, waits for the reset its
+    // account named.
+    if (seen?.account && !this._profileResting(seen.account)) {
+      return this._accountMovedOn(item, seen.account) ? 0 : this._namedLimitReset(seen.account) ?? 0;
+    }
     // OR AS SOON AS THAT IS NOT THE ACCOUNT ANY MORE. Somebody upgrading a plan
     // and picking it in Settings is a person's own hand, not the app reaching
     // for a second subscription: the row is not going back to the account it
@@ -7345,6 +7368,7 @@ export class Supervisor {
       .flatMap((l) => l.slice('stderr:'.length).split('\n')).map((l) => l.trim()).filter((l) => l && !l.startsWith(CLOUD_SENT)).at(-1) ?? (modelRefused ? String(session.result) : null);
     // The login that refused it, so a sign-in on it can bring the next try forward (`_noticeSignIns`).
     const account = refused && !session.cloud ? this._accountKey(session.engine, session.profile || 'default') : null;
+    if (account) (this._refusedOn ??= {})[key] = { account, at: now };
     // A try of its own that died at once is held again straight away.
     if (held?.trying) {
       const tries = (held.tries ?? 0) + 1;
@@ -7469,6 +7493,7 @@ export class Supervisor {
   // (`authorityOf` in shared/work-items.mts).
   forgetDeadStarts(item: WorkItem) {
     const key = `${item?.product}:${item?.id}`;
+    delete this._refusedOn?.[key];
     if (!this._heldStarts?.[key] && !this._deadStarts?.[key]) return;
     delete this._heldStarts?.[key];
     delete this._deadStarts?.[key];
@@ -9131,8 +9156,9 @@ export class Supervisor {
       if (!held.has(engine)) {
         const profiles = this._profilesFor(engine);
         const keys = profiles.map((p) => this._accountKey(engine, p));
-        const allOut = profiles.length > 0 && !this._liveProfilesFor(engine).length
-          && keys.every((k) => this._profileTrouble?.[k]?.cause === 'at-limit');
+        // A reply's one try lifts the bench but not a limit that named its reset.
+        const allOut = profiles.length > 0
+          && keys.every((k) => this._profileTrouble?.[k]?.cause === 'at-limit' && (this._profileResting(k) || this._namedLimitReset(k) != null));
         // Codex's refusal prints no hour, but its own reading of the login does.
         const read = allOut && engine === 'codex' ? this._codexBackAt(profiles) : null;
         // The reset the tool printed, never the app's own retry clock: that is
@@ -12045,7 +12071,7 @@ export class Supervisor {
     // slot check by design, so with every account on this engine sitting out it
     // would go to one anyway, die in two seconds, and go again next tick. Held
     // here and handed back, it goes out the tick the account returns.
-    if (continuation && !pinned && !this._liveProfilesFor(engine).length) {
+    if (continuation && !pinned && (!this._liveProfilesFor(engine).length || this._replyAlreadyTriedTheLimit(item))) {
       refuse('login', engine);
       if (item.answer) this.redeliverAnswer(item, item.answer);
       return;

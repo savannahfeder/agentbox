@@ -74,6 +74,13 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         return send({ method: 'turn/completed', params: { threadId, turn: { ...turn, status: 'completed' } } });
       }
       log('turn refused');
+      // Opt in with `$CODEX_HOME/at-limit`: a login out of usage, in codex-cli's own words.
+      if (fs.existsSync(path.join(home, 'at-limit'))) {
+        return send({ method: 'turn/completed', params: { threadId, turn: { ...turn, status: 'failed', error: {
+          message: fs.readFileSync(path.join(home, 'at-limit'), 'utf8'),
+          codexErrorInfo: 'usageLimitExceeded',
+        } } } });
+      }
       return send({ method: 'turn/completed', params: { threadId, turn: { ...turn, status: 'failed', error: {
         message: 'unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: https://api.openai.com/v1/responses',
         codexErrorInfo: 'unauthorized',
