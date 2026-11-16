@@ -2663,7 +2663,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer key={`${item.product}:${item.id}`} item={item} onItsWay={pickOnItsWay(sending)} runningMode={runningMode} runningEngine={runningEngine} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
+            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
