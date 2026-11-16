@@ -117,6 +117,18 @@ export function targetScript(arg) {
     return at.find((p) => { const hit = document.elementFromPoint(p.x, p.y); return hit && (hit === el || el.contains(hit)); }) || { covered: true }; })()`;
 }
 
+// A sheet still sliding in moves its rows after they are measured, and the touch lands rows below.
+export async function settledTarget(at, measure, pause, tries = 10) {
+  for (let i = 0; at && !at.covered && i < tries; i++) {
+    await pause();
+    const again = await measure();
+    const still = !!again && !again.covered && Math.abs(again.x - at.x) < 1 && Math.abs(again.y - at.y) < 1;
+    at = again;
+    if (still) break;
+  }
+  return at;
+}
+
 async function asPhone(t) {
   await t.call('Emulation.setDeviceMetricsOverride', { width: IPHONE.width, height: IPHONE.height, deviceScaleFactor: IPHONE.scale, mobile: true });
   await t.call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
@@ -169,6 +181,7 @@ if (isMain) {
       let at = await t.evaluate(targetScript(args.join(' ')));
       // Re-applying the phone's screen on connect can redraw the page and drop the last look's numbers.
       if (!at) { await t.evaluate(LOOK); at = await t.evaluate(targetScript(args.join(' '))); }
+      at = await settledTarget(at, () => t.evaluate(targetScript(args.join(' '))), () => t.wait(150));
       if (!at) { console.log(`Nothing to tap called ${args.join(' ')}. Look again.`); t.detach(); process.exit(1); }
       if (at.covered) { console.log(`${args.join(' ')} is under something else on the screen. Close what covers it, then tap again.`); t.detach(); process.exit(1); }
       await touch(t, 'touchStart', at.x, at.y);
