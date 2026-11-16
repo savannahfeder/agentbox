@@ -53,11 +53,21 @@ function setup(start: number) {
 }
 
 describe('the team checkout', () => {
-  it('takes the card now and charges when the team’s free days end', async () => {
+  // 2026-11-13: a checkout opened a minute after the team was made read "6 days free" on Stripe's page
+  // beside the app's "7 days". Stripe words the free time in whole days, rounded down, so it is
+  // given whole days, rounded up: never less than the app promised, and under a day more.
+  it('takes the card now and gives Stripe whole days, so a team just made reads 7 days free', async () => {
     const { owner, made } = setup(MADE + 60_000);
     const out = await owner({ plan: 'team' });
     expect(out.body).toMatchObject({ where: 'checkout' });
-    expect(made()['subscription_data[trial_end]']).toBe(String(Math.floor(TRIAL_ENDS / 1000)));
+    const end = Number(made()['subscription_data[trial_end]']) * 1000;
+    expect(end).toBe(TRIAL_ENDS + 60_000);
+    expect((end - (MADE + 60_000)) / DAY).toBe(TEAM.trialDays);
+  });
+  it('rounds a part day up, never down', async () => {
+    const { owner, made } = setup(MADE + 2.5 * DAY);
+    await owner({ plan: 'team' });
+    expect(Number(made()['subscription_data[trial_end]']) * 1000).toBe(MADE + 2.5 * DAY + 5 * DAY);
   });
   it('still trials a team a few days in, to the same end', async () => {
     const { owner, made } = setup(MADE + 3 * DAY);

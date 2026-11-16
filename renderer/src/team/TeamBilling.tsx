@@ -72,7 +72,7 @@ export function TeamBilling({ team, people, meId, billing, now = Date.now(), pay
         <div className="tb-hero-ends"><span>Started {v.started}</span><span>Ends {v.ends}</span></div>
       </> : (
         <div className="tb-hero-sub">{team.owner
-          ? `${v.seatsLine}${billing?.nextAt ? ` · next bill $${n(billing.nextAmount ?? 0)} on ${day(billing.nextAt)}` : ''}`
+          ? `${v.seatsLine}${billing?.endsAt ? ` · cancelled, ends ${day(billing.endsAt)}` : billing?.nextAt ? ` · next bill $${n(billing.nextAmount ?? 0)} on ${day(billing.nextAt)}` : ''}`
           : v.seatsLine}</div>
       )}
       {team.owner && (team.trial && !team.seats
@@ -90,7 +90,7 @@ export function TeamBilling({ team, people, meId, billing, now = Date.now(), pay
           <div className="tb-compare-small">{team.owner ? `You pay ${v.price} for ${team.members}` : "Paid by your team's owner"}</div>
         </Card>
       ) : team.owner ? (
-        <Card name="Billing" big={billing?.card ? `${billing.card.brand} ${billing.card.last4}` : 'No card yet'}>
+        <Card name="Billing" big={billing?.card ? `${billing.card.brand} ${billing.card.last4}`.trim() : 'No card yet'}>
           <div className="tb-compare-small">Invoices go to {billing?.email ?? 'you'}</div>
           <div className="tb-compare-small">{last ? `Last ${day(last.at)}, $${n(last.amount)} · ${last.status === 'paid' ? 'Paid' : last.status === 'failed' ? 'Failed' : 'Due'}` : 'No invoices yet'}</div>
         </Card>

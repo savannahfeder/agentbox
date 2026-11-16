@@ -22,7 +22,7 @@ import { stripeClient } from '../cloud/gateway/stripe.mjs';
 import { cloudPlanOf } from '../main/cloud/account.mts';
 import { planKey } from '../renderer/src/cloud-upgrade.ts';
 import { TeamBilling } from '../renderer/src/team/TeamBilling.tsx';
-import { SETUP_PLANS, PRO_PITCH } from '../renderer/src/setup-split.ts';
+import { PRO_PITCH } from '../renderer/src/setup-split.ts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -191,8 +191,8 @@ describe('what the screens say', () => {
   // on the left, and the trial is 50 hours, not 10 ("10 cloud hours for pro is very
   // bad given free is 5. should be more like 50").
   it('the purchase page shows the free week beside the paid month, on the left', () => {
-    const pro = SETUP_PLANS.find((p) => p.id === 'pro')!;
-    expect(pro.sub).not.toMatch(/\d+ cloud agents at once/);
+    // The list of plans went when the purchase page became the one plan page (2026-11-12).
+    expect(JSON.stringify(PRO_PITCH)).not.toMatch(/\d+ cloud agents at once/);
     expect(TEAM.trialHoursPerMember).toBe(50);
     expect(PRO_PITCH.trial).toEqual({ label: 'First 7 days', price: 'Free', line: '50 cloud hours to try' });
     expect(PRO_PITCH.paid).toEqual({ label: 'Then', price: '$40', per: 'a month', line: '400 cloud hours a month' });

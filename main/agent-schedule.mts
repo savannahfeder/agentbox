@@ -231,9 +231,9 @@ export class AgentSchedule {
    * session that is not in this reading is a moment about a process that has
    * exited — but only if the reading is real. `listAgents` answers [] on the
    * first call of every boot (it hands back the cache and measures in the
-   * background) and again whenever a `ps` fails, and sweeping against either of
-   * those would clear every moment she has set, at every app start, with no
-   * symptom except her deferred rows all coming back.
+   * background), and sweeping against that would clear every moment she has
+   * set, at every app start, with no symptom except her deferred rows all
+   * coming back.
    */
   decorate(agents: ScheduledAgent[], now = Date.now()) {
     const live = new Set<string>();

@@ -155,14 +155,12 @@ const PROJECTS_DIR = () => path.join(os.homedir(), '.claude', 'projects');
 // One `ps` answers three questions: which pids are alive, who started each one
 // (the dedupe key for the app's own workers), and when each one started (the
 // guard against pid reuse).
+// Throws when ps fails: an empty table would read as every agent gone.
 async function processTable() {
   const table = new Map<number, ProcessRow>();
-  let out = '';
-  try {
-    ({ stdout: out } = await run('/bin/ps', ['-Ao', 'pid=,ppid=,lstart=,command='], {
-      encoding: 'utf8', maxBuffer: 16 << 20, timeout: 5000,
-    }));
-  } catch { return table; }
+  const { stdout: out } = await run('/bin/ps', ['-Ao', 'pid=,ppid=,lstart=,command='], {
+    encoding: 'utf8', maxBuffer: 16 << 20, timeout: 5000,
+  });
   for (const line of out.split('\n')) {
     // pid ppid <lstart: Www Mmm dd hh:mm:ss yyyy = 5 fields> command...
     const m = line.match(/^\s*(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\S+\s+\S+\s+\S+)\s+(.*)$/);
@@ -209,7 +207,13 @@ async function fromCli(claudeBin: string | null | undefined): Promise<SessionRec
     });
     const parsed = JSON.parse(stdout);
     return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
+  } catch (err) {
+    // Cut off at the deadline is no reading at all; a Claude Code without the
+    // command is a reading of none.
+    const { killed, code } = err as { killed?: boolean; code?: unknown };
+    if (killed && code !== 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') throw err;
+    return [];
+  }
 }
 
 // The same scrub the supervisor does before every spawn. `claude agents --json`
@@ -725,7 +729,7 @@ function readState(pid: number) {
 // own window. Claude Code has no command to focus a session, so this walks the
 // parent chain to the first macOS .app and brings that to the front.
 export async function owningApp(pid: number) {
-  const table = await processTable();
+  const table = await processTable().catch(() => new Map<number, ProcessRow>());
   let cur = table.get(pid);
   for (let hops = 0; cur && hops < 12; hops += 1) {
     const m = cur.command.match(/^(\/(?:Applications|System\/Applications)\/[^/]*?\.app)\//);

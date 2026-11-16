@@ -7,7 +7,10 @@ export const SIDEBAR_SHRINKS_KEY = 'agentbox.sidebarShrinks';
 export const sidebarFolded = ({ phone, shrinks, pointedAt }: { phone: boolean; shrinks: boolean; pointedAt: boolean }) =>
   phone || (shrinks && !pointedAt);
 
-export const shrinksFrom = (stored: string | null) => stored !== '0';
+/** A sidebar drawn under a resting pointer is told the pointer entered it; only one that moved opens it. */
+export const pointerMoved = (e: { movementX: number; movementY: number }) => e.movementX !== 0 || e.movementY !== 0;
+
+export const shrinksFrom =(stored: string | null) => stored !== '0';
 
 const heard = new Set<() => void>();
 const read = () => {
