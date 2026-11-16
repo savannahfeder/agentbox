@@ -522,7 +522,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   const accountUsage = new AccountUsage({
     bin: () => config.claudeBin ?? null,
     env: () => supervisor._workerEnv(DEFAULT_ENGINE),
-    onReading: (profile, reading) => supervisor.noteUsageReading(profile, reading),
+    onReading: (profile, reading) => {
+      supervisor.noteUsageReading(profile, reading);
+      usage.adopt({ ...reading, profile });
+    },
     identity: (profile) => accountIdentity(profile === 'default' ? null : profile, { home: config.home }),
   });
   ipcMain.handle('zero:account-usage', async (event, { refresh = false, engine = DEFAULT_ENGINE }: { refresh?: boolean; engine?: string } = {}) => {
