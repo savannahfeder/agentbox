@@ -241,6 +241,7 @@ export interface FileNote {
   saving?: boolean;
   id: string;
   file: string;
+  v?: number;
   place: NotePlace;
   text: string;
   by: string | null;

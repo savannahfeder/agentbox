@@ -57,6 +57,8 @@ export interface FileReply { id: string; text: string; by: string | null; ts: nu
 export interface FileNote {
   id: string;
   file: string;
+  /** The version number it was made on, where the note says. */
+  v?: number;
   place: NotePlace;
   text: string;
   by: string | null;
@@ -287,7 +289,7 @@ export function marksOf(entries: readonly MarkEntry[] | null | undefined): FileM
     if (e.do === 'edit' && e.path) {
       edits.push({ file: e.file, path: e.path, by: e.by ?? null, ts: e.ts });
     } else if (e.do === 'note' && !notes.has(e.id)) {
-      const note: FileNote = { id: e.id, file: e.file, place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null, ...(e.wait ? { wait: true } : {}) };
+      const note: FileNote = { id: e.id, file: e.file, ...(e.v ? { v: e.v } : {}), place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null, ...(e.wait ? { wait: true } : {}) };
       if (e.place.kind === 'pin' || ((e.place.kind === 'time' || e.place.kind === 'page') && unit(e.place.x))) {
         const n = (pins.get(e.file) ?? 0) + 1;
         pins.set(e.file, n);
@@ -839,9 +841,12 @@ export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, { me
  * the same comment, not a copy, so resolving it here resolves it everywhere.
  * `from` names the version it was made on ("v1").
  */
-export function carriedNotes<N extends Pick<FileNote, 'file' | 'resolved'>>(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly N[] | null | undefined, { resolved = false }: { resolved?: boolean } = {}): Array<N & { from: string }> {
+export function carriedNotes<N extends Pick<FileNote, 'file' | 'resolved' | 'v'>>(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly N[] | null | undefined, { resolved = false }: { resolved?: boolean } = {}): Array<N & { from: string }> {
   const earlier = new Map((family?.versions ?? []).slice(0, Math.max(0, index)).map((v) => [v.id, v]));
-  return (notes ?? []).filter((n) => earlier.has(n.file) && (resolved || !n.resolved)).map((n) => ({ ...n, from: `v${earlier.get(n.file)!.n}` }));
+  // A file edited in place keeps one id across versions, so the note's own number decides.
+  const here = family?.versions?.[index]?.n;
+  const madeHereOrLater = (n: N) => typeof n.v === 'number' && typeof here === 'number' && n.v >= here;
+  return (notes ?? []).filter((n) => earlier.has(n.file) && !madeHereOrLater(n) && (resolved || !n.resolved)).map((n) => ({ ...n, from: `v${n.v ?? earlier.get(n.file)!.n}` }));
 }
 
 /** What to tell someone editing version `baseN` when somebody else has saved since, or null. */

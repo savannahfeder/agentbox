@@ -323,7 +323,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     // ⌘↵ sends it with the rest in one toagent, so the agent starts once.
     const tagged = !withIt.length && withAgent && typeof version.agent === 'string' && tagsYourAgent(typed);
     // It is in the list before the app has answered; a failure puts the words back.
-    setSavingNotes((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), resolved: false, replies: [], saving: true, wait: !tagged, ...(pinned(place) ? { pin: nextPin } : {}) } as unknown as FileNote]);
+    setSavingNotes((was) => [...was, { id, file: version.id, v: version.n, place, text, by: me, ts: Date.now(), resolved: false, replies: [], saving: true, wait: !tagged, ...(pinned(place) ? { pin: nextPin } : {}) } as unknown as FileNote]);
     setWords(''); setDraftPlace(null); setWholeAsked(false); setAsking(null);
     setActiveId(id);
     const out = await write({ do: 'note', id, file: version.id, v: version.n, place, text, wait: !tagged, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) })
