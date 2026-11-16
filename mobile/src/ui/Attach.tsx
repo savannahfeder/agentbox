@@ -2,7 +2,7 @@
 // that asks where from, and the files waiting to go, each with a way to drop
 // it. A picture waits as its thumbnail, as on the phone site (AttachRow.tsx).
 import { useState } from 'react';
-import { Image, Platform, Pressable, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, View } from 'react-native';
 import { isImageName } from '../../../renderer/src/attachments';
 import { pickAfterClose, thumbUri } from '../lib/attach';
 import { pickFiles, pickPhotos, type Picked } from '../platform/pick';
@@ -45,11 +45,12 @@ function Thumb({ file, drop }: { file: Picked; drop: () => void }) {
   );
 }
 
-/** The files waiting to go with the message. */
+/** The files waiting to go with the message, one row high so a few do not push the message away. */
 export function Attached({ files, drop }: { files: Picked[]; drop: (i: number) => void }) {
   if (!files.length) return null;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }}
+      contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       {files.map((f, i) => (isImageName(f.name) ? <Thumb key={`${f.name}-${i}`} file={f} drop={() => drop(i)} /> : (
         <View key={`${f.name}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingLeft: 10, paddingRight: 4, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, maxWidth: 240 }}>
           <Clip size={13} tint={color.faint} />
@@ -59,6 +60,6 @@ export function Attached({ files, drop }: { files: Picked[]; drop: (i: number) =
           </Pressable>
         </View>
       )))}
-    </View>
+    </ScrollView>
   );
 }
