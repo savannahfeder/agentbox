@@ -278,7 +278,7 @@ import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sky';
-import { busiestFirst, engineLetter, engineName, finishedHello, greeting, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
+import { busiestFirst, engineLetter, engineName, finishedHello, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
@@ -7802,10 +7802,12 @@ export default function App() {
     return { key: `${i.product}/${i.id}`, letter: engineLetter(engine), title: rowTitle(i), line: `${engineName(engine)} · ${i.productName}`, at: sentAtOf(i) };
   }) : [];
   const homeOpenRow = (key: string) => {
-    const entry = needsList.find((e) => e.key === key);
-    if (!entry) return;
-    openNeedsEntry(entry, {
-      item: (item) => { openedFromHome.current.add(keyOf(item)); setFocused(item); markSeen(item); },
+    const opens = homeRowOpens(key, needsList, progressTab, keyOf);
+    const openItem = (item: WorkItem) => { openedFromHome.current.add(keyOf(item)); setFocused(item); markSeen(item); };
+    if (!opens) return;
+    if ('item' in opens) { openItem(opens.item); return; }
+    openNeedsEntry(opens.entry, {
+      item: openItem,
       card: (card) => openTeammateCard(card),
       // A click on an invitation opens it, as its Inbox row does; joining is its own button there.
       lead: (l) => { if (l.mention) roomsUi.openMention(l.mention); else openInvite(); },
