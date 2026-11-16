@@ -410,7 +410,7 @@ async function createWindow() {
   // (shared/which-card-is-in-front.mts). Late-bound beside the door above,
   // because only the IPC surface knows which thread is on screen, and before it
   // exists the spool's own order is the whole of what is known.
-  let cardInFront: () => { id: string } | null = () => approvals.listPending(config.storeRoot)[0] ?? null;
+  let cardInFront: () => { id: string } | null = () => approvals.listPending(config.storeRoot, { drawn: false })[0] ?? null;
   installMenu({
     onApproval: (allow) => {
       const front = cardInFront();
