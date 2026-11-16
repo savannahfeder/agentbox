@@ -10811,7 +10811,10 @@ export class Supervisor {
     // had every task sent to a Claude Code that could not run. Both answers
     // come from the sign-in check (main/engine-setup.mts); until it has
     // answered, nothing moves.
-    const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true;
+    // That check asks only ~/.claude, so it says nothing about an added
+    // account work runs on instead (w-d75c73d091).
+    const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true
+      && (this._profilesFor(DEFAULT_ENGINE)[0] ?? 'default') === 'default';
     return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
   }
 
