@@ -95,6 +95,31 @@ describe('a file a finished thread committed on its branch', () => {
   });
 });
 
+// Round four: an answer linked docs/website-launch-checklist.md by its full
+// path inside the thread's folder. The thread had merged and its folder was
+// given back, so the link opened an empty document though main held the file.
+describe('a link by full path into a thread folder that was given back', () => {
+  const inFolder = (id: string, rel: string) => path.join(repo, '.claude', 'worktrees', id, rel);
+
+  it('opens the file from the thread\'s branch while it is not merged', async () => {
+    expect(await open(inFolder(finished, 'README.md'), null)).toBe('four tests pass\nGET /health\n');
+  });
+
+  it('opens the project\'s own copy once the branch is in main', async () => {
+    expect(await open(inFolder(merged, 'net.test.cjs'), null)).toBe('eleven tests, renamed\n');
+  });
+
+  it('still opens the folder\'s own file while the folder is there', async () => {
+    expect(await open(inFolder(running, 'README.md'), null)).toBe('being written\n');
+  });
+
+  it('matches the repository through a link to the same folder', async () => {
+    const linked = path.join(root, 'linked');
+    fs.symlinkSync(repo, linked);
+    expect(await open(path.join(linked, '.claude', 'worktrees', merged, 'net.test.cjs'), null)).toBe('eleven tests, renamed\n');
+  });
+});
+
 // The pane beside the chat. This repository has no browser to draw it in, so
 // its rule is tested and its source is read.
 const source = (p: string) => fs.readFileSync(path.join(import.meta.dirname, '..', p), 'utf8');

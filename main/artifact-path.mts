@@ -354,6 +354,22 @@ function unmergedTips(repoPath: string, fs: ArtifactFs, now: number, fresh: bool
         }));
     }, fresh);
 }
+// A full path into `<repo>/.claude/worktrees/<id>/…` whose folder is gone.
+// The repo is matched through its real path: links say /private/tmp for /tmp.
+function givenBackFolder(repoPath: string, raw: string): { id: string; rel: string } | null {
+    const mark = `${path.sep}.claude${path.sep}worktrees${path.sep}`;
+    const at = raw.indexOf(mark);
+    if (at < 0)
+        return null;
+    const [id, ...rest] = raw.slice(at + mark.length).split(path.sep);
+    if (!THREAD_ID.test(id) || !rest.length || rest.includes('..'))
+        return null;
+    const real = (p: string) => { try { return fsDefault.realpathSync(p); } catch { return null; } };
+    const repo = real(repoPath);
+    if (!repo || real(raw.slice(0, at)) !== repo || fsDefault.existsSync(path.join(repo, '.claude', 'worktrees', id)))
+        return null;
+    return { id, rel: rest.join('/') };
+}
 // Keyed by commit, so a copy never goes stale.
 const branchCopies = new Map<string, Promise<string | null>>();
 async function fileOnThreadBranch(repoPath: string | null | undefined, raw: string, thread: unknown, fs: ArtifactFs, now: number, fresh: boolean): Promise<string | null> {
@@ -457,6 +473,15 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
     if (path.isAbsolute(raw)) {
         // Said in full, so taken at its word.
         candidates.push(raw);
+        // A thread's folder is given back once its work lands, and its answer
+        // still links the file there: its branch has it, or main once merged.
+        const given = own?.repoPath ? givenBackFolder(own.repoPath, raw) : null;
+        if (given) {
+            const onBranch = await fileOnThreadBranch(own!.repoPath, given.rel, given.id, fs, now, fresh);
+            if (onBranch)
+                return withCarry({ ok: true, path: onBranch });
+            candidates.push(path.join(own!.repoPath!, given.rel));
+        }
         // Workers also write an absolute path with a segment missing (the account
         // root straight onto reports/, no product slug). The remainder is a guess,
         // so it is retried under THIS product's roots and no other.
