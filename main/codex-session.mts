@@ -422,11 +422,14 @@ export function createCodexWorker({
     };
     turnWaiters.push(done);
   });
+  const tooLate = () => Object.assign(new Error('The turn has ended; this reply will start the next one.'), { code: TURN_CLOSED });
   worker.steer = async (text: string, pictures: unknown[] = []) => {
     if (!ended && !worker.turnId) await turnStarting();
-    if (ended || !worker.threadId || !worker.turnId) throw Error('The turn is not running. Send again when the conversation is ready.');
+    if (ended) throw tooLate();
+    if (!worker.threadId || !worker.turnId) throw Error('The turn is not running. Send again when the conversation is ready.');
     const expected=worker.turnId;
-    const result=await server.steerTurn(worker.threadId,expected,text,pictures);
+    // The server can finish a turn a moment before its turn/completed reaches us.
+    const result=await server.steerTurn(worker.threadId,expected,text,pictures).catch((e: Error) => { throw /no active turn/i.test(String(e?.message)) ? tooLate() : e; });
     if(result?.turnId!==expected)throw Error('The provider did not confirm the active turn.');
     return result;
   };
