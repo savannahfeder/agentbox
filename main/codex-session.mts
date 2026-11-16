@@ -428,8 +428,9 @@ export function createCodexWorker({
     if (ended) throw tooLate();
     if (!worker.threadId || !worker.turnId) throw Error('The turn is not running. Send again when the conversation is ready.');
     const expected=worker.turnId;
-    // The server can finish a turn a moment before its turn/completed reaches us.
-    const result=await server.steerTurn(worker.threadId,expected,text,pictures).catch((e: Error) => { throw /no active turn/i.test(String(e?.message)) ? tooLate() : e; });
+    // The server can finish a turn a moment before its turn/completed reaches us,
+    // and a cloud turn's end closes the connection under a steer still in flight.
+    const result=await server.steerTurn(worker.threadId,expected,text,pictures).catch((e: Error) => { throw ended || /no active turn/i.test(String(e?.message)) ? tooLate() : e; });
     if(result?.turnId!==expected)throw Error('The provider did not confirm the active turn.');
     return result;
   };
