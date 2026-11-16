@@ -215,6 +215,8 @@ const ROW_FIELDS = [
   'createdAt', 'updatedAt', 'pinned', 'onMac',
   // The phone command that made it, so the phone can follow its stand-in here.
   'fromPhone',
+  // What the thread waits on, which puts it in Later (list-rules `waitsInLater`).
+  'blockedBy', 'waitEnded',
 ];
 // The fields a line in a thread's history may carry in its patch: what the
 // thread view draws as the conversation and its state changes.

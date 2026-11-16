@@ -69,6 +69,18 @@ export interface SettingsModel {
   cloud?: CloudModel | null;
   usage?: { claude?: unknown; codex?: unknown } | null;
   links?: readonly (LinkModel | null | undefined)[];
+  /** When the window last opened each thread, by id (renderer `seenAt`). */
+  seen?: unknown;
+}
+
+export const SEEN_SENT = 500;
+/** The newest threads this computer's window has opened, id to when; Mark Unread's 0 stays home. */
+export function phoneSeenOf(seen: unknown): Record<string, number> {
+  if (!seen || typeof seen !== 'object') return {};
+  return Object.fromEntries(Object.entries(seen as Record<string, unknown>)
+    .filter((e): e is [string, number] => /^[\w-]{1,80}$/.test(e[0]) && typeof e[1] === 'number' && Number.isFinite(e[1]) && e[1] > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, SEEN_SENT));
 }
 
 /** One usage limit as shared/usage.mts reads it; only its numbers and reset times travel. */
@@ -440,6 +452,7 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
   return {
     v: SETTINGS_VERSION,
     version: String(version ?? ''),
+    ...(model.seen ? { seen: phoneSeenOf(model.seen) } : {}),
     workspace: {
       // What the web app gives a paid plan, dictation (renderer/src/web-speech.ts).
       plan: typeof w.cloudPlan === 'string' ? w.cloudPlan : null,

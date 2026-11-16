@@ -61,6 +61,7 @@ import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAf
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mts';
+import { SEEN_SENT } from '../../shared/phone-settings.mts';
 import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
 
 const SHARE_LAST = 'agentbox:share-last';
@@ -3865,6 +3866,7 @@ export default function App() {
   useEffect(() => {
     const newest = Object.entries(seenAt).sort((a, b) => b[1] - a[1]).slice(0, 2000);
     localStorage.setItem(SEEN_AT_KEY, JSON.stringify(Object.fromEntries(newest)));
+    void api.seenHere(Object.fromEntries(newest.slice(0, SEEN_SENT)));
   }, [seenAt]);
   // THE NEWEST `seenAt`, FOR A WATCH THAT ASKS LATER. The arrival watch below
   // waits on a scroll that may be minutes away and has to see a Mark Unread
