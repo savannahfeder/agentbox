@@ -57,7 +57,7 @@
 .tq-key:hover { color: var(--text); }
 
 .tq-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.tq-chip { height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13.5px; color: var(--text); display: inline-flex; align-items: center; cursor: default; }
+.tq-chip { min-height: 30px; padding: 5px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; font-size: 13.5px; line-height: 18px; color: var(--text); text-align: left; display: inline-flex; align-items: center; cursor: default; }
 .tq-chip:hover { background: var(--wash-strong); }
 
 .rm-compose.tq-compose, .dock-card.tq-compose { margin: 8px 32px 24px 32px; }

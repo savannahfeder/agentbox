@@ -73,6 +73,10 @@ describe("a cloud agent's hook files never run on the Mac", () => {
   });
 
   it('a hook the same git would run without the pin is real, so the checks above can fail', () => {
+    // `git status` writes the index, and so runs the hook, only when it refreshes
+    // an entry: a tracked file with the same content and a new time makes sure it does.
+    const old = new Date('2001-01-01T00:00:00Z');
+    fs.utimesSync(path.join(task, '.husky', '_', 'post-commit'), old, old);
     execFileSync('git', ['status', '--porcelain'], { cwd: task });
     expect(ran()).toContain('post-index-change');
   });
