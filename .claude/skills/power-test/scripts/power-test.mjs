@@ -133,7 +133,8 @@ function run(cmd, argv, { env = process.env, timeoutMs = 10 * MIN, cwd = REPO } 
 }
 const live = (name, ...verb) => {
   const shut = verb.indexOf('--shut-for');
-  return run(node, [LIVE, ...verb], { env: { ...process.env, VERIFY_INSTANCE: name }, timeoutMs: 15 * MIN + (shut >= 0 ? Number(verb[shut + 1]) * 1000 : 0) });
+  // The copies' own Codex agents spend the testers' login too, never this Mac's default one.
+  return run(node, [LIVE, ...verb], { env: { ...process.env, VERIFY_INSTANCE: name, VERIFY_CODEX_HOME: login.home }, timeoutMs: 15 * MIN + (shut >= 0 ? Number(verb[shut + 1]) * 1000 : 0) });
 };
 
 /** `app` and `diary` in the person's folder: the tester's two commands, each knowing which copy and diary it is for. */
