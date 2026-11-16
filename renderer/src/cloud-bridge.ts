@@ -439,7 +439,7 @@ export function installCloudBridge(cfg: CloudConfig | null = typeof document ===
       const sent = sentFileName(p?.src);
       const found = sent ? null : findFile(places, p?.product, p?.src);
       const link = sent ? linkOfEntry(sent) : found && linkOfEntry(found.entry.n);
-      if (!link) return { ok: false, error: found?.entry.big ? 'This file is too big for your phone.' : 'This file is on your computer.' };
+      if (!link) return { ok: false, error: found?.entry.big ? 'This file is too big for your phone.' : found?.entry.soon || sent ? 'This file is on its way from your computer.' : 'This file is on your computer.' };
       const asked = client.generation();
       const res = await fetch(link);
       const text = res.ok ? await res.text() : null;
