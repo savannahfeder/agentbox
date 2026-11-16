@@ -4,8 +4,7 @@
 // gives every new thread a short name read Juno's run, opened on "Also want
 // to add this too:" and a long pasted list, and called it "Add new feature";
 // her answer, a table of impressions, never showed. Now a teammate's thread is
-// drawn by what it said to you, its answer's first line, and the namer leaves
-// teammate runs alone.
+// drawn by what it said to you, its answer's first line.
 import { describe, it, expect } from 'vitest';
 import { rowTitle } from '../renderer/src/list-rules.ts';
 import { wantsName } from '../main/row-label.mts';
@@ -31,8 +30,10 @@ describe('a teammate\'s thread in your inbox', () => {
     expect(rowTitle(mine)).toBe('Fix the login button');
   });
 
-  it('is not given a name by the namer, while your own threads still are', () => {
-    expect(wantsName(run({ label: '' }))).toBe(false);
-    expect(wantsName({ status: 'open', title: 'fix the login thing', labels: ['founder'] })).toBe(true);
+  // The namer names it once for its header and page (a-teammate-threads-name-stays-put-as-answers-arrive);
+  // the row never draws that name.
+  it('is not drawn by the namer\'s name, though the namer gives it one', () => {
+    expect(wantsName(run({ label: '' }))).toBe(true);
+    expect(rowTitle(run({ result: '**Two posts each.**' }))).toBe('Two posts each.');
   });
 });
