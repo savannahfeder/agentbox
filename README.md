@@ -21,7 +21,7 @@
   <a href="#how-it-works">How it works</a> ·
   <a href="#what-matters-most-goes-first">Priorities</a> ·
   <a href="#built-for-the-keyboard">Keys</a> ·
-  <a href="#agentcloud">Agentcloud</a> ·
+  <a href="#agentcloud-gives-every-agent-its-own-computer">Agentcloud</a> ·
   <a href="#what-this-sends">Privacy</a> ·
   <a href="LICENSE">GPL-3.0</a>
 </p>
@@ -216,36 +216,25 @@ own subscription. When you first open it, it finds the agents you have already
 set up and offers to bring them in. There is no server, no account to make, and
 nothing new to pay for.
 
-## Agentcloud
+## Agentcloud gives every agent its own computer
 
-Agentcloud gives every agent its own computer in the cloud. Your laptop stops
-being the limit on how many run at once, and they keep working after you close
-it.
+Each agent runs on a Linux machine in the cloud with 8 GB of memory. Your
+laptop no longer limits how many run at once, and they keep working after you
+close it.
 
-<img src="docs/readme/agentcloud.webp" alt="Three agents share one laptop; the lid shuts and each one moves to its own cloud computer, and more computers join them, each running one agent" width="100%">
+<img src="docs/readme/agentcloud.webp" alt="Four rows in the inbox, each wired to its own cloud computer running its agent's commands; one finishes and its row asks to merge" width="100%">
 
-- **A whole machine for each agent.** Linux, 2 cores and 8 GB of memory, fresh
-  for every run. The agent installs whatever it needs, and a project's
-  `.agentbox/cloud-setup.sh` runs before it starts.
-- **Your Mac stays fast.** None of the agents run on it, so starting more never
-  slows it down.
-- **Close the laptop.** A cloud thread keeps working with the lid shut. Start
-  new threads and answer the ones that need you from your phone, and the cloud
-  picks them up.
-- **The same inbox.** Cloud threads sit beside the ones on your Mac and come
-  back the same way. What they make lands in your folder, ready to review.
-- **Your own plans.** Agents run on your Claude Code and Codex subscriptions,
-  never an API key. You sign in to each one through its own sign-in, inside the
-  cloud, and the login on your Mac is never copied there.
-- **You choose what goes.** Send everything to the cloud first, or only what
-  your Mac has no room for. Any thread can also start in the cloud, or move
-  there from its menu.
-- **It asks for your Mac when it needs it.** Xcode, the iOS simulator and files
-  that only your Mac has stay there. A thread that needs one of them asks, or
-  takes that one step on your Mac.
+- **Answer from your phone.** Start threads and reply to the ones that need
+  you while your laptop is shut.
+- **The same inbox.** Cloud threads sit next to the ones on your Mac, and their
+  work comes back to your folder.
+- **Your own plans.** Agents run on the Claude Code and Codex plans you already
+  have, signed in inside the cloud. Your Mac's login never leaves your Mac.
+- **You choose what goes.** Send every thread to the cloud, or only the ones
+  your Mac has no room for.
 
-Set it up from the cloud button in the app. Every account can try it for free.
-Agentbox works fully without it, and Agentcloud is the only part that is hosted.
+Agentcloud is optional, and every account can try it for free from the cloud
+button in the app.
 
 ---
 
@@ -348,10 +337,9 @@ The thing that sends the most is not ours at all. This app drives Claude Code
 and Codex, so whatever a session reads and writes goes to Anthropic or OpenAI
 under their terms, exactly as it would if you ran those tools yourself.
 
-Agentcloud sends more, and only once you set it up. A thread that runs there
-takes a copy of its folder to its own cloud computer, and what it makes comes
-back. Without it, nothing of your work leaves your machine except through
-Claude Code and Codex.
+Agentcloud, once you turn it on, copies each cloud thread's folder to that
+thread's computer and brings back what it makes. Without it, your work leaves
+your machine only through Claude Code and Codex.
 
 </details>
 
