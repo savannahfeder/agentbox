@@ -31,7 +31,7 @@
 // stamped it, and nothing is invented, dropped or merged to put them in order.
 
 import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mts';
-import { said, traceLines } from './terminal';
+import { asTraced, said, traceLines } from './terminal';
 import { handsBack, withoutHandBack } from '../../shared/cloud-hand-back.mts';
 import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mts';
 import type { TraceSession } from './notes';
@@ -664,11 +664,13 @@ export function itemThread(
   // BOTH SIDES ARE NORMALISED BY THE SAME FUNCTION. `traceLines` puts every
   // line of prose through `said` on the way in, so a live string compared raw
   // would differ by a trailing space and print itself twice, one under the
-  // other, for the rest of the run.
+  // other, for the rest of the run. The trace also drops a heading line, so the
+  // live words are matched as it would have kept them too.
   if (live?.text) {
     const now = said(withoutHandBack(live.text));
+    const kept = asTraced(now);
     const already = placed.some((p) => p.node.kind !== 'work'
-      && p.node.who === 'it' && said(p.node.text ?? '') === now);
+      && p.node.who === 'it' && [now, kept].includes(said(p.node.text ?? '')));
     if (now && !already) {
       placed.push({ node: { at: live.at, who: 'it', text: now }, run: live.run, answer: null });
     }
