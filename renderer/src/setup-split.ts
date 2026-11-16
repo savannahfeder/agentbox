@@ -3,7 +3,7 @@
 // tests/the-setup-beside-the-app-asks-only-what-applies.test.mjs reads them.
 
 import { MATCH_SKY } from './home/sky';
-import { FREE, TEAM } from '../../cloud/gateway/plans.mjs';
+import { TEAM } from '../../cloud/gateway/plans.mjs';
 
 /** Where the app sits beside the setup, in window pixels: the steps panel's
  *  width, the app's top-left corner and scale, and, in the app's own pixels,
@@ -18,33 +18,38 @@ export function setupPreview(width: number, height: number) {
   return { left, x, y, scale, h: (height - 16 - y) / scale, right: Math.max(0, 1120 - (width - 16 - x) / scale) };
 }
 
-export type SetupStep = 'chats' | 'folder' | 'account' | 'plan' | 'invite' | 'pay' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'invite' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
+
+/** Where Back goes, from a step or from the page after the last one. It passes over the account step once
+ *  the account is made: that step only sends you forward again. */
+export function stepBefore(steps: readonly SetupStep[], at: number, signedIn: boolean): number | null {
+  let to = Math.min(at, steps.length) - 1;
+  if (to >= 0 && steps[to] === 'account' && signedIn) to -= 1;
+  return to >= 0 ? to : null;
+}
+/** A dash at the top takes you back to its step once you have passed it. */
+export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number, signedIn: boolean): boolean =>
+  i < at && !(steps[i] === 'account' && signedIn);
 
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */
-export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean }): SetupStep[] {
+export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1 }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
+  // With Claude Code and Codex both ready, which one starts your threads is yours to say.
+  if (agents > 1) out.push('agent');
   // Signing in is required, so it is a step, and what needs it comes after.
   if (team && !signedIn) out.push('account');
-  // The team is a paid thing: Free goes on without inviting anyone.
+  // One page offers Pro and takes its payment. The team is a paid thing, so inviting comes only once Pro is started.
   if (team && !onTeam) out.push('plan');
   if (team && (onTeam || plan === 'pro')) out.push('invite');
-  // Seats are bought for a team, so the purchase page follows the step that makes it.
-  if (team && !onTeam && plan === 'pro') out.push('pay');
   if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
 }
 
-/** The plans the setup offers, at the prices the cloud charges (cloud/gateway/plans.mjs). */
-export const SETUP_PLANS: Array<{ id: SetupPlan; name: string; price: string; per?: string; tag?: string; sub: string }> = [
-  { id: 'free', name: 'Free', price: '$0', sub: `Just you, with ${FREE.hours} cloud hours to try` },
-  { id: 'pro', name: 'Pro', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', tag: `${TEAM.trialDays} days free`, sub: `Your team, plus ${TEAM.hoursPerSeat} cloud hours each` },
-];
-
-/** The purchase page's words: what Pro brings in three lines, the cloud computer first, then the free week beside the paid month.
+/** The plan page's words: what Pro brings in three lines, the cloud computer first, then the free week beside the paid month, and Free as the way on.
  *  components/ProShowcase.tsx draws one card for each line, in this order. */
 export const PRO_PITCH = {
   head: 'Upgrade to Pro.',
@@ -58,7 +63,14 @@ export const PRO_PITCH = {
   paid: { label: 'Then', price: `$${TEAM.dollarsPerSeat}`, per: 'a month', line: `${TEAM.hoursPerSeat} cloud hours a month` },
   cta: `Try Pro free for ${TEAM.trialDays} days`,
   terms: 'Cancel any time.',
+  free: 'Stay on Free',
 };
+
+/** A team is made when Pro starts, before anyone has named it; the invite page shows the name to change. */
+export function teamNameFor(person: string | null | undefined): string {
+  const first = (person ?? '').trim().split(/\s+/)[0];
+  return first ? `${first}’s team` : 'My team';
+}
 
 const SHOWCASE_FILL = ['Fix the flaky date picker test', 'Add a health check endpoint', 'Profile the slowest page', 'Port the cron jobs to the queue', 'Write tests for the refund flow', 'Speed up the search index build'];
 /** The agents drawn on their own cloud computers: the person's own chats first, then stand-ins to make six. */
@@ -69,6 +81,18 @@ export function cloudShowcase(titles: readonly string[]): string[] {
 
 /** The team has bought its seats, so the purchase page can move on. */
 export const teamPaid = (plan: { team?: { seats?: number } } | null | undefined): boolean => (plan?.team?.seats ?? 0) > 0;
+
+/** ↑ and ↓ on a step that asks for one of a list: the choice one along, stopping at either end. */
+export function nextChoice<T>(all: readonly T[], now: T, by: 1 | -1): T {
+  const at = all.indexOf(now);
+  return all[Math.max(0, Math.min(all.length - 1, (at < 0 ? 0 : at) + by))] ?? now;
+}
+
+/** Which box has the cursor when the invite step opens: the team's name until it has one, then the email. */
+export const inviteCursor = (hasTeam: boolean): 'to-email' | 'add' => (hasTeam ? 'add' : 'to-email');
+
+/** Enter held down repeats, and a repeat is not a press: one press moves one step. Arrows may repeat. */
+export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key === 'Enter' && !!e.repeat;
 
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 

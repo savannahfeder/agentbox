@@ -55,7 +55,7 @@ import { practiceRefusal, noProjectYet } from '../compose-says';
 import { onCloudPhone } from '../phone-screen';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
-import { startingEngine, writeLastEngine } from '../engines';
+import { ENGINE_CHOSEN, startingEngine, writeLastEngine } from '../engines';
 import { repeatPresets } from '../components/When';
 import { ideasFor, type Idea } from '../first-run';
 import { readRule, repeatsLine } from '../format';
@@ -123,6 +123,8 @@ export interface ComposeStart {
   attachments?: PendingAttachment[];
   /** The message this card was opened from, when it was handed to an agent. */
   handFrom?: HandFrom;
+  /** The task's name, which the thread keeps while its first line still says it. */
+  named?: string;
   /** The teammate's thread this one carries on: labelled on the new thread, and its owner told once it is sent. */
   continueFrom?: { personId: string; threadId: string };
   /** The project it starts in, ahead of the default. */
@@ -359,6 +361,16 @@ export function ThreadComposer({
     if (pick.engine === 'claude' && !claudeOffered && codexOffered) setPick({ engine: 'codex', model: readLastModel(undefined, 'codex', codexDefault) ?? defaultModelFor('codex', codexDefault) });
   }, [codexOffered, claudeOffered]);
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, pick.engine));
+  // The setup asks which agent while this box is already open behind it.
+  useEffect(() => {
+    const chosen = (e: Event) => {
+      const engine: Harness = startingEngine(String((e as CustomEvent).detail ?? ''), engines);
+      setPick({ engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) });
+      setEffort(readLastEffort(undefined, engine));
+    };
+    addEventListener(ENGINE_CHOSEN, chosen);
+    return () => removeEventListener(ENGINE_CHOSEN, chosen);
+  });
   const pickModel = (p: ModelPick) => {
     setPick(p);
     writeLastEngine(p.engine);
@@ -658,6 +670,7 @@ export function ThreadComposer({
           ...(when.start ? { start: when.start } : {}),
           ...harness,
           ...(team ? sharingFields(visibility, chosenHere) : {}),
+          ...(initial?.named && message.title === initial.named ? { label: initial.named } : {}),
           ...(onAuto || initial?.handFrom || initial?.continueFrom ? { labels: [
             ...(onAuto ? [AUTO_LABEL] : []),
             ...(initial?.handFrom ? [handedFromLabel(initial.handFrom.product, initial.handFrom.id)] : []),

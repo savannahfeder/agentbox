@@ -167,6 +167,7 @@ import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
 import { claudeModelRows } from './claude-models.mts';
 import { codexLaunchEnv } from './codex-launch-env.mts';
 import { CodexUsage, codexAccountReadings } from './codex-usage.mts';
+import { askCodexForUsage } from './codex-usage-on-refresh.mts';
 import { codexBackAt } from '../shared/codex-usage.mts';
 import { createCodexWorker, mcpServerNames, resumeThreadParams, workerThreadParams } from './codex-session.mts';
 import type { CodexServerClient, ConnectionServer, ConnectionServers } from './codex-session.mts';
@@ -764,6 +765,8 @@ export interface SupervisorStore {
   recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
+  /** Who is signed in on this computer; absent on a store with no team. */
+  author?(): string | null;
   catchUpItem(slug: string, id: string, opts: { label?: string; problem?: string; result?: string }): unknown;
   routeItem(slug: string, id: string, patch: Record<string, unknown>): unknown;
   prioritizeItem(slug: string, id: string, value: unknown): unknown;
@@ -4941,7 +4944,7 @@ export class Supervisor {
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
-      .filter((i) => wantsName(i) && !(now - (this._nameMisses.get(key(i)) ?? -Infinity) < NAME_RETRY_MS))
+      .filter((i) => wantsName(i, this.store.author?.() ?? null) && !(now - (this._nameMisses.get(key(i)) ?? -Infinity) < NAME_RETRY_MS))
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
     if (!next) return undefined;
     this._naming = true;
@@ -10811,11 +10814,15 @@ export class Supervisor {
     // had every task sent to a Claude Code that could not run. Both answers
     // come from the sign-in check (main/engine-setup.mts); until it has
     // answered, nothing moves.
-    // That check asks only ~/.claude, so it says nothing about an added
-    // account work runs on instead (w-d75c73d091).
-    const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true
-      && (this._profilesFor(DEFAULT_ENGINE)[0] ?? 'default') === 'default';
+    const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true && !this._addedClaudeSignedIn();
     return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
+  }
+
+  /** The launch check only asks the default login, so a signed-in added account must be counted here. */
+  _addedClaudeSignedIn() {
+    const home = this.config.home || os.homedir();
+    const dflt = path.join(home, '.claude');
+    return this._profiles().some((p) => p !== 'default' && path.resolve(p) !== dflt && !!accountIdentity(p, { home }));
   }
 
   /** What runs when nobody chose: Claude Code, or Codex on a Mac without it. */
@@ -11717,6 +11724,34 @@ export class Supervisor {
   /** The same, read again rather than off the cache (`CodexUsage.refreshNow`). */
   refreshCodexUsage() {
     return this._codexUsage().refreshNow();
+  }
+
+  /**
+   * Refresh on Settings › Codex: ask Codex for the live figure, then read as
+   *  `refreshCodexUsage` does. A failed ask leaves the last reading in place.
+   *  An app-server started only for this is closed again once it has answered. */
+  async askCodexUsage() {
+    const home = this._codexUsageHome();
+    if (this.config.codexBin && home) {
+      const already = this._codexServers?.get(home);
+      const startedHere = !already || already.client.isClosed();
+      let entry: CodexServerEntry | null = null;
+      try {
+        entry = this._codexServer(home);
+        const server = entry;
+        const answer = await askCodexForUsage(async (method, params) => { await server.handshake; return server.client.request(method, params); });
+        this._codexUsage().took(answer, home);
+      } catch (e) {
+        console.warn(`zero: codex usage refresh: ${(e as Error)?.message ?? e}`);
+      } finally {
+        const working = [...this.sessions.values()].some((s) => s.engine === 'codex' && !s.cloud && this._codexProfileHome(s.profile ?? 'default') === home);
+        if (startedHere && entry && !working && !entry.loaded?.size && this._codexServers?.get(home) === entry) {
+          this._codexServers.delete(home);
+          entry.client.close('Usage read; nothing else is running on this login');
+        }
+      }
+    }
+    return this.refreshCodexUsage();
   }
 
   /** Every Codex login's own reading, for the Settings page. */

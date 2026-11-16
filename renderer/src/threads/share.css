@@ -11,6 +11,7 @@
 .sh-find::placeholder, .sh-note::placeholder { color: var(--text-faint); }
 .sh-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 4px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg-selected); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
 .sh-chip:hover { border-color: var(--line-strong); }
+.sh-chip-set, .sh-chip-set:hover { cursor: default; border-color: var(--line); }
 .sh-found { display: flex; flex-direction: column; padding: 4px; border-bottom: 1px solid var(--line); }
 .sh-note { display: block; width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 14px; font: inherit; font-size: 13.5px; line-height: 20px; color: var(--text); background: none; border: 0; outline: none; resize: none; }
 .sh-foot { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }

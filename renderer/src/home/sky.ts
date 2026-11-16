@@ -16,12 +16,20 @@ export type SkyArt = {
   dim?: number; coreW?: number; hotW?: number; haloW?: number;
   grain?: number;
   light?: boolean; lightBg?: Rgb; lightStrength?: number; lightDepth?: number;
+  /** Light only: faint dots stay deep and thin out, rather than fading to pastel. */
+  ink?: boolean;
+  /** How far the halo reaches below the streak, as a share of `haloW`; none when unset. */
+  below?: number;
   glow?: Glow[];
 };
 
 export type SkyId = string;
 /** A theme of its own: the window's light or dark look, with this sky on Home and the Inbox. */
-export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; frame?: string };
+/** `home` is Home's own drawing of the sky, when the Inbox's would not suit a whole page. */
+export type Sky = { id: SkyId; name: string; dark: boolean; art: SkyArt; home?: SkyArt; frame?: string; inbox?: boolean };
+
+/** Dark skies all wear the Inbox's header; a light one only when its look was drawn for it. */
+export const wearsInboxSky = (sky: Sky | null): sky is Sky => !!sky && (sky.dark || !!sky.inbox);
 
 const DUSK: Palette = { core: [235, 85, 150], hot: [255, 195, 160], halo: [105, 60, 185], ember: [150, 40, 90] };
 const EMBER: Palette = { core: [250, 92, 28], hot: [140, 150, 90], halo: [30, 92, 175], ember: [170, 55, 20] };
@@ -36,10 +44,16 @@ const DARK_SKIES: Sky[] = [
   { id: 'aurora', name: 'Dark green sky', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: '#161a19', y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
 ];
 
-const light = (palette: Palette, glow: Glow[]): SkyArt => ({
+const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyArt => ({
   ...DARK_BASE, coreW: 0.03, haloW: 0.22, palette, glow,
-  bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165,
+  bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165, ...over,
 });
+
+// Aubergine (design w-bd2cd91875/7): deep plum ink with a violet seam. No glow and no
+// grey grain, which read pastel and fake; the streak is tight like the dark one's.
+const AUBERGINE = light(
+  { core: [90, 30, 130], hot: [140, 50, 220], halo: [60, 35, 110], ember: [80, 25, 100] }, [],
+  { ink: true, grain: 0, coreW: 0.024, hotW: 0.006, haloW: 0.11, lightDepth: 120 });
 
 // The card is white and the sky fades into it, the way dark fades to black.
 // `frame` tints the window around the card so the white stands off it.
@@ -47,9 +61,9 @@ const LIGHT_SKIES: Sky[] = [
   { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  { id: 'dusk-light', name: 'Light purple sky', dark: false, frame: '#ebe5e9', art: light(
-    { core: [240, 90, 160], hot: [255, 150, 150], halo: [130, 100, 225], ember: [200, 80, 150] },
-    [['rgba(170,140,240,0.30)', 260, 90, -120], ['rgba(255,150,195,0.42)', 120, 50, -10], ['rgba(255,185,170,0.50)', 34, 18, 0]]) },
+  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, frame: '#eae9ec', art: AUBERGINE,
+    // On a whole page the inbox's tight streak read as a line through it (design 20): Home's dots fill the page above it.
+    home: { ...AUBERGINE, coreW: 0.03, haloW: 0.3, below: 0.25 } },
 ];
 
 /** Every sky theme, in the order Settings and Command-K show them. */
@@ -152,7 +166,8 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
       const line = lineStrength(x, y, quiet);
       const core = Math.exp(-((dc / coreW) ** 2)) * (0.5 + 0.5 * n) * (0.35 + 0.65 * along) * line;
       const hot = Math.exp(-(((dc + coreW * 0.25) / hotW) ** 2)) * along * (0.6 + 0.4 * n) * line;
-      const halo = dc > 0 ? Math.exp(-dc / haloW) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along) : 0;
+      const halo = dc > 0 ? Math.exp(-dc / haloW) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along)
+        : art.below ? Math.exp(dc / (haloW * art.below)) * (0.3 + 0.7 * n) * (0.25 + 0.75 * along) : 0;
       const ember = dc < 0 ? Math.exp(dc / (coreW * 3)) * 0.45 * n * along * line : 0;
       const r = (core * P.core[0] + hot * P.hot[0] + halo * P.halo[0] + ember * P.ember[0]) * dim;
       const gg = (core * P.core[1] + hot * P.hot[1] + halo * P.halo[1] + ember * P.ember[1]) * dim;
@@ -171,7 +186,7 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
           if (rnd() < grain * fadeK) { const m = 214 + rnd() * 22; g.fillStyle = `rgb(${m | 0},${(m - 7) | 0},${(m - 1) | 0})`; g.fillRect(x, y, dot, dot); }
           continue;
         }
-        const k = Math.min(1, mx / 255) * (art.lightStrength ?? 0.82);
+        const k = (art.ink ? 0.3 + 0.7 * Math.min(1, mx / 255) : Math.min(1, mx / 255)) * (art.lightStrength ?? 0.82);
         const sc = (art.lightDepth ?? 190) / mx;
         g.fillStyle = `rgb(${(LB[0] * (1 - k) + R * sc * k) | 0},${(LB[1] * (1 - k) + G * sc * k) | 0},${(LB[2] * (1 - k) + B * sc * k) | 0})`;
         g.fillRect(x, y, dot, dot);

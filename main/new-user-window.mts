@@ -14,6 +14,7 @@ interface ScreenArea { x: number; y: number; width: number; height: number }
 interface NewUserWindowFacts {
   fresh?: boolean;
   name?: string;
+  account?: string | null;
   screen?: ScreenArea | null;
   width?: number;
   height?: number;
@@ -21,10 +22,16 @@ interface NewUserWindowFacts {
 
 interface NewUserWindowOptions { title: string | undefined; x?: number; y?: number }
 
+/** A throwaway copy names its signed-in account, or says it is a new user. */
+export function newUserTitle({ fresh, name, account }: Pick<NewUserWindowFacts, 'fresh' | 'name' | 'account'>): string | undefined {
+  if (!fresh) return name;
+  return `${name} (${account || 'new user'})`;
+}
+
 /** The window options a copy adds, given whether it is a throwaway one. */
-export function newUserWindow({ fresh, name, screen, width = 1440, height = 900 }: NewUserWindowFacts = {}): NewUserWindowOptions {
-  if (!fresh) return { title: name };
-  const title = `${name} (new user)`;
+export function newUserWindow({ fresh, name, account, screen, width = 1440, height = 900 }: NewUserWindowFacts = {}): NewUserWindowOptions {
+  const title = newUserTitle({ fresh, name, account });
+  if (!fresh) return { title };
   if (!screen) return { title };
   const centred = {
     x: Math.round(screen.x + (screen.width - width) / 2),

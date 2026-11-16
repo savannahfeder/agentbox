@@ -24,7 +24,7 @@ describe('the Claude Code page', () => {
   it('the reported case:one group of tiles, every account in it, with Refresh at its head', () => {
     expect(claude.match(/<Place\b/g)).toHaveLength(1);
     expect(claude).toMatch(/name="Signed in"[\s\S]*onClick=\{refresh\}[\s\S]*accounts=\{tiles\}/);
-    expect(page).toContain("engine === 'codex' ? refreshCodex() : readAccounts(true)");
+    expect(page).toContain("engine === 'codex' ? refreshCodex(true) : readAccounts(true)");
   });
 
   it('IN USE sits beside the address, and must NOT be pushed to the right margin, where it was missed', () => {

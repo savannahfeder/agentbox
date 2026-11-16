@@ -19,7 +19,7 @@ import { SAME_PROJECT, carriedLines, leftByAMove, movedAway, movedHere, ranHere,
 import { agentSpokeSince, answerTs } from '../shared/answers.mts';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import {
-  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
+  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_CONTEXT, PRACTICE_DONE, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
   PRACTICE_REPLY_ANSWER, PRACTICE_TASK_TRACE,
 } from '../shared/first-run-practice.mts';
 import { NOTE_NAME } from './rail-note.mts';
@@ -721,6 +721,11 @@ export class Store {
 
   releaseRunClaim(slug: string, id: string, run?: Parameters<StoreModules['workItemsDisk']['releaseRunClaim']>[2]) {
     return this.modules.workItemsDisk.releaseRunClaim(this.productDir(slug), id, run);
+  }
+
+  /** Who is signed in on this computer, or null: whose words a new line is. */
+  author(): string | null {
+    return this.modules.workItemsDisk.currentAuthor();
   }
 
   // THE WRITTEN NAME THE LIST DRAWS. Written by the app rather than by a
@@ -1545,7 +1550,7 @@ export class Store {
    *  It is best effort: a practice project whose sessions folder will not take a
    *  file is not a reason to fail the beat that stages the rows. The thread
    *  simply draws the ledger, which is what it did before this existed. */
-  writePracticeTrace(slug: string, id: string, lines: unknown, startedAt: number) {
+  writePracticeTrace(slug: string, id: string, lines: unknown, startedAt: number, everyMs = 9_000) {
     if (!Array.isArray(lines) || !lines.length) return null;
     try {
       const dir = this.machineryFile(slug, path.join('sessions', id));
@@ -1561,7 +1566,7 @@ export class Store {
       // A few seconds apart, in order, so the run reads as a run. Nine seconds
       // is the measured pace of a real one (renderer/src/components/ItemThread.tsx).
       const text = lines
-        .map((line, i) => `${clockAt(began + i * 9_000)}  ${line}`)
+        .map((line, i) => `${clockAt(began + i * everyMs)}  ${line}`)
         .join('\n');
       const file = path.join(dir, `${began}.log`);
       fs.writeFileSync(file, `${text}\n`);
@@ -1584,7 +1589,7 @@ export class Store {
   // was for. Only when a line was really found: the sentence that says a folder
   // has no readme in it is a true answer and it is not a description, so it is
   // never written under the project's name.
-  finishFirstRunTask(slug: string, id: string, round = 0) {
+  finishFirstRunTask(slug: string, id: string, round = 0, { asked }: { asked?: number } = {}) {
     const { workItemsDisk } = this.modules;
     const product = this.listProducts().find((p) => p.slug === slug) ?? null;
     // A REPLY TO IT IS ANSWERED HERE TOO (2026-10-06). The first answer offers
@@ -1610,16 +1615,16 @@ export class Store {
     // earn.
     if (product?.practice) {
       const item = workItemsDisk.updateWorkItem(
-        this.productDir(slug), id, { result: PRACTICE_ANSWER }, { source: 'agent' },
+        this.productDir(slug), id, { result: PRACTICE_ANSWER, problem: PRACTICE_CONTEXT, progress: PRACTICE_DONE }, { source: 'agent' },
       );
-      // AND THE RUN IT DID, so beat eleven opens onto a conversation. What she
-      // opened on 2026-08-24 was the words "Nothing has been said here yet."
-      // under the title of the first task anybody sends in Agentbox: the row had
-      // a result and no thread at all. Backdated a few seconds so the run reads
-      // as having happened before the answer rather than after it.
-      this.writePracticeTrace(
-        slug, id, PRACTICE_TASK_TRACE, Date.now() - PRACTICE_TASK_TRACE.length * 9_000,
-      );
+      // AND THE RUN IT DID, so the thread opens onto a conversation rather than
+      // a result with nothing before it. Dated between the ask and the answer,
+      // a second apart: dated back from the answer it stood above the ask.
+      const now = Date.now();
+      const from = Math.min(Math.floor((asked ?? item?.createdAt ?? now) / 1000) * 1000 + 1_000, Math.floor(now / 1000) * 1000);
+      // With no room for a second between steps, they share one: still in order, never after the answer.
+      const every = now - from >= (PRACTICE_TASK_TRACE.length - 1) * 1_000 ? 1_000 : 0;
+      this.writePracticeTrace(slug, id, PRACTICE_TASK_TRACE, from, every);
       return { item, line: PRACTICE_ANSWER, oneLiner: null };
     }
     const folder = product?.repoPath ?? null;
