@@ -100,8 +100,18 @@ if (!quiet('git', ['merge-base', '--is-ancestor', 'HEAD', 'refs/remotes/origin/m
     'Deploy from ~/Desktop/dev/agentbox-team, which only ever follows main.');
 }
 const behind = Number(quiet('git', ['rev-list', '--count', 'HEAD..refs/remotes/origin/main']).out) || 0;
+const before = quiet('git', ['rev-parse', 'HEAD']).out;
 if (!checkOnly && behind > 0 && !quiet('git', ['merge', '--ff-only', '--quiet', 'refs/remotes/origin/main']).ok) {
   stop('Could not bring this folder up to main. Run: git merge --ff-only refs/remotes/origin/main');
+}
+// This file was read before the merge above, so a fix to the deploy that just
+// arrived would otherwise wait a release (0.1.26 ran the one before).
+if (!checkOnly && behind > 0 && !process.env.AGENTBOX_DEPLOY_RESTARTED
+  && !quiet('git', ['diff', '--quiet', before, 'HEAD', '--', 'scripts/']).ok) {
+  say('the deploy itself changed on main, so the new one takes over');
+  const restarted = spawnSync('node', ['scripts/run.mjs', 'scripts/deploy.mjs', ...process.argv.slice(2)],
+    { cwd: repo, stdio: 'inherit', env: { ...process.env, AGENTBOX_DEPLOY_RESTARTED: '1' } });
+  process.exit(restarted.status ?? 1);
 }
 let commit = checkOnly ? quiet('git', ['rev-parse', 'refs/remotes/origin/main']).out : quiet('git', ['rev-parse', 'HEAD']).out;
 console.log(`  main is at ${commit.slice(0, 8)}, newest change: ${quiet('git', ['log', '-1', '--no-merges', '--format=%s', commit]).out}${checkOnly && behind ? ` (this folder is ${behind} behind; a real run catches it up)` : ''}`);
@@ -161,6 +171,18 @@ function publishToNpm(v, cwd = repo) {
   }
 }
 
+// What npm serves as latest. Just after a publish npm says "being processed",
+// and on 0.1.26 it served the old version for under a minute, so it is read
+// again for up to five minutes before it counts as missing.
+function npmVersionNow(expected = null) {
+  const until = Date.now() + (expected ? 5 * 60_000 : 0);
+  for (;;) {
+    const r = quiet('npm', ['view', PACKAGE, 'version', '--prefer-online', '--fetch-timeout=20000'], 30_000);
+    if ((r.ok && r.out === expected) || Date.now() >= until) return r;
+    spawnSync('sleep', ['15']);
+  }
+}
+
 // A RELEASE THAT MISSED NPM. Running the whole deploy again would put out the
 // next version instead, so this publishes the one main says, from the commit
 // its release page says the Mac app was built from.
@@ -188,7 +210,7 @@ if (npmOnly) {
     published = publishToNpm(mainVersion, dir);
   }
   quiet('git', ['worktree', 'remove', '--force', dir]);
-  const now = quiet('npm', ['view', PACKAGE, 'version', '--prefer-online', '--fetch-timeout=20000'], 30_000).out;
+  const now = npmVersionNow(published ? mainVersion : null).out;
   if (!published || now !== mainVersion) {
     stop(`npm still has ${now || 'an older version'}; the reason is just above.`, 'To try again, run: npm run deploy -- --npm');
   }
@@ -353,18 +375,20 @@ const serverOk = live('node', ['scripts/cloud-gateway-setup.mjs'], { AGENTBOX_CL
 // the commit this run pinned; main has moved on since, which is not a reason
 // to publish something else.
 // npm sessions expire, and publishing can require its own approval after login.
+let npmPublished = false;
 if (signIn(npmSignIn, { required: false })) {
   bakeTheKey(pkgPath);
   packageWritten = true;
   say(`publishing ${PACKAGE}@${version} to npm (it may ask for a one-time code)`);
-  if (!publishToNpm(version)) console.log('  ✗ npm did not publish; the reason is just above');
+  npmPublished = publishToNpm(version);
+  if (!npmPublished) console.log('  ✗ npm did not publish; the reason is just above');
 }
 restorePackageJson();
 
 // ---------------------------------------------------------------------------
 // 8. EACH PLACE, READ BACK.
 say('reading back what is live');
-const npmNow = quiet('npm', ['view', PACKAGE, 'version', '--prefer-online', '--fetch-timeout=20000'], 30_000);
+const npmNow = npmVersionNow(npmPublished ? version : null);
 const tagNow = quiet('gh', ['release', 'view', '--repo', RELEASE_REPO, '--json', 'tagName', '--jq', '.tagName']);
 const feedNow = quiet('curl', ['-sL', '-m', '20', `https://github.com/${RELEASE_REPO}/releases/latest/download/latest-mac.yml`]);
 const serverNow = quiet('aws', ['lambda', 'get-function-configuration', '--region', REGION, '--function-name', SERVER,
