@@ -606,7 +606,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
 
   // An open file asks for every copy it names on each change in the app, so the
   // projects are read once per state of the threads.
-  type Lined = { chain: LinedVersion[]; same: Map<string, string> };
+  type Lined = { chain: LinedVersion[]; same: Map<string, string>; unfound: ChainVersion[] };
   type Chains = { files: PlacedFile[] | null; products: ArtifactProduct[]; productsSig: string; shared: Map<string, boolean>; byKey: Map<string, Promise<Lined>> };
   let chainsFor: Chains = { files: null, products: [], productsSig: '', shared: new Map(), byKey: new Map() };
   const chainsNow = (files: PlacedFile[]) => {
@@ -646,7 +646,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const held = had;
     // An agent writing over the same path changes nothing the sig reads.
     return held.then(async (was) => {
-      if (await bytesUnmoved(was.chain)) return was;
+      // A cloud run's answer reaches the thread before its files reach this Mac.
+      if (await bytesUnmoved(was.chain) && !(await anyLanded(f, was.unfound, now.products))) return was;
       const latest = now.byKey.get(f.key)!;
       return latest !== held ? latest : buildChain(f, sig, shared, now);
     });
@@ -657,6 +658,14 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       if ((await bytesOf(v.opened).catch(() => null))?.hash !== v.hash) return false;
     }
     return true;
+  }
+  // Only the newest copy: a name hundreds of threads say would otherwise be looked up hundreds of times an ask.
+  async function anyLanded(f: PlacedFile, unfound: readonly ChainVersion[], products: ArtifactProduct[]): Promise<boolean> {
+    for (const v of unfound) {
+      const newest = v.copies.reduce<ChainCopy | null>((a, c) => (!a || c.at > a.at ? c : a), null);
+      if (newest && await openedOf(f, { ...v, copies: [newest] }, { products })) return true;
+    }
+    return false;
   }
   function buildChain(f: PlacedFile, sig: string, shared: boolean | undefined, now: Chains): Promise<Lined> {
     filesOfInternals.chains += 1;
@@ -719,7 +728,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
    * agent's shorthand, a file only promised) is no version. `same` maps every
    * other id a version went by to the one it is shown under.
    */
-  async function lineChain(f: PlacedFile | LinedFile, shared: boolean = audienceOf(f.project) !== 'private', products: ArtifactProduct[] = readable()): Promise<{ chain: LinedVersion[]; same: Map<string, string> }> {
+  async function lineChain(f: PlacedFile | LinedFile, shared: boolean = audienceOf(f.project) !== 'private', products: ArtifactProduct[] = readable()): Promise<Lined> {
     const line = lineNow();
     const mine: Array<{ v: ChainVersion; src: string | null; entry: LineVersion | null; blank: boolean }> = [];
     // A file nothing was ever written in is no version yet: its first words are v1.
@@ -760,7 +769,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const blank = mine.find((m) => m.blank);
     if (blank && !chain.length) chain.push({ ...blank.v, n: 1, opened: blank.src, blank: true });
     for (const v of chain) same.set(`${baseName(v.name)}@${v.n}`, v.id);
-    return { chain, same };
+    return { chain, same, unfound: mine.filter((m) => !m.src).map((m) => m.v) };
   }
   // Opening may fetch: a version a teammate made is in the cloud for whoever can read its thread.
   async function openedToView(file: LinedFile, v: LinedVersion): Promise<string | null> {
