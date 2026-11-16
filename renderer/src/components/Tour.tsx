@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyEndsFinish, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyClosesFinish, keyEndsFinish, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -168,7 +168,7 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
 const same = (a: Box | null, b: Box | null) => (!a || !b ? a === b : a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
 type Finished = ReturnType<typeof finishedPlace>;
-/** The walkthrough's last word, on Home's box: you finished, and a real thread starts here. */
+/** The walkthrough's last word, above Home's greeting. */
 export function TourFinished({ covered, onDone }: { covered: boolean; onDone: () => void }) {
   const [at, setAt] = useState<Finished | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -177,30 +177,29 @@ export function TourFinished({ covered, onDone }: { covered: boolean; onDone: ()
   useEffect(() => {
     // After the press: a redraw in the middle of it took the key away from the app's own handler.
     const end = () => setTimeout(() => done.current(), 0);
-    const anyKey = (e: KeyboardEvent) => { if (keyEndsFinish(e.key)) end(); };
+    const anyKey = (e: KeyboardEvent) => {
+      if (keyClosesFinish(e)) { e.preventDefault(); e.stopImmediatePropagation(); }
+      if (keyEndsFinish(e.key)) end();
+    };
     document.addEventListener('keydown', anyKey, true);
     document.addEventListener('pointerdown', end, true);
     return () => { document.removeEventListener('keydown', anyKey, true); document.removeEventListener('pointerdown', end, true); };
   }, []);
   useEffect(() => {
     const read = () => {
-      const box = document.querySelector('.hm-start .tc-card')?.getBoundingClientRect();
       const hello = document.querySelector('.hm-hello')?.getBoundingClientRect();
       const h = cardRef.current?.offsetHeight ?? 0;
-      const next = covered || !box?.width || !hello || !h ? null : finishedPlace(box, hello, h);
-      setAt((was) => (same(was?.glow ?? null, next?.glow ?? null) && was?.left === next?.left && was?.top === next?.top ? was : next));
+      const next = covered || !hello?.width || !h ? null : finishedPlace(hello, h);
+      setAt((was) => (was?.left === next?.left && was?.top === next?.top ? was : next));
     };
     read();
     const t = setInterval(read, 120);
     return () => clearInterval(t);
   }, [covered]);
   return (
-    <>
-      {at && <div className="tour-glow tour-glow-box" style={{ left: at.glow.x, top: at.glow.y, width: at.glow.w, height: at.glow.h }} aria-hidden="true" />}
-      <div ref={cardRef} className="tour-card" role="status" style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}>
-        <span className="tour-say">You finished the walkthrough. Type your first real thread and press <K k={CMD} /><K k="↵" /></span>
-      </div>
-    </>
+    <div ref={cardRef} className="tour-card" role="status" style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}>
+      <span className="tour-say">That’s the walkthrough. Press <K k="↵" /> to finish</span>
+    </div>
   );
 }
 
