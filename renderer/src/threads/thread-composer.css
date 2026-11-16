@@ -336,6 +336,9 @@
 .tc-at-menu { position: absolute; left: 18px; top: auto; min-width: 240px; max-height: 220px; overflow-y: auto; z-index: 5; margin-top: -8px; }
 .tc-at-menu .tc-row { gap: 9px; }
 .tc-inline .tc-bar { flex-wrap: wrap; border-top: 0; padding: 14px 0 0; }
+/* One line always: fit-row.ts hides the least needed parts until it fits. */
+.tc-inline .tc-bar.tc-fit { flex-wrap: nowrap; }
+.tc-inline .tc-bar.tc-fit [data-dropped] { display: none; }
 .tc-inline .tc-subject { flex: 0 1 260px; height: 28px; padding: 0 10px; border: 1px solid var(--tc-hair); font-size: 13px; }
 .tc-inline .tc-subject:focus { border-color: var(--text-faint); }
 .tc-inline .tc-note, .tc-inline .attach-row { padding: 12px 0 0; }

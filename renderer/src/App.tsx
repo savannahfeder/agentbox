@@ -61,6 +61,7 @@ import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAf
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mts';
+import { SEEN_SENT } from '../../shared/phone-settings.mts';
 import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
 
 const SHARE_LAST = 'agentbox:share-last';
@@ -183,11 +184,11 @@ import { FirstRunFlow } from './components/FirstRun';
 import { ClassicFirstRun, OpenLesson } from './components/FirstRunClassic';
 import { landing as firstRunLanding, lessonsLeft, setLessons, showsOpenLesson, type Lesson } from './first-run-classic';
 import { useLessonPlace } from './lesson-position';
-import { ideasFor, runOfRule } from './first-run';
+import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, firstThreadSent, saysFinished, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, showIdeas, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, COACHED, COPY as WALK_COPY, FIRST_RUN_LABEL, advance as advanceRun, afterCommand, beatRows, coach, closingRefused, firstRunDone,
   afterUnblock, finishedCleared, firstRunNeeded, projectsOfTheirOwn, laterCleared, laterId, laterIndex,
@@ -278,13 +279,12 @@ import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sky';
-import { busiestFirst, engineLetter, engineName, finishedHello, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
+import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
 import { BackForward } from './components/BackForward';
 
-const FIRST_IDEAS = ideasFor();
 
 /** Which first run this install shows (shared/onboarding-arm.mts). */
 type Arm = 'tour' | 'classic';
@@ -852,7 +852,8 @@ export default function App() {
   const [setupPlan, setSetupPlan] = useState<Plan | null>(null);
   // THE CLOUD'S OWN SETUP SCREEN, opened from the cloud menu's Set up, or by
   // choosing to run in the cloud before it is set up (components/CloudSetup).
-  const [cloudSetupOpen, setCloudSetupOpen] = useState(false);
+  // ?fixtures=1&cloudsetup opens it on load, so a screenshot can reach it.
+  const [cloudSetupOpen, setCloudSetupOpen] = useState(() => { const q = new URLSearchParams(location.search); return q.has('fixtures') && q.has('cloudsetup'); });
   // Settings › Phone's own sign-in, for a build whose team version is off.
   const [phoneSignInOpen, setPhoneSignInOpen] = useState(false);
   // Share's "Sign in", pressed inside a file opened big (ShareLink.tsx).
@@ -3865,6 +3866,7 @@ export default function App() {
   useEffect(() => {
     const newest = Object.entries(seenAt).sort((a, b) => b[1] - a[1]).slice(0, 2000);
     localStorage.setItem(SEEN_AT_KEY, JSON.stringify(Object.fromEntries(newest)));
+    void api.seenHere(Object.fromEntries(newest.slice(0, SEEN_SENT)));
   }, [seenAt]);
   // THE NEWEST `seenAt`, FOR A WATCH THAT ASKS LATER. The arrival watch below
   // waits on a scroll that may be minutes away and has to see a Mark Unread
@@ -7420,6 +7422,12 @@ export default function App() {
     if (!finishOnHome.current) { if (homeHere) finishOnHome.current = true; else { setModal(null); openView('inbox'); setHomeOpen(true); } return; }
     if (!homeHere) setTour(closeFinish(tourRef.current!));
   }, [finishing, homeHere]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Keys and clicks end it in components/Tour.tsx; with neither, it goes after a beat.
+  useEffect(() => {
+    if (!finishing || !homeHere) return;
+    const gone = setTimeout(() => { if (tourRef.current?.finishing) setTour(closeFinish(tourRef.current)); }, FINISH_MS);
+    return () => clearTimeout(gone);
+  }, [finishing, homeHere]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // THE SAME SCREEN, held for the beat it takes ⌘R to put her back where she
   // was, so the reload never shows her the inbox on its way to the task. Its
@@ -8332,7 +8340,7 @@ export default function App() {
               {skyOnInbox && sky && <InboxSky art={sky.art} />}
               {skyOnPlace && sky && <InboxSky art={sky.art} />}
               {homeShown ? (
-                <HomePage hello={!fresh && saysFinished(tour) ? finishedHello(snap.team?.me?.name ?? null) : greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
+                <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
                   needs={homeNeeds} needsCount={needsList.length} inboxCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
@@ -8811,7 +8819,6 @@ export default function App() {
              reads; everything else about the card is the card anybody uses. */
           initial={walkCard ? { body: `${TASK_TITLE}\n\n${TASK_BODY}` } : tourTask ? { body: `${TASK_TITLE}\n\n${TASK_BODY}`, product: tourTask } : composeInitial}
           scripted={walkCard || tourTask ? { labels: [FIRST_RUN_LABEL] } : null}
-          ideas={!walkCard && showIdeas(tour) && !(homeShown && modal !== 'compose') ? FIRST_IDEAS : null}
           askFolder={firstTask(tour) && !tourTask}
           onOpenConversation={openConversation}
           toChat={oneChat ? (id, words, files) => roomsUi.startChat(id, team?.byId.get(id)?.name ?? 'Chat', words, files) : undefined}
@@ -8911,7 +8918,6 @@ export default function App() {
               setHomeOpen(false); setFocused(null); setView('progress'); setSelected(0);
               return;
             }
-            if (made?.id && tourRef.current) setTour(firstThreadSent(tourRef.current));
             if (how?.kind === 'message') {
               const said = firstNames(how.toMany ?? [how.to ?? '']);
               // Named for O, like a new thread (w-5513afd09a). No Z: a message
@@ -9477,7 +9483,7 @@ export default function App() {
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       <OpenLesson at={lessonAt} />
       {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
-      {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} />}
+      {finishing && <TourFinished covered={!!run || settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
       {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
         answering={practiceAnswering}
         covered={!!run || settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}

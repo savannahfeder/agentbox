@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import { harnessFor } from './harnesses.mts';
-import { teammateIdOf } from '../shared/teammates.mts';
 import { catchUpDue } from '../shared/agent-import.mts';
 // THE NAME ON THE ROW, WRITTEN RATHER THAN TAKEN FROM THE FIRST SENTENCE.
 //
@@ -127,7 +126,6 @@ const LIVE = new Set(['open', 'claimed', 'blocked']);
  */
 export function wantsName(item?: RowItem | null, me: string | null = null) {
   if (!item || !LIVE.has(item.status!)) return false;
-  if (teammateIdOf(item)) return false;
   // A task or message a teammate made is named on their computer, and the name comes with it.
   if (me && typeof item.createdBy === 'string' && item.createdBy !== me && Array.isArray(item.people) && item.people.length > 1) return false;
   // A chat just brought in is named by its rewrite (main/catch-up.mts).

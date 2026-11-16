@@ -3,10 +3,12 @@ import {submitReply} from './live-replies.mts';
 import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mts';
 import { leftByAMove } from '../shared/move-thread.mts';
 import { moveThread } from './move-thread.mts';
-import { whereTheWorkStands } from './git-change.mts';
+import { whereTheWorkStands, type WorkStands } from './git-change.mts';
+import { gitJob } from './git-change-offthread.mts';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mts';
 import { projectSeenBy } from '../shared/thread-cards.mts';
+import { phoneSeenOf } from '../shared/phone-settings.mts';
 import { createEngineSetup, engineSetUpHere } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
 // process derives from files and answers. Pushes go one way: "state changed,
@@ -52,7 +54,7 @@ import { linkCopyOf, linkKindOf, linkSource } from './file-link.mts';
 import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
-import { readChange, readChangeSummary } from './code-change.mts';
+import { readChange, readChangeSummary, withStandsNow } from './code-change.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
@@ -552,6 +554,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     try { codex = supervisor.codexAccountUsage(); } catch { /* no Codex reading */ }
     return { claude, codex };
   };
+  let seenHere: Record<string, number> = {};
+  const seenForPhone = () => seenHere;
 
   // Agents this run has already counted. In memory on purpose: a fresh launch
   // seeing the same agent again is a fresh fact about the app being used.
@@ -1038,6 +1042,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:phone-seen', (_e, { id, at }: { product?: string; id?: string; at?: number } = {}) => {
     if (typeof id !== 'string' || !id || !(Number(at) > 0)) return { ok: false, error: 'not a thread opened on the phone' };
     if (!window.isDestroyed()) window.webContents.send('zero:seen-on-phone', { id, at: Number(at) });
+    return { ok: true };
+  });
+  // And what the window has opened, for the phone's dots (phoneSettingsOf).
+  ipcMain.handle('zero:seen-here', (_e, { seen }: { seen?: unknown } = {}) => {
+    seenHere = phoneSeenOf(seen);
     return { ok: true };
   });
 
@@ -2943,7 +2952,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     });
     if (!found.ok) return found;
     try {
-      return { ok: true, change: summary ? readChangeSummary(found.path) : readChange(found.path) };
+      if (summary) return { ok: true, change: readChangeSummary(found.path) };
+      const change = readChange(found.path);
+      // Only the pane's read, which draws "not committed"; the summary is polled.
+      const prod = store.listProducts().find((p) => p.slug === product);
+      let folder: string | null = null;
+      try { folder = prod?.repoPath && change.item ? taskFolderPath(supervisor.productFolder(prod), change.item) : null; } catch { folder = null; }
+      const now = folder && fsWatch.existsSync(folder)
+        ? await (gitJob('whereTheWorkStands', folder) as Promise<WorkStands>).catch(() => null)
+        : null;
+      return { ok: true, change: withStandsNow(change, now) };
     } catch (e) {
       return { ok: false, error: `that change could not be read (${(e as Error).message})` };
     }
@@ -3092,5 +3110,5 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const hash = keeper?.hashAt(file);
     return hash ? keeper!.bringBack(hash) : Promise.resolve(false);
   };
-  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone, comeBackAt };
+  return { answerApproval, pendingApprovals, cardSentAt, push, usageForPhone, seenForPhone, comeBackAt };
 }

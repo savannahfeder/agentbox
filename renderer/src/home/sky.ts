@@ -20,6 +20,8 @@ export type SkyArt = {
   ink?: boolean;
   /** How far the halo reaches below the streak, as a share of `haloW`; none when unset. */
   below?: number;
+  /** Light only: on the empty Inbox the ink is drawn at this strength, and fainter behind the words. */
+  emptySoft?: number;
   glow?: Glow[];
 };
 
@@ -61,7 +63,8 @@ const LIGHT_SKIES: Sky[] = [
   { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, frame: '#eae9ec', art: AUBERGINE,
+  // Deep plum dots sink every grey word on a white card, so the empty Inbox draws them soft.
+  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, frame: '#eae9ec', art: { ...AUBERGINE, emptySoft: 0.45 },
     // On a whole page the inbox's tight streak read as a line through it (design 20): Home's dots fill the page above it.
     home: { ...AUBERGINE, coreW: 0.03, haloW: 0.3, below: 0.25 } },
 ];
@@ -92,6 +95,14 @@ export type Box = { x: number; y: number; w: number; h: number };
 /** How bright the streak's line is at a point: turned down behind `quiet` (the
  *  words on the page) and back to full over a soft edge, so the line dims
  *  without leaving a hole. The dots around it are not touched. */
+/** A light sky's ink at a point on the empty Inbox: `soft` everywhere, and a
+ *  third of that behind the words, eased back over the edge. Full strength
+ *  with no words or no `soft`. */
+export function inkStrength(x: number, y: number, quiet: Box | null | undefined, soft: number | undefined): number {
+  if (!quiet || soft === undefined) return 1;
+  return soft * lineStrength(x, y, quiet, 0.35, 120);
+}
+
 export function lineStrength(x: number, y: number, quiet: Box | null | undefined, low = 0.35, edge = 90): number {
   if (!quiet) return 1;
   const dx = Math.max(quiet.x - x, 0, x - (quiet.x + quiet.w));
@@ -186,7 +197,7 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
           if (rnd() < grain * fadeK) { const m = 214 + rnd() * 22; g.fillStyle = `rgb(${m | 0},${(m - 7) | 0},${(m - 1) | 0})`; g.fillRect(x, y, dot, dot); }
           continue;
         }
-        const k = (art.ink ? 0.3 + 0.7 * Math.min(1, mx / 255) : Math.min(1, mx / 255)) * (art.lightStrength ?? 0.82);
+        const k = (art.ink ? 0.3 + 0.7 * Math.min(1, mx / 255) : Math.min(1, mx / 255)) * (art.lightStrength ?? 0.82) * inkStrength(x, y, quiet, art.emptySoft);
         const sc = (art.lightDepth ?? 190) / mx;
         g.fillStyle = `rgb(${(LB[0] * (1 - k) + R * sc * k) | 0},${(LB[1] * (1 - k) + G * sc * k) | 0},${(LB[2] * (1 - k) + B * sc * k) | 0})`;
         g.fillRect(x, y, dot, dot);

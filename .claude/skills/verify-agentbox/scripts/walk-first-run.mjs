@@ -180,12 +180,18 @@ try {
   await key('Enter');
   await see('walkthrough-urgent', /Urgent threads move up your list/i);
   // The last word is said on Home's box, under a bar that reads done.
-  await see('walkthrough-done', /WALKTHROUGH DONE Close.*You finished the walkthrough\. Type your first real thread/i);
-  if (!await page.evaluate(`!!document.querySelector('.hm-start .tc-card') && !!document.querySelector('.tour-glow')`)) throw new Error('the last tip is up, but not on Home with its box lit');
-  await page.evaluate(`document.querySelector('.tour-frame .tf-skip')?.click()`);
-  await page.until(`!document.querySelector('.tour-frame') && !document.querySelector('.tour-card')`, { ms: 15_000, why: 'Close to put the last tip away' });
+  await see('walkthrough-done', /WALKTHROUGH DONE Close ↵.*You finished the walkthrough\. Press ↵ to close/i);
+  if (!await page.evaluate(`!!document.querySelector('.hm-hello') && !document.querySelector('.tour-glow')`)) throw new Error('the last tip is up, but not on Home, or something on Home is still ringed in gold');
+  // ↵ is the tip's own key: it closes the tip, and Home's box, which has the cursor, gets no new line from it.
+  const inBox = `(() => { const t = document.querySelector('.hm-start .tc-card textarea, .hm-start .tc-card [contenteditable="true"]'); return t ? String(t.value ?? t.innerText) : null; })()`;
+  await page.evaluate(`document.querySelector('.hm-start .tc-card textarea, .hm-start .tc-card [contenteditable="true"]')?.focus()`);
+  if (await page.evaluate(inBox) === null) throw new Error("Home's box has nothing to type in");
+  await key('Enter');
+  await page.until(`!document.querySelector('.tour-frame') && !document.querySelector('.tour-card') && !document.querySelector('.tour-glow')`, { ms: 3000, why: '↵ to put the last tip, its ring and the bar away' });
+  const typed = await page.evaluate(inBox);
+  if (typed !== '') throw new Error(`↵ on the last tip also reached Home's box, which now holds ${JSON.stringify(typed)}`);
   const hello = await page.evaluate(`document.querySelector('.hm-hello')?.innerText ?? ''`);
-  if (hello !== 'You finished the walkthrough, Dana') throw new Error(`Home after the walkthrough does not say you finished. Its greeting is: ${hello || 'not there'}`);
+  if (!/^Good (morning|afternoon|evening), Dana$/.test(hello)) throw new Error(`Home after the walkthrough does not greet you as it always does. Its greeting is: ${hello || 'not there'}`);
   await see('home-after', /^$/);
   if (page.errors.length) throw new Error(`the page logged ${page.errors.length} error(s): ${page.errors.slice(0, 3).join(' | ')}`);
 } catch (e) {

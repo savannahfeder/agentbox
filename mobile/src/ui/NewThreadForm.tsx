@@ -10,7 +10,7 @@ import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
 import { ruleLabel } from '../../../shared/repeats.mts';
 import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
-import { agentChoices, agentWordFor, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
+import { agentChoices, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { splitSlug } from '../../../renderer/src/phone-rows';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import type { Choices } from '../lib/actions';
@@ -194,7 +194,7 @@ export function SendButtons({ form }: { form: NewThread }) {
 
 /** The four rows and the message. `inline` is the empty inbox's: a shorter box that does not take the keyboard on its own. */
 export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { form: NewThread; inline?: boolean; onFocus?: () => void; onBlur?: () => void }) {
-  const { draft, box, talk, product, projectName, model, setSheet, error, agents, offered, engine, codex, mate, onAuto, toWord } = form;
+  const { draft, box, talk, product, projectName, model, setSheet, agents, offered, engine, codex, mate, onAuto, toWord } = form;
   // A teammate keeps its own model and project; someone new needs only the project it works in.
   const toMate = !!mate && mate !== 'new';
   return (
@@ -205,7 +205,7 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
             <Pressable onPress={() => setSheet('to')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               {mate && mate !== 'new' ? <TeammateMark t={mate} /> : mate === 'new' ? <TeammateMark t={null} /> : onAuto ? <AutoMark /> : null}
               {/* The row is the button; a second one inside it is a button in a button. */}
-              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentWordFor(agents.engines, engine)}</T>
+              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentChoices(agents.engines).find((e) => e.id === engine)?.label ?? 'Agent'}</T>
             </Pressable>
           )
           : <T style={{ fontSize: 15 }}>Agent</T>}
@@ -231,7 +231,21 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
       <TextInput ref={box} multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
         onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onFocus={onFocus} onBlur={onBlur}
         style={[{ flex: inline ? undefined : 1, minHeight: inline ? 120 : 160, padding: 16, fontFamily: font.regular, fontSize: 16, lineHeight: 24.8, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
-      <View style={{ paddingHorizontal: 16, paddingBottom: draft.files.length || error || draft.dropped ? 14 : 0, gap: 10 }}>
+    </>
+  );
+}
+
+/**
+ * Attach a file or picture, the microphone, and on the inbox Send itself. What
+ * was picked waits over this bar, which stays above the keyboard; under the
+ * message box it was scrolled out of sight.
+ */
+export function NewThreadFoot({ form, foot = 0, send }: { form: NewThread; foot?: number; send?: ReactNode }) {
+  const { draft, talk, setSheet, error } = form;
+  return (
+    <>
+    {(draft.files.length > 0 || draft.dropped > 0 || !!error || (!talk.on && !!talk.problem)) && (
+      <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 10 }}>
         <Attached files={draft.files} drop={(i) => draft.setFiles((f) => f.filter((_, n) => n !== i))} />
         {draft.dropped > 0 && (
           <T style={{ fontSize: 13, color: color.dim }}>
@@ -241,14 +255,7 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
         {error && <T style={{ fontSize: 13, color: color.dim }}>{error}</T>}
         <DictationProblem talk={talk} />
       </View>
-    </>
-  );
-}
-
-/** Attach a file or picture, the microphone, and on the inbox Send itself. */
-export function NewThreadFoot({ form, foot = 0, send }: { form: NewThread; foot?: number; send?: ReactNode }) {
-  const { talk, setSheet } = form;
-  return (
+    )}
     <View style={{ height: 52 + foot, paddingBottom: foot, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: color.line }}>
       {talk.on ? (
         <View style={{ flex: 1, flexDirection: 'row', paddingLeft: 16, paddingRight: 12 }}><Listening talk={talk} /></View>
@@ -264,6 +271,7 @@ export function NewThreadFoot({ form, foot = 0, send }: { form: NewThread; foot?
         </>
       )}
     </View>
+    </>
   );
 }
 

@@ -27,9 +27,7 @@ if (!instance || !home) { console.error('usage: STUB_CLOUD_INSTANCE=<dir> STUB_C
 
 const { createGateway } = await import(path.join(REPO, 'cloud', 'gateway', 'gateway.mjs'));
 const { TERMS_VERSION } = await import(path.join(REPO, 'cloud', 'gateway', 'terms.mjs'));
-const { FREE, PLANS, TEAM } = await import(path.join(REPO, 'cloud', 'gateway', 'plans.mjs'));
-// The copy starts on the Free plan with this many hours, fewer than five so a test reaches their end.
-const freeHours = Number(process.env.STUB_CLOUD_FREE_HOURS) || 0;
+const { PLANS, TEAM } = await import(path.join(REPO, 'cloud', 'gateway', 'plans.mjs'));
 // `owner` or `member`: the copy is on a team of three, five days into its trial,
 // with this many trial hours a member, so a test reaches their end.
 const teamRole = process.env.STUB_CLOUD_TEAM || '';
@@ -98,7 +96,6 @@ gw = createGateway({
   whoIs: async (t) => (t === 'stand-in' ? { id: PERSON } : null),
   // Files kept in the cloud as Pro keeps them; STUB_CLOUD_FILES_GB=0 is a plan that keeps none.
   plans: { ...PLANS, standin: { agents: 6, hoursPerMonth: 1000, filesGB: Number(process.env.STUB_CLOUD_FILES_GB ?? PLANS.pro.filesGB) } },
-  ...(freeHours ? { free: { ...FREE, hours: freeHours } } : {}),
   ...(teamRole ? {
     teamPlan: { ...TEAM, trialHoursPerMember: teamHours },
     teams: async (p) => {
@@ -168,7 +165,7 @@ base = `http://127.0.0.1:${server.address().port}`;
 const dot = path.join(home, '.agentbox');
 const had = fs.existsSync(path.join(dot, 'cloud-key'));
 const made = had ? null : await gw.handle({ method: 'POST', path: '/v1/devices', headers: { authorization: 'Bearer stand-in' }, body: JSON.stringify({ acceptedTerms: TERMS_VERSION, name: 'stand-in copy' }) });
-if (!freeHours && !teamRole) await gw.admin({ do: 'plan', person: PERSON, plan: 'standin' });
+if (!teamRole) await gw.admin({ do: 'plan', person: PERSON, plan: 'standin' });
 fs.mkdirSync(dot, { recursive: true });
 fs.writeFileSync(path.join(dot, 'cloud.json'), JSON.stringify({ gateway: base }, null, 2));
 if (made) {

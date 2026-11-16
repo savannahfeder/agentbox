@@ -898,16 +898,18 @@ export interface TeamBillingDetails {
 /** The Agentbox Cloud plan this Mac is signed in to, as the cloud server counts it. */
 export interface CloudPlan {
   signedIn: boolean;
-  /** 'team' and 'free' are no plan of one's own, with the team's or the free hours left (main/cloud/account.mts cloudPlanOf). */
-  plan?: 'none' | 'free' | 'team' | 'pro' | 'plus' | 'max';
+  /** 'team' is no plan of one's own, with the team's hours left (main/cloud/account.mts cloudPlanOf). */
+  plan?: 'none' | 'team' | 'pro' | 'plus' | 'max';
   unlimited?: boolean;
   /** Agents at once; null when unlimited. */
   agents?: number | null;
   hoursPerMonth?: number;
   running?: number;
   usedSeconds?: number;
-  /** With no plan: the free hours, spent or not. */
-  free?: { agents: number; hours: number; usedSeconds: number };
+  /** A paid plan in its free week: the trial's hours, which replace the month's until Stripe charges. */
+  trial?: { hours: number; usedSeconds: number };
+  /** Before any subscription: every paid plan's free week and its hours, the same on each. */
+  trialOffer?: { days: number; hours: number };
   /** The team's hours: a trial until `endsAt`, or `seats` paid for; `seats` in a trial means the card is in and not yet charged. */
   /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {
@@ -1770,6 +1772,7 @@ declare global {
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
       setThreadPins?(p: { pins: Record<string, true | null> }): Promise<unknown>;
+      seenHere?(p: { seen: Record<string, number> }): Promise<unknown>;
       setThreadOnMac?(p: { onMac: Record<string, boolean | null> }): Promise<unknown>;
       moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
@@ -2028,7 +2031,7 @@ declare global {
       cloudAccountReopen?(): Promise<unknown>;
       cloudAccountSignOut?(): Promise<unknown>;
       cloudAccountPlan?(): Promise<CloudPlan>;
-      cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
+      cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing' | 'started'; error?: string; message?: string }>;
       cloudAccountFromTeam?(p: { acceptTerms: boolean }): Promise<{ ok: boolean; error?: string; message?: string }>;
       cloudAccountBilling?(): Promise<{ ok: boolean; error?: string; message?: string }>;
       cloudClipboardCode?(): Promise<{ code: string | null }>;

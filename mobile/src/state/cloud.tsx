@@ -35,7 +35,7 @@ import type { PlaceId } from '../lib/groups';
 import { phoneProjectOrder, phoneTabs } from '../lib/tabs';
 import { batchWords, pickedPlan, type PickedPress } from '../lib/picked';
 import { onTheirWay, teamFrom, withPendingPauses, withPhoneAnswers } from '../lib/teammates';
-import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen } from '../lib/unread';
+import { isUnread, markSeen as markSeenIn, markUnseen as markUnseenIn, readSeen, seenOnComputers } from '../lib/unread';
 import { alertToken, alertTokenIfAllowed, setIconCount } from '../platform/alerts';
 import { appStore, inboxFile, persist } from '../platform/persist';
 import { inboxKeeper, readLastInbox } from '../lib/last-inbox';
@@ -177,6 +177,7 @@ function useCloudState() {
     if (isUnread(item, seenNow.current)) void seenSender.current?.threadEdit({ product: item.product, id: item.id, patch: { seen: Date.now() } }).catch(() => {});
     setSeen((s) => markSeenIn(s, item, appStore));
   }, []);
+  useEffect(() => { setSeen((s) => seenOnComputers(s, settingsRows, view.items, appStore)); }, [settingsRows, view.items]);
   const markUnseen = useCallback((item: { product: string; id: string }) => setSeen((s) => markUnseenIn(s, item, appStore)), []);
   const unread = useCallback((item: { product: string; id: string }) => isUnread(item, seen), [seen]);
   const aliases = useRef(view.aliases);

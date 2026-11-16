@@ -406,32 +406,41 @@ at AgentCore's published rates. The plan limits are set from these.
 
 ## Plans (decided 2026-10-13, numbers to be set from measured use)
 
-- Sold as "+N agent slots": agents running in the cloud at once, on top of
-  this Mac's. A monthly agent-hour limit sits behind each plan, high enough
-  that most people never reach it; past it, threads wait for the Mac.
-- Pro $40 +10 slots and 400 hours a month, Plus $100 +25 and 1,200 hours,
-  Max $200, unlimited at once, and 3,000 hours (the owner's hours,
-  2026-10-20, against a measured $0.07 an agent-hour). Max's unlimited has
-  a ceiling of 200 at once that is never shown, so one runaway loop cannot
-  take the AWS session limit every customer shares. No top-ups for now.
+- Sold by hours: no plan limits how many agents run at once ("we got rid of
+  the agent slot limitation", the owner, 2026-11-16; until then Pro ran 10
+  and Plus 25). Past a plan's monthly hours, threads wait for the Mac.
+- Pro $40 and 400 hours a month, Plus $100 and 1,200, Max $200 and 3,000
+  (the owner's hours, 2026-10-20, against a measured $0.07 an agent-hour).
+  Each has a ceiling of 200 at once that is never shown, so one runaway loop
+  cannot take the AWS session limit every customer shares. No top-ups for now.
 - A cloud hour is one agent working for one hour; waiting for a reply is
   free (a run ends with its turn). Each agent is its own machine, billed on
   what it uses, so packing agents onto one machine would not save money.
 - AWS lets this account run 5,000 sessions at once and start 25 a second
   (checked 2026-10-13; both can be raised).
-- Free: 5 hours once per account, no card, two agents at once (the owner,
-  2026-11-06, for the cloud launch; it replaces 2026-10-20's "no free cloud").
-  Two at once answers that call's worry, five hours gone in half an hour with
-  ten agents. The hours never come back, and a paid plan never spends them
-  (`FREE` in cloud/gateway/plans.mjs). Sign-in is the app's own sign-in page.
+- No free cloud hours (the owner, 2026-11-16: "get rid of 5 free hours per
+  free account, instead we encourage ppl to try the paid trial"). From
+  2026-11-06 every account had 5 hours once; they are gone, and a run left
+  going on them ends at the next call. Sign-in is the app's own sign-in page.
+- Every paid plan starts with 7 days free and 50 hours, once per person: a
+  checkout for someone who never had a subscription carries Stripe's
+  `trial_end` (`PLAN_TRIAL`). The hours are the same on every plan, so the
+  dearest plan is no way to more free hours ("We can't afford to give more
+  hours", the owner, 2026-11-16). They are counted once in `trialUsed`, and a
+  trial whose first charge fails (past_due, never paid) stays on them, as a
+  team's does.
+- Once the trial's hours are used, the app offers "Start Pro now" (in the
+  list when threads wait, and on Plan and Billing). It is a checkout for the
+  plan already in its trial, which the server answers by ending the trial on
+  Stripe (`trial_end: now`): Stripe charges the card it holds and the month's
+  hours open with no page to visit. A card that declines opens the billing page.
 
 ### The team plan (the owner, 2026-11-06; to build for 2026-11-17)
 
 - **Trial:** every team gets 7 days from the day it was made (14 until
   2026-11-10). Each member has 50 cloud hours of their own (10 until
   2026-11-13: "10 cloud hours for pro is very bad given free is 5"). No card.
-  It replaces each member's own 5 free hours while it lasts; it does not add
-  to them. A card added in the trial is charged when the trial ends, and until
+  A card added in the trial is charged when the trial ends, and until
   that charge clears the team keeps the trial's 50 hours, not a seat's 400
   (2026-11-13: a trialing team had 400 hours a member and could cancel).
 - **Paying:** $40 a member a month (Stripe price `agentbox_cloud_team_monthly`,
@@ -443,7 +452,7 @@ at AgentCore's published rates. The plan limits are set from these.
   the point of cloud" (the owner, 2026-11-13). Hours are a team's only limit,
   in the trial and on seats; there is no hidden ceiling either.
 - **Which hours a run spends:** the person's own paid plan first, then the
-  team's (paid or trial), then their free hours.
+  team's (paid or trial), and nothing after that.
 - **How it is counted:** in the person's own ledger, as a plan is: the run
   carries its team, and its seconds go to `teamTrialUsed` or `teamUsed` by
   month in that same record. The team's ledger, `ledger/teams/<team>.json`,

@@ -35,7 +35,7 @@ export type FolderListings = Map<string, { mtimeMs: number; names: Set<string> }
 
 export interface NamedFolder { key: string; pictures: NamedFile[] }
 
-export interface ManifestFile { n?: string; s: number; big?: boolean; w?: number; h?: number }
+export interface ManifestFile { n?: string; s: number; big?: boolean; soon?: boolean; w?: number; h?: number }
 
 export interface ThreadManifest { files: Record<string, ManifestFile>; folders?: Record<string, string[]> }
 
@@ -459,6 +459,11 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
           state.uploaded[name].named = now();
           state.uploaded[name].rank = Math.max(state.uploaded[name].rank ?? 0, rank);
         } else {
+          // Listed as coming, so the phone holds its place instead of calling it missing.
+          if (roomFor(st.size, rank)) {
+            const shape = shapeOf(file, st);
+            files[key] = shape ? { s: st.size, soon: true, w: shape.w, h: shape.h } : { s: st.size, soon: true };
+          }
           const job = queue.get(file) ?? { bytes: st.size, rank, roots: [where.docs, where.repo].filter(Boolean) as string[], threads: new Set() };
           job.rank = Math.max(job.rank, rank);
           job.threads.add(sk);

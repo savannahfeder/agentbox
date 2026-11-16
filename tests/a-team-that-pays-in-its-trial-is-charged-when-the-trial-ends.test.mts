@@ -87,9 +87,10 @@ describe('the team checkout', () => {
 });
 
 describe('one person’s own plan', () => {
-  it('has no trial, as before', async () => {
+  // Since 2026-11-16 every plan starts with 7 free days (tests/every-cloud-plan-starts-with-7-days-free).
+  it('has its own 7 free days, counted from the checkout, not from the team', async () => {
     const { owner, made } = setup(MADE + 60_000);
     await owner({ plan: 'pro' });
-    expect(made()['subscription_data[trial_end]']).toBeUndefined();
+    expect(made()['subscription_data[trial_end]']).toBe(String(Math.floor((MADE + 60_000 + 7 * 86_400_000) / 1000)));
   });
 });
