@@ -83,7 +83,7 @@ describe('every team sign-up names the phone website', () => {
   });
 
   it('the desktop names the website its team settings carry', () => {
-    expect(fs.readFileSync('main/team/session.mts', 'utf8')).toMatch(/emailRedirectTo: typeof cloudConfig\.phoneSite === 'string' \? cloudConfig\.phoneSite : undefined/);
+    expect(fs.readFileSync('main/team/session.mts', 'utf8')).toMatch(/emailRedirectTo: typeof cloudConfig\.phoneSite === 'string' \? new URL\(cloudConfig\.phoneSite\)\.href : undefined/);
   });
 
   // The desktop's client signs in with a one-time proof (PKCE), whose link

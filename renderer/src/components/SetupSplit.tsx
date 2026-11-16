@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, cloudShowcase, heldPress, inviteCursor, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, bringInWithin, cloudShowcase, heldPress, inviteCursor, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, inviteList, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
@@ -219,9 +219,9 @@ export function SetupSplit(p: SetupSplitProps) {
   const bring = useCallback(async () => {
     if (!ticked.length) { next(); return; }
     setBusy(true);
-    const n = await p.bringIn();
+    const n = await bringInWithin(p.bringIn);
     setBusy(false);
-    setDone((d) => ({ ...d, chats: n }));
+    if (n) setDone((d) => ({ ...d, chats: n }));
     next();
   }, [ticked.length, p, next]);
   const [browsing, setBrowsing] = useState(false);

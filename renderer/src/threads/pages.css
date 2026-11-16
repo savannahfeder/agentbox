@@ -411,8 +411,11 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-card .m .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* What is happening on the card, on the card's own line, ahead of its project
    and in the ink the row's status cell wears (w-ec2b04d449). */
-.th-card .m .s { display: flex; align-items: center; color: var(--text-dim); white-space: nowrap; flex: none; }
-.th-card .m .s::after { content: ""; width: 1px; height: 9px; margin: 0 9px; background: var(--line-strong); }
+/* A long state gives way before the short project name beside it. */
+.th-card .m .s { display: flex; align-items: center; color: var(--text-dim); white-space: nowrap; min-width: 0; flex-shrink: 10000; }
+.th-card .m .s .sw { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-card .m .s > :not(.sw) { flex: none; }
+.th-card .m .s::after { content: ""; width: 1px; height: 9px; margin: 0 9px; background: var(--line-strong); flex: none; }
 /* The rule divides the state from what follows it, so it goes when nothing does. */
 .th-card .m .s:not(:has(~ .th-prio-mark, ~ .p))::after { content: none; }
 .th-card .m .s .th-st, .th-card .m .s .th-st-cloud { margin-right: 7px; }

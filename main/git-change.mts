@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ChangedFile, Hunk, Row, RowNums } from './code-change.mts';
+import { HOOK_FREE } from './hook-free-git.mts';
 
 export interface RepoSnapshot { root: string; head: string | null; before: Map<string, string | null>; at: number }
 
@@ -62,7 +63,7 @@ function git(cwd: string, args: readonly string[], { maxBuffer = 64 * 1024 * 102
   // A user's `diff.mnemonicPrefix` rewrites a/ and b/ into c/ i/ o/ w/.
   // The reader below only knows one prefix. Turn the setting off for this
   // process so a checkout reads the same on every machine.
-  return execFileSync('git', ['--no-pager', '-c', 'diff.mnemonicPrefix=false', ...args], {
+  return execFileSync('git', ['--no-pager', '-c', 'diff.mnemonicPrefix=false', ...HOOK_FREE, ...args], {
     cwd,
     encoding: 'utf8',
     maxBuffer,

@@ -167,7 +167,8 @@ describe('an import cut off part way', () => {
     fs.mkdirSync(bin);
     const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
     const flag = path.join(tmp, 'failed-once');
-    fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\nif [ "$PWD" = '${mac}' ] && [ "$1" = apply ] && [ ! -e '${flag}' ]; then touch '${flag}'; echo 'cut off' >&2; exit 1; fi\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
+    // The app leads with `-c` settings, so `apply` is found among the words.
+    fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\ncase " $* " in *" apply "*) if [ "$PWD" = '${mac}' ] && [ ! -e '${flag}' ]; then touch '${flag}'; echo 'cut off' >&2; exit 1; fi;; esac\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
     process.env.PATH = `${bin}${path.delimiter}${oldPath}`;
     const run = launch('please do it');
     expect(await run.done).toBe(IMPORT_FAILED);

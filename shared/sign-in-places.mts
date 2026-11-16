@@ -4,11 +4,12 @@
 // No fs here: the renderer reads it to decide which press a card offers.
 // Case-blind, because a Mac's disk is: `~/.SSH` opens `~/.ssh`.
 
-const FOLDERS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.netrc|\.npmrc|\.pypirc|\.docker|\.kube|\.claude[^/]*|\.codex|\.agentbox|Keychains|\.config\/gh|\.config\/gcloud|\.password-store)(\/|$)/i;
+const FOLDERS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.netrc|\.npmrc|\.pypirc|\.docker|\.kube|\.claude[^/]*|\.codex|\.agentbox|Keychains|\.config\/gh|\.config\/gcloud|\.password-store|\.git-credentials|\.config\/git\/credentials)(\/|$)/i;
 
 // Claude Code's login ("Claude Code-credentials", one per sign-in folder),
-// Codex's, and the keys that unlock a browser's or this app's saved sign-ins.
-const KEYCHAIN_ITEMS = /^(claude code\b|codex\b)|\bsafe storage$/i;
+// Codex's, gh's token (gh:<host>), and the keys that unlock a browser's or this
+// app's saved sign-ins.
+const KEYCHAIN_ITEMS = /^(claude code\b|codex\b|gh:)|\bsafe storage$/i;
 
 export const SIGN_IN_REFUSED = 'That holds sign-ins, so it never goes to the cloud.';
 

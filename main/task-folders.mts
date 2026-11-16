@@ -67,6 +67,7 @@ import { Name, nameSlug } from '../shared/product-name.mjs';
 import { insideGitFolder } from '../shared/project-folder-check.mts';
 import { carryLocalFiles, copyTree, folderChildDeadline, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
 import type { ExecFailure } from './worktree-include.mts';
+import { HOOK_FREE } from './hook-free-git.mts';
 
 /** The answer of a git call that does not throw. */
 export interface GitResult {
@@ -165,7 +166,7 @@ const inLinkedWorktree = (cwd: string) => {
   try { return fs.lstatSync(path.join(cwd, '.git')).isFile(); } catch { return false; }
 };
 const git = (cwd: string, args: string[]): string => execFileSync('git', [
-  ...(inLinkedWorktree(cwd) ? ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false'] : []),
+  ...(inLinkedWorktree(cwd) ? HOOK_FREE : []),
   ...args,
 ], {
   cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: folderChildDeadline(), killSignal: 'SIGKILL',

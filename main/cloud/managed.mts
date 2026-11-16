@@ -212,7 +212,10 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
 
   const storage: CloudStorage = {
     async put(k: string, body: string | Buffer) {
-      const status = await upload(await linkFor('put', k), { buffer: Buffer.from(body) }, fileTimeoutMs, stallMs);
+      const buffer = Buffer.from(body);
+      // A saved key's link is signed for its size, so the bucket takes nothing bigger.
+      const size = k.startsWith('logins/keys/') ? buffer.length : undefined;
+      const status = await upload(await linkFor('put', k, LINK_SECONDS, size), { buffer }, fileTimeoutMs, stallMs);
       if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
     },
     async putFile(k: string, file: string) {

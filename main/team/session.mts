@@ -257,7 +257,8 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
         options: {
           data: { full_name: String(name ?? '').trim() || undefined },
           // Else the email's link goes to the database's default, this Mac's sign-in listener, dead outside a sign-in.
-          emailRedirectTo: typeof cloudConfig.phoneSite === 'string' ? cloudConfig.phoneSite : undefined,
+          // The allowed list reads site/**, which a bare host without its slash does not match.
+          emailRedirectTo: typeof cloudConfig.phoneSite === 'string' ? new URL(cloudConfig.phoneSite).href : undefined,
         },
       });
       if (error) throw new Error(plainAuthError(error.message));
