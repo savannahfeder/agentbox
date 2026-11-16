@@ -178,6 +178,27 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // A team's run ends once its person's own hours are spent; the sweep ends it when the trial or the team does.
   const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : s.free ? freeSpent(rec, t) : onFree(rec) || ownOver(rec, t));
   // `people`: every member's own use, for the owner's page; a start needs only this person's.
+  // A TEAM PAYS FOR THE PEOPLE ON IT: one seat when it starts, one more when
+  // somebody accepts an invitation, one fewer when somebody leaves. Stripe is
+  // told when the two differ and its webhook writes the new count. A team asks
+  // at most once in ten minutes, so a Stripe that is down is not asked on
+  // every call, and what it said is logged.
+  const seatsAsked = new Map();
+  const SEATS_ASK_GAP_MS = 10 * 60_000;
+  async function seatsFollowMembers(teamId, bill, seats, members) {
+    const want = Math.max(1, members);
+    if (!stripe?.seats || !seats || !bill.stripe?.subscription || want === seats) return;
+    const t = now();
+    if (t - (seatsAsked.get(teamId) ?? -Infinity) < SEATS_ASK_GAP_MS) return;
+    seatsAsked.set(teamId, t);
+    try {
+      await stripe.seats(bill.stripe.subscription, want);
+      log(`team ${teamId} has ${want} ${want === 1 ? 'person' : 'people'} and paid for ${seats} seats, so Stripe was told ${want}`);
+    } catch (err) {
+      log(`team ${teamId} has ${want} people and pays for ${seats} seats, and Stripe would not change it: ${err?.message || err}`);
+    }
+  }
+
   async function teamNow(person, t, { people = false } = {}) {
     if (!teams) return null;
     const team = await teams(person);
@@ -193,6 +214,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const trial = seats ? bill.stripe.status === 'trialing' : t < endsAt;
     if (!seats && !trial) return null;
     const members = team.members.filter((m) => PERSON.test(m));
+    await seatsFollowMembers(team.id, bill, seats, members.length);
     const tm = {
       id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
       seconds: teamAllot(trial),
@@ -741,7 +763,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     // Paid for inside the team's free days, the card is charged when they end.
     // Stripe trials nothing that ends within 48 hours, so a team that close pays now.
     const trialEnds = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
-    const trialEnd = trialEnds - now() > 2 * DAY_MS ? trialEnds : null;
+    // Stripe words the free time in whole days, rounded down, so 6 days 23 hours read "6 days free" beside
+    // the app's 7. It is given whole days, rounded up: never less than promised, and under a day more.
+    const left = trialEnds - now();
+    const trialEnd = left > 2 * DAY_MS ? now() + Math.ceil(left / DAY_MS) * DAY_MS : null;
     const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
     return { url: made.url, where: 'checkout' };
@@ -838,7 +863,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (!team?.id) throw new Refusal(404, 'no-team', 'You are not on a team.');
     if (!(team.owners || []).includes(person)) return { owner: false };
     const bill = (await readJson(teamKey(team.id))) || {};
-    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: null, invoices: [] };
+    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, endsAt: null, card: null, email: null, invoices: [] };
     if (!stripe || !bill.stripe?.customer) return empty;
     const [sub, customer, invoices] = await Promise.all([
       bill.stripe.subscription ? stripe.subscriptionWithCard(bill.stripe.subscription).catch(() => null) : null,
@@ -850,12 +875,17 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     // Newer Stripe keeps the period on the item, older on the subscription.
     const periodStart = at(item?.current_period_start ?? sub?.current_period_start);
     const periodEnd = at(item?.current_period_end ?? sub?.current_period_end);
-    const card = sub?.default_payment_method?.card ?? customer?.invoice_settings?.default_payment_method?.card ?? null;
-    const pays = PAYING.has(sub?.status) && !sub?.cancel_at_period_end;
+    // Paid with Link there is no card on the method, and "No card yet" was said to someone who had just paid.
+    const method = sub?.default_payment_method ?? customer?.invoice_settings?.default_payment_method ?? null;
+    const card = method?.card ?? (method?.type === 'link' ? { brand: 'Link', last4: '' } : null);
+    // Stripe marks a cancelled plan with the flag, or with an end date and no flag: either way no bill is coming.
+    const ending = PAYING.has(sub?.status) && (!!sub?.cancel_at_period_end || !!at(sub?.cancel_at));
+    const pays = PAYING.has(sub?.status) && !ending;
     return {
       ...empty, periodStart, periodEnd,
       nextAt: pays ? periodEnd : null,
       nextAmount: pays ? (Math.floor(Number(item?.quantity)) || bill.seats || 0) * teamPlan.dollarsPerSeat : null,
+      endsAt: ending ? (at(sub?.cancel_at) ?? periodEnd) : null,
       card: card ? { brand: String(card.brand || '').replace(/^./, (c) => c.toUpperCase()), last4: String(card.last4 || '') } : null,
       email: typeof customer?.email === 'string' ? customer.email : null,
       invoices: (invoices?.data ?? []).map((i) => ({

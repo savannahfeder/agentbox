@@ -174,6 +174,8 @@ export function copyConfig(state, had = {}) {
  */
 export function teamEnv(file) {
   const t = JSON.parse(fs.readFileSync(file, 'utf8'));
+  // `config` alone is somebody with no account yet: the first run's account step is theirs to do.
+  if (t.config && !t.email && !t.password) return { AGENTBOX_TEAM_CONFIG: t.config };
   if (!t.config || !t.email || !t.password) throw new Error(`the team file ${file} needs config, email and password`);
   return { AGENTBOX_TEAM_CONFIG: t.config, AGENTBOX_TEAM_TEST_LOGIN: `${t.email}:${t.password}` };
 }

@@ -157,9 +157,22 @@ export function parseListings({ base, argv, full }: { base: unknown; argv: unkno
   return out;
 }
 
+// A look comes once a minute and can wait for ps. Cut off at 10 s under heavy
+// load, every listing was thrown away and the sweep was blind when memory was
+// shortest.
+const PS_DEADLINE_MS = 30_000;
+
 function ps(args: string[]): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    execFile('/bin/ps', args, { timeout: 10_000, maxBuffer: 256 * 1024 * 1024 }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
+    execFile('/bin/ps', args, { timeout: PS_DEADLINE_MS, maxBuffer: 256 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (!err) { resolve(stdout); return; }
+      const { killed, code } = err as { killed?: boolean; code?: unknown };
+      const said = String(stderr ?? '').trim().split('\n')[0];
+      const why = killed && code !== 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
+        ? `was cut off after ${PS_DEADLINE_MS / 1000} s`
+        : `exited ${code ?? 'with no code'}${said ? `: ${said}` : ''}`;
+      reject(new Error(`/bin/ps ${args.join(' ')} ${why}`));
+    });
   });
 }
 
@@ -407,6 +420,7 @@ export class LeftoverCleaner {
   declare firstSeen: Map<string, number>;
   declare withPrograms: Set<string>;
   declare lastStatus: CleanerStatus;
+  declare looking: Promise<CleanerStatus> | null;
   declare runs: Record<string, RunRecord>;
   declare protectedIds: Set<string>;
   declare taskOf: Map<string, string>;
@@ -442,6 +456,7 @@ export class LeftoverCleaner {
     this.cpuShares = new Map();
     this.withPrograms = new Set();
     this.lastStatus = { leftovers: [], survivors: [], stopped: null, pressure: 'normal' };
+    this.looking = null;
     const saved = this._load();
     this.runs = saved.runs;
     this.protectedIds = new Set(saved.protectedIds);
@@ -515,7 +530,13 @@ export class LeftoverCleaner {
 
   /* ---------------------------------- a look ---------------------------------- */
 
-  async tick(): Promise<CleanerStatus> {
+  /** A look; one already under way is answered rather than started again. */
+  tick(): Promise<CleanerStatus> {
+    this.looking ??= this._look().finally(() => { this.looking = null; });
+    return this.looking;
+  }
+
+  async _look(): Promise<CleanerStatus> {
     const now = this.clock();
     let pressure: Pressure = 'normal';
     try { pressure = await this.readPressure(); } catch {}

@@ -18,6 +18,10 @@ export interface Tour {
   urgent?: boolean;
   /** The one practice thread the walkthrough runs on, in a practice project nothing real is behind. */
   practice?: TourPractice;
+  /** The last tip is up on Home: you finished, and a real thread starts here. */
+  finishing?: boolean;
+  /** Home's greeting says you finished, from that tip going until a first real thread is sent. */
+  greets?: boolean;
 }
 
 export interface TourPractice { slug: string; item?: string; replies: number; answered?: number }
@@ -43,6 +47,8 @@ export interface TourScreen {
   rows: number;
   /** Rows an agent is on, in that list. */
   running: number;
+  /** The walkthrough's practice thread is a row in the list on screen. */
+  practice?: boolean;
   /** A chat brought in is still being written up as a thread. */
   preparing?: boolean;
   /** The count on the Needs you tab. */
@@ -66,6 +72,8 @@ export interface TourScreen {
 }
 
 export const TOUR_KEY = 'zero.tour';
+/** How long the practice thread's agent is seen working before it answers: long enough to read the tip on its row. */
+export const PRACTICE_RUN_MS = 6_000;
 /** Sent by the app once a thread is really closed, which is the close lesson. */
 export const THREAD_CLOSED = 'agentbox:thread-closed';
 
@@ -77,7 +85,29 @@ export const tourOver = (t: Tour | null): boolean =>
 export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && !tourOver(t) && LESSONS.some((l) => !t.done.includes(l));
 export const madeUrgent = (t: Tour): Tour => ({ ...t, urgent: true });
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
-export const finishLesson = (t: Tour, l: Lesson): Tour => (t.done.includes(l) ? t : { ...t, done: [...t.done, l] });
+export function finishLesson(t: Tour, l: Lesson): Tour {
+  if (t.done.includes(l)) return t;
+  const next = { ...t, done: [...t.done, l] };
+  // The lesson that ends the walkthrough starts its last word.
+  return !tourOver(t) && tourOver(next) ? { ...next, finishing: true, greets: true } : next;
+}
+export const tourFinishing = (t: Tour | null): boolean => !!t && !!t.finishing && tourOver(t);
+export const closeFinish = (t: Tour): Tour => ({ ...t, finishing: false });
+/** A real thread sent once the walkthrough is over: the last tip has been done, and nothing more is said. */
+export const firstThreadSent = (t: Tour): Tour => ((t.finishing || t.greets) && tourOver(t) ? { ...t, finishing: false, greets: false } : t);
+/** Not while the tip that says the same sentence is up: one screen says a thing once. */
+export const saysFinished = (t: Tour | null): boolean => !!t && !!t.greets && !t.finishing && tourOver(t);
+
+type Edges = { left: number; top: number; width: number; height: number };
+/** The last tip: a ring round Home's box with even room, and the card above the greeting on its left edge. */
+export function finishedPlace(box: Edges, hello: { left: number; top: number }, cardHeight: number) {
+  const ROOM = 6;
+  return {
+    glow: { x: box.left - ROOM, y: box.top - ROOM, w: box.width + 2 * ROOM, h: box.height + 2 * ROOM },
+    left: hello.left,
+    top: Math.max(12, hello.top - 20 - cardHeight),
+  };
+}
 export const lessonOf = (s: TourStep): Lesson =>
   s === 'folder' || s === 'pick' || s === 'write' || s === 'send' ? 'compose' : s === 'answered' || s === 'gettingReady' ? 'open' : s === 'inPalette' ? 'palette' : s === 'startHere' ? 'start' : s;
 
@@ -141,7 +171,20 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
     if (s.text) return 'send';
     return s.ideas === false ? 'write' : 'pick';
   }
-  if (s.preparing && !s.thread) return s.view === 'inbox' && todo('open') ? 'gettingReady' : null;
+  // The practice thread goes where every thread goes: In progress, then Needs you, then you open it.
+  // Until it is open, no tip lands on a real thread beside it.
+  if (t.practice?.item && t.sent && todo('open') && !s.thread) {
+    if (s.composer === 'card' || s.menu) return null;
+    if (s.view === 'progress' && s.practice) return 'working';
+    if (s.view !== 'inbox' && !s.practice && (s.waiting ?? 0) > 0) return 'answered';
+    return s.view === 'inbox' && s.practice ? 'open' : null;
+  }
+  if (s.preparing && !s.thread) {
+    if (s.view === 'inbox' && todo('open')) return 'gettingReady';
+    // Chats still being written up do not hold the last tip: it is about the bar, not the list.
+    const last = !todo('close') && todo('palette') && (t.sent || !todo('start')) && s.composer !== 'card' && (s.view === 'inbox' || s.view === 'progress');
+    return last ? 'palette' : null;
+  }
   if (s.preparing && todo('close')) return null;
   if (s.preparing) return todo('palette') && (t.sent || !todo('start')) ? 'palette' : !t.sent && todo('start') ? 'startHere' : null;
   if (s.thread) {
@@ -166,6 +209,9 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   return null;
 }
 
+/** The command-bar tip sits level with a list's tabs when they end before it begins, else under them. */
+export const fitsBesideTabs = (tabsEnd: number | null, cardLeft: number, gap: number): boolean => tabsEnd !== null && tabsEnd + gap <= cardLeft;
+
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 
 export function readTour(store: Store): Tour | null {
@@ -177,7 +223,7 @@ export function readTour(store: Store): Tour | null {
     const p = t.practice && typeof t.practice.slug === 'string'
       ? { practice: { slug: t.practice.slug, ...(typeof t.practice.item === 'string' ? { item: t.practice.item } : {}), replies: Number(t.practice.replies) || 0, ...(t.practice.answered ? { answered: Number(t.practice.answered) } : {}) } }
       : {};
-    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p };
+    return { sent: !!t.sent, skipped: !!t.skipped, done: Array.isArray(t.done) ? t.done : [], ...(t.urgent ? { urgent: true } : {}), ...p, ...(t.finishing ? { finishing: true } : {}), ...(t.greets ? { greets: true } : {}) };
   } catch { return null; }
 }
 

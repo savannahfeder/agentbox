@@ -87,8 +87,20 @@ export const PRACTICE_TASK: { title: string; body: string } = {
  *
  * IT STILL TAKES TWO SECONDS AND IT IS STILL A REAL ROW WITH A REAL RESULT ON
  * THE REAL LEDGER.*/
-export const PRACTICE_ANSWER: string =
-  'Done, and it is five lines at the top of the notes: three decisions and two open questions. Say the word and I will make it shorter.';
+// IT ENDS IN OPTIONS (2026-11-13). It ended "Say the word and I will make it
+// shorter", and someone at the reply box did not know what to say. A number is
+// the answer a finished thread asks for, and the walkthrough's tip is the key.
+export const PRACTICE_ANSWER: string = [
+  'Done. The summary is five lines at the top of the notes: three decisions and two open questions.',
+  '',
+  '## Options',
+  '1. Make it shorter (recommended)',
+  '2. Keep it as it is',
+].join('\n');
+
+/** The thread's summary, so the first thread anybody opens says what it is. */
+export const PRACTICE_CONTEXT: string = 'You asked for a short summary at the top of the Practice meeting notes: what was decided, and what is still open.';
+export const PRACTICE_DONE: string = ['Read the meeting notes.', 'Added a five-line summary at the top.'].join('\n');
 
 /**
  * AND WHAT COMES BACK WHEN SHE TAKES IT UP ON THAT (2026-10-06). The answer

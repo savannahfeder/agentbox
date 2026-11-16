@@ -107,6 +107,8 @@ export interface LiveFacts {
   session?: RunningSession | null;
   /** `supervisor.queued`: the ids a tick will spawn as soon as a slot frees. */
   queued?: string[];
+  /** The walkthrough's practice thread, with the app's answer to it on its way. */
+  answering?: boolean;
   /** On `supervisor.remoteHeld`: our own session, open between Remote Control turns. */
   remoteHeld?: boolean;
   /**
@@ -311,7 +313,8 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // of these lists; AgentThread draws its own liveness off the process.
   if (item.agent) return null;
   // The walkthrough's practice rows are answered by the app and never started.
-  if ((item.labels ?? []).includes(FIRST_RUN_LABEL)) return null;
+  // While that answer is on its way the thread reads as one at work, or it looks stuck.
+  if ((item.labels ?? []).includes(FIRST_RUN_LABEL)) return facts.answering ? { state: 'working', line: 'The agent just started on this.' } : null;
   // Finished is finished. The result at the foot of the conversation is the
   // news, and a mark under it about agents would be an appendix to an ending.
   if (item.status === 'done') return null;

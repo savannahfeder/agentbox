@@ -888,6 +888,8 @@ export interface TeamBillingInvoice { at: number; amount: number; status: 'paid'
 export interface TeamBillingDetails {
   periodStart: number | null; periodEnd: number | null;
   nextAt: number | null; nextAmount: number | null;
+  /** Set when the plan was cancelled: the day it ends, with no bill after it. */
+  endsAt?: number | null;
   card: { brand: string; last4: string } | null;
   email: string | null;
   invoices: TeamBillingInvoice[];
@@ -1737,7 +1739,7 @@ declare global {
       // The thread on screen, or null anywhere that is not one thread. Optional:
       // a preload from before this channel existed simply never says.
       looking?(p: { product: string | null; id: string | null }): Promise<boolean>;
-      refreshUsage?(p?: { engine?: 'claude' | 'codex' }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
+      refreshUsage?(p?: { engine?: 'claude' | 'codex'; ask?: boolean }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
       accountUsage?(p: { refresh?: boolean; engine?: 'claude' | 'codex' }): Promise<{ readings: AccountUsageReading[] }>;
       // Whether a screen reader is running, which is what decides xterm's
       // accessibility tree. Optional: a preload from before this channel
@@ -1771,7 +1773,7 @@ declare global {
       setThreadOnMac?(p: { onMac: Record<string, boolean | null> }): Promise<unknown>;
       moveToCloud?(p: { ids: string[]; product?: string; id?: string }): Promise<{ moving?: number; ok?: boolean }>;
       setProductHidden(p: { product: string; hidden: boolean }): Promise<unknown>;
-      compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
+      compose(p: { product: string; title: string; body?: string; label?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem>;
       routeThread?(p: { product: string; id: string; to: string }): Promise<{ ok: true }>;
       answerRouteOffer?(p: { product: string; id: string; make: boolean }): Promise<{ ok: true; made: string | null }>;
       // Feedback to the Agentbox team (main/feedback.mts). Optional: an older
@@ -1833,7 +1835,7 @@ declare global {
       teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult>;
       teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult>;
       teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult>;
-      teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult>;
+      teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult>;
       teamTaskBrief(p: { product: string; id: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[] }>;
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;
@@ -2025,6 +2027,7 @@ declare global {
       cloudAccountSignOut?(): Promise<unknown>;
       cloudAccountPlan?(): Promise<CloudPlan>;
       cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
+      cloudAccountFromTeam?(p: { acceptTerms: boolean }): Promise<{ ok: boolean; error?: string; message?: string }>;
       cloudAccountBilling?(): Promise<{ ok: boolean; error?: string; message?: string }>;
       cloudClipboardCode?(): Promise<{ code: string | null }>;
     };
