@@ -55,8 +55,10 @@ describe('the window during the walkthrough', () => {
   it('has no step list beside the app', () => {
     expect(app).not.toMatch(/<TourList /);
   });
+  // "It's never supposed to be open like that except when you're hovering over it."
   it('folds the sidebar as the app does', () => {
     expect(app).toMatch(/sidebarFolded\(\{ phone: onPhone\(\), shrinks: sidebarShrinks, pointedAt: railOpen \}\)/);
+    expect(app).not.toMatch(/shrinks: sidebarShrinks && !tourLive/);
   });
 });
 

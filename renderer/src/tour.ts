@@ -91,6 +91,8 @@ export function finishLesson(t: Tour, l: Lesson): Tour {
 }
 export const tourFinishing = (t: Tour | null): boolean => !!t && !!t.finishing && tourOver(t);
 export const closeFinish = (t: Tour): Tour => ({ ...t, finishing: false });
+/** How long the last tip and "Walkthrough done" stay when nothing is pressed. */
+export const FINISH_MS = 8000;
 const BARE_MODIFIERS = ['Meta', 'Control', 'Alt', 'Shift', 'CapsLock'];
 /** Any key ends the last tip, except a modifier on its way to a chord. */
 export const keyEndsFinish = (key: string): boolean => !BARE_MODIFIERS.includes(key);

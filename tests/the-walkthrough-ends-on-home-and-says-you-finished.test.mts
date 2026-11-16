@@ -23,7 +23,7 @@
 // out: "I don't like the idea of the header saying, 'You finished the walkthrough.'"
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { closeFinish, finishLesson, finishedPlace, madeUrgent, noteSent, skipTour, startTour, tourFinishing, tourLive, tourOver, type Lesson, type Tour } from '../renderer/src/tour.ts';
+import { FINISH_MS, closeFinish, finishLesson, finishedPlace, madeUrgent, noteSent, skipTour, startTour, tourFinishing, tourLive, tourOver, type Lesson, type Tour } from '../renderer/src/tour.ts';
 import * as homeModel from '../renderer/src/home/home-model.ts';
 import * as tourRules from '../renderer/src/tour.ts';
 
@@ -69,6 +69,12 @@ describe('the finishing moment ends', () => {
   });
   it('and closing changes nothing else', () => {
     expect(closeFinish(over)).toEqual({ ...over, finishing: false });
+  });
+  // 2026-11-16: "I'm on this page and it still seems to show this. Only when I
+  // hit Close does it actually do something." It goes by itself after a beat.
+  it('by itself after a few seconds', () => {
+    expect(FINISH_MS).toBeGreaterThanOrEqual(5000);
+    expect(FINISH_MS).toBeLessThanOrEqual(10_000);
   });
 });
 
@@ -130,6 +136,15 @@ describe('the window', () => {
     expect(tour).not.toContain('Type your first real thread');
     expect(tour).toContain("document.querySelector('.hm-hello')");
     expect(app).toMatch(/\{finishing && <TourFinished covered=\{/);
+  });
+  it('ends the finishing moment by itself after a few seconds', () => {
+    expect(app).toContain('const gone = setTimeout(() => { if (tourRef.current?.finishing) setTour(closeFinish(tourRef.current)); }, FINISH_MS);');
+  });
+  // 2026-11-16, of the list under the inbox's box: "those suggestions look
+  // really weird on that background. We don't need suggestions anymore."
+  it('hands the box no suggestions', () => {
+    expect(app).not.toMatch(/ideas=\{/);
+    expect(app).not.toMatch(/FIRST_IDEAS/);
   });
   it('adds no card to Home', () => {
     expect(home).not.toMatch(/hm-next|aria-label="Next"/);

@@ -150,7 +150,7 @@ export const sameModel = (a: ModelPick | null | undefined, b: ModelPick | null |
 
 type EngineRow = { id: string; label: string };
 
-/** The agents To offers, or nothing where there is only one. */
+/** The agents a model row is tagged with, or nothing where there is only one. */
 export function agentChoices(engines?: readonly EngineRow[]): { id: Harness; label: string }[] {
   const rows = engines ?? [];
   if (rows.length < 2) return [];
@@ -159,10 +159,10 @@ export function agentChoices(engines?: readonly EngineRow[]): { id: Harness; lab
     .map((e) => ({ id: e.id as Harness, label: e.label }));
 }
 
-/** The word on the To field: the agent's name, or "Agent" where there is one. */
-export function agentWordFor(engines: readonly EngineRow[] | undefined, engine: Harness): string {
-  const rows = agentChoices(engines);
-  return rows.find((e) => e.id === engine)?.label ?? 'Agent';
+/** Whether To is drawn. The model picks the agent, so To is only there when
+ *  someone besides the agent could get the thread. */
+export function toOffered({ people, auto, mates, chosen }: { people: boolean; auto: boolean; mates: boolean; chosen: boolean }): boolean {
+  return people || auto || mates || chosen;
 }
 
 /**
