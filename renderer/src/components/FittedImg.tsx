@@ -57,7 +57,8 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
     if (!room || !near) return;
     let live = true;
     let made: string | null = null;
-    fitPicture(src, { ...room, cover })
+    const leaving = new AbortController();
+    fitPicture(src, { ...room, cover }, undefined, leaving.signal)
       .then((r) => { made = r.url; if (live) setDrawn({ for: src, url: r.url }); else URL.revokeObjectURL(r.url); })
       .catch((err) => {
         if (!live) return;
@@ -65,7 +66,7 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
         if (err instanceof PictureMissing && img.onError) img.onError(undefined as never);
         else setFailed(src);
       });
-    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+    return () => { live = false; leaving.abort(); if (made) URL.revokeObjectURL(made); };
   }, [src, room, near, cover]);
   if (failed === src) return <img {...img} src={src} />;
   if (drawn?.for !== src) {

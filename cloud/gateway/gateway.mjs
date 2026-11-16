@@ -27,6 +27,8 @@ const KEY = /^(runs|logins|files)\/([A-Za-z0-9._@+=-]+(?:\/[A-Za-z0-9._@+=-]+)*)
 const FILE_KEY = /^files\/[0-9a-f]{64}$/;
 const FILES_WEIGH_MS = 60_000;
 const LINK_MAX_SECONDS = 12 * 60 * 60;
+// The most S3 takes in one PUT.
+const ONE_UPLOAD_MAX = 5 * 2 ** 30;
 const LOGIN_LINK_SECONDS = 30 * 60;
 // Lambda takes and gives at most 6 MB; past RELAY_BYTES a call or an answer
 // goes through the person's own `runs/calls/` in the bucket instead.
@@ -176,6 +178,27 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // A team's run ends once its person's own hours are spent; the sweep ends it when the trial or the team does.
   const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : s.free ? freeSpent(rec, t) : onFree(rec) || ownOver(rec, t));
   // `people`: every member's own use, for the owner's page; a start needs only this person's.
+  // A TEAM PAYS FOR THE PEOPLE ON IT: one seat when it starts, one more when
+  // somebody accepts an invitation, one fewer when somebody leaves. Stripe is
+  // told when the two differ and its webhook writes the new count. A team asks
+  // at most once in ten minutes, so a Stripe that is down is not asked on
+  // every call, and what it said is logged.
+  const seatsAsked = new Map();
+  const SEATS_ASK_GAP_MS = 10 * 60_000;
+  async function seatsFollowMembers(teamId, bill, seats, members) {
+    const want = Math.max(1, members);
+    if (!stripe?.seats || !seats || !bill.stripe?.subscription || want === seats) return;
+    const t = now();
+    if (t - (seatsAsked.get(teamId) ?? -Infinity) < SEATS_ASK_GAP_MS) return;
+    seatsAsked.set(teamId, t);
+    try {
+      await stripe.seats(bill.stripe.subscription, want);
+      log(`team ${teamId} has ${want} ${want === 1 ? 'person' : 'people'} and paid for ${seats} seats, so Stripe was told ${want}`);
+    } catch (err) {
+      log(`team ${teamId} has ${want} people and pays for ${seats} seats, and Stripe would not change it: ${err?.message || err}`);
+    }
+  }
+
   async function teamNow(person, t, { people = false } = {}) {
     if (!teams) return null;
     const team = await teams(person);
@@ -191,6 +214,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const trial = seats ? bill.stripe.status === 'trialing' : t < endsAt;
     if (!seats && !trial) return null;
     const members = team.members.filter((m) => PERSON.test(m));
+    await seatsFollowMembers(team.id, bill, seats, members.length);
     const tm = {
       id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
       seconds: teamAllot(trial),
@@ -551,7 +575,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   async function weighFiles(person, t) {
     const { items, truncated } = await objects.sizes(`files/u-${person}/`, { max: STORAGE_LIST_MAX });
     const bytes = items.reduce((sum, o) => sum + o.size, 0);
-    return update(person, (r) => { r.files = { ...r.files, at: t, bytes, count: items.length, truncated }; return r.files; });
+    const there = new Set(items.map((o) => o.key));
+    return update(person, (r) => {
+      r.files = { ...r.files, at: t, bytes, count: items.length, truncated };
+      // A file that landed is in the weight now, so its link stops counting.
+      if (r.filePuts) r.filePuts = Object.fromEntries(Object.entries(r.filePuts).filter(([k, p]) => !there.has(k) && p.until > t));
+      return r.files;
+    });
   }
 
   async function filesNow(person, rec) {
@@ -562,17 +592,29 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   }
 
   // Read and deleted on any plan, so a plan that ends can bring its files home.
-  async function fileLink(person, rec, { op, key, seconds }) {
+  // A link to upload counts against the cap until the sweep weighs what
+  // landed, at the size the app said, which the link is signed for. An older
+  // app says none, and its link counts as the largest one upload can be.
+  async function fileLink(person, rec, { op, key, seconds, size }) {
     if (!FILE_KEY.test(key)) throw bad('a kept file is files/ and the sha256 of its bytes');
     const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
+    const scoped = scopedKey(person, key);
+    const stated = size == null ? null : Number(size);
     if (op === 'put') {
-      const cap = filesCapOf(rec, await teamOrNone(person, now()));
+      if (stated != null && !(Number.isSafeInteger(stated) && stated >= 0 && stated <= ONE_UPLOAD_MAX)) throw bad(`size is the upload's bytes, at most ${gib(ONE_UPLOAD_MAX)} GB`);
+      const t = now();
+      const cap = filesCapOf(rec, await teamOrNone(person, t));
       if (!cap) throw new Refusal(403, 'files-plan', `Keeping files in the cloud comes with ${Name} Pro, Plus and Max.`);
-      if ((rec.files?.bytes || 0) >= cap || rec.files?.truncated) throw new Refusal(403, 'files-full', `Your ${gib(cap)} GB of files in the cloud are full.`, { cap });
-      const until = now() + s * 1000;
-      if (!(rec.filesUntil >= until)) await update(person, (r) => { r.filesUntil = Math.max(r.filesUntil || 0, until + LINK_NOTE_MS); });
+      const until = t + s * 1000;
+      await update(person, (r) => {
+        const others = Object.entries(r.filePuts || {}).filter(([k, p]) => k !== scoped && p.until > t);
+        const pending = others.reduce((sum, [, p]) => sum + p.size, 0);
+        if ((r.files?.bytes || 0) + pending + Math.max(stated ?? 0, 1) > cap || r.files?.truncated) throw new Refusal(403, 'files-full', `Your ${gib(cap)} GB of files in the cloud are full.`, { cap });
+        r.filePuts = Object.fromEntries([...others, [scoped, { size: stated ?? ONE_UPLOAD_MAX, until }]]);
+        r.filesUntil = Math.max(r.filesUntil || 0, until + LINK_NOTE_MS);
+      });
     }
-    return { url: await links[op](scopedKey(person, key), s) };
+    return { url: await (op === 'put' && stated != null ? links.put(scoped, s, stated) : links[op](scoped, s)) };
   }
 
   // A plan without files starts a clock; at FILES_LAPSE_DAYS what it kept is
@@ -595,9 +637,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     await update(person, (r) => { r.files = { at: t, bytes: 0, count: 0 }; });
   }
 
-  async function link(person, rec, { op, key, seconds }) {
+  async function link(person, rec, { op, key, seconds, size }) {
     if (!['get', 'put', 'head'].includes(op)) throw bad('op is get, put or head');
-    if (typeof key === 'string' && key.startsWith('files/')) return fileLink(person, rec, { op, key, seconds });
+    if (typeof key === 'string' && key.startsWith('files/')) return fileLink(person, rec, { op, key, seconds, size });
     const scoped = scopedKey(person, key);
     if (!scoped) throw bad('a key is a run\'s or a sign-in\'s, inside your own space');
     // A sign-in is written only by the sandbox, on a link the server makes. A
@@ -721,7 +763,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     // Paid for inside the team's free days, the card is charged when they end.
     // Stripe trials nothing that ends within 48 hours, so a team that close pays now.
     const trialEnds = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
-    const trialEnd = trialEnds - now() > 2 * DAY_MS ? trialEnds : null;
+    // Stripe words the free time in whole days, rounded down, so 6 days 23 hours read "6 days free" beside
+    // the app's 7. It is given whole days, rounded up: never less than promised, and under a day more.
+    const left = trialEnds - now();
+    const trialEnd = left > 2 * DAY_MS ? now() + Math.ceil(left / DAY_MS) * DAY_MS : null;
     const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
     return { url: made.url, where: 'checkout' };
@@ -818,7 +863,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (!team?.id) throw new Refusal(404, 'no-team', 'You are not on a team.');
     if (!(team.owners || []).includes(person)) return { owner: false };
     const bill = (await readJson(teamKey(team.id))) || {};
-    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: null, invoices: [] };
+    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, endsAt: null, card: null, email: null, invoices: [] };
     if (!stripe || !bill.stripe?.customer) return empty;
     const [sub, customer, invoices] = await Promise.all([
       bill.stripe.subscription ? stripe.subscriptionWithCard(bill.stripe.subscription).catch(() => null) : null,
@@ -830,12 +875,17 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     // Newer Stripe keeps the period on the item, older on the subscription.
     const periodStart = at(item?.current_period_start ?? sub?.current_period_start);
     const periodEnd = at(item?.current_period_end ?? sub?.current_period_end);
-    const card = sub?.default_payment_method?.card ?? customer?.invoice_settings?.default_payment_method?.card ?? null;
-    const pays = PAYING.has(sub?.status) && !sub?.cancel_at_period_end;
+    // Paid with Link there is no card on the method, and "No card yet" was said to someone who had just paid.
+    const method = sub?.default_payment_method ?? customer?.invoice_settings?.default_payment_method ?? null;
+    const card = method?.card ?? (method?.type === 'link' ? { brand: 'Link', last4: '' } : null);
+    // Stripe marks a cancelled plan with the flag, or with an end date and no flag: either way no bill is coming.
+    const ending = PAYING.has(sub?.status) && (!!sub?.cancel_at_period_end || !!at(sub?.cancel_at));
+    const pays = PAYING.has(sub?.status) && !ending;
     return {
       ...empty, periodStart, periodEnd,
       nextAt: pays ? periodEnd : null,
       nextAmount: pays ? (Math.floor(Number(item?.quantity)) || bill.seats || 0) * teamPlan.dollarsPerSeat : null,
+      endsAt: ending ? (at(sub?.cancel_at) ?? periodEnd) : null,
       card: card ? { brand: String(card.brand || '').replace(/^./, (c) => c.toUpperCase()), last4: String(card.last4 || '') } : null,
       email: typeof customer?.email === 'string' ? customer.email : null,
       invoices: (invoices?.data ?? []).map((i) => ({

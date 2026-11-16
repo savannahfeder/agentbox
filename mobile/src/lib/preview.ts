@@ -29,7 +29,9 @@ export function previewRows(now = Date.now()): PhoneRows {
   const roundNote = "Three versions of the inbox are in the folder below. I'd go with the quiet one: it reads fastest at arm's length.\n\n~/docs/agentbox/designs/w-8b9c0d1e2f/\n\nWhat each one changes is in `designs/w-8b9c0d1e2f/inbox-versions.md`, and `designs/w-8b9c0d1e2f/compare.html` sets them side by side.\n\nThe walk-through is a short film: `designs/w-8b9c0d1e2f/walkthrough.mp4`\n\nThe threads I drew them from are in `designs/w-8b9c0d1e2f/threads.csv`, and the counts in `designs/w-8b9c0d1e2f/counts.json`.\n\nThe full recording, `recordings/session.mov`, is too big for the phone.\n\n## Options\n1. Go with the quiet one (recommended)\n2. Try a fourth version";
   const stuckAsk = 'Threads stuck on a Codex limit should land in Needs you.';
   const stuckNote = 'I found where a run that hits its limit is put back. Two ways to fix it:\n\n- Mark it stopped, so it shows in Needs you with the reason.\n- Retry on another account first, and only then show it.\n\n## Options\n1. Mark it stopped (recommended)\n2. Retry on another account first';
-  const meterResult = 'Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
+  const fizzAsk = 'Make fizz(15) return FizzBuzz and add a test.';
+  const fizzResult = 'fizz(15) now returns FizzBuzz, with a test for 3, 5 and 15. Committed as 9dfb76a; the working tree is clean.';
+  const meterResult ='Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
   const qualityNote = '**Sign-up fails on a slow connection.**\n\nOn a throttled connection the email step gives up after 10 seconds and the form clears what you typed. The fix keeps your words and waits 30 seconds.\n\n## Options\n1. Ship the fix (recommended)\n2. Show me the steps first';
   return {
     projects: [
@@ -55,6 +57,11 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(200), source: 'founder', patch: { body: 'I need to see when my limits reset.' } },
         { ts: at(52), source: 'agent', patch: { status: 'done', result: meterResult } },
       ]),
+      // A finished run that left a commit and offered nothing: the app asks Ship it (shared/phone-snapshot.mts `phoneChangeOf`).
+      thread('site', { id: 'w-5e6f7a8b9d', title: 'Make fizz(15) say FizzBuzz', status: 'open', priority: 0, engine: 'codex', body: fizzAsk, result: fizzResult, createdAt: at(30), updatedAt: at(3), wrote: { body: her(at(30)), result: agent(at(3)) } }, [
+        { ts: at(30), source: 'founder', patch: { body: fizzAsk } },
+        { ts: at(3), source: 'agent', patch: { result: fizzResult } },
+      ], { change: { plus: 13, minus: 1, files: [{ path: 'src/fizz.js', plus: 2, minus: 1 }, { path: 'test/fizz.test.js', plus: 11, minus: 0 }], committed: true, uncommitted: false, knowsYou: true } }),
       thread('agentbox', { id: 'w-4d5e6f7a8b', title: 'Draw the sign-in screen', status: 'claimed', priority: 5, body: 'Draw five sign-in screens on the real app.', createdAt: at(40), updatedAt: at(2), wrote: { body: her(at(40)) } }, [
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
@@ -348,12 +355,24 @@ export function previewCloud(now = () => Date.now()) {
   if (scene === 'queued') rows.commands.push({ id: 'c-preview-q', device: DEV, project: 'film', item: 'w-5e6f7a8b9c', kind: 'reply', payload: { text: 'Open on the inbox.' }, created_at: new Date(now() - 30_000).toISOString(), claimed_at: null, taken_at: null, outcome: null } as PhoneRows['commands'][number]);
   // `?scene=away`: a computer last online three hours ago, with no cloud to carry on.
   if (scene === 'away') rows.projects = rows.projects.map((p) => ({ ...p, updated_at: new Date(now() - 180 * 60_000).toISOString() }));
+  // `?scene=computers`: projects from two other computers, off for days, beside this one's.
+  if (scene === 'computers') {
+    const days = (n: number) => new Date(now() - n * 24 * 3600_000).toISOString();
+    rows.projects.push(
+      { device: '0d99e1f2a3b4', project: 'my-workspace', name: 'My Workspace', updated_at: days(3) },
+      { device: '0d99e1f2a3b4', project: 'web-todo', name: 'Web Todo', updated_at: days(3) },
+      { device: 'ac08b1c2d3e4', project: 'my-workspace', name: 'My Workspace', updated_at: days(9) },
+      { device: 'ac08b1c2d3e4', project: 'sandbox-1', name: 'Sandbox 1', updated_at: days(9) },
+    );
+    rows.projects.sort((a, b) => a.name.localeCompare(b.name));
+  }
   // `?scene=copies`: one task sent to Claude Code and again to Codex.
   if (scene === 'copies') {
     const stuck = rows.threads.find((t) => t.item === 'w-2b3c4d5e6f');
     if (stuck) rows.threads.push({ ...stuck, item: 'w-2b3c4d5e70', snapshot: { ...stuck.snapshot, item: { ...stuck.snapshot.item, id: 'w-2b3c4d5e70', engine: 'codex' } as WorkItem } });
   }
-  let signedIn = scene !== 'signed-out' && !walking;
+  // `?scene=ran-out`: the sign-in page after the cloud refused to renew the sign-in.
+  let signedIn = scene !== 'signed-out' && scene !== 'ran-out' && !walking;
   const settings = previewSettings(now());
   // `?scene=codex`: a computer whose chosen agent is Codex, so a thread naming none runs on it.
   if (scene === 'codex') (settings.settings.workspace as PreviewWorkspace).engine = 'codex';
@@ -429,10 +448,11 @@ export function previewCloud(now = () => Date.now()) {
       const group = groups.select(table, query);
       if (group) return group;
       joined();
+      if (table === 'phone_projects' && scene === 'computers') return rows.projects.map((p) => (p.device === DEV ? { ...p, updated_at: new Date(now()).toISOString() } : p));
       if (table === 'phone_projects') return rows.projects;
       if (table === 'phone_threads') return rows.threads;
       if (table === 'phone_commands') return /taken_at=is\.null/.test(query) ? rows.commands.filter((c) => !c.taken_at) : rows.commands.filter((c) => c.taken_at);
-      if (table === 'phone_settings') return [structuredClone(settings)];
+      if (table === 'phone_settings') return [structuredClone(settings), ...(scene === 'computers' ? [{ ...structuredClone(settings), device: '0d99e1f2a3b4', name: 'Studio Mac', updated_at: rows.projects.find((p) => p.device === '0d99e1f2a3b4')?.updated_at ?? '' }] : [])];
       if (table === 'team_members') return /person_id=eq/.test(query) ? [{ team_id: team.team.id }] : team.members;
       if (table === 'teams') return [team.team];
       if (table === 'people') return team.people.filter((p) => team.members.some((m) => m.person_id === p.id));
@@ -484,6 +504,7 @@ export function previewCloud(now = () => Date.now()) {
     async finishGoogle() { signedIn = true; signedInAt = now(); return session()!; },
     async askPasswordReset() {},
     resetAsked: () => false,
+    lapsed: () => (scene === 'ran-out' && !signedIn ? 'you@example.com' : null),
     async finishReset() { signedIn = true; signedInAt = now(); return session()!; },
     async setPassword() {},
     signOut() { signedIn = false; },

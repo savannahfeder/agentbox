@@ -105,7 +105,7 @@ async function launch() {
   const profile = path.join(INSTANCE, 'chrome-profile');
   fs.mkdirSync(profile, { recursive: true });
   if (freeProfile(profile)) await new Promise((r) => setTimeout(r, 500));
-  const { chrome, wsUrl } = await launchChrome({ profile, detached: true });
+  const { chrome, wsUrl } = await launchChrome({ profile, detached: true, activity: path.join(out, 'actions.jsonl') });
   const t = await connect(wsUrl);
   fs.writeFileSync(FILE, JSON.stringify({ wsUrl, targetId: t.targetId, pid: chrome.pid, url: state.url }));
   await t.goto(state.url);

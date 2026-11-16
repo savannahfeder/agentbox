@@ -190,6 +190,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   cloudAccountSignOut: 'zero:cloud-account-sign-out',
   cloudAccountPlan: 'zero:cloud-account-plan',
   cloudAccountPay: 'zero:cloud-account-pay',
+  cloudAccountFromTeam: 'zero:cloud-account-from-team',
   cloudAccountBilling: 'zero:cloud-account-billing',
   cloudAccountTeamBilling: 'zero:cloud-account-team-billing',
   projectRename: 'zero:project-rename',
