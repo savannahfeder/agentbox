@@ -97,7 +97,8 @@
 .code-file-n { flex: none; width: 56px; padding-right: 18px; box-sizing: border-box; text-align: right; color: var(--text-faint); user-select: none; -webkit-user-select: none; }
 .code-file-n::before { content: attr(data-n); }
 .code-file-text { flex: 1; white-space: pre; padding-right: 32px; font: inherit; background: none; }
-.doc-card > .code-scroll, .file-sheet-body > .code-scroll { flex: 1; min-height: 0; overflow: auto; }
+/* Not `.doc-card > .code-scroll`: in the file pane it sits inside DocPane's Beside wrapper. */
+.code-scroll { flex: 1; min-height: 0; overflow: auto; }
 .av-code-scroll { flex: 1; min-height: 0; overflow: auto; }
 .av-code-sheet { width: min(980px, calc(100% - 104px)); min-width: fit-content; margin: 28px auto 48px; background: var(--code-ground, var(--doc-page)); border: 1px solid var(--line); border-radius: 12px; }
 .av-page-wrap { flex: 1; min-height: 0; min-width: 0; position: relative; display: flex; }
