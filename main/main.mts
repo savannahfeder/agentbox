@@ -480,6 +480,8 @@ async function createWindow() {
     appDir,
     onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
   });
+  powerMonitor.on('suspend', () => freezes.asleep());
+  powerMonitor.on('resume', () => freezes.awake());
   quitStep(app, 'before-quit', 'freezes.stop', () => freezes.stop());
   const memory = startMemoryRecorder({
     dir: path.join(userDir, 'memory-log'),
