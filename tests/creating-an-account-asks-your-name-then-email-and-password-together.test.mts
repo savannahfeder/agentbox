@@ -62,11 +62,10 @@ describe('the setup account step', () => {
     expect(page).toMatch(/placeholder="you@company\.com"/);
     expect(page).toMatch(/placeholder="First and last name"/);
   });
-  it('shows quiet dots in the empty password field, and Show only once there is something to show', () => {
-    // The founder: "this looks super weird and sketch. Pretty sure password fields are ****". The
-    // empty field read "6 or more characters" in plain text, as if a password were showing. Left
-    // empty, she asked for "******* but more lowkey": faint dots, the placeholder's own colour.
-    expect(page).toMatch(/passwordField\('new-password', 'Password', false, '••••••••'\)\}/);
+  it('leaves the empty password field empty, and shows Show only once there is something to show', () => {
+    // "6 or more characters" in plain text read as a password showing; faint dots after it read as
+    // one already typed (w-3814e4435c). Empty, under its label, is neither.
+    expect(page).toMatch(/passwordField\('new-password', 'Password'\)\}/);
     expect(page).not.toMatch(/6 or more characters/);
     expect(page).toMatch(/\{password && <button type="button" className="si-pw-show"/);
   });

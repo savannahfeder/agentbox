@@ -260,10 +260,28 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       // A link opened once before, by the person or a mail scanner, comes back spent, yet that first
       // open confirmed the address, so the password from this sign-up now signs in.
       const rescue = async () => !(await c.auth.signInWithPassword(account)).error;
+      // The wait goes on after a visit nothing could finish; the screen is still told why.
+      let failedVisit: (why: string) => void = () => {};
       // As long as the link lives (cloud/supabase/config.toml, otp_expiry).
-      const { over } = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log, rescue });
-      over.catch(() => {});
-      return { confirm: true, confirmed: () => over.then(() => supabaseBackend(c)), stopWaiting: () => { cancelGoogleSignIn(); } };
+      const listen = async () => {
+        const held = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log, rescue, onFailed: (why) => failedVisit(why) });
+        held.over.catch(() => {});
+        return held;
+      };
+      let { over } = await listen();
+      return {
+        confirm: true,
+        confirmed: () => over.then(() => supabaseBackend(c)),
+        failed: () => new Promise<string>((resolve) => { failedVisit = resolve; }),
+        stopWaiting: () => { cancelGoogleSignIn(); },
+        // Sent before the wait is replaced, so a refused send leaves the earlier link's wait as it was.
+        // The new code replaces the old one in the client, so only the newest link signs in.
+        async resend() {
+          const { error: refused } = await c.auth.resend({ type: 'signup', email: account.email, options: { emailRedirectTo: returnUrl } });
+          if (refused) throw new Error(plainAuthError(refused.message));
+          ({ over } = await listen());
+        },
+      };
     },
 
     // The session an Agentbox Cloud sign-in made (main/cloud/account.mts), so

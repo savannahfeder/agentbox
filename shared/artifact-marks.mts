@@ -826,6 +826,19 @@ export function sharedByWords(v: Pick<FileVersion, 'by' | 'agent' | 'edited' | '
   return whose ? `Shared by ${whose}'s agent` : 'Shared by your agent';
 }
 
+/**
+ * The agent that hears notes on version `id`: its own, or on a person's edit,
+ * the agent whose file it was. Null on a file no agent made.
+ */
+export function agentOfVersion(versions: ReadonlyArray<Pick<FileVersion, 'id' | 'agent' | 'edited'>>, id: string): string | null {
+  for (let i = versions.findIndex((v) => v.id === id); i >= 0; i--) {
+    const v = versions[i];
+    if (typeof v.agent === 'string') return v.agent;
+    if (!v.edited) return null;
+  }
+  return null;
+}
+
 /** "Resolved by your agent in v15": a comment the version `v` answered. */
 export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, { me, nameOf }: { me: string | null; nameOf: (id: string) => string }): string {
   const whose = !v?.by || v.by === me ? null : nameOf(v.by);

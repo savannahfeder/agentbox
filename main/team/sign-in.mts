@@ -50,6 +50,8 @@ interface ReturnOptions {
   /** Another way to finish when the browser comes back without a usable code. A wait that has one
    *  also keeps listening after a failed visit, since the next visit may still bring a good code. */
   rescue?: () => Promise<boolean>;
+  /** Told why when a visit failed and the wait goes on. */
+  onFailed?: (why: string) => void;
 }
 
 /** Stop whatever is waiting on the return address, if anything is. True if one was. */
@@ -65,7 +67,7 @@ export function cancelGoogleSignIn(): boolean {
  * caller are both told. `begin` is what sends the person to the browser in the
  * first place, and runs only once the address is held.
  */
-async function returningFromTheBrowser({ returnUrl, timeoutMs, what, failedTitle, landed, timedOut, log = () => {}, begin, take, rescue }: ReturnOptions): Promise<{ over: Promise<void> }> {
+async function returningFromTheBrowser({ returnUrl, timeoutMs, what, failedTitle, landed, timedOut, log = () => {}, begin, take, rescue, onFailed }: ReturnOptions): Promise<{ over: Promise<void> }> {
   const url = new URL(returnUrl);
   const port = Number(url.port);
   if (url.hostname !== '127.0.0.1' || !port) throw new Error(`the sign-in return address must be on 127.0.0.1 with a port, not ${returnUrl}`);
@@ -94,7 +96,7 @@ async function returningFromTheBrowser({ returnUrl, timeoutMs, what, failedTitle
         return;
       }
       page(res, 400, failedTitle, why);
-      if (!rescue) finish.reject(error);
+      if (!rescue) finish.reject(error); else onFailed?.(why);
     };
     if (!code) {
       await failed(problem || `Go back to ${Name} and try again.`, new Error(problem || `${what} came back without a code`));
@@ -193,14 +195,15 @@ export async function waitForTheConfirmationLink(options: ConfirmationOptions): 
   return (await listenForTheConfirmationLink(options)).over;
 }
 
-type ConfirmationOptions = { client: SupabaseClient; returnUrl: string; timeoutMs?: number; log?: (line: string) => void; rescue?: () => Promise<boolean> };
+type ConfirmationOptions = { client: SupabaseClient; returnUrl: string; timeoutMs?: number; log?: (line: string) => void; rescue?: () => Promise<boolean>; onFailed?: (why: string) => void };
 
 /** The same wait, answering as soon as the address is held, so a link followed at once still finds it. */
-export async function listenForTheConfirmationLink({ client, returnUrl, timeoutMs = 15 * 60 * 1000, log = () => {}, rescue }: ConfirmationOptions): Promise<{ over: Promise<void> }> {
+export async function listenForTheConfirmationLink({ client, returnUrl, timeoutMs = 15 * 60 * 1000, log = () => {}, rescue, onFailed }: ConfirmationOptions): Promise<{ over: Promise<void> }> {
   return returningFromTheBrowser({
     returnUrl,
     timeoutMs,
     rescue,
+    onFailed,
     log,
     what: 'email confirmation',
     failedTitle: 'Confirming your email did not finish',

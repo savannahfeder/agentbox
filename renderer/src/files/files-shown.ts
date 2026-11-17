@@ -166,3 +166,13 @@ export function apartScratch(files: PlacedFile[]) {
 }
 
 export const scratchLine = (n: number) => (n === 1 ? '1 check picture an agent took' : `${n} check pictures agents took`);
+
+// Every tile at once on a store of thousands froze the whole app.
+export const TILES_AT_ONCE = 60;
+
+/** The first `drawn` tiles: the files, then the check pictures with what is left. */
+export function drawnOf<T>(shown: T[], scratch: T[], drawn: number): { shown: T[]; scratch: T[] } {
+  return { shown: shown.slice(0, drawn), scratch: scratch.slice(0, Math.max(0, drawn - shown.length)) };
+}
+
+export const moreTiles = (drawn: number, total: number) => (drawn >= total ? drawn : Math.min(drawn + TILES_AT_ONCE, total));

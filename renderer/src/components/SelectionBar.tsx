@@ -155,8 +155,9 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
     const got = picked();
     if (!got) return;
     const { words, at } = got;
-    onComment(quoteFrom(words), at);
+    // Let go of the page's words before the note box takes the caret, never after.
     window.getSelection()?.empty();
+    onComment(quoteFrom(words), at);
     setAt(null);
   };
   const copy = async () => {
