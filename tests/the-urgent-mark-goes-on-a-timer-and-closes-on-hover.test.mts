@@ -60,16 +60,21 @@ describe('the close', () => {
 
   // "People who go to click that might accidentally close the message": the
   // close took the O key's place on hover. Then a ringed badge on the top
-  // right corner "looks ugly. needs to be more lowkey". It now takes the
-  // dot's place, bare and faint, off the layout, and the O key stays.
-  it('takes the dot’s place, bare and faint, and the O key stays', () => {
+  // right corner "looks ugly. needs to be more lowkey". The approved one of
+  // four is a smaller badge on that corner with no ring, a faint x on the
+  // pane's own colour, off the layout, and the O key stays.
+  it('is a small ringless badge on the top right corner, and the O key stays', () => {
     expect(rule('.ur')).toMatch(/position: relative/);
-    expect(rule('.ur-close')).toMatch(/position: absolute/);
-    expect(rule('.ur-close')).toMatch(/left: \d+px/);
-    expect(rule('.ur-close')).toMatch(/border: 0/);
-    expect(rule('.ur-close')).toMatch(/background: none/);
-    expect(rule('.ur-close')).toMatch(/color: var\(--text-faint\)/);
-    expect(rule('.ur:hover .ur-dot')).toMatch(/visibility: hidden/);
+    const close = rule('.ur-close');
+    expect(close).toMatch(/position: absolute/);
+    expect(close).toMatch(/top: -6px/);
+    expect(close).toMatch(/right: -6px/);
+    expect(close).toMatch(/width: 13px/);
+    expect(close).toMatch(/border: 0/);
+    expect(close).toMatch(/border-radius: 50%/);
+    expect(close).toMatch(/background: var\(--bg\)/);
+    expect(close).toMatch(/color: var\(--text-faint\)/);
+    expect(css).not.toMatch(/\.ur:hover \.ur-dot \{/);
     expect(css).not.toMatch(/\.ur:hover \.ur-kbd \{[^}]*display: none/);
     expect(css).not.toMatch(/\.ur:hover \.ur-open \{/);
     expect(html).toContain('>O</kbd>');

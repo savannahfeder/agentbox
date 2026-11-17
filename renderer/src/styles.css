@@ -4507,8 +4507,8 @@ img.product-mark { object-fit: cover; opacity: 1; }
 
 /* AN URGENT THREAD THAT ARRIVED, in the top bar until it is opened, closed or
    its time runs out (./components/UrgentReady). No fill, accent only on the dot
-   and the word. On hover a faint close takes the dot's place, so it never
-   widens the mark and never lands where the pointer was going for O. */
+   and the word. On hover a small close sits on the top right corner, so it
+   never widens the mark and never lands where the pointer was going for O. */
 .ur {
   position: relative; display: inline-flex; align-items: center;
   order: -1; height: 30px; max-width: 420px; min-width: 0; margin-right: 6px;
@@ -4523,10 +4523,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
   background: none; border: 0; font: inherit; color: inherit; cursor: pointer;
 }
 .ur-close {
-  display: none; position: absolute; top: 50%; left: 6px; width: 14px; height: 14px; margin-top: -7px;
-  padding: 0; border: 0; background: none; color: var(--text-faint); cursor: pointer;
+  display: none; position: absolute; top: -6px; right: -6px; width: 13px; height: 13px;
+  padding: 0; border: 0; border-radius: 50%; background: var(--bg); color: var(--text-faint); cursor: pointer;
 }
-.ur:hover .ur-dot { visibility: hidden; }
 .ur:hover .ur-close { display: grid; place-items: center; }
 .ur .ur-close:hover { color: var(--text); }
 .ur-close svg { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
