@@ -71,7 +71,7 @@ describe('two cloud accounts with one organization', () => {
 
 describe('reading the organization', () => {
   it('takes the id off the probe\'s own line and nothing else', () => {
-    expect(orgFromOutput('noise\nagentbox-org:c2cf0285-cffe-4b9f-a14d-b3a03f6a2b56\n')).toBe('c2cf0285-cffe-4b9f-a14d-b3a03f6a2b56');
+    expect(orgFromOutput('noise\nagentbox-org:0f1e2d3c-4b5a-4978-8695-a4b3c2d1e0f9\n')).toBe('0f1e2d3c-4b5a-4978-8695-a4b3c2d1e0f9');
     expect(orgFromOutput('agentbox-org:\n')).toBe(null);
     expect(orgFromOutput('agentbox-org:not an id; rm -rf /\n')).toBe(null);
     expect(orgFromOutput('')).toBe(null);

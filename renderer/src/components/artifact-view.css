@@ -11,6 +11,13 @@
   padding-left: 84px;
 }
 :root[data-window="flat"] .av-top { padding-left: 16px; }
+/* The view cuts the whole window out of the drag region, so this bar is the
+   only place left to move the window from. Every child is cut again so its
+   controls and the Share panel hanging below take clicks; the name and the
+   spring hold none, so they drag too. */
+.av-top { -webkit-app-region: drag; }
+.av-top * { -webkit-app-region: no-drag; }
+.av-top .av-name, .av-top .av-spring { -webkit-app-region: drag; }
 /* The side pane's corner marks (direct-review.css), which only reach inside the main layout. */
 .av-top .doc-marks { gap: 6px; }
 .av-top :is(.doc-mark, .focus-bare) {

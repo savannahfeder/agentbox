@@ -153,9 +153,17 @@ export function checkLine(file, text, { words = [], soft = false } = {}) {
   return out;
 }
 
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
 /** A recording of a real Claude Code session carries its machine's setup. */
 export function checkRecording(file, content) {
   if (!/\.jsonl$/.test(file)) return [];
+  // A thinking block's signature decodes to bytes that include the account's organisation id.
+  for (const [, sig] of content.matchAll(/"signature"\s*:\s*"([A-Za-z0-9+/=_-]{16,})"/g)) {
+    if (UUID.test(Buffer.from(sig, 'base64').toString('latin1'))) {
+      return [{ severity: 'block', why: 'a recorded session whose thinking signature carries an account id; blank the signature' }];
+    }
+  }
   for (const line of content.split('\n')) {
     if (!line.includes('"init"')) continue;
     let d;

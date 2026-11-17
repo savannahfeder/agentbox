@@ -56,6 +56,6 @@ describe('the lists', () => {
   // Seen on screen: the card under Your threads said NOTHING RUNNING over Maya's message to Dev.
   it('and so does the card on the board', () => {
     const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
-    expect(pages).toMatch(/onThem \? <span className="s">\{onThem\}<\/span>/);
+    expect(pages).toMatch(/onThem \? <span className="s"><span className="sw">\{onThem\}<\/span><\/span>/);
   });
 });

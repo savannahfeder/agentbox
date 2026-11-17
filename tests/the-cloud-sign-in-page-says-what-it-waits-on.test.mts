@@ -61,7 +61,7 @@ describe('the button on an empty form', () => {
 });
 
 describe('the cloud "Check your email" line', () => {
-  const cloud = checkEmailLede('sam@example.com', true);
+  const cloud = checkEmailLede('sam@example.com');
   it('names the address the link went to', () => {
     expect(cloud).toContain('sam@example.com');
   });
@@ -72,7 +72,5 @@ describe('the cloud "Check your email" line', () => {
   it('and still says the link belongs on this computer, where the app is waiting', () => {
     expect(cloud).toContain('on this computer');
   });
-  it('the team version, whose link lands in a browser, asks for a sign-in after it', () => {
-    expect(checkEmailLede('sam@example.com', false)).toContain('sign in here');
-  });
+  // The team's link comes back to this computer too (tests/a-new-accounts-email-link-brings-you-back-to-the-setup-on-the-mac).
 });

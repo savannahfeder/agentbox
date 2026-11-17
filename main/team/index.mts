@@ -179,6 +179,8 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
 };
 
 /** The sign-in side: Supabase in the app, memory in tests. */
+export type Confirmation = { ok: true } | { ok: false; error: string; cancelled?: boolean };
+
 export interface TeamSession {
   configured?: boolean;
   restore(): Promise<TeamBackend | null | undefined>;
@@ -187,7 +189,7 @@ export interface TeamSession {
   cancelSignIn?(): boolean | void;
   signInWithPassword?(email: string, password: string): Promise<TeamBackend>;
   adoptSession?(session: { supabaseUrl: string; access_token: string; refresh_token: string } | null): Promise<TeamBackend | null>;
-  signUp?(account: { email: string; password: string; name: string }): Promise<{ backend?: TeamBackend; confirm?: boolean } | null | undefined>;
+  signUp?(account: { email: string; password: string; name: string; log?: (line: string) => void }): Promise<{ backend?: TeamBackend; confirm?: boolean; confirmed?: () => Promise<TeamBackend>; failed?: () => Promise<string>; stopWaiting?: () => void; resend?: () => Promise<void> } | null | undefined>;
   signOut?(): Promise<unknown>;
   /** The cloud as nobody, for what anyone may read: a shared file's link. */
   anyone?(): Promise<TeamBackend | null>;
@@ -396,6 +398,20 @@ export function createTeamService({
   // `canSignIn` survives teamForWindow, so a build with Multiplayer off still asks.
   let state: TeamState = { ...EMPTY, configured: !!session?.configured, canSignIn: !!session?.configured, settling: !!session?.configured, phoneSite: site, phoneSiteQr: null };
   let backend: TeamBackend | null = null;
+  let confirming: Promise<Confirmation> | null = null;
+  let awaitingLink: { confirmed: () => Promise<TeamBackend>; failed?: () => Promise<string>; resend?: () => Promise<void>; stopWaiting?: () => void } | null = null;
+  const waitOnTheLink = () => {
+    const waiting = awaitingLink!;
+    const ended: Promise<Confirmation> = waiting.confirmed().then(
+      async (b) => { if (awaitingLink === waiting) awaitingLink = null; await signedIn(b); return { ok: true } as const; },
+      (err) => {
+        log(`team: email confirmation: ${err?.message ?? err}`);
+        return { ok: false, error: String(err?.message ?? err), ...(err?.cancelled ? { cancelled: true } : {}) };
+      },
+    );
+    // A failed visit is answered at once; the wait itself goes on, and a good link still signs in.
+    confirming = waiting.failed ? Promise.race([ended, waiting.failed().then((error): Confirmation => ({ ok: false, error }))]) : ended;
+  };
   let sync: ReturnType<typeof createTeamSync> | null = null;
   let timer: ReturnType<typeof setInterval> | null = null;
   let unsubscribe: (() => void) | null = null;
@@ -919,6 +935,10 @@ export function createTeamService({
     async signInWithEmail(email: string, password: string) {
       if (!session?.signInWithPassword) throw new Error('this build cannot sign in with email');
       const b = await session.signInWithPassword(email, password);
+      // An address confirmed in another browser never comes back here, so the
+      // wait would hold the sign-in address for the hour.
+      awaitingLink?.stopWaiting?.();
+      awaitingLink = null;
       await signedIn(b);
       return state;
     },
@@ -931,12 +951,25 @@ export function createTeamService({
       return state;
     },
 
-    /** A new account: signed in at once, or { confirm: true } until the email is confirmed. */
+    /** A new account: signed in at once, or { confirm: true } and `confirmation` signs in once the email's link is followed. */
     async signUp(email: string, password: string, name: string) {
       if (!session?.signUp) throw new Error('this build cannot make accounts');
-      const out = await session.signUp({ email, password, name });
+      const out = await session.signUp({ email, password, name, log });
       if (out?.backend) { await signedIn(out.backend); return state; }
+      awaitingLink?.stopWaiting?.();
+      awaitingLink = out?.confirmed ? { confirmed: out.confirmed, failed: out.failed, resend: out.resend, stopWaiting: out.stopWaiting } : null;
+      if (awaitingLink) waitOnTheLink(); else confirming = null;
       return { ...state, confirm: true };
+    },
+
+    /** How the waiting confirmation link ended: signed in, or why not. Null when none waits. */
+    confirmation: () => confirming,
+
+    /** Another copy of the link, for one that never came, ran out or was opened elsewhere. */
+    async resendConfirmation() {
+      if (!awaitingLink?.resend) throw new Error('Create the account again to get a new link.');
+      await awaitingLink.resend();
+      waitOnTheLink();
     },
 
     async signOut() {

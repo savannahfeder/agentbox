@@ -15,7 +15,8 @@ isBrowser() {
   [ "$(startOf "$bpid")" = "$bstart" ] || return 1
   ps -o command= -p "$bpid" 2>/dev/null | grep -qF -- "--user-data-dir=$profile"
 }
-mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+# GNU first: GNU `stat -f` means file-system status and prints a page of it, not the time.
+mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
 
 while :; do
   isBrowser || exit 0

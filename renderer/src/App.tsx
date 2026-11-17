@@ -8237,6 +8237,7 @@ export default function App() {
               tab={view}
               people={peoplePick}
               cloud={snap.cloud ?? null}
+              cloudPlan={cloudPlan}
               onCloudMode={(mode) => { void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
               onCloudWhenOn={(mode) => { void api.setWorkspaceSetting({ key: 'cloudWhenOn', value: mode }); }}
               onCloudSetUp={() => setCloudSetupOpen(true)}
