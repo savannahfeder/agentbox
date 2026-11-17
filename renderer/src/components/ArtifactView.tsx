@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
+  addressedTo, agentOfVersion, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
 } from '../../../shared/artifact-marks.mts';
 import { AgentFace } from './AgentFace';
 import type { FileVersion } from '../../../shared/artifact-marks.mts';
@@ -13,14 +13,14 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
+import { hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
 import { ArtifactStage, StageLink, StageProject, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
-import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding } from '../comment-drafts';
+import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding, type MovedDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { noteWithPictures } from '../note-pictures';
 import { AttachRow } from './AttachRow';
@@ -187,6 +187,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // Read by the placing effect above, which runs first, so it says what was true before a version arrived.
   useEffect(() => { newestInHand.current = !!family && !!at && at.vi === family.versions.length - 1; });
   const kind = version ? viewKind(version.path) : null;
+  const agentHere = family && version ? agentOfVersion(family.versions, version.id) : null;
   const [savingNotes, setSavingNotes] = useState<FileNote[]>([]);
   const [settling, setSettling] = useState<Record<string, boolean>>({});
   const [undo, setUndo] = useState<string | null>(null);
@@ -209,7 +210,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const person = useCallback((id: string | null): Person | null => people.find((p) => p.id === (id ?? me)) ?? null, [people, me]);
   const nameOf = useCallback((id: string | null) => (id === me ? 'You' : firstName(person(id)) || 'A teammate'), [me, person]);
   const noteTo = {
-    people, me, agentMade: typeof version?.agent === 'string', toAgent: withAgent,
+    people, me, agentMade: agentHere !== null, toAgent: withAgent,
     owner: version ? whoseIsTheFile(files, version.id) : null, threadOwner: ownerOfRow,
     talking: [...whoTalksOnFile(marks.notes, family?.versions.map((v) => v.id) ?? [], me), ...talkingWith],
   };
@@ -220,8 +221,18 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const across = draftsAcross ?? `${product}:${thread ?? ''}`;
   const wordsNow = useRef(words);
   wordsNow.current = words;
+  const placeInHand = useRef(draftPlace);
+  placeInHand.current = draftPlace;
+  // The version your own save just made, which the comment being written moves onto.
+  const savedTo = useRef<string | null>(null);
+  const movedBySave = (): MovedDraft | null => {
+    const was = draftOf.current;
+    const saved = !!version?.id && savedTo.current === version.id;
+    savedTo.current = null;
+    return saved && was ? { from: was.file, holding: was.holding, draft: { words: wordsNow.current, place: placeInHand.current } } : null;
+  };
   useEffect(() => {
-    const kept = openCommentDraft({ product, thread, file: version?.id ?? '', across });
+    const kept = openCommentDraft({ product, thread, file: version?.id ?? '', across }, undefined, movedBySave());
     draftOf.current = version?.id ? { file: version.id, holding: kept.holding } : null;
     setWords(kept.words); setDraftPlace(kept.place); setAsking(null);
     setNamed(people.filter((p) => kept.words.includes(`@${firstName(p)}`)));
@@ -283,6 +294,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (!savedIn) return;
     const fam = families[savedIn.fi];
     if (!savedVersionArrived(families[savedIn.fi], savedIn.count)) return;
+    savedTo.current = fam.versions[fam.versions.length - 1].id;
     setAt({ fi: savedIn.fi, vi: fam.versions.length - 1 });
     setSavedIn(null);
   }, [families, savedIn]);
@@ -322,7 +334,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const place = placeNow;
     // A comment waits for Send, so the agent starts once for all of them; @agent sends this one now.
     // ⌘↵ sends it with the rest in one toagent, so the agent starts once.
-    const tagged = !withIt.length && withAgent && typeof version.agent === 'string' && tagsYourAgent(typed);
+    const tagged = !withIt.length && withAgent && agentHere !== null && tagsYourAgent(typed);
     // It is in the list before the app has answered; a failure puts the words back.
     setSavingNotes((was) => [...was, { id, file: version.id, v: version.n, place, text, by: me, ts: Date.now(), resolved: false, replies: [], saving: true, wait: !tagged, ...(pinned(place) ? { pin: nextPin } : {}) } as unknown as FileNote]);
     setWords(''); setDraftPlace(null); setWholeAsked(false); setAsking(null);
@@ -396,7 +408,9 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
   const unsent = withAgent ? notesToSendTheAgentAnywhere(marks, families, version?.id ?? null, people, me) : { ids: [], elsewhere: 0, elsewhereKind: 'picture' as const };
   const sendAll = () => toAgent(unsent.ids);
-  const sendNotes = withAgent && version ? notesToSendTheAgent(marks, version, family!.versions.length, people, me) : [];
+  const sendBeside = sendAllBesideTheNotes(kind);
+  const canSendAll = offers.comment && unsent.ids.length > 0;
+  const sendNotes = withAgent && version ? notesToSendTheAgent(marks, withItsAgent(family!.versions, version), family!.versions.length, people, me) : [];
   const pressSend = () => toAgent(sendNotes);
   const waitingHere = offers.comment ? openNotes.filter((n) => sendNotes.includes(n.id)) : [];
   const sentAlready = openNotes.filter((n) => !waitingHere.includes(n));
@@ -645,7 +659,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   });
 
   // Only your own agent is in the list, and only on a file it made on your thread.
-  const canTag = withAgent && typeof version?.agent === 'string';
+  const canTag = withAgent && agentHere !== null;
   const askingFor = asking ? [
     ...(canTag && 'agent'.startsWith(asking.query.toLowerCase()) ? [YOUR_AGENT] : []),
     ...people.filter((p) => p.id !== me && firstName(p).toLowerCase().startsWith(asking.query.toLowerCase())),
@@ -709,7 +723,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const buttonWords = justSent && !words.trim() && !pictures.length ? justSent : sendWords;
 
   const heldFor = (n: FileNote): { words: string; went: boolean } | null => {
-    if (n.sent || !offers.comment || typeof flat.find((x) => x.v.id === n.file)?.v.agent !== 'string') return null;
+    const on = flat.find((x) => x.v.id === n.file);
+    if (n.sent || !offers.comment || !on || agentOfVersion(families[on.fi].versions, on.v.id) === null) return null;
     const goes = noteGoesTo(n, people);
     if (goes.to === 'person' && goes.person !== n.by) return { words: `Sent to ${goes.person === me ? 'you' : nameOf(goes.person)}`, went: true };
     return withAgent && n.by === me && goes.to === 'agent' && stillWaiting(n) ? { words: 'Not sent', went: false } : null;
@@ -813,7 +828,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
             <button type="button" className="av-step av-prev" disabled={!stepTo(-1)} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
             <button type="button" className="av-step av-next" disabled={!stepTo(1)} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
-          {offers.comment && unsent.ids.length > 0 && !link && (
+          {canSendAll && !sendBeside && !link && (
             <div className="av-unsent-bar" role="status">
               <span className="av-unsent-dot" aria-hidden="true" />
               <span>{unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)}</span>
@@ -824,17 +839,18 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0 || linkNotes.comments.length > 0) && <aside className="av-side" aria-label="Notes">
           <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
-          {(offers.approve || othersApproved.length > 0 || earlier) && (
+          {(offers.approve || othersApproved.length > 0 || earlier || (canSendAll && sendBeside)) && (
             <div className="av-verdict">
               <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
                 {othersApproved.length > 0 ? `${othersApproved.map((a) => nameOf(a.by)).join(', ')} approved`
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
+              {canSendAll && sendBeside && <button type="button" className="av-btn av-unsent-send" title={unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
               {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>
           )}
           <div className="av-list">
-            {waitingHere.length > 0 && <NotesSection word="Unsent" send={{ count: sendNotes.length, onSend: () => void pressSend() }} />}
+            {waitingHere.length > 0 && <NotesSection word="Unsent" send={sendBeside ? undefined : { count: sendNotes.length, onSend: () => void pressSend() }} />}
             {waitingHere.map(card)}
             {waitingHere.length > 0 && sentAlready.length > 0 && <NotesSection word="Sent" />}
             {sentAlready.map(card)}

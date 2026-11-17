@@ -452,6 +452,8 @@ export interface TeamCallResult {
   error?: string;
   /** A new account that waits on the link in its confirmation email. */
   confirm?: boolean;
+  /** A wait the app let go of itself, which is no failure to show. */
+  cancelled?: boolean;
   /** The row a call wrote into, when it wrote one: a message's conversation. */
   made?: { product: string; id: string };
 }
@@ -1794,6 +1796,8 @@ declare global {
       teamLeave(): Promise<TeamCallResult>;
       teamCancelInvite(p: { email: string }): Promise<TeamCallResult>;
       teamSignUp(p: { name: string; email: string; password: string }): Promise<TeamCallResult>;
+      teamConfirmation(): Promise<TeamCallResult>;
+      teamResendConfirmation(): Promise<TeamCallResult>;
       teamCreate(p: { name: string }): Promise<TeamCallResult>;
       teamAcceptInvite(p: { teamId: string }): Promise<TeamCallResult>;
       teamInvite(p: { email: string }): Promise<TeamCallResult>;
