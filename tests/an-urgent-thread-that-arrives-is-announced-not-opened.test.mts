@@ -79,7 +79,8 @@ describe('which arrival is announced', () => {
 
 // The first version raised the routine corner note, which fades in six seconds
 // and "looks just like a processed task note which i've learned to ignore". It
-// now has its own mark in the top bar that stays until it is dealt with.
+// now has its own mark in the top bar. Since w-a87a660f55 it also leaves on its
+// own timer and closes on hover (the-urgent-mark-goes-on-a-timer-and-closes-on-hover).
 describe('how long the top bar names it', () => {
   const urgent = row('w-urgent', 9);
   const reading = row('w-medium', 5);
@@ -116,15 +117,15 @@ describe('how long the top bar names it', () => {
 });
 
 describe('the mark in the top bar', () => {
-  const html = renderToStaticMarkup(createElement(UrgentReady, { row: row('w-urgent', 9, { title: 'Sign-in is down' }), onOpen: () => {} }));
+  const html = renderToStaticMarkup(createElement(UrgentReady, { row: row('w-urgent', 9, { title: 'Sign-in is down' }), onOpen: () => {}, onClose: () => {} }));
 
-  it('is one button with the title and the O key', () => {
-    expect(html.match(/<button/g)).toHaveLength(1);
+  it('opens from one button with the title and the O key', () => {
+    expect(html).toMatch(/<button[^>]*class="ur-open"/);
     expect(html).toContain('Sign-in is down');
     expect(html).toContain('>O</kbd>');
   });
 
-  it('has no timer and is not the routine note', () => {
+  it('is not the routine note', () => {
     expect(html).not.toContain('toast');
   });
 
