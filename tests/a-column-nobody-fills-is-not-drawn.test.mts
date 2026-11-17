@@ -45,6 +45,11 @@ const task = (over = {}) => ({
   labels: ['given-task'], assignee: ME, people: [ME, SOFIA], createdBy: SOFIA, priority: 5,
   createdAt: NOW - MIN, updatedAt: NOW - MIN, talk: { chat: [{ by: SOFIA, ts: NOW - MIN, text: 'Review the launch film cut' }] }, wrote: {}, ...over,
 });
+const message = (id, over = {}) => ({
+  id, product: withSofia.slug, status: 'open', kind: 'directive', title: 'Is the cut ready?', body: 'Is the cut ready?',
+  labels: [], people: [ME, SOFIA], createdBy: SOFIA, priority: 5, createdAt: NOW - MIN, updatedAt: NOW - MIN,
+  wrote: { body: { ts: NOW - MIN, by: SOFIA } }, ...over,
+});
 
 const list = (items) => renderToStaticMarkup(
   React.createElement(TeamContext.Provider, { value: team },
@@ -63,20 +68,20 @@ const headed = (html, col) => new RegExp(`<div class="th-col-${col}">${COL[col]}
 const drawn = (html, col) => headed(html, col) && (filled(html, col) || !hides(col));
 
 describe('a list column with no value in any row', () => {
+  // Medium is named since 2026-11-17, so only rows with no level, such as
+  // messages nobody tagged, leave the column empty.
   it('the reported case: every priority blank draws no Priority header', () => {
-    const html = list([thread('w-1'), thread('w-2'), thread('w-3', { priority: null })]);
+    const html = list([message('w-1'), message('w-2')]);
     expect(filled(html, 'prio')).toBe(false);
     expect(drawn(html, 'prio')).toBe(false);
   });
 
-  it('one row at High brings the column back', () => {
-    const html = list([thread('w-1'), thread('w-2', { priority: 7 }), thread('w-3')]);
-    expect(drawn(html, 'prio')).toBe(true);
+  it('one thread at Medium brings the column back', () => {
+    expect(drawn(list([message('w-1'), thread('w-2')]), 'prio')).toBe(true);
   });
 
-  it('Low or Urgent alone brings it back too', () => {
-    expect(drawn(list([thread('w-1', { priority: 2 })]), 'prio')).toBe(true);
-    expect(drawn(list([thread('w-1', { priority: 9 })]), 'prio')).toBe(true);
+  it('Low, High or Urgent alone brings it back too', () => {
+    for (const priority of [2, 7, 9]) expect(drawn(list([thread('w-1', { priority })]), 'prio')).toBe(true);
   });
 
   // Agent rows in Needs you say Answered since 2026-11-02, so their column is drawn.

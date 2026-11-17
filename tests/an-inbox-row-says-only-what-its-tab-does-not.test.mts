@@ -3,8 +3,7 @@
 // "Extra unnecessary text in random areas... too cluttered to understand",
 // using the team version on 2026-11-01. Seen on the photo stage at 1440x900:
 // every agent row under NEEDS YOU read WAITING ON YOU, which is the tab's own
-// name; every row read MEDIUM, the level a thread has when nobody set one; and
-// a person's task or message put TASK or MESSAGE in the PROJECT column, which
+// name; and a person's task or message put TASK or MESSAGE in the PROJECT column, which
 // is a kind, not a project. Under IN PROGRESS a row with no agent read "In
 // progress", the tab again.
 //
@@ -93,26 +92,15 @@ describe('the Project column', () => {
   });
 });
 
+// Medium is named in its cell again since 2026-11-17
+// (a-medium-thread-says-medium-in-the-priority-column).
 describe('the Priority column', () => {
-  it('is empty at Medium, the level nobody set', () => {
-    const html = draw(thread({ priority: 5 }), company, 'inbox');
-    expect(cell(html, 'prio')).toBe('');
-    expect(cells(html)).toEqual(FIVE);
+  it('keeps the five cells at Medium', () => {
+    expect(cells(draw(thread({ priority: 5 }), company, 'inbox'))).toEqual(FIVE);
   });
 
-  it('is empty on an untagged thread, which runs at Medium', () => {
-    expect(cell(draw(thread({ priority: null }), company, 'inbox'), 'prio')).toBe('');
-  });
-
-  it.each([[9, 'Urgent'], [7, 'High'], [2, 'Low']])('still says a level somebody set: %i is %s', (priority, word) => {
+  it.each([[9, 'Urgent'], [7, 'High'], [5, 'Medium'], [2, 'Low']])('says the level: %i is %s', (priority, word) => {
     expect(cell(draw(thread({ priority }), company, 'inbox'), 'prio')).toBe(word);
-  });
-
-  it('just either side of Medium still shows', () => {
-    expect(cell(draw(thread({ priority: 7 }), company, 'inbox'), 'prio')).toBe('High');
-    expect(cell(draw(thread({ priority: 2 }), company, 'inbox'), 'prio')).toBe('Low');
-    expect(cell(draw(thread({ priority: 6 }), company, 'inbox'), 'prio')).toBe('');
-    expect(cell(draw(thread({ priority: 3 }), company, 'inbox'), 'prio')).toBe('');
   });
 });
 

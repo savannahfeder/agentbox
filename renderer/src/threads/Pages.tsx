@@ -681,7 +681,8 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   /** Words for the time cell instead of how long ago: a repeating task's next run. */
   when?: string;
 }) {
-  const id = rowPriorityId(priority);
+  // Medium is named here, unlike on a board card: a blank under the Priority heading read worse than the word.
+  const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
