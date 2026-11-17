@@ -86,7 +86,9 @@ const withConfig = (env, pairs) => {
  * before it, so a stale keychain entry cannot answer first.
  */
 function signedIn(args, opts = {}) {
-  if (!token) return runGit(args, { cwd: root, ...opts });
+  // git asks only a remote on the site, and a file nobody asked for stays full while the hook runs.
+  const url = token ? (gitSoft('remote', 'get-url', ...(args[0] === 'push' ? ['--push'] : []), PUBLIC).stdout ?? '').trim() : '';
+  if (!token || !url.startsWith(`${site}/`)) return runGit(args, { cwd: root, ...opts });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-'));
   const file = path.join(dir, 'sign-in');
   const fd = fs.openSync(file, 'w+', 0o600);

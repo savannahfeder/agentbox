@@ -126,6 +126,20 @@ describe('a private repository, whose fetch asks for the sign-in too', () => {
   }, 60_000);
 });
 
+// git never asks for a sign-in it does not need, so the file would still be
+// full when the hook ran. A remote off the GitHub site gets no token at all.
+describe('a push that never asks for the sign-in', () => {
+  beforeEach(() => setUp());
+
+  it('leaves the hook nothing to read', async () => {
+    git(base, 'remote', 'set-url', 'origin', path.join(tmp, 'origin.git'));
+    const { code, out } = await ship();
+    expect(out).toContain('ship: shipped');
+    expect(code).toBe(0);
+    expect(Number(fs.readFileSync(leftOpen, 'utf8').trim())).toBe(0);
+  }, 60_000);
+});
+
 // Another project's own ship script knows nothing of stdin, so it keeps the
 // sign-in it always had rather than losing its pushes.
 describe('a ship script that does not read the sign-in from stdin', () => {
