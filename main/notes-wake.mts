@@ -1,4 +1,4 @@
-import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles, unsentReplies, type FileMarks, type FileNote, type FileVersion, type Mark, type NotePerson } from '../shared/artifact-marks.mts';
+import { agentOfVersion, answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles, unsentReplies, type FileMarks, type FileNote, type FileVersion, type Mark, type NotePerson } from '../shared/artifact-marks.mts';
 import { heldByAPerson, type TeamRow } from '../shared/team-rules.mts';
 import { readItemHistory } from './store/work-items.mts';
 import { submitReply, type ReplyItem, type ReplySupervisor } from './live-replies.mts';
@@ -128,7 +128,7 @@ function notesWords({ store, product, id, item, ids, nameOf, people }: {
     if (note.resolved || (note.sent && !later.length) || noteGoesTo(note, people).to !== 'agent') continue;
     const family = families.find((f) => f.versions.some((v) => v.id === note.file));
     const version = family?.versions.find((v) => v.id === note.file);
-    if (typeof version?.agent !== 'string') continue;
+    if (!version || agentOfVersion(family!.versions, version.id) === null) continue;
     // `version` was found in `family`.
     if (note.sent) {
       words.push(repliesForTheAgent(note, later, version, family!.versions.length, { nameOf }));

@@ -159,7 +159,13 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     : team?.configured && onTeam
       ? <button type="button" className="th-me-signin" aria-label="Sign in to your team" onClick={onTeam}>Sign in to your team</button>
       : null;
-  return <aside className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover}>
+  // Chromium lights a mouse-focused button's ring at the next key press, so a
+  // clicked button is marked and its ring stays off until focus leaves it.
+  const clicked = {
+    onPointerDown: (e: { target: EventTarget }) => { const b = e.target instanceof Element ? e.target.closest('button') : null; if (b) b.dataset.clicked = ''; },
+    onBlur: (e: { target: EventTarget }) => { if (e.target instanceof HTMLElement) delete e.target.dataset.clicked; },
+  };
+  return <aside className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover} {...clicked}>
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {mark}<span className="th-team-name">{teamName}</span>
     </div>
