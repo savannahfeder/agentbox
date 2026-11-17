@@ -47,6 +47,35 @@ function splitRow(line: string): string[] {
 }
 
 type PmNode = JSONContent;
+
+const startsTable = (lines: string[], i: number) =>
+  TABLE_ROW_RE.test(lines[i]) && i + 1 < lines.length && TABLE_SEP_RE.test(lines[i + 1]);
+
+// GFM pipe table: | a | b | over |---|---| then data rows. Call only where startsTable holds.
+function readTable(lines: string[], from: number): { node: PmNode; next: number } {
+  const header = splitRow(lines[from]);
+  let i = from + 2;
+  const rows: string[][] = [];
+  while (i < lines.length && TABLE_ROW_RE.test(lines[i]) && !TABLE_SEP_RE.test(lines[i])) {
+    rows.push(splitRow(lines[i]));
+    i++;
+  }
+  const cell = (type: 'tableHeader' | 'tableCell') => (text: string): PmNode => ({
+    type, content: [{ type: 'paragraph', content: inlineToPm(text) }],
+  });
+  const node: PmNode = {
+    type: 'table',
+    content: [
+      { type: 'tableRow', content: header.map(cell('tableHeader')) },
+      ...rows.map((r) => ({
+        type: 'tableRow',
+        // ragged rows pad to the header width so the doc stays rectangular
+        content: header.map((_, c) => cell('tableCell')(r[c] ?? '')),
+      })),
+    ],
+  };
+  return { node, next: i };
+}
 // A list as buildListTree makes it: every list and every item has its content array.
 type ListNode = PmNode & { content: (PmNode & { content: PmNode[] })[] };
 
@@ -173,6 +202,33 @@ function collectListBlock(lines: string[], from: number, advance: (next: number)
   return items;
 }
 
+// An item's own lines as paragraphs, with any pipe table among them as a table.
+// The bullet's own line always stays a paragraph, because the editor's list
+// item must open with one.
+function itemBlocks(lines: string[]): PmNode[] {
+  const out: PmNode[] = [];
+  let text: string[] = [];
+  const flush = () => {
+    if (!text.length) return;
+    const inline = inlineBlock(text);
+    out.push(inline.length ? { type: 'paragraph', content: inline } : { type: 'paragraph' });
+    text = [];
+  };
+  for (let i = 0; i < lines.length;) {
+    if (i > 0 && startsTable(lines, i)) {
+      flush();
+      const { node, next } = readTable(lines, i);
+      out.push(node);
+      i = next;
+      continue;
+    }
+    text.push(lines[i]);
+    i++;
+  }
+  flush();
+  return out.length ? out : [{ type: 'paragraph' }];
+}
+
 // Flat items -> sibling list nodes, nesting children under the item above
 // them when they sit at least two columns deeper.
 function buildListTree(items: ListItemFlat[]): PmNode[] {
@@ -207,12 +263,11 @@ function buildListTree(items: ListItemFlat[]): PmNode[] {
         curKind = kind;
         nodes.push(cur);
       }
-      const inline: PmNode[] = inlineBlock([it.text, ...it.extra]);
-      const para: PmNode = inline.length ? { type: 'paragraph', content: inline } : { type: 'paragraph' };
+      const blocks = itemBlocks([it.text, ...it.extra]);
       cur.content.push(
         it.checked !== undefined
-          ? { type: 'taskItem', attrs: { checked: it.checked }, content: [para] }
-          : { type: 'listItem', content: [para] },
+          ? { type: 'taskItem', attrs: { checked: it.checked }, content: blocks }
+          : { type: 'listItem', content: blocks },
       );
       pos++;
     }
@@ -337,30 +392,11 @@ export function mdToPmDoc(md: string): PmNode {
       continue;
     }
 
-    // GFM pipe table: | a | b | over |---|---| then data rows
-    if (TABLE_ROW_RE.test(line) && i + 1 < lines.length && TABLE_SEP_RE.test(lines[i + 1])) {
+    if (startsTable(lines, i)) {
       flushPara();
-      const header = splitRow(line);
-      i += 2;
-      const rows: string[][] = [];
-      while (i < lines.length && TABLE_ROW_RE.test(lines[i]) && !TABLE_SEP_RE.test(lines[i])) {
-        rows.push(splitRow(lines[i]));
-        i++;
-      }
-      const cell = (type: 'tableHeader' | 'tableCell') => (text: string): PmNode => ({
-        type, content: [{ type: 'paragraph', content: inlineToPm(text) }],
-      });
-      push({
-        type: 'table',
-        content: [
-          { type: 'tableRow', content: header.map(cell('tableHeader')) },
-          ...rows.map((r) => ({
-            type: 'tableRow',
-            // ragged rows pad to the header width so the doc stays rectangular
-            content: header.map((_, c) => cell('tableCell')(r[c] ?? '')),
-          })),
-        ],
-      });
+      const { node, next } = readTable(lines, i);
+      push(node);
+      i = next;
       continue;
     }
 
@@ -478,6 +514,17 @@ function fenceFor(code: string): string {
   return '`'.repeat(Math.max(3, longest + 1));
 }
 
+function tableMd(node: PmNode): string[] {
+  const cellText = (c: PmNode) => (c.content || []).map((p: PmNode) => inlineMd(p.content)).join(' ').replace(/\n/g, ' ').replace(/\|/g, '\\|').trim();
+  const lines: string[] = [];
+  (node.content || []).forEach((row: PmNode, r: number) => {
+    const cells: PmNode[] = row.content || [];
+    lines.push(`| ${cells.map(cellText).join(' | ')} |`);
+    if (r === 0) lines.push(`|${cells.map(() => ' --- ').join('|')}|`);
+  });
+  return lines;
+}
+
 const LIST_TYPES: ReadonlySet<string | undefined> = new Set(['bulletList', 'orderedList', 'taskList']);
 
 // One list node -> markdown lines. Child lists indent by the parent marker's
@@ -496,6 +543,9 @@ function listMd(node: PmNode, indent: string): string {
       if (LIST_TYPES.has(child.type)) {
         if (!opened) open('');
         lines.push(listMd(child, cont));
+      } else if (child.type === 'table') {
+        if (!opened) open('');
+        for (const row of tableMd(child)) lines.push(cont + row);
       } else {
         for (const part of inlineMd(child.content).split('\n')) {
           if (!opened) open(part);
@@ -534,14 +584,7 @@ export function pmDocToMd(docJson: PmNode): string {
     } else if (node.type === 'image') {
       if (node.attrs?.src) out.push(`![${node.attrs.alt || ''}](${node.attrs.src})`);
     } else if (node.type === 'table') {
-      const rows: PmNode[] = node.content || [];
-      const cellText = (c: PmNode) => (c.content || []).map((p: PmNode) => inlineMd(p.content)).join(' ').replace(/\n/g, ' ').replace(/\|/g, '\\|').trim();
-      const lines: string[] = [];
-      rows.forEach((row: PmNode, r: number) => {
-        const cells: PmNode[] = row.content || [];
-        lines.push(`| ${cells.map(cellText).join(' | ')} |`);
-        if (r === 0) lines.push(`|${cells.map(() => ' --- ').join('|')}|`);
-      });
+      const lines = tableMd(node);
       if (lines.length) out.push(lines.join('\n'));
     } else {
       const text = inlineMd(node.content);
