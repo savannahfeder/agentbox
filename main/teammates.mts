@@ -901,7 +901,8 @@ export class Teammates {
     const notRead = books.filter((b) => !b.readers.includes(t.id));
     const told = this._toldInTheChat(item, t, chat);
     // What you said in the chat lately, to anyone: a stop, a change of plan.
-    const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
+    // A line a thread wrote for you (`via`) is that thread's word, not yours.
+    const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && !m.via && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
       .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${(m.to as string[]).map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
     const lastSeen = Math.max(0, ...earlier.map((i) => (i.wrote?.answer?.source === 'founder' ? i.wrote.answer.ts ?? 0 : 0)));
     const untried = method && laterThan(method.changedAt, lastSeen);

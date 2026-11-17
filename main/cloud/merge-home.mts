@@ -4,7 +4,9 @@
 // Anything but a plain merge returns why, and the hand-back runs as before.
 
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
+import { HOOK_FREE } from '../hook-free-git.mts';
 
 // The exact line the cloud run is told to end on (main/cloud/run.mts). One that
 // asks for more than the merge is an agent's.
@@ -35,14 +37,16 @@ interface GitResult {
 
 const GIT_MS = 20_000;
 const FETCH_MS = 2 * 60_000;
-// A push runs the project's own pre-push hook, which may run its tests: a ship's deadline (main/ship-queue.mts).
+// A push may run the project's own pre-push hook, which may run its tests: a ship's deadline (main/ship-queue.mts).
 const PUSH_MS = 20 * 60_000;
 // Never a prompt for a password: a fetch or push nobody can answer fails instead.
 const NO_PROMPT = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
 
-function git(cwd: string, args: string[], { timeout = GIT_MS, env = process.env }: { timeout?: number; env?: NodeJS.ProcessEnv } = {}): Promise<GitResult> {
+// Every git here runs in a tree the cloud agent wrote, or will once merged, so
+// a hooks path that resolves into it runs the agent's code: none run by default.
+function git(cwd: string, args: string[], { timeout = GIT_MS, env = process.env, hooks = HOOK_FREE }: { timeout?: number; env?: NodeJS.ProcessEnv; hooks?: readonly string[] } = {}): Promise<GitResult> {
   return new Promise((resolve) => {
-    execFile('git', args, { cwd, encoding: 'utf8', timeout, env, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile('git', [...hooks, ...args], { cwd, encoding: 'utf8', timeout, env, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
       resolve(error
         ? { ok: false, out: `${stdout ?? ''}${stderr ?? ''}`.trim() || String(error.message) }
         : { ok: true, out: String(stdout).trim() });
@@ -74,6 +78,24 @@ async function catchUp(base: string, { remote }: { remote: string }): Promise<Me
   return { ok: true };
 }
 
+const real = (p: string): string => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+const within = (p: string, dir: string): boolean => p === dir || p.startsWith(dir + path.sep);
+
+/**
+ * The hooks the push may run: the project's own when they live outside its
+ * working tree (`.git/hooks`, or a folder elsewhere), pinned by absolute path;
+ * none when they live inside it (husky's `.husky/_`), since after the merge
+ * that tree is the cloud agent's.
+ */
+async function pushHooks(base: string): Promise<readonly string[]> {
+  const where = await git(base, ['rev-parse', '--path-format=absolute', '--git-path', 'hooks'], { hooks: ['-c', 'core.fsmonitor=false'] });
+  const common = await git(base, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  if (!where.ok || !common.ok || !where.out || where.out === '/dev/null') return HOOK_FREE;
+  const hooks = real(where.out);
+  if (within(hooks, real(base)) && !within(hooks, real(common.out))) return HOOK_FREE;
+  return ['-c', `core.hooksPath=${hooks}`, '-c', 'core.fsmonitor=false'];
+}
+
 const clean = async (cwd: string): Promise<boolean> => { const s = await git(cwd, ['status', '--porcelain']); return s.ok && s.out === ''; };
 
 async function mergeNow(cwd: string, { beforePush = null }: MergeHomeOptions = {}): Promise<MergeHomeResult> {
@@ -97,6 +119,7 @@ async function mergeNow(cwd: string, { beforePush = null }: MergeHomeOptions = {
   const commits = await count(base, `HEAD..${branch.out}`);
   if (commits === null) return { ok: false, why: 'git could not compare the branch with main' };
   if (!commits) return { ok: true, commits: 0, into: into.out };
+  const gate = await pushHooks(base);
   const merged = await git(base, ['merge', '--no-edit', branch.out]);
   if (!merged.ok) {
     await git(base, ['merge', '--abort']);
@@ -106,7 +129,7 @@ async function mergeNow(cwd: string, { beforePush = null }: MergeHomeOptions = {
   const giveBack = beforePush ? await beforePush() : null;
   let pushed;
   try {
-    pushed = await git(base, ['push', '--quiet', published.remote, `HEAD:${published.ref}`], { timeout: PUSH_MS, env: NO_PROMPT });
+    pushed = await git(base, ['push', '--quiet', published.remote, `HEAD:${published.ref}`], { timeout: PUSH_MS, env: NO_PROMPT, hooks: gate });
   } finally {
     giveBack?.();
   }

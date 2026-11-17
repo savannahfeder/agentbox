@@ -551,7 +551,7 @@ async function createWindow() {
       // Why each thread nothing runs on is waiting, so the phone does not read it as "Nothing running".
       waits: () => phoneWaitsOf(supervisor.status()),
       // The cards waiting on her, each with the fingerprint her answer must carry back.
-      approvals: () => approvals.listPending(config.storeRoot).map((r) => ({ ...r, card: approvals.cardShown(config.storeRoot, r.id) })),
+      approvals: () => approvals.listPending(config.storeRoot, { on: 'phone' }).map((r) => ({ ...r, card: approvals.cardShown(config.storeRoot, r.id, 'phone') })),
       stateFile: path.join(config.storeRoot, '.phone-inbox.json'),
       // This installation and this store together (main/phone-inbox.mts).
       device: () => phoneDevice(userDir, config.storeRoot),

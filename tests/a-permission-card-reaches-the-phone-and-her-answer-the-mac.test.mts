@@ -77,12 +77,12 @@ describe('the card she read', () => {
 
   it('is the one her Mac would answer, and not once the request is rewritten under it', () => {
     write(request('a-1'));
-    approvals.listPending(root);
-    const card = approvals.cardShown(root, 'a-1');
+    approvals.listPending(root, { on: 'phone' });
+    const card = approvals.cardShown(root, 'a-1', 'phone');
     expect(approvals.cardStillShown(root, 'a-1', card)).toBe(true);
     expect(approvals.cardStillShown(root, 'a-1', 'something-else')).toBe(false);
     write(request('a-1', { input: { command: 'rm -rf ~' } }));
-    approvals.listPending(root);
+    approvals.listPending(root, { on: 'phone' });
     expect(approvals.cardStillShown(root, 'a-1', card)).toBe(false);
     expect(approvals.cardStillShown(root, 'a-9', card)).toBe(false);
   });

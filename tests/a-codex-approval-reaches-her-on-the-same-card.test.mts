@@ -276,7 +276,7 @@ describe('the door the founder answers through', () => {
   const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
 
   it('tells the codex spool as well as writing the answer file', () => {
-    expect(ipc).toMatch(/approvals\.answer\(config\.storeRoot, id, allow, note\)/);
+    expect(ipc).toMatch(/approvals\.answer\(config\.storeRoot, id, allow, note(, phone)?\)/);
     expect(ipc).toMatch(/supervisor\.settleCodexApproval\?\.\(id, allow, note\)/);
   });
 
