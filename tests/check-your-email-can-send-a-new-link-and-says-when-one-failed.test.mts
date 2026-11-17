@@ -27,8 +27,10 @@ const freePort = () => new Promise<number>((resolve) => {
   const s = net.createServer();
   s.listen(0, '127.0.0.1', () => { const { port } = s.address() as net.AddressInfo; s.close(() => resolve(port)); });
 });
+// A fresh connection per visit: a resend replaces the listener, and a kept-alive
+// socket to the old one fails with ECONNRESET when the next visit reuses it.
 const follow = (url: string) => new Promise<{ status: number; page: string }>((resolve, reject) => {
-  http.get(url, (res) => { let page = ''; res.on('data', (d) => { page += d; }); res.on('end', () => resolve({ status: res.statusCode ?? 0, page })); }).on('error', reject);
+  http.get(url, { agent: false }, (res) => { let page = ''; res.on('data', (d) => { page += d; }); res.on('end', () => resolve({ status: res.statusCode ?? 0, page })); }).on('error', reject);
 });
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json' } });
 const tokenAnswer = { access_token: 'a1', refresh_token: 'r1', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user: { id: 'u-1', email: 'new@example.com', aud: 'authenticated' } };
