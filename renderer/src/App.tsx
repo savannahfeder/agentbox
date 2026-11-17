@@ -107,6 +107,7 @@ import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, 
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
+import { commandATicksTheList, selectWhatYouAreReading } from './select-all';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
 import { isUrgentRow, urgentArrival, urgentRaised, urgentShown, type UrgentRaised } from './urgent-arrival';
@@ -6484,12 +6485,14 @@ export default function App() {
       // NO ⌘1 TO ⌘4 (w-914b16eab6, 2026-10-02). They went straight to a
       // section of the sidebar until the sections became the tabs above, which
       // Tab walks. They were removed on her word, not left as a second way in.
-      // cmd-A: select everything in the current list for batch action. It
-      // works from inside a focused task too (dropping back to the list),
-      // and pressing it again with everything selected clears the selection.
+      // ⌘A ticks the whole list, or clears the ticks when all are ticked, only
+      // when the list is on screen. Anywhere else it selects what you are reading.
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'a' && !inInput && !modal) {
+        if (!commandATicksTheList({ threadOpen: !!focused, repeatOpen: !!focusedRepeat, cardOpen: !!openCard })) {
+          if (selectWhatYouAreReading(document)) e.preventDefault();
+          return;
+        }
         e.preventDefault();
-        setFocused(null);
         setMultiSel((m) => m.size >= list.length && list.length > 0 ? new Set() : new Set(list.map((i) => i.id)));
         return;
       }
