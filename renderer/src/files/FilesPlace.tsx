@@ -14,7 +14,7 @@ import { SAYS_UNDO } from '../toast-parts';
 import type { LedgerLine } from '../thread-history';
 import type { DragEvent } from 'react';
 import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
-import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, needsReview, onMacOf, scratchLine, shownName, sizeWords, sortFiles, versionWord, type FileSort } from './files-shown';
+import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
 import './files-place.css';
 
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
@@ -265,6 +265,23 @@ function useSlot(id: string) {
   return el;
 }
 
+/** True from when the element comes within a screen of the page's view, and after. */
+function useNear<T extends Element>() {
+  const ref = useRef<T | null>(null);
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (near || !el) return;
+    if (typeof IntersectionObserver === 'undefined') { setNear(true); return; }
+    // The page scrolls inside itself, so the margin is measured on it, not on the window.
+    const watch = new IntersectionObserver((seen) => { if (seen.some((s) => s.isIntersecting)) setNear(true); },
+      { root: el.closest('.fp-page'), rootMargin: '100% 0px' });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [near]);
+  return [ref, near] as const;
+}
+
 function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, onTrash, chosen = null, unmovable = false }: {
   file: PlacedFile; list: boolean; now: number; me: string | null; nameOf: (id: string) => string; onOpen: () => void;
   folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (file: PlacedFile, name: string) => void;
@@ -286,18 +303,19 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, 
   const name = shownName(file);
   const whose = !file.opened && file.by && file.by !== me ? nameOf(file.by) : null;
   const choosing = chosen !== null || unmovable;
+  const [faceRef, near] = useNear<HTMLSpanElement>();
   return <div className={`${list ? 'fp-line' : 'fp-tile'}${file.cloud ? ' is-in-cloud' : ''}${chosen ? ' is-chosen' : ''}${unmovable ? ' is-unmovable' : ''}`} draggable={!!file.project && !choosing} onDragStart={(e) => { e.dataTransfer.setData(DRAGGED, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
     {chosen !== null && <span className="fp-check" aria-hidden="true">{chosen && <CheckGlyph />}</span>}
     <button type="button" className="fp-open-file" onClick={onOpen} aria-label={choosing ? `${chosen ? 'Unchoose' : 'Choose'} ${file.name}` : `Open ${file.name}`} aria-pressed={choosing ? !!chosen : undefined} title={name === file.name ? undefined : file.name}>
       {list
         ? <>
-          <span className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
+          <span ref={faceRef} className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? near && <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
           <span className="fp-name">{name}</span>
           <span className="fp-line-marks">{marks}</span>
           <span className="fp-meta-words">{said}</span>
         </>
         : <>
-          <span className={`fp-face fp-face-${file.kind ?? 'file'}`}><Face file={file} whose={whose} /></span>
+          <span ref={faceRef} className={`fp-face fp-face-${file.kind ?? 'file'}`}>{near && <Face file={file} whose={whose} />}</span>
           <span className="fp-name">{name}</span>
           <span className="fp-meta"><span className="fp-meta-words">{said}</span>{marks}</span>
         </>}
@@ -484,6 +502,20 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const { files: unsorted, scratch } = query ? { files: found, scratch: [] } : apartScratch(found);
   const shown = sortFiles(unsorted, sort);
   const [scratchOpen, setScratchOpen] = useState(false);
+  const [drawn, setDrawn] = useState(TILES_AT_ONCE);
+  useEffect(() => { setDrawn(TILES_AT_ONCE); }, [project, folder, query, kind, review, sort]);
+  const total = shown.length + (scratchOpen ? scratch.length : 0);
+  const draw = drawnOf(shown, scratchOpen ? scratch : [], drawn);
+  const foot = useRef<HTMLDivElement | null>(null);
+  // Watched afresh after each step: a new watcher reports at once, so a step too short to push the foot away asks for the next.
+  useEffect(() => {
+    const el = foot.current;
+    if (!el || drawn >= total || typeof IntersectionObserver === 'undefined') return;
+    const watch = new IntersectionObserver((seen) => { if (seen.some((s) => s.isIntersecting)) setDrawn((d) => moreTiles(d, total)); },
+      { root: el.closest('.fp-page'), rootMargin: '0px 0px 100% 0px' });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [drawn, total]);
   const nameOf = (id: string) => firstName(team?.byId.get(id) ?? null) || 'A teammate';
   const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); else readAgain(); return r; });
   const move = (key: string, to: string | null) => { void act({ do: 'move', key, folder: to }); };
@@ -589,9 +621,9 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
           <span className="fp-name"><NameBox placeholder={naming.what === 'table' ? 'Table name' : 'Document name'} onCancel={() => setNaming(null)} onDone={(name) => makeFile(naming.what === 'table' ? 'table' : 'document', name)} /></span>
         </div>
       </div>}
-      {shown.map(tile)}
+      {draw.shown.map(tile)}
     </div>
-    {scratch.length > 0 && <div className="fp-scratch-row">
+    {scratch.length > 0 && draw.shown.length === shown.length && <div className="fp-scratch-row">
       <button type="button" className="fp-scratch" aria-expanded={scratchOpen} onClick={() => setScratchOpen(!scratchOpen)}>
         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={scratchOpen ? 'M4 10l4-4 4 4' : 'M6 4l4 4-4 4'} /></svg>
         {scratchLine(scratch.length)}
@@ -599,9 +631,10 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
       {scratch[0].project && <MoveMenu file={scratch[0]} name={scratchLine(scratch.length)} keys={scratch.map((f) => f.key)} folders={folders} act={(p) => { void act(p); }}
         onNewFolder={(name) => { void act({ do: 'make', project: scratch[0].project ?? '', name }).then((r) => { if (r.ok && r.folder) for (const f of scratch) move(f.key, r.folder); }); }} />}
     </div>}
-    {scratchOpen && scratch.length > 0 && <div className={`${asList ? 'fp-lines' : 'fp-grid'} fp-grid-scratch`}>
-      {scratch.map(tile)}
+    {draw.scratch.length > 0 && <div className={`${asList ? 'fp-lines' : 'fp-grid'} fp-grid-scratch`}>
+      {draw.scratch.map(tile)}
     </div>}
+    {drawn < total && <div ref={foot} aria-hidden="true" />}
     {openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); readAgain(); }} onNotice={onNotice}
       onPlace={(p) => { setOpenKey(null); onPlace(p); }} />}
   </div>;

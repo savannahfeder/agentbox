@@ -1124,16 +1124,30 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     try {
       const out = await team.signUp(email, password, name);
       push();
-      // The setup waits on "Check your email" and moves on by itself once this signs in.
-      void team.confirmation()?.then((ok) => {
-        if (ok) { try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ } }
-        push();
-      });
+      raiseOnceConfirmed();
       return { ok: true, team: teamNow(), confirm: !!out?.confirm };
     } catch (err) {
       return { ok: false, error: String((err as Error)?.message ?? err), team: teamNow() };
     }
   });
+  // The setup waits on "Check your email" and moves on by itself once this signs in.
+  const raiseOnceConfirmed = () => {
+    void team?.confirmation()?.then(({ ok }) => {
+      if (ok) { try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ } }
+      push();
+    });
+  };
+  // How the link ended, so "Check your email" can say it failed. Bounded by the session's own wait.
+  ipcMain.handle('zero:team-confirmation', async () => {
+    const waiting = team?.confirmation();
+    if (!waiting) return { ok: false, error: 'Create the account again to get a new link.' };
+    const out = await waiting;
+    return out.ok ? { ok: true, team: teamNow() } : { ...out, team: teamNow() };
+  });
+  ipcMain.handle('zero:team-resend-confirmation', teamCall(async () => {
+    await team!.resendConfirmation();
+    raiseOnceConfirmed();
+  }));
   ipcMain.handle('zero:team-create', teamCall(({ name }: { name: string }) => team!.createTeam(name)));
   // An invite answered yes. Nothing else joins a team.
   ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }: { teamId: string }) => team!.acceptInvite(teamId)));
