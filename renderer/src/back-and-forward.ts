@@ -2,14 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { View } from './types';
 
 /** A place the arrows can take you back to. Pages the trail does not know
- *  (Team, Rooms, search) are not recorded rather than recorded wrongly. */
+ *  (search, Today) are not recorded rather than recorded wrongly. */
 export type Stop =
   | { at: 'home' }
   | { at: 'list'; view: View }
   | { at: 'thread'; product: string; id: string }
   | { at: 'files'; project: string | null }
   | { at: 'connections' }
-  | { at: 'settings'; pane: string | null };
+  | { at: 'settings'; pane: string | null }
+  /** The Team page: 'team' is the Standup, `mate:<id>` and `person:<id>` a member's page. */
+  | { at: 'team'; place: string }
+  | { at: 'group'; id: string }
+  | { at: 'teammate'; id: string }
+  /** A teammate's thread, which is a card from their Mac rather than one of your rows. */
+  | { at: 'card'; person: string; thread: string };
 
 export type Trail = { stops: Stop[]; at: number };
 
@@ -21,8 +27,42 @@ export function sameStop(a: Stop, b: Stop): boolean {
   if (a.at === 'list' && b.at === 'list') return a.view === b.view;
   if (a.at === 'thread' && b.at === 'thread') return a.product === b.product && a.id === b.id;
   if (a.at === 'files' && b.at === 'files') return a.project === b.project;
+  if (a.at === 'team' && b.at === 'team') return a.place === b.place;
+  if (a.at === 'group' && b.at === 'group') return a.id === b.id;
+  if (a.at === 'teammate' && b.at === 'teammate') return a.id === b.id;
+  if (a.at === 'card' && b.at === 'card') return a.person === b.person && a.thread === b.thread;
   // Settings is one place: its pages are where you are inside it.
   return true;
+}
+
+/** What is on screen, in the order one covers another. */
+export type Screen = {
+  settings: { pane: string | null } | null;
+  thread: { product: string; id: string } | null;
+  card: { person: string; thread: string } | null;
+  home: boolean;
+  files: { project: string | null } | null;
+  connections: boolean;
+  group: string | null;
+  teammate: string | null;
+  teamPlace: string | null;
+  /** A page the trail does not know. */
+  unrecorded: boolean;
+  view: View;
+};
+
+export function stopOnScreen(s: Screen): Stop | null {
+  if (s.settings) return { at: 'settings', pane: s.settings.pane };
+  if (s.thread) return { at: 'thread', product: s.thread.product, id: s.thread.id };
+  if (s.card) return { at: 'card', person: s.card.person, thread: s.card.thread };
+  if (s.home) return { at: 'home' };
+  if (s.files) return { at: 'files', project: s.files.project };
+  if (s.connections) return { at: 'connections' };
+  if (s.group) return { at: 'group', id: s.group };
+  if (s.teammate) return { at: 'teammate', id: s.teammate };
+  if (s.teamPlace) return { at: 'team', place: s.teamPlace };
+  if (s.unrecorded) return null;
+  return { at: 'list', view: s.view };
 }
 
 export function arrive(trail: Trail, stop: Stop): Trail {

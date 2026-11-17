@@ -282,7 +282,7 @@ import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sk
 import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
-import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
+import { stopOnScreen, useBackAndForward, type Stop as TrailStop } from './back-and-forward';
 import { BackForward } from './components/BackForward';
 
 
@@ -7372,23 +7372,41 @@ export default function App() {
   const backForwardOn = !onPhone();
   const homeHere = homeOn && homeOpen && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
-  const stopHere: TrailStop | null = settingsOpen ? { at: 'settings', pane: settingsAt }
-    : focused ? { at: 'thread', product: focused.product, id: focused.id }
-    : homeHere ? { at: 'home' }
-    : filesShown ? { at: 'files', project: filesPage?.project ?? null }
-    : connectionsShown ? { at: 'connections' }
-    : search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || focusedRepeat || todayOn || tasksOn ? null
-    : { at: 'list', view };
+  const groupHere = roomShown && roomsUi.openId !== 'groups' ? roomsUi.openId : null;
+  const stopHere = stopOnScreen({
+    settings: settingsOpen ? { pane: settingsAt } : null,
+    thread: focused ? { product: focused.product, id: focused.id } : null,
+    card: teamShown && openCard ? { person: openCard.personId, thread: openCard.threadId } : null,
+    home: homeHere,
+    files: filesShown ? { project: filesPage?.project ?? null } : null,
+    connections: connectionsShown,
+    group: groupHere,
+    teammate: teammatesShown ? teammatesUi.open : null,
+    teamPlace: chatsPlaceShown ? chatsPlace : null,
+    unrecorded: search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || !!focusedRepeat || todayOn || tasksOn,
+    view,
+  });
+  const cardOf = (s: { person: string; thread: string }) => cards.find((c) => c.personId === s.person && c.threadId === s.thread);
   const trail = useBackAndForward({
     on: backForwardOn,
     here: stopHere,
-    exists: (s) => s.at !== 'thread' || selectable.some((i) => i.id === s.id && i.product === s.product),
+    exists: (s) => s.at === 'thread' ? selectable.some((i) => i.id === s.id && i.product === s.product)
+      : s.at === 'card' ? !!cardOf(s)
+      : s.at === 'team' ? s.place === 'team' || members.some((m) => m.key === s.place)
+      : true,
     go: (s) => {
       if (s.at === 'home') { openView('inbox'); setHomeOpen(true); }
       else if (s.at === 'list') openView(s.view);
       else if (s.at === 'files') openFiles(s.project);
       else if (s.at === 'connections') openConnectionsPage(null);
-      else if (s.at === 'settings') {
+      else if (s.at === 'team') openChatsPlace(s.place);
+      else if (s.at === 'group') { openView(view); roomsUi.open(s.id); }
+      else if (s.at === 'teammate') teammatesUi.go(s.id);
+      else if (s.at === 'card') {
+        const card = cardOf(s);
+        // The page it was opened from stays, so its Back still names it.
+        if (card) { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); openTeammateCard(card); }
+      } else if (s.at === 'settings') {
         setTeamOpen(false); closeSearch(); setFocused(null);
         setSettingsPane(s.pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true);
       } else {
@@ -7402,6 +7420,10 @@ export default function App() {
     : s.at === 'files' ? 'Files'
     : s.at === 'connections' ? 'Connections'
     : s.at === 'settings' ? 'Settings'
+    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : members.find((m) => m.key === s.place)?.name ?? 'Team')
+    : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
+    : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
+    : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
     : selectable.find((i) => i.id === s.id && i.product === s.product)?.title ?? 'the thread';
   useEffect(() => {
     if (!onPhone()) return;
