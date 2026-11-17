@@ -387,14 +387,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // becomes a no, by the same rule and in the same place as a yes the spool
   // would not take: `allow` and `note` stop meaning what she pressed and start
   // meaning what was actually recorded.
-  const answerApproval = (id: string, allow: boolean, note?: string) => {
-    const shown = approvals.cardShown(config.storeRoot, id);
+  // `phoneCard`: the card her phone answered on, which is what gets signed.
+  const answerApproval = (id: string, allow: boolean, note?: string, phoneCard?: string) => {
+    const phone = phoneCard !== undefined ? { card: phoneCard } : undefined;
+    const shown = phone ? phoneCard : approvals.cardShown(config.storeRoot, id);
     if (allow && supervisor.codexCardChanged?.(id, shown)) {
       console.warn(`zero: approval ${id} was drawn from a request that has since been rewritten; the founder's Allow was for a different card and nothing has been allowed`);
       allow = false;
       note = CARD_CHANGED;
     }
-    const ok = approvals.answer(config.storeRoot, id, allow, note);
+    const ok = approvals.answer(config.storeRoot, id, allow, note, phone);
     if (!ok) { allow = false; note = SPOOL_REFUSED; }
     const settled = supervisor.settleCodexApproval?.(id, allow, note) ?? false;
     if (!ok && settled) console.warn(`zero: approval ${id} could not be recorded in the spool; the worker waiting on it has been denied`);
@@ -459,7 +461,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // and a request rewritten since gets nothing.
   ipcMain.handle('zero:approve', (_e, { id, allow, note, card }: { id: string; allow: boolean; note?: string; card?: string }) => {
     if (card !== undefined && !approvals.cardStillShown(config.storeRoot, id, card)) return { ok: false, error: 'the card changed after your phone showed it, so nothing was allowed' };
-    return { ok: answerApproval(id, allow, note) };
+    return { ok: answerApproval(id, allow, note, card) };
   });
 
   // AN AGENT ROW IS NOT A WORK ITEM. Rows for her Claude Code agents are drawn
