@@ -15,11 +15,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import * as nodeModule from 'node:module';
 import { stripTypesFlags } from '../main/strip-types.mts';
 
 const repo = path.resolve(import.meta.dirname, '..');
 const HOOK = path.join(repo, 'bin', 'typescript-in-node-modules.mjs');
 const ON_ITS_OWN = { typescript: 'strip' };
+// The hook needs Node 22.15; the package asks for 22.18, and the Mac that ships may be older.
+const HOOKS_HERE = typeof (nodeModule as { registerHooks?: unknown }).registerHooks === 'function';
 
 let dir: string;
 let pkg: string;
@@ -59,11 +62,13 @@ const node = (args: string[]) => spawnSync(process.execPath, args, { encoding: '
 describe('the app installed by npm', () => {
   it('cannot load its .mts on plain Node, which is what broke', () => {
     const run = node([path.join(pkg, 'main', 'child.mts')]);
-    expect(run.stderr).toMatch(/ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING/);
+    // Below 22.18 Node will not load a .mts at all without a flag.
+    expect(run.stderr).toMatch(/ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING|ERR_UNKNOWN_FILE_EXTENSION/);
+    expect(run.status).not.toBe(0);
   });
 
-  it('starts, and so do a helper process and a thread it starts', () => {
-    const run = node([path.join(pkg, 'bin', 'start.mjs')]);
+  it.skipIf(!HOOKS_HERE)('starts, and so do a helper process and a thread it starts', () => {
+    const run = node([...stripTypesFlags(), path.join(pkg, 'bin', 'start.mjs')]);
     expect(run.stderr).not.toMatch(/ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING/);
     expect(run.stderr).not.toMatch(/ExperimentalWarning/);
     expect(run.stdout.trim().split('\n').sort()).toEqual(['child 42', 'thread 21']);
@@ -89,6 +94,15 @@ describe('the app installed by npm', () => {
     expect(hookAt).toBeGreaterThan(-1);
     // A static import of a .mts is loaded before any line of the file runs, hook or not.
     expect(bin).not.toMatch(/^import [^\n]*\.mts['"]/m);
+  });
+
+  it('lets a checkout start on a Node too old for the hook', () => {
+    const hook = fs.readFileSync(HOOK, 'utf8');
+    // A named import of what Node 22.14 lacks is a SyntaxError before any check can run.
+    expect(hook).not.toMatch(/import\s*\{[^}]*registerHooks/);
+    const run = node([HOOK]);
+    expect(run.stderr).toBe('');
+    expect(run.status).toBe(0);
   });
 
   it('ships the hook in the package', () => {
