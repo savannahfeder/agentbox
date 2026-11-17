@@ -46,9 +46,9 @@ export function keepAfterSignIn(service: string, { finishing = false }: { finish
   const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
   const when = finishing ? 'Once the login finishes, keep' : 'First, keep';
   const why = 'this sign-in for every later cloud thread: a cloud machine forgets its logins when the run ends.';
-  if (!svc || svc.keys.length !== 1) {
-    const names = svc ? ` under ${svc.keys.map((k) => k.name).join(' and ')}, one call each` : ', under the variable its tools read, if they read one from the environment';
-    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep${names}.` };
+  if (!svc) return { message: 'A cloud machine forgets its logins when the run ends. If later cloud runs need this one, ask for its key with an AGENTBOX-NEEDS: key line, which they answer on a card.' };
+  if (svc.keys.length !== 1) {
+    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep under ${svc.keys.map((k) => k.name).join(' and ')}, one call each.` };
   }
   const name = svc.keys[0].name;
   const read = READ_TOKEN[svc.id];
