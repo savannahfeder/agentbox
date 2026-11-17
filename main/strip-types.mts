@@ -3,7 +3,12 @@
 // when asked, so a helper process or thread started on one of our .mts files
 // carries the flag there. A process that strips types only because it was
 // started with the flag reports typescript on, but its children still need it.
-export function stripTypesFlags(features: { typescript?: unknown } = process.features as { typescript?: unknown }, execArgv: string[] = process.execArgv): string[] {
+// No Node strips a file under node_modules, so a copy npm installed hands its
+// helpers the hook that does (bin/typescript-in-node-modules.mjs).
+export function stripTypesFlags(features: { typescript?: unknown } = process.features as { typescript?: unknown }, execArgv: string[] = process.execArgv, here: string = import.meta.url): string[] {
   const onItsOwn = features.typescript && !execArgv.includes('--experimental-strip-types');
-  return onItsOwn ? [] : ['--experimental-strip-types', '--disable-warning=ExperimentalWarning'];
+  const flags = onItsOwn ? [] : ['--experimental-strip-types', '--disable-warning=ExperimentalWarning'];
+  return new URL(here).pathname.includes('/node_modules/')
+    ? [...flags, '--import', new URL('../bin/typescript-in-node-modules.mjs', here).href]
+    : flags;
 }
