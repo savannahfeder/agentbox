@@ -138,12 +138,13 @@ export function canDrive(bin = CHROME, platform = process.platform, exists = fs.
  * browser, which lives across many short commands); then its profile should sit
  * inside the instance folder, so `live.mjs down` finds and stops it.
  */
-export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform, start = spawn, owner = process.env.AGENTBOX_TEST_RUN_PID, activity = null, watchEvery = 30, watchIdle = 3600 } = {}) {
+// `scale` must match any device scale the caller later emulates: Chrome draws an iframe at the window's own.
+export async function launchChrome({ width = 1440, height = 900, scale = 2, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform, start = spawn, owner = process.env.AGENTBOX_TEST_RUN_PID, activity = null, watchEvery = 30, watchIdle = 3600 } = {}) {
   if (platform === 'darwin' && bin === MAC_CHROME) throw new Error(NO_HIDDEN_BROWSER);
   if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
   const chrome = start(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
+    `--force-device-scale-factor=${scale}`, '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'], detached });
   const wsUrl = await new Promise((resolve, reject) => {
