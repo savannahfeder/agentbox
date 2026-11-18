@@ -8,10 +8,10 @@ export function ticketReference(value: string): string | null {
   return value.trim().match(REFERENCE)?.[1].toLowerCase() ?? null;
 }
 
-/** The thread a link's address names: its id, the ticket form, or agentbox://work-items/<id> as agents write it. */
+/** The thread a link's address names: its id, the ticket form, or agentbox://work-item(s)/<id> as agents write it. */
 export function threadOfHref(href: string | null | undefined): string | null {
   const h = href ?? '';
-  return ticketReference(h.startsWith(TICKET_HREF) ? h.slice(TICKET_HREF.length) : h.replace(/^agentbox:\/\/work-items\//i, ''));
+  return ticketReference(h.startsWith(TICKET_HREF) ? h.slice(TICKET_HREF.length) : h.replace(/^agentbox:\/\/work-items?\//i, ''));
 }
 
 export function ticketQuery(value: string): string | null {
