@@ -9699,8 +9699,9 @@ export class Supervisor {
       // MEMORY SHORT READS AS NO SLOT HERE (main/start-hold.mts), so an Urgent
       // row still takes a lesser session's slot below: a swap, which adds
       // nothing. A row this Mac's memory holds goes to the cloud instead when
-      // it may (`_roomFor`).
-      if (!this._roomFor(engine, item)) {
+      // it may (`_roomFor`). A row its model turns away takes no slot, so it is
+      // told so now rather than once a slot it will never use frees.
+      if (!this._modelIsForEngineOtherThan(item, engine) && !this._roomFor(engine, item)) {
         // A row being prepared holds its own slot; it is not waiting for one.
         if (!this._preparing?.has(item.id)) this._noteNotStarting(item, this._whyNoRoom(engine, item), engine);
         // an Urgent row takes a slot rather than queueing behind work that

@@ -130,10 +130,10 @@ export function pageTitle(item: Parameters<typeof rowTitle>[0]): string {
   return teammateIdOf(item) && (item.title ?? '').trim() ? shownTitle(item) : rowTitle(item);
 }
 
-/** An answer opening with a line that is bold and nothing else wears it as its headline. */
+/** An answer opening with a line that is bold and nothing else wears it as its headline; one with a link stays in the answer, where links are drawn. */
 export function splitHeadline(text: string): { headline: string | null; rest: string } {
   const m = /^\s*\*\*([^*\n]+)\*\*[ \t]*(?:\n|$)/.exec(text);
-  if (!m) return { headline: null, rest: text };
+  if (!m || /\]\([^)]*\)/.test(m[1])) return { headline: null, rest: text };
   return { headline: m[1].trim(), rest: text.slice(m[0].length).replace(/^\s+/, '') };
 }
 
