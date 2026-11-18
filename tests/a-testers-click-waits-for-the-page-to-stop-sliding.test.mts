@@ -15,6 +15,7 @@ import path from 'node:path';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
+import { canDrive } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
 
 const BROWSE = path.resolve('.claude/skills/verify-agentbox/scripts/browse.mjs');
 const KEY = crypto.createHash('sha1').update(path.resolve('.')).digest('hex').slice(0, 8);
@@ -42,7 +43,7 @@ const PAGE = `<!doctype html><style>
   nav.addEventListener('mouseleave', () => { nav.classList.remove('open'); main.classList.remove('open'); drawTabs(); });
 </script>`;
 
-it('a click after the sidebar presses the tab named, not the one the page slid under the pointer', async () => {
+it.skipIf(!canDrive())('a click after the sidebar presses the tab named, not the one the page slid under the pointer', async () => {
   const server = http.createServer((_q, s) => { s.writeHead(200, { 'content-type': 'text/html' }); s.end(PAGE); });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
   const port = (server.address() as { port: number }).port;
