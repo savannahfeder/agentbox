@@ -28,7 +28,7 @@ import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
 import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
-import { arrowRows, spotIn, stepIn } from './one-thing-at-a-time';
+import { arrowRows, pageTitle, spotIn, stepIn } from './one-thing-at-a-time';
 import { AIMED_AT_THE_THREAD_YOU_LEFT, CLICK_FOR_THE_THREAD_YOU_LEFT, clickAimedHere, pickLandsHere, type Arrival, type Point } from './pick-settles';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
@@ -7078,7 +7078,7 @@ export default function App() {
   const whereItWent = sentLineShown && toast?.goes ? (
     <SentLine
       key={toastShown.current}
-      title={sentTo ? reachAudienceOf(sentTo) ?? ((isConversationRow(sentTo) && othersIn(snap?.products.find((p) => p.slug === sentTo.product)?.team, snap?.team?.me?.id ?? null, (id) => snap?.team?.people.find((p) => p.id === id)?.name)) || rowTitle(sentTo)) : 'the thread you left'}
+      title={sentTo ? reachAudienceOf(sentTo) ?? ((isConversationRow(sentTo) && othersIn(snap?.products.find((p) => p.slug === sentTo.product)?.team, snap?.team?.me?.id ?? null, (id) => snap?.team?.people.find((p) => p.id === id)?.name)) || pageTitle(sentTo)) : 'the thread you left'}
       says={sentLineSays(toast.text)}
       at={toast.goes.at}
       undoes={toastParts(toast.text).undo}
