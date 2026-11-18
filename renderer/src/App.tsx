@@ -110,7 +110,7 @@ import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { commandATicksTheList, selectWhatYouAreReading } from './select-all';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
-import { isUrgentRow, urgentArrival, urgentRaised, urgentShown, type UrgentRaised } from './urgent-arrival';
+import { isUrgentRow, urgentArrival, urgentKept, urgentRaised, urgentShown, type UrgentRaised } from './urgent-arrival';
 import { UrgentReady } from './components/UrgentReady';
 import { leavePlace, placeKey, placeToReturnTo } from './thread-place';
 import { DONE, manyOrOne } from './done-word';
@@ -4073,6 +4073,7 @@ export default function App() {
     announcedUrgent.current.add(urgent.id);
     setUrgentReady(urgentRaised(urgent, focused));
   }, [inbox, focused]);
+  useEffect(() => { setUrgentReady((r) => urgentKept(r, focused)); }, [focused]);
   const urgentShownRow = urgentShown(urgentReady, focused, inbox);
   const openUrgentReady = useCallback(() => {
     if (!urgentShownRow) return;
