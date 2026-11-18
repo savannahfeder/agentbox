@@ -57,6 +57,17 @@ const KEYS = {
   F2: { code: 'F2', keyCode: 113 },
   ' ': { code: 'Space', keyCode: 32 },
 };
+const KEY_WORDS = {
+  esc: 'Escape', escape: 'Escape', enter: 'Enter', return: 'Enter', tab: 'Tab', space: ' ',
+  down: 'ArrowDown', up: 'ArrowUp', left: 'ArrowLeft', right: 'ArrowRight',
+  arrowdown: 'ArrowDown', arrowup: 'ArrowUp', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight',
+  home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown', backspace: 'Backspace', delete: 'Delete', del: 'Delete', f2: 'F2',
+};
+/** The key a name means as a person writes it ("esc", "down"), or null when it names none. */
+export function keyNamed(key) {
+  if (key.length === 1 || KEYS[key]) return key;
+  return KEY_WORDS[key.toLowerCase()] ?? null;
+}
 const MODIFIERS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
 const MODIFIER_NAMES = { control: 'ctrl', cmd: 'meta', command: 'meta', option: 'alt' };
 

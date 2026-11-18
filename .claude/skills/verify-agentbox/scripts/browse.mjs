@@ -34,7 +34,7 @@ import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-ty
 
 rerunWithStripTypes(import.meta.url);
 // After the re-run: cdp.mjs reaches .mts, which a static import would load first.
-const { launchChrome, connect, freeProfile, readModifiers } = await import('./cdp.mjs');
+const { launchChrome, connect, freeProfile, readModifiers, keyNamed } = await import('./cdp.mjs');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, INSTANCE } = await import(path.join(here, 'live.mjs'));
@@ -311,9 +311,14 @@ if (verb === 'open') {
     console.log(`Nothing pressed: ${unknown.join(', ')} is not a key to hold. Use meta, ctrl, shift or alt.`);
     process.exit(1);
   }
+  const named = keyNamed(key ?? '');
+  if (!named) {
+    console.log(`Nothing pressed: "${key ?? ''}" is not a key. Use one character, or Enter, Escape, Tab, ArrowDown, Backspace…`);
+    process.exit(1);
+  }
   const t = await tab();
-  await t.press(key, mods);
-  await report(t, `Pressed ${[...mods, key].join('+')}.`);
+  await t.press(named, mods);
+  await report(t, `Pressed ${[...mods, named === ' ' ? 'Space' : named].join('+')}.`);
   t.detach();
 } else if (verb === 'pressat') {
   // A press on a spot, for what has no button: a pin on a picture, a place on a timeline.
