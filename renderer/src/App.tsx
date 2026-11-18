@@ -58,7 +58,7 @@ import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
 import { continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
-import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
+import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, aWordFollows, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS, WORD_FOLLOWS_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mts';
 import { SEEN_SENT } from '../../shared/phone-settings.mts';
@@ -306,6 +306,8 @@ type Modal = null | 'cloud-off' | 'compose' | 'filter' | 'palette' | 'reply' | '
 // written in the card, and the card is where it has to reappear. Null is an
 // undo that cancelled something and had nothing of hers to return.
 type Restored = { item: WorkItem } | { compose: true } | null;
+/** An E or L on an open thread that is waiting to see if a word follows it. */
+type WaitingKey = { key: string; thread: string; timer: ReturnType<typeof setTimeout> };
 const restoredItem = (r: Restored): WorkItem | null => (r && 'item' in r ? r.item : null);
 const rowKey = (i: WorkItem) => `${i.product}/${i.id}`;
 const leadKey = (l: LeadRow) => l.key;
@@ -6309,6 +6311,20 @@ export default function App() {
   const movedByKeyAt = useRef(0);
   const nowhereAt = useRef(0);
   const typedIntoBoxAt = useRef(0);
+  const waitingKey = useRef<WaitingKey | null>(null);
+  const actAfterTheWait = (w: WaitingKey) => {
+    if (waitingKey.current !== w) return;
+    waitingKey.current = null;
+    const item = focusedNow.current;
+    if (!item || keyOf(item) !== w.thread || modalNow.current) return;
+    movedByKeyAt.current = Date.now();
+    if (w.key.toLowerCase() === 'e') void markDoneNow.current(item);
+    else openSnoozeNow.current(item);
+  };
+  const markDoneNow = useRef(markDone);
+  markDoneNow.current = markDone;
+  const openSnoozeNow = useRef(openSnooze);
+  openSnoozeNow.current = openSnooze;
   const screenIs = `${focused ? keyOf(focused) : ''}|${modal === 'reply' ? '' : modal ?? ''}|${view}|${search !== null}|${roomShown}|${teamShown}|${openDoc?.src ?? ''}`;
   const screenWas = useRef(screenIs);
   useLayoutEffect(() => {
@@ -6615,16 +6631,38 @@ export default function App() {
         // offer a worker wrote on Friday (format.ts, offerIsLive), and the one
         // the app asks for a finished run is answered here too (./ship-offer).
         const opts = offerNow(focused);
-        // What is typed with no box under it goes in the box of the thread on
-        // screen, and a key that closes things waits out a change of screen.
-        if (!e.defaultPrevented && !runRef.current && !focused.agent
-          && keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc }) === 'to the box') {
-          e.preventDefault();
+        const typeIntoTheBox = (item: WorkItem, words: string) => {
           typedIntoBoxAt.current = Date.now();
-          saveDraft(focused, `${readDraft(focused)}${e.key}`);
-          window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(focused) }));
+          saveDraft(item, `${readDraft(item)}${words}`);
+          window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
           setModal('reply');
           requestAnimationFrame(() => focusTheReplyBox());
+        };
+        const waiting = waitingKey.current;
+        if (waiting && e.repeat && e.key.toLowerCase() === waiting.key.toLowerCase()) { e.preventDefault(); return; }
+        if (waiting) {
+          clearTimeout(waiting.timer);
+          waitingKey.current = null;
+          if (aWordFollows({ key: e.key, repeat: e.repeat }) && waiting.thread === keyOf(focused)) {
+            e.preventDefault();
+            typeIntoTheBox(focused, `${waiting.key}${e.key}`);
+            return;
+          }
+        }
+        // What is typed with no box under it goes in the box of the thread on
+        // screen, and a key that closes things waits out a change of screen.
+        const means = !e.defaultPrevented && !runRef.current && !focused.agent
+          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc })
+          : 'shortcut';
+        if (means === 'to the box') {
+          e.preventDefault();
+          typeIntoTheBox(focused, e.key);
+          return;
+        }
+        if (means === 'wait') {
+          e.preventDefault();
+          const w: WaitingKey = { key: e.key, thread: keyOf(focused), timer: setTimeout(() => actAfterTheWait(w), WORD_FOLLOWS_MS) };
+          waitingKey.current = w;
           return;
         }
         if (e.key === 'e' || e.key === 'E' || e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') movedByKeyAt.current = Date.now();
