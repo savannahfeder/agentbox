@@ -231,7 +231,7 @@ import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { TeamBilling } from './team/TeamBilling';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
+import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, ProductsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, stoppedIds, type Fleet } from './fleet';
@@ -396,6 +396,7 @@ const liveAnswer = (i: WorkItem) => (i.answer && i.answer !== '(withdrawn)' ? i.
 // on every snapshot.
 const NO_ORDER: string[] = [];
 const NO_RUNNING: RunningSession[] = [];
+const NO_PRODUCTS: Product[] = [];
 // How soon a first read that missed is asked again, rather than at the next
 // 30 s phone poll.
 const FIRST_READ_AGAIN_MS = 1_500;
@@ -8078,6 +8079,7 @@ export default function App() {
     <FleetContext.Provider value={fleet}>
     <WaitingContext.Provider value={waitingByThread}>
     <ItemsContext.Provider value={items}>
+    <ProductsContext.Provider value={snap?.products ?? NO_PRODUCTS}>
     <FollowContext.Provider value={team ? followValue : null}>
     <DecideContext.Provider value={roomsUi.teamGroup ? {
       label: `Add to ${roomsUi.teamGroup.name}’s decisions`,
@@ -10023,6 +10025,7 @@ export default function App() {
     </TeammatesContext.Provider>
     </DecideContext.Provider>
     </FollowContext.Provider>
+    </ProductsContext.Provider>
     </ItemsContext.Provider>
     </WaitingContext.Provider>
     </FleetContext.Provider>
