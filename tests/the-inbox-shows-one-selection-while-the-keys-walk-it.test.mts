@@ -100,23 +100,17 @@ describe.skipIf(!browserAvailable)('a sidebar button pressed with the mouse', ()
 describe('the app', () => {
   const app = read('renderer/src/App.tsx');
 
-  it('tracks the pointer row whether or not key hints are on, and only lets it own the keys when they are', () => {
-    expect(app).toMatch(/onHover=\{setHoveredId\}/);
-    expect(app).not.toMatch(/onHover=\{keyHints \? setHoveredId : undefined\}/);
-    expect(app).toMatch(/const keyHover = keyHints \? hoveredId : null;/);
-    const pointed = app.slice(app.indexOf('const pointed: WorkItem | undefined'), app.indexOf('const keyTab ='));
-    expect(pointed).toMatch(/keyHover/);
-    expect(pointed).not.toMatch(/hoveredId/);
+  it('leaves Enter to a button the keyboard reached, and otherwise takes it from a clicked one when it opens a row', () => {
+    const list = app.slice(app.indexOf('const walkPage = (dir: 1 | -1)'));
+    const before = list.slice(0, list.indexOf('switch (e.key) {'));
+    expect(before).toMatch(/if \(e\.key === 'Enter' && enterIsTheButtons\(e\)\) return;/);
+    expect(before).toMatch(/if \(e\.key === 'Enter' && !multiSel\.size && \(pointed \|\| keyCard \|\| keyLead\)\) e\.preventDefault\(\);/);
   });
 
-  it('takes Enter from a button the mouse left focused when Enter opens a row', () => {
-    const enter = app.match(/case 'Enter': ([^\n]*)/)![1];
-    expect(enter).toMatch(/e\.preventDefault\(\)/);
-  });
-
-  it('draws the hover underline from the pointer row the keys can clear, not from :hover', () => {
+  it('draws the hover underline from the pointer row the keys can clear, and :hover only where the pointer never holds the keys', () => {
     const css = read('renderer/src/styles.css');
     expect(css).not.toMatch(/\.row:hover \.subject/);
-    expect(css).toMatch(/\.row\.pointed \.subject \{ text-decoration-color: var\(--line-strong\)/);
+    expect(css).toMatch(/\.row\.hovers:hover \.subject,\s*\.row\.pointed \.subject \{ text-decoration-color: var\(--line-strong\)/);
+    expect(read('renderer/src/components/List.tsx')).toMatch(/\$\{!hoverTo \? ' hovers' : hoveredId === item\.id \? ' pointed' : ''\}/);
   });
 });

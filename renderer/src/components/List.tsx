@@ -474,7 +474,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                 {...(tab === 'inbox' && !isImportRow(item)
                   ? { 'data-hint': 'row', 'data-hint-text': '.subject' }
                   : {})}
-                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${hoveredId === item.id ? ' pointed' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}${lastThread?.id === item.id && lastThread.product === item.product ? ' recent' : ''}`}
+                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${!hoverTo ? ' hovers' : hoveredId === item.id ? ' pointed' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}${lastThread?.id === item.id && lastThread.product === item.product ? ' recent' : ''}`}
                 /*
                  * ON MOUSE MOVE, NOT ON MOUSE ENTER. A pointer parked over the
                    list while she walks it with J and K would otherwise claim

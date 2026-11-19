@@ -525,10 +525,8 @@ export default function App() {
   // rather than a side effect: the keys reach the pointed row BECAUSE the row
   // under the pointer is drawing a promise about them. With nothing drawn there
   // is no promise, so the keyboard's own row is the honest target again, which
-  // is what the app did before this. `hoveredId` still draws the hover; only
-  // `keyHover` hands it the keys.
+  // is what the app did before this. `hoveredId` is simply never set.
   const [keyHints, setKeyHints] = useState(() => localStorage.getItem(HINTS_KEY) !== '0');
-  const keyHover = keyHints ? hoveredId : null;
   const setHints = useCallback((v: boolean) => {
     setKeyHints(v);
     localStorage.setItem(HINTS_KEY, v ? '1' : '0');
@@ -3314,7 +3312,7 @@ export default function App() {
   // another row the same key is right for.
   const walkAim = run?.step === 'open' && run.item
     ? run.item
-    : walkBeat.length ? (keyHover && walkBeat.includes(keyHover) ? keyHover : walkBeat[0]) : null;
+    : walkBeat.length ? (hoveredId && walkBeat.includes(hoveredId) ? hoveredId : walkBeat[0]) : null;
   const walkOwn = walkAim ? list.find((i) => i.id === walkAim) : undefined;
 
   /* ------------------------- a panel with a panel in it -------------------- */
@@ -4376,7 +4374,7 @@ export default function App() {
   const chatsPlaceShown = !!chatsPlace && homeLayout === 'chats' && !connectionsShown && !filesShown && !teammatesShown && !roomShown && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
   const listCovered = somethingCoversTheList({ homeOn, homeOpen, threadOpen: !!focused || !!focusedRepeat, searching: search !== null, settingsOpen, teamShown, placeShown: chatsPlaceShown, fileOverTheList: fullScreenDoc });
   const pointed: WorkItem | undefined = walkOwn
-    ?? (keyHover && !multiSel.size ? list.find((i) => !listCovered && i.id === keyHover) : undefined)
+    ?? (hoveredId && !multiSel.size ? list.find((i) => !listCovered && i.id === hoveredId) : undefined)
     ?? (keyCard || keyLeadPicked || listCovered ? undefined : current);
   const keyTab = stacked && pointed ? stacked.tabOf(pointed) : view;
   // No row, card or tick on the list, so a row's keys are words for its box.
@@ -6776,6 +6774,10 @@ export default function App() {
           }
         }
         if (e.key === 'e' || e.key === 'E') movedByKeyAt.current = Date.now();
+      // A button the keyboard reached keeps Enter. Otherwise Enter is the row's,
+      // and prevented so a button a click left focused is not pressed as well.
+      if (e.key === 'Enter' && enterIsTheButtons(e)) return;
+      if (e.key === 'Enter' && !multiSel.size && (pointed || keyCard || keyLead)) e.preventDefault();
       switch (e.key) {
         case 'j': case 'J':
         case 'ArrowDown': {
@@ -6814,8 +6816,7 @@ export default function App() {
           }
           break;
         // On a teammate's row, Enter opens their card.
-        // Prevented, so a button a click left focused is not pressed as well.
-        case 'Enter': if (enterIsTheButtons(e)) break; if (!multiSel.size && (pointed || keyCard || keyLead)) e.preventDefault(); if (!multiSel.size && pointed) { setFocused(pointed); markSeen(pointed); } else if (!multiSel.size && keyCard) openTeammateCard(keyCard); else if (!multiSel.size && keyLead) answerLead(keyLead); break;
+        case 'Enter': if (!multiSel.size && pointed) { setFocused(pointed); markSeen(pointed); } else if (!multiSel.size && keyCard) openTeammateCard(keyCard); else if (!multiSel.size && keyLead) answerLead(keyLead); break;
         case 'e': case 'E':
           e.preventDefault();
           // In the snoozed view E wakes things: getting an item back is that
@@ -8790,7 +8791,7 @@ export default function App() {
                   emptyText={olderMore !== false && search !== null ? 'Searching older threads…' : search ? `Nothing matches “${search}”.` : undefined}
                   keyView={view}
                   hoveredId={hoveredId}
-                  onHover={setHoveredId}
+                  onHover={keyHints ? setHoveredId : undefined}
                   onSelect={(i) => { setCardSel(null); setSelected(i); }}
                   onOpenRepeat={openRepeat}
                   onOpen={(item) => { setCardSel(null); setFocused(item); markSeen(item); }}
