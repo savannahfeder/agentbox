@@ -168,6 +168,8 @@ export interface HarnessReaders {
   summarize(...args: never[]): unknown;
   trace(...args: never[]): unknown;
   activity(...args: never[]): unknown;
+  /** The agent has begun answering, so the words it was started with are in its conversation. */
+  took(...args: never[]): boolean;
 }
 
 /** One operation of a harness as the registry hands it out: every name is a function, declined or absent ones refuse before doing anything. */

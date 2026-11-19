@@ -26,7 +26,7 @@ import { openCodeClient, createOpenCodeWorker, splitModel } from '../opencode-se
 import type { OpenCodeClient, OpenCodePlan, OpenCodeWorker } from '../opencode-server.mts';
 import {
   captureOpenCodeEvent, openCodeStreamingText, summarizeOpenCodeEvent,
-  traceOpenCodeEvent, openCodeActivity, rememberOpenCodeProsePart,
+  traceOpenCodeEvent, openCodeActivity, rememberOpenCodeProsePart, openCodeTookTheWords,
   openCodePermissionConfig,
 } from '../opencode.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
@@ -147,6 +147,7 @@ export const openCodeHarness = {
     summarize: summarizeOpenCodeEvent,
     trace: traceOpenCodeEvent,
     activity: openCodeActivity,
+    took: openCodeTookTheWords,
   }),
 
   // Native names through, untranslated, as the Codex adapter does. The prose

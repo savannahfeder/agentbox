@@ -1278,6 +1278,7 @@ export interface FrameReaders {
   activity(...frame: unknown[]): unknown;
   summarize(...frame: unknown[]): string | null | undefined;
   trace(...frame: unknown[]): string | null | undefined;
+  took(...frame: unknown[]): boolean;
 }
 function codexLineReaders(r: FrameReaders) {
   const note = (line: unknown) => { try { const m = JSON.parse(line as string) as CodexNote | null; return typeof m?.method === 'string' && m.id === undefined ? m : null; } catch { return null; } };
@@ -1286,7 +1287,7 @@ function codexLineReaders(r: FrameReaders) {
     if (!m) return withView ? false : null;
     return withView ? fn(a, m.method, m.params) : fn(m.method, m.params);
   };
-  return { capture: on(r.capture, true), stream: on(r.stream, true), activity: on(r.activity, true), summarize: on(r.summarize, false), trace: on(r.trace, false) };
+  return { capture: on(r.capture, true), stream: on(r.stream, true), activity: on(r.activity, true), summarize: on(r.summarize, false), trace: on(r.trace, false), took: (line: unknown) => !!on(r.took, false)(line) };
 }
 
 export class Supervisor {
@@ -12492,15 +12493,17 @@ export class Supervisor {
     // the real camelCase/snake_case divergence between app-server and the
     // `codex exec` stream the removed August build parsed, which is exactly the
     // difference a future reader has to be able to see.
-    const { capture, stream, summarize, trace: traceOne, activity } = harness.readers() as FrameReaders;
+    const { capture, stream, summarize, trace: traceOne, activity, took } = harness.readers() as FrameReaders;
     // One frame of a session, whatever a frame is on this engine: a line of
     // stdout, or a method and its params.
     const absorb = (...frame: unknown[]) => {
       session.lastOutputAt = Date.now();
       capture(session, ...frame);
-      // The conversation is up, so the words it was started with are in it
-      // (`_noteHeard`). Here rather than at exit: an app quit may not wait for one.
-      if (continuation && item.answer && session.sessionId && !session.heardNoted) {
+      // The agent has begun answering, so the words it was started with are in
+      // its conversation (`_noteHeard`). Not on the line that only names the
+      // conversation: a run stopped then never took them. Here rather than at
+      // exit: an app quit may not wait for one.
+      if (continuation && item.answer && session.sessionId && !session.heardNoted && took(...frame)) {
         session.heardNoted = true;
         this._noteHeard(item, session.sessionId);
       }
