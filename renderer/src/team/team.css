@@ -174,7 +174,7 @@ img.tm-av { background: var(--bg-selected); }
 .tm-choice { height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 12.5px; cursor: pointer; }
 .tm-choice:hover { border-color: var(--line-strong); color: var(--text); }
 .tm-choice[aria-pressed="true"] { border-color: var(--text-dim); color: var(--text); background: var(--wash); }
-.tm-leave-ask { font-size: 13.5px; color: var(--text-dim); margin-right: 6px; }
+.tm-leave-ask { font-size: 13.5px; color: var(--text-dim); margin-right: 6px; align-self: center; }
 
 /* A STATUS LINE YOU WRITE YOURSELF (w-0b54ee983f). Two homes, because the
    other two went while this was being built: the Team board was deleted

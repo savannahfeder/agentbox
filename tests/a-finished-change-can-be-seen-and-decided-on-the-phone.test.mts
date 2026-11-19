@@ -143,7 +143,7 @@ describe('a finished thread opened on the phone', () => {
 describe('the phone thread bar', () => {
   const page = fs.readFileSync('mobile/src/app/thread/[product]/[id].tsx', 'utf8');
   it('draws the change under the answer', () => {
-    expect(page).toMatch(/thread\.change && <ChangeCard change=\{thread\.change\} \/>/);
+    expect(page).toMatch(/thread\.change && <ChangeCard change=\{thread\.change\} /);
   });
   it('keeps the up and down arrows but no count and no Review button', () => {
     expect(page).toMatch(/label="Previous thread"/);
