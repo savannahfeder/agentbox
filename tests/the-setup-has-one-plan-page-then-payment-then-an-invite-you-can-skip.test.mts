@@ -35,11 +35,10 @@ describe('the order of the steps', () => {
     expect(setupSteps({ ...base, plan: 'free' })).toEqual(['chats', 'account', 'plan', 'look']);
     expect(setupSteps({ ...base, plan: 'pro' })).not.toContain('pay');
   });
-  it('invites people only once Pro is started, straight after the plan page', () => {
-    expect(setupSteps({ ...base, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'look']);
-  });
-  it('still sends someone already on a team to invite, with no plan asked', () => {
-    expect(setupSteps({ ...base, signedIn: true, plan: 'free', onTeam: true })).toEqual(['chats', 'invite', 'look']);
+  // 2026-11-19: multiplayer is invite-only, so the setup asks nobody to invite people.
+  it('goes from the plan page to the look, with no invite step, Pro or not', () => {
+    expect(setupSteps({ ...base, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'look']);
+    expect(setupSteps({ ...base, signedIn: true, plan: 'free', onTeam: true })).toEqual(['chats', 'look']);
   });
   it('asks for no plan on a build with no team cloud', () => {
     expect(setupSteps({ ...base, team: false, plan: 'pro' })).toEqual(['chats', 'look']);
@@ -95,16 +94,6 @@ describe('the name a team starts with', () => {
   it('is plain when there is no name', () => {
     expect(teamNameFor('')).toBe('My team');
     expect(teamNameFor(undefined)).toBe('My team');
-  });
-});
-
-describe('the invite page', () => {
-  it('can always be skipped', () => {
-    expect(split).toMatch(/'Sending…'\)\}\{quiet\('Skip', next\)\}/);
-  });
-  it('shows the team’s name, and a changed one renames it', () => {
-    expect(split).toMatch(/placeholder="Name your team"/);
-    expect(split).toMatch(/await api\.teamRename\(name\)/);
   });
 });
 

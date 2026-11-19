@@ -422,26 +422,33 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const draftKey = (path: string) => `doc-edit-draft:${product}:${path}`;
   const editingNow = useRef(editing);
   editingNow.current = editing;
+  const readWords = (p: string): Promise<string | null> => (fromElsewhere
+    ? fromElsewhere.readText(p).catch(() => null)
+    : api.readDoc({ product, src: p, thread }).then((r) => (r.ok ? r.text ?? null : null)).catch(() => null));
   const startEdit = async () => {
     if (!version || !family || starting.current === version.id) return;
     const v = version;
     const fam = family.key;
     starting.current = v.id;
-    const [text, opened] = fromElsewhere
-      ? await Promise.all([fromElsewhere.readText(v.path).catch(() => null), fromElsewhere.find(v.path).catch(() => null)])
-      : await Promise.all([api.readDoc({ product, src: v.path, thread }).then((r) => (r.ok ? r.text ?? null : null)).catch(() => null), api.resolveDoc({ product, src: v.path, thread }).then((r) => r.opened ?? null).catch(() => null)]);
-    starting.current = null;
-    if (inHand.current !== v.id) return;
-    if (text === null) { setUnreadable(v.id); return; }
     // Words a sitting kept but never saved, from a failed save or a closed app.
     let kept: ReturnType<typeof keptDraft<typeof v>> = null;
     try { kept = keptDraft(family.versions, v, (p) => localStorage.getItem(draftKey(p))); } catch { /* no storage, no draft */ }
+    // Kept words stand on the version they were typed over; the newer ones are merged in once open.
+    const base = kept?.base ?? v;
+    const [onBase, opened] = await Promise.all([
+      readWords(base.path),
+      fromElsewhere ? fromElsewhere.find(v.path).catch(() => null) : api.resolveDoc({ product, src: v.path, thread }).then((r) => r.opened ?? null).catch(() => null),
+    ]);
+    const text = onBase ?? (base === v ? null : await readWords(v.path));
+    starting.current = null;
+    if (inHand.current !== v.id) return;
+    if (text === null) { setUnreadable(v.id); return; }
     const draft = kept?.draft;
     typed.current = draft ?? null;
     posted.current = null;
     setEditWord(null);
     setTold(null);
-    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base: kept?.base ?? v });
+    setEditing({ fam, text, draft, folder: opened ? opened.replace(/\/[^/]*$/, '') : null, base });
     if (draft !== undefined) idle.current = window.setTimeout(() => { void postNow.current(); }, SAVE_AFTER_A_PAUSE_MS);
   };
   useEffect(() => {
@@ -450,18 +457,20 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // Teammates with the same document open type into one live copy of it.
   const liveTicket = useLiveTicket(editing ? { product, project, name: editing.base.name } : null);
   const liveSession = useLiveSession(liveTicket);
-  // A version this sitting did not save (an agent's) is merged into the live words by the keeper.
-  const [incoming, setIncoming] = useState<string | null>(null);
+  // A version this sitting did not save (an agent's) is merged into the words on screen, and saves
+  // measure from it, so the words the sitting opened on are never posted over it.
   const newestNow = family?.versions[family.versions.length - 1];
   useEffect(() => {
-    if (!editing || !liveSession?.keeper || !newestNow || newestNow.id === editing.base.id) return undefined;
+    if (!editing || !newestNow || newestNow.id === editing.base.id) return undefined;
     let gone = false;
-    const read = fromElsewhere
-      ? fromElsewhere.readText(newestNow.path).catch(() => null)
-      : api.readDoc({ product, src: newestNow.path, thread }).then((r) => (r.ok ? r.text ?? null : null)).catch(() => null);
-    void read.then((t) => { if (!gone && t !== null && t !== posted.current) setIncoming(t); });
+    void readWords(newestNow.path).then((t) => {
+      if (gone || t === null || t === posted.current) return;
+      setEditing((was) => (was && was.text !== t ? { ...was, text: t } : was));
+      const fi = familiesNow.current.findIndex((f) => f.key === editing.fam);
+      if (fi >= 0) setAt({ fi, vi: familiesNow.current[fi].versions.length - 1 });
+    });
     return () => { gone = true; };
-  }, [newestNow?.id, liveSession?.keeper, !!editing]);
+  }, [newestNow?.id, !!editing]);
   const waitingForEditor = opensForTyping({ canEdit, editing: !!editing, unreadable, version: version?.id ?? null }) || (!!editing && liveTicket === undefined);
 
   // A save asked for while one is on its way waits for it, then posts what is newer.
@@ -492,9 +501,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const newest = family.versions[family.versions.length - 1];
     const old = version;
     setRestoring(true);
-    const text = fromElsewhere
-      ? await fromElsewhere.readText(old.path).catch(() => null)
-      : await api.readDoc({ product, src: old.path, thread }).then((r) => (r.ok ? r.text ?? null : null)).catch(() => null);
+    const text = await readWords(old.path);
     if (text === null) { setRestoring(false); setTold(`v${old.n} could not be read, so it cannot be restored.`); return; }
     const why = await onNewVersion!(newest.name, text, newest.path, newest.id).catch((err: Error) => err.message);
     setRestoring(false);
@@ -817,7 +824,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
           )}
           {editing && (
             <div className="av-pane" key={`editing-${editing.base.id}`} ref={editPane} onClick={pickInEditor}>
-              {liveTicket !== undefined && <DocText product={product} src={editing.base.path} text={incoming ?? editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
+              {liveTicket !== undefined && <DocText product={product} src={editing.base.path} text={editing.text} mtime={0} folder={editing.folder} onSaved={() => {}} onNotice={setTold} live={liveSession}
                 versions={{ onDraft, saveNow, flush: flushEdit, paint: paintEditor, draft: editing.draft, byline: bylineOf(version ?? editing.base), focus: typing }} />}
               {offers.comment && <SelectionBar page={editPane} onComment={(quote) => { setWholeAsked(false); setDraftPlace({ kind: 'quote', text: quote }); box.current?.focus(); }} />}
             </div>
