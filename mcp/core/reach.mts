@@ -252,7 +252,7 @@ function namedElsewhere(dir: string, asked: string, ownFolder: string): string |
   const given = path.isAbsolute(asked) ? path.relative(dir, asked) : asked.replace(/^\.\//, '');
   const outside = (rel: string) => !rel || rel.startsWith('..') || path.isAbsolute(rel) || path.posix.dirname(rel) === ownFolder;
   if (given.includes('/')) {
-    const rel = given.split(path.sep).join('/');
+    const rel = path.posix.normalize(given.split(path.sep).join('/'));
     return !outside(rel) && fs.existsSync(path.join(dir, rel)) ? rel : null;
   }
   let threads: string[] = [];
