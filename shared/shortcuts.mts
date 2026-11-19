@@ -238,7 +238,7 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // it is answered from anywhere at all.
       { keys: ['⌘1', '⌘2'], join: 'or', what: 'Allow or deny a card asking to run something.' },
       // SelectionBar.tsx, a window keydown in capture, so an editor cannot keep it.
-      { keys: ['⌘⌥M'], what: 'Comment on the words you selected.' },
+      { keys: ['⌘/'], what: 'Comment on the words you selected.' },
     ],
   },
 ];

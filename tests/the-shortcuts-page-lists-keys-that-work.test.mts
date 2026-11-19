@@ -168,7 +168,7 @@ const HANDLED = {
   'N': [[focused, "else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'n': case 'N': e.preventDefault(); startThread(); break;"]],
   // Into the task the toast is about, on the list and inside a task alike
   // (w-f0bfe32859). Gated on the toast in toast-parts.ts, which has its own test.
-  '⌘⌥M': [[selectionBar, "window.addEventListener('keydown', key, true);"], [selectionBar, 'if (!isCommentChord(e, MAC)) return;']],
+  '⌘/': [[selectionBar, "window.addEventListener('keydown', key, true);"], [selectionBar, 'if (!isCommentChord(e, MAC)) return;']],
   'O': [[chords, 'const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);'], [chords, 'openToastRow(goesTo);']],
 };
 

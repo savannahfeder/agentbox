@@ -59,9 +59,9 @@ export function reportSelectedWords(page: WordsPage): void {
   page.addEventListener('keyup', later, true);
   // The frame keeps the keyboard, so the comment chord has to be handed up; the app decides whether it is one.
   page.addEventListener('keydown', (e) => {
-    if (!e.altKey || !(e.metaKey || e.ctrlKey) || e.code !== 'KeyM') return;
+    if (e.altKey || !(e.metaKey || e.ctrlKey) || e.key !== '/') return;
     e.preventDefault?.();
-    say({ type: 'agentbox-comment-key', code: e.code, key: e.key, metaKey: !!e.metaKey, ctrlKey: !!e.ctrlKey, altKey: true, shiftKey: !!e.shiftKey });
+    say({ type: 'agentbox-comment-key', code: e.code, key: e.key, metaKey: !!e.metaKey, ctrlKey: !!e.ctrlKey, altKey: false, shiftKey: !!e.shiftKey });
   }, true);
   page.addEventListener('message', (e) => {
     if (e.source === page.parent && e.data?.type === 'agentbox-clear-selection') page.getSelection()?.removeAllRanges();

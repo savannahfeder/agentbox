@@ -103,8 +103,8 @@ describe.skipIf(!browserAvailable)('Comment on highlighted words', () => {
     expect(await chip().textContent()).toContain('Coding agents work');
   });
 
-  // The chord, in the document you type into: the editor must not keep the press or type an M over the words.
-  it('Ctrl+Alt+M (⌘⌥M on a Mac) does what Comment does', async () => {
+  // The chord, in the document you type into: the editor must not keep the press or type a / over the words.
+  it('Ctrl+/ (⌘/ on a Mac) does what Comment does', async () => {
     const before = await page.locator('.ProseMirror').textContent();
     await page.evaluate(() => {
       const t = document.createTreeWalker(document.querySelector('.ProseMirror'), NodeFilter.SHOW_TEXT);
@@ -112,7 +112,7 @@ describe.skipIf(!browserAvailable)('Comment on highlighted words', () => {
       const r = document.createRange(); r.setStart(n, 4); r.setEnd(n, 23);
       getSelection().removeAllRanges(); getSelection().addRange(r);
     });
-    await page.keyboard.press('Control+Alt+KeyM');
+    await page.keyboard.press('Control+Slash');
     await expect.poll(() => page.evaluate(() => document.activeElement?.matches('.av-write textarea'))).toBe(true);
     expect(await chip().textContent()).toContain('platforms kept bann');
     expect(await page.locator('.ProseMirror').textContent()).toBe(before);
@@ -120,7 +120,7 @@ describe.skipIf(!browserAvailable)('Comment on highlighted words', () => {
 
   it('with nothing selected the chord does nothing', async () => {
     await page.locator('.ProseMirror p').last().click();
-    await page.keyboard.press('Control+Alt+KeyM');
+    await page.keyboard.press('Control+Slash');
     expect(await chip().count()).toBe(0);
   });
 

@@ -133,7 +133,13 @@
 .link-pop.selection-bar { z-index: 9450; gap: 2px; padding: 4px; }
 .selection-bar .link-pop-btn { padding: 4px 8px; color: var(--text-dim); }
 .selection-bar-comment { display: inline-flex; align-items: center; gap: 6px; }
-.selection-bar-comment kbd { margin-left: 2px; padding: 0; border: 0; background: none; font: 11px var(--mono); color: var(--text-faint); }
+/* The reply box's own key cap, so a key looks the same wherever the app draws one. */
+.selection-bar-keys { display: inline-flex; gap: 3px; margin-left: 2px; }
+.selection-bar-keys kbd {
+  font-family: var(--mono); font-size: 10.5px; line-height: 14px; color: var(--text-dim);
+  background: var(--wash); border: 1px solid var(--line-strong);
+  border-radius: var(--radius); padding: 0 5px; min-width: 16px; text-align: center;
+}
 
 
 .av-side { flex: none; width: 340px; display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
