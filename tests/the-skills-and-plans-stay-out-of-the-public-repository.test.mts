@@ -1,10 +1,9 @@
 // The founder found the agent skills listed on the public GitHub repository and
-// asked for them to be private (2026-11-16). An audit found the plans worse: the
-// cloud plan's reading of Anthropic's and OpenAI's terms, the cost of a seat,
-// and the phone plan's App Store strategy. All of it moved to a private
-// repository checked out at `.claude/skills`, with the skills' own tests. This
-// holds the public side: nothing of it tracked, the push check refusing it,
-// and the suite still running its tests on a computer that has the folder.
+// asked for them to be private (2026-11-16), and the internal plans with them.
+// Both moved to a private repository checked out at `.claude/skills`, with the
+// skills' own tests. This holds the public side: nothing of it tracked, the
+// push check refusing it, and the suite still running its tests on a computer
+// that has the folder.
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
