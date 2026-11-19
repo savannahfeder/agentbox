@@ -995,10 +995,19 @@ const DEAD_RUN_HALVES: Record<string, string[]> = {
   'at-limit': ['is at its usage limit', 'so nothing has been done on this task.'],
 };
 
+// A THREAD WHOSE MODEL IS FOR THE OTHER AGENT (`_sayTheModelIsForAnotherEngine`
+// in main/supervisor.mts): nothing starts it until its model changes.
+export function modelForAnotherEngineSentence({ asked, model, running }: { asked: string; model: string; running: string }): string {
+  return `This task chose ${asked} model "${model}", but this computer would run it with ${running}. Nothing has been done. Pick a ${running} model to continue, or use a computer with ${asked}.`;
+}
+export function saysTheModelIsForAnotherEngine(text: string | null | undefined): boolean {
+  return /^This task chose .+ model ".*", but this computer would run it with .+\. Nothing has been done\./.test(String(text ?? ''));
+}
+
 export function saysARunGotNowhere(text: string | null | undefined): boolean {
   const s = String(text ?? '');
   if (!s.trim()) return false;
-  if (deadRunCause(s)) return true;
+  if (deadRunCause(s) || saysTheModelIsForAnotherEngine(s)) return true;
   if (Object.values(WORKED_OPENERS).some((opener) => s.includes(opener))) return true;
   return s.startsWith(UNDELIVERED) || s.startsWith(STOPPED_STARTING);
 }

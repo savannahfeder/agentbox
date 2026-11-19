@@ -1,4 +1,4 @@
-import { noteGoesTo, notedFilesInLines, threadFiles, versionForPath, type FileVersion, type NamedFile, type ThreadLine } from '../../shared/artifact-marks.mts';
+import { agentOfVersion, noteGoesTo, notedFilesInLines, threadFiles, versionForPath, type FileVersion, type NamedFile, type ThreadLine } from '../../shared/artifact-marks.mts';
 import { DOCUMENT_HEIGHT_SCRIPT } from '../../shared/frame-document-height.mts';
 import { SELECTED_WORDS_SCRIPT } from '../../shared/frame-selected-words.mts';
 import type { FileElsewhere, FileNote } from './types';
@@ -72,7 +72,8 @@ export function sentTimes(lines: readonly MarkLine[]): Map<string, number> {
  * id (notes on any of them are its notes) and the copies Files may know more about.
  * A document no message named is a line of its own.
  */
-export function fileFamilyFor(lines: readonly ThreadLine[], src: string): { version: FileVersion | null; fileIds: string[]; files: NamedFile[]; copies: { path: string; file: string }[] } {
+/** `agent`: who hears notes on the version (agentOfVersion), null when nobody does. */
+export function fileFamilyFor(lines: readonly ThreadLine[], src: string): { version: FileVersion | null; agent: string | null; fileIds: string[]; files: NamedFile[]; copies: { path: string; file: string }[] } {
   const asked = src.replace(/^\.\//, '');
   const said = notedFilesInLines(lines);
   const named = versionForPath(threadFiles(said), asked);
@@ -81,7 +82,7 @@ export function fileFamilyFor(lines: readonly ThreadLine[], src: string): { vers
   const version = named ?? versionForPath(families, asked);
   const family = version ? families.find((f) => f.versions.some((x) => x.id === version.id)) : null;
   const versions = family?.versions ?? [];
-  return { version, fileIds: versions.map((x) => x.id), files: all, copies: versions.map((v) => ({ path: v.path, file: v.id })) };
+  return { version, agent: version ? agentOfVersion(versions, version.id) : null, fileIds: versions.map((x) => x.id), files: all, copies: versions.map((v) => ({ path: v.path, file: v.id })) };
 }
 
 /** How many notes a file has, counting every copy's once: what the mark beside the chat says. */

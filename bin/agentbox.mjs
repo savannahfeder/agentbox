@@ -14,15 +14,18 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import './typescript-in-node-modules.mjs';
 
-import { bootHeadless, createServer, newToken, picturesTheAppOwns } from '../main/serve.mts';
-import { appHome } from '../main/store/home.mts';
-import { NO_TERMINAL, ptyIsHere } from '../main/pty.mts';
-import { learnShellDataDirs } from '../main/shell-path.mts';
-import { startFreezeRecorder } from '../main/freeze-recorder.mts';
-import { readHubAddress } from '../main/hub-address.mts';
-import { watchNewChatsFor } from '../main/new-chats-watch.mts';
-import { osOpenDialog } from '../main/os-folder-window.mts';
+// Loaded only once the hook above is in: a static import of a .mts is read
+// before any line of this file runs.
+const { bootHeadless, createServer, newToken, picturesTheAppOwns } = await import('../main/serve.mts');
+const { appHome } = await import('../main/store/home.mts');
+const { NO_TERMINAL, ptyIsHere } = await import('../main/pty.mts');
+const { learnShellDataDirs } = await import('../main/shell-path.mts');
+const { startFreezeRecorder } = await import('../main/freeze-recorder.mts');
+const { readHubAddress } = await import('../main/hub-address.mts');
+const { watchNewChatsFor } = await import('../main/new-chats-watch.mts');
+const { osOpenDialog } = await import('../main/os-folder-window.mts');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.dirname(here);

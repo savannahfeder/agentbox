@@ -706,8 +706,10 @@ function CloudKeyRow({ name, label, savedAt }: { name: string; label: string | n
  */
 export function agentCountOptions(w: {
   accounts?: unknown[]; agentsTotal?: number; capacity?: number; slotsMax?: number; sessionsAtOnce?: number;
+  agentsAuto?: boolean; agentsAutoTotal?: number;
 }) {
-  const auto = w.agentsTotal ?? w.capacity ?? 1;
+  // With a number set by hand, what runs now is that number, not Automatic's.
+  const auto = (w.agentsAuto === false ? w.agentsAutoTotal : undefined) ?? w.agentsTotal ?? w.capacity ?? 1;
   const say = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
   // NO DASH BETWEEN THE TWO HALVES. This read "Automatic — 6 agents" until she
   // saw it on the screen: "looks quite bad". The app has refused em dashes in
@@ -2940,8 +2942,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
     const slots = read('memoryGateSlots', w.memoryGate?.slots ?? null);
     const slow = read('agentsFeltSlow', null);
     const outside = read('outsideAgents', w.outsideAgents);
-    const say = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
-    const options = [{ value: 'auto', label: `Automatic (${say(w.agentsTotal)})` }, ...Array.from({ length: w.slotsMax ?? 12 }, (_, i) => ({ value: String(i + 1), label: say(i + 1) }))];
+    const options = agentCountOptions({ ...w, agentsAuto: isAuto });
     return (
       <Page title="Running">
         <Group id="agents" label="Agents">

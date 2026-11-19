@@ -644,7 +644,9 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         const said = (await waitForSignIn(id, asked.id, { product, waitMs: 0 })).status;
         if (said === 'skipped' || said === 'replied') return json({ status: 'denied', message: 'They did not sign in here, so there is nothing to keep.' });
         const names = keyNamesFor(asked.service);
-        if (names && !names.includes(keep.name)) return json({ status: 'denied', message: `A ${asked.service} sign-in is kept as ${names.join(' or ')}, not ${keep.name}.` });
+        // Off the list, the name would be the agent's own choice, and a blocklist of names keeps missing some.
+        if (!names) return json({ status: 'denied', message: `A ${asked.service} sign-in is not one ${Name} keeps. If later cloud runs need its key, ask for it with an AGENTBOX-NEEDS: key line, which they answer on a card.` });
+        if (!names.includes(keep.name)) return json({ status: 'denied', message: `A ${asked.service} sign-in is kept as ${names.join(' or ')}, not ${keep.name}.` });
         await keepCloudKey(keep.name, keep.value);
         return json({ status: 'kept', message: `Kept as ${keep.name} for every later cloud run.` });
       }

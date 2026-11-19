@@ -178,9 +178,13 @@ export function writeFreeze(dir: string, line: FreezeLine, { keepDays = KEEP_DAY
  * written. Never throws: a recorder that breaks the app is worse than a gap.
  */
 export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_MS, rotateMs = 60_000, intervalUs = 10_000, onFreeze = () => {} }: FreezeRecorderOptions = {}) {
-  const beat = new SharedArrayBuffer(8);
+  // [0] the main thread's last beat, [1] 1 while the Mac sleeps, [2] when it
+  // last woke, all on the hrtime clock.
+  const beat = new SharedArrayBuffer(8 * 3);
   const stamp = new BigInt64Array(beat);
   const tick = () => Atomics.store(stamp, 0, process.hrtime.bigint());
+  const asleep = () => Atomics.store(stamp, 1, 1n);
+  const awake = () => { Atomics.store(stamp, 2, process.hrtime.bigint()); Atomics.store(stamp, 1, 0n); };
   tick();
   const timer = setInterval(tick, BEAT_MS);
   timer.unref?.();
@@ -193,7 +197,7 @@ export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_
   } catch (err) {
     clearInterval(timer);
     console.warn(`zero: freezes will not be recorded: ${(err as Error).message}`);
-    return { stop() {} };
+    return { stop() {}, asleep() {}, awake() {} };
   }
   worker.unref();
   worker.on('message', (m: { freeze?: FreezeSummary; gaveUp?: string } | null) => {
@@ -203,5 +207,8 @@ export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_
   worker.on('error', (err) => { clearInterval(timer); console.warn(`zero: the freeze recorder stopped: ${err.message}`); });
   return {
     stop() { clearInterval(timer); worker?.terminate().catch(() => {}); },
+    // A hold that spans a sleep is the Mac asleep, not the app stuck.
+    asleep,
+    awake,
   };
 }

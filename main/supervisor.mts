@@ -135,7 +135,7 @@ import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importe
 import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
-import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown } from '../shared/spawn-trouble.mts';
+import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown, modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
 import { machineryPath, storeRootEnv } from './store/home.mts';
@@ -3172,6 +3172,15 @@ export class Supervisor {
    * open row every fifteen seconds; a line per pass is the staleness-banner
    * failure again (CLAUDE.md, 2026-08-12).
    */
+  /** The engine a row's model belongs to when it is not `engine`, else null. */
+  _modelIsForEngineOtherThan(item: WorkItem, engine: string): string | null {
+    if (!item?.model) return null;
+    const claudeModelOnCodex = engine === 'codex' && !isEngine(item.engine) && typeof item.model === 'string'
+      && (item.model.startsWith('claude-') || CLAUDE_MODELS.some(m => m.alias === item.model));
+    if (modelForEngine(item, engine) && !claudeModelOnCodex) return null;
+    return claudeModelOnCodex ? 'claude' : isEngine(item.engine) ? item.engine : 'codex';
+  }
+
   _sayTheModelIsForAnotherEngine(item: WorkItem, engine: string) {
     this._crossModelSaid ??= new Set();
     if (this._crossModelSaid.has(item?.id)) return;
@@ -3180,7 +3189,7 @@ export class Supervisor {
     const running = engineLabel(engine);
     try {
       this.store.recordSessionResult(item.product, item.id, {
-        result: `This task chose ${asked} model "${item.model}", but this computer would run it with ${running}. Nothing has been done. Pick a ${running} model to continue, or use a computer with ${asked}.`,
+        result: modelForAnotherEngineSentence({ asked, model: String(item.model), running }),
         status: 'open',
       });
     } catch (e) { console.warn('zero: could not say the model is for another engine:', (e as Error).message); }
@@ -8822,6 +8831,14 @@ export class Supervisor {
           || this._pushedByHer(i) || this._resumeQueue.has(i.id))
         .map((i) => i.id);
       for (const id of this._recovering ?? []) if (heldBySweep(id) && !this._comingHome?.has(id) && !queued.includes(id)) queued.push(id);
+      // `spawnWorker` turns these away on every tick until the model changes, and
+      // its sentence puts them in Needs you (`gaveUpOnTheAnswer`).
+      const byId = new Map(allThreads().map((i) => [i.id, i]));
+      const refused = queued.filter((id) => {
+        const i = byId.get(id);
+        return !!i?.model && !!this._modelIsForEngineOtherThan(i, this._engineFor(i));
+      });
+      if (refused.length) queued = queued.filter((id) => !refused.includes(id));
     } catch {}
     if (this.paused) queued = [];
     // Queued rows whose run is being set up or was asked for by name (Try
@@ -9682,8 +9699,9 @@ export class Supervisor {
       // MEMORY SHORT READS AS NO SLOT HERE (main/start-hold.mts), so an Urgent
       // row still takes a lesser session's slot below: a swap, which adds
       // nothing. A row this Mac's memory holds goes to the cloud instead when
-      // it may (`_roomFor`).
-      if (!this._roomFor(engine, item)) {
+      // it may (`_roomFor`). A row its model turns away takes no slot, so it is
+      // told so now rather than once a slot it will never use frees.
+      if (!this._modelIsForEngineOtherThan(item, engine) && !this._roomFor(engine, item)) {
         // A row being prepared holds its own slot; it is not waiting for one.
         if (!this._preparing?.has(item.id)) this._noteNotStarting(item, this._whyNoRoom(engine, item), engine);
         // an Urgent row takes a slot rather than queueing behind work that
@@ -10237,7 +10255,7 @@ export class Supervisor {
     const review = continuation && harnessFor(engine).capabilities.nativeReview && providerCommand(item.answer, engine)?.name === 'review' ? providerCommand(item.answer, engine) : null;
     const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer!.trim() : null;
     if (command) prompt = command;
-    else prompt = withWorkerGitBrief(prompt, product.repoPath);
+    else prompt = withWorkerGitBrief(prompt, product.repoPath, engine);
     if (!command && resumeId) {
       // Native resumes can reuse an older system prompt, so refresh the task
       // boundaries in the new turn too, without depending on a newer CLI flag.
@@ -12026,12 +12044,10 @@ export class Supervisor {
     // Asked here rather than inside `spawnPlan` because the answer is not a
     // narrower plan, it is no run at all -- and asked before the slot check and
     // before the product lookup, so a refusal costs the fleet nothing.
-    const claudeModelOnCodex = engine === 'codex' && !isEngine(item?.engine) && typeof item?.model === 'string'
-      && (item.model.startsWith('claude-') || CLAUDE_MODELS.some(m => m.alias === item.model));
-    if (item?.model && (!modelForEngine(item, engine) || claudeModelOnCodex)) {
+    const modelsEngine = this._modelIsForEngineOtherThan(item, engine);
+    if (modelsEngine) {
       refuse('model', engine);
-      const asked = claudeModelOnCodex ? 'claude' : isEngine(item?.engine) ? item.engine : 'codex';
-      this._sayTheModelIsForAnotherEngine({ ...item, engine: asked }, engine);
+      this._sayTheModelIsForAnotherEngine({ ...item, engine: modelsEngine }, engine);
       // THE USER'S WORDS ARE NOT DELIVERED BY A WORKER THAT NEVER STARTED. The queue
       // writes the delivery mark before it calls this method and that mark is
       // persisted, so leaving it standing would record the reply as handed over
@@ -13111,8 +13127,8 @@ export class Supervisor {
       ? template.replace(/<!-- repeat-rules:(start|end) -->\n?/g, '')
       : template.replace(/<!-- repeat-rules:start -->[\s\S]*?<!-- repeat-rules:end -->\n?/g, '');
     // And a teammate's run: how it finishes, only where a teammate:<id> label says it is one.
-    // A thread she sent to a teammate is her ask, so the rules for her rows hold.
-    template = teammateIdOf(item) && !item.routed
+    // A thread she sent to a teammate, or started in its chat, is her ask, so the rules for her rows hold.
+    template = teammateIdOf(item) && !item.routed && !(item.labels ?? []).includes(CHAT_LABEL)
       ? template.replace(/<!-- teammate-rules:(start|end) -->\n?/g, '')
       : template.replace(/<!-- teammate-rules:start -->[\s\S]*?<!-- teammate-rules:end -->\n?/g, '');
     // And the fourth: her rule about when a piece of work gets its own row.
@@ -13174,7 +13190,7 @@ export class Supervisor {
     // to the briefs in Settings can use the same two tokens and follow a
     // rename too. Her saved copy keeps the tokens; only what a session reads
     // has the name in it.
-    return fillName(`${header}\n\n---\n\n${template}\n\n${workerGitBrief(product.repoPath)}`);
+    return fillName(`${header}\n\n---\n\n${template}\n\n${workerGitBrief(product.repoPath, engine)}`);
   }
 
   // What a spawned worker is allowed to do when the founder has not said.

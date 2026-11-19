@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld('zero', {
   teamSignOut: () => ipcRenderer.invoke('zero:team-sign-out'),
   teamSignInEmail: (payload) => ipcRenderer.invoke('zero:team-sign-in-email', payload),
   teamSignUp: (payload) => ipcRenderer.invoke('zero:team-sign-up', payload),
+  teamConfirmation: () => ipcRenderer.invoke('zero:team-confirmation'),
+  teamResendConfirmation: () => ipcRenderer.invoke('zero:team-resend-confirmation'),
   teamCreate: (payload) => ipcRenderer.invoke('zero:team-create', payload),
   teamAcceptInvite: (payload) => ipcRenderer.invoke('zero:team-accept-invite', payload),
   teamInvite: (payload) => ipcRenderer.invoke('zero:team-invite', payload),

@@ -901,7 +901,8 @@ export class Teammates {
     const notRead = books.filter((b) => !b.readers.includes(t.id));
     const told = this._toldInTheChat(item, t, chat);
     // What you said in the chat lately, to anyone: a stop, a change of plan.
-    const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
+    // A line a thread wrote for you (`via`) is that thread's word, not yours.
+    const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && !m.via && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
       .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${(m.to as string[]).map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
     const lastSeen = Math.max(0, ...earlier.map((i) => (i.wrote?.answer?.source === 'founder' ? i.wrote.answer.ts ?? 0 : 0)));
     const untried = method && laterThan(method.changedAt, lastSeen);
@@ -1005,6 +1006,8 @@ export class Teammates {
       '- Reach the person only to show finished work, or for a decision, a yes before anything that leaves the team (sends, posts, ships, merges, pays), or a sign-in only they have. Then end this run with that as your answer, written like any agent thread\'s last message: the bold line, then plain sentences, then numbered options, your recommendation first. It reaches their inbox. Leave this item open. A message to people is the exception: team_tell and team_task ask your owner for that yes themselves, on one card with your exact words, so never ask for it again in your answer.',
       item?.routed
         ? '- This thread is the person\'s own ask, sent to you: end with your answer as your last message and leave it open. Only they close it.'
+        : (item?.labels ?? []).includes(CHAT_LABEL)
+        ? '- This thread began with the person\'s own words to you: end with your answer as your last message and leave it open. Never close it yourself.'
         : `- When nothing needs them, post a one-line summary to the team chat, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call. This run is your own work, not the person's ask, so closing it needs no quote from them. A duty that found nothing worth doing ends there.`,
       '- Never wait or poll for a teammate. Say what you are waiting for in the chat and finish. Hand work on with team_pass, not create_work_item.',
     ].filter((x) => x !== null).join('\n');
