@@ -109,17 +109,9 @@ export const HINTS: Record<string, HintLine[]> = {
     // sidebar still says Closed while this says Mark done; whichever merges
     // second makes them agree. Do not put "Close" back.
     { key: 'E', what: 'Mark done' },
-    // L, NOT S, SINCE 2026-10-01. S opens the summary inside a thread and
-    // opened the schedule picker here, so the plate and the thread's own top
-    // bar printed one letter for two different things. Scheduling is L
-    // everywhere now: this plate, the shortcuts page, ⌘K and the walk.
+    // L, not S, since 2026-10-01: S once meant the summary too.
     { key: 'L', what: 'Schedule for later' },
   ],
-  // AND S IS NOT ON THIS PLATE, BECAUSE THE SUMMARY BUTTON PRINTS IT. S means
-  // the summary everywhere in the app now (threads/Summary.tsx); the button in
-  // a thread's top bar wears its own S the way the reply pill wears R, and a
-  // component that already shows its key gets no plate. The shortcuts page
-  // lists it.
   // The cloud button (threads/Pages.tsx): ⌘C turns the cloud on or off.
   cloud: [{ key: '⌘C', what: 'Cloud on or off' }],
   // THE MAGNIFIER GETS A PLATE: nothing about a magnifier says what pressing it costs.
@@ -134,10 +126,6 @@ export const HINTS: Record<string, HintLine[]> = {
   // the row plate's own wording.
   done: [{ key: 'E', what: 'Mark done' }],
   'close-task': [{ key: '', what: 'Close the task for both of you' }],
-  // The Summary button printed its S on its face until w-5984544441; the key
-  // is said here now, the same as every other button in the corner. Since
-  // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.
-  summary: [{ key: 'S', what: 'Show or hide the summary' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
   // The Inbox button left of the back arrow, drawn only on a thread.
   inbox: [{ key: 'esc', what: 'Inbox' }],

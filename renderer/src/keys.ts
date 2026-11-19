@@ -16,13 +16,8 @@
 // slash that opened it is the first character of the query, and every search
 // starts by returning nothing.
 //
-// AND THE SCHEDULE PICKER IS ON L NOW, NOT S (2026-10-01). S opens the
-// summary inside a thread (threads/Summary.tsx) and opened the picker
-// everywhere else, so one letter meant two things and an office manager
-// testing the app hit both in a minute. S is the summary's everywhere; L is
-// "later" and is the one key that schedules. The paragraph above still
-// describes what goes wrong, with L in place of S: it is the key that opens
-// the picker that has to be swallowed, whichever letter that is.
+// The schedule picker is on L, not S, since 2026-10-01: it is the key that
+// opens the picker that has to be swallowed, whichever letter that is.
 export const OPENS_A_TEXT_FIELD = new Set(['r', 'l', 'c', 'n']);
 
 export function opensATextField(key: string): boolean {

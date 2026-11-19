@@ -187,11 +187,6 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // (w-ef92663cb1). It landed after this list last changed, so it was
       // missing here at first.
       { keys: ['⌘J'], what: 'Show or hide this task’s terminal.' },
-      // threads/Summary.tsx, `useSummaryShortcut`: it listens in the capture
-      // phase and stops the key there, so S belongs to the summary on a thread
-      // that has one. It is under THIS heading and not the one below because it
-      // is the one key in the app that works only inside an open thread.
-      { keys: ['S'], what: 'Show or hide the summary.' },
     ],
   },
   {
@@ -208,7 +203,7 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // the summary inside a thread and still meant the schedule picker in the
       // list, so this page taught one letter for two different things and an
       // office manager testing the app met both inside a minute. One meaning
-      // per letter: S is the summary, L is later. And the page says the word
+      // per letter. And the page says the word
       // the key stands for, because that word is the action's name now
       // (w-66e3ece93d): the ⌘K row, the picker and the toast all say Later.
       { keys: ['L'], what: 'Later: put the task off until a time you pick.' },

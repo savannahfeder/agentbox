@@ -40,9 +40,6 @@ const settings = read('renderer/src/components/Settings.tsx');
 const palette = read('renderer/src/components/Palette.tsx');
 const compose = read('renderer/src/components/Compose.tsx');
 const focus = read('renderer/src/components/Focus.tsx');
-// The summary panel owns S in its own capture-phase listener (2026-10-01), so
-// that row's handler is here rather than in App.tsx.
-const summary = read('renderer/src/threads/Summary.tsx');
 const mainProc = read('main/main.mts');
 const css = read('renderer/src/styles.css');
 
@@ -136,18 +133,8 @@ const HANDLED = {
   // L, NOT S, SINCE 2026-10-01. S opened this picker in the list AND toggled
   // the summary inside a thread, so the page taught one letter for two
   // different things and an office manager testing the app met both inside a
-  // minute. One meaning per letter: L is later, S is the summary.
+  // minute. One meaning per letter: L is later.
   'L': [[focused, "e.key === 'l' || e.key === 'L') openSnooze(focused)"], [list, "case 'l': case 'L':"]],
-  // AND S IS THE ONE ROW ON THE PAGE WHOSE HANDLER IS NOT IN App.tsx. The
-  // summary owns its key in its own component, in the capture phase, which is
-  // why it beat the window's handler for the day they were both bound. The
-  // claim the page makes is "S shows or hides the summary", so the evidence is
-  // that hook: the key it reads, and the toggle it calls.
-  'S': [
-    [summary, "if (e.key !== 's' && e.key !== 'S') return;"],
-    [summary, 'if (!e.repeat) onToggle();'],
-    [summary, "window.addEventListener('keydown', onKey, true);"],
-  ],
   'Z': [[focused, "e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }"], [list, "case 'z': case 'Z': e.preventDefault(); undo(); break;"]],
   '⌘A': [
     [chords, "e.key.toLowerCase() === 'a' && !inInput && !modal"],
@@ -318,6 +305,9 @@ describe('the page stays a page and not a wall', () => {
   // and the toast draws the cap, so a cap on a toast that this page never
   // mentions is the same nuisance. It sits beside Z, its other half, in a
   // group of four that becomes five.
+  //
+  // AND S CAME OFF IN 2026-11 (w-d143fcb40a): the side summary it opened was
+  // gone, so the page listed a key that did nothing.
   it('is four groups, none of them longer than seven keys', () => {
     expect(SHORTCUTS).toHaveLength(4);
     for (const g of SHORTCUTS) expect(g.keys.length).toBeLessThanOrEqual(7);

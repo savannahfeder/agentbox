@@ -360,6 +360,13 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
     window.addEventListener('zero:add-people', askToAdd);
     return () => window.removeEventListener('zero:add-people', askToAdd);
   }, [askToAdd]);
+  // ⌘K's Share with chosen people… opens the same list Share → Chosen people does.
+  useEffect(() => {
+    if (!share) return undefined;
+    const askToChoose = () => { setSharing('choose'); setOpen(true); };
+    window.addEventListener('zero:choose-people', askToChoose);
+    return () => window.removeEventListener('zero:choose-people', askToChoose);
+  }, [!!share]);
 
   // CLOSED BY ESCAPE AND BY A PRESS ANYWHERE OUTSIDE IT. Both listen first, on
   // the window's capture, and Escape stops there: the window's own Escape

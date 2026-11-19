@@ -24,6 +24,10 @@
 // answer per letter and that every surface reads it off the same place. The
 // surfaces are listed out below precisely because the fault was never in any
 // one of them: each was locally correct and they disagreed.
+//
+// AND S MEANS NOTHING SINCE 2026-11 (w-d143fcb40a). The side summary it opened
+// had been unreachable since every thread opened on the one-at-a-time page, so
+// it was taken out, and S with it. Nothing may say S until something answers it.
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -39,12 +43,11 @@ import { PRACTICE_ROWS } from '../shared/first-run-practice.mts';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const app = read('renderer/src/App.tsx');
-const summary = read('renderer/src/threads/Summary.tsx');
 
 /** Every row of the shortcuts page that draws a given cap. */
 const rowsFor = (cap) => SHORTCUTS.flatMap((g) => g.keys).filter((k) => k.keys.includes(cap));
 
-describe('the app answers L for later and S for the summary', () => {
+describe('the app answers L for later, and nothing answers S', () => {
   it('binds L in both branches of the key handler and S in neither', () => {
     // The focused branch, with a thread open in front of somebody.
     expect(app).toContain("else if (e.key === 'l' || e.key === 'L') openSnooze(focused);");
@@ -58,20 +61,12 @@ describe('the app answers L for later and S for the summary', () => {
     expect(app).not.toContain("case 's': case 'S':");
   });
 
-  it('leaves S to the summary panel, which owns it in its own component', () => {
-    expect(summary).toContain("if (e.key !== 's' && e.key !== 'S') return;");
-    expect(summary).toContain("window.addEventListener('keydown', onKey, true);");
-    // It still stops the key, which is the right shape for a component that
-    // owns one whatever else happens to be bound.
-    expect(summary).toContain('e.stopImmediatePropagation();');
-  });
 
   it('swallows the press that opens the picker, and only the ones with a field', () => {
     // The picker focuses a text field the moment it opens, so the keystroke
     // that opened it would be typed into that field. The whole story is in
     // tests/shortcuts-swallow-their-key.test.mts.
     expect([...OPENS_A_TEXT_FIELD]).toContain('l');
-    // The summary panel has no field in it, so S needs no swallow.
     expect([...OPENS_A_TEXT_FIELD]).not.toContain('s');
   });
 });
@@ -80,13 +75,9 @@ describe('every surface that says a key says the same one', () => {
   it('the hover plate on a row', () => {
     expect(HINTS.row.map((l) => l.key)).toEqual(['↵', 'E', 'L']);
     expect(HINTS.row.find((l) => l.key === 'L').what).toBe('Schedule for later');
-    // S is on no plate but the Summary button's own. The button used to print
-    // its S on its face; since keys are shown on hover and not on a button
-    // (w-5984544441), that plate is where S is said, and it is the only one.
-    for (const [name, lines] of Object.entries(HINTS)) {
-      for (const line of lines) if (name !== 'summary') expect(line.key, `${line.what} is on S`).not.toBe('S');
+    for (const lines of Object.values(HINTS)) {
+      for (const line of lines) expect(line.key, `${line.what} is on S`).not.toBe('S');
     }
-    expect(HINTS.summary).toEqual([{ key: 'S', what: 'Show or hide the summary' }]);
   });
 
   it('the chip drawn on a row while the tutorial is on', () => {
@@ -107,15 +98,9 @@ describe('every surface that says a key says the same one', () => {
     // One row per letter, and each says the one thing its letter does.
     expect(rowsFor('L')).toHaveLength(1);
     expect(rowsFor('L')[0].what).toBe('Later: put the task off until a time you pick.');
-    expect(rowsFor('S')).toHaveLength(1);
-    expect(rowsFor('S')[0].what).toBe('Show or hide the summary.');
-    // S is listed under the heading for an open thread, because that is the one
-    // place it works. The handler behind each of these caps is checked in
-    // tests/the-shortcuts-page-lists-keys-that-work.test.mts.
-    const group = SHORTCUTS.find((g) => g.keys.some((k) => k.keys.includes('S')));
-    expect(group.label).toBe('In a task you have opened');
+    expect(rowsFor('S')).toHaveLength(0);
     expect(everyKey()).toContain('L');
-    expect(everyKey()).toContain('S');
+    expect(everyKey()).not.toContain('S');
   });
 
   it('the tutorial, on the beat that teaches putting work off', () => {
@@ -168,9 +153,7 @@ describe('no letter in the app means two things', () => {
     expect(letters.length).toBeGreaterThan(6);
     const twice = letters.filter((cap) => new Set(rowsFor(cap).map((k) => k.what)).size > 1);
     expect(twice).toEqual([]);
-    // And both of this round's letters are in that sweep rather than beside it.
     expect(letters).toContain('L');
-    expect(letters).toContain('S');
   });
 
   // AND THE SAME ACROSS THE SURFACES, for the keys a row can draw. The plate

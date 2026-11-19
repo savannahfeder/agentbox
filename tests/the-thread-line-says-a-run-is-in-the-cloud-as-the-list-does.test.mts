@@ -6,13 +6,13 @@
 // (Pages.tsx StatusMark) drew RunningMark with the cell's `cloud`, and the
 // panel's StatusGlyph read `live` and `mark` and never `cloud`.
 //
-// Now the panel's Status row and the mark leading the line under the title draw
-// the same cloud while the run is in the cloud, the dot while it is on this
-// Mac, and neither while nothing runs.
+// Now the mark leading the line under the title draws the same cloud while the
+// run is in the cloud and the dot while it is on this Mac. The panel went in
+// 2026-11 (w-d143fcb40a).
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SummaryPanel, ThreadStateMark } from '../renderer/src/threads/Summary.tsx';
+import { ThreadStateMark } from '../renderer/src/threads/Summary.tsx';
 import { ThreadCells } from '../renderer/src/threads/Pages.tsx';
 import { FleetContext } from '../renderer/src/fleet.ts';
 globalThis.React = React;
@@ -30,36 +30,14 @@ const fleetOf = (where) => ({
   sessions: where ? new Map([['w-1', { itemId: 'w-1', product: 'northwind', startedAt: NOW - 19 * M, tail: [], ...(where === 'cloud' ? { where: 'cloud' } : {}) }]]) : new Map(),
 });
 const within = (where, el) => renderToStaticMarkup(h(FleetContext.Provider, { value: fleetOf(where) }, el));
-const panel = (where, it = item) => within(where, h(SummaryPanel, { item: it, items: [it], team: null }));
 const lead = (where) => within(where, h(ThreadStateMark, { item }));
 const listRow = (where) => within(where, h(ThreadCells, { item, product, now: NOW }));
-const statusRow = (html) => html.slice(html.indexOf('>Status<'), html.indexOf('>Priority<'));
 const clouds = (html) => (html.match(/th-st-cloud/g) ?? []).length;
 const dots = (html) => (html.match(/ts-st-working live/g) ?? []).length;
 
-describe('the summary panel\'s Status row', () => {
-  it('wears the cloud while the run is in the cloud, as the inbox row does', () => {
-    expect(clouds(listRow('cloud'))).toBe(1);
-    const row = statusRow(panel('cloud'));
-    expect(row).toContain('Working');
-    expect(clouds(row)).toBe(1);
-    expect(dots(row)).toBe(0);
-  });
-
-  it('keeps the half-dot while the run is on this Mac', () => {
-    const row = statusRow(panel('mac'));
-    expect(dots(row)).toBe(1);
-    expect(clouds(row)).toBe(0);
-  });
-
-  it('wears neither while nothing runs', () => {
-    const row = statusRow(panel(null, { ...item, status: 'open', claim: null }));
-    expect(clouds(row) + dots(row)).toBe(0);
-  });
-});
-
 describe('the mark leading the line under the title', () => {
   it('is the cloud in the cloud and the dot on this Mac', () => {
+    expect(clouds(listRow('cloud'))).toBe(1);
     expect(clouds(lead('cloud'))).toBe(1);
     expect(dots(lead('cloud'))).toBe(0);
     expect(dots(lead('mac'))).toBe(1);

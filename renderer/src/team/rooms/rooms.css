@@ -491,27 +491,8 @@
 .gt-inset.workspace-layout > .topbar { padding-left: 44px; padding-right: 28px; }
 .gt-inset .th-table .row.unread::before { left: 25px; }
 
-/* A thread's summary on the left, where the sidebar was, read first (round 15). */
-.gt-sumleft .focus-pane[data-summary="open"] > .focus-scroll,
-.gt-sumleft .focus-pane[data-summary="open"] > .focus-dock,
-.gt-sumleft .focus-pane[data-summary="open"] > .keep-line,
-.gt-sumleft .focus-pane[data-summary="open"] > .task-terminal { margin-right: 0; margin-left: var(--ts-panel-w); }
-.gt-sumleft .ts-panel { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--line); }
-.gt-sumleft.gt-inset .ts-panel { padding-left: 44px; }
-.gt-sumleft .focus-pane { --ts-panel-w: 368px; }
-/* Folded with S, it leaves its strip on the same side it was open on. */
-.gt-sumleft .focus-pane[data-summary="rail"] > .focus-scroll,
-.gt-sumleft .focus-pane[data-summary="rail"] > .focus-dock,
-.gt-sumleft .focus-pane[data-summary="rail"] > .keep-line,
-.gt-sumleft .focus-pane[data-summary="rail"] > .task-terminal,
-.gt-sumleft .focus-pane[data-summary="over"] > .focus-scroll,
-.gt-sumleft .focus-pane[data-summary="over"] > .focus-dock,
-.gt-sumleft .focus-pane[data-summary="over"] > .keep-line,
-.gt-sumleft .focus-pane[data-summary="over"] > .task-terminal { margin-right: 0; margin-left: var(--ts-rail-w); }
-.gt-sumleft .ts-rail { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--line); }
-.gt-sumleft .ts-rail-ic svg, .gt-sumleft .ts-close svg { transform: scaleX(-1); }
-/* A thread's trail, its arrow on the 44-point edge the summary, a document's
-   conversation and its reply box all start on, and its corner where the Inbox's is. */
+/* A thread's trail, its arrow on the 44-point edge a document's
+   conversation and its reply box start on, and its corner where the Inbox's is. */
 .workspace-layout.gt-inset.workspace-task > .topbar { padding-left: 36px; }
 .workspace-layout.gt-inset[data-artifact-layout="beside"] .focus { padding-left: 44px; }
 .workspace-layout.gt-inset[data-artifact-layout="beside"] .focus-dock { padding-left: 44px; }

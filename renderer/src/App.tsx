@@ -538,8 +538,8 @@ export default function App() {
   const [focused, setFocused] = useState<WorkItem | null>(null);
   // A ⌘K row that acts on the open thread's page (Focus `pageAsk`), and what that
   // page reports it draws (Focus `onShown`), which is when those rows are offered.
-  const [threadAsk, setThreadAsk] = useState<{ key: string; what: 'summary' | 'people' | 'rename'; at: number } | null>(null);
-  const [openShows, setOpenShows] = useState<{ key: string; change: boolean; summary: 'open' | 'closed' | null; ship: ParsedOption[] | null } | null>(null);
+  const [threadAsk, setThreadAsk] = useState<{ key: string; what: 'rename'; at: number } | null>(null);
+  const [openShows, setOpenShows] = useState<{ key: string; change: boolean; ship: ParsedOption[] | null } | null>(null);
   useEffect(() => {
     setThreadAsk((a) => (a && focused && a.key === `${focused.product}/${focused.id}` ? a : null));
   }, [focused?.product, focused?.id]);
@@ -7627,15 +7627,20 @@ export default function App() {
   };
   const runThreadCommand = (item: WorkItem, c: ThreadCommand) => {
     setModal(null);
-    const onPage = (what: 'summary' | 'people' | 'rename') => {
+    const onPage = (what: 'rename') => {
       if (!focused || keyOf(focused) !== keyOf(item)) { setFocused(item); markSeen(item); }
-      if (what !== 'summary') setOpenDoc(null);
+      setOpenDoc(null);
       setThreadAsk({ key: keyOf(item), what, at: Date.now() });
     };
     const d = c.does;
     switch (d.act) {
       case 'see': if (d.already) showToast(SEE_SAID[d.to]); else void seeThread(item, d.to); return;
-      case 'people': case 'rename': case 'summary': onPage(d.act); return;
+      case 'rename': onPage(d.act); return;
+      case 'people':
+        if (!focused || keyOf(focused) !== keyOf(item)) { setFocused(item); markSeen(item); }
+        // Next tick, as Add people below: the menu is on the thread's page, which may only just be opening.
+        setTimeout(() => window.dispatchEvent(new Event('zero:choose-people')), 60);
+        return;
       case 'pin': pinThread(item.id, d.pin, true); showToast(d.pin ? 'Pinned to the top of your list' : 'Unpinned'); return;
       case 'place': placeThread(item, d.keep); return;
       case 'code': setOpenDoc({ product: item.product, src: changePathFor(item.id) }); return;
@@ -9219,8 +9224,8 @@ export default function App() {
                 }]
               : []),
             { id: 'snooze', label: 'Later', keywords: LATER_KEYWORDS, oldNames: LATER_OLD_NAMES, keyHint: 'L', run: () => openSnooze(target) },
-            // WHAT THE THREAD'S OWN CONTROLS DO (w-e85916b92c): its summary
-            // panel, three-dot menu, S key, Add people and a teammate's strip.
+            // WHAT THE THREAD'S OWN CONTROLS DO (w-e85916b92c): its three-dot
+            // menu, Add people and a teammate's strip.
             ...(() => {
               const project = team?.products.get(target.product) ?? null;
               const page = !target.agent && !isTroubleRow(target) && !isUpdateRow(target) && !isDirect(project ?? undefined);

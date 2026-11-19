@@ -1,11 +1,9 @@
-// FIRST TRY ON A REAL IPHONE (2026-10-11), four things the desktop's layout
+// FIRST TRY ON A REAL IPHONE (2026-10-11), things the desktop's layout
 // left behind on a phone:
 //
 // - "the unshare button just stays visible on the screen at all times". A row
 //   shows Share or Unshare on hover; a tap leaves :hover on the row it touched,
 //   so the button stayed, hid that row's age, and underlined its title.
-// - "not sure how to open the summary on mobile". The summary opens from a
-//   rail down the thread's right edge, which the phone layout hid.
 // - "icons in the top corner are bunched up". On a team, View and filters
 //   wears the faces of whose threads are shown, and the phone squeezed faces
 //   and sliders into one 40px button, over the Settings gear.
@@ -56,36 +54,5 @@ describe('on a phone, the inboxes along the bottom', () => {
     // (a-phone-shows-the-wall-scrolls-documents-straight-and-keeps-its-corner-clear),
     // and the bar lets that wall through (w-33511040d7).
     expect(last('.list-pane > .th-bar', 'background')).toBe('transparent');
-  });
-});
-
-describe('on a phone, the summary', () => {
-  it('opens from an icon at the right of the thread\'s top bar', () => {
-    const rail = bodiesFor('.focus-pane .ts-rail');
-    expect(rail).toMatch(/position:\s*fixed/);
-    expect(rail).toMatch(/top:\s*calc\(env\(safe-area-inset-top/);
-    expect(last('.focus-pane .ts-rail', 'width')).toBe('44px');
-    expect(last('.focus-pane .ts-rail .ts-rail-mark', 'display')).toBe('none');
-    // The phone hid the rail outright; that rule is gone.
-    expect(rules.some((r) => r.selector.trim().endsWith('.ts-rail') && /display:\s*none/.test(r.body) && !r.selector.includes('data-summary'))).toBe(false);
-  });
-  // "the summary seems a bit too high" (2026-10-12). Measured in a 393x852
-  // page with a 59px status bar, the top bar's middle at 87px: the summary's
-  // glyph sat at 85, the ⋯ at 86.5, and the back arrow and the name at 91,
-  // pushed down by the desktop's 18px top margin on the header that holds them.
-  // Fixed, all four measure 86.5 to 87.
-  it('sits on one line with the ⋯, the back arrow and the name: the middle of the top bar', () => {
-    // No top margin, and room on the right for the summary icon and the ⋯.
-    expect(last('.workspace-task-header', 'margin')).toBe('0 48px 0 0');
-    expect(last('.workspace-task-header', 'align-self')).toBe('center');
-    expect(last('.focus-pane .ts-rail .ts-rail-ic', 'margin')).toBe('0');
-    expect(bodiesFor('.focus-pane .ts-rail')).toMatch(/top:\s*calc\(env\(safe-area-inset-top, 0px\) \+ \(var\(--phone-top, 56px\) - 44px\) \/ 2\)/);
-  });
-  it('opens as a page of its own over the thread, with its close in reach', () => {
-    const panel = bodiesFor('.focus-pane .ts-panel');
-    expect(panel).toMatch(/position:\s*fixed/);
-    expect(panel).toMatch(/left:\s*0/);
-    expect(panel).toMatch(/right:\s*0/);
-    expect(last('.focus-pane .ts-panel', 'width')).toBe('auto');
   });
 });
