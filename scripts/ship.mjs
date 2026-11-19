@@ -76,7 +76,7 @@ const why = notReadyToShip({
 });
 if (why) await stop(why);
 
-const privately = pushPrivateFolder(root, { message: `Changes from ${branch}` });
+const privately = pushPrivateFolder(root, { message: `Changes from ${branch}`, trusted: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..') });
 if (privately.pushed) say(`pushed ${privately.commits} commit(s) in ${privately.path} to its own repository.`);
 else if (privately.why) say(`${privately.why}. Push it from there by hand.`);
 

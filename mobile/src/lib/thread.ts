@@ -54,7 +54,10 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const mine = view.waiting.filter((w) => w.product === product && w.id === id);
   // A thread sent from here that the computer has not taken: its message is the first thing she said,
   // unless the title on the page already says all of it.
-  const message = String(item.body || item.title || '').trim();
+  // A one-line message is the title, so a body of only file links needs it put back on top.
+  const body = String(item.body ?? '').trim();
+  const onlyFiles = !!body && body.split('\n').every((l) => !l.trim() || /^!?\[[^\]]*\]\([^)]*\)$/.test(l.trim()));
+  const message = (onlyFiles && item.title && !String(item.title).startsWith('Attached: ') ? `${String(item.title).trim()}\n\n${body}` : String(item.body || item.title || '')).trim();
   const sent = item.waitsForMac && message && message !== pageTitle(item).trim() ? [{ at: item.createdAt ?? 0, text: message }] : [];
   const pending = [...sent, ...mine.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}) }))];
   // A reply Agentbox Cloud took with the computer away says so (shared/cloud-kit.mts).
