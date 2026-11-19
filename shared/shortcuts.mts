@@ -237,6 +237,8 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // the card prints them inside Allow and Deny. Under this heading because
       // it is answered from anywhere at all.
       { keys: ['⌘1', '⌘2'], join: 'or', what: 'Allow or deny a card asking to run something.' },
+      // SelectionBar.tsx, a window keydown in capture, so an editor cannot keep it.
+      { keys: ['⌘⌥M'], what: 'Comment on the words you selected.' },
     ],
   },
 ];

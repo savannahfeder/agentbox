@@ -44,6 +44,7 @@ const focus = read('renderer/src/components/Focus.tsx');
 // that row's handler is here rather than in App.tsx.
 const summary = read('renderer/src/threads/Summary.tsx');
 const mainProc = read('main/main.mts');
+const selectionBar = read('renderer/src/components/SelectionBar.tsx');
 const css = read('renderer/src/styles.css');
 
 // The window key handler, cut into the three states it actually has. Every
@@ -167,6 +168,7 @@ const HANDLED = {
   'N': [[focused, "else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }"], [list, "case 'n': case 'N': e.preventDefault(); startThread(); break;"]],
   // Into the task the toast is about, on the list and inside a task alike
   // (w-f0bfe32859). Gated on the toast in toast-parts.ts, which has its own test.
+  '⌘⌥M': [[selectionBar, "window.addEventListener('keydown', key, true);"], [selectionBar, 'if (!isCommentChord(e, MAC)) return;']],
   'O': [[chords, 'const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);'], [chords, 'openToastRow(goesTo);']],
 };
 

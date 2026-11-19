@@ -24,6 +24,18 @@ export function boxPickedIn(root: { contains(node: never): boolean } | null, el:
   return words.trim() ? words : null;
 }
 
+/** Google Docs' and Word's key for a comment. A plain letter would type over the words in a document you can edit. */
+export const COMMENT_CHORD = '⌘⌥M';
+
+type Press = { code?: string; key?: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean };
+
+/** By `code`, because Option turns the M into µ on a Mac. */
+export function isCommentChord(e: Press, mac: boolean): boolean {
+  if (!e.altKey || e.shiftKey) return false;
+  if (mac ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey) return false;
+  return e.code === 'KeyM';
+}
+
 export const quoteFrom =(words: string) => words.replace(/\s+/g, ' ').trim().slice(0, MAX_QUOTE_CHARS);
 
 const GAP = 8;

@@ -18,11 +18,23 @@ interface WordsSelection {
   removeAllRanges(): void;
 }
 
+interface WordsEvent {
+  source?: unknown;
+  data?: { type?: string };
+  code?: string;
+  key?: string;
+  metaKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  shiftKey?: boolean;
+  preventDefault?(): void;
+}
+
 interface WordsPage {
   parent: { postMessage(message: unknown, targetOrigin: string): void };
   getSelection(): WordsSelection | null;
   requestAnimationFrame(callback: () => void): number;
-  addEventListener(type: string, listener: (event: { source?: unknown; data?: { type?: string } }) => void, options?: boolean): void;
+  addEventListener(type: string, listener: (event: WordsEvent) => void, options?: boolean): void;
 }
 
 /** Runs in the page's own origin. Only the selected words and where they sit leave it. */
@@ -45,6 +57,12 @@ export function reportSelectedWords(page: WordsPage): void {
   page.addEventListener('mousedown', none, true);
   page.addEventListener('mouseup', later, true);
   page.addEventListener('keyup', later, true);
+  // The frame keeps the keyboard, so the comment chord has to be handed up; the app decides whether it is one.
+  page.addEventListener('keydown', (e) => {
+    if (!e.altKey || !(e.metaKey || e.ctrlKey) || e.code !== 'KeyM') return;
+    e.preventDefault?.();
+    say({ type: 'agentbox-comment-key', code: e.code, key: e.key, metaKey: !!e.metaKey, ctrlKey: !!e.ctrlKey, altKey: true, shiftKey: !!e.shiftKey });
+  }, true);
   page.addEventListener('message', (e) => {
     if (e.source === page.parent && e.data?.type === 'agentbox-clear-selection') page.getSelection()?.removeAllRanges();
   });

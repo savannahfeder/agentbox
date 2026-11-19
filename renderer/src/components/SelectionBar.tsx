@@ -2,7 +2,8 @@
 // over them offers a comment. Selecting alone never starts one.
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { barSpot, boxPickedIn, pickedIn, quoteFrom } from '../selection-bar';
+import { barSpot, boxPickedIn, COMMENT_CHORD, isCommentChord, pickedIn, quoteFrom } from '../selection-bar';
+import { chord, MAC } from '../this-keyboard';
 
 type Box = { top: number; bottom: number; left: number; right: number };
 
@@ -18,11 +19,14 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
   const [picked, setPicked] = useState<{ words: string; first: Box; all: Box } | null>(null);
   const [copied, setCopied] = useState(false);
   const [moves, setMoves] = useState(0);
+  const commentNow = useRef<(() => void) | null>(null);
   useEffect(() => {
     setPicked(null);
     if (!frame) return undefined;
     const hear = (e: MessageEvent) => {
-      if (e.source !== frame.contentWindow || e.data?.type !== 'agentbox-selected-words') return;
+      if (e.source !== frame.contentWindow) return;
+      if (e.data?.type === 'agentbox-comment-key' && isCommentChord(e.data, MAC)) { commentNow.current?.(); return; }
+      if (e.data?.type !== 'agentbox-selected-words') return;
       const { words, first, all } = e.data;
       setCopied(false);
       setPicked(typeof words === 'string' && words.trim() && first && all ? { words, first, all } : null);
@@ -52,6 +56,7 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
     el.style.top = `${spot.top}px`;
   }, [picked, copied, moves, frame]);
 
+  commentNow.current = picked ? () => comment() : null;
   if (!picked) return null;
   const comment = () => {
     onComment(quoteFrom(picked.words));
@@ -64,7 +69,7 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
     try { await navigator.clipboard.writeText(picked.words); setCopied(true); } catch { /* clipboard blocked */ }
   };
   return createPortal(<div ref={bar} className="link-pop selection-bar" role="toolbar" aria-label="Selected words" onMouseDown={(e) => e.preventDefault()}>
-    <button type="button" className="link-pop-btn selection-bar-comment" onClick={comment}><CommentGlyph />Comment</button>
+    <button type="button" className="link-pop-btn selection-bar-comment" onClick={comment}><CommentGlyph />Comment<kbd>{chord(COMMENT_CHORD)}</kbd></button>
     <button type="button" className="link-pop-btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</button>
   </div>, document.body);
 }
@@ -142,7 +147,6 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
     el.style.top = `${spot.top}px`;
   }, [at, copied]);
 
-  if (!at) return null;
   const picked = () => {
     const sel = window.getSelection();
     const words = pickedIn(page.current, sel);
@@ -153,13 +157,28 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
   };
   const comment = () => {
     const got = picked();
-    if (!got) return;
+    if (!got) return false;
     const { words, at } = got;
     // Let go of the page's words before the note box takes the caret, never after.
     window.getSelection()?.empty();
     onComment(quoteFrom(words), at);
     setAt(null);
+    return true;
   };
+  const commentNow = useRef(comment);
+  commentNow.current = comment;
+
+  // Capture, so a document's editor never gets the press first.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!isCommentChord(e, MAC)) return;
+      if (commentNow.current()) { e.preventDefault(); e.stopPropagation(); }
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, []);
+
+  if (!at) return null;
   const copy = async () => {
     const words = picked()?.words;
     if (!words) return;
@@ -167,7 +186,7 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
   };
   // On the body: the page scrolls inside a size container, which would hold a fixed bar to itself.
   return createPortal(<div ref={bar} className="link-pop selection-bar" role="toolbar" aria-label="Selected words" onMouseDown={(e) => e.preventDefault()}>
-    <button type="button" className="link-pop-btn selection-bar-comment" onClick={comment}><CommentGlyph />Comment</button>
+    <button type="button" className="link-pop-btn selection-bar-comment" onClick={comment}><CommentGlyph />Comment<kbd>{chord(COMMENT_CHORD)}</kbd></button>
     <button type="button" className="link-pop-btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</button>
   </div>, document.body);
 }
