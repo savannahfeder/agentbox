@@ -94,9 +94,10 @@ interface MenuHandlers {
   onApproval?: (allow: boolean) => unknown;
   onReload?: () => unknown;
   onZoom?: (delta: number, target: WebContents | null) => unknown;
+  onQuit?: () => unknown;
 }
 
-export function installMenu({ onApproval, onReload, onZoom }: MenuHandlers = {}): void {
+export function installMenu({ onApproval, onReload, onZoom, onQuit }: MenuHandlers = {}): void {
   // A CLICK NAMES ITS WINDOW.after the chords were fixed. Electron hands a menu
   // click the window it was chosen from, so the click stops asking what is
   // focused, which is the question that was coming back null. main.mts decides
@@ -117,7 +118,8 @@ export function installMenu({ onApproval, onReload, onZoom }: MenuHandlers = {})
         { role: 'hideOthers' },
         { role: 'unhide' },
         { type: 'separator' },
-        { role: 'quit' },
+        // Not Electron's quit role, which quits at once even while agents work.
+        { label: process.platform === 'darwin' ? `Quit ${app.name}` : 'Quit', accelerator: 'CommandOrControl+Q', click: () => (onQuit ?? (() => app.quit()))() },
       ],
     },
     {

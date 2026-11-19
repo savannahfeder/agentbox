@@ -51,7 +51,7 @@ import type { SkyArt } from '../home/sky';
 import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, cloudMonthLine, cloudMoveLine, countedAccounts, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
 import type { Offer, OfferGo } from '../cloud-upgrade';
-import { isCause, causeOf, waitingOn, causeWord, causeWhere, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../../../shared/causes.mts';
+import { isCause, causeOf, waitingOn, causeWord, causePlace, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../../../shared/causes.mts';
 import './pages.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no
@@ -144,6 +144,8 @@ export function RunningMark({ cloud = false }: { cloud?: boolean }) {
 export const WaitingContext = createContext<Map<string, number>>(new Map());
 /** Your rows, so a row that waits on another can name it. */
 export const ItemsContext = createContext<readonly WorkItem[]>([]);
+/** Every project, so a cause row can name the ones its threads are in. */
+export const ProductsContext = createContext<readonly Product[]>([]);
 
 /** The threads queued while this Mac runs all it can (App.tsx provides it). */
 export const FreeAgentContext = createContext<Set<string>>(new Set());
@@ -743,6 +745,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const tryAgain = useContext(TryAgainContext);
   const retry = tryAgain && offersTryAgain(item, facts) ? <TryAgainButton onPress={() => tryAgain(item)} /> : undefined;
   const allItems = useContext(ItemsContext);
+  const allProducts = useContext(ProductsContext);
   const savedKeys = useContext(SavedKeysContext);
   const waits = team ? waitWords(item, { items: allItems, cards: team.state.cards ?? [], nameOf: (id: string) => team.byId.get(id)?.name ?? 'Someone' }) : null;
   const nameFirst = (id: string) => firstName(team?.byId.get(id) ?? null);
@@ -818,7 +821,11 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // ONE ROW PER CAUSE (shared/causes.mts): how many threads wait behind it, and from where.
   const behind = isCause(item) && item.status !== 'done' ? waitingOn(item, allItems ?? []) : null;
   if (behind) {
-    return <RowCells status={{ ...(status ?? cell), word: causeWord(behind.length) }} title={rowTitle(item)} pinned={!!item.pinned} where={causeWhere(item, behind, product?.name ?? '')} person={person}
+    const nameOfProduct = (slug: string) => allProducts.find((p) => p.slug === slug)?.name ?? (slug === item.product ? product?.name ?? '' : slug);
+    const place = causePlace(item, behind, nameOfProduct);
+    // The count stays whole when a long name is cut short.
+    const where = <><span className="th-proj-name">{place.name}</span>{place.more ? <span className="th-proj-more">+{place.more}</span> : null}</>;
+    return <RowCells status={{ ...(status ?? cell), word: causeWord(behind.length) }} title={rowTitle(item)} pinned={!!item.pinned} where={where} person={person}
       priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
   }
   // And a thread behind one says what it waits on, and that it comes back when that is fixed.

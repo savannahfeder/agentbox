@@ -760,7 +760,7 @@ export interface TeamChatLine {
 }
 export interface TeamRunLine {
   id: string; kind: 'run'; teammate: string; item: string; product: string; title: string;
-  verb: 'picked' | 'passed' | 'queued' | 'sent' | 'answered' | 'finished' | 'stopped'; by?: string; byName?: string; waiting?: boolean; answered?: boolean;
+  verb: 'picked' | 'passed' | 'queued' | 'sent' | 'answered' | 'finished' | 'stopped' | 'opened'; by?: string; byName?: string; waiting?: boolean; answered?: boolean;
   /** Your words, on an `answered` line. */
   text?: string; ts: number;
   /** The first thing it said, on a `sent` line. */

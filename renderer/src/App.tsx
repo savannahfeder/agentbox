@@ -107,6 +107,7 @@ import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, 
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
+import { enterIsTheButtons } from './focused-button';
 import { commandATicksTheList, selectWhatYouAreReading } from './select-all';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
@@ -139,7 +140,7 @@ import { FilesPlace, useFilesList } from './files/FilesPlace';
 import { ConnectionsPlace } from './connections/ConnectionsPlace';
 import { TeammatesContext } from './teammates/row-lead';
 import { ChatsContext, ChatsFrame, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
-import { queuedTeammateRun } from './teammates/chat-lines';
+import { queuedTeammateRun, threadsItOpened } from './teammates/chat-lines';
 import { teammateIdOf } from '../../shared/teammates.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
@@ -231,7 +232,7 @@ import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { TeamBilling } from './team/TeamBilling';
 import { ProjectShare, ProjectWho } from './team/ProjectShare';
-import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
+import { ConnectComputer, EmptyTab, FilteredEmpty, HeaderActions, INBOX_TABS, InboxBoard, InboxClear, ItemsContext, ProductsContext, LiveContext, CloudContext, SavedKeysContext, MoveToCloudContext, CloudOfferContext, FreeAgentContext, StateTabs, TryAgainContext, WaitingContext } from './threads/Pages';
 import { offersTryAgain, tryAgainWords } from './try-again';
 import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, stoppedIds, type Fleet } from './fleet';
@@ -396,6 +397,7 @@ const liveAnswer = (i: WorkItem) => (i.answer && i.answer !== '(withdrawn)' ? i.
 // on every snapshot.
 const NO_ORDER: string[] = [];
 const NO_RUNNING: RunningSession[] = [];
+const NO_PRODUCTS: Product[] = [];
 // How soon a first read that missed is asked again, rather than at the next
 // 30 s phone poll.
 const FIRST_READ_AGAIN_MS = 1_500;
@@ -6774,6 +6776,10 @@ export default function App() {
           }
         }
         if (e.key === 'e' || e.key === 'E') movedByKeyAt.current = Date.now();
+      // A button the keyboard reached keeps Enter. Otherwise Enter is the row's,
+      // and prevented so a button a click left focused is not pressed as well.
+      if (e.key === 'Enter' && enterIsTheButtons(e)) return;
+      if (e.key === 'Enter' && !multiSel.size && (pointed || keyCard || keyLead)) e.preventDefault();
       switch (e.key) {
         case 'j': case 'J':
         case 'ArrowDown': {
@@ -7999,7 +8005,7 @@ export default function App() {
     } else if (placeMember.key.startsWith('mate:')) {
       const id = placeMember.key.slice('mate:'.length);
       const t = teammatesUi.list.find((x) => x.id === id);
-      const runs = items.filter((i) => i.labels?.includes(`teammate:${id}`));
+      const runs = [...items.filter((i) => i.labels?.includes(`teammate:${id}`)), ...threadsItOpened(items, id)];
       const asks = mineInNeeds.filter((i) => teammateIdOf(i) === id);
       const askIds = new Set(asks.map((i) => i.id));
       const split = nowAndFinished(runs.filter((i) => !askIds.has(i.id)), { done: (i) => i.status === 'done', at: (i) => i.updatedAt, now });
@@ -8078,6 +8084,7 @@ export default function App() {
     <FleetContext.Provider value={fleet}>
     <WaitingContext.Provider value={waitingByThread}>
     <ItemsContext.Provider value={items}>
+    <ProductsContext.Provider value={snap?.products ?? NO_PRODUCTS}>
     <FollowContext.Provider value={team ? followValue : null}>
     <DecideContext.Provider value={roomsUi.teamGroup ? {
       label: `Add to ${roomsUi.teamGroup.name}’s decisions`,
@@ -10023,6 +10030,7 @@ export default function App() {
     </TeammatesContext.Provider>
     </DecideContext.Provider>
     </FollowContext.Provider>
+    </ProductsContext.Provider>
     </ItemsContext.Provider>
     </WaitingContext.Provider>
     </FleetContext.Provider>
