@@ -51,7 +51,9 @@ describe('a key straight after a reply is sent', () => {
     page.press('Enter', mods);
     box.isConnected = false; // the send folds the box and moves on to B
     page.active = null;
-    now += 50;
+    // Under the 400 ms measured; a letter inside BURST_MS of the send is the
+    // sentence still arriving (letters-typed-straight-after-a-send-are-not-shortcuts).
+    now += 300;
   };
 
   it('O after Ctrl+Enter reaches the app, and the app opens the thread the reply went to', () => {

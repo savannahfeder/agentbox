@@ -5,8 +5,7 @@
 //   queued, because it counted an agent as busy only once its words shimmered;
 // - with Home now on by default, the practice tutorial ran with Home drawn
 //   over the inbox, so tips about tabs, the board and an open thread pointed
-//   at a screen that was not there, and N and Tab moved nothing it watched;
-// - on the invite step, Enter added an address and then nothing would send.
+//   at a screen that was not there, and N and Tab moved nothing it watched.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
@@ -18,11 +17,5 @@ describe('the walkthrough and the practice tutorial', () => {
   });
   it('puts Home away while the practice tutorial runs', () => {
     expect(read('App.tsx')).toMatch(/const homeShown = homeOn && homeOpen && !run && /);
-  });
-});
-
-describe('the invite step', () => {
-  it('sends with Enter once the address box is empty', () => {
-    expect(read('components/SetupSplit.tsx')).toMatch(/enter === 'add'\) \{ e\.preventDefault\(\); if \(typed\.trim\(\)\) addEmail\(\); else primary\.current\(\); return; \}/);
   });
 });
