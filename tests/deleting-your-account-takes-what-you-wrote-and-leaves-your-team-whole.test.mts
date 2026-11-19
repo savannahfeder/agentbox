@@ -52,6 +52,7 @@ beforeEach(async () => {
   db = new PGlite(await emptyDatabase());
   await db.exec(STAND_IN);
   await db.exec(migrations);
+  await db.exec(`insert into public.multiplayer_people (email) values ('*')`);
   await db.exec(`
     grant usage on schema auth to authenticated, anon;
     grant execute on function auth.uid() to authenticated, anon;

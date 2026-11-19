@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Face } from './people';
+import { AskForMultiplayer, NOT_LET_IN } from './ask-for-multiplayer';
 import type { Person } from '../types';
 import '../threads/thread-composer.css';
 import '../threads/share.css';
@@ -21,8 +22,9 @@ export function emailsIn(text: string, had: readonly string[] = []): { emails: s
   return { emails, rest };
 }
 
-export function StartTeam({ me, onStarted }: { me: Person | null; onStarted?: () => void }) {
+export function StartTeam({ me, multiplayer, onStarted }: { me: Person | null; multiplayer?: boolean | null; onStarted?: () => void }) {
   const [open, setOpen] = useState(false);
+  const letIn = multiplayer !== false;
   return (
     <div className="st-empty">
       <div className="st-seats">
@@ -30,8 +32,10 @@ export function StartTeam({ me, onStarted }: { me: Person | null; onStarted?: ()
         <span className="st-seat" aria-hidden="true">{plus}</span>
         <span className="st-seat" aria-hidden="true">{plus}</span>
       </div>
-      <h2 className="td-title st-title">Bring your team in</h2>
-      <button type="button" className="th-new st-start" onClick={() => setOpen(true)}>Start a team</button>
+      <h2 className="td-title st-title">{letIn ? 'Bring your team in' : NOT_LET_IN}</h2>
+      {letIn
+        ? <button type="button" className="th-new st-start" onClick={() => setOpen(true)}>Start a team</button>
+        : <AskForMultiplayer email={me?.email} className="th-new st-start" />}
       {open && <StartTeamCard onClose={() => setOpen(false)} onStarted={() => { setOpen(false); onStarted?.(); }} />}
     </div>
   );

@@ -49,8 +49,10 @@ describe("a teammate thread's name", () => {
     expect(pageTitle(renamed)).toBe('Launch tweets');
   });
 
-  it('leaves the inbox row reading as the teammate\'s message', () => {
-    expect(rowTitle(thread({ result: '**Post 7 now opens the hook.**' }))).toBe('Post 7 now opens the hook.');
+  // The inbox row took the answer's first line too until w-877175ed81.
+  it('is the name its inbox row has', () => {
+    const answered = thread({ result: '**Post 7 now opens the hook.**' });
+    expect(rowTitle(answered)).toBe(pageTitle(answered));
   });
 
   it('leaves a thread with no teammate named as before', () => {

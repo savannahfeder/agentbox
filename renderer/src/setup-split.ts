@@ -34,7 +34,7 @@ export async function bringInWithin(bring: () => Promise<number>, ms = BRING_IN_
   }
 }
 
-export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'invite' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
 
 /** Where Back goes, from a step or from the page after the last one. It passes over the account step once
@@ -59,7 +59,6 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true, p
   if (team && !signedIn) out.push('account');
   // One page offers Pro and takes its payment. The team is a paid thing, so inviting comes only once Pro is started.
   if (team && !onTeam) out.push('plan');
-  if (team && (onTeam || plan === 'pro')) out.push('invite');
   if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
@@ -71,7 +70,8 @@ export const PRO_PITCH = {
   head: 'Upgrade to Pro.',
   perks: [
     { id: 'cloud', title: 'A computer for every agent' },
-    { id: 'team', title: 'Share threads and tasks with your team' },
+    // Multiplayer is let in by hand for now (20261119000000_multiplayer_is_invite_only.sql).
+    { id: 'team', title: 'Share threads and tasks with your team', tag: 'Invite only' },
     { id: 'files', title: 'Files saved in the cloud' },
   ],
   // The free week beside the paid month, so the trial's hours are never read as the plan's.
@@ -82,7 +82,7 @@ export const PRO_PITCH = {
   free: 'Stay on Free',
 };
 
-/** A team is made when Pro starts, before anyone has named it; the invite page shows the name to change. */
+/** A team is made when Pro starts, before anyone has named it; Settings › Team renames it. */
 export function teamNameFor(person: string | null | undefined): string {
   const first = (person ?? '').trim().split(/\s+/)[0];
   return first ? `${first}’s team` : 'My team';
@@ -104,8 +104,6 @@ export function nextChoice<T>(all: readonly T[], now: T, by: 1 | -1): T {
   return all[Math.max(0, Math.min(all.length - 1, (at < 0 ? 0 : at) + by))] ?? now;
 }
 
-/** Which box has the cursor when the invite step opens: the team's name until it has one, then the email. */
-export const inviteCursor = (hasTeam: boolean): 'to-email' | 'add' => (hasTeam ? 'add' : 'to-email');
 
 /** Enter held down repeats, and a repeat is not a press: one press moves one step. Arrows may repeat. */
 export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key === 'Enter' && !!e.repeat;
@@ -132,18 +130,12 @@ export function starterChoices<T extends StarterLike>(left: T[]): T[] {
   return ENGINEERING.map((id) => left.find((s) => s.starter === id)).filter((s): s is T => !!s);
 }
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export function inviteList(raw: string[]): string[] {
-  return [...new Set(raw.map((e) => e.trim().toLowerCase()).filter((e) => EMAIL.test(e)))];
-}
-
 const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 /** What the last screen says was set up: only what happened. */
-export function setUpLines({ chats, project, invited, teammates }: { chats: number; project: string | null; invited: number; teammates: string[] }): string[] {
+export function setUpLines({ chats, project, teammates }: { chats: number; project: string | null; teammates: string[] }): string[] {
   const out: string[] = [];
   if (chats) out.push(`${n(chats, 'chat', 'chats')} brought in`);
   else if (project) out.push(`${project} is ready`);
-  if (invited) out.push(`${n(invited, 'teammate', 'teammates')} invited`);
   for (const t of teammates) out.push(`${t} added`);
   return out;
 }

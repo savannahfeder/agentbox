@@ -83,6 +83,8 @@ export interface TeamState {
   cards: TeamCard[];
   lastSyncAt: number | null;
   error: string | null;
+  /** False only when the cloud said this person's team is not let in yet; null when it could not say. */
+  multiplayer?: boolean | null;
   phoneSite?: string | null;
   phoneSiteQr?: string | null;
   phoneError?: string | null;
@@ -132,6 +134,8 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   teamPeople(teamId: string): Promise<TeamPerson[]>;
   listCards(): Promise<TeamCard[]>;
   pendingInvites(): Promise<TeamInvite[]>;
+  /** 20261119000000_multiplayer_is_invite_only.sql: whether this person may invite teammates. */
+  hasMultiplayer?(): Promise<boolean>;
   listInvites?(teamId: string): Promise<TeamSentInvite[]>;
   createTeam(name: string): Promise<TeamRef>;
   renameTeam(teamId: string, name: string): Promise<unknown>;
@@ -552,7 +556,13 @@ export function createTeamService({
     // The invites this team has out, so the settings page can say who has not
     // joined yet and let them be cancelled.
     const sent = team && backend!.listInvites ? await backend!.listInvites(team.id).catch(() => []) : [];
-    set(withCards(cards, { team, people, invites, sent, since: me ? kept().getSince(me) : null }));
+    set(withCards(cards, { team, people, invites, sent, since: me ? kept().getSince(me) : null, multiplayer: await readMultiplayer() }));
+  }
+
+  // An older cloud has no gate, so a failed ask is null and nothing is hidden.
+  async function readMultiplayer() {
+    if (!backend?.hasMultiplayer) return null;
+    return backend.hasMultiplayer().catch((err) => { log(`team: multiplayer: ${err.message}`); return null; });
   }
 
   // WHO HAS OPENED EACH CONVERSATION, by `${slug}/${id}` then person. An older
@@ -588,6 +598,7 @@ export function createTeamService({
         // An invite sent after this person signed in shows up here, not at
         // their next sign-in. It is offered, never taken up.
         if (!state.team) await refreshTeam();
+        else if (state.multiplayer === false) set({ multiplayer: await readMultiplayer() });
         await clearLapsedStatus();
         const report = await sync!.syncOnce();
         // The people are read again on every pass, with the activity, so a
