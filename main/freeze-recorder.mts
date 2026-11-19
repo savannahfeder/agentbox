@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { stripTypesFlags } from './strip-types.mts';
+import { noteThread } from './thread-heaps.mts';
 
 export const THRESHOLD_MS = 500;
 export const KEEP_DAYS = 7;
@@ -200,6 +201,7 @@ export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_
     return { stop() {}, asleep() {}, awake() {} };
   }
   worker.unref();
+  noteThread('freeze watcher', worker);
   worker.on('message', (m: { freeze?: FreezeSummary; gaveUp?: string } | null) => {
     if (m?.freeze) { try { onFreeze(m.freeze); } catch { /* the line is already on disk */ } }
     if (m?.gaveUp) console.warn(`zero: freezes will not be recorded: ${m.gaveUp}`);

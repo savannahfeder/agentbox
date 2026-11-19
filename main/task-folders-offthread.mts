@@ -31,6 +31,7 @@
 import { Worker } from 'node:worker_threads';
 import * as folders from './task-folders.mts';
 import { stripTypesFlags } from './strip-types.mts';
+import { noteThread } from './thread-heaps.mts';
 
 export type FolderJobName =
   | 'restoreTaskFolder' | 'releaseTaskFolder' | 'parkTaskFolder' | 'listTaskFolders'
@@ -257,7 +258,11 @@ export class FolderLanes {
 }
 
 const lanes = new FolderLanes({
-  makeThread: () => new Worker(new URL('./task-folders-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] }),
+  makeThread: () => {
+    const thread = new Worker(new URL('./task-folders-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
+    noteThread('folders', thread);
+    return thread;
+  },
   runHere: (name, args) => (folders[name] as (...args: unknown[]) => unknown)(...args),
 });
 

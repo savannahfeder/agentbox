@@ -32,6 +32,7 @@ import { codexDataDirs } from './agent-homes.mts';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
 import { howTheChatEnded } from '../shared/agent-import.mts';
 import { stripTypesFlags } from './strip-types.mts';
+import { noteThread } from './thread-heaps.mts';
 
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
 
@@ -493,6 +494,7 @@ export function readCodexThreadsOffThread(opts: CodexThreadsOptions = {}): Promi
     if (!worker) {
       worker = new Worker(new URL('./codex-threads-worker.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
       worker.unref();
+      noteThread('codex reader', worker);
       worker.on('message', ({ id, ok, value, error }: OffThreadReply) => {
         const w = waiting.get(id);
         if (!w) return;

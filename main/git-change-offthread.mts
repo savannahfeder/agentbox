@@ -12,6 +12,7 @@ import { Worker } from 'node:worker_threads';
 import * as git from './git-change.mts';
 import { saveRunChange } from './run-change.mts';
 import { stripTypesFlags } from './strip-types.mts';
+import { noteThread } from './thread-heaps.mts';
 
 type Job = (...args: unknown[]) => unknown;
 
@@ -51,6 +52,7 @@ function thread(): Worker | null {
     broken = true;
     return null;
   }
+  noteThread('git', worker);
   worker.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
     const job = waiting.get(id);
     if (!job) return;

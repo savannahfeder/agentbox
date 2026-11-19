@@ -38,6 +38,7 @@ import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { startMemoryRecorder } from './memory-recorder.mts';
+import { threadHeaps } from './thread-heaps.mts';
 import { FreezeWatch } from './freeze-watch.mts';
 import { applyThrough, phoneDevice } from './phone-inbox.mts';
 import type { PhoneChannel } from './phone-inbox.mts';
@@ -489,6 +490,7 @@ async function createWindow() {
     dir: path.join(userDir, 'memory-log'),
     processes: () => app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) })),
     windowSnapshot: (file) => (window && !window.isDestroyed() ? window.webContents.takeHeapSnapshot(file) : Promise.reject(new Error('no window'))),
+    threads: () => threadHeaps(),
   });
   quitStep(app, 'before-quit', 'memory.stop', () => memory.stop());
   const freezeWatch = new FreezeWatch({ store, userDir, appDir });
