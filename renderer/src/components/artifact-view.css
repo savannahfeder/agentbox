@@ -133,14 +133,6 @@
 .link-pop.selection-bar { z-index: 9450; gap: 2px; padding: 4px; }
 .selection-bar .link-pop-btn { padding: 4px 8px; color: var(--text-dim); }
 .selection-bar-comment { display: inline-flex; align-items: center; gap: 6px; }
-/* The reply box's key cap, in the body font: the code font draws ⌘ too small to read. */
-.selection-bar-keys { display: inline-flex; gap: 3px; margin-left: 2px; }
-.selection-bar-keys kbd {
-  font-family: inherit; font-size: 11px; line-height: 15px; color: var(--text-dim);
-  background: var(--wash); border: 1px solid var(--line-strong);
-  border-radius: var(--radius); padding: 0 5px; min-width: 16px; text-align: center;
-}
-
 
 .av-side { flex: none; width: 340px; display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
 .av-verdict { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }

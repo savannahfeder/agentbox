@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import { isCommentChord, COMMENT_CHORD } from '../renderer/src/selection-bar.ts';
 import { reportSelectedWords } from '../shared/frame-selected-words.mts';
 import { SHORTCUTS } from '../shared/shortcuts.mts';
+import { HINTS } from '../renderer/src/hint-plate.ts';
 
 const press = (over: Record<string, unknown>) => ({ code: 'Slash', key: '/', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...over });
 const bar = () => fs.readFileSync(new URL('../renderer/src/components/SelectionBar.tsx', import.meta.url), 'utf8');
@@ -50,9 +51,11 @@ describe('the bar answers it', () => {
     expect(bar()).toContain("window.addEventListener('keydown', key, true)");
     expect(bar()).toContain('if (!isCommentChord(e, MAC)) return;');
   });
-  it('and draws it on Comment in the app\'s own caps, one per key', () => {
-    expect(bar().match(/<CommentKeys \/>/g)?.length).toBe(2);
-    expect(bar()).toContain('caps(COMMENT_CHORD).map(');
+  // Caps printed on the button were turned down twice; the app says a button's key on hover, in the hint plate.
+  it('says it the way every other button does, on the hover plate, not on the button', () => {
+    expect(bar().match(/data-hint="comment"/g)?.length).toBe(2);
+    expect(bar()).not.toContain('<kbd');
+    expect(HINTS.comment).toEqual([{ key: COMMENT_CHORD, what: 'Comment on selected words' }]);
   });
   it('is listed on the shortcuts page', () => {
     const row = SHORTCUTS.flatMap((g) => g.keys).find((k) => k.keys.includes(COMMENT_CHORD));
