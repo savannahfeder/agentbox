@@ -144,7 +144,9 @@ export async function launchChrome({ width = 1440, height = 900, scale = 2, prof
   if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
   const chrome = start(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    `--force-device-scale-factor=${scale}`, '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
+    // Dark with nobody connected: the media setting below lasts one connection,
+    // and a command that lets go would turn a Match system page light.
+    `--force-device-scale-factor=${scale}`, '--hide-scrollbars', '--no-first-run', '--force-dark-mode', ...KEEPS_OFF_THE_KEYCHAIN,
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'], detached });
   const wsUrl = await new Promise((resolve, reject) => {

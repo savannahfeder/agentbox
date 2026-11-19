@@ -37,8 +37,8 @@ describe("a teammate's thread page", () => {
     expect(pageTitle(run({ title: '  ' }))).toBe(rowTitle(run({ title: '' })));
   });
 
-  it('leaves the list row reading as its message', () => {
-    expect(rowTitle(run())).toBe("Four questions are in the team chat; answer them and I'm set up as Launch lead.");
+  it('is the name its list row has', () => {
+    expect(rowTitle(run())).toBe('Set up its job');
   });
 
   it('leaves every other thread named as the list names it', () => {

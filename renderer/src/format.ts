@@ -62,6 +62,7 @@ export interface ParsedOption {
 export function parseOptions(body?: string): ParsedOption[] {
   if (!body) return [];
   const lines = body.split('\n');
+  if (!lines.some(isOptionsHeading)) return headlessOptions(lines)?.options ?? [];
   let inOptions = false;
   const options: ParsedOption[] = [];
   for (const line of lines) {
@@ -80,6 +81,42 @@ export function parseOptions(body?: string): ParsedOption[] {
     }
   }
   return options;
+}
+
+const isOptionsHeading = (line: string) => /^#{1,4}\s/.test(line) && /option/i.test(line);
+
+// Agents do not always write the heading (a Codex run ended on a bare list,
+// w-40d7d7cf71). Without it, a numbered list counts as an offer only when it
+// closes the message, runs 1, 2, 3..., and marks one choice recommended, so a
+// list of steps stays prose.
+const ITEM = /^ {0,3}(\d+)[.)]\s+(.*)$/;
+const LEADING_MARK = /^(?:\*\*|__)?\[?recommended(?:\]|\s*[:\p{Pd}]|\*\*|__)\s*(?:\*\*|__)?\s*[:\p{Pd}]?\s*/iu;
+const TRAILING_MARK = /\s*(?:\p{Pd}\s*)?(?:\*\*|__)?[([]recommended\b[^)\]]*[)\]](?:\*\*|__)?\s*$|\s*\p{Pd}\s*(?:\*\*|__)?recommended(?:\*\*|__)?\s*$/iu;
+
+function headlessOptions(lines: string[]): { start: number; end: number; options: ParsedOption[] } | null {
+  let last = -1;
+  for (let i = lines.length - 1; i >= 0; i--) if (ITEM.test(lines[i])) { last = i; break; }
+  if (last < 0) return null;
+  const continues = (l: string) => !l.trim() || /^\s{2,}\S/.test(l);
+  let end = last + 1;
+  while (end < lines.length && continues(lines[end])) end++;
+  const after = lines.slice(end).filter((l) => l.trim());
+  if (after.length > 2 || after.some((l) => /^#{1,4}\s/.test(l))) return null;
+  let start = last;
+  for (let i = last - 1; i >= 0 && (ITEM.test(lines[i]) || continues(lines[i])); i--) if (ITEM.test(lines[i])) start = i;
+  const options: ParsedOption[] = [];
+  for (let i = start; i < end; i++) {
+    const m = lines[i].match(ITEM);
+    if (!m) continue;
+    const text = m[2].trim();
+    const bare = text.replace(LEADING_MARK, '');
+    const marked = bare !== text || TRAILING_MARK.test(text);
+    const words = marked ? `${bare.replace(TRAILING_MARK, '')} (recommended)` : text;
+    options.push({ n: Number(m[1]), text: words, recommended: marked });
+  }
+  if (options.length < 2 || options.some((o, i) => o.n !== i + 1) || !options.some((o) => o.recommended)) return null;
+  while (end > start && !lines[end - 1].trim()) end--;
+  return { start, end, options };
 }
 
 // WHICH FIELD A PICK LIVES IN, and it is not always the body.
@@ -131,6 +168,10 @@ export function itemOptions(item: HasFields): ParsedOption[] {
 // list where it was written, as the record of what was offered.
 export function stripOptionsSection(body: string): string {
   const lines = body.split('\n');
+  if (!lines.some(isOptionsHeading)) {
+    const list = headlessOptions(lines);
+    return list ? [...lines.slice(0, list.start), ...lines.slice(list.end)].join('\n') : body;
+  }
   const out: string[] = [];
   let inOptions = false;
   for (const line of lines) {
