@@ -182,6 +182,8 @@ export interface PhoneInboxOptions {
   liveOf?: (slug: string, id: string) => PhoneLiveRun | null;
   /** The saved change of the thread's last run, without its rows; null when it has none. */
   changeOf?: (dir: string, id: string) => Parameters<typeof phoneChangeOf>[0];
+  /** Where that saved change is on disk, rows and all, so the phone can open its code. */
+  changeFileOf?: (dir: string, id: string) => string;
   waitsOf?: () => { byId?: Record<string, PhoneWait>; paused?: boolean } | null;
   approvalsOf?: () => PhoneApprovalAsk[];
   readSettings?: (() => SettingsModel | null | Promise<SettingsModel | null>) | null;
@@ -262,7 +264,8 @@ export function createPhoneInbox({
   build = threadSnapshot,
   // (slug, id) -> { since, where: 'mac' | 'cloud', doing: [{ label, startedAt }] } while an agent runs on it, else null.
   liveOf = () => null,
-  changeOf = (dir: string, id: string) => { try { return readChangeSummary(path.join(machineryDir(dir), changePath(id))); } catch { return null; } },
+  changeFileOf = (dir: string, id: string) => path.join(machineryDir(dir), changePath(id)),
+  changeOf = (dir: string, id: string) => { try { return readChangeSummary(changeFileOf(dir, id)); } catch { return null; } },
   // () -> { byId: { [id]: { state, tool?, until? } }, paused } (shared/phone-snapshot.mts phoneWaitsOf),
   // why each thread nothing runs on is waiting, read once a pass; none says nothing.
   waitsOf = () => null,
@@ -430,7 +433,8 @@ export function createPhoneInbox({
         // Only the run or its files moved: the copy of the row and its lines is the one already made.
         let base = was?.inputs === inputs ? was.base : null;
         const made = () => (base ??= build(item, history, SNAPSHOT_LIMITS, { home, runs: runsOf(p.slug, item.id) }));
-        const files = uploads && p.dir ? uploads.manifest(sk, made as () => ThreadSnapshot, { dir: p.dir, repoPath: p.repoPath, updatedAt: item.updatedAt ?? 0, base: inputs }) : null;
+        const changeFile = change && p.dir ? { key: changePath(item.id), file: changeFileOf(p.dir, item.id) } : null;
+        const files = uploads && p.dir ? uploads.manifest(sk, made as () => ThreadSnapshot, { dir: p.dir, repoPath: p.repoPath, updatedAt: item.updatedAt ?? 0, base: `${inputs}\0${changeKey}`, change: changeFile }) : null;
         if (was && was.inputs === inputs && was.live === live && was.files === files && was.askKey === askKey && was.waitKey === waitKey && was.changeKey === changeKey && state.sent[sk] === was.key) continue;
         let snap: Record<string, unknown> = live ? { ...made(), live } : made();
         if (waitingOn.length) snap = { ...snap, approvals: waitingOn };

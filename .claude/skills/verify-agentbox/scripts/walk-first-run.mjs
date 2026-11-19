@@ -133,20 +133,14 @@ try {
   await page.type('correct-horse-9');
   await see('account-email-and-password', /Create account/i);
   await key('Enter');
-  await see('plan', /Upgrade to Pro.*Try Pro free for 7 days.*Stay on Free/i);
+  await see('plan', /Upgrade to Pro.*Invite only.*Try Pro free for 7 days.*Stay on Free/i);
   if (/\d+ (cloud agents )?at once/i.test(await page.evaluate(`document.querySelector('.setup-split')?.innerText ?? ''`))) throw new Error('the plan page still names a number of cloud agents at once');
   await key('Enter');
   await see('plan-waiting-on-stripe', /Finish in your browser/i);
   await page.evaluate('window.__walkPaid = true');
-  await see('invite', /Invite your team.*Skip/i);
-  if (!await page.evaluate(`document.querySelector('.setup-split input[data-ss-enter="to-email"]')?.value === 'Dana’s team'`)) throw new Error('the invite page did not show the team made as Pro started');
-  await page.type('theo@northwind.test');
-  await key('Enter');
-  await see('invite-added', /Send 1 invite.*Skip/i);
-  await key('Enter');
   await see('look', /Pick your look/i);
   await key('Enter');
-  await see('all-set', /You’re set up.*4 chats brought in.*1 teammate invited.*Start the walkthrough/i);
+  await see('all-set', /You’re set up.*4 chats brought in.*Start the walkthrough/i);
   // There is a way back from the last page: Back, and the dash of a step already passed.
   if (!await click('Back')) throw new Error('the last page has no Back');
   await see('back-from-all-set', /STEP 6 OF 6.*Pick your look/i);

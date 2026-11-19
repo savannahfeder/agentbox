@@ -18,8 +18,8 @@ const trial = fs.readFileSync(new URL('../renderer/src/pro-trial.ts', import.met
 
 describe('where the purchase page comes', () => {
   // 2026-11-12: it is the plan step itself, straight after the account; a second page three steps on read as the offer made twice.
-  it('straight after the account, and inviting follows it for Pro', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'look']);
+  it('straight after the account', () => {
+    expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'look']);
   });
   it('nowhere for Free, or for someone joining a team that is already paid for', () => {
     expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'free' })).not.toContain('pay');
@@ -96,11 +96,6 @@ describe('the page on screen', () => {
   it('lists what Pro brings, and can be skipped', () => {
     expect(split).toMatch(/PRO_PITCH\.perks\.map\(\(k\) => <div key=\{k\.id\} className="ss-perk">/);
     expect(split).toMatch(/: PRO_PITCH\.cta, \(\) => void pay\(\), payState !== 'opening'\)\}\{plan !== 'pro' && quiet\(PRO_PITCH\.free, next\)\}/);
-  });
-  it('moves from the team’s name to the email field on Enter, where Enter on nothing goes on', () => {
-    // Walking it, Enter in "Name your team" did nothing at all.
-    expect(split).toMatch(/<input className="ss-input" data-ss-enter="to-email" placeholder="Name your team"/);
-    expect(split).toMatch(/if \(typing && enter === 'to-email'\) \{ e\.preventDefault\(\); document\.querySelector<HTMLInputElement>\('\.setup-split input\[data-ss-enter="add"\]'\)\?\.focus\(\); return; \}/);
   });
   it('makes the team as Pro starts, before anyone is invited, since its seats are what is paid for', () => {
     expect(trial).toMatch(/if \(!hasTeam\) \{\n    const made = await api\.teamCreate\(teamNameFor\(name\)\);[\s\S]*await api\.cloudAccountPay\('team'\)/);
