@@ -797,8 +797,7 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
       key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item),
-      // A cause names every project its threads are in, as its list row does.
-      project: isCause(item) && item.status !== 'done' ? causeWhere(item, waitingOn(item, items), product.name) : product.name,
+      project: isCause(item) && item.status !== 'done' ? causeWhere(item, waitingOn(item, items), (slug) => bySlug.get(slug)?.name ?? slug) : product.name,
       projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null,
       live: !!live?.has(item.id),
     });
