@@ -83,6 +83,19 @@ export const PREVIEW_FILM_ATTACHED = listed('~/docs/launch-film', [
 export const PREVIEW_SCRIPT_ATTACHED = listed('~/docs/launch-film', [['script/launch-script.md', 'f3', 'md', SCRIPT.length, `data:text/markdown;charset=utf-8,${encodeURIComponent(SCRIPT)}`]]);
 /** The website's copy: the meter it shipped. */
 export const PREVIEW_SITE_ATTACHED = listed('~/docs/website', [['designs/limits-meter.png', 'f4', 'png', 71_000, meter]]);
+const FIZZ = JSON.stringify({
+  plus: 13, minus: 1, files: [
+    { path: 'src/fizz.js', plus: 2, minus: 1, hunks: [{ said: 'fizz(15) hit the Fizz branch first, so the FizzBuzz case goes on top.', nums: [[1, 1], [null, 2], [2, 3], [3, 4], [4, null], [null, 5], [5, 6]], rows: [
+      ['=', 'export function fizz(n) {'], ['+', '  if (n % 15 === 0) return "FizzBuzz";'],
+      ['=', '  if (n % 3 === 0) return "Fizz";'], ['=', '  if (n % 5 === 0) return "Buzz";'], ['-', '  return n;'], ['+', '  return String(n);'], ['=', '}'],
+    ] }] },
+    { path: 'test/fizz.test.js', plus: 11, minus: 0, hunks: [{ said: 'A test for each case, 15 first.', nums: Array.from({ length: 11 }, (_, i) => [null, i + 1]), rows: [
+      'import { fizz } from "../src/fizz.js";', '', 'test("15 is FizzBuzz", () => {', '  expect(fizz(15)).toBe("FizzBuzz");', '});', 'test("9 is Fizz", () => {', '  expect(fizz(9)).toBe("Fizz");', '});', 'test("7 is 7", () => {', '  expect(fizz(7)).toBe("7");', '});',
+    ].map((l) => ['+', l]) }] },
+  ],
+});
+/** The fizz thread's copy: the change its run saved, as main/phone-inbox.mts sends it. */
+export const PREVIEW_FIZZ_ATTACHED = listed('~/docs/website', [['runs/w-5e6f7a8b9d/the-change-it-made.change', 'f5', 'change', FIZZ.length, `data:application/json;charset=utf-8,${encodeURIComponent(FIZZ)}`]]);
 
 /** A link for every name; one the preview does not carry is the first picture. */
 export const previewLink = (n) => PREVIEW_LINKS.get(n) ?? PREVIEW_LINKS.values().next().value;

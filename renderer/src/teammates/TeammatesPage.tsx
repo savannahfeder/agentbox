@@ -11,7 +11,7 @@ import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST
 import { ModelPicker } from '../components/Model';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
-import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
+import { answerOf, answersMessage, chatEntries, chatWith, openedLines, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
 import { AskBeforeDeleting } from '../team/MessageMore';
@@ -213,7 +213,7 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   onOpen: (open: string) => void; onOpenThread: (product: string, id: string) => void; onOpenFile: (product: string, src: string) => void; placeholder: string; error: string | null;
   tabOf: (item: WorkItem) => TabView | null;
 }) {
-  const entries = chatWith(view, t.id);
+  const entries = [...chatWith(view, t.id), ...openedLines(items, t.id)].sort((a, b) => a.ts - b.ts);
   const scroller = useRef<HTMLDivElement>(null);
   const last = entries.at(-1)?.id;
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [last, t.id]);
@@ -222,14 +222,15 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   let day = '';
   let prevFrom = '';
   let saved = false;
-  // Threads it sent one after another are one list, as they would be in the inbox.
+  // Threads it sent or opened one after another are one list, as they would be in the inbox.
   let sent: TeamRunLine[] | null = null;
+  const aThread = (e: ChatEntry) => e.kind === 'run' && (e.verb === 'sent' || e.verb === 'opened');
   const rows: ReactNode[] = [];
   for (const e of entries) {
     const d = dayOf(e.ts);
     if (d !== day) { rows.push(<div key={`day-${e.id}`} className="rm-day"><span className="rm-label">{d}</span></div>); day = d; prevFrom = ''; sent = null; }
-    if (e.kind === 'run' && e.verb === 'sent' && sent) { sent.push(e as TeamRunLine); continue; }
-    if (!(e.kind === 'run' && e.verb === 'sent')) sent = null;
+    if (aThread(e) && sent) { sent.push(e as TeamRunLine); continue; }
+    if (!aThread(e)) sent = null;
     // Several things saved in a row read as one line.
     if (e.kind === 'act' && SAVED_VERBS.has(e.verb ?? '')) {
       if (!saved) rows.push(<Saved key={e.id} onSee={() => onOpen(`about:${t.id}`)} />);
@@ -249,7 +250,7 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
         files={kept ? { product: kept.slug, dir: kept.dir } : null}
         asking={open.some((q) => q.id === e.id) ? asking : null} />);
       prevFrom = e.from;
-    } else if (e.kind === 'run' && e.verb === 'sent') {
+    } else if (aThread(e)) {
       sent = [e as TeamRunLine];
       rows.push(<SentCard key={e.id} runs={sent} items={items} tabOf={tabOf} onOpenThread={onOpenThread} />);
       // It stands apart from the messages, so the next one says who wrote it.
@@ -278,8 +279,10 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
 }
 
 const SENT_WORDS: Partial<Record<TabView, string>> = { inbox: 'Waiting on you', progress: 'In progress', done: 'Done' };
+// A thread it opened for an agent waits in Later until you start it.
+const OPENED_WORDS: Partial<Record<TabView, string>> = { ...SENT_WORDS, snoozed: 'Not started' };
 
-// What it sent you: one quiet line per thread, where it stands and its title, that opens it.
+// What it sent you or opened: one quiet line per thread, where it stands and its title, that opens it.
 function SentCard({ runs, items, tabOf, onOpenThread }: {
   runs: TeamRunLine[]; items: WorkItem[]; tabOf: (item: WorkItem) => TabView | null;
   onOpenThread: (product: string, id: string) => void;
@@ -290,7 +293,7 @@ function SentCard({ runs, items, tabOf, onOpenThread }: {
       const tab = item ? tabOf(item) : null;
       return <button key={r.id} type="button" className="tq-sent-line" onClick={() => onOpenThread(r.product, r.item)}>
         {tab === 'inbox' && <i className="tq-dot-need" aria-hidden="true" />}
-        <span className="v">{(tab && SENT_WORDS[tab]) ?? 'Sent you'}:</span> <span className="t">{r.said || r.title}</span>
+        <span className="v">{r.verb === 'opened' ? (tab && OPENED_WORDS[tab]) ?? 'Opened' : (tab && SENT_WORDS[tab]) ?? 'Sent you'}:</span> <span className="t">{r.said || r.title}</span>
       </button>;
     })}
   </div>;

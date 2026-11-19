@@ -45,6 +45,7 @@ import { machineryPath, removeMachinery } from './store/home.mts';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
 import { hopOf, HOP_LABEL_PREFIX } from '../shared/teammates.mts';
+import { writesToReopen, type WasBeforeClose } from '../shared/reopen-as-it-was.mts';
 import {
   answerMode as readAnswerMode, answerModes, clearAnswerMode as clearAnswerModeFile, setAnswerMode,
   touchAnswerMode as touchAnswerModeFile,
@@ -637,6 +638,14 @@ export class Store {
     if (priority != null) item = workItemsDisk.updateWorkItem(dir, id, { priority }, { source: 'founder' });
     if (status) item = workItemsDisk.updateWorkItem(dir, id, { status }, { source: 'founder' });
     if (typeof putAway === 'boolean') item = workItemsDisk.updateWorkItem(dir, id, { putAway }, { source: 'founder' });
+    return item;
+  }
+
+  /** Z on a close: the status the row had before it (shared/reopen-as-it-was.mts). */
+  reopenAsItWas(slug: string, id: string, was: WasBeforeClose | null | undefined) {
+    const dir = this.productDir(slug);
+    let item: StoreItem | null = null;
+    for (const { status, source } of writesToReopen(was)) item = this.modules.workItemsDisk.updateWorkItem(dir, id, { status }, { source });
     return item;
   }
 
