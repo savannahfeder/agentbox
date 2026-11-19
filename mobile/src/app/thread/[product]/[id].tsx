@@ -627,7 +627,7 @@ export default function ThreadScreen() {
               <Markdown text={thread.outcome.text} dir={dir} files={files} />
             </View>
           )}
-          {thread.change && <ChangeCard change={thread.change} />}
+          {thread.change && <ChangeCard change={thread.change} product={item.product} id={item.id} />}
           {thread.after.length > 0 && (
             <View style={{ marginTop: 22, gap: 9 }}>
               {thread.after.map((a, k: number) => <ActLine key={`${a.at}-${k}`} act={a} joined={k > 0} />)}

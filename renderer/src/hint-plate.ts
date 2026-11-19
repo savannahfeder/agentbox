@@ -109,17 +109,9 @@ export const HINTS: Record<string, HintLine[]> = {
     // sidebar still says Closed while this says Mark done; whichever merges
     // second makes them agree. Do not put "Close" back.
     { key: 'E', what: 'Mark done' },
-    // L, NOT S, SINCE 2026-10-01. S opens the summary inside a thread and
-    // opened the schedule picker here, so the plate and the thread's own top
-    // bar printed one letter for two different things. Scheduling is L
-    // everywhere now: this plate, the shortcuts page, ⌘K and the walk.
+    // L, not S, since 2026-10-01: S once meant the summary too.
     { key: 'L', what: 'Schedule for later' },
   ],
-  // AND S IS NOT ON THIS PLATE, BECAUSE THE SUMMARY BUTTON PRINTS IT. S means
-  // the summary everywhere in the app now (threads/Summary.tsx); the button in
-  // a thread's top bar wears its own S the way the reply pill wears R, and a
-  // component that already shows its key gets no plate. The shortcuts page
-  // lists it.
   // The cloud button (threads/Pages.tsx): ⌘C turns the cloud on or off.
   cloud: [{ key: '⌘C', what: 'Cloud on or off' }],
   // THE MAGNIFIER GETS A PLATE: nothing about a magnifier says what pressing it costs.
@@ -134,10 +126,6 @@ export const HINTS: Record<string, HintLine[]> = {
   // the row plate's own wording.
   done: [{ key: 'E', what: 'Mark done' }],
   'close-task': [{ key: '', what: 'Close the task for both of you' }],
-  // The Summary button printed its S on its face until w-5984544441; the key
-  // is said here now, the same as every other button in the corner. Since
-  // w-a3482b8c2c it hangs from the summary's rail and the icon that closes it.
-  summary: [{ key: 'S', what: 'Show or hide the summary' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
   // The Inbox button left of the back arrow, drawn only on a thread.
   inbox: [{ key: 'esc', what: 'Inbox' }],
@@ -150,6 +138,8 @@ export const HINTS: Record<string, HintLine[]> = {
   'thread-files': [{ key: '', what: 'Files in this thread' }],
   'runs-on': [{ key: '', what: 'Where this thread runs' }],
   more: [{ key: '', what: 'More actions' }],
+  // Comment on the bar over selected words (SelectionBar.tsx).
+  comment: [{ key: '⌘/', what: 'Comment on selected words' }],
 };
 
 export interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }
@@ -193,13 +183,17 @@ export function placeHint(
    */
   text?: { left: number },
   inset = 0,
+  /** 'above' for a control whose plate would cover what it acts on, such as the bar over selected words. */
+  side: 'below' | 'above' = 'below',
 ): { top: number; left: number; rose: boolean } | null {
   // A BOX OF NOTHING IS NOT A PLACE. A detached element measures 0 by 0 at 0,0,
   // and the clamp below would turn that into the window's top-left corner,
   // which is where a row's keys once ended up, sitting over the traffic
   // lights. The caller drops the hint rather than drawing it somewhere.
   if (comp.width <= 0 && comp.height <= 0) return null;
-  const rose = comp.bottom + HINT_GAP + plate.height > viewport.height - HINT_MARGIN;
+  const rose = side === 'above'
+    ? comp.top - HINT_GAP - plate.height >= HINT_MARGIN
+    : comp.bottom + HINT_GAP + plate.height > viewport.height - HINT_MARGIN;
   const top = rose ? comp.top - HINT_GAP - plate.height : comp.bottom + HINT_GAP;
   // `center`: under the middle of a small square button, whose plate is
   // wider than it and would otherwise hang off one side.

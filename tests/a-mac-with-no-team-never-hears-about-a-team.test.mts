@@ -8,9 +8,8 @@
 // the public: it only starts when cloud/team.config.json is in the app folder,
 // and neither the npm package nor the desktop build carries that file. But four
 // sentences reached a person with no team regardless, because they were drawn
-// whatever the team state was:
-//   - the summary panel's "Visible to: Team" row, with a Team / Chosen people
-//     menu (a thread with no visibility reads as "team" when there is no team);
+// whatever the team state was (a fourth, the side summary's "Visible to" row,
+// went with that panel):
 //   - the walk's "who" beat: "Every thread goes to an agent, or to a person on
 //     your team.";
 //   - the walk's last card: "Open Team to see what your teammates are working
@@ -23,29 +22,11 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { SummaryPanel } from '../renderer/src/threads/Summary';
 import { InboxClear } from '../renderer/src/threads/Pages';
 import { COACHED, COPY, coach } from '../renderer/src/onboarding';
 
 const TEAM_WORDS = /\bteam\b|teammate|Visible to/i;
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-const NOW = Date.now();
-const item = {
-  id: 'w-1', product: 'north', productName: 'Northwind', title: 'Send the terms', status: 'open',
-  kind: 'task', labels: [], priority: 5, createdAt: NOW - 60_000, updatedAt: NOW - 60_000,
-};
-const team = { state: { since: 0, signedIn: true }, me: 'p-me', byId: new Map(), products: new Map() };
-
-describe('the summary panel', () => {
-  const draw = (t) => text(renderToStaticMarkup(React.createElement(SummaryPanel, { item, items: [item], team: t })));
-  it('has no Visible to row when there is no team', () => {
-    expect(draw(null)).not.toMatch(TEAM_WORDS);
-  });
-  it('still has it on a team', () => {
-    expect(draw(team)).toMatch(/Visible to/);
-  });
-});
-
 describe('the walk', () => {
   // THE "WHO" BEAT IS GONE (2026-10-06), the one card that named a team in the
   // middle of the walk: single player, so a thread only ever goes to an agent.

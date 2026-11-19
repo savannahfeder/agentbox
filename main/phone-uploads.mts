@@ -132,6 +132,7 @@ const knownType = (file: string) => TYPES[path.extname(file).toLowerCase()] ?? P
 /** What a file goes up as, or null for one that never goes. */
 export const typeOf = (file: string) => {
   if (NEVER.test(file) || SECRET_NAME.test(path.basename(file))) return null;
+  if (/\.change$/i.test(file)) return 'application/json';
   return knownType(file) ?? DOCUMENTS[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
 };
 
@@ -425,7 +426,7 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
    * its files looked at again every five minutes, since a page can change under the
    * same words.
    */
-  function manifest(sk: string, made: ThreadSnapshot | (() => ThreadSnapshot), { dir, repoPath = null, updatedAt = 0, base = '' }: { dir: string; repoPath?: string | null; updatedAt?: number | string; base?: string }) {
+  function manifest(sk: string, made: ThreadSnapshot | (() => ThreadSnapshot), { dir, repoPath = null, updatedAt = 0, base = '', change = null }: { dir: string; repoPath?: string | null; updatedAt?: number | string; base?: string; change?: NamedFile | null }) {
     const was = memo.get(sk);
     if (was && was.base === base && now() - was.at < LOOK_AGAIN_MS) return was.out;
     const rank = Number(updatedAt) || 0;
@@ -436,7 +437,11 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
       const folders = foldersNamed(snapshot, { dir, repoPath, home });
       const where = { docs: real(dir), repo: repoPath && real(repoPath) };
       // Each page with its own files right after it.
-      const all = new Map();
+      const all = new Map<string, string>();
+      // The run's saved change lives with the app's own records, outside both
+      // project folders, so it is only ever sent when the caller names it.
+      const changeFile = change ? real(change.file) : null;
+      if (change && changeFile && /\.change$/.test(changeFile)) all.set(change.key, changeFile);
       const budget = { bytes: PAGES_READ_MAX };
       for (const f of named) {
         if (all.size >= limits.files) break;
@@ -464,7 +469,8 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
             const shape = shapeOf(file, st);
             files[key] = shape ? { s: st.size, soon: true, w: shape.w, h: shape.h } : { s: st.size, soon: true };
           }
-          const job = queue.get(file) ?? { bytes: st.size, rank, roots: [where.docs, where.repo].filter(Boolean) as string[], threads: new Set() };
+          const roots = file === changeFile ? [path.dirname(file)] : [where.docs, where.repo].filter(Boolean) as string[];
+          const job = queue.get(file) ?? { bytes: st.size, rank, roots, threads: new Set() };
           job.rank = Math.max(job.rank, rank);
           job.threads.add(sk);
           queue.set(file, job);

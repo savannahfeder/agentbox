@@ -16,8 +16,8 @@ const thread = {
   result: '**Would you approve this post?**\n\nA useful assistant can help you get to a first draft faster.',
 };
 
-it("names a teammate's thread by its title, where the inbox row reads its answer", () => {
-  expect(rowTitle(thread)).toBe('Would you approve this post?');
+it("names a teammate's thread by its title, in the inbox and on its page", () => {
+  expect(rowTitle(thread)).toBe('LinkedIn post topics without Later');
   expect(pageTitle(thread)).toBe('LinkedIn post topics without Later');
 });
 

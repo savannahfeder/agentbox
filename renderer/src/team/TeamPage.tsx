@@ -12,6 +12,7 @@ import { api } from '../api';
 import { Face } from './people';
 import { handoverAsk, handoverOf } from './handover';
 import { inviteWords } from './invite-words';
+import { AskForMultiplayer, NOT_LET_IN } from './ask-for-multiplayer';
 
 
 export function TeamPage({ team, inviteFocus = false }: {
@@ -70,6 +71,10 @@ function TeamSetup({ team, onDone, inviteFocus = false }: { team: TeamState; onD
         <button className="tm-btn" disabled={busy} onClick={() => run(() => api.teamAcceptInvite(invite.teamId))}>Join</button>
         <button className="tm-btn" disabled={busy} onClick={() => setNotNow([...notNow, invite.teamId])}>Not now</button>
       </div>
+    </> : !team.team && team.multiplayer === false ? <>
+      <h2>{NOT_LET_IN}</h2>
+      <div className="tm-field-row"><AskForMultiplayer email={me?.email} className="tm-btn" /></div>
+      <p>Waiting for an invite from a teammate instead? Ask them to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : !team.team ? <>
       <h2>Start your team</h2>
       <p>Name it, then invite people by email. Anyone you invite is asked to join when they sign in with that email.</p>
@@ -171,10 +176,13 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
     ))}
 
     <div className="tm-section">Invite people</div>
-    <form className="tm-field-row" onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
+    {team.multiplayer === false ? <div className="tm-field-row">
+      <span className="tm-leave-ask">{NOT_LET_IN}.</span>
+      <AskForMultiplayer email={me?.email} className="tm-btn" />
+    </div> : <form className="tm-field-row" onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
       <input className="tm-input" placeholder="Their email" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)} />
       <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
-    </form>
+    </form>}
 
     <div className="tm-section">Leave</div>
     {confirmLeave ? (

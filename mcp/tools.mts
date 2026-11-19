@@ -454,8 +454,8 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_remember',
-      description: 'Keep a standing preference the person stated ("from now on", "always", "never", "I prefer") in a few words, in their terms. The person sees it in the team chat and can undo it. If you have a method file, put it there too: your method is what every later run reads.',
-      schema: { text: z.string().describe('the preference, in a few words') },
+      description: 'Note what the person taught you: a correction, approval, turn-down, decision or standing preference, in one line, in their words, with the date. Every later run reads your notes beside your method, and your look-back folds them into it, so a working run notes rather than rewriting its method. The person sees it in the team chat and can undo it.',
+      schema: { text: z.string().describe('the lesson, in one line') },
       run: ({ text: words }: { text: string }) => json(teamRemember({ text: words }, thisRun())),
     },
     {
@@ -478,7 +478,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_method',
-      description: 'Write your method, the one file every run of yours reads whole: send text to write all of it, or old (one passage exactly as it reads now) and new (what replaces it) to change one part. Always use this rather than editing the file: a run in the cloud edits a copy that never comes back. The version it replaces is kept.',
+      description: 'Write your method, the one file every run of yours reads whole: send text to write all of it, or old (one passage exactly as it reads now) and new (what replaces it) to change one part. Use it when you set yourself up, in a look-back, or when the person asks you to change it; in a run doing work, note lessons with team_remember instead. Always use this rather than editing the file: a run in the cloud edits a copy that never comes back. The version it replaces is kept.',
       schema: {
         text: z.string().optional().describe('your whole method'),
         old: z.string().optional().describe('one passage of it, exactly as it reads now'),

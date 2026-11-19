@@ -40,7 +40,7 @@ describe('which threads get the page', () => {
 
 describe('what the page draws outside Needs you', () => {
   it('the same page: no side panel, the summary on top, choices at the foot, files as names in the words', () => {
-    expect(focus).toMatch(/const summaryOffered = summarised && !openDoc && !page;/);
+    expect(focus).not.toMatch(/SummaryPanel|SummaryRail/);
     expect(focus).toMatch(/queue=\{page \? \{ context: item\.problem \?\? null, repeats: repeat \? repeatsLine\(repeat\.rule\) : null \} : undefined\}/);
     expect(focus).toContain('{offerInPane && (page || closeAsk || answered ? null : (');
     expect(focus).not.toContain('<QueueFile');

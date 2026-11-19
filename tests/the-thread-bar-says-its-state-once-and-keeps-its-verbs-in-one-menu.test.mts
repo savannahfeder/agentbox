@@ -128,12 +128,11 @@ describe('the state leads the line under the title, said once', () => {
     expect(css).toMatch(/\.by-lead \.ts-lead ~ \.fm-said::before \{ content: '· '; \}/);
   });
 
-  // SAID ONCE, AND NOW ONCE ACROSS THE WHOLE THREAD (w-a3482b8c2c): the
-  // summary's rail and its Status row say the state, so the line only leads
-  // with it while neither is on screen.
-  it('is handed the mark by the thread page only while the summary cannot say it', () => {
+  // The side summary that once said the state instead went in 2026-11
+  // (w-d143fcb40a), so every summarised thread's line leads with it.
+  it('is handed the mark by the thread page on every summarised thread', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain('lead={summarised && !summaryOffered ? <ThreadStateMark item={item} /> : null}');
+    expect(focus).toContain('lead={summarised ? <ThreadStateMark item={item} /> : null}');
   });
 });
 
@@ -239,10 +238,9 @@ describe('the menu is reachable by keyboard and every key still works', () => {
     expect(menu).toMatch(/onKeyDown=\{openFromKeys\}/);
   });
 
-  it('keeps E, ⌘J and S where they were', () => {
+  it('keeps E and ⌘J where they were', () => {
     expect(app).toContain("else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); markDone(focused); }");
     expect(app).toContain("window.dispatchEvent(new Event('task-terminal-toggle'));");
-    expect(focus).toMatch(/useSummaryShortcut\(toggleSummary, summaryOffered\)/);
     // The menu's terminal row sends the very event ⌘J sends, and the terminal
     // tells the page whether it is open so the row can say Open or Hide.
     expect(focus).toContain("onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}");

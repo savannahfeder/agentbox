@@ -553,7 +553,14 @@ export class Teammates {
     if (!team.length) return [];
     team = this._namedByRole(team, now);
     const mine = (items ?? []).filter((i) => teammateIdOf(i));
-    const lookBack = room ? { ok: (t: { id: string; engine?: string | null }) => { try { return !!readMethod(this.dir(), t.id) && room(t.engine ?? null); } catch { return false; } } } : null;
+    const lookBack = room ? {
+      ok: (t: { id: string; engine?: string | null }) => { try { return !!readMethod(this.dir(), t.id) && room(t.engine ?? null); } catch { return false; } },
+      notes: (t: { id: string }) => {
+        const method = (() => { try { return readMethod(this.dir(), t.id); } catch { return null; } })();
+        const memory = team.find((x) => x.id === t.id)?.memory ?? [];
+        return method ? memory.filter((m) => laterThan(m.at, method.changedAt)).map((m) => m.at) : [];
+      },
+    } : null;
     const actions: WakeAction[] = planWakes({ teammates: team, chat, items: mine, now, shipped: shippedByProduct(items), lookBack });
     const byId = new Map(team.map((t) => [t.id, t]));
     const done: WakeAction[] = [];
@@ -801,10 +808,10 @@ export class Teammates {
     }
     if (trigger.kind === 'look-back') {
       return { body: [
-        'Time to learn from what the person said on your recent work. The threads they replied on are written out whole in your brief, under "Threads named in what woke you".',
+        'Time to learn from what the person said on your recent work. The threads they replied on are written out whole in your brief, under "Threads named in what woke you", and the notes your runs kept since your method last changed are under "Learned since your method was last tidied".',
         '',
-        '1. Read each one whole.',
-        '2. Check your method against them. Fix any rule their words since contradict or have moved past, merge rules that say the same thing, and add any correction, approval or turn-down it is missing, quoted with its date and thread.',
+        '1. Read each thread whole.',
+        '2. Check your method against them and the notes. Fold every note in. Fix any rule their words since contradict or have moved past, merge rules that say the same thing, and add any correction, approval or turn-down it is missing, quoted with its date and thread.',
         '3. Keep it tight. The newest word wins, a remark about one piece of work is not a rule for all of it, and the whole method stays under the cap.',
         '',
         'Do no other work in this run. If the method changed, save it with team_method and post one line in the team chat saying what changed. If nothing needed changing, post nothing. Either way, close this run yourself.',
@@ -930,7 +937,7 @@ export class Teammates {
         untried ? '**Your method has changed since the person last saw your work.** Whatever this run makes, show it to them rather than closing quietly, so they can tell you if the change was right.' : null,
         '',
         method.text.length > METHOD_CAP
-          ? `${method.text.slice(0, METHOD_CAP)}\n\n… (your method is longer than ${METHOD_CAP} characters and is cut here: tighten it this run, keeping every rule the person gave)`
+          ? `${method.text.slice(0, METHOD_CAP)}\n\n… (your method is longer than ${METHOD_CAP} characters and is cut here: ${isLookBack(item) ? 'tighten it in this look-back' : 'your next look-back tightens it'}, keeping every rule the person gave)`
           : method.text.trim(),
         '',
       ] : this._buildMethodFirst(t, file, sources, origin.length > 0)),
@@ -943,7 +950,11 @@ export class Teammates {
       ...(record ? ['## Your recent work, from the record', 'Each of your recent runs, what the person said on it in their words, and the first line of what you answered. Read it before you start: it is how you know what was already tried, approved and turned down.', record, ''] : []),
       ...(t.duties?.length ? ['## What you do on your own', ...t.duties.map((d) => `- ${d.what} (${dutyWhen(d).toLowerCase()})${d.tell ? `. Bring the person in only when ${d.tell}` : ''}`), 'You also wake when someone writes to you or passes you work.', ''] : []),
       ...(!method && t.memory.length ? ['## What you know about the person (put these in your method)', ...t.memory.map((m) => `- ${m.text}`), ''] : []),
-      ...(method && t.memory.some((m) => laterThan(m.at, method.changedAt)) ? ['## Noted since your method last changed (put these in it)', ...t.memory.filter((m) => laterThan(m.at, method.changedAt)).map((m) => `- ${m.text}`), ''] : []),
+      ...(method && t.memory.some((m) => laterThan(m.at, method.changedAt)) ? [
+        '## Learned since your method was last tidied',
+        'Your runs noted these after your method last changed. Where one disagrees with your method, they win.',
+        ...t.memory.filter((m) => laterThan(m.at, method.changedAt)).map((m) => `- ${m.text}`), '',
+      ] : []),
       ...(reads.length ? ['## Shared playbooks you read (lessons for every teammate doing this kind of work)', ...reads.flatMap((b) => [`### ${b.title}`, ...b.lessons.map((l) => `- ${cut(l.text, 300)}`)]), ''].slice(0, 60) : []),
       ...(notRead.length ? [`Playbooks on the team you do not read yet: ${notRead.map((b) => b.title).join(', ')}. Start reading one with team_playbook and its title, leaving out lesson, when its work is yours too.`, ''] : []),
       ...this._projectsFor(t),
@@ -998,7 +1009,9 @@ export class Teammates {
       '- A tool saying your work is valid is not your work being good: a lint, a build or a check passing is the floor, not the finish. Before you show anything, look at what you made the way they will see it, the frames, the page, the picture, against the craft\'s own standard and their own instructions about how work is shown, and fix what fails. Showing something you never looked at is the thing they notice first.',
       '- Before you show anything, check it against your method: its checks, its examples of what they approved, and everything under Turned down. Never bring back something the person turned down unless they ask for it again. Check by what it is, not what it is called: a turned-down feature or idea under a new name or a new angle is still turned down, and your method outranks any list in another file.',
       '- Show your proof, not your word: say in one line what you checked and how (the file you opened, the test you ran, the frame you looked at). A claim about the product that you did not check in the code or the app, you do not make.',
-      `- When the person corrects, approves, turns down or decides something, update your method in this run, before you finish, with team_method: quote their words with the date and thread, and change what it contradicts rather than adding a second rule beside it. Write only what they said or showed; mark your own reading as yours. Say in one line what changed.`,
+      method && !isLookBack(item)
+        ? '- When the person corrects, approves, turns down or decides something, act on it at once, and note it with team_remember: one line, their words, the date. That is all the note-keeping a working run does. Your look-back folds the notes into your method while you are idle, so do not rewrite your method for them; change it with team_method only when the person asks you to.'
+        : `- When the person corrects, approves, turns down or decides something, put it in your method with team_method: quote their words with the date and thread, and change what it contradicts rather than adding a second rule beside it. Write only what they said or showed; mark your own reading as yours. Say in one line what changed.`,
       '- Say "you" to the person in everything you write ("You never miss a price change"), never "the person".',
       '- Need a teammate to do something? Hand it over with team_pass (to, title, details). In the details, point at the threads, files and links it needs rather than retelling them, so nothing is lost on the way. It waits for the person\'s yes unless they told that teammate otherwise. Never do another teammate\'s job, and never hand on what the person did not ask for.',
       '- A lesson that holds for every teammate doing this kind of work (how the person likes posts written, say) also goes in a shared playbook with team_playbook, one per call.',
@@ -1006,6 +1019,8 @@ export class Teammates {
       '- Reach the person only to show finished work, or for a decision, a yes before anything that leaves the team (sends, posts, ships, merges, pays), or a sign-in only they have. Then end this run with that as your answer, written like any agent thread\'s last message: the bold line, then plain sentences, then numbered options, your recommendation first. It reaches their inbox. Leave this item open. A message to people is the exception: team_tell and team_task ask your owner for that yes themselves, on one card with your exact words, so never ask for it again in your answer.',
       item?.routed
         ? '- This thread is the person\'s own ask, sent to you: end with your answer as your last message and leave it open. Only they close it.'
+        : (item?.labels ?? []).includes(CHAT_LABEL)
+        ? '- This thread began with the person\'s own words to you: end with your answer as your last message and leave it open. Never close it yourself.'
         : `- When nothing needs them, post a one-line summary to the team chat, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call. This run is your own work, not the person's ask, so closing it needs no quote from them. A duty that found nothing worth doing ends there.`,
       '- Never wait or poll for a teammate. Say what you are waiting for in the chat and finish. Hand work on with team_pass, not create_work_item.',
     ].filter((x) => x !== null).join('\n');
