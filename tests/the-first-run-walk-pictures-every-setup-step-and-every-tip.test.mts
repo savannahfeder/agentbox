@@ -26,8 +26,8 @@ const TIPS_NOT_WALKED: Record<string, string> = {
 describe('the first-run walk', () => {
   it('reads the setup steps the app has', () => {
     expect(steps).toContain('account');
-    // Eight since the purchase page became the plan step (2026-11-12).
-    expect(steps.length).toBeGreaterThanOrEqual(8);
+    // Seven since the invite step went (2026-11-19): multiplayer is invite-only.
+    expect(steps.length).toBeGreaterThanOrEqual(7);
   });
   it('pictures every setup step', () => {
     const missing = steps.filter((s) => !STEPS_NOT_WALKED[s] && !walk.includes(`see('${s}'`));

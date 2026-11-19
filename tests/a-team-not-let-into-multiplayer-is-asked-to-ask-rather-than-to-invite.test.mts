@@ -2,7 +2,7 @@
 // invite from a team not let in, so without this the app still offered "Start
 // and invite 2" and the setup's invite step, then answered "could not be
 // invited" with no reason. Measured by reading the team state the window gets
-// and the setup's steps for each answer the cloud can give.
+// for each answer the cloud can give, and the setup's steps and Pro list.
 import { it, expect, describe, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,8 +12,10 @@ import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mts';
-import { setupSteps } from '../renderer/src/setup-split.ts';
+import { PRO_PITCH, setupSteps } from '../renderer/src/setup-split.ts';
 import { askWords } from '../renderer/src/team/ask-for-multiplayer.tsx';
+
+const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
 
 type Answer = () => Promise<boolean>;
 const services: { signOut(): Promise<unknown> }[] = [];
@@ -62,15 +64,19 @@ describe('what the window is told', () => {
   });
 });
 
-describe('the setup after Pro is bought', () => {
+// The founder, 2026-11-19: "We don't want the step where you invite your team
+// ... because obviously it's invite only", and the Pro list should say so.
+describe('the setup', () => {
   const pro = { chats: 3, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' as const };
-  it('skips the invite step for a team not let in', () => {
-    expect(setupSteps({ ...pro, multiplayer: false })).not.toContain('invite');
+  it('has no step for inviting people, after Pro or for someone already on a team', () => {
+    expect(setupSteps(pro)).toEqual(['chats', 'plan', 'look']);
+    expect(setupSteps({ ...pro, plan: 'free', onTeam: true })).toEqual(['chats', 'look']);
+    expect(split).not.toMatch(/Invite your team\.|teamInvite/);
   });
-  it('keeps it when let in, or when the cloud could not say', () => {
-    expect(setupSteps({ ...pro, multiplayer: true })).toContain('invite');
-    expect(setupSteps({ ...pro, multiplayer: null })).toContain('invite');
-    expect(setupSteps(pro)).toContain('invite');
+  it('marks sharing with your team as invite only where it lists what Pro brings', () => {
+    expect(PRO_PITCH.perks.find((k) => k.id === 'team')).toMatchObject({ tag: 'Invite only' });
+    expect(PRO_PITCH.perks.filter((k) => 'tag' in k).map((k) => k.id)).toEqual(['team']);
+    expect(split).toMatch(/\{'tag' in k && <span className="ss-perk-tag">\{k\.tag\}<\/span>\}/);
   });
 });
 
