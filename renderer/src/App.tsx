@@ -139,7 +139,7 @@ import { FilesPlace, useFilesList } from './files/FilesPlace';
 import { ConnectionsPlace } from './connections/ConnectionsPlace';
 import { TeammatesContext } from './teammates/row-lead';
 import { ChatsContext, ChatsFrame, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
-import { queuedTeammateRun } from './teammates/chat-lines';
+import { queuedTeammateRun, threadsItOpened } from './teammates/chat-lines';
 import { teammateIdOf } from '../../shared/teammates.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
@@ -7998,7 +7998,7 @@ export default function App() {
     } else if (placeMember.key.startsWith('mate:')) {
       const id = placeMember.key.slice('mate:'.length);
       const t = teammatesUi.list.find((x) => x.id === id);
-      const runs = items.filter((i) => i.labels?.includes(`teammate:${id}`));
+      const runs = [...items.filter((i) => i.labels?.includes(`teammate:${id}`)), ...threadsItOpened(items, id)];
       const asks = mineInNeeds.filter((i) => teammateIdOf(i) === id);
       const askIds = new Set(asks.map((i) => i.id));
       const split = nowAndFinished(runs.filter((i) => !askIds.has(i.id)), { done: (i) => i.status === 'done', at: (i) => i.updatedAt, now });
