@@ -209,6 +209,7 @@ import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT }
 import { waitingCounts } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
+import { wasBeforeClose } from '../../shared/reopen-as-it-was.mts';
 import { openSignIn } from '../../shared/sign-in-ask.mts';
 import { ChatAgentsContext, type ChatAgentsValue } from './team/ChatAgents';
 import { agentLinks, askedInLabel, chatProjects, chatTaskSharing, chatTranscript, lastAskKeptOnMac, taskBrief, taskTitle, withTask } from './team/agent-mentions';
@@ -4998,7 +4999,7 @@ export default function App() {
       await api.answer({ product: item.product, id: item.id, status: 'done', ...(unshippedOk ? { closeUnshipped: true } : {}) });
       for (const t of carried) await api.answer({ product: t.product, id: t.id, status: 'done' });
       pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => {
-        await api.answer({ product: item.product, id: item.id, status: 'open' });
+        await api.answer({ product: item.product, id: item.id, status: 'open', reopenAs: wasBeforeClose(item) });
         for (const t of carried) await api.answer({ product: t.product, id: t.id, status: 'open' });
       } });
     }, `${DONE.verb}: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);
@@ -5987,7 +5988,7 @@ export default function App() {
     pushUndo({ label: `Reopened: ${closed}`, undoes: `reopen ${which}`, brings: bringsBack(targets), ticks: targets.map((i) => i.id), undid: targets.filter((i) => !i.agent).map((i) => ({ product: i.product, id: i.id, words: 'Undid closing it' })), run: async () => {
       for (const item of targets) {
         if (item.agent) await api.closeAgent({ key: agentKey(item.agent), through: 0 });
-        else await api.answer({ product: item.product, id: item.id, status: 'open' });
+        else await api.answer({ product: item.product, id: item.id, status: 'open', reopenAs: wasBeforeClose(item) });
       }
     } });
     showToast((kept.length
@@ -7198,7 +7199,7 @@ export default function App() {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
       pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => {
         await endIt();
-        await api.answer({ product: item.product, id: item.id, status: 'open' });
+        await api.answer({ product: item.product, id: item.id, status: 'open', reopenAs: wasBeforeClose(item) });
       } });
     }, said, () => { void endIt(); return null; }, false, undefined, undid);
   };
