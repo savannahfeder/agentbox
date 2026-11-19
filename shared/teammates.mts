@@ -681,6 +681,16 @@ function asksYouStill(item: RunItem, tid: string, chat: ChatLike, except: string
     || (isSetupRun(item, tid, chat) && leavesSomethingOpen(item.result));
 }
 
+// Your latest words on a chat-started run were typed in the thread, not sent
+// from the chat: you are working in it there, so it is yours to close.
+export function repliedInThread(item: RunItem, tid: string, chat: ChatLike): boolean {
+  if (item.wrote?.answer?.source !== 'founder') return false;
+  const said = String(item.answer ?? '').trim();
+  if (!said) return false;
+  return !(chat?.messages ?? []).some((m) => m.kind === 'msg' && m.from === YOU && !m.via
+    && Array.isArray(m.to) && m.to.includes(tid) && String(m.text ?? '').trim() === said);
+}
+
 // A run whose question reached you in the chat, so your next chat words can be
 // its answer. A run made by a duty or a hand-off asks in its own thread, and
 // chat words to its teammate are new work.
@@ -1001,7 +1011,9 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
       // Its own pass to another project is the one word of its own that wakes it.
       const selfPass = m.kind === 'pass' && !!m.product;
       if (m.from === tid && !selfPass) { actions.push({ type: 'seen', msg: m.id, teammate: tid }); continue; }
-      if (t.paused && m.from !== YOU) continue;
+      // A line a thread wrote for you (`via`) starts new work like yours, but
+      // never wakes a paused teammate or answers a run as you.
+      if (t.paused && (m.from !== YOU || m.via)) continue;
       const fromYou = m.from === YOU;
       if (!fromYou && m.kind === 'msg') { actions.push({ type: 'seen', msg: m.id, teammate: tid }); continue; }
       const hop = fromYou ? 0 : (Number.isInteger(m.hop) ? m.hop as number : 0) + 1;
@@ -1011,14 +1023,14 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         continue;
       }
       // A new thread to a teammate is new work, never an answer to its last question.
-      if (fromYou && m.kind === 'msg' && !m.fresh) {
+      if (fromYou && !m.via && m.kind === 'msg' && !m.fresh) {
         const runs = runsOf(tid, items);
         const named = runAnswered(m, chat);
         const waiting = runs.find((i) => i.id === named && waitingOnYou(i))
           ?? runs.filter((i) => waitingOnYou(i) && asksYouStill(i, tid, chat, m.id) && talksInChat(i, tid, chat, m.id)).sort((a, b) => (b.wrote?.result?.ts ?? 0) - (a.wrote?.result?.ts ?? 0))[0];
         // A running run hears your words only if your words started it;
         // anything else is new work, queued behind it.
-        const yours = new Set((chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === YOU && x.id !== m.id).map((x) => runIdFor(`${x.id}>${tid}`)));
+        const yours = new Set((chat.messages ?? []).filter((x) => x.kind === 'msg' && x.from === YOU && !x.via && x.id !== m.id).map((x) => runIdFor(`${x.id}>${tid}`)));
         const running = runs.find((i) => isActiveRun(i) && i.status === 'claimed' && yours.has(i.id));
         const into = waiting ?? running;
         if (into) {
@@ -1061,7 +1073,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
   for (const t of live) {
     if (t.status !== 'active') continue;
     for (const i of runsOf(t.id, items)) {
-      if (!(i.labels ?? []).includes(CHAT_LABEL) || !waitingOnYou(i) || asksYouStill(i, t.id, chat)) continue;
+      if (!(i.labels ?? []).includes(CHAT_LABEL) || !waitingOnYou(i) || asksYouStill(i, t.id, chat) || repliedInThread(i, t.id, chat)) continue;
       const text = String(i.result ?? '').trim();
       const since = i.wrote?.answer?.ts ?? 0;
       const posted = (chat.messages ?? []).some((x) => x.kind === 'msg' && x.from === t.id && x.run === i.id && !x.options?.length && x.ts > since && toNames(x.to).every((y) => y === YOU));

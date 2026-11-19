@@ -47,6 +47,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   teamSignOut: 'zero:team-sign-out',
   teamSignInEmail: 'zero:team-sign-in-email',
   teamSignUp: 'zero:team-sign-up',
+  teamConfirmation: 'zero:team-confirmation',
+  teamResendConfirmation: 'zero:team-resend-confirmation',
   teamCreate: 'zero:team-create',
   teamInvite: 'zero:team-invite',
   teamRename: 'zero:team-rename',

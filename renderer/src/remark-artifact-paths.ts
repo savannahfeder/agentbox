@@ -2,6 +2,7 @@
 // react-markdown needs. The rule itself is in artifact-paths.ts, which has no
 // react-markdown in it so the phone app can share it.
 import { keepConnectionLinks } from './connections/connections-shown';
+import { threadOfHref } from './ticket-references';
 
 export { CODE_PATH, isMediaPath, linkArtifactPaths, productPath, remarkArtifactPaths, type Options } from './artifact-paths';
 
@@ -10,5 +11,7 @@ export { CODE_PATH, isMediaPath, linkArtifactPaths, productPath, remarkArtifactP
 export function artifactUrlTransform(url: string): string {
   // An agent mentioned in a conversation keeps its address, which is what the
   // link component reads to draw it as a mention (w-7b9cb8636a).
-  return /^(file:\/\/|agentbox-agent:)/i.test(url) ? url : keepConnectionLinks(url);
+  if (/^(file:\/\/|agentbox-agent:)/i.test(url)) return url;
+  // A thread, as agents write it, becomes its id, which a page opens as a thread.
+  return (/^agentbox:\/\/work-items?\//i.test(url) && threadOfHref(url)) || keepConnectionLinks(url);
 }

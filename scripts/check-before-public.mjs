@@ -153,9 +153,17 @@ export function checkLine(file, text, { words = [], soft = false } = {}) {
   return out;
 }
 
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
 /** A recording of a real Claude Code session carries its machine's setup. */
 export function checkRecording(file, content) {
   if (!/\.jsonl$/.test(file)) return [];
+  // A thinking block's signature decodes to bytes that include the account's organisation id.
+  for (const [, sig] of content.matchAll(/"signature"\s*:\s*"([A-Za-z0-9+/=_-]{16,})"/g)) {
+    if (UUID.test(Buffer.from(sig, 'base64').toString('latin1'))) {
+      return [{ severity: 'block', why: 'a recorded session whose thinking signature carries an account id; blank the signature' }];
+    }
+  }
   for (const line of content.split('\n')) {
     if (!line.includes('"init"')) continue;
     let d;
@@ -281,17 +289,23 @@ Use "block" only when you are confident it is private or a real secret. Empty li
 Lines follow, as "path:line: text".
 `;
 
+// The push runs this from the branch's own folder, with the push token among
+// the GIT_* variables, and `claude -p` would load that branch's
+// .claude/settings.json hooks. So it starts in an empty folder of its own.
 function runModel(input) {
   return new Promise((resolve) => {
-    const child = spawn('claude', ['-p', '--model', 'sonnet', '--output-format', 'text'], {
-      stdio: ['pipe', 'pipe', 'ignore'],
+    const away = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-public-check-'));
+    const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+    const child = spawn('claude', ['-p', '--model', 'sonnet', '--output-format', 'text', '--setting-sources', 'user'], {
+      cwd: away, env, stdio: ['pipe', 'pipe', 'ignore'],
     });
     let out = '';
     const timer = setTimeout(() => child.kill('SIGTERM'), 5 * 60 * 1000);
+    const done = () => { clearTimeout(timer); fs.rmSync(away, { recursive: true, force: true }); };
     child.stdout.on('data', (d) => { out += d; });
-    child.on('error', () => { clearTimeout(timer); resolve(null); });
+    child.on('error', () => { done(); resolve(null); });
     child.on('close', (code) => {
-      clearTimeout(timer);
+      done();
       if (code !== 0) return resolve(null);
       const json = out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1);
       try { resolve(JSON.parse(json).findings ?? []); } catch { resolve(null); }

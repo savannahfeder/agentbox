@@ -231,14 +231,16 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   useEffect(() => {
     if (!editor || editor.isDestroyed || text === onDisk.current) return;
     const room = liveNow.current;
-    if (room) {
+    // A sitting's words are merged with a new version, never replaced by it or left behind it.
+    if (room || asVersions.current) {
       // In a live file a new version is merged in once, by the keeper.
-      const was = onDisk.current;
+      const was = baseMd.current;
+      const next = pmDocToMd(mdToPmDoc(text));
       onDisk.current = text;
-      baseMd.current = pmDocToMd(mdToPmDoc(text));
-      if (!room.keeper) return;
+      baseMd.current = next;
+      if (room && !room.keeper) return;
       const now = pmDocToMd(editor.getJSON());
-      const merged = mergeText(was, now, text, { overlap: 'mine' }).text;
+      const merged = mergeText(was, now, next, { overlap: 'mine' }).text;
       // An edit, so the keeper saves the merged words.
       if (merged !== now) editor.commands.setContent(mdToPmDoc(merged), { emitUpdate: true });
       return;

@@ -108,7 +108,8 @@ describe('the ship queue, when the push needs a GitHub sign-in', () => {
     await new ShipQueue({ store: fakeStore(), userDir, folderFor, isLive: () => false, run,
       pushSignIn: () => ({ env: { [TOKEN_VAR]: 'tok' }, config: [['credential.https://github.com.helper', 'x']] }) }).tick([row({ updatedAt: 2000 })], products());
     expect(seen).toHaveLength(2);
-    expect(seen[0]).toBeUndefined();
+    // Every ship names the approved checkout, which the hooks come from.
+    expect(seen[0]).toEqual({ base: expect.any(String) });
     expect(seen[1].env[TOKEN_VAR]).toBe('tok');
     expect(seen[1].gitConfig).toEqual([['credential.https://github.com.helper', 'x']]);
   });

@@ -57,6 +57,17 @@ const KEYS = {
   F2: { code: 'F2', keyCode: 113 },
   ' ': { code: 'Space', keyCode: 32 },
 };
+const KEY_WORDS = {
+  esc: 'Escape', escape: 'Escape', enter: 'Enter', return: 'Enter', tab: 'Tab', space: ' ',
+  down: 'ArrowDown', up: 'ArrowUp', left: 'ArrowLeft', right: 'ArrowRight',
+  arrowdown: 'ArrowDown', arrowup: 'ArrowUp', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight',
+  home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown', backspace: 'Backspace', delete: 'Delete', del: 'Delete', f2: 'F2',
+};
+/** The key a name means as a person writes it ("esc", "down"), or null when it names none. */
+export function keyNamed(key) {
+  if (key.length === 1 || KEYS[key]) return key;
+  return KEY_WORDS[key.toLowerCase()] ?? null;
+}
 const MODIFIERS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
 const MODIFIER_NAMES = { control: 'ctrl', cmd: 'meta', command: 'meta', option: 'alt' };
 
@@ -127,12 +138,15 @@ export function canDrive(bin = CHROME, platform = process.platform, exists = fs.
  * browser, which lives across many short commands); then its profile should sit
  * inside the instance folder, so `live.mjs down` finds and stops it.
  */
-export async function launchChrome({ width = 1440, height = 900, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform, start = spawn, owner = process.env.AGENTBOX_TEST_RUN_PID, activity = null, watchEvery = 30, watchIdle = 3600 } = {}) {
+// `scale` must match any device scale the caller later emulates: Chrome draws an iframe at the window's own.
+export async function launchChrome({ width = 1440, height = 900, scale = 2, profile, detached = false, bin = CHROME, waitMs = 20_000, platform = process.platform, start = spawn, owner = process.env.AGENTBOX_TEST_RUN_PID, activity = null, watchEvery = 30, watchIdle = 3600 } = {}) {
   if (platform === 'darwin' && bin === MAC_CHROME) throw new Error(NO_HIDDEN_BROWSER);
   if (!fs.existsSync(bin)) throw new Error(`No browser at ${bin}. The live drive needs it.`);
   const chrome = start(bin, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-    '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
+    // Dark with nobody connected: the media setting below lasts one connection,
+    // and a command that lets go would turn a Match system page light.
+    `--force-device-scale-factor=${scale}`, '--hide-scrollbars', '--no-first-run', '--force-dark-mode', ...KEEPS_OFF_THE_KEYCHAIN,
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'], detached });
   const wsUrl = await new Promise((resolve, reject) => {

@@ -74,7 +74,10 @@ function watch() {
   const last = Number(Atomics.load(stamp, 0) / 1000n);
   if (nowUs() - last > thresholdMs * 1000) { frozeAt ??= last; return; }
   if (frozeAt === null) return;
-  seen.push({ fromUs: frozeAt, toUs: last });
+  // On waking, the beat and the wake can come in either order: still asleep
+  // covers the beat first, a wake since the hold began covers the wake first.
+  const slept = Atomics.load(stamp, 1) !== 0n || Number(Atomics.load(stamp, 2) / 1000n) >= frozeAt;
+  if (!slept) seen.push({ fromUs: frozeAt, toUs: last });
   frozeAt = null;
   void turn();
 }

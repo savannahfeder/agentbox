@@ -410,7 +410,7 @@ async function createWindow() {
   // (shared/which-card-is-in-front.mts). Late-bound beside the door above,
   // because only the IPC surface knows which thread is on screen, and before it
   // exists the spool's own order is the whole of what is known.
-  let cardInFront: () => { id: string } | null = () => approvals.listPending(config.storeRoot)[0] ?? null;
+  let cardInFront: () => { id: string } | null = () => approvals.listPending(config.storeRoot, { drawn: false })[0] ?? null;
   installMenu({
     onApproval: (allow) => {
       const front = cardInFront();
@@ -480,6 +480,8 @@ async function createWindow() {
     appDir,
     onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
   });
+  powerMonitor.on('suspend', () => freezes.asleep());
+  powerMonitor.on('resume', () => freezes.awake());
   quitStep(app, 'before-quit', 'freezes.stop', () => freezes.stop());
   const memory = startMemoryRecorder({
     dir: path.join(userDir, 'memory-log'),
@@ -549,7 +551,7 @@ async function createWindow() {
       // Why each thread nothing runs on is waiting, so the phone does not read it as "Nothing running".
       waits: () => phoneWaitsOf(supervisor.status()),
       // The cards waiting on her, each with the fingerprint her answer must carry back.
-      approvals: () => approvals.listPending(config.storeRoot).map((r) => ({ ...r, card: approvals.cardShown(config.storeRoot, r.id) })),
+      approvals: () => approvals.listPending(config.storeRoot, { on: 'phone' }).map((r) => ({ ...r, card: approvals.cardShown(config.storeRoot, r.id, 'phone') })),
       stateFile: path.join(config.storeRoot, '.phone-inbox.json'),
       // This installation and this store together (main/phone-inbox.mts).
       device: () => phoneDevice(userDir, config.storeRoot),

@@ -50,6 +50,9 @@ export const DEPLOY_NEEDS_MS = 6 * 60_000;
 /** The same, with this checkout's git, the network and npm, done by `until`. */
 export function deployAfterShip({ root, say, until }) {
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  // npm and npx run the branch's own code. The push token and the git settings
+  // that hand it over are for git alone.
+  const branchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
   let site = null;
   try { site = JSON.parse(fs.readFileSync(teamConfigFile(root), 'utf8')).phoneSite ?? null; } catch { /* none here */ }
   return deployWebApp({
@@ -61,11 +64,11 @@ export function deployAfterShip({ root, say, until }) {
     known: (sha) => spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: root }).status === 0,
     deploy: () => {
       if (until - Date.now() < DEPLOY_NEEDS_MS) return { ok: false, why: 'the ship ran long, so there was no time left to build it' };
-      const signedIn = spawnSync('npx', ['--yes', 'wrangler@4', 'whoami'], { cwd: root, encoding: 'utf8', timeout: 120_000 });
+      const signedIn = spawnSync('npx', ['--yes', 'wrangler@4', 'whoami'], { cwd: root, env: branchEnv, encoding: 'utf8', timeout: 120_000 });
       if (signedIn.status !== 0 || /not authenticated|You are not logged in/i.test(`${signedIn.stdout}${signedIn.stderr}`)) {
         return { ok: false, why: 'this computer is not signed in to Cloudflare (npx wrangler login)' };
       }
-      const r = spawnSync('npm', ['run', 'phone:deploy'], { cwd: root, stdio: 'inherit', timeout: Math.max(60_000, until - Date.now()) });
+      const r = spawnSync('npm', ['run', 'phone:deploy'], { cwd: root, env: branchEnv, stdio: 'inherit', timeout: Math.max(60_000, until - Date.now()) });
       return r.status === 0 ? { ok: true } : { ok: false, why: r.error?.message ?? `npm run phone:deploy ended with ${r.status}` };
     },
     log: say,

@@ -46,14 +46,21 @@ export function keepAfterSignIn(service: string, { finishing = false }: { finish
   const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
   const when = finishing ? 'Once the login finishes, keep' : 'First, keep';
   const why = 'this sign-in for every later cloud thread: a cloud machine forgets its logins when the run ends.';
-  if (!svc || svc.keys.length !== 1) {
-    const names = svc ? ` under ${svc.keys.map((k) => k.name).join(' and ')}, one call each` : ', under the variable its tools read, if they read one from the environment';
-    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep${names}.` };
+  if (!svc) return { message: 'A cloud machine forgets its logins when the run ends. If later cloud runs need this one, ask for its key with an AGENTBOX-NEEDS: key line, which they answer on a card.' };
+  if (svc.keys.length !== 1) {
+    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep under ${svc.keys.map((k) => k.name).join(' and ')}, one call each.` };
   }
   const name = svc.keys[0].name;
   const read = READ_TOKEN[svc.id];
   const how = read ? `Run \`${read}\`` : 'Read the token its login saved';
   return { keep: { name, ...(read ? { read } : {}) }, message: `${when} ${why} ${how} and call sign_in with this ask and keep { name: '${name}', value: the token }.` };
+}
+
+/** The keys a known service's sign-in may be kept under, or null for one not on the list. */
+export function keyNamesFor(service: string): string[] | null {
+  const n = plain(service);
+  const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
+  return svc ? svc.keys.map((k) => k.name) : null;
 }
 
 export interface SignInRequest { service?: string; url?: string; code?: string; why?: string; asksForCode?: boolean; ask?: string; finished?: boolean }

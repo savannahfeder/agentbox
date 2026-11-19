@@ -387,14 +387,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // becomes a no, by the same rule and in the same place as a yes the spool
   // would not take: `allow` and `note` stop meaning what she pressed and start
   // meaning what was actually recorded.
-  const answerApproval = (id: string, allow: boolean, note?: string) => {
-    const shown = approvals.cardShown(config.storeRoot, id);
+  // `phoneCard`: the card her phone answered on, which is what gets signed.
+  const answerApproval = (id: string, allow: boolean, note?: string, phoneCard?: string) => {
+    const phone = phoneCard !== undefined ? { card: phoneCard } : undefined;
+    const shown = phone ? phoneCard : approvals.cardShown(config.storeRoot, id);
     if (allow && supervisor.codexCardChanged?.(id, shown)) {
       console.warn(`zero: approval ${id} was drawn from a request that has since been rewritten; the founder's Allow was for a different card and nothing has been allowed`);
       allow = false;
       note = CARD_CHANGED;
     }
-    const ok = approvals.answer(config.storeRoot, id, allow, note);
+    const ok = approvals.answer(config.storeRoot, id, allow, note, phone);
     if (!ok) { allow = false; note = SPOOL_REFUSED; }
     const settled = supervisor.settleCodexApproval?.(id, allow, note) ?? false;
     if (!ok && settled) console.warn(`zero: approval ${id} could not be recorded in the spool; the worker waiting on it has been denied`);
@@ -429,11 +431,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // answer in THIS process, ahead of the page: reading a different order from
   // the one on screen means ⌘Y allows a command nobody was reading.
   let looking: { product: string | null; id: string } | null = null;
-  const pendingApprovals = () => cardsInFront(approvals.listPending(config.storeRoot), looking);
+  // Read at a press (the chord, the menu): finds the card, signs nothing new.
+  const pendingApprovals = () => cardsInFront(approvals.listPending(config.storeRoot, { drawn: false }), looking);
   // When each card was first sent to the window, so a chord in its first moment answers nothing (shared/card-settles.mts).
   const sentAt = new Map<string, number>();
   const sendingApprovals = () => {
-    const cards = pendingApprovals();
+    const cards = cardsInFront(approvals.listPending(config.storeRoot), looking);
     const now = Date.now();
     for (const id of [...sentAt.keys()]) if (!cards.some((c) => c.id === id)) sentAt.delete(id);
     for (const c of cards) if (!sentAt.has(c.id)) sentAt.set(c.id, now);
@@ -458,7 +461,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // and a request rewritten since gets nothing.
   ipcMain.handle('zero:approve', (_e, { id, allow, note, card }: { id: string; allow: boolean; note?: string; card?: string }) => {
     if (card !== undefined && !approvals.cardStillShown(config.storeRoot, id, card)) return { ok: false, error: 'the card changed after your phone showed it, so nothing was allowed' };
-    return { ok: answerApproval(id, allow, note) };
+    return { ok: answerApproval(id, allow, note, card) };
   });
 
   // AN AGENT ROW IS NOT A WORK ITEM. Rows for her Claude Code agents are drawn
@@ -1123,11 +1126,30 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     try {
       const out = await team.signUp(email, password, name);
       push();
+      raiseOnceConfirmed();
       return { ok: true, team: teamNow(), confirm: !!out?.confirm };
     } catch (err) {
       return { ok: false, error: String((err as Error)?.message ?? err), team: teamNow() };
     }
   });
+  // The setup waits on "Check your email" and moves on by itself once this signs in.
+  const raiseOnceConfirmed = () => {
+    void team?.confirmation()?.then(({ ok }) => {
+      if (ok) { try { if (window?.isMinimized?.()) window.restore?.(); window?.show?.(); } catch { /* no window to raise */ } }
+      push();
+    });
+  };
+  // How the link ended, so "Check your email" can say it failed. Bounded by the session's own wait.
+  ipcMain.handle('zero:team-confirmation', async () => {
+    const waiting = team?.confirmation();
+    if (!waiting) return { ok: false, error: 'Create the account again to get a new link.' };
+    const out = await waiting;
+    return out.ok ? { ok: true, team: teamNow() } : { ...out, team: teamNow() };
+  });
+  ipcMain.handle('zero:team-resend-confirmation', teamCall(async () => {
+    await team!.resendConfirmation();
+    raiseOnceConfirmed();
+  }));
   ipcMain.handle('zero:team-create', teamCall(({ name }: { name: string }) => team!.createTeam(name)));
   // An invite answered yes. Nothing else joins a team.
   ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }: { teamId: string }) => team!.acceptInvite(teamId)));

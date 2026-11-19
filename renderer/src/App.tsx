@@ -28,7 +28,7 @@ import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
 import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
-import { arrowRows, spotIn, stepIn } from './one-thing-at-a-time';
+import { arrowRows, pageTitle, spotIn, stepIn } from './one-thing-at-a-time';
 import { AIMED_AT_THE_THREAD_YOU_LEFT, CLICK_FOR_THE_THREAD_YOU_LEFT, clickAimedHere, pickLandsHere, type Arrival, type Point } from './pick-settles';
 import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
@@ -58,7 +58,7 @@ import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
 import { continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
-import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS } from './reply-keys';
+import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, aWordFollows, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS, WORD_FOLLOWS_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mts';
 import { SEEN_SENT } from '../../shared/phone-settings.mts';
@@ -107,9 +107,10 @@ import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, 
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
+import { commandATicksTheList, selectWhatYouAreReading } from './select-all';
 import { modelCommands } from './thread-model-commands';
 import { MOVE_KEYWORDS, whyItCannotMove } from '../../shared/move-thread.mts';
-import { isUrgentRow, urgentArrival, urgentRaised, urgentShown, type UrgentRaised } from './urgent-arrival';
+import { isUrgentRow, urgentArrival, urgentKept, urgentRaised, urgentShown, type UrgentRaised } from './urgent-arrival';
 import { UrgentReady } from './components/UrgentReady';
 import { leavePlace, placeKey, placeToReturnTo } from './thread-place';
 import { DONE, manyOrOne } from './done-word';
@@ -282,7 +283,7 @@ import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sk
 import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
-import { useBackAndForward, type Stop as TrailStop } from './back-and-forward';
+import { stopOnScreen, useBackAndForward, type Stop as TrailStop } from './back-and-forward';
 import { BackForward } from './components/BackForward';
 
 
@@ -305,6 +306,8 @@ type Modal = null | 'cloud-off' | 'compose' | 'filter' | 'palette' | 'reply' | '
 // written in the card, and the card is where it has to reappear. Null is an
 // undo that cancelled something and had nothing of hers to return.
 type Restored = { item: WorkItem } | { compose: true } | null;
+/** An E or L on an open thread that is waiting to see if a word follows it. */
+type WaitingKey = { key: string; thread: string; timer: ReturnType<typeof setTimeout> };
 const restoredItem = (r: Restored): WorkItem | null => (r && 'item' in r ? r.item : null);
 const rowKey = (i: WorkItem) => `${i.product}/${i.id}`;
 const leadKey = (l: LeadRow) => l.key;
@@ -4072,6 +4075,7 @@ export default function App() {
     announcedUrgent.current.add(urgent.id);
     setUrgentReady(urgentRaised(urgent, focused));
   }, [inbox, focused]);
+  useEffect(() => { setUrgentReady((r) => urgentKept(r, focused)); }, [focused]);
   const urgentShownRow = urgentShown(urgentReady, focused, inbox);
   const openUrgentReady = useCallback(() => {
     if (!urgentShownRow) return;
@@ -6308,6 +6312,20 @@ export default function App() {
   const movedByKeyAt = useRef(0);
   const nowhereAt = useRef(0);
   const typedIntoBoxAt = useRef(0);
+  const waitingKey = useRef<WaitingKey | null>(null);
+  const actAfterTheWait = (w: WaitingKey) => {
+    if (waitingKey.current !== w) return;
+    waitingKey.current = null;
+    const item = focusedNow.current;
+    if (!item || keyOf(item) !== w.thread || modalNow.current) return;
+    movedByKeyAt.current = Date.now();
+    if (w.key.toLowerCase() === 'e') void markDoneNow.current(item);
+    else openSnoozeNow.current(item);
+  };
+  const markDoneNow = useRef(markDone);
+  markDoneNow.current = markDone;
+  const openSnoozeNow = useRef(openSnooze);
+  openSnoozeNow.current = openSnooze;
   const screenIs = `${focused ? keyOf(focused) : ''}|${modal === 'reply' ? '' : modal ?? ''}|${view}|${search !== null}|${roomShown}|${teamShown}|${openDoc?.src ?? ''}`;
   const screenWas = useRef(screenIs);
   useLayoutEffect(() => {
@@ -6484,12 +6502,14 @@ export default function App() {
       // NO ⌘1 TO ⌘4 (w-914b16eab6, 2026-10-02). They went straight to a
       // section of the sidebar until the sections became the tabs above, which
       // Tab walks. They were removed on her word, not left as a second way in.
-      // cmd-A: select everything in the current list for batch action. It
-      // works from inside a focused task too (dropping back to the list),
-      // and pressing it again with everything selected clears the selection.
+      // ⌘A ticks the whole list, or clears the ticks when all are ticked, only
+      // when the list is on screen. Anywhere else it selects what you are reading.
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'a' && !inInput && !modal) {
+        if (!commandATicksTheList({ threadOpen: !!focused, repeatOpen: !!focusedRepeat, cardOpen: !!openCard })) {
+          if (selectWhatYouAreReading(document)) e.preventDefault();
+          return;
+        }
         e.preventDefault();
-        setFocused(null);
         setMultiSel((m) => m.size >= list.length && list.length > 0 ? new Set() : new Set(list.map((i) => i.id)));
         return;
       }
@@ -6612,16 +6632,38 @@ export default function App() {
         // offer a worker wrote on Friday (format.ts, offerIsLive), and the one
         // the app asks for a finished run is answered here too (./ship-offer).
         const opts = offerNow(focused);
-        // What is typed with no box under it goes in the box of the thread on
-        // screen, and a key that closes things waits out a change of screen.
-        if (!e.defaultPrevented && !runRef.current && !focused.agent
-          && keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc }) === 'to the box') {
-          e.preventDefault();
+        const typeIntoTheBox = (item: WorkItem, words: string) => {
           typedIntoBoxAt.current = Date.now();
-          saveDraft(focused, `${readDraft(focused)}${e.key}`);
-          window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(focused) }));
+          saveDraft(item, `${readDraft(item)}${words}`);
+          window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(item) }));
           setModal('reply');
           requestAnimationFrame(() => focusTheReplyBox());
+        };
+        const waiting = waitingKey.current;
+        if (waiting && e.repeat && e.key.toLowerCase() === waiting.key.toLowerCase()) { e.preventDefault(); return; }
+        if (waiting) {
+          clearTimeout(waiting.timer);
+          waitingKey.current = null;
+          if (aWordFollows({ key: e.key, repeat: e.repeat }) && waiting.thread === keyOf(focused)) {
+            e.preventDefault();
+            typeIntoTheBox(focused, `${waiting.key}${e.key}`);
+            return;
+          }
+        }
+        // What is typed with no box under it goes in the box of the thread on
+        // screen, and a key that closes things waits out a change of screen.
+        const means = !e.defaultPrevented && !runRef.current && !focused.agent
+          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc })
+          : 'shortcut';
+        if (means === 'to the box') {
+          e.preventDefault();
+          typeIntoTheBox(focused, e.key);
+          return;
+        }
+        if (means === 'wait') {
+          e.preventDefault();
+          const w: WaitingKey = { key: e.key, thread: keyOf(focused), timer: setTimeout(() => actAfterTheWait(w), WORD_FOLLOWS_MS) };
+          waitingKey.current = w;
           return;
         }
         if (e.key === 'e' || e.key === 'E' || e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') movedByKeyAt.current = Date.now();
@@ -7074,7 +7116,7 @@ export default function App() {
   const whereItWent = sentLineShown && toast?.goes ? (
     <SentLine
       key={toastShown.current}
-      title={sentTo ? reachAudienceOf(sentTo) ?? ((isConversationRow(sentTo) && othersIn(snap?.products.find((p) => p.slug === sentTo.product)?.team, snap?.team?.me?.id ?? null, (id) => snap?.team?.people.find((p) => p.id === id)?.name)) || rowTitle(sentTo)) : 'the thread you left'}
+      title={sentTo ? reachAudienceOf(sentTo) ?? ((isConversationRow(sentTo) && othersIn(snap?.products.find((p) => p.slug === sentTo.product)?.team, snap?.team?.me?.id ?? null, (id) => snap?.team?.people.find((p) => p.id === id)?.name)) || pageTitle(sentTo)) : 'the thread you left'}
       says={sentLineSays(toast.text)}
       at={toast.goes.at}
       undoes={toastParts(toast.text).undo}
@@ -7372,23 +7414,41 @@ export default function App() {
   const backForwardOn = !onPhone();
   const homeHere = homeOn && homeOpen && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
-  const stopHere: TrailStop | null = settingsOpen ? { at: 'settings', pane: settingsAt }
-    : focused ? { at: 'thread', product: focused.product, id: focused.id }
-    : homeHere ? { at: 'home' }
-    : filesShown ? { at: 'files', project: filesPage?.project ?? null }
-    : connectionsShown ? { at: 'connections' }
-    : search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || focusedRepeat || todayOn || tasksOn ? null
-    : { at: 'list', view };
+  const groupHere = roomShown && roomsUi.openId !== 'groups' ? roomsUi.openId : null;
+  const stopHere = stopOnScreen({
+    settings: settingsOpen ? { pane: settingsAt } : null,
+    thread: focused ? { product: focused.product, id: focused.id } : null,
+    card: teamShown && openCard ? { person: openCard.personId, thread: openCard.threadId } : null,
+    home: homeHere,
+    files: filesShown ? { project: filesPage?.project ?? null } : null,
+    connections: connectionsShown,
+    group: groupHere,
+    teammate: teammatesShown ? teammatesUi.open : null,
+    teamPlace: chatsPlaceShown ? chatsPlace : null,
+    unrecorded: search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || !!focusedRepeat || todayOn || tasksOn,
+    view,
+  });
+  const cardOf = (s: { person: string; thread: string }) => cards.find((c) => c.personId === s.person && c.threadId === s.thread);
   const trail = useBackAndForward({
     on: backForwardOn,
     here: stopHere,
-    exists: (s) => s.at !== 'thread' || selectable.some((i) => i.id === s.id && i.product === s.product),
+    exists: (s) => s.at === 'thread' ? selectable.some((i) => i.id === s.id && i.product === s.product)
+      : s.at === 'card' ? !!cardOf(s)
+      : s.at === 'team' ? s.place === 'team' || members.some((m) => m.key === s.place)
+      : true,
     go: (s) => {
       if (s.at === 'home') { openView('inbox'); setHomeOpen(true); }
       else if (s.at === 'list') openView(s.view);
       else if (s.at === 'files') openFiles(s.project);
       else if (s.at === 'connections') openConnectionsPage(null);
-      else if (s.at === 'settings') {
+      else if (s.at === 'team') openChatsPlace(s.place);
+      else if (s.at === 'group') { openView(view); roomsUi.open(s.id); }
+      else if (s.at === 'teammate') teammatesUi.go(s.id);
+      else if (s.at === 'card') {
+        const card = cardOf(s);
+        // The page it was opened from stays, so its Back still names it.
+        if (card) { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); openTeammateCard(card); }
+      } else if (s.at === 'settings') {
         setTeamOpen(false); closeSearch(); setFocused(null);
         setSettingsPane(s.pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true);
       } else {
@@ -7402,6 +7462,10 @@ export default function App() {
     : s.at === 'files' ? 'Files'
     : s.at === 'connections' ? 'Connections'
     : s.at === 'settings' ? 'Settings'
+    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : members.find((m) => m.key === s.place)?.name ?? 'Team')
+    : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
+    : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
+    : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
     : selectable.find((i) => i.id === s.id && i.product === s.product)?.title ?? 'the thread';
   useEffect(() => {
     if (!onPhone()) return;
@@ -8237,6 +8301,7 @@ export default function App() {
               tab={view}
               people={peoplePick}
               cloud={snap.cloud ?? null}
+              cloudPlan={cloudPlan}
               onCloudMode={(mode) => { void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
               onCloudWhenOn={(mode) => { void api.setWorkspaceSetting({ key: 'cloudWhenOn', value: mode }); }}
               onCloudSetUp={() => setCloudSetupOpen(true)}
@@ -9868,7 +9933,7 @@ export default function App() {
         }} />
       )}
       {urgentShownRow && cornerHeaderTarget && createPortal(
-        <UrgentReady row={urgentShownRow} onOpen={openUrgentReady} />,
+        <UrgentReady row={urgentShownRow} onOpen={openUrgentReady} onClose={() => setUrgentReady(null)} />,
         cornerHeaderTarget,
       )}
       {toast && (() => {

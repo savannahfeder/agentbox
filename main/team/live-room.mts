@@ -43,7 +43,9 @@ export function liveForTheWholeTeam({ mine, cards, named }: {
 }): boolean {
   const key = (s: unknown) => String(s ?? '').trim().toLowerCase();
   if (mine) return !!mine.team?.projectId && projectSeenBy(mine).who === 'team';
-  return (cards ?? []).some((c) => key(c.project) === key(named) && !c.people?.length);
+  // Every project of that name shares the room, so one shared with chosen people closes it.
+  const same = (cards ?? []).filter((c) => key(c.project) === key(named));
+  return same.length > 0 && same.every((c) => !c.people?.length);
 }
 
 /**
