@@ -23,12 +23,6 @@ command -v aws >/dev/null 2>&1 || {
     && unzip -q "$d/aws.zip" -d "$d" && sudo "$d/aws/install" >/dev/null; rm -rf "$d"
 }
 # The skills, their tests and the plans: a private repository (.agentbox/private.json).
-# GH_TOKEN reads and pushes it, taken from the environment each time and never written down.
-if [ -n "$GH_TOKEN" ] && [ ! -d .claude/skills/.git ]; then
-  helper='!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; }; f'
-  GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0="$helper" \
-    node -e "import('./main/private-folder.mts').then((m) => console.log('private folder:', JSON.stringify(m.bringPrivateFolder(process.cwd(), { every: 0 }))))"
-  [ -d .claude/skills/.git ] && git -C .claude/skills config credential.helper "$helper"
-fi
+sh .agentbox/private-folder.sh
 # python3-venv: the pre-push hook installs semgrep into a venv (scripts/security-scan-the-push.mjs).
 python3 -c 'import ensurepip' >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv; }

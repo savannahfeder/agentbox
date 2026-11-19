@@ -14,7 +14,8 @@ rules that are not obvious from them.
 The skills, their tests and the plans (`docs/cloud`, `docs/mobile`,
 `docs/team`) are a private repository checked out at `.claude/skills`
 (`.agentbox/private.json`). Its notes are as binding as this file. A change
-there is committed and pushed in that folder, not in this repository.
+there is committed and pushed in that folder, not in this repository. On a
+cloud run without it, `sh .agentbox/private-folder.sh` clones it.
 
 @.claude/skills/CLAUDE.md
 
