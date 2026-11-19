@@ -550,6 +550,8 @@ export interface TeamState {
   seen?: Record<string, Record<string, number>>;
   lastSyncAt: number | null;
   error: string | null;
+  /** False only when the cloud said this person's team is not let into multiplayer yet. */
+  multiplayer?: boolean | null;
   /** Rooms (alpha), while switched on in Alpha features (main/team/rooms.mts). */
   rooms?: RoomsState | null;
 }

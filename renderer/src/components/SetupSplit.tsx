@@ -106,7 +106,8 @@ export function SetupSplit(p: SetupSplitProps) {
   const [plan, setPlan] = useState<SetupPlan>('free');
   const [engine, setEngine] = useState<'claude' | 'codex'>('claude');
   const agents = p.engines?.length ?? 1;
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents]);
+  const multiplayer = p.snap?.team?.multiplayer ?? null;
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents, multiplayer }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents, multiplayer]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;

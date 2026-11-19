@@ -51,7 +51,7 @@ export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number,
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */
-export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1 }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number }): SetupStep[] {
+export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1, multiplayer = null }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number; multiplayer?: boolean | null }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
   // With Claude Code and Codex both ready, which one starts your threads is yours to say.
   if (agents > 1) out.push('agent');
@@ -59,7 +59,7 @@ export function setupSteps({ chats, team, teammates, project, signedIn = true, p
   if (team && !signedIn) out.push('account');
   // One page offers Pro and takes its payment. The team is a paid thing, so inviting comes only once Pro is started.
   if (team && !onTeam) out.push('plan');
-  if (team && (onTeam || plan === 'pro')) out.push('invite');
+  if (team && (onTeam || plan === 'pro') && multiplayer !== false) out.push('invite');
   if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
