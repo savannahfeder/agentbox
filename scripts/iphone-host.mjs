@@ -16,7 +16,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { parseTree, readScreen, lookText, pickThing, swipePoints, keyCode } from './iphone-screen.mjs';
+import { parseTree, readScreen, lookText, pickThing, swipePoints, keyCode } from './lib/iphone-screen.mjs';
 
 export function keyFits(header, ticket) {
   const key = String(header ?? '').replace(/^Bearer\s+/i, '');
