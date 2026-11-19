@@ -87,6 +87,7 @@ export const PRIVATE_PATHS = [
   ['the operator\'s standing instructions', /(^|\/)briefs\/founder\.md$/],
   ['an inbox ledger', /(^|\/)work-items\.jsonl$/],
   ['a product\'s private notes', /(^|\/)(decisions|STATE)\.md$/],
+  ['part of the private repository (.agentbox/private.json)', /^\.claude\/skills\/|^docs\/(cloud|mobile|team)\/[^/]*plan[^/]*\.md$/i],
   ['local Claude Code settings or history', /(^|\/)\.claude\/(settings\.local\.json|projects\/|todos\/|history)/],
   ['a key or certificate', /\.(pem|p12|p8|pfx|key|mobileprovision)$|(^|\/)id_(rsa|ed25519|ecdsa)$/],
   ['a screen or audio recording', /\.(mov|mp4|m4v|webm|m4a|wav|cast)$/i],

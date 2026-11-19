@@ -574,10 +574,10 @@ export function rowTitle(i: {
   result?: string;
   wrote?: { title?: { ts: number; source?: string }; label?: { ts: number } };
 }): string {
-  // A teammate's thread reads as its message to you, and before it has said
-  // anything, as its own title, never a name guessed from its opening line.
-  if (teammateIdOf(i)) return (i.result ?? '').split('\n').map((l) => searchText(l).trim()).find(Boolean) || (i.title ?? '');
-  return shownTitle(i);
+  const name = shownTitle(i);
+  // A teammate's thread can start with no words of yours to name it by.
+  if (!name && teammateIdOf(i)) return (i.result ?? '').split('\n').map((l) => searchText(l).trim()).find(Boolean) ?? '';
+  return name;
 }
 
 // The schedule box names a thread the way the list does, not by its raw title

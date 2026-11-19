@@ -192,6 +192,11 @@ export function supabaseBackend(client: SupabaseClient) {
       return rows.map((r) => ({ teamId: r.team_id, teamName: r.team_name, invitedBy: r.invited_by ?? null, invitedByName: r.invited_by_name ?? null }));
     },
 
+    async hasMultiplayer() {
+      await myId();
+      return must<boolean>(await client.rpc('i_have_multiplayer'), 'asking whether this team has multiplayer') === true;
+    },
+
     async acceptInvite(teamId: string) {
       await myId();
       must(await client.rpc('accept_invite', { p_team: teamId }), 'joining the team');

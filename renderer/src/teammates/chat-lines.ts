@@ -2,6 +2,7 @@
 // runs leave, in time order, seen whole or through one teammate.
 import type { RunningSession, Teammate, TeamChatLine, TeamRunLine, TeammatesView, WorkItem } from '../types';
 import { spanLabel } from '../notes';
+import { parseOptions } from '../format';
 import { nextRunAt } from '../../../shared/repeats.mts';
 import { teammateIdOf } from '../../../shared/teammates.mts';
 
@@ -106,10 +107,14 @@ export function answerOf(view: TeammatesView | null | undefined, q: TeamChatLine
 }
 
 /** A teammate's questions asked in this thread, with answers to tap, that you have not answered anywhere. */
-export function openQuestionsIn(view: TeammatesView | null | undefined, item: Pick<WorkItem, 'id' | 'labels'>): TeamChatLine[] {
+export function openQuestionsIn(view: TeammatesView | null | undefined, item: Pick<WorkItem, 'id' | 'labels' | 'result' | 'wrote'>): TeamChatLine[] {
   const tid = teammateIdOf(item);
   if (!view || !tid) return [];
-  return view.chat.filter((m) => m.kind === 'msg' && m.from === tid && m.run === item.id && !!m.options?.length && !answerOf(view, m));
+  // A later answer offering its own choices, or your own later word, replaces
+  // the chat question in the thread; it is still answered in Chats.
+  const offeredAt = parseOptions(item.result).length ? item.wrote?.result?.ts ?? 0 : 0;
+  const after = Math.max(offeredAt, item.wrote?.answer?.ts ?? 0);
+  return view.chat.filter((m) => m.kind === 'msg' && m.from === tid && m.run === item.id && !!m.options?.length && !answerOf(view, m) && m.ts > after);
 }
 
 // The question a teammate's message asks: its last sentence that ends in a
@@ -313,6 +318,24 @@ function betweenYou(e: ChatEntry, id: string): boolean {
 
 export function chatWith(view: TeammatesView | null | undefined, id: string): ChatEntry[] {
   return chatEntries(view, id).filter((e) => betweenYou(e, id));
+}
+
+type Filed = Pick<WorkItem, 'id' | 'product' | 'title' | 'labels' | 'createdAt'> & { parent?: string; label?: string };
+
+/**
+ * The threads this teammate's runs filed for an ordinary agent. A teammate's
+ * own runs are left out: its page already lists those.
+ */
+export function threadsItOpened<T extends Filed>(items: readonly T[], id: string): T[] {
+  const runs = new Set(items.filter((i) => teammateIdOf(i) === id).map((i) => `${i.product}/${i.id}`));
+  return items.filter((i) => i.parent && !teammateIdOf(i) && runs.has(`${i.product}/${i.parent}`));
+}
+
+/** The same threads as lines for its chat, oldest first. */
+export function openedLines(items: readonly Filed[], id: string): TeamRunLine[] {
+  return threadsItOpened(items, id)
+    .map((i): TeamRunLine => ({ id: `${i.id}:opened`, kind: 'run', verb: 'opened', teammate: id, item: i.id, product: i.product, title: i.label || i.title, ts: i.createdAt ?? 0 }))
+    .sort((a, b) => a.ts - b.ts);
 }
 
 export function logOf(view: TeammatesView | null | undefined, id: string): ChatEntry[] {

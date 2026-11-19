@@ -23,3 +23,6 @@ zero.config.json
 #   renderer/dist           build output. A copy of it is some OTHER commit's
 #                           build, and `npm start` builds it anyway.
 #   main/window-helper      nothing in the app references it any more.
+#   .claude/skills          the private checkout. main/private-folder.mts gives
+#                           it, and skips a branch that still tracks the old
+#                           copy, where this list would refuse the folder.

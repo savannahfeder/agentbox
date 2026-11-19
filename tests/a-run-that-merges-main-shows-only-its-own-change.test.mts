@@ -99,7 +99,8 @@ describe('a run that merges main in shows only its own change', () => {
 
     const change = changeFromRepo(before);
     expect(change.files.map((f) => f.path)).toEqual(['app.mts']);
-    expect(added(change, 'app.mts')).toEqual(['mine 8']);
+    // The earlier round is still waiting to ship on this branch, so it counts.
+    expect(added(change, 'app.mts')).toEqual(['earlier round 3', 'mine 8']);
   });
 
   it('still shows everything once the run has shipped and main points at its own commit', () => {

@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import { dashGoesBack, stepBefore, type SetupStep } from '../renderer/src/setup-split.ts';
 
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-const steps: SetupStep[] = ['chats', 'agent', 'account', 'plan', 'invite', 'look'];
+const steps: SetupStep[] = ['chats', 'agent', 'account', 'plan', 'teammates', 'look'];
 
 describe('where Back goes', () => {
   it('is the last step, from the page after the last step', () => {
