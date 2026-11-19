@@ -754,6 +754,8 @@ export function runsThisWeek(teammateId: string, items: readonly RunItem[] | nul
 // there to keep it rare and cheap.
 export const LOOK_BACK_LABEL = 'look-back';
 export const LOOK_BACK_AFTER = 3;
+// Or this many notes a working run kept, which one long thread can give.
+export const LOOK_BACK_NOTES = 5;
 const LOOK_BACK_EVERY_MS = 24 * 60 * 60 * 1000;
 const LOOK_BACK_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 const LOOK_BACK_LEAVES = 3;
@@ -961,7 +963,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
   /** When each project last shipped. */
   shipped?: Readonly<Record<string, number>>;
   /** Whether a teammate may look back now (it has a method, and its plan has room). */
-  lookBack?: { ok: (t: TeammateLike) => boolean } | null;
+  lookBack?: { ok: (t: TeammateLike) => boolean; notes?: (t: TeammateLike) => readonly number[] } | null;
 } = {}): WakeAction[] {
   const actions: WakeAction[] = [];
   const live = teammates.filter((t) => !t.endedAt);
@@ -1165,7 +1167,8 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
     if (runsThisWeek(t.id, items, now) >= (t.limit ?? DEFAULT_LIMIT) - LOOK_BACK_LEAVES) continue;
     const since = lookBackSince(t.id, items);
     if (since && now - since < LOOK_BACK_EVERY_MS) continue;
-    if (taughtRuns(t.id, items, since, now).length < LOOK_BACK_AFTER) continue;
+    const notes = (lookBack?.notes?.(t) ?? []).filter((at) => at > since).length;
+    if (taughtRuns(t.id, items, since, now).length < LOOK_BACK_AFTER && notes < LOOK_BACK_NOTES) continue;
     const trigger: WakeTrigger = { kind: 'look-back', since };
     actions.push({ type: 'run', teammate: t.id, id: runIdFor(`${t.id}~look-back~${since}`), trigger, title: runTitle(trigger, t), start: 'now' });
     pendingNew.set(t.id, 1);
