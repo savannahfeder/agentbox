@@ -133,10 +133,10 @@
 .link-pop.selection-bar { z-index: 9450; gap: 2px; padding: 4px; }
 .selection-bar .link-pop-btn { padding: 4px 8px; color: var(--text-dim); }
 .selection-bar-comment { display: inline-flex; align-items: center; gap: 6px; }
-/* The reply box's own key cap, so a key looks the same wherever the app draws one. */
+/* The reply box's key cap, in the body font: the code font draws ⌘ too small to read. */
 .selection-bar-keys { display: inline-flex; gap: 3px; margin-left: 2px; }
 .selection-bar-keys kbd {
-  font-family: var(--mono); font-size: 10.5px; line-height: 14px; color: var(--text-dim);
+  font-family: inherit; font-size: 11px; line-height: 15px; color: var(--text-dim);
   background: var(--wash); border: 1px solid var(--line-strong);
   border-radius: var(--radius); padding: 0 5px; min-width: 16px; text-align: center;
 }
