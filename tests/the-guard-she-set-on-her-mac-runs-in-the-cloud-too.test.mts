@@ -112,6 +112,9 @@ beforeEach(async () => {
   git(mac, 'init', '-q', '-b', 'main');
   git(mac, 'config', 'user.email', 'dev@example.com');
   git(mac, 'config', 'user.name', 'Dev');
+  // Git's detached auto-maintenance can still be writing in .git when afterEach deletes it.
+  git(mac, 'config', 'maintenance.auto', 'false');
+  git(mac, 'config', 'gc.auto', '0');
   fs.writeFileSync(path.join(mac, 'a.txt'), 'one\n');
   git(mac, 'add', '.');
   git(mac, 'commit', '-q', '-m', 'first');
@@ -122,7 +125,7 @@ afterEach(async () => {
   await sandbox?.close();
   s3.closeAllConnections();
   await new Promise((r) => s3.close(r));
-  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 });
 
 const transport = {

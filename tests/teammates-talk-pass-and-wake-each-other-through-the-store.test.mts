@@ -67,7 +67,9 @@ describe('teammates through the store', () => {
     const brief = team.briefFor(runs[0]);
     expect(brief).toContain('You are Quality lead: a teammate');
     expect(brief).toContain('Can you try checkout on a phone?');
-    expect(brief).toContain(`"teammate:${ada.id}"`);
+    // Your words started it, so it is never told to close it itself.
+    expect(brief).toContain('Never close it yourself.');
+    expect(brief).not.toContain(`"teammate:${ada.id}"`);
     // The person reads the chat; "It's with the person for review" read as
     // someone else (third power test).
     expect(brief).toContain('never "the person"');
