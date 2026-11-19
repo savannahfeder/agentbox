@@ -3,8 +3,8 @@
 // w-41ff964775. Some people want to be quieter, and some want a thread seen by
 // a few people (a manager, say) without showing it to the whole company.
 //
-// Three choices now, in the composer's Who sees it menu and the summary
-// panel's Visible to, and Chosen people opens the same people picker the To
+// Three choices now, in the composer's Who sees it menu and the thread menu's
+// Share (the side summary's Visible to went in 2026-11), and Chosen people opens the same people picker the To
 // field uses. The cloud is what enforces it (tests/team-a-thread-shared-with-
 // chosen-people-reaches-only-them.test.mjs); this file is the window: the
 // rules that decide the words, and what the real components draw.
@@ -12,10 +12,9 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SummaryPanel } from '../renderer/src/threads/Summary.tsx';
 import { ThreadCells } from '../renderer/src/threads/Pages.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';
-import { chosenNames, whoSees, VISIBILITY_WORD } from '../renderer/src/threads/summary-rules.ts';
+import { chosenNames, whoSees } from '../renderer/src/threads/summary-rules.ts';
 import { rowSharing } from '../renderer/src/threads/page-rules.ts';
 import { chosenWords, sharingFields, VISIBILITY_ROWS } from '../renderer/src/threads/composer-rules.ts';
 globalThis.React = React;
@@ -45,13 +44,11 @@ const team = {
   byId: new Map(PEOPLE.map((p) => [p.id, p])),
   products: new Map(),
 };
-const panel = (it, t = team) => renderToStaticMarkup(React.createElement(SummaryPanel, { item: it, items: [it], team: t }));
 const row = (it, product = northwind, t = team) => renderToStaticMarkup(
   React.createElement(TeamContext.Provider, { value: t }, React.createElement(ThreadCells, { item: it, product, now: NOW })),
 );
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const composer = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-const summarySrc = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', import.meta.url), 'utf8');
 const pagesCss = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
 const T = { me: ME, since: SINCE };
 
@@ -59,10 +56,6 @@ describe('the three choices', () => {
   it('offers Team, Chosen people and Private, in that order', () => {
     expect(VISIBILITY_ROWS.map((v) => v.id)).toEqual(['team', 'people', 'private']);
     expect(VISIBILITY_ROWS.map((v) => v.label)).toEqual(['Team', 'Chosen people', 'Private']);
-  });
-
-  it('says the three words the same way everywhere', () => {
-    expect(VISIBILITY_WORD).toEqual({ team: 'Team', people: 'Chosen people', private: 'Only you' });
   });
 
   it('uses no em dash in any line a person reads', () => {
@@ -113,28 +106,11 @@ describe('the composer', () => {
   });
 });
 
-describe('the summary panel', () => {
-  it('names the people a thread is shared with, in the panel itself', () => {
-    expect(text(panel(item({ visibility: 'people', visibleTo: [THEO] })))).toMatch(/Visible to Theo/);
-    expect(text(panel(item({ visibility: 'people', visibleTo: [THEO, ANA] })))).toMatch(/Visible to Theo and Ana/);
-    expect(text(panel(item({ visibility: 'people', visibleTo: [THEO, ANA, BEN] })))).toMatch(/Visible to 3 people/);
-  });
-
-  it('still reads Team and Only you on the other two', () => {
-    expect(text(panel(item({ visibility: 'team' })))).toMatch(/Visible to Team/);
-    expect(text(panel(item({ visibility: 'private' })))).toMatch(/Visible to Only you/);
-  });
-
-  it('reads Only you on a thread shared with chosen people that names nobody', () => {
-    expect(text(panel(item({ visibility: 'people', visibleTo: [] })))).toMatch(/Visible to Only you/);
-  });
-
-  it('writes the list through the same threadEdit path, and Private when the last person comes off', () => {
-    expect(summarySrc).toMatch(/save\(next\.length \? \{ visibility: 'people', visibleTo: next \} : \{ visibility: 'private', visibleTo: \[\] \}\)/);
-  });
-
-  it('names them in words, never as ids', () => {
-    expect(panel(item({ visibility: 'people', visibleTo: [THEO] }))).not.toContain(THEO);
+describe('who it is shared with, in words', () => {
+  it('names the people a thread is shared with', () => {
+    expect(chosenNames([THEO], team.byId)).toBe('Theo');
+    expect(chosenNames([THEO, ANA], team.byId)).toBe('Theo and Ana');
+    expect(chosenNames([THEO, ANA, BEN], team.byId)).toBe('3 people');
   });
 
   it('says Nobody yet rather than an empty line while she is picking', () => {

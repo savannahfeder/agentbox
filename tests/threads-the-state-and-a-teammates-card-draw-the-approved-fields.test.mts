@@ -1,5 +1,6 @@
-// THE SUMMARY PANEL, THE TOP BAR'S STATE AND BUTTON, AND A TEAMMATE'S CARD
-// DRAW THE APPROVED FIELDS AND NOTHING NEW.
+// THE THREAD'S STATE AND A TEAMMATE'S CARD DRAW THE APPROVED FIELDS AND
+// NOTHING NEW. (The side summary panel this also held went in 2026-11,
+// w-d143fcb40a.)
 //
 // Approved 2026-10-01 after nine design rounds. The rule for the teammate's
 // card: it carries the same information as the thread's summary and nothing
@@ -11,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SummaryPanel, ThreadStateMark, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
+import { ThreadStateMark, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
 globalThis.React = React;
 
 const NOW = Date.now();
@@ -26,7 +27,6 @@ const item = (o = {}) => ({
   wrote: { progress: { ts: NOW - 19 * M, source: 'agent' } },
   ...o,
 });
-const items = [item(), { ...item({ id: 'w-google', title: 'Sign in with Google' }) }];
 const draw = (el) => renderToStaticMarkup(el);
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -35,9 +35,6 @@ const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 // the state is drawn on its own now; the four words and their marks are the
 // same four.
 describe('the top bar', () => {
-  // The Summary button itself left the top bar on w-a3482b8c2c; the rail that
-  // replaced it is held by the-summary-folds-to-a-rail-and-the-header-stops-
-  // saying-waiting.test.mjs. The state word and its mark are still drawn here.
   it('draws the state word with its mark', () => {
     const state = draw(React.createElement(ThreadStateMark, { item: item() }));
     expect(text(state)).toBe('Waiting');
@@ -48,55 +45,6 @@ describe('the top bar', () => {
     expect(say({ status: 'claimed', claim: { holder: 'h', leaseUntil: NOW + M } })).toMatch(/^In progress/);
     expect(say({ runAt: NOW + 60 * M })).toMatch(/^Scheduled/);
     expect(say({ status: 'done' })).toMatch(/^Done/);
-  });
-});
-
-// Signed into a team, because Visible to is drawn only on one (w-db6f5e331e).
-const team = { state: { since: 0, signedIn: true }, me: 'p-me', byId: new Map(), products: new Map() };
-
-describe('the panel', () => {
-  const html = draw(React.createElement(SummaryPanel, { item: item(), items, team }));
-  const words = text(html);
-  // CHANGED 2026-10-04 (w-922f66bb06): Priority second, and Updated last.
-  it('lists the properties in the approved order', () => {
-    expect(words).toMatch(/Status Waiting Priority High Owner You Project Northwind Visible to Team Updated/);
-  });
-  // Blocked by and Blocks left the panel on w-b38e975e2c; that test file
-  // (threads-the-summary-reads-properties-then-the-name-and-its-three-lines)
-  // pins their absence and the new order.
-  // CHANGED 2026-10-04 (w-54e9c7243f): a line with no words is left out,
-  // heading and all, instead of reading "Not written yet". A stand-in read
-  // off the ask is still drawn, dim.
-  // CHANGED 2026-10-05 (w-54e9c7243f): Context and Done, never Solution.
-  it('then the lines that have words, a stand-in dim until something is written', () => {
-    expect(words).toMatch(/Context Acme’s contract ends on the 14th/);
-    expect(words).toMatch(/Done Terms are drafted at 8% over last year\./);
-    expect(words).not.toMatch(/Solution|Not written yet/);
-    const standIn = draw(React.createElement(SummaryPanel, { item: item({ problem: undefined, body: 'Draft the Acme terms.' }), items, team: null }));
-    expect(standIn).toMatch(/class="ts-line dim"[^>]*>Draft the Acme terms\./);
-  });
-  // CHANGED 2026-10-04 (w-922f66bb06): the faint line under the words became
-  // the Updated row at the foot, and it says only when.
-  it('says when it was last updated, as the last property', () => {
-    expect(words).toMatch(/Updated 19 min ago$/);
-    expect(words).not.toContain('Kept up to date');
-  });
-  it('draws priority with the app’s own bars, Urgent as a fourth bar and never an exclamation mark', () => {
-    expect(html).toMatch(/<span class="prio-bars p3">/);
-    const urgent = draw(React.createElement(SummaryPanel, { item: item({ priority: 9 }), items, team: null }));
-    expect(urgent).toMatch(/<span class="prio-bars p4"><i><\/i><i><\/i><i><\/i><i><\/i><\/span>Urgent/);
-    expect(text(urgent)).not.toContain('!');
-    const card = draw(React.createElement(TeammateCard, { card: { personId: 'p', threadId: 't', visible: true, title: 'T', project: 'P', state: 'running', priority: 9, problem: null, progress: null, solution: null, blockedBy: [], blocks: [], updatedAt: NOW }, person: null }));
-    expect(card).toContain('prio-bars p4');
-    expect(text(card)).not.toContain('!');
-  });
-  // "Only you" since 2026-10-01: the same words an old thread nobody shared
-  // reads (tests/threads-the-summary-names-its-thread-and-shows-what-you-can-change.test.mts).
-  it('reads Only you for a private thread', () => {
-    expect(text(draw(React.createElement(SummaryPanel, { item: item({ visibility: 'private' }), items, team })))).toMatch(/Visible to Only you/);
-  });
-  it('uses no em dash anywhere', () => {
-    expect(html).not.toContain('—');
   });
 });
 
