@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { isCommentChord, COMMENT_CHORD } from '../renderer/src/selection-bar.ts';
 import { reportSelectedWords } from '../shared/frame-selected-words.mts';
 import { SHORTCUTS } from '../shared/shortcuts.mts';
-import { HINTS } from '../renderer/src/hint-plate.ts';
+import { HINTS, placeHint } from '../renderer/src/hint-plate.ts';
 
 const press = (over: Record<string, unknown>) => ({ code: 'Slash', key: '/', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...over });
 const bar = () => fs.readFileSync(new URL('../renderer/src/components/SelectionBar.tsx', import.meta.url), 'utf8');
@@ -60,6 +60,29 @@ describe('the bar answers it', () => {
   it('is listed on the shortcuts page', () => {
     const row = SHORTCUTS.flatMap((g) => g.keys).find((k) => k.keys.includes(COMMENT_CHORD));
     expect(row?.what).toBe('Comment on the words you selected.');
+  });
+});
+
+// Measured in the real file view: hung under the bar, the plate covered the selected words, which showed through it.
+describe('the plate keeps off the words you selected', () => {
+  const screen = { width: 1440, height: 900 };
+  const plate = { width: 230, height: 36 };
+  const bar = { top: 430, bottom: 460, left: 500, right: 640, width: 140, height: 30 };
+  it('rises above a control that asks for it', () => {
+    const at = placeHint(bar, plate, screen, 'left', undefined, 0, 'above');
+    expect(at?.rose).toBe(true);
+    expect(at!.top + plate.height).toBeLessThanOrEqual(bar.top);
+  });
+  it('hangs under when there is no room above', () => {
+    const high = { ...bar, top: 20, bottom: 50 };
+    expect(placeHint(high, plate, screen, 'left', undefined, 0, 'above')?.rose).toBe(false);
+  });
+  it('every other control still hangs under', () => {
+    expect(placeHint(bar, plate, screen)?.rose).toBe(false);
+  });
+  it('the bar asks for above when it sits over the words, below when it sits under them', () => {
+    expect(fs.readFileSync(new URL('../renderer/src/components/SelectionBar.tsx', import.meta.url), 'utf8').match(/data-hint-side=\{side\}/g)?.length).toBe(2);
+    expect(fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8')).toContain("shownHint.el.dataset.hintSide === 'above' ? 'above' : 'below'");
   });
 });
 

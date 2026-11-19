@@ -9158,7 +9158,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 */
 .hint-plate {
   position: fixed;
-  z-index: 90;
+  /* Over a file opened full screen and the bar over its selected words, whose buttons wear hints too. */
+  z-index: 9460;
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 4px 0;

@@ -9998,6 +9998,7 @@ export default function App() {
           lines={HINTS[shownHint.id]}
           comp={shownHint.el.getBoundingClientRect()}
           align={shownHint.el.dataset.hintAlign === 'right' ? 'right' : shownHint.el.dataset.hintAlign === 'center' ? 'center' : 'left'}
+          side={shownHint.el.dataset.hintSide === 'above' ? 'above' : 'below'}
           /* `data-hint-text` names the words inside the component, so the plate
              lines up with the title rather than with the card's edge: a plate
              is expected to be left-aligned with the text, not pushed past it. */

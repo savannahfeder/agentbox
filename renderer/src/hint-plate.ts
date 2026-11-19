@@ -195,13 +195,17 @@ export function placeHint(
    */
   text?: { left: number },
   inset = 0,
+  /** 'above' for a control whose plate would cover what it acts on, such as the bar over selected words. */
+  side: 'below' | 'above' = 'below',
 ): { top: number; left: number; rose: boolean } | null {
   // A BOX OF NOTHING IS NOT A PLACE. A detached element measures 0 by 0 at 0,0,
   // and the clamp below would turn that into the window's top-left corner,
   // which is where a row's keys once ended up, sitting over the traffic
   // lights. The caller drops the hint rather than drawing it somewhere.
   if (comp.width <= 0 && comp.height <= 0) return null;
-  const rose = comp.bottom + HINT_GAP + plate.height > viewport.height - HINT_MARGIN;
+  const rose = side === 'above'
+    ? comp.top - HINT_GAP - plate.height >= HINT_MARGIN
+    : comp.bottom + HINT_GAP + plate.height > viewport.height - HINT_MARGIN;
   const top = rose ? comp.top - HINT_GAP - plate.height : comp.bottom + HINT_GAP;
   // `center`: under the middle of a small square button, whose plate is
   // wider than it and would otherwise hang off one side.

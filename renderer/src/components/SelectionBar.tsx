@@ -19,6 +19,8 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
   const [picked, setPicked] = useState<{ words: string; first: Box; all: Box } | null>(null);
   const [copied, setCopied] = useState(false);
   const [moves, setMoves] = useState(0);
+  // The key's plate goes on the far side of the bar from the words, never over them.
+  const [side, setSide] = useState<'above' | 'below'>('above');
   const commentNow = useRef<(() => void) | null>(null);
   useEffect(() => {
     setPicked(null);
@@ -54,6 +56,7 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
     const spot = barSpot(onScreen(picked.first), onScreen(picked.all), { w: el.offsetWidth, h: el.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, top });
     el.style.left = `${spot.left}px`;
     el.style.top = `${spot.top}px`;
+    setSide(spot.top < onScreen(picked.first).top ? 'above' : 'below');
   }, [picked, copied, moves, frame]);
 
   commentNow.current = picked ? () => comment() : null;
@@ -69,7 +72,7 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
     try { await navigator.clipboard.writeText(picked.words); setCopied(true); } catch { /* clipboard blocked */ }
   };
   return createPortal(<div ref={bar} className="link-pop selection-bar" role="toolbar" aria-label="Selected words" onMouseDown={(e) => e.preventDefault()}>
-    <button type="button" className="link-pop-btn selection-bar-comment" data-hint="comment" onClick={comment}><CommentGlyph />Comment</button>
+    <button type="button" className="link-pop-btn selection-bar-comment" data-hint="comment" data-hint-side={side} onClick={comment}><CommentGlyph />Comment</button>
     <button type="button" className="link-pop-btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</button>
   </div>, document.body);
 }
@@ -102,6 +105,7 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
   const bar = useRef<HTMLDivElement | null>(null);
   const [at, setAt] = useState<{ first: Box; all: Box } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [side, setSide] = useState<'above' | 'below'>('above');
 
   useEffect(() => {
     let frame = 0;
@@ -145,6 +149,7 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
     const spot = barSpot(at.first, at.all, { w: el.offsetWidth, h: el.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, top, left });
     el.style.left = `${spot.left}px`;
     el.style.top = `${spot.top}px`;
+    setSide(spot.top < at.first.top ? 'above' : 'below');
   }, [at, copied]);
 
   const picked = () => {
@@ -186,7 +191,7 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
   };
   // On the body: the page scrolls inside a size container, which would hold a fixed bar to itself.
   return createPortal(<div ref={bar} className="link-pop selection-bar" role="toolbar" aria-label="Selected words" onMouseDown={(e) => e.preventDefault()}>
-    <button type="button" className="link-pop-btn selection-bar-comment" data-hint="comment" onClick={comment}><CommentGlyph />Comment</button>
+    <button type="button" className="link-pop-btn selection-bar-comment" data-hint="comment" data-hint-side={side} onClick={comment}><CommentGlyph />Comment</button>
     <button type="button" className="link-pop-btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</button>
   </div>, document.body);
 }
