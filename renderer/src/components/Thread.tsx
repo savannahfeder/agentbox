@@ -243,6 +243,11 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
     const by = (e as { by?: string }).by;
     return team && by && by !== team.me ? team.byId.get(by) ?? { id: by, email: '', name: 'A teammate', avatarUrl: null } : null;
   };
+  // Words a person you asked for help wrote to the agent: theirs, with their face.
+  const helperOf = (e: AgentEvent) => {
+    const id = (e as { fromId?: string }).fromId;
+    return team && id ? team.byId.get(id) ?? null : null;
+  };
   // AN AGENT'S MESSAGE IS ITS OWN, on its owner's screen as well as anyone's.
   const voiceOf = (e: AgentEvent): string | null => {
     const { voice } = e as { voice?: AgentVoice };
@@ -546,6 +551,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   <div className="msg-head">
                     <span className="msg-who">{voiceOf(e) ? <><Face person={teammateOf(e)} agent />{voiceOf(e)}</> : teammateOf(e)
                       ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
+                      : helperOf(e) ? <><Face person={helperOf(e)} />{firstName(helperOf(e))}</>
                       : e.who === 'you' ? 'You' : ((e as { from?: string }).from ?? nameOf?.(e) ?? name)}</span>
                     {headFacts(e, when(e.at))}
                     <MessageKind e={e} />

@@ -5,6 +5,7 @@ import { Face, TeamContext } from '../team/people';
 import type { Person } from '../types';
 import { firstName, matchPeople, type SeenBy } from './share-rules';
 import './share.css';
+import '../team/asks.css';
 
 const mark = { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
 export const LinkMark = () => <svg {...mark}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>;
@@ -114,19 +115,45 @@ export function SendSheet({ people, start, link, onCopy, onSend }: {
   );
 }
 
-/** After a person is picked under "Give it to someone else": what you want from them, then it goes. */
-export function GiveSheet({ to, onGive }: { to: { id: string; name: string }; onGive: (note: string) => void }) {
+export type GiveMode = 'help' | 'review' | 'give';
+
+const MODES: { id: GiveMode; label: string; detail: (first: string) => string; ask: string; go: (first: string) => string }[] = [
+  { id: 'help', label: 'Help with a step', detail: (f) => `Stays yours. ${f} can talk to your agent here, then hands it back.`, ask: 'What do you need help with?', go: (f) => `Ask ${f} to help` },
+  { id: 'review', label: 'Review it', detail: (f) => `${f} looks it over and sends it back with an answer.`, ask: 'What should they look at?', go: (f) => `Ask ${f} to review` },
+  { id: 'give', label: 'Hand it over', detail: (f) => `It becomes ${f}'s, and this thread closes here.`, ask: 'Add a note', go: (f) => `Give to ${f}` },
+];
+
+/** After a person is picked: help with a step, a review, or the whole thread, and a note. */
+export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help' }: {
+  to: { id: string; name: string };
+  onGive: (note: string) => void;
+  /** Help or a review keeps the thread yours; without it only handing over is offered. */
+  onAsk?: (kind: 'help' | 'review', note: string) => void;
+  /** The message picked as the step, drawn as a quote. */
+  step?: string | null;
+  start?: GiveMode;
+}) {
   const [note, setNote] = useState('');
+  const [mode, setMode] = useState<GiveMode>(onAsk ? start : 'give');
   const team = useContext(TeamContext);
   const first = to.name.split(/\s+/)[0] || to.name;
+  const m = MODES.find((x) => x.id === mode)!;
+  const go = () => { if (mode === 'give' || !onAsk) onGive(note.trim()); else onAsk(mode, note.trim()); };
   return (
-    <div className="th-menu ts-more-menu sh-send" role="dialog" aria-label={`Give it to ${first}`}>
+    <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Bring in ${first}`}>
       <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
-      <textarea className="sh-note" autoFocus placeholder="Add a note" value={note} aria-label="Add a note" rows={2}
+      {onAsk && <div className="sh-modes" role="radiogroup" aria-label="What you want from them">
+        {MODES.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => setMode(x.id)}>
+          <span className="sh-mode-dot" aria-hidden="true" />
+          <span className="sh-mode-words"><b>{x.label}</b><span>{x.detail(first)}</span></span>
+        </button>)}
+      </div>}
+      {step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>}
+      <textarea className="sh-note" autoFocus placeholder={m.ask} value={note} aria-label={m.ask} rows={2}
         onChange={(e) => setNote(e.target.value)}
-        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onGive(note.trim()); } }} />
+        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); } }} />
       <div className="sh-foot">
-        <button type="button" className="th-new sh-go" onClick={() => onGive(note.trim())}>Give to {first}</button>
+        <button type="button" className="th-new sh-go" onClick={go}>{m.go(first)}</button>
       </div>
     </div>
   );

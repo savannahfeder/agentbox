@@ -92,6 +92,8 @@ export interface ThreadEvent {
   field?: 'body' | 'answer' | 'result' | 'note';
   /** The agent teammate who handed this over, on a reply the app wrote for it. */
   from?: string;
+  /** Whose that was, by id: a person you asked to help draws with their face. */
+  fromId?: string;
   /** The agent that wrote this message on its owner's behalf. */
   voice?: AgentVoice;
   /** A comment or approval on a file: which file, and for a comment where on it. */
@@ -456,7 +458,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     if (has(patch, 'answer') && Array.isArray(patch!.fromNotes) && !typed) continue;
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
-      events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from });
+      const fromId = (patch!.from as { teammate?: unknown }).teammate;
+      events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from, ...(typeof fromId === 'string' ? { fromId } : {}) });
       continue;
     }
     if (has(patch, 'answer')) {

@@ -537,6 +537,7 @@ async function createWindow() {
     wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
+    tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {

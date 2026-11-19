@@ -137,6 +137,10 @@ export interface WorkItem {
   waitEnded?: { said: string; at: number };
   /** Where it went when someone left the team (main/team/departures.mts). */
   handedOver?: { said: string; at: number };
+  /** A task asking for help or a review on someone's thread (shared/thread-asks.mts). */
+  ask?: { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string };
+  /** How that ask was handed back. */
+  verdict?: 'done' | 'yes' | 'changes';
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -1135,6 +1139,8 @@ export interface AgentTurn {
   /** An agent teammate that handed this thread work: drawn as an agent's
    *  message under that teammate's name, never as yours. */
   from?: string;
+  /** Whose words those were, by id: a person you asked to help draws with their face. */
+  fromId?: string;
   /** The agent that wrote this message on its owner's behalf (`by`). */
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
@@ -1846,6 +1852,8 @@ declare global {
       teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult>;
       teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult>;
       teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult>;
+      teamAsk(p: { product: string; id: string; to: string; kind: 'help' | 'review'; note?: string; step?: string }): Promise<TeamCallResult>;
+      teamHandBack(p: { product: string; id: string; verdict?: 'done' | 'yes' | 'changes'; words?: string }): Promise<TeamCallResult>;
       teamTaskBrief(p: { product: string; id: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[] }>;
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;

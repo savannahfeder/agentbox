@@ -14,6 +14,8 @@
 import path from 'node:path';
 import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mts';
 import { createThreadShare } from './thread-share.mts';
+import { createAsks, type TellThread } from './asks.mts';
+import { askBody, askOf, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
 import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
@@ -222,6 +224,7 @@ export interface TeamItem {
 /** A row of the store as far as handing a thread on or moving a message reads it. */
 export interface TeamRow {
   id: string;
+  assignee?: string;
   label?: string;
   title?: string;
   body?: string;
@@ -257,7 +260,7 @@ export interface TeamLinePatch {
   comment?: { text?: unknown } | null;
 }
 
-export interface TeamAnswer { answer: string; voice?: unknown; forAgent?: unknown; inReplyTo?: string; status?: string }
+export interface TeamAnswer { answer?: string; voice?: unknown; forAgent?: unknown; inReplyTo?: string; status?: string; putAway?: boolean }
 
 export interface TeamStore {
   listProducts(opts?: { includeArchived?: boolean }): TeamProduct[];
@@ -339,6 +342,8 @@ export interface TeamServiceOptions {
   rooms?: TeamRoomsSetup | null;
   /** Settings › Alpha features › Multiplayer. Off, no thread of this person's is shared. */
   sharing?: () => boolean;
+  /** Words from someone you asked for help, to your thread's agent, through your own supervisor. */
+  tellThread?: TellThread | null;
 }
 
 /** A file handed to a task; one with a `rel` is a file the words name. */
@@ -347,6 +352,7 @@ interface TaskFile extends AttachmentFile { rel?: string }
 interface TaskInput {
   title?: unknown; body?: unknown; priority?: number | null; due?: unknown; files?: TaskFile[]; voice?: unknown;
   visibility?: unknown; visibleTo?: unknown[]; blockedBy?: unknown;
+  ask?: { kind: AskKind; owner: string; thread: string; product: string; step?: string; note?: string };
 }
 
 /** What rides along with a message: a voice note, the agent it is for, a subject that makes it its own thread. */
@@ -392,6 +398,7 @@ export function createTeamService({
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
   sharing = () => true,
+  tellThread = null,
 }: TeamServiceOptions) {
   // The phone site's address, only an https one, and its code for Settings.
   const site = typeof phone?.site === 'string' && /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(phone.site) ? phone.site : null;
@@ -446,6 +453,17 @@ export function createTeamService({
   function products() {
     try { return store.listProducts(); } catch { return []; }
   }
+
+  const asks = createAsks({
+    file: path.join(path.dirname(stateFile), '.team-asks.json'),
+    me: () => state.me?.id ?? null,
+    products,
+    readRows: (dir) => disk.readWorkItems(dir),
+    nameOf: (id) => state.people.find((p) => p.id === id)?.name || 'A teammate',
+    tell: tellThread,
+    putAway: (slug, id) => { try { store.answerItem(slug, id, { putAway: true }); } catch (err) { log(`asks: ${(err as Error).message}`); } },
+    log,
+  });
 
   // A status the owner set has run out: wipe it where it is stored, so old
   // text does not sit in the cloud. Everyone who READS it already saw it go,
@@ -615,6 +633,7 @@ export function createTeamService({
             write: (dir: string, id: string, patch: Record<string, unknown>) => disk.updateWorkItem(dir, id, patch, { source: 'system' }),
           });
           await handOverWhatLeft(cards, people);
+          if (asks.carryBack()) onChange();
         }
         if (report.joined.length || report.pulled) log(`team: joined ${report.joined.length}, pulled ${report.pulled}, pushed ${report.pushed}`);
         if (report.notJoined) log(`team: left ${report.notJoined} shared project(s) unjoined, this computer already holds the most it takes on by itself`);
@@ -862,6 +881,7 @@ export function createTeamService({
       onChange,
       log,
       now,
+      relay: (c, thread) => asks.relay(c, thread),
     });
     sync = createTeamSync({
       backend,
@@ -1227,7 +1247,7 @@ export function createTeamService({
      * (shared/team-rules.mts). A file with a `rel` is one the words name: its
      * links are pointed at the copy.
      */
-    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy }: TaskInput = {}) {
+    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy, ask }: TaskInput = {}) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const me = state.me.id;
       const list = [...new Set(([] as string[]).concat(toIn ?? []).filter(Boolean))];
@@ -1260,7 +1280,7 @@ export function createTeamService({
       const blocks = (Array.isArray(blockedBy) ? blockedBy : []).filter((id) => typeof id === 'string' && /^(person|card|name):./.test(id));
       const item = store.composeItem(product.slug, {
         title: named, body: full, priority: level, assignee: to, ...(due ? { due } : {}), people: [me, to], labels: [GIVEN_TASK], voice,
-        ...seen, ...(blocks.length ? { blockedBy: blocks } : {}),
+        ...seen, ...(blocks.length ? { blockedBy: blocks } : {}), ...(ask ? { ask } : {}),
       });
       onChange();
       await syncNow();
@@ -1300,6 +1320,59 @@ export function createTeamService({
       store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}.`, status: 'done' });
       onChange();
       return made;
+    },
+
+    /**
+     * ASK SOMEONE FOR HELP OR A REVIEW ON YOUR THREAD, KEEPING IT YOURS. It is
+     * opened to them, and a task names the thread and the step you picked. With
+     * help, what they write there goes to the agent until they hand it back.
+     */
+    async askTeammate({ product: slug, id, to, kind, note = '', step = '' }: { product: string; id: string; to: string; kind: string; note?: string; step?: string }) {
+      if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
+      if (kind !== 'help' && kind !== 'review') throw new Error('ask for help or a review');
+      const product = products().find((p) => p.slug === slug);
+      const row = product ? store.readItem(slug, id) : null;
+      if (!product || !row) throw new Error('that thread is gone');
+      if (product.team?.direct) throw new Error('a conversation cannot be asked about');
+      const person = state.people.find((p) => p.id === to);
+      if (!person) throw new Error('that person is not on your team');
+      if (to === state.me.id) throw new Error('that thread is yours already');
+      const seen = seenNow(row, product, kept().getSince(state.me.id));
+      if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
+      const title = String(row.label || row.title || 'A thread');
+      const link = threadLink(state.me.id, id);
+      const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', note: String(note), step: String(step) });
+      const made = await this.giveTask(to, {
+        title,
+        body: link ? sentWords(title, link, brief) : brief,
+        priority: row.priority,
+        ask: {
+          kind, owner: state.me.id, thread: id, product: slug,
+          ...(String(step).trim() ? { step: String(step).trim().slice(0, 1200) } : {}),
+          ...(String(note).trim() ? { note: String(note).trim().slice(0, 1200) } : {}),
+        },
+      });
+      onChange();
+      return made;
+    },
+
+    /** The person asked hands it back: their words and verdict close the task, and the owner's copy puts them on the thread. */
+    async handBack({ product: slug, id, verdict = 'done', words = '' }: { product: string; id: string; verdict?: string; words?: string }) {
+      if (!state.me) throw new Error('sign in first');
+      const row = store.readItem(slug, id);
+      const a = askOf(row as never);
+      if (!row || !a) throw new Error('that ask is gone');
+      if (row.assignee !== state.me.id) throw new Error('that ask is not yours to hand back');
+      if (row.status === 'done') throw new Error('that was already handed back');
+      const said = String(words ?? '').trim();
+      const dir = products().find((p) => p.slug === slug)?.dir;
+      if (!dir) throw new Error('that ask is gone');
+      // Before the close, so the owner's copy never reads a close without its verdict.
+      disk.updateWorkItem(dir, id, { verdict: verdict === 'yes' || verdict === 'changes' ? verdict : 'done' }, { source: 'founder' });
+      store.answerItem(slug, id, { ...(said ? { answer: said } : {}), status: 'done' });
+      onChange();
+      await syncNow();
+      return { ok: true };
     },
 
     /** A task's words and files, for a new thread of your own: its links would point at nothing there. */

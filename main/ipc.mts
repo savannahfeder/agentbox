@@ -1194,6 +1194,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     supervisor.setThreadPins({ [id]: null });
     return made;
   }));
+  ipcMain.handle('zero:team-ask', teamCall(({ product, id, to, kind, note, step }: { product: string; id: string; to: string; kind: string; note?: string; step?: string }) => team!.askTeammate({ product, id, to, kind, note, step })));
+  ipcMain.handle('zero:team-hand-back', teamCall(({ product, id, verdict, words }: { product: string; id: string; verdict?: string; words?: string }) => team!.handBack({ product, id, verdict, words })));
   ipcMain.handle('zero:team-task-brief', (_e, { product, id }: { product: string; id: string }) => {
     if (!team) throw new Error('This build has no team cloud set up.');
     return team.taskBrief(product, id);

@@ -125,6 +125,8 @@ export interface AnswerInput {
 
 export interface ComposeInput {
   id?: string | null;
+  /** On a task to a person: help or a review asked on the giver's thread. */
+  ask?: Record<string, unknown>;
   title?: string;
   body?: string;
   kind?: string;
@@ -897,7 +899,7 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
-  composeItem(slug: string, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent }: ComposeInput) {
+  composeItem(slug: string, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent, ask }: ComposeInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -912,6 +914,8 @@ export class Store {
     if (allLabels.includes(GIVEN_TASK) && (visibility === 'team' || (visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length))) {
       Object.assign(first, { visibility, ...(visibility === 'people' ? { visibleTo: [...new Set((visibleTo ?? []).map(String))] } : {}) });
     }
+    // So is what the task asks on the giver's thread (shared/thread-asks.mts).
+    if (allLabels.includes(GIVEN_TASK) && ask) Object.assign(first, { ask });
     // A thread the cloud started from the phone keeps the id it ran under there.
     const created = id
       ? workItemsDisk.createWorkItemIfAbsent(dir, id, first, { source: 'system' }).item

@@ -13,6 +13,7 @@ import { Face, TeamContext, dueWords, firstName, type TeamView } from './people'
 import { agentOnTask } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
 import { shownTitle } from '../../../shared/thread-title.mts';
+import { askWord } from '../../../shared/thread-asks.mts';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
 export function teamHeld(item: WorkItem, team: TeamView | null): boolean {
@@ -30,11 +31,14 @@ export function TeamSaid({ item }: { item: WorkItem }) {
   const due = dueWords(item.due);
   const task = isGivenTask(item, team.products.get(item.product));
   const closer = item.wrote?.status?.by;
+  const ask = task ? item.ask?.kind ?? null : null;
   const said = task && item.status === 'done'
-    ? `${closer === team.me ? 'you' : firstName(team.byId.get(closer ?? '') ?? team.byId.get(other ?? ''))} marked this done`
+    ? ask ? (closer === item.assignee ? `${mine ? 'you' : name} handed this back` : `${mine ? name : 'you'} took this back`)
+      : `${closer === team.me ? 'you' : firstName(team.byId.get(closer ?? '') ?? team.byId.get(other ?? ''))} marked this done`
+    : ask ? (mine ? `${name} asked you` : `asked ${name}`)
     : mine ? `${name} gave you this` : `with ${name}`;
   return <span className="fm-said">
-    {task ? 'Task' : item.productName} · {said}
+    {ask ? askWord(ask) : task ? 'Task' : item.productName} · {said}
     {task && <> · {priorityLabelOf(priorityIdOf(shownPriority(item)))}</>}
     {due && <> · <span className="tm-due-word">{due}</span></>}
   </span>;
@@ -147,6 +151,8 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
   const [error, setError] = useState<string | null>(null);
   const choices = teamRouteChoices(item, team);
   const on = isGivenTask(item, team?.products.get(item.product)) ? agentOnTask(items, item, [...mates.values()]) : null;
+  // An ask is answered on the asker's thread, from the bar above (team/AskBar.tsx).
+  if (item.ask) return null;
   if (on && item.status !== 'done') {
     return <div className="opt-strip">
       <button type="button" className="opt-row" onClick={() => onOpenItem?.(on.item)}>

@@ -1135,6 +1135,8 @@ export const api = {
   async teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMoveToThread(p)); },
   async teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessageMate(p)); },
   async teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
+  async teamAsk(p: { product: string; id: string; to: string; kind: 'help' | 'review'; note?: string; step?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAsk(p)); },
+  async teamHandBack(p: { product: string; id: string; verdict?: 'done' | 'yes' | 'changes'; words?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandBack(p)); },
   async teamTaskBrief(p: { product: string; id: string }) { return window.zero!.teamTaskBrief(p); },
   async teamContinueBrief(p: { personId: string; threadId: string }) { return window.zero!.teamContinueBrief(p); },
   async teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamContinued(p)); },

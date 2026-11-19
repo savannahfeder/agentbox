@@ -132,6 +132,8 @@ contextBridge.exposeInMainWorld('zero', {
   teamMessageMate: (payload) => ipcRenderer.invoke('zero:team-message-mate', payload),
   teamGiveTask: (payload) => ipcRenderer.invoke('zero:team-give-task', payload),
   teamHandOn: (payload) => ipcRenderer.invoke('zero:team-hand-on', payload),
+  teamAsk: (payload) => ipcRenderer.invoke('zero:team-ask', payload),
+  teamHandBack: (payload) => ipcRenderer.invoke('zero:team-hand-back', payload),
   teamTaskBrief: (payload) => ipcRenderer.invoke('zero:team-task-brief', payload),
   rooms: (payload) => ipcRenderer.invoke('zero:rooms', payload),
   teammates: (payload) => ipcRenderer.invoke('zero:teammates', payload),

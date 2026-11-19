@@ -1,0 +1,35 @@
+/* Asking a teammate on a thread: the line over the owner's reply box, and the
+   bar over a helper's view of the thread. Rounded, as the design is. */
+.asks-line { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; }
+.asks-one { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 12px 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 12px; font-size: 14px; color: var(--text-dim); }
+.asks-one b { font-weight: 500; color: var(--text); }
+.asks-words { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; flex: 1; min-width: 0; }
+.asks-when { font-size: 12.5px; color: var(--text-faint); }
+.asks-take { flex: none; height: 28px; padding: 0 12px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; }
+.asks-take:hover { color: var(--text); border-color: var(--text-faint); }
+
+/* The three ways in the Ask or hand off sheet. */
+.sh-modes { display: flex; flex-direction: column; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line); }
+.sh-mode { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px; text-align: left; font: inherit; color: var(--text-dim); background: none; border: 0; border-radius: 10px; cursor: pointer; }
+.sh-mode:hover { background: var(--bg-hover, var(--bg-selected)); }
+.sh-mode.on { background: var(--bg-selected); color: var(--text); }
+.sh-mode-dot { flex: none; width: 14px; height: 14px; margin-top: 2px; border: 1.5px solid var(--line-strong); border-radius: 50%; box-sizing: border-box; }
+.sh-mode.on .sh-mode-dot { border: 4px solid var(--accent, var(--text)); }
+.sh-mode-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sh-mode-words b { font-weight: 500; font-size: 13.5px; color: var(--text); }
+.sh-mode-words span { font-size: 12.5px; line-height: 17px; color: var(--text-faint); }
+.sh-step { margin: 8px 14px 0; padding: 6px 10px; font-size: 12.5px; line-height: 18px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; background: var(--bg-raised); white-space: pre-wrap; max-height: 90px; overflow: hidden; }
+
+/* A helper on someone's thread: what was asked, and handing it back. */
+.ask-bar { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 14px 16px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 14px; }
+.ask-bar-head { display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: var(--text); }
+.ask-bar-head b { font-weight: 500; }
+.ask-bar-note { margin: 0; font-size: 14px; line-height: 21px; color: var(--text-dim); white-space: pre-wrap; }
+.ask-bar-step { margin: 0; padding: 6px 10px; font-size: 13px; line-height: 19px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
+.ask-bar-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ask-bar-acts button { height: 30px; padding: 0 14px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg-selected); border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; }
+.ask-bar-acts button.quiet { background: none; color: var(--text-dim); }
+.ask-bar-acts button:disabled { opacity: .5; cursor: default; }
+.ask-bar-back { display: flex; flex-direction: column; gap: 8px; }
+.ask-bar-back textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 12px; font: inherit; font-size: 14px; line-height: 20px; color: var(--text); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 10px; outline: none; resize: vertical; }
+.ask-bar-done { margin: 0; font-size: 14px; color: var(--text-dim); }

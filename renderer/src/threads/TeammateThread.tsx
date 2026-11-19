@@ -23,7 +23,8 @@ import { artifactUrlTransform, isMediaPath } from '../remark-artifact-paths';
 import { firstName, Face, TeamContext } from '../team/people';
 import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
-import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
+import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard, WorkItem } from '../types';
+import { AskBar } from '../team/AskBar';
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
@@ -33,8 +34,11 @@ const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
-export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue }: {
+export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack }: {
   card: ThreadCard; person: Person | null; now: number;
+  /** Their open ask of you on this thread: help puts your words to their agent. */
+  ask?: WorkItem | null;
+  onHandBack?: (verdict: 'done' | 'yes' | 'changes', words: string) => Promise<boolean>;
   /** Carry it on in a thread of your own. */
   onContinue?: () => void;
   /** Where the back button goes: Threads, or the group it was opened from. */
@@ -148,6 +152,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
   };
   const owner = firstName(person) || 'Someone';
+  const helping = ask?.ask?.kind === 'help';
   const openMark = useCallback((link: FileMarkLink) => setBig({ file: link.file, note: link.id, at: Date.now() }), []);
   const files = useMemo(() => filesOnThread(work?.lines ?? [], marks.notes).map((f) => ({
     ...f, open: () => open(f.src),
@@ -198,6 +203,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
       </header>
       <div className="tp-grid">
         <section className="th-work" aria-label="The conversation">
+          {ask && onHandBack && <AskBar task={ask} owner={person} onHandBack={onHandBack} />}
           {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
           {work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
           <FileMarkOpener.Provider value={openMark}>
@@ -212,9 +218,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
-              <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
+              <textarea value={draft} rows={2} placeholder={helping ? `Write to ${owner}'s agent` : `Comment to ${owner}`} aria-label={helping ? `Write to ${owner}'s agent` : `Comment to ${owner}`}
                 onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
-              <button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>
+              <button type="submit" disabled={!draft.trim() || sending}>{helping ? 'Send to the agent' : `Send to ${owner}`}</button>
             </div>
           </form>
         </section>

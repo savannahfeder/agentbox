@@ -105,6 +105,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   teamMessageMate: 'zero:team-message-mate',
   teamGiveTask: 'zero:team-give-task',
   teamHandOn: 'zero:team-hand-on',
+  teamAsk: 'zero:team-ask',
+  teamHandBack: 'zero:team-hand-back',
   teamTaskBrief: 'zero:team-task-brief',
   rooms: 'zero:rooms',
   // Teammates: make, describe, start, edit, write to, and what they remember.

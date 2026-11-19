@@ -9811,6 +9811,24 @@ export class Supervisor {
     }
   }
 
+  // SOMEONE YOU ASKED FOR HELP, WRITING ON YOUR THREAD (main/team/asks.mts).
+  // Their words take the road an AI teammate's do: into a live session if one
+  // is up, else as a reply that starts the next turn on this computer. `hold`
+  // only writes them and waits for you, which is how a hand-back lands.
+  async tellThread(product: string, id: string, { text, from, hold = false }: { text: string; from: { teammate: string; name: string }; hold?: boolean }) {
+    const commit = () => this.store.tellItem(product, id, { text, from, hold });
+    if (hold) { commit(); this.wake?.(); this.onChange?.(); return 'held'; }
+    const deadline = this.config.teammateReplyDeadlineMs ?? 30_000;
+    let timer: NodeJS.Timeout | undefined;
+    const late = new Promise((resolve) => { timer = setTimeout(() => resolve('late'), deadline); });
+    const sent = submitReply(this, { product, id, answer: text, from: from.name } as ReplyPayload, commit);
+    const out = await Promise.race([sent, late]).finally(() => clearTimeout(timer));
+    if (out === 'late') sent.catch((err: Error) => console.warn(`zero: ${from.name}'s words did not reach the thread: ${err.message}`));
+    this.wake?.();
+    this.onChange?.();
+    return out;
+  }
+
   // Your words to a teammate that is already on a run go into that run, the
   // way a reply typed in its thread does, live if a session is up.
   async serveTeammates(now = Date.now()) {

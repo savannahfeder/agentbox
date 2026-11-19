@@ -305,6 +305,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     shareSite: cloudConfig.phoneSite ?? null,
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
+    tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   if (team) store.teammates?.bindTeam(team);
