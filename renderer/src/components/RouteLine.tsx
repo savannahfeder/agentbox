@@ -60,7 +60,7 @@ export function RouteLine({ item, mates }: { item: WorkItem; mates: ReadonlyMap<
   return <div className="rt-line">
     {mate ? <TeammateMark t={mate} /> : <AgentFace />}
     {changing
-      ? <span>Give it to <Choices to={others} mates={mates} names={names} onPick={pick} />.</span>
+      ? <span>Give it to <Choices to={others} mates={mates} names={names} onPick={pick} /> instead.</span>
       : <span>{mate ? <><b>{mate.name}</b> took this.{routed.why ? ` ${routed.why}` : ''}</> : routed.why}</span>}
     {!changing && others.length > 0 && <button type="button" className="rt-change" onClick={() => setChanging(true)}>Give it to someone else</button>}
     {failed}

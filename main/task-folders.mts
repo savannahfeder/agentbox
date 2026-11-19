@@ -66,6 +66,7 @@ import path from 'node:path';
 import { Name, nameSlug } from '../shared/product-name.mjs';
 import { insideGitFolder } from '../shared/project-folder-check.mts';
 import { carryLocalFiles, copyTree, folderChildDeadline, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
+import { givePrivateFolder } from './private-folder.mts';
 import type { ExecFailure } from './worktree-include.mts';
 import { HOOK_FREE } from './hook-free-git.mts';
 
@@ -764,6 +765,8 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   if (dependencies) {
     try { carryLocalFiles(root, staging, { landsAt: folder }); }
     catch (error) { clearUnfinished(root, staging); throw Error(`Could not make a folder for ${name}: ${(error as ExecFailure).message}`); }
+    const given = givePrivateFolder(root, staging);
+    if (!given.given && given.why) console.warn(`[task-folders] ${name} has no private folder: ${given.why}`);
   }
 
   // `worktree move` rather than a rename, so git's own record of where this

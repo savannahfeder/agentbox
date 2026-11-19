@@ -1413,7 +1413,11 @@ body {
   text-underline-offset: 4px;
   transition: text-decoration-color 0.12s ease;
 }
-.row:hover .subject { text-decoration-color: var(--line-strong); }
+/* `.pointed`, not `:hover`: J and K take the row back from a pointer that has
+   not moved, and `:hover` would keep a second underline on it. `.hovers` is a
+   list with key hints off, where the pointer never holds the keys. */
+.row.hovers:hover .subject,
+.row.pointed .subject { text-decoration-color: var(--line-strong); }
 .row.selected .subject,
 .row.checked .subject { text-decoration-color: var(--underline); }
 
@@ -9158,7 +9162,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 */
 .hint-plate {
   position: fixed;
-  z-index: 90;
+  /* Over a file opened full screen and the bar over its selected words, whose buttons wear hints too. */
+  z-index: 9460;
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 4px 0;

@@ -1,5 +1,5 @@
 # One iPhone simulator on one of GitHub's free Macs, held for one synthetic
-# tester (.claude/skills/product-loop/scripts/iphones.mjs starts it). The app
+# tester (the product-loop skill's iphones.mjs starts it). The app
 # is the phone app's preview build: made-up threads, nothing signed in, so
 # nothing private reaches this public run. It is built here once per version
 # of mobile/, renderer/ and shared/ and kept in the cache.
@@ -106,7 +106,7 @@ jobs:
         env:
           TICKET: ${{ inputs.ticket }}
         run: |
-          nohup node .claude/skills/product-loop/scripts/iphone-host.mjs --udid "$UDID" --bundle "$BUNDLE" --ticket "$TICKET" --port 8790 --stop-file "$RUNNER_TEMP/stop" > "$RUNNER_TEMP/host.log" 2>&1 &
+          nohup node scripts/iphone-host.mjs --udid "$UDID" --bundle "$BUNDLE" --ticket "$TICKET" --port 8790 --stop-file "$RUNNER_TEMP/stop" > "$RUNNER_TEMP/host.log" 2>&1 &
           echo "HOST_PID=$!" >> "$GITHUB_ENV"
           nohup "$RUNNER_TEMP/cloudflared" tunnel --no-autoupdate --protocol http2 --url http://127.0.0.1:8790 > "$RUNNER_TEMP/tunnel.log" 2>&1 &
           url=""
