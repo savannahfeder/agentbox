@@ -9484,7 +9484,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }
 /* In a narrow column the label drops under the name whole, lined up with it, rather than breaking inside its box. */
 .msg-head:has(> .msg-kind) { flex-wrap: wrap; row-gap: 4px; }
-.msg-head > .msg-kind { margin-left: 0; white-space: nowrap; }
+/* A label longer than the column (a quoted sentence) wraps inside its box: held
+   on one line, it made the whole thread scroll sideways. */
+.msg-head > .msg-kind { margin-left: 0; max-width: 100%; overflow-wrap: anywhere; }
 .msg-head:has(> .msg-kind) > .msg-when { white-space: nowrap; }
 .msg-kind-why { color: var(--text-faint); letter-spacing: 0; }
 .msg-kind-why::before { content: '\00b7'; margin-right: 6px; }
