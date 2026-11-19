@@ -49,7 +49,7 @@ describe('the window’s close button', () => {
     expect(h.asked).toHaveLength(0);
   });
 
-  it('does not ask for a quit asked for by name: the menu, the keys, an update', () => {
+  it('does not ask again once the app is quitting (an update, a logout, a quit already answered)', () => {
     const h = harness({ working: 3 });
     h.app.emit('before-quit');
     expect(h.press().prevented).toBe(false);
@@ -83,8 +83,8 @@ describe('what it says', () => {
 });
 
 describe('the app window uses it', () => {
-  it('counting the agents running on this computer', () => {
+  it('counting the agents a quit would stop', () => {
     const main = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
-    expect(main).toMatch(/askBeforeClosingWhileWorking\(\{ app, window, dialog, working: \(\) => supervisor\._load\(\), name: Name \}\)/);
+    expect(main).toMatch(/askBeforeClosingWhileWorking\(\{ app, window, dialog, working: \(\) => supervisor\._stoppedByQuitting\(\), name: Name \}\)/);
   });
 });

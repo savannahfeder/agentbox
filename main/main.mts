@@ -281,6 +281,7 @@ installCrashReports({
 });
 
 let window: BrowserWindow | null = null;
+let askingQuit: () => void = () => app.quit();
 // A ROOM INVITE LINK THAT OPENED THE APP (Rooms, alpha): agentbox://join/<token>.
 // Held until the window takes it ('zero:take-join'); a window that is up is
 // told to come and take it, and one still starting takes it as it mounts.
@@ -421,6 +422,7 @@ async function createWindow() {
     // the inbox rather than whatever happens to hold focus. If the click ever
     // arrives without one, this window is the answer, never nothing.
     onZoom: (delta, target) => applyZoom(delta, target ?? window?.webContents ?? null),
+    onQuit: () => askingQuit(),
   });
   // ANALYTICS, AND EVERYTHING IT NEEDS TO BE HONEST. Off unless her switch is
   // on AND a key is configured, so a copy built from source sends nothing. The
@@ -1382,7 +1384,7 @@ async function createWindow() {
     }, Number(process.env.ZERO_SCREENSHOT_DELAY_MS ?? 2500));
   }
 
-  askBeforeClosingWhileWorking({ app, window, dialog, working: () => supervisor._load(), name: Name });
+  askingQuit = askBeforeClosingWhileWorking({ app, window, dialog, working: () => supervisor._stoppedByQuitting(), name: Name }).quit;
 
   window.on('closed', () => {
     supervisor.stop();

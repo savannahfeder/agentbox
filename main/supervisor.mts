@@ -8349,6 +8349,19 @@ export class Supervisor {
     return n;
   }
 
+  /** The runs on this computer a quit would stop. A run the run host holds
+   *  is let go by `killAll` and carries on, so the quit question leaves it out. */
+  _stoppedByQuitting() {
+    let n = this._preparing?.size ?? 0;
+    for (const s of this.sessions.values()) {
+      if (s.command || s.remoteIdle || s.cloud) continue;
+      const rec = this._liveSessions?.[s.itemId];
+      const carriesOn = s.hosted && s.child instanceof HostedRun && !!s.sessionId && rec?.sessionId === s.sessionId;
+      if (!carriesOn) n += 1;
+    }
+    return n;
+  }
+
   // WHAT THIS EXIT SAYS ABOUT SPAWNING, which for most exits is nothing.
   //
   // A session that dies within seconds did no work: a hit usage limit, a bad
