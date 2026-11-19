@@ -918,7 +918,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     if (reopenAs && status === 'open' && !answer) {
       const out = store.reopenAsItWas(product, id, reopenAs);
       push();
-      if (out?.status === 'open') supervisor.wake();
+      if (out?.status === 'open') { supervisor.liftBrakeForHer?.(); supervisor.wake(); }
       return out;
     }
     // Out of your own Needs you, on a task between people: no reply, no close, no run.
