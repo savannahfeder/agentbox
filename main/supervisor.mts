@@ -13127,8 +13127,8 @@ export class Supervisor {
       ? template.replace(/<!-- repeat-rules:(start|end) -->\n?/g, '')
       : template.replace(/<!-- repeat-rules:start -->[\s\S]*?<!-- repeat-rules:end -->\n?/g, '');
     // And a teammate's run: how it finishes, only where a teammate:<id> label says it is one.
-    // A thread she sent to a teammate is her ask, so the rules for her rows hold.
-    template = teammateIdOf(item) && !item.routed
+    // A thread she sent to a teammate, or started in its chat, is her ask, so the rules for her rows hold.
+    template = teammateIdOf(item) && !item.routed && !(item.labels ?? []).includes(CHAT_LABEL)
       ? template.replace(/<!-- teammate-rules:(start|end) -->\n?/g, '')
       : template.replace(/<!-- teammate-rules:start -->[\s\S]*?<!-- teammate-rules:end -->\n?/g, '');
     // And the fourth: her rule about when a piece of work gets its own row.
