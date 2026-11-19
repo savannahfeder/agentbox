@@ -34,7 +34,7 @@ import { rerunWithStripTypes } from '../../../../scripts/lib/rerun-with-strip-ty
 
 rerunWithStripTypes(import.meta.url);
 // After the re-run: cdp.mjs reaches .mts, which a static import would load first.
-const { launchChrome, connect, freeProfile, readModifiers } = await import('./cdp.mjs');
+const { launchChrome, connect, freeProfile, readModifiers, keyNamed } = await import('./cdp.mjs');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { readState, INSTANCE } = await import(path.join(here, 'live.mjs'));
@@ -173,6 +173,23 @@ async function thingAt(t, which, clickIfCovered, scroll = true) {
   })()`);
 }
 
+/**
+ * Where the thing is once it has held still for one look, or null if it never
+ * could be reached. Drawn again while the page moved, it has lost its number,
+ * so it is found by its words: its old place is where something else now is.
+ */
+async function stoppedAt(t, which, words) {
+  let last = null;
+  for (const start = Date.now(); Date.now() - start < 3000;) {
+    await t.wait(160);
+    waited += 160;
+    const now = (await thingAt(t, which, false, false)) ?? (await thingAt(t, words, false, false));
+    if (now?.reachable && last && Math.abs(now.x - last.x) < 1 && Math.abs(now.y - last.y) < 1) return now;
+    last = now?.reachable ? now : null;
+  }
+  return last;
+}
+
 const MOD_BITS = { alt: 1, ctrl: 2, meta: 4, shift: 8 };
 async function mouse(t, at, { button = 'left', times = 1, mods = [] } = {}) {
   const modifiers = mods.reduce((n, m) => n | (MOD_BITS[m] ?? 0), 0);
@@ -228,19 +245,17 @@ if (verb === 'open') {
     process.exit(0);
   }
   // The pointer arriving can move the page (leaving the sidebar slides it back
-  // 164px), and a person aims again at where the thing went.
+  // 164px), and a person aims again at where the thing went once it stops.
   let aim = hit;
   if (hit?.reachable) {
     await t.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: hit.x, y: hit.y, button: 'none' });
-    await t.wait(320);
-    waited += 320;
-    const again = await thingAt(t, which, false, false);
-    if (again?.reachable) aim = again;
+    aim = await stoppedAt(t, which, hit.words);
   }
   // A real press, because only a real press may start a film with sound.
   if (aim?.reachable) await mouse(t, aim, { button: verb === 'rightclick' ? 'right' : 'left', times: verb === 'dblclick' ? 2 : 1, mods: held });
   const said = verb === 'dblclick' ? 'Double-clicked' : verb === 'rightclick' ? 'Right-clicked' : 'Pressed';
   await report(t, hit === null ? `Nothing numbered or named "${which}" on screen. Run look again.`
+    : hit.reachable && !aim ? `"${hit.words}" went from under the pointer before it could be pressed. Run look again.`
     : !hit.reachable && verb !== 'click' ? `"${hit.words}" is covered by something else on screen.`
       : `${said} "${hit.words}"${held.length ? ` holding ${held.join('+')}` : ''}.`);
   t.detach();
@@ -296,9 +311,14 @@ if (verb === 'open') {
     console.log(`Nothing pressed: ${unknown.join(', ')} is not a key to hold. Use meta, ctrl, shift or alt.`);
     process.exit(1);
   }
+  const named = keyNamed(key ?? '');
+  if (!named) {
+    console.log(`Nothing pressed: "${key ?? ''}" is not a key. Use one character, or Enter, Escape, Tab, ArrowDown, Backspace…`);
+    process.exit(1);
+  }
   const t = await tab();
-  await t.press(key, mods);
-  await report(t, `Pressed ${[...mods, key].join('+')}.`);
+  await t.press(named, mods);
+  await report(t, `Pressed ${[...mods, named === ' ' ? 'Space' : named].join('+')}.`);
   t.detach();
 } else if (verb === 'pressat') {
   // A press on a spot, for what has no button: a pin on a picture, a place on a timeline.

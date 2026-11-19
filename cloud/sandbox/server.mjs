@@ -480,15 +480,19 @@ export function createSandbox({
     try { msg = JSON.parse(line); } catch { return false; }
     if (msg?.id === undefined || typeof msg.method !== 'string') return false;
     const k = callKey(conn, msg.id);
-    if (macAway(r)) {
-      const kept = r.handshakes.get(`${r.connServer.get(conn)}\u0000${msg.method}`) ?? r.offline.handshakes?.[r.connServer.get(conn)]?.[msg.method];
-      if (HANDSHAKE.has(msg.method) && kept) {
-        // Answered with what the app said before, and still sent on, so the
-        // Mac's own server is opened too; its answer is dropped.
-        try { sock.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: kept }) + '\n'); } catch { /* gone */ }
-        r.calls.set(k, { conn, msg, sock, state: 'answered-here', handshake: true });
-        return false;
-      }
+    const away = macAway(r);
+    // The start's own handshake is answered at once even while the Mac counts
+    // as there: a Mac that sent the run and slept never answers, and Claude
+    // Code gives up on the server well before `afterMs`.
+    const carried = r.offline.handshakes?.[r.connServer.get(conn)]?.[msg.method];
+    const kept = away ? (r.handshakes.get(`${r.connServer.get(conn)}\u0000${msg.method}`) ?? carried) : carried;
+    if (HANDSHAKE.has(msg.method) && kept) {
+      // Still sent on, so the Mac's own server is opened too; its answer is dropped.
+      try { sock.write(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: kept }) + '\n'); } catch { /* gone */ }
+      r.calls.set(k, { conn, msg, sock, state: 'answered-here', handshake: true });
+      return false;
+    }
+    if (away) {
       // A write the Mac named as safe to make late is kept for it, in the
       // run's own events, and made when it next reads them.
       const server = r.connServer.get(conn);

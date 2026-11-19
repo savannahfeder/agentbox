@@ -159,7 +159,8 @@ export function teamHire({ name, job }: { name?: unknown; job?: unknown } = {}, 
   const now = ctx.now ?? Date.now();
   const id = newTeammateId();
   writeTeammate(dir, id, { name: role, role, letter: letterFor(role, team), job: words.slice(0, 2000), status: 'draft', product: me?.product ?? project.id, createdAt: now, paused: false }, now);
-  writeChat(dir, { kind: 'msg', from: YOU, to: [id], text: words.slice(0, 8000), setup: true }, now);
+  // The job is this thread's words, so it carries `via` like any line a thread writes for you.
+  writeChat(dir, { kind: 'msg', from: YOU, to: [id], text: words.slice(0, 8000), setup: true, via: item.id, viaProduct: project.id }, now);
   writeChat(dir, { kind: 'act', from: me?.id ?? YOU, verb: 'hired', text: `${me?.name ?? 'You'} made ${role}, which is setting itself up.` }, now);
   return { teammate: { id, name: role, status: 'draft' }, note: `${role} wakes now to set itself up, and asks the person what it cannot tell from the job.` };
 }
@@ -200,8 +201,11 @@ const SAID: { [K in keyof Teammate]?: string } = {
 };
 
 // Made from your threads and has written its method from them: the threads
-// answered what a newcomer would otherwise have to ask.
+// answered what a newcomer would otherwise have to ask. One a thread hired was
+// not made by you, so your threads are not your answer to it.
 function learnedFromThreads(dir: string, id: string): boolean {
+  const made = readChat(dir).messages.find((m) => m.kind === 'msg' && m.from === YOU && m.setup && (m.to ?? []).includes(id));
+  if (made?.via) return false;
   try {
     return fs.readdirSync(sourcesDir(dir, id)).length > 0 && fs.statSync(methodFile(dir, id)).size > 0;
   } catch {

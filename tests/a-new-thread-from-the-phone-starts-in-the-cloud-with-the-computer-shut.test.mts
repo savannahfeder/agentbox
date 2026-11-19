@@ -627,7 +627,7 @@ describe('end to end, through the real sandbox', () => {
       await sandbox.close();
       s3.closeAllConnections();
       await new Promise((r) => s3.close(r));
-      fs.rmSync(tmp, { recursive: true, force: true });
+      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   }, 90_000);
 });
