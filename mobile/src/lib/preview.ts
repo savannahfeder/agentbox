@@ -5,7 +5,7 @@ import { macAway, macSeenOf } from '../../../renderer/src/phone-rows';
 import type { PhoneRows } from '../../../renderer/src/phone-rows';
 import type { LedgerLine } from '../../../renderer/src/thread-history';
 import type { WorkItem } from '../../../renderer/src/types';
-import { PREVIEW_ATTACHED, PREVIEW_FILM_ATTACHED, PREVIEW_PLAN_ATTACHED, PREVIEW_SCRIPT_ATTACHED, PREVIEW_SITE_ATTACHED, previewLink } from './preview-files.mjs';
+import { PREVIEW_ATTACHED, PREVIEW_FIZZ_ATTACHED, PREVIEW_FILM_ATTACHED, PREVIEW_PLAN_ATTACHED, PREVIEW_SCRIPT_ATTACHED, PREVIEW_SITE_ATTACHED, previewLink } from './preview-files.mjs';
 
 const DEV = '0a1b2c3d4e5f';
 const MIN = 60_000;
@@ -69,7 +69,7 @@ export function previewRows(now = Date.now()): PhoneRows {
       thread('site', { id: 'w-5e6f7a8b9d', title: 'Make fizz(15) say FizzBuzz', status: 'open', priority: 0, engine: 'codex', body: fizzAsk, result: fizzResult, createdAt: at(30), updatedAt: at(3), wrote: { body: her(at(30)), result: agent(at(3)) } }, [
         { ts: at(30), source: 'founder', patch: { body: fizzAsk } },
         { ts: at(3), source: 'agent', patch: { result: fizzResult } },
-      ], { change: { plus: 13, minus: 1, files: [{ path: 'src/fizz.js', plus: 2, minus: 1 }, { path: 'test/fizz.test.js', plus: 11, minus: 0 }], committed: true, uncommitted: false, knowsYou: true } }),
+      ], { attached: PREVIEW_FIZZ_ATTACHED, change: { plus: 13, minus: 1, files: [{ path: 'src/fizz.js', plus: 2, minus: 1 }, { path: 'test/fizz.test.js', plus: 11, minus: 0 }], committed: true, uncommitted: false, knowsYou: true } }),
       thread('agentbox', { id: 'w-4d5e6f7a8b', title: 'Draw the sign-in screen', status: 'claimed', priority: 5, body: 'Draw five sign-in screens on the real app.', createdAt: at(40), updatedAt: at(2), wrote: { body: her(at(40)) } }, [
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {

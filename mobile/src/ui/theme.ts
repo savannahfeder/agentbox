@@ -34,6 +34,8 @@ export const DARK = {
   // Lines a change added and took out (`--code-plus`, `--code-minus`).
   plus: '#7bc98e',
   minus: '#e28f82',
+  plusBed: 'rgba(123, 201, 142, 0.13)',
+  minusBed: 'rgba(226, 143, 130, 0.12)',
   // How dark a floating card's shadow is. Black at .55 reads as a smudge on Light.
   lift: 0.55,
 };
@@ -63,6 +65,8 @@ export const LIGHT: Palette = {
   scrim: 'rgba(17, 25, 48, 0.28)',
   plus: '#2f7d4e',
   minus: '#c0503c',
+  plusBed: 'rgba(47, 125, 78, 0.10)',
+  minusBed: 'rgba(192, 80, 60, 0.09)',
   lift: 0.14,
 };
 
