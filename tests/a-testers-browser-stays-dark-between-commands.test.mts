@@ -12,13 +12,13 @@ import { it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { launchChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
+import { launchChrome, canDrive } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'dark-between-'));
 let chrome: { kill: (s?: string) => void } | null = null;
 afterAll(() => { chrome?.kill('SIGKILL'); fs.rmSync(profile, { recursive: true, force: true }); });
 
-it('a page asked nothing about its colours still reads dark', async () => {
+it.skipIf(!canDrive())('a page asked nothing about its colours still reads dark', async () => {
   const launched = await launchChrome({ profile, width: 400, height: 300 });
   chrome = launched.chrome;
   const ws = new WebSocket(launched.wsUrl);
