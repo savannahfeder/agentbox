@@ -30,6 +30,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { racedWithAnotherPush, notReadyToShip, runsEveryTest, startedWhenBusy } from './lib/ship-rules.mjs';
 import { deployAfterShip } from './lib/web-app-deploy.mjs';
+import { pushPrivateFolder } from './lib/private-folder.mjs';
 
 // THE FOLDER IT SHIPS IS THE ONE IT RUNS IN. `npm run ship` runs in the
 // package root, so a person or agent in a worktree ships that worktree as
@@ -74,6 +75,10 @@ const why = notReadyToShip({
   hasCommits: git('rev-list', '--count', `${PUBLIC}/main..HEAD`) !== '0',
 });
 if (why) await stop(why);
+
+const privately = pushPrivateFolder(root, { message: `Changes from ${branch}` });
+if (privately.pushed) say(`pushed ${privately.commits} commit(s) in ${privately.path} to its own repository.`);
+else if (privately.why) say(`${privately.why}. Push it from there by hand.`);
 
 async function mergeWhatMoved() {
   if (git('rev-list', '--count', `HEAD..${PUBLIC}/main`) === '0') return;
