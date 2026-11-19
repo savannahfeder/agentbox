@@ -222,6 +222,8 @@
 /* `:root` outweighs `:root:root .row .subject`, which sets every title to 400. */
 :root .th-table .row.unread .subject { font-weight: 530; }
 .th-cell-proj { font: 11.5px/20px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; min-width: 0; }
+.th-proj-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.th-proj-more { flex: none; margin-left: 6px; }
 .th-cell-proj .tm-av { width: 16px; height: 16px; line-height: 14px; font-size: 8px; margin-right: 8px; flex: none; }
 .th-cell-prio { font: 11.5px/20px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); display: flex; align-items: center; }
 .th-cell-prio.urgent { color: var(--accent); }
