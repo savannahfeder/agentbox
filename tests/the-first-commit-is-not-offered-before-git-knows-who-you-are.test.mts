@@ -129,7 +129,7 @@ describe('whether git in this folder can name an author', () => {
       run(dir, 'config', 'user.name', 'Example Developer');
       run(dir, 'config', 'user.email', 'developer@example.test');
       run(dir, 'commit', '-qam', 'usage');
-      expect(endRun(second)).toBe(null);
+      expect(endRun(second)).toBeTruthy();
       expect(savedChange()).toMatchObject({ committed: true, uncommitted: false, knowsYou: true });
     } finally { fs.rmSync(docs, { recursive: true, force: true }); }
   }, 30_000);

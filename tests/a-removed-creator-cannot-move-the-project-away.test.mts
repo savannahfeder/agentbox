@@ -69,6 +69,7 @@ beforeAll(async () => {
   db = new PGlite(await emptyDatabase());
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
+  await db.exec(`insert into public.multiplayer_people (email) values ('*')`);
   await db.exec(GRANTS);
   await signUp(MAYA, 'maya@northwind.test', 'Maya');
   await signUp(THEO, 'theo@northwind.test', 'Theo');

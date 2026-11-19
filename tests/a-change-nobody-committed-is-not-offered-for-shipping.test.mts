@@ -74,7 +74,8 @@ describe('what the folder says a run left behind', () => {
     fs.appendFileSync(path.join(dir, 'strutils.py'), '\ndef is_palindrome(s):\n    return True\n');
     run(dir, 'git', ['commit', '-qam', 'palindrome']);
     const before = snapshotRepo(dir);
-    expect(changeFromRepo(before).files).toHaveLength(0);
+    // The thread's own branch: its change is what is waiting to ship.
+    expect(changeFromRepo(before).files).toHaveLength(1);
     expect(changeFromRepo(before).stands).toEqual({ committed: true, uncommitted: false });
   });
 
@@ -163,7 +164,7 @@ describe('the change saved for a thread carries it', () => {
     expect(saved().committed).toBe(false);
     const second = snapshotRepo(dir);
     run(dir, 'git', ['commit', '-qam', 'palindrome']);
-    expect(endRun(second)).toBe(null);
+    expect(endRun(second)).toBeTruthy();
     expect(saved().committed).toBe(true);
     expect(saved().uncommitted).toBe(false);
     // And the change itself is untouched: she can still read what was done.

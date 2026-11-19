@@ -16,7 +16,7 @@ it('refreshes commit instructions on resumed turns without duplicating a fresh b
   expect(prompt).toContain(COMMIT_IDENTITY_CHECK);
   expect(withWorkerGitBrief(prompt, '/a/repository')).toBe(prompt);
   expect(withWorkerGitBrief('A personal task.', null)).toBe('A personal task.');
-  expect(fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8').includes('prompt = withWorkerGitBrief(prompt, product.repoPath)')).toBe(true);
+  expect(fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8').includes('prompt = withWorkerGitBrief(prompt, product.repoPath, engine)')).toBe(true);
 });
 
 it('requires identity before approval and batches one commit request', () => {
@@ -26,7 +26,7 @@ it('requires identity before approval and batches one commit request', () => {
   expect(brief).toContain('Never invent an author');
   expect(brief).toContain('one approval request');
   expect(brief).toContain('Do not add user.name or user.email overrides');
-  expect(fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8')).toContain('workerGitBrief(product.repoPath)');
+  expect(fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8')).toContain('workerGitBrief(product.repoPath, engine)');
 });
 
 it('includes the commit checks for both engines even with custom worker instructions', () => {
