@@ -106,7 +106,6 @@ export const PARITY = {
   'thread:see-private': { missing: 'the computer takes it; the phone copy of a thread does not say who can see it' },
   'thread:pin': { phone: MENU, find: "'Pin thread'" },
   'thread:rename': { phone: MENU, find: 'label="Rename"' },
-  'thread:summary': { phone: THREAD, find: 'function Summary(' },
   'thread:code': { missing: 'the code change carried in the phone copy' },
   'thread:place': { phone: OFFERS, find: "'Keep on your computer'" },
   'thread:end-repeat': { phone: MENU, find: 'label="Stop repeating"' },

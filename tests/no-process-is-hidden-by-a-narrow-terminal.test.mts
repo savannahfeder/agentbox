@@ -15,8 +15,13 @@ import { it, expect, afterEach } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { processes } from '../scripts/lib/chrome-guard.mjs';
-import { holdersOf } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
+
+// The skills are a private checkout, absent on GitHub and in a public clone.
+const CDP = path.resolve(import.meta.dirname, '../.claude/skills/verify-agentbox/scripts/cdp.mjs');
+const cdp = fs.existsSync(CDP) ? await import(pathToFileURL(CDP).href) : null;
 
 const running = [];
 const columns = process.env.COLUMNS;
@@ -60,14 +65,14 @@ it('hands back the whole command line when there is no terminal to measure', asy
   expect(commandOf(child.pid)).toContain(`--user-data-dir=${profile}`);
 }, 15_000);
 
-it('finds the browser on a profile named past the cut, and no other', async () => {
+it.skipIf(!cdp)('finds the browser on a profile named past the cut, and no other', async () => {
   const profile = profilePath('mine');
   const child = browserOn(profile);
   process.env.COLUMNS = '79';
   await listed(child.pid);
 
-  expect(holdersOf(profile, processes, '/bin/sh')).toContain(child.pid);
-  expect(holdersOf(profilePath('theirs'), processes, '/bin/sh')).not.toContain(child.pid);
+  expect(cdp.holdersOf(profile, processes, '/bin/sh')).toContain(child.pid);
+  expect(cdp.holdersOf(profilePath('theirs'), processes, '/bin/sh')).not.toContain(child.pid);
 }, 15_000);
 
 it('reads the same on a wide terminal as on a narrow one', async () => {

@@ -42,11 +42,12 @@ describe('the row says how many wait and where they are', () => {
     expect(waitingOn(all[0], all).map((i) => i.id)).toEqual(['a', 'b']);
     expect(causeWord(2)).toBe('2 waiting');
   });
-  it('says All projects when they span more than one', () => {
-    expect(causeWhere(all[0], waitingOn(all[0], all), 'Agentbox')).toBe('All projects');
+  const nameOf = (slug) => ({ agentbox: 'Agentbox', website: 'Website' })[slug];
+  it('names its own project and counts the other when they span two', () => {
+    expect(causeWhere(all[0], waitingOn(all[0], all), nameOf)).toBe('Agentbox +1');
   });
   it('says its own project when they are all in it', () => {
-    expect(causeWhere(all[0], [all[1]], 'Agentbox')).toBe('Agentbox');
+    expect(causeWhere(all[0], [all[1]], nameOf)).toBe('Agentbox');
   });
   it('lists only open causes, newest first', () => {
     const rows = [cause('old', { createdAt: 1 }), cause('new', { createdAt: 2 }), cause('shut', { status: 'done' })];
@@ -116,7 +117,7 @@ describe('what the testers found in the third run', () => {
   });
 
   it('the board names every project a cause\'s threads are in, as the list does', () => {
-    expect(fs.readFileSync(new URL('../renderer/src/threads/page-rules.ts', import.meta.url), 'utf8')).toMatch(/project: isCause\(item\) && item\.status !== 'done' \? causeWhere\(item, waitingOn\(item, items\), product\.name\) : product\.name/);
+    expect(fs.readFileSync(new URL('../renderer/src/threads/page-rules.ts', import.meta.url), 'utf8')).toMatch(/project: isCause\(item\) && item\.status !== 'done' \? causeWhere\(item, waitingOn\(item, items\), \(slug\) => bySlug\.get\(slug\)\?\.name \?\? slug\) : product\.name/);
   });
 
   it('the board card of a cause says how many wait, as its list row does', () => {

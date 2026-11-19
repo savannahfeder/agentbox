@@ -33,7 +33,8 @@ describe('a thread a teammate sent you, in its chat', () => {
   // Since round 12 they show whose they are, as the inbox does
   // (threads-a-teammate-sent-you-together-share-one-window).
   it('joins threads sent one after another into one list', () => {
-    expect(page).toMatch(/if \(e\.kind === 'run' && e\.verb === 'sent' && sent\) \{ sent\.push\(e as TeamRunLine\); continue; \}/);
+    expect(page).toMatch(/const aThread = \(e: ChatEntry\) => e\.kind === 'run' && \(e\.verb === 'sent' \|\| e\.verb === 'opened'\);/);
+    expect(page).toMatch(/if \(aThread\(e\) && sent\) \{ sent\.push\(e as TeamRunLine\); continue; \}/);
     expect(card).toMatch(/\{runs\.map\(\(r\) => \{/);
   });
 

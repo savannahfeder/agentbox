@@ -186,7 +186,8 @@ describe('round nine', async () => {
   it('keeps Enter on its own buttons', () => {
     expect(fs.readFileSync('renderer/src/components/NeedCard.tsx', 'utf8').match(/onKeyDown=\{keepKeys\}/g)).toHaveLength(5);
   });
-  it('starts a fresh stand-in cloud unless the old one answers', () => {
+  // The skills are a private checkout, absent on GitHub and in a public clone.
+  it.skipIf(!fs.existsSync('.claude/skills/verify-agentbox'))('starts a fresh stand-in cloud unless the old one answers', () => {
     expect(fs.readFileSync('.claude/skills/verify-agentbox/scripts/live.mjs', 'utf8')).toMatch(/alive\(was\.pid\) && await fetch\(was\.url/);
   });
 });

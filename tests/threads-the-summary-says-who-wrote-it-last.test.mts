@@ -16,7 +16,7 @@
 // reads "Just now", "19 min ago". Who wrote it is no longer said. The cases
 // below are the same ones, read through `updatedWord`.
 import { describe, it, expect } from 'vitest';
-import { agoWords, updatedWord, stateGlyph, STATE_WORD, readSummaryOpen, SUMMARY_OPEN_KEY } from '../renderer/src/threads/summary-rules.ts';
+import { agoWords, updatedWord, stateGlyph, STATE_WORD } from '../renderer/src/threads/summary-rules.ts';
 
 const NOW = Date.parse('2026-10-01T15:00:00');
 const M = 60_000;
@@ -74,20 +74,5 @@ describe('the state, as a word and a mark', () => {
     expect(stateGlyph('running', true)).toBe('run');
     expect(stateGlyph('scheduled', false)).toBe('sched');
     expect(stateGlyph('done', true)).toBe('done');
-  });
-});
-
-describe('open or closed, remembered', () => {
-  const store = (v) => ({ getItem: (k) => (k === SUMMARY_OPEN_KEY ? v : null) });
-  it('is open the first time', () => {
-    expect(SUMMARY_OPEN_KEY).toBe('threads.summary.open');
-    expect(readSummaryOpen(store(null))).toBe(true);
-  });
-  it('stays closed once closed, and open once opened', () => {
-    expect(readSummaryOpen(store('0'))).toBe(false);
-    expect(readSummaryOpen(store('1'))).toBe(true);
-  });
-  it('reads open when storage throws', () => {
-    expect(readSummaryOpen({ getItem: () => { throw new Error('denied'); } })).toBe(true);
   });
 });

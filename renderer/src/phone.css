@@ -269,23 +269,8 @@
   :root:root:root .th-col::-webkit-scrollbar { display: none; }
   :root:root:root .th-col-h { padding-top: 8px; }
 
-  /* An open task: the words take the width, the right-hand rail goes. */
-  :root:root:root .focus-pane { --ts-rail-w: 0px; --ts-panel-w: 0px; --read-w: 100%; }
-  /* THE SUMMARY OPENS FROM AN ICON AT THE RIGHT OF THE THREAD'S TOP BAR. The
-     desktop's rail down the right edge took a quarter of a phone's width, so
-     it was hidden, and with it the only way in ("not sure how to open the
-     summary on mobile", 2026-10-11). Its marks stay in the summary itself. */
-  :root:root:root .focus-pane .ts-rail {
-    /* Beside the thread's ⋯, which keeps the corner, and on the top bar's
-       middle line with it, the back arrow and the name. */
-    position: fixed; top: calc(env(safe-area-inset-top, 0px) + (var(--phone-top, 56px) - 44px) / 2); right: calc(50px + env(safe-area-inset-right, 0px)); bottom: auto; left: auto;
-    width: 44px; height: 44px; padding: 0; gap: 0; justify-content: center; align-items: center;
-    border: 0; background: none; z-index: 60;
-  }
-  :root:root:root .focus-pane .ts-rail .ts-rail-mark { display: none; }
-  /* The desktop rail's 4px gap under its icon put the glyph 2px above the
-     middle. */
-  :root:root:root .focus-pane .ts-rail .ts-rail-ic { margin: 0; }
+  /* An open task: the words take the width. */
+  :root:root:root .focus-pane { --read-w: 100%; }
   /* The header the back arrow and the name are in wore the desktop's 18px
      top margin and hung from the top, 4px below the bar's middle. On the
      right it stops short of the summary icon: the bar keeps 48px, this 48. */
@@ -312,14 +297,6 @@
   :root:root:root .ts-top { align-items: center; gap: 2px; }
   :root:root:root .ts-top .ts-more { width: 44px; height: 44px; border-color: transparent; }
   :root:root:root .ts-top .ts-done { height: 44px; padding: 0 10px; border-color: transparent; }
-  /* Open, it is a page of its own over the thread, under the same top bar,
-     closed from its own icon at its top right. */
-  :root:root:root .focus-pane .ts-panel {
-    position: fixed; top: calc(env(safe-area-inset-top, 0px) + var(--phone-top, 56px)); left: 0; right: 0; bottom: 0;
-    width: auto; z-index: 60; padding: 20px 16px calc(40px + env(safe-area-inset-bottom, 0px));
-    border-left: 0; border-top: 1px solid var(--line);
-    background: var(--bg);
-  }
   /* Its top bar is a back arrow and the thread's name in the reading type,
      not the desktop's "NEEDS YOU / NAME" crumb in capitals. */
   :root:root:root .thread-crumb-from, :root:root:root .thread-crumb-sep { display: none; }
@@ -363,7 +340,6 @@
   :root:root:root .focus-dock-inner { padding: 0 12px; max-width: none; width: auto; margin: 0; }
   :root:root:root .focus-dock-inner > * { max-width: none; width: 100%; }
   :root:root:root .focus-dock { padding-left: 0; padding-right: 0; }
-  :root:root:root .focus-pane[data-summary="open"] > * { margin-right: 0; }
   :root:root:root .focus-body pre, :root:root:root .focus-body table { max-width: 100%; overflow-x: auto; }
   /* A PAGE SCROLLS UP AND DOWN; ONLY A WIDE THING SCROLLS SIDEWAYS, under the
      finger that is on it. The scroller took a wide table's width, so every

@@ -11,6 +11,14 @@ starts this checkout. The Mac app, the dmg, and the Darwin paths
 stay. Read the code and git for the current state; this file only holds the
 rules that are not obvious from them.
 
+The skills, their tests and the plans (`docs/cloud`, `docs/mobile`,
+`docs/team`) are a private repository checked out at `.claude/skills`
+(`.agentbox/private.json`). Its notes are as binding as this file. A change
+there is committed and pushed in that folder, not in this repository. On a
+cloud run without it, `sh .agentbox/private-folder.sh` clones it.
+
+@.claude/skills/CLAUDE.md
+
 ## Every change lands with tests, and you run all of them
 
 - Write the test first and watch it fail, then fix.
@@ -129,34 +137,10 @@ nowhere else. That folder follows the public main on its own:
 Whether you ask before shipping is set by the person's own instructions, not
 by this file.
 
-## SYNTHETIC USERS, AND THE THREAD THAT SETS THE STANDARD (2026-11-01)
-
-When a change wants synthetic users before it ships, they are `power-test`,
-with the people the change is for. Team and Rooms changes get several testers
-at once on one team. The phone app's testers are `product-loop`.
-
-Synthetic users run on Codex, never Claude Code (2026-11-08): the person keeps
-a Codex plan for testing only. Both skills start every tester as `codex exec`
-on the Codex login with the best plan; never run one as a subagent
-(`tests/every-synthetic-tester-runs-on-codex`).
-
-The app they test runs real agents on real plans, Claude Code and Codex
-(2026-11-11). Stand-in agents run only when the person agreed to them for
-that run, in their own words (`--stand-ins "<their words>"`), and the run
-says so up front. 48 of 50 runs were on stand-ins without anyone being told
-(`tests/a-power-test-runs-on-real-plans-unless-the-person-agreed`).
-
-The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
-used the multiplayer build for whole workdays, logged what broke, agents
-fixed it on the branch, and the team tested the fixes. The person only chose
-between finished screens. Run a big change the same way: real use for
-hours, real people from `power-test/people/`, fixes tested again by the same
-testers, and screenshots of the result.
-
 ## RELEASING IS ONE COMMAND: `npm run deploy` (2026-10-26)
 
 A release (the Mac app, npm, the agentbox.ac download and update feed, the
-cloud server) is `cd ~/Desktop/dev/agentbox-team && npm run deploy`, run by
+cloud server) is `npm run deploy` in the folder the app runs from, run by
 the person, because it signs with their Apple account. Hand them that line
 and nothing else. Do not write out the steps it runs: hand-written release
 steps went wrong in a dozen ways, which is why it exists. To see what it would

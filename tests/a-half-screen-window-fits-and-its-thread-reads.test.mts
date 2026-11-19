@@ -2,16 +2,11 @@
 //
 // What broke: tiled into the right half of a 1710-point screen, the window
 // would not go under its 980-point floor, so 125 points of it hung off the
-// screen's edge. At 980 the thread's pane is 876 wide, which the summary took
-// as room (352 + 520 = 872) although the Groups layout draws it 368 wide, so
-// the summary stayed open and the conversation ran off the screen mid-word.
-// Measured on the built renderer at 855 and 720: below 980 nothing overflows
-// the window, but the inbox's table kept Status, Project, Priority and Sent at
-// full width and cut every title to about ten letters, and a summary opened by
-// hand squeezed the conversation to 383 points beside it.
+// screen's edge. Measured on the built renderer at 855 and 720: below 980
+// nothing overflows the window, but the inbox's table kept Status, Project,
+// Priority and Sent at full width and cut every title to about ten letters.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { SUMMARY_NEEDS, summaryFits, summaryPlace } from '../renderer/src/room.ts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
@@ -26,46 +21,8 @@ describe('the window can be half of a laptop screen', () => {
   });
 });
 
-describe('the summary needs room for its widest panel', () => {
-  it('folds in the reported window, 980 less the folded sidebar and the frame', () => {
-    expect(summaryFits(980 - 82 - 22)).toBe(false);
-  });
-  it('leaves 520 points of conversation beside the Groups panel, 368 wide', () => {
-    expect(SUMMARY_NEEDS - 368).toBeGreaterThanOrEqual(520);
-    expect(summaryFits(SUMMARY_NEEDS)).toBe(true);
-  });
-});
-
-describe('a summary opened without room lies over the conversation', () => {
-  it('sits beside the conversation when there is room', () => {
-    expect(summaryPlace({ offered: true, shown: true, fits: true })).toBe('open');
-  });
-  it('lies over it when there is not', () => {
-    expect(summaryPlace({ offered: true, shown: true, fits: false })).toBe('over');
-  });
-  it('is the rail when closed, whatever the room', () => {
-    expect(summaryPlace({ offered: true, shown: false, fits: true })).toBe('rail');
-    expect(summaryPlace({ offered: true, shown: false, fits: false })).toBe('rail');
-  });
-  it('is nothing on a thread with no summary', () => {
-    expect(summaryPlace({ offered: false, shown: false, fits: true })).toBeUndefined();
-  });
-
-  const css = read('renderer/src/threads/summary.css');
-  it('leaves the conversation at the rail width under it', () => {
-    expect(css).toMatch(/\.focus-pane\[data-summary="over"\] > \.focus-scroll[\s\S]*?margin-right: var\(--ts-rail-w\)/);
-  });
-  it('is drawn on a fill, so the words under it do not show through', () => {
-    const rule = css.match(/\.focus-pane\[data-summary="over"\] \.ts-panel \{[^}]*\}/)?.[0] ?? '';
-    expect(rule).toMatch(/background: var\(--/);
-  });
-  it('is wired into the pane', () => {
-    expect(read('renderer/src/components/Focus.tsx')).toMatch(/data-summary=\{summaryPlace\(/);
-  });
-});
-
 // The grid's tracks come from variables; a step sets them, and `initial` drops a track.
-const gridRule = (css) => css.match(/\n\.th-grid \{[^}]*\}/)[0];
+const gridRule =(css) => css.match(/\n\.th-grid \{[^}]*\}/)[0];
 const varsIn = (body) => Object.fromEntries([...body.matchAll(/(?:^|\n)\s*\.th-grid(?:, \.th-grid\.with-person)? \{([^}]*)\}/g)]
   .flatMap((m) => [...m[1].matchAll(/--th-([a-z]+): ([^;]+);/g)].map((v) => [v[1], v[2]])));
 const columnsWith = (css, ...bodies) => {

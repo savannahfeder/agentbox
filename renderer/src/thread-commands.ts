@@ -1,6 +1,5 @@
-// PURE. The ⌘K rows for what a thread's own controls do: the summary panel,
-// the three-dot menu, the S key, a conversation's Add people and the strip a
-// teammate's task opens with. Each row is offered exactly where its control
+// PURE. The ⌘K rows for what a thread's own controls do: the three-dot menu,
+// a conversation's Add people and the strip a teammate's task opens with. Each row is offered exactly where its control
 // is, and says in `does` what App.tsx should run.
 //
 // Every row keeps its own keywords so a word finds only the rows it means:
@@ -19,7 +18,6 @@ export type ThreadDoes =
   | { act: 'pin'; pin: boolean }
   | { act: 'place'; keep: PlaceAct }
   | { act: 'code' }
-  | { act: 'summary' }
   | { act: 'rename' }
   | { act: 'end-repeat' }
   | { act: 'add-people' }
@@ -49,7 +47,7 @@ export interface ThreadFacts {
   pinned?: boolean | null;
   place?: ThreadPlace | null;
   /** What the open thread draws, or null when this thread is not the open one. */
-  open?: { change: boolean; summary: 'open' | 'closed' | null } | null;
+  open?: { change: boolean } | null;
   rename?: boolean;
   repeats?: boolean;
   /** True on a conversation, which opens a new one; 'thread' on an agent thread, which takes them in place. */
@@ -145,15 +143,6 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
     rows.push({ id: 'pin', label: f.pinned ? 'Unpin thread' : 'Pin thread', keywords: 'pin pinned unpin top stick sticky', does: { act: 'pin', pin: !f.pinned } });
   }
   if (f.rename) rows.push({ id: 'rename', label: 'Rename thread…', keywords: 'rename name title retitle call it', does: { act: 'rename' } });
-  if (f.open?.summary) {
-    rows.push({
-      id: 'summary',
-      label: f.open.summary === 'open' ? 'Hide summary' : 'Show summary',
-      keyHint: 'S',
-      keywords: 'summary panel context details properties info',
-      does: { act: 'summary' },
-    });
-  }
   if (f.open?.change) rows.push({ id: 'code', label: 'View code changes', keywords: 'code changes diff files what changed', does: { act: 'code' } });
   if (f.place && f.place !== 'off') {
     rows.push({

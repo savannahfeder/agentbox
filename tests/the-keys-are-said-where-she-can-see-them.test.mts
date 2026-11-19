@@ -209,7 +209,7 @@ describe('only a component that does not already show its key carries a hint', (
     const worn = new Set();
     // The icon buttons over a thread that name themselves on the plate
     // (2026-11-02), and the Inbox button left of the back arrow.
-    const named = ['team/TeamFocus.tsx', 'threads/ThreadFiles.tsx', 'threads/PlaceButton.tsx', 'components/BackForward.tsx'].map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src', f), 'utf8'));
+    const named = ['team/TeamFocus.tsx', 'threads/ThreadFiles.tsx', 'threads/PlaceButton.tsx', 'components/BackForward.tsx', 'components/SelectionBar.tsx'].map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src', f), 'utf8'));
     for (const file of [app, list, nav1, terminal, focus, pages, summary, queue, threadMenu, ...named]) {
       // The row writes its own as a spread, because it is only worn in the
       // inbox and only off an ordinary row.

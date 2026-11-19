@@ -96,8 +96,4 @@ describe('a thread', () => {
     expect(app).toContain(': <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (');
     expect(css).not.toMatch(/workspace-task > \.topbar \{[^}]*height/);
   });
-  it('folded with S, leaves its summary’s strip on the left, where it was open', () => {
-    expect(css).toMatch(/\.gt-sumleft \.ts-rail \{[^}]*right: auto; left: 0;/);
-    expect(css).toMatch(/\.gt-sumleft \.focus-pane\[data-summary="rail"\] > \.focus-scroll,/);
-  });
 });
