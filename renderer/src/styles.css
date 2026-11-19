@@ -1413,7 +1413,9 @@ body {
   text-underline-offset: 4px;
   transition: text-decoration-color 0.12s ease;
 }
-.row:hover .subject { text-decoration-color: var(--line-strong); }
+/* `.pointed`, not `:hover`: J and K take the row back from a pointer that has
+   not moved, and `:hover` would keep a second underline on it. */
+.row.pointed .subject { text-decoration-color: var(--line-strong); }
 .row.selected .subject,
 .row.checked .subject { text-decoration-color: var(--underline); }
 
