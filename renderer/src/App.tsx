@@ -7968,8 +7968,10 @@ export default function App() {
   // Where a task you gave stands for the person holding it: whether they opened it, or wrote back.
   const givenStage = (i: WorkItem): string => {
     if (i.status === 'done') return 'Done';
+    if (i.ask && i.verdict) return 'Handed back';
     const holder = i.assignee ?? '';
-    if (holder && lastSpeaker(i) === holder) return 'Replied';
+    // A reply in one of the task's own threads counts too (round four: it said Seen after Dana replied).
+    if (holder && (lastSpeaker(i) === holder || (i.talk?.chat ?? []).some((c) => c.by === holder))) return 'Replied';
     return (snap?.team?.seen?.[`${i.product}/${i.id}`]?.[holder] ?? 0) >= (i.createdAt ?? 0) ? 'Seen' : 'Not opened';
   };
   const itemRow = (i: WorkItem, word: string, tone: PlaceRow['tone']): PlaceRow => ({ key: `${i.product}/${i.id}`, title: rowTitle(i), word, at: i.updatedAt, tone, onOpen: () => openItem(i) });

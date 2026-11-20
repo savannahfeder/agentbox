@@ -36,6 +36,8 @@ export function taskWords(item: WorkItem, product: Product | undefined | null, m
   if (blocked) return { word: blocked.word, unread: false, other, at, held: true, title: blocked.title };
   // An ask says what it asks, so a review reads as one in the list (round four of the team test).
   const asks = item.ask?.kind;
+  // Handed back stays handed back, whatever a thank-you since did to the status (shared/thread-asks.mts).
+  if (asks && item.verdict) return { word: holding ? 'You handed it back' : `${name} handed it back`, unread: false, other, at };
   if (holding) return { word: inMyInbox(item, product, me) ? (asks ? `${name} asks for ${asks === 'help' ? 'help' : 'a review'}` : `From ${name}`) : 'You have this', unread: false, other, at };
   return { word: asks ? `${name} is ${asks === 'help' ? 'helping' : 'reviewing'}` : `With ${name}`, unread: false, other, at };
 }

@@ -289,6 +289,11 @@ describe('the row of an ask', () => {
     expect(taskWords(task({ ask: { kind: 'help', owner: 'sam', thread: 't', product: 'api' } }), product, 'theo', nameOf)?.word).toBe('Sam asks for help');
     expect(taskWords(task(), product, 'sam', nameOf)?.word).toBe('Theo is reviewing');
   });
+  // Round four: the board said "With Dana" for a review Dana had handed back and Priya had thanked her for.
+  it('says it was handed back, even after a thank-you reopened the task', () => {
+    expect(taskWords(task({ verdict: 'yes' }), product, 'sam', nameOf)?.word).toBe('Theo handed it back');
+    expect(taskWords(task({ verdict: 'yes' }), product, 'theo', nameOf)?.word).toBe('You handed it back');
+  });
   it('a task that is not an ask reads as before', () => {
     expect(taskWords(task({ ask: undefined }), product, 'sam', nameOf)?.word).toBe('With Theo');
   });
