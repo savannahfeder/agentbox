@@ -123,6 +123,16 @@ describe('a ship and a private folder a worker could write', () => {
     expect(fs.existsSync(w.marker)).toBe(false);
   });
 
+  // A sparse checkout in the app folder's copy writes config.worktree there, so the worker's may hold anything.
+  it('reads no worktree settings that differ from the app folder\'s', () => {
+    const w = world();
+    for (const at of [path.join(w.app, '.claude/skills'), w.at]) git(at, 'config', 'extensions.worktreeConfig', 'true');
+    put(path.join(w.app, '.claude/skills/.git/config.worktree'), '[core]\n\tsparseCheckout = false\n');
+    put(path.join(w.at, '.git/config.worktree'), `[core]\n\tfsmonitor = touch '${w.marker}'; false\n`);
+    expect(ship(w).pushed).toBe(false);
+    expect(fs.existsSync(w.marker)).toBe(false);
+  });
+
   it('pushes nothing when the app folder has no private checkout to compare with', () => {
     const w = world();
     fs.rmSync(path.join(w.app, '.claude/skills'), { recursive: true, force: true });

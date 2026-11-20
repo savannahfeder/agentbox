@@ -26,6 +26,10 @@ export function plantedIn(at, trusted) {
   for (const name of ['commondir', 'config.worktree', 'hooks']) {
     if (kind(path.join(own, name)) !== kind(path.join(given, name))) return `its .git/${name} is not the app folder's`;
   }
+  for (const name of ['commondir', 'config.worktree']) {
+    const mine = read(path.join(own, name));
+    if (mine && !mine.equals(read(path.join(given, name)) ?? Buffer.alloc(0))) return `its .git/${name} is not the app folder's`;
+  }
   if (kind(path.join(own, 'config')) !== 'file') return 'its git settings are not a plain file';
   const config = read(path.join(own, 'config'));
   if (!config || !config.equals(read(path.join(given, 'config')) ?? Buffer.alloc(0))) return 'its git settings differ from the app folder\'s copy';
