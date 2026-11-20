@@ -3159,9 +3159,11 @@ export default function App() {
     for (const i of done) m.set(i.id, 'done');
     for (const i of snoozed) m.set(i.id, 'scheduled');
     for (const i of progress) m.set(i.id, 'running');
+    // With someone you asked: moving, not waiting on you (round three: the board said Needs you, the list did not).
+    for (const id of askedOut) if (!m.has(id)) m.set(id, 'running');
     for (const i of inbox) m.set(i.id, 'waiting');
     return m;
-  }, [inbox, progress, snoozed, done]);
+  }, [inbox, progress, snoozed, done, askedOut]);
   const stateOfMine = useCallback((i: WorkItem) => tabState.get(i.id) ?? null, [tabState]);
   // THE TASKS A THREAD FILED THAT STILL WAIT FOR A YES (w-d2744c6daa), off the
   // same rule the Approve button reads. A close on a thread with any of these
