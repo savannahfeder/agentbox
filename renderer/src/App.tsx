@@ -79,7 +79,7 @@ import { CloudOffAsk } from './components/CloudOffAsk';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
 import { Snooze } from './components/Snooze';
-import { LATER_KEYWORDS, LATER_OLD_NAMES, REOPEN_KEYWORDS } from './palette-rows';
+import { LATER_KEYWORDS, LATER_OLD_NAMES, REOPEN_KEYWORDS, threadResult } from './palette-rows';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
@@ -3946,12 +3946,17 @@ export default function App() {
       hint: `Repeats ${repeatTag(rule)}`,
       run: () => { setModal(null); if (search !== null) closeSearch(); openRepeatRef.current?.(rule); },
     })),
-    ...withoutRunsOf(searchThreads(items, q, searchContext).map(({ item }) => item), ruled).map((item) => ({
+    ...(() => {
+      const found = searchThreads(items, q, searchContext);
+      const summaries = new Map(found.map(({ item, summary }) => [item, summary]));
+      const now = Date.now();
+      return withoutRunsOf(found.map(({ item }) => item), ruled).map((item) => ({
       id: `thread-${item.product}-${item.id}`,
       label: threadSearchDetails(item, searchContext).title,
-      hint: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product,
+      ...threadResult(item, { summary: summaries.get(item) ?? '', project: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product, now }),
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); },
-    })),
+      }));
+    })(),
     ...teammateThreadsFound(weekCards, team?.me, q).map((card) => ({
       id: `card-${card.personId}-${card.threadId}`,
       label: card.title ?? '',

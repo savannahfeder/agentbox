@@ -4173,13 +4173,17 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 /* A long title gives way, never the project's name. */
 .palette-k .palette-thread .palette-hint { flex: none; }
 /* A line, file, comment or decision found inside something: its words, then who
-   and where under them in the faint ink. Two lines, so the row is taller. */
-.palette-k .palette-found { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
-.palette-k .palette-found .palette-glyph { padding-top: 3px; }
-.palette-k .palette-found .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.palette-k .palette-found .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+   and where under them in the faint ink. A thread: its title, then the line it
+   was found by. Two lines, so the row is taller. */
+.palette-k :is(.palette-found, .palette-two) { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
+.palette-k :is(.palette-found, .palette-two) .palette-glyph { padding-top: 3px; }
+.palette-k :is(.palette-found, .palette-two) .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.palette-k :is(.palette-found, .palette-two) .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
-.palette-k .palette-found .hit { color: var(--text); font-weight: 600; }
+.palette-k :is(.palette-found, .palette-two) .hit { color: var(--text); font-weight: 600; }
+.palette-k .palette-two .palette-hint { padding-top: 2px; }
+/* Finished threads step back; the highlight behind a selected one does not. */
+.palette-k .palette-done > * { opacity: .5; }
 
 /* A found line, landed on from the results: marked for a moment. */
 [data-line] { transition: background-color .5s ease, box-shadow .5s ease; }

@@ -29,6 +29,22 @@
 import { type Look } from './skins';
 import { type ThemeChoice } from './theme';
 import { DONE } from './done-word';
+import { agoShort } from './home/home-model';
+import { localDate } from './local-dates';
+
+/* ------------------------------- threads --------------------------------- */
+
+export type ThreadResult = { sub: string; hint: string; done: boolean };
+
+/** A thread ⌘K found: the line it was found by, where it is and how old, and whether it is finished. */
+export function threadResult(
+  item: { status: string; updatedAt?: number; createdAt: number },
+  { summary, project, now }: { summary: string; project: string; now: number },
+): ThreadResult {
+  const at = item.updatedAt ?? item.createdAt;
+  const age = now - at < 86_400_000 ? agoShort(at, now) : localDate(at, { month: 'short', day: 'numeric' });
+  return { sub: summary, hint: `${project} · ${age}`, done: item.status === 'done' };
+}
 
 /* ------------------------------- matching -------------------------------- */
 
