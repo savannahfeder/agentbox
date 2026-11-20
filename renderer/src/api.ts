@@ -805,6 +805,12 @@ export const api = {
     if (!zero?.fileLinkShare) return { ok: false, error: `quit and reopen ${NAME} to share files` };
     return zero.fileLinkShare(p);
   },
+  /** The file into a chat: a teammate's id, or 'team' for the team's group. */
+  async fileToChat(p: FileLinkAsk & { to: string }): Promise<{ ok: boolean; roomId?: string; error?: string }> {
+    const zero = window.zero;
+    if (!zero?.fileToChat) return { ok: false, error: `quit and reopen ${NAME} to send files` };
+    return zero.fileToChat(p);
+  },
   async fileLinkStop(p: { token: string }): Promise<{ ok: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.fileLinkStop) return { ok: false, error: `quit and reopen ${NAME} to share files` };

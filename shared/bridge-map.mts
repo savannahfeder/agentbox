@@ -218,6 +218,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   readDoc: 'zero:read-doc',
   fileLink: 'zero:file-link',
   fileLinkShare: 'zero:file-link-share',
+  fileToChat: 'zero:file-to-chat',
   fileLinkStop: 'zero:file-link-stop',
   fileLinks: 'zero:file-links',
   fileLinkComments: 'zero:file-link-comments',

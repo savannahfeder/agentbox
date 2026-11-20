@@ -60,6 +60,7 @@ import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
 import { isOnTeam } from '../shared/rooms-on.mts';
 import { liveForTheWholeTeam, liveRoomFor } from './team/live-room.mts';
+import { sendFileToChat, TEAM_CHAT } from './team/file-to-chat.mts';
 import { openForThePerson } from './opens-a-program.mts';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
@@ -2926,6 +2927,27 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return withEditable(arg, await team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null));
   }));
   ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => withEditable(arg, await team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg, team)) }))));
+  // The same file into a chat: the team's group or one teammate's (main/team/file-to-chat.mts).
+  ipcMain.handle('zero:file-to-chat', async (_e, arg: LinkArg & { to?: unknown } = {}) => {
+    const rooms = team?.rooms;
+    const me = team?.state()?.me?.id;
+    if (!rooms || !me) return { ok: false, error: 'Sign in to send it to your team.' };
+    const to = String(arg.to ?? '');
+    const person = (team.state()?.people ?? []).find((p) => p.id === to);
+    if (to !== TEAM_CHAT && (!person || to === me)) return { ok: false, error: 'That person is not on your team.' };
+    try {
+      const found = await resolveArtifact({
+        src: arg.src, product: arg.product, thread: typeof arg.thread === 'string' ? arg.thread : null,
+        products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team.firstNameOf,
+      });
+      if (!found.ok) return { ok: false, error: found.error || 'This file is not on this computer.' };
+      const roomId = await sendFileToChat({ rooms, me, to, toName: person?.name ?? '', file: found.path });
+      push();
+      return { ok: true, roomId };
+    } catch (err) {
+      return { ok: false, error: String((err as Error)?.message ?? err) };
+    }
+  });
   type AccessArg = LinkArg & { access?: unknown; can?: unknown; email?: unknown };
   ipcMain.handle('zero:file-link-access', linkCall(async ({ token, access, can }: AccessArg, team) => {
     await team.setFileLinkAccess(String(token ?? ''), String(access ?? ''), String(can ?? ''));

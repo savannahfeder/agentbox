@@ -308,6 +308,7 @@ contextBridge.exposeInMainWorld('zero', {
   // A link anyone can open, to one of her files (main/file-link.mts).
   fileLink: (payload) => ipcRenderer.invoke('zero:file-link', payload),
   fileLinkShare: (payload) => ipcRenderer.invoke('zero:file-link-share', payload),
+  fileToChat: (payload) => ipcRenderer.invoke('zero:file-to-chat', payload),
   fileLinkStop: (payload) => ipcRenderer.invoke('zero:file-link-stop', payload),
   fileLinks: () => ipcRenderer.invoke('zero:file-links'),
   fileLinkComments: (payload) => ipcRenderer.invoke('zero:file-link-comments', payload),

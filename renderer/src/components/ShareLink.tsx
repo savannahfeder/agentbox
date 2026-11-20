@@ -1,12 +1,14 @@
 // SHARE: a link anyone can open to the file on screen (main/file-link.mts).
 // Nothing leaves this computer until Copy link is pressed. Every version of
 // one file shares one link; Update link puts the copy on screen in it.
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { api, type FileLinkState, type LinkComment } from '../api';
 import { shareSignedOutWords, shareWords } from '../public-link-words';
 import { shareSignInStartsOn, signInWasSkipped } from '../sign-in-ask';
 import { NoteGlyph } from './NoteGlyphs';
 import { placeWords, shownName, type NotePlace } from '../../../shared/artifact-marks.mts';
+import { TeamContext } from '../team/people';
+import type { Person as TeamPerson } from '../types';
 
 /** A link comment's place, short: "at 0:24", "a pin", the quote. */
 const placeOn = (place: NotePlace) => (place.kind === 'time' ? `at ${placeWords({ place: { kind: 'time', s: place.s } })}` : place.kind === 'pin' ? 'on a pin' : placeWords({ place }));
@@ -141,6 +143,28 @@ function People({ token, editable, onProblem }: { token: string; editable: boole
   );
 }
 
+export type SendTarget = { to: string; name: string };
+
+/** Whom a file can go to from Share: the team's group, then each teammate. */
+export function sendTargets({ me, people, rooms }: { me: string | null; people: readonly TeamPerson[]; rooms: readonly { id: string; name: string; teamId?: string | null }[] }): SendTarget[] {
+  const mates = people.filter((p) => p.id !== me).map((p) => ({ to: p.id, name: (p.name || p.email).split(/\s+/)[0] }));
+  if (!mates.length) return [];
+  const group = rooms.find((r) => r.teamId);
+  return [...(group ? [{ to: 'team', name: group.name }] : []), ...mates];
+}
+
+/** The row of chats a file can be sent into, and where it went. */
+export function SendTo({ targets, busy, sent, onSend }: { targets: readonly SendTarget[]; busy: string | null; sent: string | null; onSend: (to: string) => void }) {
+  if (!targets.length) return null;
+  const went = targets.find((t) => t.to === sent);
+  return (
+    <div className="av-share-send-to" role="group" aria-label="Send to">
+      <span className="av-share-send-l">{went ? `Sent to ${went.name}` : 'Send to'}</span>
+      {targets.map((t) => <button type="button" key={t.to} className={`av-share-chip${t.to === sent ? ' is-sent' : ''}`} disabled={!!busy} onClick={() => onSend(t.to)}>{t.name}</button>)}
+    </div>
+  );
+}
+
 /** `icon`: drawn as the side pane's square mark rather than a worded button. */
 export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   product: string; thread: string; src: string;
@@ -155,6 +179,17 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   const [problem, setProblem] = useState<string | null>(null);
   const box = useRef<HTMLDivElement | null>(null);
   const ask = { product, thread, src };
+  const team = useContext(TeamContext);
+  const targets = team ? sendTargets({ me: team.me, people: team.state.people, rooms: team.state.rooms?.rooms ?? [] }) : [];
+  const [sending, setSending] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const sendTo = async (to: string) => {
+    setSending(to); setProblem(null); setSentTo(null);
+    const out = await api.fileToChat({ ...ask, to });
+    setSending(null);
+    if (!out.ok) { setProblem(out.error ?? 'That did not send.'); return; }
+    setSentTo(to);
+  };
 
   const [stopAsked, setStopAsked] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -221,7 +256,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     setState({ ...state, link: null });
     setSaid(shareWords.stopped);
   };
-  const toggle = () => { setOpen(!open); setSaid(null); setProblem(null); setStopAsked(false); };
+  const toggle = () => { setOpen(!open); setSaid(null); setProblem(null); setStopAsked(false); setSentTo(null); };
   const copyIt = async (url: string) => {
     if (!(await copy(url))) { setProblem('This browser would not copy. Open the link and copy it from there.'); return; }
     setCopied(true);
@@ -246,6 +281,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
       {open && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           <p className="av-share-title">Share <span>{name}</span></p>
+          {state.signedIn && <SendTo targets={targets} busy={sending} sent={sentTo} onSend={(to) => void sendTo(to)} />}
           {!state.signedIn ? (() => {
             const offer = shareSignedOutWords(shareSignInStartsOn({ skipped: signInWasSkipped() }));
             return <>

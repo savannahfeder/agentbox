@@ -1987,6 +1987,7 @@ declare global {
       fileLinkShare?(p: FileLinkAsk): Promise<FileLinkState>;
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
+      fileToChat?(p: FileLinkAsk & { to: string }): Promise<{ ok: boolean; roomId?: string; error?: string }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null; product?: string; thread?: string; src?: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkAccess?(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }>;
