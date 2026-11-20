@@ -3103,7 +3103,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   const [nativeNames, setNativeNames] = useState<string[]>([]);
   // While the box starts with a slash, not only while the menu is open: once
   // she types past /loop the box still has to know /loop is a command.
-  const discoveringCommands = !item.agent && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
+  const discoveringCommands = !item.agent && !talkTo?.length && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
   useEffect(() => {
     setNativeNames([]);
     if (!discoveringCommands) return;
@@ -3308,7 +3308,9 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   // because that value is thrown away by the send.
   const canSetMode = !item.agent;
   // Commands are provider-specific; canSetMode still gates every permission path.
-  const query = !item.agent ? slashQuery(text) : null;
+  // A reply that goes to people reaches no agent, so it offers none of an agent's commands.
+  const toAgent = !item.agent && !talkTo?.length;
+  const query = toAgent ? slashQuery(text) : null;
   /*
    * ONE LIST, AND IT IS THE ONE THE MENU DRAWS. This was `modeMatches(query)`
      with a second expression below deciding what to render, which was fine
@@ -3330,7 +3332,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   // and with it went `chipOpen` and the click-away that shut it.
   const slashOpen = menuRows.length > 0;
   // The command waiting on her words, once Enter has put it in the box.
-  const holding = !item.agent ? commandBeingWritten(text, claudeCode, nativeNames) : null;
+  const holding = toAgent ? commandBeingWritten(text, claudeCode, nativeNames) : null;
   // WHAT THIS SEND WILL ACTUALLY RUN AS: the mode picked for this one message
   // if there is one, otherwise whatever the fleet is set to. Never a guess and
   // never a blank: a footer that says nothing when nothing is picked is the
