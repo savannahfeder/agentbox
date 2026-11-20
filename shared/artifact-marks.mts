@@ -893,7 +893,7 @@ export function approvalSince(family: Pick<FileFamily, 'versions'> | null | unde
  * comments still open on it. A version in `offered` (offeredTogether) is a
  * choice still on the table, so a newer one beside it is not asked about.
  */
-export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: ReadonlyArray<Pick<FileNote, 'file' | 'resolved'>> | null | undefined, offered: ReadonlySet<string> | null = null): { text: string; newest: FileVersion | null } | null {
+export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: ReadonlyArray<Pick<FileNote, 'file' | 'resolved'>> | null | undefined, offered: ReadonlySet<string> | null = null): { text: string; newest: FileVersion | null; yes: string } | null {
   const versions = family?.versions ?? [];
   const here = versions[index];
   if (!here) return null;
@@ -903,7 +903,9 @@ export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefin
   const said = [`Approve v${here.n}?`];
   if (newest) said.push(`v${newest.n} is newer.`);
   if (open) said.push(open > 1 ? `${open} comments are still open.` : '1 comment is still open.');
-  return { text: said.join(' '), newest };
+  const left = `${open} ${open === 1 ? 'comment' : 'comments'} open`;
+  const yes = !open ? `Approve v${here.n}, not v${newest!.n}` : newest ? `Approve v${here.n} with ${left}` : `Approve with ${left}`;
+  return { text: said.join(' '), newest, yes };
 }
 
 /** The newest edited copy of the file at `path`, or `path` when nobody has edited it. */

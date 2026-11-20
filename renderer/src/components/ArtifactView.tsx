@@ -381,7 +381,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
 
   // An older version, or one with comments open, is approved only once that is said.
-  const [approveAsked, setApproveAsked] = useState<{ text: string; newest: FileVersion | null } | null>(null);
+  const [approveAsked, setApproveAsked] = useState<{ text: string; newest: FileVersion | null; yes: string } | null>(null);
   useEffect(() => { setApproveAsked(null); }, [version?.id]);
   const approveNow = async (v: FileVersion, undo = false) => {
     const owner = whoseIsTheFile(files, v.id);
@@ -818,7 +818,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
             <p className="av-told av-ask" role="alertdialog">
               {approveAsked.text}
               {approveAsked.newest && <button type="button" className="av-btn is-on" onClick={() => approveNewest(approveAsked.newest!)}>Approve v{approveAsked.newest.n}</button>}
-              <button type="button" className="av-btn" onClick={() => void approveNow(version)}>Approve v{version.n} anyway</button>
+              <button type="button" className="av-btn" onClick={() => void approveNow(version)}>{approveAsked.yes}</button>
               <button type="button" className="av-btn" onClick={() => setApproveAsked(null)}>Not yet</button>
             </p>
           )}
