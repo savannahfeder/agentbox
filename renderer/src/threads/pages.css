@@ -682,7 +682,5 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-cell-title.with-aside > .th-who-name { flex: none; }
 /* An AI teammate's letter on its own soft colour until it has a drawn face, so it never reads as an agent. */
 .th-mate .tq { border: 0; background: var(--mate-tint); color: #2b2a33; font-weight: 600; }
-/* EXPLORATION: three undotted agent faces. */
-[data-agent="1"] .th-slot .agent-face { border: 0; color: var(--text-faint); }
-[data-agent="2"] .th-slot .agent-face { border: 0; background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text-dim); }
-[data-agent="3"] .th-slot .agent-face { border-style: solid; border-color: color-mix(in srgb, var(--text) 22%, transparent); color: var(--text-dim); }
+/* EXPLORATION: the Thread heading on the faces' edge instead of the titles'. */
+[data-head="faces"] .th-head .th-grid > :first-child { margin-left: calc(var(--gutter) - var(--text-x)); }
