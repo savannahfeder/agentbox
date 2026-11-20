@@ -12,7 +12,8 @@ import type { GroupRow } from '../../shared/room-needs-you.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mts';
 import { carryIntoRoom } from './carry-files.mts';
 import type { FoundToSend } from './carry-files.mts';
-import { readRoomMessage } from '../../shared/agent-voice.mts';
+import { readRoomMessage, roomBody } from '../../shared/agent-voice.mts';
+import { Name } from '../../shared/product-name.mjs';
 import { cleanMark } from '../../shared/artifact-marks.mts';
 import { pairRooms } from '../../shared/pair-room.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
@@ -425,7 +426,8 @@ export function createRooms({
       lookAsked = true;
       try {
         await b.putRoomFile(room.id, TEAM_LOOK, Buffer.from(TEAM_LOOK_TEMPLATE).toString('base64'));
-        await api.send(room.id, TEAM_LOOK_POSTED);
+        // In the app's name: the person whose copy happened to look first never wrote it.
+        await api.send(room.id, roomBody({ name: Name }, TEAM_LOOK_POSTED));
         text = TEAM_LOOK_TEMPLATE;
       } catch (err) {
         if ((err as { code?: string })?.code !== FILE_EXISTS) throw err;
