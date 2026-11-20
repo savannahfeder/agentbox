@@ -15,7 +15,7 @@ import type { FoundToSend } from './carry-files.mts';
 import { readRoomMessage, roomBody } from '../../shared/agent-voice.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { cleanMark } from '../../shared/artifact-marks.mts';
-import { pairRooms } from '../../shared/pair-room.mts';
+import { isPairRoom, pairRooms } from '../../shared/pair-room.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
 import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mts';
 
@@ -364,6 +364,7 @@ export function createRooms({
       const nameOf = (id: string | null) => profiles.get(id as string)?.display_name || everyone?.find((p) => p.id === id)?.name || '';
       const row = groupRow({
         roomId: r.id, roomName: r.name, messages: held, mentioned: mentioned.filter((m) => m.roomId === r.id), me: who, readAt,
+        pair: isPairRoom(r),
         people: [...(called?.map((n) => ({ id: n.person_id, name: n.name })) ?? []), { id: who as string, name: me()?.name ?? '' }, { id: who as string, name: profiles.get(who as string)?.display_name ?? '' }],
         doneAt: p.doneAt[r.id] ?? 0, nameOf,
         answeredAt: Math.max(0, ...(fileMarks.get(r.id) ?? []).filter((m) => m.by === who).map((m) => m.at)),
