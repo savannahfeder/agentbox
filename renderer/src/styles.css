@@ -3307,6 +3307,15 @@ body {
 .reply-dock .compose-note.attach-problem { padding-left: 0; padding-right: 0; }
 
 .attach-thumb { position: relative; }
+.attach-open {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--artifact-corner-small);
+  cursor: zoom-in;
+}
+.attach-open:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .attach-thumb img {
   height: 84px;
   max-width: 220px;
