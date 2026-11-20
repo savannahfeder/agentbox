@@ -178,6 +178,17 @@ export function weekRank(wall: readonly RoomCard[], id: string): number {
   return 1 + wall.filter((c) => c.hoursWeek > mine).length;
 }
 
+/** A profile's ranks: the week's only in a group of three or more, and neither for someone with no hours to rank. */
+export function profileRanks(room: Pick<Room, 'members' | 'wall'>, card: Pick<RoomCard, 'id' | 'hoursWeek' | 'hoursTotal'>, allTime: number | undefined): { week: number | null; allTime: number | null } {
+  return {
+    week: room.members > 2 && card.hoursWeek > 0 ? weekRank(room.wall, card.id) : null,
+    allTime: allTime != null && card.hoursTotal > 0 ? allTime : null,
+  };
+}
+
+/** A teammate's name opens their own page, which has their threads; you and anyone else open the profile. */
+export const personOpens = (c: Pick<RoomCard, 'me' | 'teammate'>): 'page' | 'profile' => (c.teammate && !c.me ? 'page' : 'profile');
+
 export function agentsWords(n: number | null): string {
   if (n == null || n <= 0) return 'Not running';
   return `${n} ${n === 1 ? 'agent' : 'agents'} working`;
