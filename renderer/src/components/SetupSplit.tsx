@@ -9,13 +9,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
-import type { Snapshot } from '../types';
+import type { CloudPlan, Snapshot } from '../types';
 import type { SessionThread } from '../agent-import-card';
 import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, bringInWithin, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, bringInWithin, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
@@ -106,7 +106,10 @@ export function SetupSplit(p: SetupSplitProps) {
   const [plan, setPlan] = useState<SetupPlan>('free');
   const [engine, setEngine] = useState<'claude' | 'codex'>('claude');
   const agents = p.engines?.length ?? 1;
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents]);
+  // Found once the account is signed in. Joining takes it off the list, so the page remembers it.
+  const invite = p.snap?.team?.invites?.[0] ?? null;
+  const [joined, setJoined] = useState<string | null>(null);
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents, invited: !!invite || !!joined }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents, invite, joined]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
@@ -148,22 +151,32 @@ export function SetupSplit(p: SetupSplitProps) {
   stepsNow.current = steps;
   const pastAccount = useCallback(() => { setError(null); setAt((i) => (stepsNow.current[i] === 'account' ? i + 1 : i)); }, []);
   useEffect(() => { if (step === 'account' && signedIn) pastAccount(); }, [step, signedIn, pastAccount]);
-  const backTo = stepBefore(steps, at, signedIn);
-  const back = backTo !== null || p.onBack ? () => { setError(null); if (backTo !== null) setAt(backTo); else p.onBack?.(); } : null;
 
   const me = p.snap?.team?.me;
 
   // ---- Starting Pro: the cloud account, the team its seats are bought for, its Stripe checkout in the browser, then wait for the seats.
   const [payState, setPayState] = useState<'idle' | 'opening' | 'waiting'>('idle');
   const hasTeam = !!p.snap?.team?.team;
+  // A team already made may have used some or all of its free days, and only the cloud knows which.
+  const [seen, setSeen] = useState<CloudPlan | null>(null);
+  useEffect(() => {
+    if (step !== 'plan' || !hasTeam) return undefined;
+    let live = true;
+    void api.cloudAccountPlan().then((plan) => { if (live) setSeen(plan); });
+    return () => { live = false; };
+  }, [step, hasTeam]);
+  const offer = proOffer(proFreeDays(hasTeam, seen));
+  const paid = plan === 'pro' || teamPaid(seen);
+  const backTo = stepBefore(steps, at, signedIn, paid);
+  const back = backTo !== null || p.onBack ? () => { setError(null); if (backTo !== null) setAt(backTo); else p.onBack?.(); } : null;
   const pay = useCallback(async () => {
-    if (plan === 'pro') { next(); return; }
+    if (paid) { next(); return; }
     setPayState('opening'); setError(null);
     // The account step signed in to the team; the payment is the cloud's. Terms were named on that step, and only there.
     const out = await startProTrial({ hasTeam, name: me?.name, acceptTerms: !signedInAtStart });
     if (!out.ok) { setPayState('idle'); setError(out.message); return; }
     setPayState('waiting');
-  }, [plan, next, signedInAtStart, hasTeam, me?.name]);
+  }, [paid, next, signedInAtStart, hasTeam, me?.name]);
   useEffect(() => {
     if (payState !== 'waiting') return undefined;
     let live = true;
@@ -302,12 +315,28 @@ export function SetupSplit(p: SetupSplitProps) {
     body = <>
       <div className="ss-perks">{PRO_PITCH.perks.map((k) => <div key={k.id} className="ss-perk"><span className="ss-perk-icon">{PERK_ICONS[k.id]}</span>{k.title}{'tag' in k && <span className="ss-perk-tag">{k.tag}</span>}</div>)}</div>
       <div className="ss-pricing">
-        <div><span className="ss-pricing-label">{PRO_PITCH.trial.label}</span><b className="ss-pricing-price">{PRO_PITCH.trial.price}</b><span className="ss-pricing-line">{PRO_PITCH.trial.line}</span></div>
-        <div><span className="ss-pricing-label">{PRO_PITCH.paid.label}</span><b className="ss-pricing-price">{PRO_PITCH.paid.price}<small>{PRO_PITCH.paid.per}</small></b><span className="ss-pricing-line">{PRO_PITCH.paid.line}</span></div>
+        {offer.trial && <div><span className="ss-pricing-label">{offer.trial.label}</span><b className="ss-pricing-price">{offer.trial.price}</b><span className="ss-pricing-line">{offer.trial.line}</span></div>}
+        <div><span className="ss-pricing-label">{offer.paid.label}</span><b className="ss-pricing-price">{offer.paid.price}<small>{offer.paid.per}</small></b><span className="ss-pricing-line">{offer.paid.line}</span></div>
       </div>
       {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
-      <div className="ss-acts">{go(plan === 'pro' ? 'Continue' : payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : PRO_PITCH.cta, () => void pay(), payState !== 'opening')}{plan !== 'pro' && quiet(PRO_PITCH.free, next)}</div>
-      {plan !== 'pro' && <p className="ss-price-line">{PRO_PITCH.terms}</p>}
+      <div className="ss-acts">{go(paid ? 'Continue' : payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : offer.cta, () => void pay(), payState !== 'opening')}{!paid && quiet(PRO_PITCH.free, next)}</div>
+      {!paid && <p className="ss-price-line">{PRO_PITCH.terms}</p>}
+    </>;
+  } else if (step === 'join') {
+    const name = joined ?? invite?.teamName ?? 'your team';
+    head = [`Join ${name}.`, ''];
+    const join = async () => {
+      if (!invite) return;
+      setBusy(true); setError(null);
+      const out = await api.teamAcceptInvite(invite.teamId);
+      setBusy(false);
+      if (!out.ok) { setError((out as { error?: string }).error ?? 'That invitation could not be taken up.'); return; }
+      setJoined(invite.teamName);
+      next();
+    };
+    body = <>
+      <div className="ss-list"><Row face={name[0]?.toUpperCase() ?? '·'} name={name} sub={invite?.invitedByName ? `${invite.invitedByName} invited you` : undefined} end={joined ? <span className="ss-dim"><Tick />Joined</span> : undefined} /></div>
+      <div className="ss-acts">{joined ? go('Continue', next) : <>{go(`Join ${name}`, () => void join(), true, 'Joining…')}{quiet('Not now', next)}</>}</div>
     </>;
   } else if (step === 'teammates') {
     head = ['Add your own AI teammates.', ''];
@@ -357,7 +386,7 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-left">
         <div className="ss-brand"><Mark />{Name}</div>
         <div className="ss-steps">
-          {steps.map((s, i) => (dashGoesBack(steps, i, at, signedIn)
+          {steps.map((s, i) => (dashGoesBack(steps, i, at, signedIn, paid)
             ? <button type="button" key={s} className="ss-was" tabIndex={-1} disabled={busy} aria-label={`Back to step ${i + 1}`} onClick={() => { setError(null); setAt(i); }} />
             : <i key={s} className={i < at ? 'ss-was' : i === at ? 'ss-is' : ''} />))}
           <span>{step ? stepLabel(steps, step) : 'All set'}</span>

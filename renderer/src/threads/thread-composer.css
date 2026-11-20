@@ -74,7 +74,6 @@
   text-decoration: underline dotted var(--line-strong);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
-  transition: text-decoration-color 0.14s;
 }
 .tc-word:hover .tc-word-text, .tc-word.open .tc-word-text { text-decoration-color: var(--text-faint); }
 .tc-word:focus-visible { outline: none; }
@@ -320,7 +319,7 @@
 .tc-inline .tc-text {
   height: auto; overflow-y: auto; padding: 0 0 14px;
   font-size: 22px; line-height: 30px;
-  border-bottom: 1px solid var(--line-strong); transition: border-color 0.14s;
+  border-bottom: 1px solid var(--line-strong);
 }
 /* N lands here without opening anything, so the rule has to show it worked, or
    the next N is typed into the box. */

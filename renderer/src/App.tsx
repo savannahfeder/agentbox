@@ -79,7 +79,7 @@ import { CloudOffAsk } from './components/CloudOffAsk';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
 import { Snooze } from './components/Snooze';
-import { LATER_KEYWORDS, LATER_OLD_NAMES, REOPEN_KEYWORDS } from './palette-rows';
+import { LATER_KEYWORDS, LATER_OLD_NAMES, REOPEN_KEYWORDS, threadResult } from './palette-rows';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
  `astral/w-86452550e5-looks`.
@@ -101,7 +101,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
-import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
@@ -127,7 +127,7 @@ import { repeatTag } from './repeat-words';
 import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
 import { hintScheduler, type HintScheduler } from './hint-timing';
 import { HINTS } from './hint-plate';
-import { MAC, chord, sayKeys } from './this-keyboard';
+import { MAC, WINDOWS, chord, sayKeys } from './this-keyboard';
 import { HintPlate } from './components/HintPlate';
 import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, wornSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
@@ -2653,13 +2653,13 @@ export default function App() {
   // the inbox, which is the whole point: "I only see things that need me."
   const snoozed = useMemo(() => [
     // AND A FIFTH (w-5244c90c33): a thread waiting on another one, unless a
-    // session or the ship queue has it, which is In progress. A put-off one too.
+    // session, the run queue or the ship queue has it, which is In progress. A put-off one too.
     ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i)
-        || ((hiddenAt(i) > now || waitsInLater(i, waitingOn(i))) && !liveIds.has(i.id) && !shippingIds.has(i.id) && !pendingIds.has(i.id)))
+        || putOffInLater(i, { hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i), runOnIt: liveIds.has(i.id) || queuedIds.has(i.id) || shippingIds.has(i.id) || pendingIds.has(i.id) }))
       && (i.status !== 'done' || i.wrote?.status?.source !== 'founder')
       && (!scope || i.product === scope)),
     ...agentList.filter((r) => (r.runAt ?? 0) > now),
-  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, shippingIds, pendingIds, scope, now]);
+  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, queuedIds, shippingIds, pendingIds, scope, now]);
 
   // Repeating tasks. They are RULES, on their own channel, which is why nothing
   // in the item list rules has to know they exist. They are read up here, ahead
@@ -3022,6 +3022,8 @@ export default function App() {
   const homeSet = useHomeSettings();
   const [homeOpen, setHomeOpen] = useState(homeOn);
   const darkWindow = useDarkWindow();
+  // The Windows title bar buttons are drawn by the system, in glyphs that have to follow the page.
+  useEffect(() => { if (WINDOWS) window.zero?.windowButtons?.({ dark: darkWindow }); }, [darkWindow]);
   // A sky theme is worn only while the window wears its look.
   const skyPicked = homeOn ? skyTheme(homeSet.skyTheme) : null;
   const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;
@@ -3946,12 +3948,17 @@ export default function App() {
       hint: `Repeats ${repeatTag(rule)}`,
       run: () => { setModal(null); if (search !== null) closeSearch(); openRepeatRef.current?.(rule); },
     })),
-    ...withoutRunsOf(searchThreads(items, q, searchContext).map(({ item }) => item), ruled).map((item) => ({
+    ...(() => {
+      const found = searchThreads(items, q, searchContext);
+      const summaries = new Map(found.map(({ item, summary }) => [item, summary]));
+      const now = Date.now();
+      return withoutRunsOf(found.map(({ item }) => item), ruled).map((item) => ({
       id: `thread-${item.product}-${item.id}`,
       label: threadSearchDetails(item, searchContext).title,
-      hint: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product,
+      ...threadResult(item, { summary: summaries.get(item) ?? '', project: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product, now }),
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); },
-    })),
+      }));
+    })(),
     ...teammateThreadsFound(weekCards, team?.me, q).map((card) => ({
       id: `card-${card.personId}-${card.threadId}`,
       label: card.title ?? '',

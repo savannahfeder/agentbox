@@ -136,7 +136,7 @@ describe('the window', () => {
 
   it('a close or answer held for Z leaves Later at once', () => {
     const later = app.slice(app.indexOf('const snoozed = useMemo(() => ['), app.indexOf('].sort((a, b) => whenShown(a) - whenShown(b))'));
-    expect(later).toMatch(/!shippingIds\.has\(i\.id\) && !pendingIds\.has\(i\.id\)/);
+    expect(later).toMatch(/runOnIt:[^}]*shippingIds\.has\(i\.id\) \|\| pendingIds\.has\(i\.id\)/);
   });
 
   it('a reply taken back puts back the time the store lifted', () => {

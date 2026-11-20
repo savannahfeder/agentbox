@@ -9,9 +9,14 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 // The sandboxed preload runs while the document is still loading, and
 // documentElement is null then. Reading it here throws, and a throw on this
 // line skips the bridge below, so the window draws the canned inbox.
+//
+// Windows draws its own buttons in the top-right corner instead
+// (main/window-buttons.mts), so the band above the pane stays there.
 if (process.platform !== 'darwin') {
   const markFlat = () => {
-    if (document.documentElement) document.documentElement.dataset.window = 'flat';
+    if (!document.documentElement) return;
+    document.documentElement.dataset.window = 'flat';
+    if (process.platform === 'win32') document.documentElement.dataset.windowButtons = 'right';
   };
   if (document.documentElement) markFlat();
   else document.addEventListener('DOMContentLoaded', markFlat);
@@ -188,6 +193,8 @@ contextBridge.exposeInMainWorld('zero', {
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
   // Which appearance the window's glass is drawn in (main/window-glass.mts).
   glassTone: (payload) => ipcRenderer.invoke('zero:glass-tone', payload),
+  // The Windows title bar buttons' glyphs, for a light or dark page (main/window-buttons.mts).
+  windowButtons: (payload) => ipcRenderer.invoke('zero:window-buttons', payload),
   // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the
   // snapshot, so these two are only the verbs: look again now, and restart onto
   // the version that has already downloaded. Nothing here can start a download,

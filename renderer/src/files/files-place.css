@@ -36,7 +36,7 @@
 .fp-folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 10px 22px; margin-top: 18px; }
 .fp-folder {
   position: relative; min-width: 0; height: 56px; display: flex; align-items: center;
-  background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner); transition: border-color .12s ease;
+  background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner);
 }
 .fp-folder:hover, .fp-folder:focus-within { border-color: var(--line-strong); }
 .fp-folder.is-over { border-color: var(--text-faint); background: var(--wash-strong); }
@@ -71,7 +71,7 @@
 /* 16:10, a screenshot's shape, so a picture fills its tile with nothing cut at the sides. */
 .fp-face {
   position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 10; overflow: hidden;
-  background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner); transition: border-color .12s ease;
+  background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner);
 }
 .fp-tile:hover .fp-face, .fp-open-file:focus-visible .fp-face { border-color: var(--line-strong); }
 .fp-face img, .fp-face video { width: 100%; height: 100%; object-fit: cover; display: block; }

@@ -256,8 +256,16 @@ export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null 
   return out;
 }
 
-/** Every process, tagged with its task where it can be: `ps` on a Mac (about 100 ms), /proc on Linux. */
+/**
+ * Whether this computer can tie a program to its task at all. Windows lets no
+ * process read another's environment, and the tag is only ever read from
+ * there, so on Windows nothing is attributed and nothing is stopped.
+ */
+export const seesTaskTags = (platform: string = process.platform) => platform !== 'win32';
+
+/** Every process, tagged with its task where it can be: `ps` on a Mac (about 100 ms), /proc on Linux, none on Windows. */
 export async function listProcesses(platform: string = process.platform): Promise<ProcessRecord[]> {
+  if (!seesTaskTags(platform)) return [];
   if (platform !== 'darwin') return readLinuxProcesses();
   const [base, argv, full] = await Promise.all([
     ps(['-axo', 'pid=,ppid=,rss=,time=,lstart=,comm=']),

@@ -195,7 +195,7 @@ import { StartBudget, cloudStartPressure } from './cloud/start-budget.mts';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
 import { asksToClose } from '../shared/asks-to-close.mts';
 import type { MergeHomeResult } from './cloud/merge-home.mts';
-import { autoSlots, DEFAULTS as MEMORY_GATE, pressureFrom } from './memory-gate.mts';
+import { autoSlots, DEFAULTS as MEMORY_GATE, memoryGateWorksOn, pressureFrom } from './memory-gate.mts';
 import { LeftoverCleaner } from './leftovers.mts';
 import { syncCodexMemoryGate } from './codex-memory-gate.mts';
 import { autoAgents } from './machine.mts';
@@ -1847,10 +1847,10 @@ export class Supervisor {
     // A READING BEFORE THE RESTART WAVE, so the sessions a restart brings back
     // meet the memory hold too rather than all arriving before the first
     // reading does (main/start-hold.mts). One sysctl, a few milliseconds.
-    if (this.config.memoryGate) this._memReading = readMacPressureNow();
+    if (this._memoryGateOn()) this._memReading = readMacPressureNow();
     if (this.shareTools) this._toolHost();
     try { this.recoverInterrupted('startup'); } catch (e) { console.warn('zero: startup recovery:', (e as Error).message); }
-    if (this.config.memoryGate) this.setMemoryGate(true).catch((e) => console.warn('zero: memory gate:', e.message));
+    if (this._memoryGateOn()) this.setMemoryGate(true).catch((e) => console.warn('zero: memory gate:', e.message));
     this.setLeftoverCleanup(!!this.config.cleanupLeftovers).catch((e) => console.warn('zero: leftovers:', e.message));
     this._timer = setInterval(() => this.tick().catch((e) => console.warn('supervisor:', e.message)), POLL_MS);
     this.tick().catch(() => {});
@@ -6447,7 +6447,7 @@ export class Supervisor {
    */
   _machineTotal(): number | null {
     if (this.config.agentsAuto) {
-      return autoAgents({ ...this._machine(), gated: !!this.config.memoryGate, nudge: this.config.agentsNudge });
+      return autoAgents({ ...this._machine(), gated: this._memoryGateOn(), nudge: this.config.agentsNudge });
     }
     const picked = Number(this.config.agentsAtOnce);
     if (!this.config.agentsAuto && Number.isFinite(picked) && picked >= 1) return Math.floor(picked);
@@ -8221,7 +8221,7 @@ export class Supervisor {
     const now = Date.now();
     const swap = !!item && [...this._preempted.values()].some((p) => p.forItem === item.id && p.local !== false);
     const d = startDecision({
-      on: !!this.config.memoryGate,
+      on: this._memoryGateOn(),
       reading: this._memReading,
       recent: this._memRecent ?? [],
       now,
@@ -8264,7 +8264,7 @@ export class Supervisor {
    * short, the rule urgent work already has.
    */
   _memoryLetsLaunch(item: WorkItem | null | undefined, { asked = false }: { asked?: boolean } = {}) {
-    if (!this.config.memoryGate) return true;
+    if (!this._memoryGateOn()) return true;
     const key = String(item?.id ?? '').startsWith('digest-') ? DIGEST_PASS : item?.id;
     const passed = this._letThroughOverdue?.get(key as string);
     // Kept for the whole window, not spent on first use: one launch can ask
@@ -8285,7 +8285,7 @@ export class Supervisor {
    *  thirty, and its silence ages the last reading out (STALE_MS), which
    *  lifts the hold rather than freezing it. */
   _refreshMemoryReading() {
-    if (!this.config.memoryGate) return;
+    if (!this._memoryGateOn()) return;
     const now = Date.now();
     if (this._memReading && now - this._memReading.at < 10_000) return;
     if (this._memReadingSince && now - this._memReadingSince < 30_000) return;
@@ -11779,7 +11779,7 @@ export class Supervisor {
     // spent to protect against spending memory. Chained off the handshake, it
     // costs two calls on a process that was being started regardless, and it runs
     // before any thread of this server exists.
-    if (this.config.memoryGate) {
+    if (this._memoryGateOn()) {
       handshake
         .then(() => this.setCodexMemoryGate(true, home, entry))
         .catch((e) => console.warn(`zero: codex memory gate: ${e.message}`));
@@ -14180,7 +14180,7 @@ export class Supervisor {
 
   /** The hooks for the per-spawn settings file, or null when it is off. */
   memoryGateHooks() {
-    if (!this.config.memoryGate) return null;
+    if (!this._memoryGateOn()) return null;
     const script = unpacked(path.join(this.appDir, 'scripts', 'memory-gate-hook.sh'));
     const quoted = `'${script.replace(/'/g, `'\\''`)}'`;
     // Above the longest wait by ten minutes: a hook that times out lets its
@@ -14196,7 +14196,7 @@ export class Supervisor {
 
   /** Where a worker's hook asks, and who it is asking for. Empty when off. */
   memoryGateEnv(item: WorkItem | null | undefined) {
-    if (!this.config.memoryGate || !item) return {};
+    if (!this._memoryGateOn() || !item) return {};
     return {
       AGENTBOX_GATE_SOCK: this.config.memoryGateSocket || memoryGateSocketPath(),
       AGENTBOX_GATE_ITEM: String(item.id ?? ''),
@@ -14218,7 +14218,7 @@ export class Supervisor {
    * AGENTBOX_GATE_SOCK is absent — which it is everywhere but here.
    */
   codexMemoryGateEnv() {
-    if (!this.config.memoryGate) return {};
+    if (!this._memoryGateOn()) return {};
     return { AGENTBOX_GATE_SOCK: this.config.memoryGateSocket || memoryGateSocketPath() };
   }
 
@@ -14320,7 +14320,10 @@ export class Supervisor {
     });
   }
 
+  _memoryGateOn() { return !!this.config.memoryGate && memoryGateWorksOn(); }
+
   async setMemoryGate(on: boolean) {
+    if (!memoryGateWorksOn()) return;
     if (!on) {
       await this.stopMemoryGate();
       await this.setCodexMemoryGate(false).catch(() => {});

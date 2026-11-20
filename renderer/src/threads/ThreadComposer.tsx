@@ -81,6 +81,7 @@ import { shownTitle } from '../../../shared/thread-title.mts';
 import { dayDeadline, dueFromWords, dueSaid } from '../../../shared/team-tasks.mts';
 import { nameWait } from '../../../shared/thread-waits.mts';
 import { continuedFromLabel } from '../../../shared/thread-continued.mts';
+import { closesOnPress } from '../press';
 
 /** What went out, so the caller can say so and offer the way back. */
 export interface ThreadSent {
@@ -1553,7 +1554,7 @@ export function ThreadComposer({
   );
   if (inline) return box;
   // Closing the box ends its dictation, so a click outside it waits for Stop.
-  return <div className="modal-backdrop tc-veil" onClick={() => { if (!talk.on) onClose(); }}>{box}</div>;
+  return <div className="modal-backdrop tc-veil" {...closesOnPress(() => { if (!talk.on) onClose(); })}>{box}</div>;
 }
 
 /* ------------------------------- glyphs --------------------------------- */

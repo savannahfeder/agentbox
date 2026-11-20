@@ -24,7 +24,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CODE_PATH, linkArtifactPaths, isMediaPath, productPath } from '../renderer/src/remark-artifact-paths.ts';
+import { CODE_PATH, linkArtifactPaths, isMediaPath, productPath, shortPath } from '../renderer/src/remark-artifact-paths.ts';
 import os from 'node:os';
 import { servable, byteRange, mediaResponse, mediaType } from '../main/img-scheme.mts';
 
@@ -172,7 +172,8 @@ describe('the pane draws a player for audio and video', () => {
   });
 
   it('links a full path in backticks into the product folder, the way it does in a sentence', () => {
-    expect(focus).toContain('productPath(shown, productDir)');
+    expect(focus).toContain('shortPath(shown, productDir,');
+    expect(shortPath(`${DIR}/GreatCollections-form-TO-SIGN.pdf`, DIR)).toBe('GreatCollections-form-TO-SIGN.pdf');
     expect(productPath(`${DIR}/GreatCollections-form-TO-SIGN.pdf`, DIR)).toBe('GreatCollections-form-TO-SIGN.pdf');
     expect(productPath(`${DIR}-video/a.pdf`, DIR)).toBe(null);
     expect(productPath('designs/a.pdf', DIR)).toBe(null);

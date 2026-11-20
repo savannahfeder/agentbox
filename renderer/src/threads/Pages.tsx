@@ -53,6 +53,7 @@ import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, c
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
 import type { Offer, OfferGo } from '../cloud-upgrade';
 import { isCause, causeOf, waitingOn, causeWord, causePlace, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../../../shared/causes.mts';
+import { actsOnPress } from '../press';
 import './pages.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no
@@ -521,11 +522,11 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
   const press = (t: TabView) => (states ? (t === 'inbox' ? team!.onNeeds() : states.onTab(t)) : team ? team.onNeeds() : onView(t));
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
-    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} onClick={() => press(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
-    {team && !states && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} onClick={team.onEverything}>{EVERYTHING_ELSE}</button>}
-    {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} onClick={team.today.onToday}>Today</button>}
-    {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} onClick={team.tasks.onTasks}>Tasks</button>}
-    {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} onClick={team.done.onDone}>{DONE.short}</button>}
+    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} {...actsOnPress(() => press(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
+    {team && !states && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} {...actsOnPress(team.onEverything)}>{EVERYTHING_ELSE}</button>}
+    {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} {...actsOnPress(team.today.onToday)}>Today</button>}
+    {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} {...actsOnPress(team.tasks.onTasks)}>Tasks</button>}
+    {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} {...actsOnPress(team.done.onDone)}>{DONE.short}</button>}
     {after}
   </div>{team?.corner}{onSearch && <SearchButton onSearch={onSearch} />}</div>;
 }
