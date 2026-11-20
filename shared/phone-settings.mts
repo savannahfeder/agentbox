@@ -56,7 +56,7 @@ export interface SettingsModel {
     slotsMax?: number;
     slotsSuggested?: number;
     running?: number;
-    memoryGate?: { on?: boolean; slots?: number | null; slotsAuto?: number | null; slotsMax?: number | null; now?: string | null; reading?: unknown };
+    memoryGate?: { on?: boolean; slots?: number | null; slotsAuto?: number | null; slotsMax?: number | null; now?: string | null; reading?: unknown } | null;
     leftovers?: { on?: boolean; now?: string | null };
     accounts?: ClaudeAccountModel[];
     cloudPermission?: unknown;
@@ -490,7 +490,7 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
       slotsMax: w.slotsMax,
       slotsSuggested: w.slotsSuggested,
       running: w.running,
-      memoryGate: { on: !!gate.on, slots: gate.slots ?? null, slotsAuto: gate.slotsAuto ?? null, slotsMax: gate.slotsMax ?? null, now: gate.now ?? null, reading: memoryReadingOf(gate.reading) },
+      memoryGate: w.memoryGate ? { on: !!gate.on, slots: gate.slots ?? null, slotsAuto: gate.slotsAuto ?? null, slotsMax: gate.slotsMax ?? null, now: gate.now ?? null, reading: memoryReadingOf(gate.reading) } : null,
       leftovers: { on: !!w.leftovers?.on, now: w.leftovers?.now ?? null },
       accounts: (w.accounts ?? []).map((a) => ({
         // The desktop's rule (Settings.tsx agentStory): a Claude login is signed in once it has an address.
