@@ -90,7 +90,8 @@ describe('an option pressed with words in the box', () => {
   });
   it('is what the option buttons send, and the helper is told it went', () => {
     const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-    expect(page).toContain("if (o) void send(optionWithNote(o.text.replace(/\\s*\\(recommended\\)\\s*$/i, ''), draft));");
-    expect(page).toContain('api.teamComment({ personId, threadId, text, ...(helping ? { answers: true } : {}) })');
+    // Since round 3 a press picks and the one send carries both (a-helper-picks-an-option-and-says-why-in-one-send).
+    expect(page).toContain('return o ? optionWithNote(o.text.replace(');
+    expect(page).toContain('api.teamComment({ personId, threadId, text, ...(answering ? { answers: true } : {}) })');
   });
 });

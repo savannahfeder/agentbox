@@ -38,6 +38,17 @@ const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
+/** A press on an option picks it; a second press on the picked one sends, as the owner's picker does. */
+export function helperPress(picked: number | null, n: number): { picked: number; send: boolean } {
+  return { picked: n, send: picked === n };
+}
+
+/** The one send: the picked option, then why, in the helper's words. */
+export function helperAnswer(options: readonly { n: number; text: string }[], picked: number | null, draft: string): string {
+  const o = picked === null ? null : options.find((x) => x.n === picked);
+  return o ? optionWithNote(o.text.replace(/\s*\(recommended\)\s*$/i, ''), draft) : draft.trim();
+}
+
 /** A pressed option, with whatever was typed in the box under it. */
 export const optionWithNote = (option: string, draft: string): string => (draft.trim() ? `${option}\n\n${draft.trim()}` : option);
 
@@ -77,7 +88,13 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
   const following = useContext(FollowContext);
   const followed = !!following?.is(card);
 
-  useEffect(() => { setWork(null); setDraft(''); }, [personId, threadId]);
+  // What is typed survives opening one of the thread's files and coming back.
+  const draftKey = `teammate-draft:${personId}:${threadId}`;
+  useEffect(() => { setWork(null); setDraft(sessionStorage.getItem(draftKey) ?? ''); }, [personId, threadId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const write = (text: string) => {
+    setDraft(text);
+    try { if (text) sessionStorage.setItem(draftKey, text); else sessionStorage.removeItem(draftKey); } catch { /* kept for this page only */ }
+  };
   useEffect(() => {
     let live = true;
     api.teamThreadWork({ personId, threadId }).then((w) => { if (live) setWork(w as Work); });
@@ -154,16 +171,17 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
 
-  const send = async (said = draft) => {
-    const text = said.trim();
+  const send = async (said?: string) => {
+    const text = (said ?? helperAnswer(options, picked, draft)).trim();
     if (!text || sending) return;
     setSending(true);
-    const out = await api.teamComment({ personId, threadId, text, ...(helping ? { answers: true } : {}) });
+    const out = await api.teamComment({ personId, threadId, text, ...(answering ? { answers: true } : {}) });
     setSending(false);
     if (!out?.ok) { onNotice(out?.error ?? 'That comment did not send.'); return; }
-    setDraft('');
+    write('');
+    setPicked(null);
     // Their copy starts the agent on it at its next sync (main/team/thread-share.mts).
-    if (helping) { onNotice(`Sent to ${owner}'s agent`); setAnsweredStep(true); }
+    if (answering) { onNotice(`Sent to ${owner}'s agent`); setAnsweredStep(true); setAnsweringKept(false); }
     setReread((n) => n + 1);
     following?.follow(card);
   };
@@ -187,14 +205,23 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
   // Asked to help with a step, what they write answers it on the owner's agent.
   const helping = answersTheStep(card, team?.me ?? null);
   const options = helping ? optionsToAnswer({ events, outcome: built.outcome }) : [];
-  const box = helping ? `Answer for ${owner}'s agent` : `Comment to ${owner}`;
+  // Once asked, the box stays an answer until it sends, whatever arrives meanwhile.
+  const [answeringKept, setAnsweringKept] = useState(false);
+  useEffect(() => { setAnsweringKept(false); setPicked(null); }, [personId, threadId]);
+  useEffect(() => { if (helping) setAnsweringKept(true); }, [helping]);
+  const answering = helping || answeringKept;
+  const [picked, setPicked] = useState<number | null>(null);
+  const box = answering ? `Answer for ${owner}'s agent` : `Comment to ${owner}`;
+  const replyBox = useRef<HTMLTextAreaElement>(null);
   // Until their copy takes the answer up, the header says it went rather than the wait it ended.
   const [answeredStep, setAnsweredStep] = useState(false);
   useEffect(() => { setAnsweredStep(false); }, [personId, threadId]);
   const sentToAgent = answeredStep && !helping && card.state !== 'running' && card.state !== 'done';
   const pickOption = (n: number) => {
-    const o = options.find((x) => x.n === n);
-    if (o) void send(optionWithNote(o.text.replace(/\s*\(recommended\)\s*$/i, ''), draft));
+    const press = helperPress(picked, n);
+    setPicked(press.picked);
+    if (press.send) void send(helperAnswer(options, press.picked, draft));
+    else replyBox.current?.focus();
   };
   const pickRef = useRef<HTMLButtonElement>(null);
   // 1-9 picks, as on the owner's own page, unless a box has the keys.
@@ -271,16 +298,16 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
           )}
           {/* Out of the form, whose button styles would square its rows. */}
           {options.length > 0 && !reviewing && <OptionsOffer bare ask="" askAll="" options={options} peekOption={null} askPeek={false}
-            selectedOption={null} selRef={pickRef} onPick={pickOption}
+            selectedOption={picked} selRef={pickRef} onPick={pickOption}
             onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />}
           {reviewing ? (
             <SendBack owner={owner} note={review.note} notes={myOpenNotes} face={<Face person={team?.me ? team.byId.get(team.me) : null} me />} onSend={sendBack} />
           ) : <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
-              <textarea value={draft} rows={2} placeholder={box} aria-label={box}
-                onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
-              <button type="submit" disabled={!draft.trim() || sending}>{helping ? `Send to ${owner}'s agent` : `Send to ${owner}`}</button>
+              <textarea ref={replyBox} value={draft} rows={2} placeholder={box} aria-label={box}
+                onChange={(e) => write(e.target.value)} onKeyDown={onKey} />
+              <button type="submit" disabled={!helperAnswer(options, picked, draft) || sending}>{answering ? `Send to ${owner}'s agent` : `Send to ${owner}`}</button>
             </div>
           </form>}
         </section>
