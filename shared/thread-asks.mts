@@ -125,7 +125,7 @@ export function handedBackWords({ kind, name, verdict, words, asked = null }: { 
 export function askBody({ kind, owner, note, step }: { kind: AskKind; owner: string; note: string; step?: string | null }): string {
   // The line over the message says who asked and what for; this says only what it means.
   const lead = kind === 'help'
-    ? `What you write on this thread goes to ${owner}'s agent until you hand it back.`
+    ? `What you write on ${owner}'s thread goes to ${owner}'s agent until you hand it back.`
     : 'Say whether it looks good or what to change.';
   const quoted = step?.trim() ? step.trim().split('\n').map((l) => `> ${l}`).join('\n') : '';
   return [note.trim(), quoted, lead].filter(Boolean).join('\n\n');

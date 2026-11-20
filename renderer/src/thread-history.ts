@@ -576,6 +576,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
           askedACommand = false;
           continue;
         }
+        // Nor is a teammate's hand-back, which holds the thread for you the same way.
+        if (line.source === 'system' && events.at(-1)?.from && events.at(-1)?.field === 'answer') continue;
         // HER OWN BLOCKED IS NOT THE AGENT STOPPING. She has no control that
         // writes it; the one thing that does is a Z putting a row back where
         // her reply found it (`withdrawReply`), and it read as "It stopped and

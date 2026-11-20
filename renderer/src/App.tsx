@@ -2552,6 +2552,8 @@ export default function App() {
   const progress = useMemo(() => [
     ...items.filter((i) => {
       if (scope && i.product !== scope) return false;
+      // Your thread says who has it; the task the ask sent them is not a second row.
+      if (askIGave(i, team?.me ?? null)) return false;
       const deferredUntil = dueAt(i);
       if (hiddenAt(i) > now && !liveIds.has(i.id)) return false;
       // The grace window: the write waits for Z, the signal must not, because a
@@ -2633,9 +2635,9 @@ export default function App() {
   // In progress until it does (w-bc976fd247).
   const done = useMemo(() => {
     const needsYou = new Set(inbox.map((i) => i.id));
-    return items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done')
+    return items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !askIGave(i, team?.me ?? null))
       .sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [items, scope, inbox, liveIds, shippingIds]);
+  }, [items, scope, inbox, liveIds, shippingIds, team?.me]);
 
   // Scheduled is the future inbox: everything waiting for its moment, soonest
   // first. The view only exists while something is in it. It holds two things

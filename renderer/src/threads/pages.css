@@ -555,7 +555,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-comment-box { display: flex; align-items: flex-start; gap: 10px; padding: 10px 10px 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--wash); }
 .tp-comment-box:focus-within { border-color: var(--text-faint); }
 .tp-comment-box > .tm-av { margin-top: 5px; }
-.th-comment textarea { flex: 1; min-width: 0; padding: 6px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; line-height: 20px; resize: none; }
+.th-comment textarea { flex: 1; min-width: 0; padding: 6px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; line-height: 20px; resize: none; field-sizing: content; min-height: 40px; max-height: 240px; overflow-y: auto; }
 .th-comment textarea:focus { outline: none; }
 .th-comment button { height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
 .th-comment button:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
