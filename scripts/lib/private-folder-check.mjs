@@ -1,6 +1,5 @@
-// What the ship and the change card check before running git in a task's
-// private checkout. Reads files only: the app's own process imports it
-// (main/git-change.mts), so nothing here may start a process.
+// What the ship checks before running git in a task's private checkout. Reads
+// files only.
 
 import fs from 'node:fs';
 import path from 'node:path';
