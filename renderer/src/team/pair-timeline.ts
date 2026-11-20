@@ -127,5 +127,10 @@ export function pairLine(e: PairEntry, me: string, nameOf: (id: string) => strin
   if (e.kind === 'handoff') return `Handed ${whom} a thread`;
   if (e.kind === 'help') return `Asked ${whom} to help`;
   if (e.kind === 'review') return `Asked ${whom} for a review`;
-  return e.text;
+  return linksAsWords(e.text);
+}
+
+/** These lines are drawn as plain words, so a Markdown link shows its words; where it leads is the button under the line. */
+export function linksAsWords(text: string): string {
+  return text.replace(/\[([^\]\n]+)\]\((?:https?:\/\/|\/)[^)\s]+\)/g, '$1');
 }

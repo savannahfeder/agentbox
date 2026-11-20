@@ -36,6 +36,7 @@ import { sendKeyFor } from '../../reply-keys';
 import { I } from './icons';
 import type { MessageMarks } from '../decisions';
 import { LINE_MISSING } from '../../reveal-line';
+import { readDraft, saveDraft } from '../../drafts';
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { clockOf } from '../../teammates/chat-lines';
@@ -409,9 +410,6 @@ function useStick(deps: unknown[]) {
   return ref;
 }
 
-// What you are writing in each room, kept while you go and look at another.
-const drafts = new Map<string, string>();
-
 // A file dragged in arrives as a path on this Mac rather than as bytes.
 async function base64Of(a: PendingAttachment): Promise<string | null> {
   if (a.dataBase64) return a.dataBase64;
@@ -502,8 +500,9 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   onNotice?: (text: string) => void;
   onEditLast: () => void;
 }) {
-  const draftKey = `${roomId}:${placeholder}`;
-  const [text, setText] = useState(() => drafts.get(draftKey) ?? '');
+  // What you are writing in each room, kept while you look at another and through a restart.
+  const draftAt = useMemo(() => ({ product: `room:${roomId}`, id: placeholder }), [roomId, placeholder]);
+  const [text, setText] = useState(() => readDraft(draftAt));
   const [plain, setPlain] = useState('');
   const [caret, setCaret] = useState(0);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
@@ -512,7 +511,7 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   const [pick, setPick] = useState(0);
   const ref = useRef<RichBox | null>(null);
   const filePicker = useRef<HTMLInputElement>(null);
-  useEffect(() => { drafts.set(draftKey, text); }, [draftKey, text]);
+  useEffect(() => { saveDraft(draftAt, text); }, [draftAt, text]);
   // A chat that is the page, or a thread opened to reply in: its box takes the typing, not the app's letter keys.
   useEffect(() => { if (takesTyping) requestAnimationFrame(() => ref.current?.focus()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // "@" then letters at the caret opens the people in the room.
@@ -584,7 +583,6 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
       setAttachments((now) => now.filter((a) => !files.some((f) => f === a || (f.draftId && f.draftId === a.draftId))));
       setFailed(false);
       failedWith.current = null;
-      drafts.delete(draftKey);
     } catch (e) {
       if (marked) void sendTurnedBack(voiceKey, files.map((a) => a.draftId));
       setFailed(true);

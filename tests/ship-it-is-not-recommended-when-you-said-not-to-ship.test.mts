@@ -49,6 +49,16 @@ describe('when the agent says the change is not ready', () => {
     expect(agentSaidNotReady('It is not yet ready to merge.')).toBe(true);
     // Round eight: "shared durable storage is required before production and nothing shipped".
     expect(agentSaidNotReady('Shared durable storage is required before production, so nothing shipped.')).toBe(true);
+    // Round eleven: both testers were offered "Ship it, recommended" under these.
+    expect(agentSaidNotReady('Before shipping, I recommend rejecting invalid timestamps on new bookings.')).toBe(true);
+    expect(agentSaidNotReady('The full suite has a failure in the export test, and the retry store is in memory.')).toBe(true);
+    expect(agentSaidNotReady('Two tests failed: the export test and the refund test.')).toBe(true);
+    expect(agentSaidNotReady('Coordinate durable storage with Sam before it goes to production.')).toBe(true);
+  });
+  it('does not read a passing suite or a past fix as not ready', () => {
+    expect(agentSaidNotReady('0 tests failed and 41 passed.')).toBe(false);
+    expect(agentSaidNotReady('The test that failed before now passes.')).toBe(false);
+    expect(agentSaidNotReady('I ran the suite before committing. Everything passes.')).toBe(false);
   });
   it('does not hold it for a change that is ready, or one committed without pushing', () => {
     expect(agentSaidNotReady('Committed on the branch without pushing. Ready to ship.')).toBe(false);

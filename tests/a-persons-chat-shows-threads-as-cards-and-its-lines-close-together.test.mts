@@ -93,3 +93,31 @@ describe('a person\'s or a group\'s chat', () => {
     expect(rule('.app.doc-open .gr-page .rm-compose')).toMatch(/grid-template-columns: minmax\(0, 1fr\);/);
   });
 });
+
+// Round eleven: "Started on this in a thread of my own: [Overlapping appointments
+// bug investigation](https://app.agentbox.ac/t/…)" was drawn with its brackets
+// and the whole address across two lines.
+describe('a line of what passed between you', () => {
+  it('shows a Markdown link as its words', async () => {
+    const { linksAsWords } = await import('../renderer/src/team/pair-timeline.ts');
+    expect(linksAsWords('Started on this in a thread of my own: [Overlapping appointments](https://app.agentbox.ac/t/a/w-557f3877ba)'))
+      .toBe('Started on this in a thread of my own: Overlapping appointments');
+    expect(linksAsWords('See [the table](/t/a/w-1234567890) and [notes](https://example.com/n).')).toBe('See the table and notes.');
+  });
+  it('leaves brackets that are not a link alone', async () => {
+    const { linksAsWords } = await import('../renderer/src/team/pair-timeline.ts');
+    expect(linksAsWords('Use [x] for done (see list)')).toBe('Use [x] for done (see list)');
+  });
+});
+
+// Round eleven: a reply typed in the person chat, sent while the app could not
+// reach the cloud, was gone after the app restarted. The box kept its words in
+// memory only.
+describe('the chat box', () => {
+  it('keeps what you are writing in the draft store, which outlives a restart', () => {
+    const src = fs.readFileSync(new URL('../renderer/src/team/rooms/RoomChat.tsx', import.meta.url), 'utf8');
+    expect(src).toContain("const [text, setText] = useState(() => readDraft(draftAt));");
+    expect(src).toContain('useEffect(() => { saveDraft(draftAt, text); }, [draftAt, text]);');
+    expect(src).not.toContain('new Map<string, string>()');
+  });
+});

@@ -139,7 +139,14 @@ const HOLD_IT = /\b(?:do not|don['’]t|dont|never|without)\s+(?:merg(?:e|ing)|s
 export const saidNotToShip = (...words: readonly (string | null | undefined)[]): boolean => words.some((w) => HOLD_IT.test(w ?? ''));
 
 // And the agent saying the change is not ready. Its usual "committed without pushing" is not that.
-const NOT_READY = /\bnot (?:yet )?(?:production[- ]ready|ready to (?:ship|merge|deploy|go out))\b|\brequired before (?:production|it ships|shipping)\b/i;
+const NOT_READY = new RegExp([
+  String.raw`\bnot (?:yet )?(?:production[- ]ready|ready to (?:ship|merge|deploy|go out))\b`,
+  String.raw`\brequired before (?:production|it ships|shipping)\b`,
+  String.raw`\bbefore (?:shipping|it ships|merging|deploying|(?:it )?goes to production|production)\b,? (?:I|we) (?:recommend|suggest|need|would)`,
+  String.raw`\bbefore (?:it )?goes to production\b`,
+  String.raw`\bsuite (?:has|had) (?:a |one |\d+ )?failures?\b`,
+  String.raw`\b(?:[1-9]\d*|one|two|three|four|five|several|some) (?:tests? )?(?:failed|fail|failing)\b`,
+].join('|'), 'i');
 export const agentSaidNotReady = (result: string | null | undefined): boolean => NOT_READY.test(result ?? '');
 
 export function shipOfferFor(stands: Standing, onlyFiles?: readonly string[] | null, { held = false }: { held?: boolean } = {}): { ask: string; options: ParsedOption[]; headed: boolean } | null {

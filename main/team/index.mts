@@ -15,7 +15,7 @@ import path from 'node:path';
 import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mts';
 import { createThreadShare } from './thread-share.mts';
 import { createAsks, type TellThread } from './asks.mts';
-import { changePath } from '../code-change.mts';
+import { changePath, readChangeSummary } from '../code-change.mts';
 import { askBody, askIsOpen, askOf, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
@@ -559,6 +559,16 @@ export function createTeamService({
       else files.push({ rel, name: shownName(rel), srcPath: real });
     }
     return { words, files, tooBig };
+  }
+
+  // The code a thread's agent changed lives only on this computer, so it goes with an ask or a hand-over.
+  function changeOfThread(product: TeamProduct, id: string, title: string) {
+    const file = machineryPath(product.dir, changePath(id));
+    if (!fs.existsSync(file)) return { files: [], loose: false, name: '' };
+    const name = `${shortTitle(title) || 'the'} change.change`;
+    let loose = false;
+    try { loose = readChangeSummary(file).uncommitted === true; } catch { /* unreadable: say nothing about it */ }
+    return { files: [{ name, srcPath: file }], loose, name };
   }
 
   // THE TEAM THIS MAC IS IN IS THE ONE IT REMEMBERS. Found by review
@@ -1314,9 +1324,12 @@ export function createTeamService({
       if (!person) throw new Error('that person is not on your team');
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
+      const change = changeOfThread(product, id, String(row.label || row.title || ''));
+      const giver = state.me.name?.split(/\s+/)[0] || 'the giver';
+      const loose = change.loose ? `Not committed yet: this work is only on ${giver}'s computer. Every edit the agent made is in ${change.name}, attached.` : '';
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
       // What the giver wants from them comes first, over the thread's own words.
-      const brief = [String(note ?? '').trim(), words, left].filter(Boolean).join('\n\n');
+      const brief = [String(note ?? '').trim(), words, loose, left].filter(Boolean).join('\n\n');
       // The task leads back to the thread, opened to them as Share's Send opens it.
       const seen = seenNow(row, product, kept().getSince(state.me.id));
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
@@ -1324,7 +1337,7 @@ export function createTeamService({
       const made = await this.giveTask(to, {
         title: row.label || row.title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
-        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files,
+        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...change.files, ...files],
       });
       // As your own words: a note would be drawn as the agent's checkpoint.
       const said = String(note ?? '').trim();
@@ -1352,9 +1365,7 @@ export function createTeamService({
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const title = String(row.label || row.title || 'A thread');
       const link = threadLink(state.me.id, id);
-      // The code it changed and the files it made live only on this computer; they go with the ask so they can be read.
-      const change = machineryPath(product.dir, changePath(id));
-      const files = [...(fs.existsSync(change) ? [{ name: `${shortTitle(title) || 'the'} change.change`, srcPath: change }] : []), ...briefOfThread(row, product).files];
+      const files = [...changeOfThread(product, id, title).files, ...briefOfThread(row, product).files];
       const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', helper: person.name?.split(/\s+/)[0] || null, note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,

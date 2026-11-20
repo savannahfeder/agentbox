@@ -19,6 +19,8 @@ import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mts';
 import { isGivenTask } from '../shared/team-rules.mts';
 import { TeammateCard } from '../renderer/src/threads/Summary.tsx';
+import { machineryPath } from '../main/store/home.mts';
+import { changePath } from '../main/code-change.mts';
 globalThis.React = React;
 
 async function aMac(cloud: ReturnType<typeof createMemoryCloud>, personId: string) {
@@ -46,9 +48,14 @@ beforeEach(async () => {
 });
 afterEach(async () => { disk.setLineAuthor(null); await theo.service.signOut(); await lena.service.signOut(); });
 
-async function handed(progress?: string) {
+async function handed(progress?: string, change?: { uncommitted: boolean }) {
   const t = theo.store.composeItem('api', { title: 'Retries charge twice', body: 'Find why a retried payment charges twice.' });
   if (progress !== undefined) disk.updateWorkItem(theo.dir, t.id, { progress }, { source: 'agent' });
+  if (change) {
+    const file = machineryPath(theo.dir, changePath(t.id));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ item: t.id, files: [], committed: !change.uncommitted, uncommitted: change.uncommitted }));
+  }
   theo.store.recordSessionResult('api', t.id, { result: 'The retry path skips the key check.' });
   await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
   for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
@@ -64,6 +71,17 @@ describe('the task a hand-over makes', () => {
     const task = await handed();
     expect(task.body).not.toContain('already tried');
     expect(task.body).toContain('Where it got to:');
+  });
+  it('says the work is not committed and carries every edit with it', async () => {
+    // Round eleven: the receiver's agent could not find the test the summary named; it was only on the giver's computer.
+    const task = await handed('Added a focused test', { uncommitted: true });
+    expect(task.body).toContain("Not committed yet: this work is only on Theo's computer. Every edit the agent made is in Retries charge twice change.change, attached.");
+    expect(task.body).toMatch(/\]\(attachments\/[^)]*change\.change\)/);
+  });
+  it('says nothing of it when the work is committed, and still carries the change', async () => {
+    const task = await handed('Added a focused test', { uncommitted: false });
+    expect(task.body).not.toContain('Not committed');
+    expect(task.body).toMatch(/change\.change\)/);
   });
   it('says nothing about it when the list is only blank lines', async () => {
     const task = await handed('\n  \n');
