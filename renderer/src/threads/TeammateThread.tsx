@@ -206,7 +206,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
       </header>
       <div className="tp-grid">
         <section className="th-work" aria-label="The conversation">
-          {ask && onHandBack && <AskBar task={ask} owner={person} onHandBack={onHandBack} />}
+          {ask && onHandBack && <AskBar task={ask} owner={person} onHandBack={onHandBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
           {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
           {work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
           <FileMarkOpener.Provider value={openMark}>

@@ -8538,7 +8538,8 @@ export default function App() {
                   asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
                   asksSlot={!team ? null : focused.ask && focused.assignee === team.me && focused.status !== 'done'
                     ? <AskBar task={focused} owner={team.byId.get(focused.ask.owner) ?? null} onHandBack={(verdict, words) => handAskBack(focused, verdict, words)}
-                      onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />
+                      onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)}
+                      onOpenChange={(src) => setOpenDoc({ product: focused.product, src, readOnly: true })} />
                     : focused.ask && focused.ask.owner === team.me
                     ? <AskSentLine task={focused} onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />
                     : <AsksLine item={focused} items={items} onTakeBack={(task) => { void takeAskBack(task); }} />}

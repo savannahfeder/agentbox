@@ -8,11 +8,18 @@ import './asks.css';
 
 type Verdict = 'done' | 'yes' | 'changes';
 
-export function AskBar({ task, owner, onHandBack, onOpenThread }: {
+/** The code change an ask carries (main/team/index.mts askTeammate), as a path in the task's project. */
+export function askChange(task: Pick<WorkItem, 'body'>): string | null {
+  return /\]\((attachments\/[^)\s]+\.change)\)/.exec(String(task.body ?? ''))?.[1] ?? null;
+}
+
+export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange }: {
   task: WorkItem;
   owner: Person | null;
   onHandBack: (verdict: Verdict, words: string) => Promise<boolean>;
   onOpenThread?: () => void;
+  /** Opens the change it carries, when it carries one. */
+  onOpenChange?: (src: string) => void;
 }) {
   const [giving, setGiving] = useState<Verdict | null>(null);
   const [words, setWords] = useState('');
@@ -20,6 +27,7 @@ export function AskBar({ task, owner, onHandBack, onOpenThread }: {
   const ask = task.ask;
   if (!ask) return null;
   const first = firstName(owner) || 'Your teammate';
+  const change = onOpenChange ? askChange(task) : null;
   const back = async () => {
     if (!giving || busy) return;
     setBusy(true);
@@ -50,6 +58,7 @@ export function AskBar({ task, owner, onHandBack, onOpenThread }: {
       ) : (
         <div className="ask-bar-acts">
           {onOpenThread && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
+          {change && <button type="button" className={onOpenThread ? 'quiet' : undefined} onClick={() => onOpenChange?.(change)}>View the change</button>}
           {ask.kind === 'review'
             ? <>
               <button type="button" className={onOpenThread ? 'quiet' : undefined} onClick={() => setGiving('yes')}>Looks good</button>

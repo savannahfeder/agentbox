@@ -28,6 +28,7 @@ import { askIGave, askOnMe, asksOnThread, handedBackAsks, handedBackBy, handedBa
 import { GiveSheet } from '../renderer/src/threads/SharePanel.tsx';
 import { machineryPath } from '../main/store/home.mts';
 import { byWorkHere } from '../renderer/src/thread-commands.ts';
+import { AskBar, askChange } from '../renderer/src/team/AskBar.tsx';
 import { changePath } from '../main/code-change.mts';
 
 async function aMac(cloud, personId, tellThread) {
@@ -123,6 +124,14 @@ describe('an ask for a review', () => {
     await sam.service.askTeammate({ product: 'api', id: t.id, to: theo.personId, kind: 'review' });
     await both();
     expect(theTask().body).toMatch(/\(attachments\/[\w.-]*Add-a-health-endpoint-change\.change\)/);
+  });
+
+  // Round three: Theo opened Sam's thread to review and found no way to the change.
+  it('the bar on the thread names the change it carries, and nothing when it carries none', () => {
+    expect(askChange({ body: 'Review\n\n[Health change.change](attachments/ab12cd34ef56-Health-change.change)' })).toBe('attachments/ab12cd34ef56-Health-change.change');
+    expect(askChange({ body: 'Review\n\n[plan.md](attachments/x-plan.md)' })).toBeNull();
+    const html = renderToStaticMarkup(h(AskBar, { task: { id: 't', product: 'dm', productName: '', ask: { kind: 'review', owner: 'sam', thread: 'w', product: 'api' }, body: '[c](attachments/x.change)' }, owner: null, onHandBack: async () => true, onOpenChange() {} }));
+    expect(html).toContain('View the change');
   });
 
   it('carries nothing when the thread changed no code', async () => {
