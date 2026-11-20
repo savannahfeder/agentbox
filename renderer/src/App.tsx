@@ -7707,7 +7707,7 @@ export default function App() {
         ? await roomsUi.startChat(to[0], team?.byId.get(to[0])?.name ?? 'Chat', words).then((error) => ({ ok: !error, error: error ?? undefined }))
         : await api.teamMessage(to.length === 1 ? to[0] : to, words);
       // Help and review leave it yours, waiting on them, with what you asked on it.
-      const waits = out.ok && asks ? await api.threadEdit(item.product, item.id, askedPatch(to, askedSaid(asks, names, note), Date.now())) : null;
+      const waits = out.ok && asks ? await api.threadEdit(item.product, item.id, askedPatch(to, askedSaid(asks, names, note), Date.now(), asks)) : null;
       const sent = asks === 'help' ? `Asked ${names} for help` : asks === 'review' ? `Sent to ${names} for review` : `Sent to ${names}`;
       showToast(!out.ok ? (out.error ?? `It did not reach ${names}.`) : waits && !waits.ok ? (waits.error ?? 'It went, but the wait did not save.') : sent, out.ok ? { product: item.product, id: item.id } : undefined);
       if (out.ok && to.length === 1) { try { localStorage.setItem(SHARE_LAST, to[0]); } catch { /* the menu just names the first */ } }

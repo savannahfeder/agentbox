@@ -32,7 +32,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { asksForYourWords, cellUnderTab, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
+import { asksForYourWords, cellUnderTab, givenBy, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -813,7 +813,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // places on one row is what the column was drawn to end. `FreeAgentContext`
   // is untouched and still decides whether the cloud offers itself.
   const handed = team ? handedBy(item, product ?? undefined, team.me) : null;
-  const handedFace = handed ? <span className="tq-from"><Face person={team?.byId.get(handed.from) ?? null} /><b>{nameFirst(handed.from)}</b></span> : null;
+  const from = handed?.from ?? (team ? givenBy(item, allItems ?? [], team.me) : null);
+  const handedFace = from ? <span className="tq-from"><Face person={team?.byId.get(from) ?? null} /><b>{nameFirst(from)}</b></span> : null;
   const commented = (handed?.note ?? null) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? linkCommentLine(item.linkComments)

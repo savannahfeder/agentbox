@@ -56,13 +56,33 @@ export function askedSaid(want: 'help' | 'review', names: string, note: string):
 }
 
 /** The edit that leaves the thread yours, waiting on them, saying what you asked. */
-export const askedPatch = (to: readonly string[], said: string, now: number) => ({ blockedBy: to.map(personWait), asked: { said, at: now } });
+export const askedPatch = (to: readonly string[], said: string, now: number, want: 'help' | 'review') => ({ blockedBy: to.map(personWait), asked: { said, at: now, want } });
+
+export interface AskedItem {
+  status?: string;
+  blockedBy?: readonly string[];
+  asked?: { said: string; at?: number; want?: 'help' | 'review' } | null;
+  wrote?: Record<string, { ts?: number; source?: string } | undefined>;
+}
 
 /** What you asked, while the wait it set is still the thread's wait. */
-export function askedNow(item: { status?: string; blockedBy?: readonly string[]; asked?: { said: string } | null; wrote?: Record<string, { ts?: number; source?: string } | undefined> } | null | undefined): string | null {
+export function askedOf(item: AskedItem | null | undefined): { said: string; at: number; want: 'help' | 'review' | null } | null {
   if (!item?.asked?.said || !setByPerson(item)) return null;
-  return (item.wrote?.asked?.ts ?? 0) >= (item.wrote?.blockedBy?.ts ?? Infinity) ? item.asked.said : null;
+  if ((item.wrote?.asked?.ts ?? 0) < (item.wrote?.blockedBy?.ts ?? Infinity)) return null;
+  return { said: item.asked.said, at: item.asked.at ?? item.wrote?.asked?.ts ?? 0, want: item.asked.want ?? null };
 }
+
+export const askedNow = (item: AskedItem | null | undefined): string | null => askedOf(item)?.said ?? null;
+
+/** Their words answer the step: the owner asked them for help with it, and they wrote after. */
+export function helpAnswers(item: AskedItem | null | undefined, by: string, at: number): boolean {
+  const asked = askedOf(item);
+  return asked?.want === 'help' && at > asked.at && !!item!.blockedBy?.includes(personWait(by));
+}
+
+/** On the helper's copy: the card says its owner waits on this person to answer a step. */
+export const answersTheStep = (card: { blockedBy?: readonly { id: string; want?: string }[] } | null | undefined, me: string | null): boolean =>
+  !!me && !!card?.blockedBy?.some((b) => b.id === personWait(me) && b.want === 'help');
 
 /** The message a step link names on the teammate's copy of the thread: the newest one written by then. */
 export function stepLine(events: readonly { kind?: string; at: number; uid?: string; message?: boolean; who?: string }[], at: number): string | null {

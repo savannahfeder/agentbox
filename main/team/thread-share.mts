@@ -23,6 +23,7 @@ import path from 'node:path';
 import { artifactRoots, resolveArtifact } from '../artifact-path.mts';
 import { bytesOf, hideSecrets } from '../../shared/phone-snapshot.mts';
 import { isShared, runnerOf } from '../../shared/team-rules.mts';
+import { helpAnswers, type AskedItem } from '../../shared/thread-ask.mts';
 import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, threadFiles } from '../../shared/artifact-marks.mts';
 import { saveNextVersion } from '../file-version.mts';
 import { MAX_MESSAGE_FILE_BYTES } from './sync.mts';
@@ -629,8 +630,15 @@ export function createThreadShare({
       if (!thread) continue;
       // The name is for the owner's agent, which has no team list to look it up in.
       const name = nameOf(c.by);
+      // Asked to help with this step, their words are its answer: the owner's agent runs on them.
+      const answers = helpAnswers(thread.item as AskedItem, c.by, c.at);
+      const reopen = thread.item.status === 'done' || thread.item.status === 'blocked' ? { status: 'open' } : {};
+      const first = String(name ?? '').split(/\s+/)[0] || 'A teammate';
       added += disk.appendForeignLines(thread.product.dir, [{
-        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
+        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`,
+        patch: answers
+          ? { answer: c.text, from: { teammate: c.by, name: name || 'A teammate' }, blockedBy: [], waitEnded: { said: `${first} answered this step`, at: now() }, ...reopen }
+          : { comment: { text: c.text, ...(name ? { name } : {}) } },
       }]);
       delivered.add(c.id);
     }

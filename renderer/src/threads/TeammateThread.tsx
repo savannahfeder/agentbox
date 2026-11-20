@@ -27,7 +27,8 @@ import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Pers
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
-import { stepLine } from '../../../shared/thread-ask.mts';
+import { answersTheStep, stepLine } from '../../../shared/thread-ask.mts';
+import { parseOptions } from '../format';
 import { revealLine } from '../reveal-line';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -139,8 +140,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
 
-  const send = async () => {
-    const text = draft.trim();
+  const send = async (said = draft) => {
+    const text = said.trim();
     if (!text || sending) return;
     setSending(true);
     const out = await api.teamComment({ personId, threadId, text });
@@ -154,6 +155,11 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
   };
   const owner = firstName(person) || 'Someone';
+  // Asked to help with a step, what they write answers it on the owner's agent.
+  const helping = answersTheStep(card, team?.me ?? null);
+  const lastAsk = [...events].reverse().find((e) => e.who === 'agent' && e.message);
+  const options = helping ? parseOptions((lastAsk as { words?: string } | undefined)?.words) : [];
+  const box = helping ? `Answer for ${owner}'s agent` : `Comment to ${owner}`;
   const openMark = useCallback((link: FileMarkLink) => setBig({ file: link.file, note: link.id, at: Date.now() }), []);
   const files = useMemo(() => filesOnThread(work?.lines ?? [], marks.notes).map((f) => ({
     ...f, open: () => open(f.src),
@@ -216,11 +222,14 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
             </div>
           )}
           <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+            {options.length > 0 && <div className="tp-options" role="group" aria-label="The agent's options">
+              {options.map((o) => <button key={o.n} type="button" disabled={sending} onClick={() => void send(o.text.replace(/\s*\(recommended\)\s*$/i, ''))}>{o.n}. {o.text}</button>)}
+            </div>}
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
-              <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
+              <textarea value={draft} rows={2} placeholder={box} aria-label={box}
                 onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
-              <button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>
+              <button type="submit" disabled={!draft.trim() || sending}>{helping ? `Send to ${owner}'s agent` : `Send to ${owner}`}</button>
             </div>
           </form>
         </section>

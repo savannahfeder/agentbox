@@ -104,7 +104,7 @@ export type WorkItemPatch = {
   shippedAt?: number;
   waitEnded?: SaidAt;
   handedOver?: SaidAt;
-  asked?: SaidAt;
+  asked?: SaidAt & { want?: 'help' | 'review' };
   linkComment?: LinkComment;
   linkReply?: { file: string; text: string };
   comment?: { text: string; name?: string };
@@ -823,7 +823,13 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       const text = str(value.text, MAX_TEXT_BYTES);
       return file && text ? { file, text } : undefined;
     }
-    case 'waitEnded': case 'handedOver': case 'asked': {
+    case 'asked': {
+      if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
+      const said = str((value as Fields).said, MAX_SUMMARY);
+      const want = (value as Fields).want === 'help' || (value as Fields).want === 'review' ? (value as Fields).want : undefined;
+      return said ? { said, at: Math.trunc((value as Fields).at as number), ...(want ? { want } : {}) } : undefined;
+    }
+    case 'waitEnded': case 'handedOver': {
       if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
       const said = str((value as Fields).said, MAX_SUMMARY);
       return said ? { said, at: Math.trunc((value as Fields).at as number) } : undefined;

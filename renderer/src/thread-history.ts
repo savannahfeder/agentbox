@@ -456,7 +456,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     if (has(patch, 'answer') && Array.isArray(patch!.fromNotes) && !typed) continue;
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
-      events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from });
+      // A person asked to help with a step answers it through a comment (main/team/thread-share.mts).
+      const answered = String(line.uid ?? '').startsWith('comment-');
+      events.push({ at, who: 'agent', said: answered ? `${from} answered` : `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from });
       continue;
     }
     if (has(patch, 'answer')) {

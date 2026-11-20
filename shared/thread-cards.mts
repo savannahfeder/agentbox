@@ -17,6 +17,7 @@
 //                from user research): not a wordless one, not a count.
 
 import { shownPriority } from './rank.mts';
+import { askedOf } from './thread-ask.mts';
 import { isShared, isTaskRow, runnerOf, taskGiver } from './team-rules.mts';
 import { deadlineOf, type TaskRow } from './team-tasks.mts';
 import { isShippedNote } from './shipped-note.mts';
@@ -47,7 +48,8 @@ export interface CardItem extends TaskRow {
 
 export type ProjectSeen = { personal?: boolean; seenBy?: string; seenByPeople?: readonly string[] } | null | undefined;
 export type Visibility = 'team' | 'people' | 'private';
-type Linked = { id: string; title: string | null };
+// `want` on a wait for a person: what the owner asked of them (shared/thread-ask.mts).
+type Linked = { id: string; title: string | null; want?: 'help' | 'review' };
 
 // A type, not an interface, so it goes up among the cloud's cards (main/team/sync.mts SyncCard).
 export type OwnCard = {
@@ -389,6 +391,7 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     }
   }
   const linked = (ids: unknown): Linked[] => (Array.isArray(ids) ? ids : []).map((id) => ({ id, title: titleOf.get(id) ?? null }));
+  const withWant = (all: Linked[], want: 'help' | 'review' | null | undefined) => (want ? all.map((l) => (l.id.startsWith('person:') ? { ...l, want } : l)) : all);
   const kept = startOfDay(now - FINISHED_CARDS_KEPT_MS);
   for (const { item, product } of all) {
     if (!shownToTeam(item, since, product)) continue;
@@ -410,7 +413,7 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
       // The level it runs at, so a teammate reads what the owner reads.
       state, priority: shownPriority(item),
       problem: s.problem || null, progress: s.progress || null, solution: solution || null,
-      blockedBy: [...(waitsOn ? [{ id: waitsOn, title: waitsOn.slice('name:'.length) }] : []), ...linked(item.blockedBy)],
+      blockedBy: [...(waitsOn ? [{ id: waitsOn, title: waitsOn.slice('name:'.length) }] : []), ...withWant(linked(item.blockedBy), askedOf(item)?.want)],
       blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
       ...(shippedAt ? { shippedAt } : {}),
     });

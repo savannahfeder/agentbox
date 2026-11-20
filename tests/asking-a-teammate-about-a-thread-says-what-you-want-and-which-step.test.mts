@@ -104,7 +104,7 @@ describe('what the teammate gets', () => {
 describe('the thread you asked about', () => {
   const at = 1_000_000;
   const asked = (o = {}) => ({
-    id: 'w-1', status: 'open', labels: ['founder'], result: QUESTION, ...askedPatch(['p-theo'], askedSaid('help', 'Theo', 'could you look at this question?'), at),
+    id: 'w-1', status: 'open', labels: ['founder'], result: QUESTION, ...askedPatch(['p-theo'], askedSaid('help', 'Theo', 'could you look at this question?'), at, 'help'),
     wrote: { result: { source: 'agent', ts: at - 10 }, blockedBy: { source: 'founder', ts: at }, asked: { source: 'founder', ts: at } }, ...o,
   });
   it('waits on them in Later, not Answered in Needs you, saying who has it', () => {
@@ -125,10 +125,10 @@ describe('the thread you asked about', () => {
     const id = 'w-0000000001';
     const out = foldWorkItems([
       buildLine({ id, patch: { title: 'Idempotency', status: 'open' }, source: 'founder', now: at - 9 }),
-      buildLine({ id, patch: askedPatch(['p-theo'], 'Asked Theo for help with this step', at), source: 'founder', now: at }),
+      buildLine({ id, patch: askedPatch(['p-theo'], 'Asked Theo for help with this step', at, 'help'), source: 'founder', now: at }),
     ], at);
     const item = (Array.isArray(out) ? out : [...out.values()]).find((i: { id: string }) => i.id === id);
-    expect(item.asked).toEqual({ said: 'Asked Theo for help with this step', at });
+    expect(item.asked).toEqual({ said: 'Asked Theo for help with this step', at, want: 'help' });
     expect(askedNow(item)).toBe('Asked Theo for help with this step');
   });
 });
@@ -224,6 +224,16 @@ describe('on two copies of the app', () => {
     expect(line).toMatchObject({ people: [maya.personId], fromMe: false, text: 'Help with this step: could you look at this question?' });
   });
 
+  it('neither an ask nor a hand-over makes a second thread on the sender\'s side', async () => {
+    const threadsOf = () => maya.store.listItems().filter((i) => !maya.store.listProducts().find((p) => p.slug === i.product)?.team?.direct);
+    const t = maya.store.composeItem('api', { title: 'Idempotency key for POST appointments', body: 'Add a key.' });
+    const before = threadsOf().map((i) => i.id).sort();
+    await maya.service.message(theo.personId, askWords({ want: 'help', title: 'Idempotency key for POST appointments', link: threadLink(maya.personId, t.id)!, note: 'Look?', step: null }));
+    await maya.service.handOn({ product: 'api', id: t.id, to: theo.personId, note: 'Yours now' });
+    for (let k = 0; k < 2; k += 1) { await maya.service.syncNow(); await theo.service.syncNow(); }
+    expect(threadsOf().map((i) => i.id).sort()).toEqual(before);
+  });
+
   it('a hand-over keeps your note on the thread you gave', async () => {
     const t = maya.store.composeItem('api', { title: 'Empty state', body: 'Draw the empty state.' });
     await maya.service.handOn({ product: 'api', id: t.id, to: theo.personId, note: 'The Figma file is v3. Send it back when built.' });
@@ -236,7 +246,7 @@ describe('on two copies of the app', () => {
 
   it('the wait and the note are an edit the thread takes', async () => {
     const t = maya.store.composeItem('api', { title: 'Idempotency', body: 'Add an idempotency key.' });
-    maya.store.threadEdit('api', t.id, askedPatch([theo.personId], 'Asked Theo for help with this step', Date.now()));
+    maya.store.threadEdit('api', t.id, askedPatch([theo.personId], 'Asked Theo for help with this step', Date.now(), 'help'));
     const row = maya.store.readItem('api', t.id);
     expect(row.blockedBy).toEqual([personWait(theo.personId)]);
     expect(askedNow(row)).toBe('Asked Theo for help with this step');

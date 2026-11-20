@@ -11,10 +11,11 @@ const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx
 
 describe("the comment box on a teammate's thread", () => {
   it('names the owner on its button, as a file note does', () => {
-    expect(page).toContain('<button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>');
+    expect(page).toContain('<button type="submit" disabled={!draft.trim() || sending}>{helping ? `Send to ${owner}\'s agent` : `Send to ${owner}`}</button>');
   });
   it('still says what the box is for', () => {
-    expect(page).toContain('placeholder={`Comment to ${owner}`}');
+    expect(page).toContain("const box = helping ? `Answer for ${owner}'s agent` : `Comment to ${owner}`;");
+    expect(page).toContain('placeholder={box}');
   });
   it('has no button that says only Comment', () => {
     expect(page).not.toMatch(/>Comment<\/button>/);

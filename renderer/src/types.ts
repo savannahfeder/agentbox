@@ -138,7 +138,7 @@ export interface WorkItem {
   /** Where it went when someone left the team (main/team/departures.mts). */
   handedOver?: { said: string; at: number };
   /** What its owner asked a teammate, with the wait on them (shared/thread-ask.mts). */
-  asked?: { said: string; at: number };
+  asked?: { said: string; at: number; want?: 'help' | 'review' };
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -495,7 +495,7 @@ export interface ThreadCard {
   problem: string | null;
   progress: string | null;
   solution: string | null;
-  blockedBy: { id: string; title: string | null }[];
+  blockedBy: { id: string; title: string | null; want?: 'help' | 'review' }[];
   blocks: { id: string; title: string | null }[];
   /** Whom it reaches: the chosen people, or null for the whole team. */
   people: string[] | null;
