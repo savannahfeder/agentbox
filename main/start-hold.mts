@@ -70,7 +70,7 @@ export function readMacPressureNow(): PressureSample {
   let freePct: number | null = null;
   try {
     const out = execFileSync('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level'],
-      { timeout: 2_000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      { timeout: 2_000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
     [level, freePct] = out.trim().split(/\s+/).map(Number);
   } catch { /* not a Mac, or sysctl did not answer */ }
   return { level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null, at: Date.now() };

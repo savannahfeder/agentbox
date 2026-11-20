@@ -17,7 +17,7 @@ function signedInHome(env: NodeJS.ProcessEnv): string | null {
 }
 
 const finderDelete =(from: string): Promise<void> => new Promise<void>((resolve, reject) => {
-  execFile('osascript', ['-e', 'on run argv', '-e', 'tell application "Finder" to delete (POSIX file (item 1 of argv) as alias)', '-e', 'end run', from], { timeout: FINDER_MS }, (err) => (err ? reject(new Error(`Finder would not move it to the Trash: ${err.message}`)) : resolve()));
+  execFile('osascript', ['-e', 'on run argv', '-e', 'tell application "Finder" to delete (POSIX file (item 1 of argv) as alias)', '-e', 'end run', from], { timeout: FINDER_MS, windowsHide: true }, (err) => (err ? reject(new Error(`Finder would not move it to the Trash: ${err.message}`)) : resolve()));
 });
 
 /**

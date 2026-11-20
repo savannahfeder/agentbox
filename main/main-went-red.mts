@@ -102,7 +102,7 @@ export function redOnMain(userDir: string): string[] {
 /** `gh`, with its own words back and never a throw. */
 export function runGh(args: string[], { cwd, timeout = 60 * 1000 }: { cwd?: string; timeout?: number } = {}): Promise<GhResult> {
   return new Promise<GhResult>((resolve) => {
-    execFile('gh', args, { cwd, encoding: 'utf8', timeout, maxBuffer: LOG_BYTES }, (error, stdout, stderr) => {
+    execFile('gh', args, { cwd, encoding: 'utf8', timeout, maxBuffer: LOG_BYTES, windowsHide: true }, (error, stdout, stderr) => {
       if (error) resolve({ code: error.code ?? 1, out: `${stdout ?? ''}${stderr ?? ''}${error.message ?? ''}` });
       else resolve({ code: 0, out: String(stdout ?? '') });
     });

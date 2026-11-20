@@ -37,7 +37,7 @@ function mdatOf(out: unknown): number | null {
   return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
 }
 
-type RunLater = (cmd: string, args: string[], opts: { encoding: 'utf8'; timeout: number }, done: (err: Error | null, out: string) => void) => void;
+type RunLater = (cmd: string, args: string[], opts: { encoding: 'utf8'; timeout: number; windowsHide: boolean }, done: (err: Error | null, out: string) => void) => void;
 
 /**
  * When that Keychain entry last changed, or null when there is none, handed to
@@ -47,7 +47,7 @@ type RunLater = (cmd: string, args: string[], opts: { encoding: 'utf8'; timeout:
 export function keychainStampLater(service: string, done: (at: number | null) => void, run: RunLater = execFile as unknown as RunLater, platform: string = process.platform) {
   if (platform !== 'darwin') { done(null); return; }
   try {
-    run('/usr/bin/security', ['find-generic-password', '-s', service], { encoding: 'utf8', timeout: 3000 }, (err, out) => done(err ? null : mdatOf(out)));
+    run('/usr/bin/security', ['find-generic-password', '-s', service], { encoding: 'utf8', timeout: 3000, windowsHide: true }, (err, out) => done(err ? null : mdatOf(out)));
   } catch { done(null); }
 }
 
