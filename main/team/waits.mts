@@ -33,13 +33,14 @@ export function reviewedInChat(chats: readonly ReviewChat[], me: string | null, 
 
 type ReviewMark = { do?: unknown; file?: unknown; text?: unknown; v?: unknown; owner?: unknown };
 
-/** Their notes and approvals on the files of the newest review ask about this thread in a chat. */
-function reviewMarksInChat(chats: readonly ReviewChat[], me: string | null, item: Pick<WaitingItem, 'id'>, person: string): { at: number; mark: ReviewMark }[] {
+/** Their notes and approvals (anyone's but mine, with no person) on the files of the newest review ask about this thread in a chat. */
+function reviewMarksInChat(chats: readonly ReviewChat[], me: string | null, item: Pick<WaitingItem, 'id'>, person: string | null): { at: number; by: string; mark: ReviewMark }[] {
   for (const chat of chats) {
     const ask = chat.messages.filter((m) => m.by === me && !m.deleted && askedThread(m.body)?.id === item.id).at(-1);
     if (!ask) continue;
     const files = new Set(askFiles(ask.body));
-    const theirs = chat.marks.filter((m) => m.by === person && m.at > ask.at).map((m) => ({ at: m.at, mark: m.mark as ReviewMark }))
+    const theirs = chat.marks.filter((m) => !!m.by && m.by !== me && (person === null || m.by === person) && m.at > ask.at)
+      .map((m) => ({ at: m.at, by: m.by!, mark: m.mark as ReviewMark }))
       .filter((m) => (m.mark.do === 'note' || m.mark.do === 'approve') && files.has(String(m.mark.file ?? '').replace(/#\d+$/, '')));
     if (theirs.length) return theirs;
   }
@@ -51,11 +52,11 @@ function reviewMarksInChat(chats: readonly ReviewChat[], me: string | null, item
  * owner named it, so its Notes panel holds them. The chat's version number is
  * the chat's own, so it does not come along.
  */
-export function reviewLinesFromChat(chats: readonly ReviewChat[], me: string | null, item: Pick<WaitingItem, 'id'>, person: string): LedgerLine[] {
-  return reviewMarksInChat(chats, me, item, person).map(({ at, mark }) => {
+export function reviewLinesFromChat(chats: readonly ReviewChat[], me: string | null, item: Pick<WaitingItem, 'id'>, person: string | null = null): LedgerLine[] {
+  return reviewMarksInChat(chats, me, item, person).map(({ at, by, mark }) => {
     const { v: _v, owner: _owner, ...rest } = mark;
     const file = shownRoomFile(String(mark.file ?? '').replace(/#\d+$/, ''));
-    return { id: item.id, ts: at, source: 'system', by: person, uid: `review-${item.id}-${String((mark as { id?: unknown }).id ?? `${String(mark.do)}-${at}`)}`, patch: { artifact: { ...rest, file } } };
+    return { id: item.id, ts: at, source: 'system', by, uid: `review-${item.id}-${String((mark as { id?: unknown }).id ?? `${String(mark.do)}-${at}`)}`, patch: { artifact: { ...rest, file } } };
   });
 }
 
@@ -99,6 +100,7 @@ export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me
   const lastWordFrom = (person: string) => lastIn(person).ts;
   const lastWordsFrom = (person: string) => lastIn(person).text;
   let told = 0;
+  const reviewed = new Set(talks.flatMap((c) => c.messages.filter((m) => m.by === me && !m.deleted).map((m) => askedThread(m.body)?.id).filter((id): id is string => !!id)));
   const everything = me ? products.flatMap((p) => read(p)) : [];
   for (const product of products) {
     const items = read(product);
@@ -107,9 +109,11 @@ export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me
     const ended = product.team?.direct
       ? (me ? endedTaskBlocks(items, { items: everything, cards, me, lastWordFrom, nameOf }) : [])
       : endedWaits(items, { items, cards, lastWordFrom, lastWordsFrom, nameOf, now, reviewedIn: (item, person) => reviewedInChat(talks, me, item, person) });
+    // Whether or not the thread still waits on them: a second ask may have taken the wait over.
+    if (append && !product.team?.direct && reviewed.size) {
+      for (const item of items) { const lines = reviewed.has(item.id) ? reviewLinesFromChat(talks, me, item) : []; if (lines.length) append(product.dir, lines); }
+    }
     for (const { item, said } of ended) {
-      const reviewed = append ? (item.blockedBy ?? []).map(String).flatMap((id) => (id.startsWith('person:') ? reviewLinesFromChat(talks, me, item, id.slice('person:'.length)) : [])) : [];
-      if (reviewed.length) append!(product.dir, reviewed);
       write(product.dir, item.id, { blockedBy: [], waitEnded: { said, at: now } });
       told += 1;
     }

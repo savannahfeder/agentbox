@@ -11,6 +11,9 @@
 // - After she approved, their chat showed nothing of it.
 // - Lena's Share panel stayed open on its person list after Send for review,
 //   with nothing saying it went.
+// - Priya sent checkout.html to Lena for review, then asked Theo for help on
+//   the same thread, which put its wait on Theo. Lena's approval and note came
+//   after, found no wait on her, and never reached the thread.
 // Measured on the rules, the sync step and the screens' sources.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -97,5 +100,30 @@ describe('the Share panel after Send for review', () => {
     const share = fs.readFileSync(new URL('../renderer/src/components/ShareLink.tsx', import.meta.url), 'utf8');
     expect(share).toMatch(/setOpen\(false\);\s*setWent\(sharedWords\(/);
     expect(share).toContain('{went && <span className="av-share-went" role="status">{went}</span>}');
+  });
+});
+
+describe('a review that comes back after the thread moved on to another ask', () => {
+  it('still lands on the owner\'s file: the reported case', () => {
+    const helping = { id: 'w-price', status: 'open', ...askedPatch(['p-theo'], 'Asked Theo for help with this step', at + 2, 'help'), wrote: { blockedBy: { source: 'founder', ts: at + 2 }, asked: { source: 'founder', ts: at + 2 } } };
+    const added: Record<string, unknown>[] = [];
+    const wrote: Record<string, unknown>[] = [];
+    noticeEndedWaits({
+      products: [{ slug: 'web', dir: '/web', team: { direct: false } }] as never, read: () => [helping] as never, write: (_d, _id, patch) => wrote.push(patch), cards: [],
+      nameOf: () => 'Lena Fischer', now: at + 100, me: 'p-lena', chats: [{ messages: [ask], marks: [noteMark(at + 5), approveMark(at + 6)] }],
+      append: (_dir, lines) => { added.push(...(lines as Record<string, unknown>[])); },
+    });
+    expect(added.map((l) => (l.patch as { artifact: { do: string } }).artifact.do)).toEqual(['note', 'approve']);
+    expect(wrote).toEqual([]);
+  });
+  it('must NOT copy the owner\'s own marks, or marks on another thread\'s files', () => {
+    const other = { id: 'w-other', status: 'open' };
+    const added: unknown[] = [];
+    noticeEndedWaits({
+      products: [{ slug: 'web', dir: '/web', team: { direct: false } }] as never, read: () => [other] as never, write: () => {}, cards: [],
+      nameOf: () => 'x', now: at + 100, me: 'p-lena', chats: [{ messages: [ask], marks: [{ ...noteMark(at + 5), by: 'p-lena' }, noteMark(at + 6)] }],
+      append: (_dir, lines) => { added.push(...lines); },
+    });
+    expect(added).toEqual([]);
   });
 });
