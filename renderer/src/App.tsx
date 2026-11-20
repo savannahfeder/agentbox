@@ -7910,7 +7910,8 @@ export default function App() {
       const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : null;
       // A conversation's record is named for nobody; the row's sender says who it is with.
       const project = directSlugs.has(i.product) ? '' : i.productName;
-      return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+      const asks = from && i.ask && i.assignee === team?.me ? (i.ask.kind === 'help' ? ' asks for help' : ' asks for a review') : '';
+      return { key: `${i.product}/${i.id}`, letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: from ? `${from}${asks}` : null, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
     },
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : busiestFirst(members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
