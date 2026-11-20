@@ -226,7 +226,7 @@ import { NOT_ANSWERING, NOT_ANSWERING_MS, RESTART_IT, RESTART_IT_MS, SEND_NOT_TA
 import { TEAM_WAIT_MS } from './boot-waits';
 import { signInAsk, shareSignInStartsOn, SIGN_IN_SKIPPED } from './sign-in-ask';
 import { isNew } from '../../shared/notify-rules.mts';
-import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mts';
+import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast, lastSpeaker } from '../../shared/team-rules.mts';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { StartTeam } from './team/StartTeam';
 import { inboxBadge } from './needs-count';
@@ -2315,6 +2315,8 @@ export default function App() {
   const inboxCandidates = useMemo(() => items.filter((i) => {
     if (pendingIds.has(i.id)) return false; // action held in the grace window: already sent, as far as the inbox is concerned
     if (i.product && scope && i.product !== scope) return false;
+    // Someone you asked has it, notes and comments included; it comes back here when they hand it back (shared/thread-asks.mts).
+    if (askedOut.has(i.id) && !asking(i)) return false;
     if (commentsWaitOnYou(i, seenAt[i.id] ?? unreadSince)) return true;
     if (i.linkComments?.length) return true;
     if (fileNewsFor(i, team?.me ?? null, { myName }).length) return true;
@@ -2335,8 +2337,6 @@ export default function App() {
     // And the app is still to ship it, which is the same: nobody needs to look
     // until it has (`shipping` in list-rules, w-0c1ba766eb).
     if (shippingIds.has(i.id) && !stillAsksYou(i) && !asking(i)) return false;
-    // Someone you asked has it; it comes back here when they hand it back (shared/thread-asks.mts).
-    if (askedOut.has(i.id) && !asking(i)) return false;
     if (owedAnAnswer.has(i.id)) return true;
     // The rule itself lives in list-rules.ts, pure and pinned by tests. What
     // is left here is the view's own business: the grace window, the clock,
@@ -7960,6 +7960,13 @@ export default function App() {
           ? <p className="ev-empty">{evMember.name.split(' ')[0]} shares no threads with the team.</p>
           : <PersonThreads cards={evCards} name={evMember.name.split(' ')[0]} now={now} onOpen={openTeammateCard} items={items} products={snap?.products ?? []} />);
   const openItem = (item: WorkItem) => { setFocused(item); markSeen(item); };
+  // Where a task you gave stands for the person holding it: whether they opened it, or wrote back.
+  const givenStage = (i: WorkItem): string => {
+    if (i.status === 'done') return 'Done';
+    const holder = i.assignee ?? '';
+    if (holder && lastSpeaker(i) === holder) return 'Replied';
+    return (snap?.team?.seen?.[`${i.product}/${i.id}`]?.[holder] ?? 0) >= (i.createdAt ?? 0) ? 'Seen' : 'Not opened';
+  };
   const itemRow = (i: WorkItem, word: string, tone: PlaceRow['tone']): PlaceRow => ({ key: `${i.product}/${i.id}`, title: rowTitle(i), word, at: i.updatedAt, tone, onOpen: () => openItem(i) });
   const ITEM_WORD: Record<string, [string, PlaceRow['tone']]> = { running: ['Working', 'work'], waiting: ['Waits on you', 'ask'], scheduled: ['Later', 'later'], done: ['Done', 'done'] };
   // A teammate's waiting thread waits on them, not on you, so it never wears the accent.
@@ -8031,7 +8038,7 @@ export default function App() {
             ...onYou.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'ask')),
             ...mentionsBy.map((m) => ({ key: m.id, title: m.body || `In ${m.roomName}`, word: m.roomName, at: m.at, tone: 'ask' as const, onOpen: () => roomsUi.openMention(m) })),
           ], now, { ask: true }),
-          ...listPart('Tasks you gave', given.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? '', 'later')), now),
+          ...listPart('Tasks you gave', given.map((i) => itemRow(i, dueSaid(dayDeadline(i.due), now, { ahead: true })?.word ?? givenStage(i), 'later')), now),
           ...listPart('In progress', theirs.now.map(cardRow), now),
           ...listPart('Done this week', theirs.finished.map((c) => ({ ...cardRow(c), word: '' })), now),
           ...matesPart('AI teammates', theirMates, waits, (key) => pickMember(key)),
