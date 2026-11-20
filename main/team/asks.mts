@@ -70,9 +70,11 @@ export function createAsks({ file, me, products, readRows, nameOf, tell, putAway
       const done = new Set(k.back);
       const all = taskRows();
       let carried = 0;
+      let changed = false;
       for (const r of handedBackAsks(all.map((t) => t.row) as never[], me(), done)) {
         const a = askIGave(r as never, me())!;
         const where = products().find((p) => p.slug === a.product);
+        changed = true;
         if (!where) { k.back.push(r.id); continue; }
         const helper = String((r as { assignee?: string }).assignee);
         const name = nameOf(helper);
@@ -84,7 +86,7 @@ export function createAsks({ file, me, products, readRows, nameOf, tell, putAway
         if (slug) putAway(slug, r.id);
         carried += 1;
       }
-      if (carried) save();
+      if (changed) save();
       return carried;
     },
   };
