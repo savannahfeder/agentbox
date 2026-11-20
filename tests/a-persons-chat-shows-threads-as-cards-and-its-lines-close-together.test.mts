@@ -121,3 +121,17 @@ describe('the chat box', () => {
     expect(src).not.toContain('new Map<string, string>()');
   });
 });
+
+// Round eleven's screenshot: "Sam, here is the validation audit table." and
+// "Can you open the document" sat a blank line plus the paragraph gap apart.
+// The message box keeps line breaks (pre-wrap), and Markdown puts one between
+// its paragraphs, so each gap drew an extra line.
+describe('two paragraphs in a chat message', () => {
+  it('are the paragraph gap apart, with no blank line between', async () => {
+    const { renderToStaticMarkup: draw } = await import('react-dom/server');
+    const { default: Md } = await import('react-markdown');
+    expect(draw(React.createElement(Md, null, 'One.\n\nTwo.'))).toBe('<p>One.</p>\n<p>Two.</p>');
+    const css = fs.readFileSync(new URL('../renderer/src/team/rooms/rooms.css', import.meta.url), 'utf8');
+    expect(css).toContain('.rm-cm .tx:has(> p, > ul, > ol, > pre, > blockquote) { white-space: normal; }');
+  });
+});

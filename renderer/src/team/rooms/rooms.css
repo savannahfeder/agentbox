@@ -154,6 +154,8 @@
 .rm-cm .h, .rm-cm .tx { user-select: text; -webkit-user-select: text; }
 .rm-cm .tm-av { user-select: none; -webkit-user-select: none; }
 .rm-cm .tx p { margin: 0; white-space: pre-line; }
+/* Markdown leaves a line break between its paragraphs; kept, it drew as a blank line on top of the gap. */
+.rm-cm .tx:has(> p, > ul, > ol, > pre, > blockquote) { white-space: normal; }
 .rm-cm .tx p + p { margin-top: 8px; }
 .rm-cm .tx a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .rm-cm .tx code { font-family: var(--mono); font-size: .88em; background: var(--wash-strong); padding: 1px 4px; }
