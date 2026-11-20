@@ -42,6 +42,19 @@ export function taskWords(item: WorkItem, product: Product | undefined | null, m
   return { word: asks ? `${name} is ${asks === 'help' ? 'helping' : 'reviewing'}` : `With ${name}`, unread: false, other, at };
 }
 
+/** Where a task you gave stands for the person holding it, in Tasks you gave: an ask says which, and what came back. */
+export function givenStage(i: WorkItem, seen: number): string {
+  const kind = i.ask?.kind === 'review' ? 'Review' : i.ask?.kind === 'help' ? 'Help' : null;
+  const holder = i.assignee ?? '';
+  // A reply in one of the task's own threads counts too (round four: it said Seen after Dana replied).
+  const replied = !!holder && (lastSpeaker(i) === holder || (i.talk?.chat ?? []).some((c) => c.by === holder));
+  const stage = i.ask && i.verdict ? (i.verdict === 'yes' ? 'Looks good' : i.verdict === 'changes' ? 'Needs changes' : 'Handed back')
+    : i.status === 'done' ? 'Done'
+      : replied ? 'Replied'
+        : seen >= (i.createdAt ?? 0) ? 'Seen' : 'Not opened';
+  return kind ? `${kind} · ${stage}` : stage;
+}
+
 /** A task's card carries no words. If it is between you and them this Mac has its
  *  name; to anyone else on the team it is just a task. */
 export function namedCards<C extends { threadId: string; title: string | null; project: string | null }>(cards: readonly C[], items: readonly Pick<WorkItem, 'id' | 'label' | 'title'>[]): C[] {

@@ -230,7 +230,7 @@ import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, is
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { StartTeam } from './team/StartTeam';
 import { inboxBadge } from './needs-count';
-import { namedCards } from './team/company';
+import { givenStage as givenStageOf, namedCards } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { TeamBilling } from './team/TeamBilling';
@@ -7971,15 +7971,7 @@ export default function App() {
           ? <p className="ev-empty">{evMember.name.split(' ')[0]} shares no threads with the team.</p>
           : <PersonThreads cards={evCards} name={evMember.name.split(' ')[0]} now={now} onOpen={openTeammateCard} items={items} products={snap?.products ?? []} />);
   const openItem = (item: WorkItem) => { setFocused(item); markSeen(item); };
-  // Where a task you gave stands for the person holding it: whether they opened it, or wrote back.
-  const givenStage = (i: WorkItem): string => {
-    if (i.status === 'done') return 'Done';
-    if (i.ask && i.verdict) return 'Handed back';
-    const holder = i.assignee ?? '';
-    // A reply in one of the task's own threads counts too (round four: it said Seen after Dana replied).
-    if (holder && (lastSpeaker(i) === holder || (i.talk?.chat ?? []).some((c) => c.by === holder))) return 'Replied';
-    return (snap?.team?.seen?.[`${i.product}/${i.id}`]?.[holder] ?? 0) >= (i.createdAt ?? 0) ? 'Seen' : 'Not opened';
-  };
+  const givenStage = (i: WorkItem) => givenStageOf(i, snap?.team?.seen?.[`${i.product}/${i.id}`]?.[i.assignee ?? ''] ?? 0);
   const itemRow = (i: WorkItem, word: string, tone: PlaceRow['tone']): PlaceRow => ({ key: `${i.product}/${i.id}`, title: rowTitle(i), word, at: i.updatedAt, tone, onOpen: () => openItem(i) });
   const ITEM_WORD: Record<string, [string, PlaceRow['tone']]> = { running: ['Working', 'work'], waiting: ['Waits on you', 'ask'], scheduled: ['Later', 'later'], done: ['Done', 'done'] };
   // A teammate's waiting thread waits on them, not on you, so it never wears the accent.
