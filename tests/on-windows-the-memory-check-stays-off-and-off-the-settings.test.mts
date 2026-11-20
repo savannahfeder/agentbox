@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { Supervisor } from '../main/supervisor.mts';
 import { memoryGateSettings } from '../main/settings.mts';
 import { memoryGateWorksOn } from '../main/memory-gate.mts';
+import { phoneSettingsOf } from '../shared/phone-settings.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const realPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!;
@@ -56,6 +57,13 @@ describe('on Windows with the switch on', () => {
     await sup.setMemoryGate(true);
     expect(sup._memoryGate ?? null).toBeNull();
     expect(fs.existsSync(path.join(tmp, '.codex'))).toBe(false);
+  });
+
+  it('the phone gets no memory switch either', () => {
+    const phone = phoneSettingsOf({ ok: true, workspace: { memoryGate: null } }, { version: null });
+    expect(phone?.workspace.memoryGate).toBeNull();
+    const mac = phoneSettingsOf({ ok: true, workspace: { memoryGate: { on: true, slots: null, slotsAuto: 2, slotsMax: 12, now: null } } }, { version: null });
+    expect(mac?.workspace.memoryGate?.on).toBe(true);
   });
 
   it('the Running page has no memory switch', () => {

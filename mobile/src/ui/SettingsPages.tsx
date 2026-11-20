@@ -376,7 +376,7 @@ const isAutoNow = (s: SettingsState, w: Pick<NonNullable<SettingsState['settings
 /** What the computer measured, first, as the desktop's Running page leads with it (`Reading`). */
 function Measured() {
   const w = useSettings().settings!.workspace;
-  const f = runningFigures({ running: w.running, capacity: w.agentsTotal, gate: w.memoryGate });
+  const f = runningFigures({ running: w.running, capacity: w.agentsTotal, gate: w.memoryGate ?? undefined });
   if (!f) return null;
   const line = (text: string) => <T key={text} style={{ fontSize: 12.5, lineHeight: 18.75, color: color.dim, paddingVertical: 12, borderTopWidth: 1, borderTopColor: color.line }}>{text}</T>;
   return (

@@ -41,7 +41,7 @@ export interface PhoneWorkspaceCopy {
   slotsMax: number;
   slotsSuggested: number;
   running: number;
-  memoryGate: { on: boolean; slots: number | null; slotsAuto: number; slotsMax: number; now: string | null };
+  memoryGate: { on: boolean; slots: number | null; slotsAuto: number; slotsMax: number; now: string | null } | null;
   leftovers: { on: boolean; now: string | null };
   accounts: { id: string; email: string | null; chosen: boolean; state?: string; note: string | null; resetsAt: number | null; plan: string | null; running: number }[];
   codexAccounts: { id: string; email: string | null; name: string | null; plan: string | null; signedIn: boolean; chosen: boolean }[];
