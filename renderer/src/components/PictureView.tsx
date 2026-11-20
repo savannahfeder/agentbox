@@ -6,6 +6,7 @@ import { clickZoom, isDoubleTap, lowestZoom, panLimits, panToKeep, pictureFit, p
 import { doubleTapScale, onPhone } from '../phone-screen';
 import { CrossIcon } from './CrossIcon';
 import { focusTheReplyBox } from '../focus-at-end';
+import { pressedInThePalette } from '../palette-rows';
 import { opening, seenAt } from '../picture';
 
 export type { Picture };
@@ -162,7 +163,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
   useEffect(() => {
     dialog.current?.focus();
     const key = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey) return;
+      if (e.metaKey || e.ctrlKey || pressedInThePalette(e.target)) return;
       e.stopImmediatePropagation();
       wake();
       if (e.key === 'Escape') { e.preventDefault(); onClose(); requestAnimationFrame(() => focusTheReplyBox()); }

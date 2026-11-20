@@ -3692,6 +3692,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
      strip drawn after it stands down in workspace-navigation.css. */
   -webkit-app-region: no-drag;
 }
+/* Over a file opened big, under the ⌘F box. Only then: the tour points at the
+   bar from 1000. */
+body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-backdrop { z-index: 9480; }
 
 /* THE IMPORT CARD THAT ENDS SETUP WAS DRAWN DIMMED. Setup's veil is 299 and
    this backdrop was 40, so the veil lay over the card. It goes at 301, with

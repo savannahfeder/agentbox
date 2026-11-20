@@ -124,6 +124,15 @@ export function escapeClosesThePalette(
   return () => win.removeEventListener('keydown', key, true);
 }
 
+// A file opened big hears every key before the app does, so it asks these
+// before taking one that belongs to ⌘K opened over it.
+export const paletteIsOpen = (doc: { querySelector: (s: string) => unknown }): boolean => !!doc.querySelector('.palette-backdrop');
+
+export function pressedInThePalette(target: unknown): boolean {
+  const closest = (target as { closest?: (s: string) => unknown } | null)?.closest;
+  return typeof closest === 'function' && !!closest.call(target, '.palette-backdrop');
+}
+
 /* ---------------------------- the appearance rows ------------------------ */
 
 // A row as described, with the look it goes to instead of a callback, so this
