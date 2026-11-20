@@ -3,10 +3,9 @@
 // put on the list.
 import { useState } from 'react';
 import { api } from '../api';
+import { askWords, NOT_LET_IN } from './multiplayer-words';
 
-export const NOT_LET_IN = 'Multiplayer is invite-only for now';
-
-export const askWords = (email: string | null | undefined) => `Please let my team into multiplayer. My email is ${email ?? 'unknown'}.`;
+export { askWords, NOT_LET_IN };
 
 export function AskForMultiplayer({ email, className }: { email: string | null | undefined; className: string }) {
   const [state, setState] = useState<'idle' | 'busy' | 'asked'>('idle');

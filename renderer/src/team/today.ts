@@ -7,6 +7,7 @@ import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
 import { isShared, isTaskRow, runnerOf, taskNewsAt } from '../../../shared/team-rules.mts';
 import { isSetupTitle } from '../../../shared/teammates.mts';
 import { waitParts } from '../../../shared/thread-waits.mts';
+import { isCause } from '../../../shared/causes.mts';
 import { blockedWords, deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { shownPriority } from '../../../shared/rank.mts';
 import { priorityIdOf, priorityLabelOf } from '../priority';
@@ -186,7 +187,8 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
   const agentOn = agentOnOrComing(supervisor);
   for (const i of items) {
     // A teammate's "Set up …" thread is often its first day of work; its title says nothing of that work, its progress does.
-    if (i.agent || i.title === 'Set up its job') continue;
+    // A cause row is the app's, standing for the threads stuck behind it.
+    if (i.agent || i.title === 'Set up its job' || isCause(i)) continue;
     const setupSays = isSetupTitle(i.title) && i.labels?.some((l) => l.startsWith('teammate:')) ? howFar(i.progress) : undefined;
     const task = isTaskRow(i);
     if (direct.has(i.product) && !task) continue;

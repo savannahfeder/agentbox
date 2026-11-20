@@ -3307,6 +3307,15 @@ body {
 .reply-dock .compose-note.attach-problem { padding-left: 0; padding-right: 0; }
 
 .attach-thumb { position: relative; }
+.attach-open {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--artifact-corner-small);
+  cursor: zoom-in;
+}
+.attach-open:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .attach-thumb img {
   height: 84px;
   max-width: 220px;
@@ -3692,6 +3701,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
      strip drawn after it stands down in workspace-navigation.css. */
   -webkit-app-region: no-drag;
 }
+/* Over a file opened big, under the ⌘F box. Only then: the tour points at the
+   bar from 1000. */
+body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-backdrop { z-index: 9480; }
 
 /* THE IMPORT CARD THAT ENDS SETUP WAS DRAWN DIMMED. Setup's veil is 299 and
    this backdrop was 40, so the veil lay over the card. It goes at 301, with
@@ -4161,13 +4173,17 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* A long title gives way, never the project's name. */
 .palette-k .palette-thread .palette-hint { flex: none; }
 /* A line, file, comment or decision found inside something: its words, then who
-   and where under them in the faint ink. Two lines, so the row is taller. */
-.palette-k .palette-found { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
-.palette-k .palette-found .palette-glyph { padding-top: 3px; }
-.palette-k .palette-found .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.palette-k .palette-found .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+   and where under them in the faint ink. A thread: its title, then the line it
+   was found by. Two lines, so the row is taller. */
+.palette-k :is(.palette-found, .palette-two) { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
+.palette-k :is(.palette-found, .palette-two) .palette-glyph { padding-top: 3px; }
+.palette-k :is(.palette-found, .palette-two) .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.palette-k :is(.palette-found, .palette-two) .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
-.palette-k .palette-found .hit { color: var(--text); font-weight: 600; }
+.palette-k :is(.palette-found, .palette-two) .hit { color: var(--text); font-weight: 600; }
+.palette-k .palette-two .palette-hint { padding-top: 2px; }
+/* Finished threads step back; the highlight behind a selected one does not. */
+.palette-k .palette-done > * { opacity: .5; }
 
 /* A found line, landed on from the results: marked for a moment. */
 [data-line] { transition: background-color .5s ease, box-shadow .5s ease; }
