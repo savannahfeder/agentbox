@@ -18,10 +18,6 @@ export function useTeammateWho(item: Pick<WorkItem, 'labels'>): { face: ReactNod
 }
 
 export function TeammateLead({ item }: { item: Pick<WorkItem, 'labels'> }) {
-  const team = useContext(TeammatesContext);
-  if ((item.labels ?? []).some((l) => l === OFFER_LABEL || l === REACH_LABEL)) return <span className="tq-from"><i className="tq tq-sm tq-hash" aria-hidden="true">+</i><b>{Name}</b></span>;
-  const id = teammateIdOf(item);
-  const t = id ? team.get(id) : undefined;
-  if (!t) return null;
-  return <span className="tq-from"><TeammateMark t={t} /><b>{t.name}</b></span>;
+  const who = useTeammateWho(item);
+  return who ? <span className="tq-from">{who.face}<b>{who.name}</b></span> : null;
 }
