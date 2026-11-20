@@ -24,7 +24,7 @@ import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
 import { findFileToSend } from './carry-files.mts';
 import { readableSharedThreads } from '../everything-found.mts';
 import { plainRef } from '../../shared/carried-files.mts';
-import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mts';
+import { listSharedProjects, joinSharedProject, linkSharedFolders, markShared, makeDirect } from './projects.mts';
 import type { TeamRecord } from './projects.mts';
 import type { SyncBackend, SyncCard, SyncDisk, SyncReport, SyncState } from './sync.mts';
 import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
@@ -666,6 +666,7 @@ export function createTeamService({
         else if (state.multiplayer === false) set({ multiplayer: await readMultiplayer() });
         await clearLapsedStatus();
         const report = await sync!.syncOnce();
+        for (const l of linkSharedFolders(products())) log(`team: ${path.basename(l.dir)} now works in ${l.repoPath}, your own project of the same name`);
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
         // on the first line of theirs that arrives here.
