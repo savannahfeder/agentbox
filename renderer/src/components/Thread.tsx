@@ -51,6 +51,7 @@ import { EDIT_LAST } from '../team/chat-events';
 import { messageMore, withEmbeds, wordsOf } from '../team/message-more';
 import { ThreadLine } from '../team/ThreadPanel';
 import { AgentAnswers } from '../team/ChatAgents';
+import { AskAboutContext, askAboutStep } from '../team/AsksLine';
 import { NeedOlder } from './NeedCard';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
@@ -243,6 +244,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
     const by = (e as { by?: string }).by;
     return team && by && by !== team.me ? team.byId.get(by) ?? { id: by, email: '', name: 'A teammate', avatarUrl: null } : null;
   };
+  const askAbout = useContext(AskAboutContext) && !chat;
   // Words a person you asked for help wrote to the agent: theirs, with their face.
   const helperOf = (e: AgentEvent) => {
     const id = (e as { fromId?: string }).fromId;
@@ -555,6 +557,9 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                       : e.who === 'you' ? 'You' : ((e as { from?: string }).from ?? nameOf?.(e) ?? name)}</span>
                     {headFacts(e, when(e.at))}
                     <MessageKind e={e} />
+                    {askAbout && e.who !== 'you' && !helperOf(e) && !voiceOf(e) && e.text && (
+                      <button type="button" className="msg-ask" onClick={() => askAboutStep(e.text ?? '')}>Ask a teammate</button>
+                    )}
                   </div>
                 )}
                 {/* WHAT A PERSON TYPED IS NOT MARKDOWN (w-a33b339772).

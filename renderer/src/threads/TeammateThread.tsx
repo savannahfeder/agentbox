@@ -102,7 +102,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
-  const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run');
+  const helpingNow = ask?.ask?.kind === 'help';
+  const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run')
+    .map((e: AgentEvent) => (helpingNow && 'says' in e && e.says === 'comment' && (e as { by?: string }).by === team?.me ? { ...e, says: 'to-agent' as const } : e));
 
   // Their copy publishes its marks with its messages; everyone's come together here.
   const own = useMemo(() => marksOf((work?.lines ?? [])
@@ -187,7 +189,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
             {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
           </button>}
-          {onContinue && canContinue(work, card, team?.me ?? null) && (
+          {onContinue && !ask && canContinue(work, card, team?.me ?? null) && (
             <button type="button" className="th-follow" onClick={onContinue}
               title={`Start a thread of your own with ${owner}'s conversation and files.`}>
               Continue it yourself
@@ -218,9 +220,14 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
-              <textarea value={draft} rows={2} placeholder={helping ? `Write to ${owner}'s agent` : `Comment to ${owner}`} aria-label={helping ? `Write to ${owner}'s agent` : `Comment to ${owner}`}
-                onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
-              <button type="submit" disabled={!draft.trim() || sending}>{helping ? 'Send to the agent' : `Send to ${owner}`}</button>
+              {helping
+                ? <textarea value={draft} rows={2} placeholder={`Write to ${owner}'s agent`} aria-label={`Write to ${owner}'s agent`}
+                  onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
+                : <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
+                  onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />}
+              {helping
+                ? <button type="submit" disabled={!draft.trim() || sending}>Send to the agent</button>
+                : <button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>}
             </div>
           </form>
         </section>

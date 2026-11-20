@@ -24,6 +24,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState, type Rea
 import { createPortal } from 'react-dom';
 import { ThreadPanel } from '../team/ThreadPanel';
 import { TeamContext } from '../team/people';
+import { AskAboutContext } from '../team/AsksLine';
 import { useReactionsNow, type Press } from '../team/reactions-now';
 import { api } from '../api';
 import { onPhone } from '../phone-screen';
@@ -94,7 +95,9 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk = null, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
+export function ItemThread({ askAbout = false, onOpenFileMark, item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk = null, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
+  /** Whether a person can be asked about one of the agent's messages (team/AsksLine.tsx). */
+  askAbout?: boolean;
   /** What a "on onboarding-a.png, Pin 1" link in this thread opens. */
   onOpenFileMark?: (link: FileMarkLink) => void;
   /** One thing at a time (w-65bcefb857): the summary on top, the newest answer, the rest folded. */
@@ -510,7 +513,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     return (
       <>
         {queueHead}
-        <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} />
+        <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null}
+          person={newest.fromId && team?.byId.get(newest.fromId) ? { p: team.byId.get(newest.fromId)!, at: newest.at } : null} />
         <TeammateOffer item={item} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
@@ -522,7 +526,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   }
 
   return (
-    <FileMarkOpener.Provider value={onOpenFileMark ?? null}>
+    <AskAboutContext.Provider value={askAbout}><FileMarkOpener.Provider value={onOpenFileMark ?? null}>
       {queueHead}
       <Thread
         events={from >= 0 ? events.slice(from) : events}
@@ -601,6 +605,6 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}
       {madeList(made.atFoot)}
       {askTurn < Math.max(from, 0) && askHere}
-    </FileMarkOpener.Provider>
+    </FileMarkOpener.Provider></AskAboutContext.Provider>
   );
 }

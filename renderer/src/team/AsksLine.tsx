@@ -1,11 +1,17 @@
 // ABOVE YOUR REPLY BOX, WHILE SOMEONE YOU ASKED IS ON YOUR THREAD: who, since
 // when, and Take it back. What they hand back lands in the thread itself.
-import { useContext } from 'react';
-import { asksOnThread } from '../../../shared/thread-asks.mts';
+import { createContext, useContext } from 'react';
+import { asksOnThread, stepOf } from '../../../shared/thread-asks.mts';
 import { updatedWords } from '../threads/page-rules';
 import type { WorkItem } from '../types';
 import { Face, TeamContext, firstName } from './people';
 import './asks.css';
+
+/** True on a thread of yours that a person can be asked about: an agent's message offers "Ask a teammate". */
+export const AskAboutContext = createContext(false);
+
+/** Opens the thread menu's people list with this message as the step (threads/ThreadMenu.tsx). */
+export const askAboutStep = (text: string) => window.dispatchEvent(new CustomEvent('zero:ask-step', { detail: stepOf(text) }));
 
 export function AsksLine({ item, items, now = Date.now(), onTakeBack }: {
   item: WorkItem;
@@ -26,9 +32,9 @@ export function AsksLine({ item, items, now = Date.now(), onTakeBack }: {
           <div key={a.row.id} className="asks-one">
             <Face person={person} size={22} />
             <span className="asks-words">
-              {a.ask.kind === 'help'
+              <span>{a.ask.kind === 'help'
                 ? <><b>{first}</b> is helping. What they write here goes to your agent.</>
-                : <><b>{first}</b> is reviewing this.</>}
+                : <><b>{first}</b> is reviewing this.</>}</span>
               <span className="asks-when">Asked {updatedWords(a.at, now)}</span>
             </span>
             <button type="button" className="asks-take" onClick={() => onTakeBack(a.row as WorkItem)}>Take it back</button>

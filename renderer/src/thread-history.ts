@@ -99,7 +99,7 @@ export interface ThreadEvent {
   /** A comment or approval on a file: which file, and for a comment where on it. */
   fileMark?: FileMarkLink;
   /** A teammate's comment (reaches the owner, starts nothing) or an agent's checkpoint. */
-  says?: 'comment' | 'progress';
+  says?: 'comment' | 'progress' | 'to-agent';
   // The runs that began at this pickup, oldest first. Set by withRuns, and
   // an array because a session that never got its claim in still has to land
   // somewhere rather than disappear.

@@ -8,7 +8,14 @@
 .asks-take { flex: none; height: 28px; padding: 0 12px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; }
 .asks-take:hover { color: var(--text); border-color: var(--text-faint); }
 
-/* The three ways in the Ask or hand off sheet. */
+/* "Ask a teammate" on an agent's message, there when you point at it. */
+.msg-ask { margin-left: auto; height: 24px; padding: 0 10px; font: inherit; font-size: 12.5px; color: var(--text-faint); background: none; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; opacity: 0; transition: opacity .12s; }
+.msg:hover .msg-ask, .msg-ask:focus-visible { opacity: 1; }
+.msg-ask:hover { color: var(--text); border-color: var(--line-strong); }
+
+/* The three ways in the Ask or hand off sheet. Its parts keep their height: the menu's card would squeeze them. */
+.th-menu.sh-give { max-height: none; height: auto; overflow: visible; }
+.sh-give > * { flex: none; }
 .sh-modes { display: flex; flex-direction: column; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line); }
 .sh-mode { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px; text-align: left; font: inherit; color: var(--text-dim); background: none; border: 0; border-radius: 10px; cursor: pointer; }
 .sh-mode:hover { background: var(--bg-hover, var(--bg-selected)); }

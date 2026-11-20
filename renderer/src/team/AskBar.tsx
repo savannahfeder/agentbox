@@ -34,8 +34,9 @@ export function AskBar({ task, owner, onHandBack, onOpenThread }: {
         <Face person={owner} size={24} />
         <span><b>{first}</b> {ask.kind === 'help' ? 'asked you to help on this thread.' : 'asked for your review.'}</span>
       </div>
-      {ask.note && <p className="ask-bar-note">{ask.note}</p>}
-      {ask.step && <blockquote className="ask-bar-step">{ask.step.length > 400 ? `${ask.step.slice(0, 400)}…` : ask.step}</blockquote>}
+      {/* On the task's own page its message already says both. */}
+      {ask.note && !onOpenThread && <p className="ask-bar-note">{ask.note}</p>}
+      {ask.step && !onOpenThread && <blockquote className="ask-bar-step">{ask.step.length > 400 ? `${ask.step.slice(0, 400)}…` : ask.step}</blockquote>}
       {giving ? (
         <div className="ask-bar-back">
           <textarea autoFocus value={words} placeholder={ask4} aria-label={ask4} rows={2}

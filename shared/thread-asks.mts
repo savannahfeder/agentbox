@@ -88,6 +88,14 @@ export function handedBackAsks(rows: readonly AskRow[], me: string | null, done:
   });
 }
 
+/** The part of an agent's message a teammate is asked about: the paragraph with its question, else its opening. */
+export function stepOf(text: string): string {
+  const plain = text.replace(/\*\*|__|`/g, '').trim();
+  const paras = plain.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const asked = paras.find((p) => /\?/.test(p)) ?? paras[0] ?? '';
+  return asked.length > 600 ? `${asked.slice(0, 600)}…` : asked;
+}
+
 /** The word under an ask's name in a list, where "Task" goes on any other. */
 export const askWord = (kind: AskKind): string => (kind === 'help' ? 'Help' : 'Review');
 

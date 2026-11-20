@@ -69,7 +69,7 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AsksLine } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askOnMe } from '../../shared/thread-asks.mts';
+import { askOnMe, asksOnThread } from '../../shared/thread-asks.mts';
 import { SEE_SAID, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -8415,12 +8415,12 @@ export default function App() {
                     with the same people picked, or to the room whose board it
                     was opened from. */}
                 <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
+                  syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
                   onHandBack={(verdict, words) => {
                     const task = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;
                     return task ? handAskBack(task, verdict, words) : Promise.resolve(false);
                   }}
-                  syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
@@ -8515,6 +8515,7 @@ export default function App() {
                   giveTo={giveToFor(focused)}
                   onGive={(to, note) => { void giveThread(focused, to, note); }}
                   onAsk={team ? (to, kind, note, step) => { void askOnThread(focused, to, kind, note, step); } : undefined}
+                  asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
                   asksSlot={!team ? null : focused.ask && focused.assignee === team.me && focused.status !== 'done'
                     ? <AskBar task={focused} owner={team.byId.get(focused.ask.owner) ?? null} onHandBack={(verdict, words) => handAskBack(focused, verdict, words)}
                       onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />

@@ -41,11 +41,12 @@ export function appWrote(outcome: ItemOutcome | null, wrote?: Record<string, { s
 }
 
 /** The newest answer: the one lifted to the foot, or else the last thing said that was not yours. */
-export function newestAnswer(events: AgentEvent[], outcome: ItemOutcome | null): { at: number; text: string } | null {
+export function newestAnswer(events: AgentEvent[], outcome: ItemOutcome | null): { at: number; text: string; fromId?: string } | null {
   if (outcome) return { at: outcome.at, text: outcome.text };
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
-    if (said(e) && e.who !== 'you' && e.text?.trim()) return { at: e.at, text: e.text };
+    // A person you asked to help signs what they wrote (team/AsksLine.tsx).
+    if (said(e) && e.who !== 'you' && e.text?.trim()) return { at: e.at, text: e.text, ...(e.fromId ? { fromId: e.fromId } : {}) };
   }
   return null;
 }
