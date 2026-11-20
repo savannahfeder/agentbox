@@ -38,6 +38,8 @@
 
 /* A helper on someone's thread: what was asked, as a message, and handing it back. */
 .ask-bar { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 0; }
+/* After the result block, which ends without a message's own space below it. */
+.appendix + .ask-bar { margin-top: 32px; }
 .ask-bar-head { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-dim); }
 .ask-bar-head b { font-weight: 500; color: var(--text); }
 .ask-bar-when { font-size: 13px; color: var(--text-faint); }
