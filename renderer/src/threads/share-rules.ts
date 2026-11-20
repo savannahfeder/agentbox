@@ -7,7 +7,7 @@ export { LINK_SITE, openTo, seenNow, sentWords, threadLink, threadOfLink, type S
 export interface SharePerson { id: string; name?: string | null; email?: string | null }
 
 /** The thread a plain click on this link opens in the app; a ⌘, Ctrl or Shift click is the browser's. */
-export function threadToOpen(href: string | null | undefined, keys: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): { owner: string; id: string } | null {
+export function threadToOpen(href: string | null | undefined, keys: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): { owner: string; id: string; at?: number } | null {
   return keys.metaKey || keys.ctrlKey || keys.shiftKey ? null : threadOfLink(href);
 }
 

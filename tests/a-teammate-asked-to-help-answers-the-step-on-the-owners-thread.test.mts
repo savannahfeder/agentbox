@@ -136,11 +136,26 @@ describe('on two copies of the app', () => {
   });
 });
 
+describe('the options a helper can press', () => {
+  it('are the agent\'s newest offer, and none once someone replied after it', async () => {
+    const { optionsToAnswer } = await import('../renderer/src/threads/TeammateThread.tsx');
+    const { itemThread } = await import('../renderer/src/item-thread.ts');
+    const lines = [
+      { id: 'w-1', ts: 1, source: 'founder', patch: { title: 'Idempotency', body: 'Add a key.' } },
+      { id: 'w-1', ts: 2, source: 'agent', patch: { result: 'Where should keys be stored?\n\n## Options\n1. Postgres table (recommended)\n2. Redis with a TTL' } },
+    ];
+    const events = (ls: typeof lines) => itemThread(ls, [], null, { whole: true });
+    expect(optionsToAnswer(events(lines)).map((o) => o.text)).toEqual(['Postgres table (recommended)', 'Redis with a TTL']);
+    expect(optionsToAnswer(events([...lines, { id: 'w-1', ts: 3, source: 'founder', patch: { answer: 'Postgres' } }]))).toEqual([]);
+    expect(optionsToAnswer(events([...lines, { id: 'w-1', ts: 3, source: 'agent', patch: { result: 'Done, used Postgres.' } }]))).toEqual([]);
+  });
+});
+
 describe('the helper\'s page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
   it('offers the step\'s options and says the box answers the agent', () => {
     expect(page).toContain('answersTheStep(card, team?.me ?? null)');
-    expect(page).toContain('parseOptions(');
+    expect(page).toContain('const options = helping ? optionsToAnswer({ events, outcome: built.outcome }) : [];');
     expect(page).toContain("`Answer for ${owner}'s agent`");
   });
 });

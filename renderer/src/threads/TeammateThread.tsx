@@ -23,7 +23,7 @@ import { artifactUrlTransform, isMediaPath } from '../remark-artifact-paths';
 import { firstName, Face, TeamContext } from '../team/people';
 import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
-import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
+import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
@@ -35,6 +35,14 @@ const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
 const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
+
+/** The options the agent's newest words offer, for a helper to press; none once anyone spoke after them. */
+export function optionsToAnswer({ events, outcome }: { events: readonly AgentEvent[]; outcome?: { at: number; text: string } | null }) {
+  const said = events.filter((e): e is AgentSaid => !e.kind);
+  const last = said[said.length - 1];
+  if (outcome && (!last || outcome.at >= last.at)) return parseOptions(outcome.text);
+  return last?.who === 'it' ? parseOptions(last.text) : [];
+}
 
 export function TeammateThread({ card, person, now, syncedAt, openAt, step = null, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue }: {
   card: ThreadCard; person: Person | null; now: number;
@@ -104,7 +112,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
   const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run');
-  const stepAt = step ? stepLine(events, step) : null;
+  // The newest answer is drawn under the conversation, not in it, and is a step too.
+  const stepAt = step ? stepLine([...events, ...(built.outcome ? [{ at: built.outcome.at }] : [])], step) : null;
   useEffect(() => (stepAt ? revealLine(stepAt) : undefined), [stepAt, personId, threadId]);
 
   // Their copy publishes its marks with its messages; everyone's come together here.
@@ -157,8 +166,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
   const owner = firstName(person) || 'Someone';
   // Asked to help with a step, what they write answers it on the owner's agent.
   const helping = answersTheStep(card, team?.me ?? null);
-  const lastAsk = [...events].reverse().find((e) => e.who === 'agent' && e.message);
-  const options = helping ? parseOptions((lastAsk as { words?: string } | undefined)?.words) : [];
+  const options = helping ? optionsToAnswer({ events, outcome: built.outcome }) : [];
   const box = helping ? `Answer for ${owner}'s agent` : `Comment to ${owner}`;
   const openMark = useCallback((link: FileMarkLink) => setBig({ file: link.file, note: link.id, at: Date.now() }), []);
   const files = useMemo(() => filesOnThread(work?.lines ?? [], marks.notes).map((f) => ({
@@ -216,7 +224,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
             {events.length > 0 && <Thread events={events} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />}
           </FileMarkOpener.Provider>
           {built.outcome && (
-            <div className="appendix appendix-foot">
+            <div className="appendix appendix-foot" data-line={`at-${built.outcome.at}`}>
               <div className="appendix-label">{built.outcome.field === 'result' ? 'Result' : 'Latest checkpoint'}</div>
               {md(built.outcome.text)}
             </div>

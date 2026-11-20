@@ -98,6 +98,8 @@ export interface ThreadEvent {
   fileMark?: FileMarkLink;
   /** A teammate's comment (reaches the owner, starts nothing) or an agent's checkpoint. */
   says?: 'comment' | 'progress';
+  /** A comment the owner's reply after it took to the agent. */
+  carried?: boolean;
   // The runs that began at this pickup, oldest first. Set by withRuns, and
   // an array because a session that never got its claim in still has to land
   // somewhere rather than disappear.
@@ -198,6 +200,8 @@ const COMPOSE_GAP_MS = 60_000;
  */
 export function threadEvents(lines: LedgerLine[], engine?: string | null, numbers?: Record<string, number> | null): ThreadEvent[] {
   const events: ThreadEvent[] = [];
+  // The owner's next reply carries the comments since their last one to the agent.
+  const lastReply = Math.max(0, ...lines.filter((l) => l.source === 'founder' && words(l.patch?.answer)).map((l) => l.ts));
   // Folded forward as we walk, so a rename can say what the name WAS. The fold
   // keeps only the latest value per field, so this is the one place the old
   // title still exists.
@@ -307,7 +311,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     if (comment) {
       const text = words(comment.text);
       if (isContinuedNote(comment.text)) events.push({ at, who: 'you', said: 'continued this in their own thread' });
-      else if (text) events.push({ at, who: 'you', said: 'They commented', words: text, message: true, says: 'comment' });
+      else if (text) events.push({ at, who: 'you', said: 'They commented', words: text, message: true, says: 'comment', ...(lastReply > at ? { carried: true } : {}) });
       continue;
     }
 

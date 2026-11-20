@@ -40,7 +40,7 @@ import { chord } from '../this-keyboard';
 import { DONE } from '../done-word';
 import { onPhone } from '../phone-screen';
 import { PlaceButton, type PlaceFacts } from './PlaceButton';
-import { nameWait } from '../../../shared/thread-waits.mts';
+import { nameWait, waitParts } from '../../../shared/thread-waits.mts';
 import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
@@ -259,6 +259,12 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 }
 
 /* ----------------------------------------------------------------- button */
+
+/** A teammate picked under Waits on…, who is told through the send sheet; null keeps it a plain wait. */
+export function personToAsk(id: string, { blocks, canAsk }: { blocks: boolean; canAsk: boolean }): string | null {
+  const w = waitParts(id);
+  return !blocks && canAsk && w.kind === 'person' ? w.person : null;
+}
 
 export function ThreadMenu({ share = null, step = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
   /** What Share… offers, or null where the thread cannot be shared. */
@@ -498,7 +504,11 @@ export function ThreadMenu({ share = null, step = null, onCopyLink, onSendTo, on
           {waitsNow && <button type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onWait?.(null); }}>
             <span className="ico"><WaitMark /></span><span className="ts-more-label">{blocks ? 'Not blocked' : 'Stop waiting'}</span>
           </button>}
-          {waitChoices.map((c) => <button key={c.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onWait?.(c.id); }}>
+          {waitChoices.map((c) => <button key={c.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => {
+            const ask = personToAsk(c.id, { blocks, canAsk: !!share });
+            if (ask) { setWaiting(false); openSend([ask], wantFirst(step) ?? 'review'); return; }
+            close(false); onWait?.(c.id);
+          }}>
             <span className="ico"><WaitMark /></span><span className="ts-more-label">{c.label}</span>
           </button>)}
           {/* A task can wait on someone off the team, or on something, in plain words. */}

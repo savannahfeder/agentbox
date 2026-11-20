@@ -86,14 +86,23 @@ export interface WaitEndContext {
   items: readonly WaitingItem[];
   cards: readonly WaitCard[];
   lastWordFrom: (person: string) => number;
+  /** The words of that newest message, quoted where the wait ends so the thread shows them. */
+  lastWordsFrom?: (person: string) => string | null;
   nameOf: NameOf;
   now: number;
 }
 
-function oneEnd(item: WaitingItem, id: string, since: number, { items, cards, lastWordFrom, nameOf }: WaitEndContext): string | null {
+const QUOTE_CHARS = 80;
+const quoted = (text: string | null | undefined): string => {
+  const line = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!line) return '';
+  return `: “${line.length > QUOTE_CHARS ? `${line.slice(0, QUOTE_CHARS - 1).trimEnd()}…` : line}”`;
+};
+
+function oneEnd(item: WaitingItem, id: string, since: number, { items, cards, lastWordFrom, lastWordsFrom, nameOf }: WaitEndContext): string | null {
   const w = waitParts(id);
   if (w.kind === 'person') {
-    if (lastWordFrom(w.person) > since) return `${FIRST(nameOf(w.person))} wrote to you`;
+    if (lastWordFrom(w.person) > since) return `${FIRST(nameOf(w.person))} wrote to you${quoted(lastWordsFrom?.(w.person))}`;
     return item.waitingComments?.some((c) => c.by === w.person && c.ts > since) ? `${FIRST(nameOf(w.person))} commented` : null;
   }
   if (w.kind === 'name') return null;

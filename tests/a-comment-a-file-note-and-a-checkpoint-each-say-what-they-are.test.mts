@@ -28,8 +28,8 @@ describe('what the thread says each message is', () => {
   const said = events.filter((e) => e.kind !== 'work' && e.kind !== 'run');
   const find = (words) => said.find((e) => (e.text ?? '').includes(words));
 
-  it('a teammate comment is a comment that started no agent', () => {
-    expect(messageKind(find('apology email'))).toEqual({ word: 'Comment', why: 'did not start the agent' });
+  it('a teammate comment is a comment, which the reply after it took to the agent', () => {
+    expect(messageKind(find('apology email'))).toEqual({ word: 'Comment', why: 'Went to the agent with the next reply' });
   });
 
   it('a note on a file names the file and the place', () => {

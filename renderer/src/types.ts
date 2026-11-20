@@ -1143,6 +1143,8 @@ export interface AgentTurn {
   fileMark?: FileMarkLink;
   /** A teammate's comment, or an agent's checkpoint (thread-history.ts). */
   says?: 'comment' | 'progress';
+  /** A comment the owner's reply after it took to the agent. */
+  carried?: boolean;
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
@@ -1985,9 +1987,9 @@ declare global {
       writeDoc?(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }>;
       fileLink?(p: FileLinkAsk): Promise<FileLinkState>;
       fileLinkShare?(p: FileLinkAsk): Promise<FileLinkState>;
+      fileToChat?(p: FileLinkAsk & { to: string }): Promise<{ ok: boolean; roomId?: string; error?: string }>;
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
-      fileToChat?(p: FileLinkAsk & { to: string }): Promise<{ ok: boolean; roomId?: string; error?: string }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkComment?(p: { token: string; text: string; place?: NotePlace | null; product?: string; thread?: string; src?: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;
       fileLinkAccess?(p: { token: string; access: LinkAccess; can: LinkCan }): Promise<{ ok: boolean; error?: string }>;
