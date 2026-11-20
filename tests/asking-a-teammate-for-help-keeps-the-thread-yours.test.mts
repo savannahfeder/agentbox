@@ -31,6 +31,7 @@ import { byWorkHere } from '../renderer/src/thread-commands.ts';
 import { AskBar, askChange } from '../renderer/src/team/AskBar.tsx';
 import { offerIsLive } from '../renderer/src/format.ts';
 import { rowSummary } from '../renderer/src/list-rules.ts';
+import { taskWords } from '../renderer/src/team/company.ts';
 import { changePath } from '../main/code-change.mts';
 
 async function aMac(cloud, personId, tellThread) {
@@ -271,6 +272,21 @@ describe('the wiring', () => {
   it('a helper\'s words on your thread are passed on by your own supervisor', () => {
     expect(read('main/main.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
     expect(read('main/serve.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
+  });
+});
+
+// Round four: Priya could not tell from the inbox which rows were teammates asking for her review.
+describe('the row of an ask', () => {
+  const product = { slug: 'dm', team: { direct: true, projectId: 'd1', people: ['sam', 'theo'] } };
+  const task = (o = {}) => ({ id: 'k', product: 'dm', labels: [GIVEN_TASK], status: 'open', assignee: 'theo', createdBy: 'sam', people: ['sam', 'theo'], ask: { kind: 'review', owner: 'sam', thread: 't', product: 'api' }, ...o });
+  const nameOf = (id) => ({ sam: 'Sam', theo: 'Theo' })[id];
+  it('says what is asked, to the person asked and to the one who asked', () => {
+    expect(taskWords(task(), product, 'theo', nameOf)?.word).toBe('Sam asks for a review');
+    expect(taskWords(task({ ask: { kind: 'help', owner: 'sam', thread: 't', product: 'api' } }), product, 'theo', nameOf)?.word).toBe('Sam asks for help');
+    expect(taskWords(task(), product, 'sam', nameOf)?.word).toBe('Theo is reviewing');
+  });
+  it('a task that is not an ask reads as before', () => {
+    expect(taskWords(task({ ask: undefined }), product, 'sam', nameOf)?.word).toBe('With Theo');
   });
 });
 
