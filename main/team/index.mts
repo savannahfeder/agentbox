@@ -46,6 +46,7 @@ import { createRooms } from './rooms.mts';
 import { isOnTeam } from '../../shared/rooms-on.mts';
 import { noticeEndedWaits } from './waits.mts';
 import { handOverDepartures } from './departures.mts';
+import { handedChange } from './handed-change.mts';
 import type { Departure } from './departures.mts';
 import type { CloudPhoneCommand } from './supabase-backend.mts';
 import { mateCard, splitCards } from '../../shared/mate-cards.mts';
@@ -1227,7 +1228,7 @@ export function createTeamService({
      * (shared/team-rules.mts). A file with a `rel` is one the words name: its
      * links are pointed at the copy.
      */
-    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy }: TaskInput = {}) {
+    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy }: TaskInput = {}, { sync = true }: { sync?: boolean } = {}) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const me = state.me.id;
       const list = [...new Set(([] as string[]).concat(toIn ?? []).filter(Boolean))];
@@ -1263,7 +1264,7 @@ export function createTeamService({
         ...seen, ...(blocks.length ? { blockedBy: blocks } : {}),
       });
       onChange();
-      await syncNow();
+      if (sync) await syncNow();
       return item;
     },
 
@@ -1285,8 +1286,9 @@ export function createTeamService({
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
+      const change = handedChange({ repoPath: product.repoPath, id, owner: (state.me.name || 'the giver').split(/\s+/)[0], outDir: path.join(product.dir, 'runs', id) });
       // What the giver wants from them comes first, over the thread's own words.
-      const brief = [String(note ?? '').trim(), words, left].filter(Boolean).join('\n\n');
+      const brief = [String(note ?? '').trim(), words, change.words, left].filter(Boolean).join('\n\n');
       // The task leads back to the thread, opened to them as Share's Send opens it.
       const seen = seenNow(row, product, kept().getSince(state.me.id));
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
@@ -1294,12 +1296,13 @@ export function createTeamService({
       const made = await this.giveTask(to, {
         title: row.label || row.title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
-        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files,
-      });
+        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...files, ...(change.file ? [change.file] : [])],
+      }, { sync: false });
       // As your own words: a note would be drawn as the agent's checkpoint.
       const asked = String(note ?? '').replace(/\s+/g, ' ').trim();
       store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}${asked ? `: ${asked}` : '.'}`, status: 'done' });
       onChange();
+      await syncNow();
       return made;
     },
 
