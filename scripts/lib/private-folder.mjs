@@ -10,6 +10,8 @@ import path from 'node:path';
 
 const PUSH_MS = 2 * 60_000;
 const LOCAL_MS = 20_000;
+// The push runs the skill tests it reaches (scripts/private-push-gate.mjs).
+const CHECKED_PUSH_MS = 10 * 60_000;
 
 function named(dir) {
   try {
@@ -63,9 +65,13 @@ export function pushPrivateFolder(dir, { message, env = process.env, trusted = d
   if (!at || !fs.existsSync(path.join(at, '.git'))) return { pushed: false };
   const planted = plantedIn(at, path.join(trusted, rel));
   if (planted) return { pushed: false, why: `${rel} was left as it is, because ${planted}` };
+  // The gate, not the public hooks the ship names in the environment, which
+  // refuse a commit on any main the public main does not hold.
+  const gate = path.join(trusted, 'scripts', 'private-hooks');
+  if (!fs.existsSync(path.join(gate, 'pre-push'))) return { pushed: false, why: `${rel} was left as it is, because the checks its push runs are missing here` };
   const quiet = { ...env, GIT_TERMINAL_PROMPT: '0' };
   const git = (args, timeout = LOCAL_MS) => {
-    const r = spawnSync('git', args, { cwd: at, encoding: 'utf8', env: quiet, timeout, killSignal: 'SIGKILL' });
+    const r = spawnSync('git', ['-c', `core.hooksPath=${gate}`, ...args], { cwd: at, encoding: 'utf8', env: quiet, timeout, killSignal: 'SIGKILL' });
     return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
   };
   const status = git(['status', '--porcelain']);
@@ -85,7 +91,10 @@ export function pushPrivateFolder(dir, { message, env = process.env, trusted = d
     git(['rebase', '--abort']);
     return { pushed: false, why: `could not put ${rel}'s commits after what was pushed meanwhile: ${rebased.out}` };
   }
-  const pushed = git(['push', '--quiet'], PUSH_MS);
-  if (!pushed.ok) return { pushed: false, why: `could not push ${rel}: ${pushed.out}` };
+  const pushed = git(['push', '--quiet'], CHECKED_PUSH_MS);
+  if (!pushed.ok) {
+    const refused = /private push refused: (.*)/.exec(pushed.out)?.[1];
+    return { pushed: false, why: refused ? `${rel} was not pushed, because ${refused}` : `could not push ${rel}: ${pushed.out}` };
+  }
   return { pushed: true, commits, path: rel };
 }

@@ -56,6 +56,13 @@ export function privateFolderOf(root: string): PrivateFolder | null {
   return { path: rel, url };
 }
 
+/** Point the checkout's push at this checkout's gate (scripts/private-push-gate.mjs). */
+function gateItsPush(root: string, at: string): void {
+  const gate = path.join(root, 'scripts', 'private-hooks');
+  if (!fs.existsSync(path.join(gate, 'pre-push'))) return;
+  if (git(at, ['config', '--get', 'core.hooksPath']).out !== gate) git(at, ['config', 'core.hooksPath', gate]);
+}
+
 const tracks = (cwd: string, rel: string) => git(cwd, ['ls-files', '--error-unmatch', '--', rel]).ok;
 const ignores = (cwd: string, rel: string) => git(cwd, ['check-ignore', '-q', '--', path.join(rel, 'x')]).ok;
 
@@ -74,6 +81,7 @@ export function bringPrivateFolder(root: string, { every = EVERY, now = Date.now
   }
   lastLook.set(root, now);
   if (cloned) {
+    gateItsPush(root, at);
     const pulled = git(at, ['pull', '--ff-only', '--quiet'], PULL_MS);
     return pulled.ok ? { ok: true, did: 'pulled' } : { ok: true, did: 'recent', why: `could not bring ${named.path} up to date: ${pulled.out}` };
   }
@@ -89,6 +97,7 @@ export function bringPrivateFolder(root: string, { every = EVERY, now = Date.now
   }
   if (!fs.existsSync(at)) {
     fs.renameSync(temp, at);
+    gateItsPush(root, at);
     return { ok: true, did: 'cloned' };
   }
   // What the public copy left behind stays, and an edit made there shows as a change.
@@ -97,6 +106,7 @@ export function bringPrivateFolder(root: string, { every = EVERY, now = Date.now
   git(at, ['reset', '--quiet']);
   const gone = git(at, ['ls-files', '--deleted']);
   for (const file of gone.ok && gone.out ? gone.out.split('\n') : []) git(at, ['checkout', '--', file]);
+  gateItsPush(root, at);
   return { ok: true, did: 'cloned' };
 }
 
