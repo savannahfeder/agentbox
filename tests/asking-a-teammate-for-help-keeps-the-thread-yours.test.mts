@@ -265,6 +265,10 @@ describe('the wiring', () => {
     expect(app).toContain("const about = openCard.title ? `About “${openCard.title}”: ` : '';");
     expect(app).toContain('if (about && !readDraft(convo).trim()) { saveDraft(convo, about);');
   });
+  // Rounds three and four: Home said a teammate had nothing running while their profile showed two in progress.
+  it('Home counts a teammate\'s running work the way their profile does', () => {
+    expect(read('renderer/src/App.tsx')).toContain('const agents = Math.max(m.agents ?? 0, m.inProgress ?? 0);');
+  });
   // Round two: Dana's returned review sat under week-old rows because its project ranks last.
   it('a thread handed back ranks with a teammate\'s message, not with its project', () => {
     expect(read('renderer/src/App.tsx')).toContain('handedBackBy(i as Parameters<typeof handedBackBy>[0]) ? new Set([i.product]) : directSlugs');

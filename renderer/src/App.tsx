@@ -7910,10 +7910,12 @@ export default function App() {
       : items.filter((i) => i.status === 'done' && i.labels?.includes(`teammate:${id}`)).map((i) => i.updatedAt);
     const week = weekCounts(done, now);
     const waiting = (waits.get(m.key) ?? 0) > 0;
+    // The count their profile shows: their presence card can lag the threads they shared (rounds three and four).
+    const agents = Math.max(m.agents ?? 0, m.inProgress ?? 0);
     return {
       key: m.key, name: m.name, letter: (m.letter || m.name).slice(0, 1).toUpperCase(), ai: m.kind === 'mate',
-      line: waiting ? 'Waiting on you' : m.now ?? (m.agents ? 'Working' : 'Nothing running'),
-      state: teamRowState({ agents: m.agents, waitingOnYou: waiting }), week, total: week.reduce((a, b) => a + b, 0),
+      line: waiting ? 'Waiting on you' : m.now ?? (agents ? 'Working' : 'Nothing running'),
+      state: teamRowState({ agents, waitingOnYou: waiting }), week, total: week.reduce((a, b) => a + b, 0),
     };
   }));
   const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => {
