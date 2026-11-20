@@ -48,6 +48,8 @@ export function AsksLine({ item, items, now = Date.now(), onTakeBack }: {
       {open.map((a) => {
         const person = team.byId.get(a.to) ?? null;
         const first = firstName(person) || 'Someone';
+        // Whether they have opened the ask yet, from the read marks the task carries.
+        const seenAt = team.state.seen?.[`${(a.row as WorkItem).product}/${a.row.id}`]?.[a.to] ?? 0;
         return (
           <div key={a.row.id} className="asks-one">
             <Face person={person} size={22} />
@@ -55,7 +57,7 @@ export function AsksLine({ item, items, now = Date.now(), onTakeBack }: {
               <span>{a.ask.kind === 'help'
                 ? <><b>{first}</b> is helping and can write to your agent.</>
                 : <><b>{first}</b> is reviewing this.</>}</span>
-              <span className="asks-when">Asked {updatedWords(a.at, now)}</span>
+              <span className="asks-when">{seenAt >= a.at ? `Seen ${updatedWords(seenAt, now)}` : `Asked ${updatedWords(a.at, now)}, not opened yet`}</span>
             </span>
             <button type="button" className="asks-take" onClick={() => onTakeBack(a.row as WorkItem)}>Take it back</button>
           </div>
