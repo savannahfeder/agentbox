@@ -1056,7 +1056,8 @@ export function ThreadComposer({
         <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => { pickProject(p.slug); setProjectChosen(true); close('text'); }}>
           <Swatch slug={p.slug} /><span className="tc-row-label">{p.name}</span>
-          {!p.repoPath && <span className="tc-row-note">For personal tasks</span>}
+          {/* A project a teammate shared has no folder here either, and is the team's, not personal (round four). */}
+          {p.team?.projectId ? <span className="tc-row-note">Shared with your team</span> : !p.repoPath && <span className="tc-row-note">For personal tasks</span>}
         </button>
       ))}
       {/* MAKING A PROJECT IS A THING YOU CAN DO FROM HERE, ALWAYS (approved

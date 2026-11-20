@@ -58,7 +58,7 @@ export function AsksLine({ item, items, now = Date.now(), onTakeBack }: {
                 ? <><b>{first}</b> is helping and can write to your agent.</>
                 : <><b>{first}</b> is reviewing this.</>}</span>
               <span className="asks-when">{seenAt >= a.at ? `Seen ${updatedWords(seenAt, now)}` : `Asked ${updatedWords(a.at, now)}, not opened yet`}</span>
-              {a.ask.note && <span className="asks-note">{a.ask.note.length > 140 ? `${a.ask.note.slice(0, 140)}…` : a.ask.note}</span>}
+              {a.ask.note && <span className="asks-note">{a.ask.note}</span>}
             </span>
             <button type="button" className="asks-take" onClick={() => onTakeBack(a.row as WorkItem)}>Take it back</button>
           </div>
