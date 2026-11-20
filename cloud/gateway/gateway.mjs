@@ -17,7 +17,7 @@ import { isKeyObject } from '../../shared/cloud-keys.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { JOIN_SCHEME } from '../../shared/room-links.mts';
 import { WEB_APP } from '../../shared/cloud-address.mts';
-import { paidHeadline } from '../../shared/paid-words.mts';
+import { paidHeadline } from './paid-words.mts';
 import { PAYING, planOfLookupKey } from './stripe.mjs';
 import { createPhoneCarry } from './phone.mjs';
 import { createPhoneRunStatus } from './phone-status.mjs';

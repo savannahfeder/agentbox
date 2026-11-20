@@ -13,7 +13,7 @@ import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { stripeClient } from '../cloud/gateway/stripe.mjs';
 import { WEB_APP } from '../shared/cloud-address.mts';
-import { paidHeadline } from '../shared/paid-words.mts';
+import { paidHeadline } from '../cloud/gateway/paid-words.mts';
 import { paidPageOf } from '../renderer/src/paid/paid.ts';
 
 const A = '11111111-1111-4111-8111-111111111111';

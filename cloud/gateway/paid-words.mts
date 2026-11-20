@@ -1,7 +1,8 @@
 // What the page after Stripe says: the server's own page (cloud/gateway) and
-// the web app's /paid (renderer/src/paid) read the same words.
-import { PLANS } from '../cloud/gateway/plans.mjs';
-import { Name } from './product-name.mjs';
+// the web app's /paid (renderer/src/paid) read the same words. It sits here,
+// not in shared/, because the Mac app ships shared/ and not cloud/.
+import { PLANS } from './plans.mjs';
+import { Name } from '../../shared/product-name.mjs';
 
 export function paidHeadline(query: URLSearchParams): string {
   if (query.has('cancelled')) return 'Nothing was charged';
