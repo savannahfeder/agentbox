@@ -10,8 +10,9 @@ let inlineWidth = 760;
 export function picturesNamedIn(text: string | null | undefined): string[] {
   const out = new Set<string>();
   for (const m of String(text ?? '').matchAll(/!\[[^\]]*\]\(<?([^)>\s]+)>?\)/g)) {
-    const whole = wholePicturePath(m[1]);
-    if (whole && isImagePath(whole)) out.add(whole);
+    let whole: string | null = null;
+    try { whole = wholePicturePath(m[1]); } catch { continue; }
+    if (whole && /^(\/|[A-Za-z]:[\\/])/.test(whole) && isImagePath(whole)) out.add(whole);
   }
   return [...out];
 }

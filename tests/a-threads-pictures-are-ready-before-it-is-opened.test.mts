@@ -19,6 +19,14 @@ describe('the pictures a thread names', () => {
     expect(picturesNamedIn('![r](shots/a.png) ![w](https://x.dev/a.png) [doc](/Users/x/p/a.png) ![t](/Users/x/p/notes.txt)')).toEqual([]);
     expect(picturesNamedIn(null)).toEqual([]);
   });
+
+  it('leave out a file url with a stray percent sign rather than stopping the inbox', () => {
+    expect(picturesNamedIn('![p](file:///Users/x/p/100%zz.png) ![q](/Users/x/p/q.png)')).toEqual(['/Users/x/p/q.png']);
+  });
+
+  it('never include a file url that names a web address, so selecting a row fetches nothing remote', () => {
+    expect(picturesNamedIn('![w](file://https://x.dev/a.png) ![v](file://x.dev/a.png)')).toEqual([]);
+  });
 });
 
 describe('the row under the cursor', () => {
