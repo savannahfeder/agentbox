@@ -5,7 +5,8 @@
 // worker's skill edit reached every later agent unchecked (confirmed by a
 // disprover on dummy repos, 2026-11-19). The private checkout's push now runs
 // a gate from the public checkout: the key and unsafe-setting rules, and the
-// skill tests the change reaches.
+// skill tests the change reaches. Only this repository's own scripts use it;
+// the app is unchanged.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -13,10 +14,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pushPrivateFolder } from '../scripts/lib/private-folder.mjs';
-import { bringPrivateFolder } from '../main/private-folder.mts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const HOOKS = path.join(ROOT, 'scripts', 'private-hooks');
 const made: string[] = [];
 afterEach(() => { for (const d of made.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
 
@@ -146,38 +145,5 @@ describe('the ship\'s push of what a task left in the private folder', () => {
     expect(r.pushed).toBe(false);
     expect(r.why).toMatch(/GitHub token/);
     expect(tip(w.remote)).toBe('first');
-  });
-});
-
-describe('the app folder\'s private checkout', () => {
-  const appWith = (w: ReturnType<typeof world>) => {
-    const app = path.join(w.dir, 'fresh-app');
-    put(path.join(app, '.agentbox/private.json'), JSON.stringify({ path: '.claude/skills', url: w.remote }));
-    put(path.join(app, '.gitignore'), '/.claude/skills/\n');
-    fs.cpSync(HOOKS, path.join(app, 'scripts', 'private-hooks'), { recursive: true });
-    git(app, 'init', '-q');
-    return app;
-  };
-
-  it('is set to push through the gate when it is cloned', () => {
-    const app = appWith(world());
-    expect(bringPrivateFolder(app, { every: 0 })).toMatchObject({ ok: true, did: 'cloned' });
-    expect(git(path.join(app, '.claude/skills'), 'config', '--get', 'core.hooksPath')).toBe(path.join(app, 'scripts', 'private-hooks'));
-  });
-
-  it('is set to push through the gate when one cloned before is brought up to date', () => {
-    const w = world();
-    const app = appWith(w);
-    git(w.dir, 'clone', '-q', w.remote, path.join(app, '.claude/skills'));
-    expect(bringPrivateFolder(app, { every: 0 }).ok).toBe(true);
-    expect(git(path.join(app, '.claude/skills'), 'config', '--get', 'core.hooksPath')).toBe(path.join(app, 'scripts', 'private-hooks'));
-  });
-
-  it('is left alone in a checkout that has no gate to point at', () => {
-    const w = world();
-    const app = appWith(w);
-    fs.rmSync(path.join(app, 'scripts'), { recursive: true, force: true });
-    expect(bringPrivateFolder(app, { every: 0 }).ok).toBe(true);
-    expect(spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: path.join(app, '.claude/skills') }).status).toBe(1);
   });
 });
