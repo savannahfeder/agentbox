@@ -141,6 +141,21 @@ describe('an ask for a review', () => {
     expect(html).toContain('View the change');
   });
 
+  // Round eight: Priya asked Sam to review a table her agent made; the link in the
+  // task pointed at her project, and on Sam's computer it opened nothing.
+  it('carries the files the thread made, linked in its words, as a hand-over does', async () => {
+    disk.setLineAuthor(sam.personId);
+    const t = sam.store.composeItem('api', { title: 'Summarise bookings', body: 'Make a table.' });
+    const dir = sam.store.listProducts().find((p) => p.slug === 'api').dir;
+    fs.mkdirSync(path.join(dir, 'tables'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'tables', 'bookings-v2.csv'), 'clinic,rate\nElm,11.45\n');
+    sam.store.recordSessionResult('api', t.id, { result: 'Saved [bookings-v2.csv](tables/bookings-v2.csv).' });
+    await sam.service.syncNow();
+    await sam.service.askTeammate({ product: 'api', id: t.id, to: theo.personId, kind: 'review', note: 'Check [the table](tables/bookings-v2.csv), please.' });
+    await both();
+    expect(theTask().body).toMatch(/\[the table\]\(attachments\/[\w.-]*bookings-v2\.csv\)/);
+  });
+
   it('carries nothing when the thread changed no code', async () => {
     await asked('review');
     expect(theTask().body).not.toContain('.change)');

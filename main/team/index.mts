@@ -1345,9 +1345,9 @@ export function createTeamService({
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const title = String(row.label || row.title || 'A thread');
       const link = threadLink(state.me.id, id);
-      // The code it changed lives only on this computer; it goes with the ask so they can read it.
+      // The code it changed and the files it made live only on this computer; they go with the ask so they can be read.
       const change = machineryPath(product.dir, changePath(id));
-      const files = fs.existsSync(change) ? [{ name: `${shortTitle(title) || 'the'} change.change`, srcPath: change }] : [];
+      const files = [...(fs.existsSync(change) ? [{ name: `${shortTitle(title) || 'the'} change.change`, srcPath: change }] : []), ...briefOfThread(row, product).files];
       const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,
