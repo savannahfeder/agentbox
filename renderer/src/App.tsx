@@ -60,7 +60,7 @@ import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, aWordFollows, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS, WORD_FOLLOWS_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
-import { shownToPeople } from '../../shared/thread-cards.mts';
+import { replyOnHandedOn, shownToPeople } from '../../shared/thread-cards.mts';
 import { SEEN_SENT } from '../../shared/phone-settings.mts';
 import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
 import { askWords, askedNow, askedPatch, askedSaid, latestStep } from '../../shared/thread-ask.mts';
@@ -5237,6 +5237,8 @@ export default function App() {
         showToast('A message you sent did not reach its agent. Click to open it, your words are back in the reply box.', { product: item.product, id: item.id });
       }
     };
+    const handedOff = replyOnHandedOn(item, text);
+    if (handedOff) { putBack(new Error(handedOff)); return; }
     // A REPLY TO HER OWN THREAD IN THE TUTORIAL (2026-10-06). It is written at
     // once rather than after the three seconds Z can take it back, because Z
     // has not been taught yet and the walk moves on from this press: the
