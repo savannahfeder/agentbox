@@ -2962,6 +2962,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       const item = want && to !== TEAM_CHAT && typeof arg.thread === 'string' && typeof arg.product === 'string' ? store.readItem(arg.product, arg.thread) : null;
       const link = item ? threadLink(me, item.id) : null;
       const about = item && link ? { title: String(item.label || item.title || 'A thread'), link } : null;
+      if (about) await team.openThreadTo(arg.product as string, item!.id, [to]);
       const roomId = await sendFileToChat({ rooms, me, to, toName: person?.name ?? '', files, note, want, about });
       if (about) store.threadEdit(arg.product as string, item!.id, askedPatch([to], askedSaid('review', team.firstNameOf(to) || 'them', note), Date.now(), 'review'));
       push();

@@ -3075,6 +3075,7 @@ export default function App() {
     const card = weekCards.find((c) => c.personId === personId && c.threadId === threadId);
     if (card) { setFocused(null); openTeammateCard(card, null, at ?? null); return; }
     // A link can come before its card: ask the cloud now, and open it if it comes.
+    showToast(`Opening ${firstName(team?.byId.get(personId) ?? null) || 'your teammate'}'s thread…`);
     linkWaiting.current = { personId, threadId, at };
     void api.teamSync().catch(() => {}).then(() => setTimeout(() => {
       const w = linkWaiting.current;

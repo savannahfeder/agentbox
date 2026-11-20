@@ -1271,6 +1271,21 @@ export function createTeamService({
 
     /**
      * GIVE A THREAD TO A PERSON: its new name, brief, priority, due day and files
+    /**
+     * A thread sent to people is opened to them, as Share's Send opens it, and
+     * its card goes up before any link to it can arrive.
+     */
+    async openThreadTo(slug: string, id: string, to: string[], { sync = true }: { sync?: boolean } = {}) {
+      if (!state.me) throw new Error('start or join a team first');
+      const product = products().find((p) => p.slug === slug);
+      const row = product ? store.readItem(slug, id) : null;
+      if (!product || !row) throw new Error('that thread is gone');
+      const seen = seenNow(row, product, kept().getSince(state.me.id));
+      if (seen === 'team') return;
+      store.threadEdit(slug, id, openTo(seen, row.visibleTo, to));
+      if (sync) await syncNow();
+    },
+
      * go as a task, and the thread closes here saying who has it. The close is
      * in your hand rather than the app's, or Done would read it as news and put
      * it in your own Needs you.
@@ -1299,8 +1314,7 @@ export function createTeamService({
       // What the giver wants from them comes first, over the thread's own words.
       const brief = [String(note ?? '').trim(), words, change.words, left].filter(Boolean).join('\n\n');
       // The task leads back to the thread, opened to them as Share's Send opens it.
-      const seen = seenNow(row, product, kept().getSince(state.me.id));
-      if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
+      await this.openThreadTo(slug, id, [to], { sync: false });
       const link = threadLink(state.me.id, id);
       const made = await this.giveTask(to, {
         title: row.label || row.title,
