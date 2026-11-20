@@ -1964,6 +1964,8 @@ export class Supervisor {
    * hold every thread until the reset it printed. Its bench goes, and a limit
    * mark with it, so a chat on the login left behind can move here. Still
    * capped, its first run dies in seconds and benches it to its reset again.
+   * An ended subscription's mark goes the same way: a renewal changes nothing
+   * in the login's file, so the pick is the only sign of one.
    */
   accountChosen(engine: string, profile: string | null | undefined) {
     // The cloud follows the pick (`_cloudAccountOfThisMac`), so its check is asked afresh.
@@ -1971,7 +1973,8 @@ export class Supervisor {
     if (engineOf(engine) === DEFAULT_ENGINE) { this._accountChosenAt = Date.now(); this._accountSwitch = null; }
     if (!profile) return false;
     const key = this._accountKey(engine, profile);
-    if (this._profileTrouble?.[key]?.cause === 'at-limit') this._clearProfileTrouble(key);
+    const cause = this._profileTrouble?.[key]?.cause;
+    if (cause === 'at-limit' || cause === 'subscription-ended') this._clearProfileTrouble(key);
     else if (this._profileCooldown) this._profileCooldown[key] = 0;
     if (engineOf(engine) === DEFAULT_ENGINE) this._spawnCooldownUntil = 0;
     this._saveState();
@@ -6211,7 +6214,10 @@ export class Supervisor {
     if (cause === 'at-limit') {
       const resetsAt = limitResetMoment(raw);
       if (resetsAt) this._profileTrouble[profile].resetsAt = resetsAt;
-      // And which plan it was hit on, for `_forgetLimitsOfAnOldPlan`.
+    }
+    // Which plan it was refused or capped on, for `_forgetLimitsOfAnOldPlan`
+    // and `_forgetRenewedSubscriptions`.
+    if (cause === 'at-limit' || cause === 'subscription-ended') {
       const stamp = plan ? planStamp(profile, { home: this.config.home || os.homedir() }) : null;
       if (stamp) this._profileTrouble[profile].plan = stamp;
     }
@@ -6290,7 +6296,9 @@ export class Supervisor {
    * A SUBSCRIPTION RENEWED IS LET BACK IN. An ended one leaves the rotation at
    * once, like anything waiting on a person, and nothing would start on it to
    * prove it works again. Its own file says so: once its billing is no longer
-   * "none", the trouble goes and the next run on it is the proof.
+   * "none", and its plan fields have moved since the refusal, the trouble goes
+   * and the next run on it is the proof. A file that still says it pays is not
+   * enough on its own: an unpaid subscription's file goes on saying so.
    */
   _forgetRenewedSubscriptions() {
     let forgot = false;
@@ -6298,6 +6306,7 @@ export class Supervisor {
     for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
       if (trouble?.cause !== 'subscription-ended') continue;
       if (readPlan(key, { home }).ended) continue;
+      if (trouble.plan && planStamp(key, { home }) === trouble.plan) continue;
       this._clearProfileTrouble(key);
       forgot = true;
     }
@@ -6310,7 +6319,9 @@ export class Supervisor {
    * login that is signed in and allowed to use Claude Code, and an account she
    * has not picked never gets the surviving session that would otherwise clear
    * its mark. A limit mark goes only when nothing in the reading is at 100%.
-   * Trouble that is not the account's (an old Claude Code, the network) stays.
+   * Trouble that is not the account's (an old Claude Code, the network) stays,
+   * and so does an ended subscription: Claude Code still reports usage for one
+   * it refuses to run on.
    */
   noteUsageReading(profile: string | null | undefined, reading: { at?: number; limits?: { percent?: number | null }[] | null } | null | undefined, { onlyLimit = false }: { onlyLimit?: boolean } = {}) {
     const key = this._accountKey(DEFAULT_ENGINE, profile || 'default');
@@ -6319,7 +6330,7 @@ export class Supervisor {
     if (limits.length) (this._usageSeen ??= {})[profile || 'default'] = { limits, at: reading!.at ?? 0 };
     if (!trouble || !limits.length) return false;
     if ((reading!.at ?? 0) < (trouble.at ?? trouble.since ?? 0)) return false;
-    const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'subscription-ended', 'unknown'].includes(trouble.cause as string))
+    const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'unknown'].includes(trouble.cause as string))
       || (trouble.cause === 'at-limit' && limits.every((l) => !(l.percent! >= 100)));
     if (!proven) return false;
     this._clearProfileTrouble(key);
