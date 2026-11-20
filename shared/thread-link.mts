@@ -15,13 +15,15 @@ export function threadLink(owner: string | null | undefined, id: string, site = 
   return `${site.replace(/\/+$/, '')}/t/${owner}/${id}`;
 }
 
-/** Whose thread a link of ours names, or null for any other address. */
-export function threadOfLink(href: string | null | undefined): { owner: string; id: string } | null {
+/** Whose thread a link of ours names, and the step it opens at (shared/thread-ask.mts), or null for any other address. */
+export function threadOfLink(href: string | null | undefined): { owner: string; id: string; at?: number } | null {
   let u: URL;
   try { u = new URL(String(href ?? '')); } catch { return null; }
   if (u.protocol !== 'https:' || !OUR_HOSTS.has(u.hostname)) return null;
   const m = /^\/t\/([^/]+)\/([^/]+)\/?$/.exec(u.pathname);
-  return m && PART.test(m[1]) && PART.test(m[2]) ? { owner: m[1], id: m[2] } : null;
+  if (!m || !PART.test(m[1]) || !PART.test(m[2])) return null;
+  const at = Number(u.searchParams.get('at'));
+  return { owner: m[1], id: m[2], ...(/^\d{1,15}$/.test(u.searchParams.get('at') ?? '') && at > 0 ? { at } : {}) };
 }
 
 /**

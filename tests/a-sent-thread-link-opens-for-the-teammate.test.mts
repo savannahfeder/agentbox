@@ -118,14 +118,14 @@ describe('the window', () => {
     expect(app).toContain('if (await copyText(link)) return true;');
   });
   it('publishes the thread before its link is sent', () => {
-    expect(app).toMatch(/await api\.teamSync\(\)\.catch\(\(\) => \{\}\);\n\s+const words = sentWords\(rowTitle\(item\), link, note\);\n\s+const out = oneChat && to\.length === 1\n\s+\? await roomsUi\.startChat\([\s\S]{0,200}?: await api\.teamMessage\(/);
+    expect(app).toMatch(/await api\.teamSync\(\)\.catch\(\(\) => \{\}\);\n[\s\S]{0,300}?const words = asks \? askWords\([\s\S]{0,120}?: sentWords\(rowTitle\(item\), link, note\);\n\s+const out = oneChat && to\.length === 1\n\s+\? await roomsUi\.startChat\([\s\S]{0,200}?: await api\.teamMessage\(/);
   });
   it('asks Share… and Send the same question the team list does', () => {
     expect(focus).toContain('const seen: SeenBy = seenNow(item, teamCtx.products.get(item.product), teamCtx.state.since ?? null);');
     expect(app).toContain('const seen = seenNow(item, team?.products.get(item.product), team?.state.since ?? null);');
   });
   it('syncs and waits for a linked thread it does not have yet, and opens it when it comes', () => {
-    expect(app).toContain('linkWaiting.current = { personId, threadId };');
+    expect(app).toContain('linkWaiting.current = { personId, threadId, at };');
     expect(app).toMatch(/const w = linkWaiting\.current;\n\s+if \(!w\) return;\n\s+const card = weekCards\.find\(\(c\) => c\.personId === w\.personId && c\.threadId === w\.threadId\);/);
     expect(app).toContain("hasn't shared that thread with you.");
   });

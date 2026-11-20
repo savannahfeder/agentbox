@@ -20,6 +20,7 @@ export interface WaitingItem {
   updatedAt?: number;
   agent?: unknown;
   wrote?: Record<string, { ts?: number; source?: string } | undefined>;
+  waitingComments?: readonly { by: string; ts: number }[];
 }
 
 export interface WaitCard {
@@ -89,9 +90,12 @@ export interface WaitEndContext {
   now: number;
 }
 
-function oneEnd(id: string, since: number, { items, cards, lastWordFrom, nameOf }: WaitEndContext): string | null {
+function oneEnd(item: WaitingItem, id: string, since: number, { items, cards, lastWordFrom, nameOf }: WaitEndContext): string | null {
   const w = waitParts(id);
-  if (w.kind === 'person') return lastWordFrom(w.person) > since ? `${FIRST(nameOf(w.person))} wrote to you` : null;
+  if (w.kind === 'person') {
+    if (lastWordFrom(w.person) > since) return `${FIRST(nameOf(w.person))} wrote to you`;
+    return item.waitingComments?.some((c) => c.by === w.person && c.ts > since) ? `${FIRST(nameOf(w.person))} commented` : null;
+  }
   if (w.kind === 'name') return null;
   if (w.kind === 'card') {
     const card = cards.find((c) => c.personId === w.person && c.threadId === w.thread);
@@ -120,7 +124,7 @@ export function endedWaits<T extends WaitingItem>(rows: readonly T[], ctx: WaitE
       out.push({ item, said: `Still waiting on ${waitingOnWords(item.blockedBy![0], ctx)} after 3 days` });
       continue;
     }
-    const ends = item.blockedBy!.map((id) => oneEnd(id, since, ctx));
+    const ends = item.blockedBy!.map((id) => oneEnd(item, id, since, ctx));
     if (ends.every(Boolean)) out.push({ item, said: ends.at(-1)! });
   }
   return out;

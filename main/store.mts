@@ -887,7 +887,7 @@ export class Store {
     // `label` is a rename (w-ab3d51dc7d): the name every row shows. Never
     // `title`, which is the message the thread was started with and briefs
     // every run. Written on her authority, it outranks the namer's.
-    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks', 'start', 'label', 'shippedAt'];
+    const fields = ['problem', 'progress', 'solution', 'visibility', 'visibleTo', 'priority', 'blockedBy', 'blocks', 'start', 'label', 'shippedAt', 'asked'];
     const allowed = Object.fromEntries(Object.entries(patch ?? {}).filter(([k]) => fields.includes(k)));
     if ('label' in allowed) {
       allowed.label = String(allowed.label ?? '').replace(/\s+/g, ' ').trim();

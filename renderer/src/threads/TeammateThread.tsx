@@ -27,13 +27,15 @@ import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Pers
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
+import { stepLine } from '../../../shared/thread-ask.mts';
+import { revealLine } from '../reveal-line';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
 const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
-export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue }: {
+export function TeammateThread({ card, person, now, syncedAt, openAt, step = null, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue }: {
   card: ThreadCard; person: Person | null; now: number;
   /** Carry it on in a thread of your own. */
   onContinue?: () => void;
@@ -43,6 +45,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   onMessage: () => void;
   /** Open this file at this comment, from a row in Needs you. */
   openAt?: ArtifactOpen | null;
+  /** When the message a link was sent about was written: the page lands on it. */
+  step?: number | null;
   /** The sync that last ran, which is when there can be anything new to read. */
   syncedAt: number | null;
   /** Open a copied file in the side pane. */
@@ -99,6 +103,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
   const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run');
+  const stepAt = step ? stepLine(events, step) : null;
+  useEffect(() => (stepAt ? revealLine(stepAt) : undefined), [stepAt, personId, threadId]);
 
   // Their copy publishes its marks with its messages; everyone's come together here.
   const own = useMemo(() => marksOf((work?.lines ?? [])

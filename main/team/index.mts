@@ -1297,7 +1297,8 @@ export function createTeamService({
         priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files,
       });
       // As your own words: a note would be drawn as the agent's checkpoint.
-      store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}.`, status: 'done' });
+      const asked = String(note ?? '').replace(/\s+/g, ' ').trim();
+      store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}${asked ? `: ${asked}` : '.'}`, status: 'done' });
       onChange();
       return made;
     },

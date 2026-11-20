@@ -63,6 +63,7 @@ import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mts';
 import { SEEN_SENT } from '../../shared/phone-settings.mts';
 import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
+import { askWords, askedNow, askedPatch, askedSaid, latestStep } from '../../shared/thread-ask.mts';
 
 const SHARE_LAST = 'agentbox:share-last';
 import { changePathFor } from './code-artifact';
@@ -759,6 +760,7 @@ export default function App() {
   // A TEAMMATE'S THREAD, opened from the Team board: its card, never its conversation.
   const [openCard, setOpenCard] = useState<ThreadCard | null>(null);
   const [cardOpenAt, setCardOpenAt] = useState<ArtifactOpen | null>(null);
+  const [cardStep, setCardStep] = useState<number | null>(null);
   // THERE IS NO MEMBERS PAGE ANY MORE (w-8415594d19, 2026-10-01). Team
   // management is a pane in Settings, so the sidebar's two team rows are one
   // row that opens it. This is all that is left of them: whether the email box
@@ -3049,15 +3051,16 @@ export default function App() {
   );
   // A teammate's thread opens as their card, over the page, and Back returns here.
   // The keyboard goes with it, so Escape comes back to their row and J carries on.
-  const openTeammateCard = useCallback((card: ThreadCard, at: ArtifactOpen | null = null) => {
+  const openTeammateCard = useCallback((card: ThreadCard, at: ArtifactOpen | null = null, step: number | null = null) => {
     // A task between you and them is here to open, not only its card.
     const task = items.find((i) => i.id === card.threadId && isTaskRow(i));
     if (task) { setFocused(task); return; }
     setCardOpenAt(at);
+    setCardStep(step);
     setOpenCard(card); setTeamOpen(true); setCardSel(stopKey({ card }));
   }, [items]);
-  const linkWaiting = useRef<{ personId: string; threadId: string } | null>(null);
-  const openContinuedFrom = useCallback((personId: string, threadId: string) => {
+  const linkWaiting = useRef<{ personId: string; threadId: string; at?: number } | null>(null);
+  const openContinuedFrom = useCallback((personId: string, threadId: string, at?: number) => {
     // A link to a thread of your own opens it, wherever you are.
     if (personId === team?.me) {
       const own = items.find((i) => i.id === threadId);
@@ -3065,9 +3068,9 @@ export default function App() {
       return;
     }
     const card = weekCards.find((c) => c.personId === personId && c.threadId === threadId);
-    if (card) { setFocused(null); openTeammateCard(card); return; }
+    if (card) { setFocused(null); openTeammateCard(card, null, at ?? null); return; }
     // A link can come before its card: ask the cloud now, and open it if it comes.
-    linkWaiting.current = { personId, threadId };
+    linkWaiting.current = { personId, threadId, at };
     void api.teamSync().catch(() => {}).then(() => setTimeout(() => {
       const w = linkWaiting.current;
       if (w?.personId !== personId || w.threadId !== threadId) return;
@@ -3082,7 +3085,7 @@ export default function App() {
     if (!card) return;
     linkWaiting.current = null;
     setFocused(null);
-    openTeammateCard(card);
+    openTeammateCard(card, null, w.at ?? null);
   }, [weekCards, openTeammateCard]);
   const continueTeammateThread = useCallback((card: ThreadCard) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
@@ -7610,7 +7613,7 @@ export default function App() {
   const waitIs = (item: WorkItem) => {
     if (!team) return null;
     if (isTaskRow(item)) return blockedWords(item, { items, cards, me: team.me, nameOf: nameOfPerson })?.title ?? null;
-    return setByPerson(item) ? waitWords(item, { items, cards, nameOf: nameOfPerson })?.title ?? null : null;
+    return setByPerson(item) ? askedNow(item) ?? waitWords(item, { items, cards, nameOf: nameOfPerson })?.title ?? null : null;
   };
   // A ⌘K row from ./thread-commands, on the thread it was offered over. The
   // rows that act on the thread's page open that thread first.
@@ -7685,7 +7688,7 @@ export default function App() {
       showToast('The link could not be copied.');
       return false;
     },
-    send: async (target, to, note) => {
+    send: async (target, to, note, want = null) => {
       const item = items.find((i) => i.product === target.product && i.id === target.id);
       const link = threadLink(team?.me, target.id);
       if (!item || !link || !to.length) return;
@@ -7698,11 +7701,15 @@ export default function App() {
       }
       // The card goes up first, or the link can arrive before there is anything to open.
       await api.teamSync().catch(() => {});
-      const words = sentWords(rowTitle(item), link, note);
+      const asks = want === 'help' || want === 'review' ? want : null;
+      const words = asks ? askWords({ want: asks, title: rowTitle(item), link, note, step: latestStep(item) }) : sentWords(rowTitle(item), link, note);
       const out = oneChat && to.length === 1
         ? await roomsUi.startChat(to[0], team?.byId.get(to[0])?.name ?? 'Chat', words).then((error) => ({ ok: !error, error: error ?? undefined }))
         : await api.teamMessage(to.length === 1 ? to[0] : to, words);
-      showToast(out.ok ? `Sent to ${names}` : (out.error ?? `It did not reach ${names}.`), out.ok ? { product: item.product, id: item.id } : undefined);
+      // Help and review leave it yours, waiting on them, with what you asked on it.
+      const waits = out.ok && asks ? await api.threadEdit(item.product, item.id, askedPatch(to, askedSaid(asks, names, note), Date.now())) : null;
+      const sent = asks === 'help' ? `Asked ${names} for help` : asks === 'review' ? `Sent to ${names} for review` : `Sent to ${names}`;
+      showToast(!out.ok ? (out.error ?? `It did not reach ${names}.`) : waits && !waits.ok ? (waits.error ?? 'It went, but the wait did not save.') : sent, out.ok ? { product: item.product, id: item.id } : undefined);
       if (out.ok && to.length === 1) { try { localStorage.setItem(SHARE_LAST, to[0]); } catch { /* the menu just names the first */ } }
       void refresh();
     },
@@ -8393,7 +8400,7 @@ export default function App() {
                     with the same people picked, or to the room whose board it
                     was opened from. */}
                 <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
-                  syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
+                  syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt} step={cardStep}
                   backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}

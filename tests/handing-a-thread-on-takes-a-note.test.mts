@@ -7,7 +7,8 @@
 // Picking a person now opens the sheet Share uses, with a note box and a
 // button that names them; the note goes at the top of the task, under the
 // thread's link and over where the agent got to. Measured on the in-memory
-// cloud and by drawing the sheet.
+// cloud and by drawing the sheet. Since 2026-11-20 that sheet is Share's own,
+// opened on Hand it over (asking-a-teammate-about-a-thread-…).
 import { it, expect, beforeEach, afterEach, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,7 +22,7 @@ import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mts';
 import { isGivenTask } from '../shared/team-rules.mts';
 import { handedFrom } from '../shared/thread-link.mts';
-import { GiveSheet } from '../renderer/src/threads/SharePanel.tsx';
+import { SendSheet } from '../renderer/src/threads/SharePanel.tsx';
 
 async function aMac(cloud, personId) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hand-on-note-'));
@@ -78,7 +79,8 @@ describe('the task a hand-off makes', () => {
 });
 
 describe('the sheet after you pick a person', () => {
-  const html = renderToStaticMarkup(h(GiveSheet, { to: { id: 'u-lena', name: 'Lena Fischer' }, onGive() {} }));
+  const lena = { id: 'u-lena', name: 'Lena Fischer', email: '', avatarUrl: null };
+  const html = renderToStaticMarkup(h(SendSheet, { people: [lena], start: ['u-lena'], link: false, onCopy() {}, onSend() {}, want: 'hand', wants: ['hand'] }));
   it('names who gets it, has a note box, and a button that says so', () => {
     expect(html).toContain('Lena');
     expect(html).toContain('placeholder="Add a note"');
@@ -90,8 +92,8 @@ describe('the wiring', () => {
   const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
   it('picking a person opens the sheet; an AI teammate still starts at once', () => {
     const menu = read('renderer/src/threads/ThreadMenu.tsx');
-    expect(menu).toContain("if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p);");
-    expect(menu).toMatch(/<GiveSheet to=\{givingTo\} onGive=\{\(note\) => \{ close\(false\); onGive\?\.\(givingTo, note\); \}\} \/>/);
+    expect(menu).toContain("if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else { setGiving(false); openSend([p.id], 'hand'); }");
+    expect(menu).toContain("if (p) onGive?.({ id: p.id, name: p.name || p.email }, note);");
   });
   it('the note travels to the hand-off', () => {
     expect(read('renderer/src/App.tsx')).toContain('api.teamHandOn({ product: item.product, id: item.id, to: to.id, ...(note.trim() ? { note: note.trim() } : {}) })');

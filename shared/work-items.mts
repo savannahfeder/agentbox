@@ -104,6 +104,7 @@ export type WorkItemPatch = {
   shippedAt?: number;
   waitEnded?: SaidAt;
   handedOver?: SaidAt;
+  asked?: SaidAt;
   linkComment?: LinkComment;
   linkReply?: { file: string; text: string };
   comment?: { text: string; name?: string };
@@ -387,6 +388,9 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // WHERE A THREAD WENT WHEN SOMEONE LEFT THE TEAM: `{ said, at }`, the line
   // each copy writes on what it moved (main/team/departures.mts).
   'handedOver',
+  // WHAT ITS OWNER ASKED A TEAMMATE, with the wait on them: `{ said, at }`
+  // (shared/thread-ask.mts).
+  'asked',
   // SOMEONE'S COMMENT ON THE THREAD'S FILE THROUGH ITS PUBLIC LINK:
   // `{ name, file, text }`, beside the note that says it (main/team/link-comments.mts).
   'linkComment',
@@ -819,7 +823,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       const text = str(value.text, MAX_TEXT_BYTES);
       return file && text ? { file, text } : undefined;
     }
-    case 'waitEnded': case 'handedOver': {
+    case 'waitEnded': case 'handedOver': case 'asked': {
       if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
       const said = str((value as Fields).said, MAX_SUMMARY);
       return said ? { said, at: Math.trunc((value as Fields).at as number) } : undefined;

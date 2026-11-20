@@ -8,14 +8,15 @@ import { handedFrom } from '../../../shared/thread-link.mts';
 import { taskGiver } from '../../../shared/team-rules.mts';
 import { firstName, TeamContext } from '../team/people';
 
-export const OpenTeammateThread = createContext<((personId: string, threadId: string) => void) | null>(null);
+/** `at`: the step a link opens at (shared/thread-ask.mts). */
+export const OpenTeammateThread = createContext<((personId: string, threadId: string, at?: number) => void) | null>(null);
 
 /** A link in a chat: a thread's link opens the thread here, anything else a new tab. */
 export function ChatLink({ href, children }: { href?: string; children?: ReactNode }) {
   const open = useContext(OpenTeammateThread);
   return <a href={href} target="_blank" rel="noreferrer" onClick={(e) => {
     const t = open && threadToOpen(href, e);
-    if (t) { e.preventDefault(); open(t.owner, t.id); }
+    if (t) { e.preventDefault(); open(t.owner, t.id, t.at); }
   }}>{children}</a>;
 }
 

@@ -1,8 +1,9 @@
 // The panels Share… opens under the thread's dots, drawn with the menu's own
 // parts (.th-menu, .row-i) so they sit where its rows were.
-import { useContext, useState } from 'react';
-import { Face, TeamContext } from '../team/people';
+import { useState } from 'react';
+import { Face } from '../team/people';
 import type { Person } from '../types';
+import { WANT_WORDS, type Step, type Want } from '../../../shared/thread-ask.mts';
 import { firstName, matchPeople, type SeenBy } from './share-rules';
 import './share.css';
 
@@ -32,7 +33,7 @@ export function ShareList({ link, first, others, seen, onCopy, onSendFirst, onSe
         <span className="ico"><LinkMark /></span><span className="ts-more-label">Copy link</span>
       </button>}
       {first && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSendFirst}>
-        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send to {firstName(first)}</span>
+        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send to {firstName(first)}…</span>
         <Face person={first} size={18} />
       </button>}
       {others && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSendOther}>
@@ -73,26 +74,44 @@ export function ChooseList({ people, chosen, onPick }: { people: readonly Person
   );
 }
 
-/** To, a note, and Send to inbox; Copy link beside it for a link instead. */
-export function SendSheet({ people, start, link, onCopy, onSend }: {
+/** What the button says for what you want: a plain send is the link in their inbox. */
+export function sendWords(want: Want | null, to: readonly Person[]): string {
+  if (want === 'help') return 'Ask for help';
+  if (want === 'review') return 'Send for review';
+  if (want === 'hand') return `Give to ${to.length === 1 ? firstName(to[0]) : 'them'}`;
+  return 'Send to inbox';
+}
+
+/**
+ * To, what you want from them, a note, and the button that does it. Pressing
+ * the picked want again takes it off, which sends the link alone. Help shows
+ * the step it is about; a hand-over goes to one person.
+ */
+export function SendSheet({ people, start, link, onCopy, onSend, step = null, want: first = null, wants = [] }: {
   people: readonly Person[];
   start: readonly string[];
   link: boolean;
   onCopy: () => void;
-  onSend: (to: string[], note: string) => void;
+  onSend: (to: string[], note: string, want: Want | null) => void;
+  step?: Step | null;
+  want?: Want | null;
+  wants?: readonly Want[];
 }) {
   const [to, setTo] = useState<string[]>([...start]);
   const [typed, setTyped] = useState('');
   const [note, setNote] = useState('');
+  const [want, setWant] = useState<Want | null>(first && wants.includes(first) ? first : null);
   const found = typed ? matchPeople(people, typed, to).slice(0, 5) : [];
   const add = (id: string) => { setTo((was) => [...new Set([...was, id])]); setTyped(''); };
-  const send = () => { if (to.length) onSend(to, note.trim()); };
+  const ready = want === 'hand' ? to.length === 1 : to.length > 0;
+  const send = () => { if (ready) onSend(to, note.trim(), want); };
+  const picked = to.map((id) => people.find((x) => x.id === id)).filter((p): p is Person => !!p);
   return (
     <div className="th-menu ts-more-menu sh-send" role="dialog" aria-label="Send to someone">
       <div className="sh-to">
         <span className="sh-label">To</span>
-        {to.map((id) => { const p = people.find((x) => x.id === id); return p && <button key={id} type="button" className="sh-chip" title="Take off" onClick={() => setTo((was) => was.filter((x) => x !== id))}><Face person={p} size={18} />{firstName(p)}</button>; })}
-        <input className="sh-find" autoFocus placeholder={to.length ? '' : 'Add a person'} value={typed} aria-label="Add a person"
+        {picked.map((p) => <button key={p.id} type="button" className="sh-chip" title="Take off" onClick={() => setTo((was) => was.filter((x) => x !== p.id))}><Face person={p} size={18} />{firstName(p)}</button>)}
+        <input className="sh-find" autoFocus={!to.length} placeholder={to.length ? '' : 'Add a person'} value={typed} aria-label="Add a person"
           onChange={(e) => setTyped(e.target.value)}
           onKeyDown={(e) => {
             e.stopPropagation();
@@ -103,30 +122,16 @@ export function SendSheet({ people, start, link, onCopy, onSend }: {
       {found.length > 0 && <div className="sh-found">
         {found.map((p) => <button key={p.id} type="button" className={row} onClick={() => add(p.id)}><span className="ico"><Face person={p} size={18} /></span><span className="ts-more-label">{p.name || p.email}</span></button>)}
       </div>}
-      <textarea className="sh-note" placeholder="Add a note" value={note} aria-label="Add a note" rows={2}
+      {wants.length > 0 && <div className="sh-wants" role="group" aria-label="What you want">
+        {wants.map((w) => <button key={w} type="button" className="sh-want" aria-pressed={want === w} onClick={() => setWant((was) => (was === w ? null : w))}>{WANT_WORDS[w]}</button>)}
+      </div>}
+      {want === 'help' && step && <blockquote className="sh-step">{step.words}</blockquote>}
+      <textarea className="sh-note" autoFocus={to.length > 0} placeholder="Add a note" value={note} aria-label="Add a note" rows={2}
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }} />
       <div className="sh-foot">
-        {link && <button type="button" className="th-new sh-ghost" onClick={onCopy}><LinkMark />Copy link</button>}
-        <button type="button" className="th-new sh-go" disabled={!to.length} onClick={send}>Send to inbox</button>
-      </div>
-    </div>
-  );
-}
-
-/** After a person is picked under "Give it to someone else": what you want from them, then it goes. */
-export function GiveSheet({ to, onGive }: { to: { id: string; name: string }; onGive: (note: string) => void }) {
-  const [note, setNote] = useState('');
-  const team = useContext(TeamContext);
-  const first = to.name.split(/\s+/)[0] || to.name;
-  return (
-    <div className="th-menu ts-more-menu sh-send" role="dialog" aria-label={`Give it to ${first}`}>
-      <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
-      <textarea className="sh-note" autoFocus placeholder="Add a note" value={note} aria-label="Add a note" rows={2}
-        onChange={(e) => setNote(e.target.value)}
-        onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onGive(note.trim()); } }} />
-      <div className="sh-foot">
-        <button type="button" className="th-new sh-go" onClick={() => onGive(note.trim())}>Give to {first}</button>
+        {link && want !== 'hand' && <button type="button" className="th-new sh-ghost" onClick={onCopy}><LinkMark />Copy link</button>}
+        <button type="button" className="th-new sh-go" disabled={!ready} onClick={send}>{sendWords(want, picked)}</button>
       </div>
     </div>
   );

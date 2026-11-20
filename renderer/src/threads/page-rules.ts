@@ -1003,7 +1003,7 @@ export function workAudience(item: WorkItem, product: Product | undefined | null
 
 /** Whom a thread was handed to: it is closed, but it did not finish. */
 export function handedTo(item: { status?: string; answer?: string | null }): string | null {
-  return handedOn(item) ? String(item.answer).slice('Given to '.length).replace(/\.$/, '') : null;
+  return handedOn(item) ? String(item.answer).slice('Given to '.length).split(/:\s/)[0].replace(/\.$/, '') : null;
 }
 
 export function handedInitials(name: string): string {

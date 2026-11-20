@@ -132,6 +132,7 @@ import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
 import { ContinuedFrom, HandedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
 import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
+import { latestStep } from '../../../shared/thread-ask.mts';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle, showsWhenItComesBack } from '../list-rules';
@@ -1403,7 +1404,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       // A file opens beside the chat, a deck full screen, a web address in the
       // pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
-      if (goes === 'thread' && openLinkedThread) { const t = threadOfLink(href)!; openLinkedThread(t.owner, t.id); return; }
+      if (goes === 'thread' && openLinkedThread) { const t = threadOfLink(href)!; openLinkedThread(t.owner, t.id, t.at); return; }
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (!asksForANewTab(click) && opensBeside(href)) { openBeside(newestOfFamily(href, edits), from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
@@ -1928,7 +1929,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     <ThreadMenu
       share={share}
       onCopyLink={() => onShare!.copy(item)}
-      onSendTo={(to, note) => onShare!.send(item, to, note)}
+      step={latestStep(item)}
+      onSendTo={(to, note, want) => onShare!.send(item, to, note, want)}
       onSee={(to) => onShare!.see(item, to)}
       onChoose={(id) => onShare!.choose(item, id)}
       key={`${item.product}:${item.id}`}
