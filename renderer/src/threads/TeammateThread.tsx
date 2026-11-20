@@ -1,8 +1,10 @@
-// A TEAMMATE'S SHARED THREAD, the whole window: its name and what it waits on
-// at the top, then the conversation as its owner sees it (drawn by the owner's
-// own Thread from the lines their copy published) with a box for a comment,
-// and beside it what it is about, its files and its properties. Read-only.
+// A TEAMMATE'S SHARED THREAD, laid out as an opened thread of your own: its
+// crumb and buttons in the window's header, then in the same reading column its
+// name and what it waits on, the conversation as its owner sees it (drawn by
+// the owner's own Thread from the lines their copy published) and a box for a
+// comment. About puts what it is about, its files and its properties beside it.
 import { useCallback, useContext, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
@@ -25,7 +27,7 @@ import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
 import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard, WorkItem } from '../types';
 import { AskBar } from '../team/AskBar';
-import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
+import { MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
 
@@ -34,8 +36,11 @@ const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
-export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack }: {
+export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack, headerTarget = null, cornerTarget = null }: {
   card: ThreadCard; person: Person | null; now: number;
+  /** The window's header, where an opened thread's crumb and buttons go. */
+  headerTarget?: HTMLElement | null;
+  cornerTarget?: HTMLElement | null;
   /** Their open ask of you on this thread: help puts your words to their agent. */
   ask?: WorkItem | null;
   onHandBack?: (verdict: 'done' | 'yes' | 'changes', words: string) => Promise<boolean>;
@@ -58,6 +63,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [reread, setReread] = useState(0);
+  // What it is about, its files and its properties, beside the thread when asked for.
+  const [about, setAbout] = useState(false);
   const { personId, threadId } = card;
   const team = useContext(TeamContext);
   const following = useContext(FollowContext);
@@ -160,6 +167,23 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     ...f, open: () => open(f.src),
   })), [work?.lines, marks, open]);
 
+  const acts = (
+    <div className="tp-acts">
+      {following && card.state !== 'done' && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
+        onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
+        {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
+      </button>}
+      {onContinue && !ask && canContinue(work, card, team?.me ?? null) && (
+        <button type="button" className="th-follow" onClick={onContinue}
+          title={`Start a thread of your own with ${owner}'s conversation and files.`}>
+          Continue it yourself
+        </button>
+      )}
+      <MessagePerson person={person} onMessage={onMessage} />
+      <button type="button" className={`th-follow tp-about${about ? ' on' : ''}`} aria-pressed={about} onClick={() => setAbout(!about)}>About</button>
+    </div>
+  );
+
   return (
     <div className="tp-page">
       {big && product && (
@@ -182,31 +206,21 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}
-      <div className="tp-bar">
-        <button type="button" className="th-back" onClick={onBack}><span aria-hidden="true">←</span>{backLabel}</button>
-        <div className="tp-acts">
-          {following && card.state !== 'done' && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
-            onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
-            {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
-          </button>}
-          {onContinue && !ask && canContinue(work, card, team?.me ?? null) && (
-            <button type="button" className="th-follow" onClick={onContinue}
-              title={`Start a thread of your own with ${owner}'s conversation and files.`}>
-              Continue it yourself
-            </button>
-          )}
-          <MessagePerson person={person} onMessage={onMessage} />
+      {headerTarget ? createPortal(<ThreadCrumb from={backLabel} name={card.title || `${owner}'s thread`} onBack={onBack} />, headerTarget) : (
+        <div className="tp-bar">
+          <button type="button" className="th-back" onClick={onBack}><span aria-hidden="true">←</span>{backLabel}</button>
+          {acts}
         </div>
-      </div>
-      <header className="tp-top">
-        <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
-        {card.title && <h1 className="th-card-title">{card.title}</h1>}
-        {/* While you were asked in, the bar below says where it stands, not "waiting on" its owner. */}
-        {card.visible && !ask && <TeammateStanding card={card} person={person} now={now} />}
-      </header>
-      <div className="tp-grid">
-        <section className="th-work" aria-label="The conversation">
-          {ask && onHandBack && <AskBar task={ask} owner={person} onHandBack={onHandBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+      )}
+      {headerTarget && cornerTarget && createPortal(acts, cornerTarget)}
+      <div className={`tp-grid${about ? ' tp-with-about' : ''}`}>
+        <section className="th-work tp-col" aria-label="The conversation">
+          <header className="tp-top">
+            {card.title && <h1 className="th-card-title">{card.title}</h1>}
+            <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
+            {/* While you were asked in, the ask at the end says where it stands, not "waiting on" its owner. */}
+            {card.visible && !ask && <TeammateStanding card={card} person={person} now={now} />}
+          </header>
           {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
           {work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
           <FileMarkOpener.Provider value={openMark}>
@@ -218,6 +232,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
               {md(built.outcome.text)}
             </div>
           )}
+          {/* The ask is the newest thing said here, so it comes last, as a message. */}
+          {ask && onHandBack && <AskBar task={ask} owner={person} onHandBack={onHandBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
           <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
@@ -232,9 +248,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             </div>
           </form>
         </section>
-        <aside className="tp-side" aria-label="About this thread">
+        {about && <aside className="tp-side" aria-label="About this thread">
           <TeammateCard card={card} person={person} files={files} />
-        </aside>
+        </aside>}
       </div>
     </div>
   );

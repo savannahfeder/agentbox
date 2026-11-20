@@ -1,6 +1,7 @@
-// WHAT A TEAMMATE ASKED OF YOU ON THEIR THREAD, over that thread: their note,
-// the step they picked, and handing it back with your answer. On the task's own
-// page it also opens their thread.
+// WHAT A TEAMMATE ASKED OF YOU ON THEIR THREAD, as the newest message on it:
+// their note, the step they picked, and handing it back with your answer. On
+// the task's own page the same buttons sit under the message that asked
+// (`AskActions`), since that message already says the rest.
 import { useState } from 'react';
 import type { Person, WorkItem } from '../types';
 import { Face, firstName } from './people';
@@ -13,8 +14,10 @@ export function askChange(task: Pick<WorkItem, 'body'>): string | null {
   return /\]\((attachments\/[^)\s]+\.change)\)/.exec(String(task.body ?? ''))?.[1] ?? null;
 }
 
-export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange }: {
+export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, under = false }: {
   task: WorkItem;
+  /** Only the answer, under the message that asked, which already names the thread and the change. */
+  under?: boolean;
   owner: Person | null;
   onHandBack: (verdict: Verdict, words: string) => Promise<boolean>;
   onOpenThread?: () => void;
@@ -37,11 +40,11 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange }: 
   };
   const ask4 = giving === 'changes' ? `What should ${first} change?` : `Anything ${first} should know? (optional)`;
   return (
-    <section className="ask-bar" aria-label={`What ${first} asked`}>
-      <div className="ask-bar-head">
-        <Face person={owner} size={24} />
-        <span><b>{first}</b> {ask.kind === 'help' ? 'asked you to help on this thread.' : 'asked for your review.'}</span>
-      </div>
+    <section className={`ask-bar${under ? ' ask-under' : ''}`} aria-label={`What ${first} asked`}>
+      {!under && <div className="ask-bar-head">
+        <Face person={owner} size={22} />
+        <b>{first}</b><span>{ask.kind === 'help' ? 'asked you to help' : 'asked for your review'}</span>
+      </div>}
       {/* On the task's own page its message already says both. */}
       {ask.note && !onOpenThread && <p className="ask-bar-note">{ask.note}</p>}
       {ask.step && !onOpenThread && <blockquote className="ask-bar-step">{ask.step.length > 400 ? `${ask.step.slice(0, 400)}…` : ask.step}</blockquote>}
@@ -57,14 +60,14 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange }: 
         </div>
       ) : (
         <div className="ask-bar-acts">
-          {onOpenThread && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
-          {change && <button type="button" className={onOpenThread ? 'quiet' : undefined} onClick={() => onOpenChange?.(change)}>View the change</button>}
+          {onOpenThread && !under && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
+          {change && !under && <button type="button" onClick={() => onOpenChange?.(change)}>View the change</button>}
           {ask.kind === 'review'
             ? <>
-              <button type="button" className={onOpenThread ? 'quiet' : undefined} onClick={() => setGiving('yes')}>Looks good</button>
-              <button type="button" className="quiet" onClick={() => setGiving('changes')}>Needs changes</button>
+              <button type="button" onClick={() => setGiving('yes')}>Looks good</button>
+              <button type="button" onClick={() => setGiving('changes')}>Needs changes</button>
             </>
-            : <button type="button" className={onOpenThread ? 'quiet' : undefined} onClick={() => setGiving('done')}>Hand back to {first}</button>}
+            : <button type="button" onClick={() => setGiving('done')}>Hand back to {first}</button>}
         </div>
       )}
     </section>

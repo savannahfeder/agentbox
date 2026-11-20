@@ -424,21 +424,31 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-pop .opts .th-prio-mark { margin-right: 0; }
 
 /* ------------------------------------------------------------ a teammate's thread */
-/* The whole window: the name and what it waits on across the top, then the
-   conversation on the left and what it is about on the right. */
+/* Laid out as an opened thread of your own (one-thing-at-a-time.css, THE TASK
+   PAGE FILLS THE WINDOW): the same type, the same measure, starting a third of
+   the way into the spare room. The founder on the page it replaced: "it doesn't
+   match our design style ... the padding is really different". */
 /* Measured by its own width: a file opened beside it narrows the page, not the window. */
-.tp-page { padding: 14px 40px 48px; container: tp / inline-size; }
-.tp-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 28px; }
+.tp-page { padding: 0 0 48px; container: tp / inline-size; }
+.tp-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 32px 0; }
 .tp-acts { display: flex; align-items: center; gap: 10px; }
-.tp-top { margin: 0 0 28px; padding: 0 0 24px; border-bottom: 1px solid var(--line); }
+.tp-about.on { color: var(--text); border-color: var(--text-faint); }
+.tp-top { margin: 0 0 28px; }
 .tp-whose { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--text-dim); }
 .tp-whose .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }
-.tp-top .th-card-title { margin: 0 0 14px; font-size: 28px; line-height: 34px; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
+.tp-top .th-card-title { margin: 0 0 10px; font-size: calc(var(--tp-type) * 1.7); line-height: 1.2; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
 .tp-standing { display: flex; align-items: center; flex-wrap: wrap; gap: 0 10px; margin: 0; font-size: 14px; color: var(--text-dim); }
 .tp-standing .ts-st { margin-right: 0; }
 .tp-standing b { font-weight: 500; color: var(--text); }
 .tp-standing .tp-ago { margin-left: auto; font-size: 12.5px; color: var(--text-faint); }
-.tp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 64px; align-items: start; }
+.tp-grid {
+  --tp-type: clamp(16px, calc(0.25cqi + 13px), 18px);
+  --tp-measure: min(calc(var(--tp-type) * 47.5), calc(100cqi - 96px));
+  display: grid; grid-template-columns: minmax(0, var(--tp-measure)); gap: 48px; align-items: start;
+  padding: 12px 32px 0 max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
+}
+.tp-grid.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
+.tp-col :is(.msg-body, .appendix) { font-size: var(--tp-type); }
 .tp-side { position: sticky; top: 0; }
 .tp-side .ts-ticket { max-width: none; margin: 0; padding: 20px 22px 18px; border-radius: 10px; }
 .tp-side .ts-tk-part { padding: 0 0 18px; margin: 0 0 18px; border-bottom: 1px solid var(--line); }
@@ -532,7 +542,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .workspace-collapsed .workspace-navigation .th-me-btn > .tm-av { display: inline-block; }
 .th-work { min-width: 0; }
 .th-work .msg-body p, .th-work .appendix p { margin: 0 0 10px; }
-.th-work .msg-body ul, .th-work .msg-body ol, .th-work .appendix ul, .th-work .appendix ol { margin: 0 0 10px; }
+/* The numbers sit inside the column, as they do on an opened thread of your own. */
+.th-work .msg-body ul, .th-work .msg-body ol, .th-work .appendix ul, .th-work .appendix ol { margin: 0 0 10px 22px; padding: 0; }
 .th-follow { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
 .th-follow:hover { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
 .th-follow.on { border-color: var(--line); color: var(--text-faint); }
@@ -547,7 +558,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-comment button:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
 .th-comment button:disabled { color: var(--text-faint); border-color: var(--line); cursor: default; }
 @container tp (max-width: 980px) {
-  .tp-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .tp-grid, .tp-grid.tp-with-about { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-left: 32px; }
   .tp-side { position: static; }
 }
 @container tp (max-width: 720px) {

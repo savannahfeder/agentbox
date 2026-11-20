@@ -67,7 +67,7 @@ import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, thread
 const SHARE_LAST = 'agentbox:share-last';
 import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
-import { AskSentLine, AsksLine } from './team/AsksLine';
+import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
 import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
 import { SEE_SAID, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
@@ -7158,6 +7158,9 @@ export default function App() {
   const [taskHeader, setTaskHeader] = useState<HTMLDivElement | null>(null);
   // The socket look B of w-581dbc6cc4's round teleports the code mark into.
   const [cornerHeaderTarget, setCornerHeaderTarget] = useState<HTMLSpanElement | null>(null);
+  // A teammate's opened thread puts its crumb and buttons where an opened thread of your own does.
+  const [teamHeader, setTeamHeader] = useState<HTMLDivElement | null>(null);
+  const [teamCorner, setTeamCorner] = useState<HTMLSpanElement | null>(null);
   const [connectionsCorner, setConnectionsCorner] = useState<HTMLSpanElement | null>(null);
 
   // A schedule set on a thread. On one RUN of a repeating task it moves that
@@ -8147,7 +8150,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}${skyOnPlace ? ' sky-shown sky-place' : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${(focused && !settingsOpen && !inChats) || (teamShown && !focused && openCard && snap?.team?.signedIn && snap.team.team) ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}${skyOnPlace ? ' sky-shown sky-place' : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put
@@ -8284,7 +8287,7 @@ export default function App() {
               <CrossIcon />
             </button>
           </nav>
-        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'}</h1> : evOn ? <h1 className="workspace-title">Inbox</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Inbox</h1>))}
+        ) : (settingsOpen ? <div className="workspace-page-heading"><button className="workspace-back" aria-label="Back to previous page" title="Back to previous page (Esc)" onClick={() => { setSettingsOpen(false); setSettingsPane(null); }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><h1 className="workspace-title">{settingsPage === 'projects' ? 'Projects' : settingsPage === 'team' ? 'Team' : 'Settings'}</h1></div> : focused ? (inChats ? <><div className="gc-head"><div className="gc-head-col"><span className="workspace-title gc-col-title">{homeLayout === 'chats' ? 'Team' : 'Chats'}</span></div><div className="workspace-task-header cx-task-header" ref={setTaskHeader} /></div><div className="workspace-artifact-header" ref={setArtifactHeader} /></> : <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (filesShown ? <h1 className="workspace-title">Files</h1> : connectionsShown ? <h1 className="workspace-title">Connections</h1> : chatsPlaceShown ? <h1 className="workspace-title">Team</h1> : teamShown ? (openCard && snap?.team?.signedIn && snap.team.team ? <div className="workspace-task-header" ref={setTeamHeader} /> : <h1 className="workspace-title">{openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'}</h1>) : evOn ? <h1 className="workspace-title">Inbox</h1> : teammatesShown ? teammatesUi.title : roomsUi.live && !roomShown ? <h1 className="workspace-title">Inbox</h1> : roomShown && roomsUi.heading ? roomsUi.heading.title : <h1 className="workspace-title">Inbox</h1>))}
         {/* THE PLUS, THE COMMAND MARK AND THE COG STEP OFF WHILE SHE IS
             SEARCHING, and that is the half of the chosen design that is not the
             cross. It is forced, not chosen: .topbar and .body carry the same 22px
@@ -8332,6 +8335,7 @@ export default function App() {
           {/* Not while Settings or the Team page covers the thread: the thread's
               state and Summary button were left standing in their header. */}
           {focused && !settingsOpen && !teamShown && <span style={{display:'contents'}} ref={setCornerHeaderTarget}/>}
+          {!focused && teamShown && openCard && <span style={{display:'contents'}} ref={setTeamCorner}/>}
           {connectionsShown && <span style={{display:'contents'}} ref={setConnectionsCorner}/>}
           {/* SEARCH, NEW THREAD AND DISPLAY (approved 2026-10-01): the whole of
               the right end on the Inbox, which is the one page of threads now
@@ -8436,6 +8440,7 @@ export default function App() {
                     with the same people picked, or to the room whose board it
                     was opened from. */}
                 <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
+                  headerTarget={focused ? null : teamHeader} cornerTarget={focused ? null : teamCorner}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
                   onHandBack={(verdict, words) => {
@@ -8526,6 +8531,10 @@ export default function App() {
               ) : focused ? (
                 <TicketItems.Provider value={items}>
                 <ChatsFrame current={inChats ? chatsDirectKey(focused.id) : null}>
+                {/* Asked of you: the answer sits under the message that asked, where a reply goes. */}
+                <UnderTheAsk.Provider value={team && focused.ask && focused.assignee === team.me && askIsOpen(focused)
+                  ? <AskBar task={focused} owner={team.byId.get(focused.ask.owner) ?? null} under onHandBack={(verdict, words) => handAskBack(focused, verdict, words)} />
+                  : null}>
                 <Focus
                   cloudKeys={snap.cloud?.setUp ? (snap.cloud.keys ?? []).map((k) => k.name) : null}
                   // A run of a repeating task carries its rule into the
@@ -8542,13 +8551,11 @@ export default function App() {
                   onGive={(to, note) => { void giveThread(focused, to, note); }}
                   onAsk={team ? (to, kind, note, step) => { void askOnThread(focused, to, kind, note, step); } : undefined}
                   asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
-                  asksSlot={!team ? null : focused.ask && focused.assignee === team.me && askIsOpen(focused)
-                    ? <AskBar task={focused} owner={team.byId.get(focused.ask.owner) ?? null} onHandBack={(verdict, words) => handAskBack(focused, verdict, words)}
-                      onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)}
-                      onOpenChange={(src) => setOpenDoc({ product: focused.product, src, readOnly: true })} />
+                  asksSlot={!team || (focused.ask && focused.assignee === team.me && askIsOpen(focused)) ? null
                     : focused.ask && focused.ask.owner === team.me
                     ? <AskSentLine task={focused} onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />
-                    : <AsksLine item={focused} items={items} onTakeBack={(task) => { void takeAskBack(task); }} />}
+                    : null}
+                  asksCorner={team && !focused.ask ? <AsksChip item={focused} items={items} now={now} onTakeBack={(task) => { void takeAskBack(task); }} /> : null}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}
                   waitChoices={waitsFor(focused)}
@@ -8722,6 +8729,7 @@ export default function App() {
                   }}
                   stoppable={!walking && stoppableNow(focused)}
                 />
+                </UnderTheAsk.Provider>
                 {/* Who is in it, down the right, as a group lists them. */}
                 {inChats && roomsUi.live && roomsUi.chatPeople(directs.find((d) => d.id === focused.id)?.people ?? [])}
                 </ChatsFrame>

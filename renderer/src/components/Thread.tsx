@@ -51,7 +51,7 @@ import { EDIT_LAST } from '../team/chat-events';
 import { messageMore, withEmbeds, wordsOf } from '../team/message-more';
 import { ThreadLine } from '../team/ThreadPanel';
 import { AgentAnswers } from '../team/ChatAgents';
-import { AskAboutContext, askAboutStep } from '../team/AsksLine';
+import { AskAboutContext, UnderTheAsk, askAboutStep } from '../team/AsksLine';
 import { NeedOlder } from './NeedCard';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
@@ -245,6 +245,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
     return team && by && by !== team.me ? team.byId.get(by) ?? { id: by, email: '', name: 'A teammate', avatarUrl: null } : null;
   };
   const askAbout = useContext(AskAboutContext) && !chat;
+  const underAsk = useContext(UnderTheAsk);
   // Words a person you asked for help wrote to the agent: theirs, with their face.
   const helperOf = (e: AgentEvent) => {
     const id = (e as { fromId?: string }).fromId;
@@ -366,6 +367,8 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // message opens what is ../team/chat-layout.ts; a folded run is work to it.
   const slots = chat ? chatLayout(nodes.map((e) => (e.kind === 'run' ? { kind: 'work', at: e.at } : e))) : null;
   const newest = chat ? newestSaid(nodes) : -1;
+  // A task's first message is the one that asked.
+  const asked = slots ? slots.findIndex((x) => !!x?.head) : -1;
   // Only the agent's last word, with nothing said to it since, takes what a card asks for (NeedCard.tsx).
   const asking = (() => {
     for (let k = nodes.length - 1; k >= 0; k--) {
@@ -497,6 +500,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     ? <div className="msg-body msg-deleted">{e.text}</div>
                     : <ChatFold lines={e.who === 'you'} newest={n === newest}>{md(e.text ?? '')}</ChatFold>}
                 {e.edited && !slot.head && editing !== e.uid && <span className="msg-edited chat-edited-cont">edited</span>}
+                {n === asked && underAsk && <div className="chat-under">{underAsk}</div>}
                 {/* THE CHIPS, AND THE BAR WHEN YOU POINT AT IT (w-560647d4db).
                     Both hang off the message's own uid, which is the name the
                     store keeps a reaction under and the only name a message has

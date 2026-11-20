@@ -9,6 +9,20 @@
 .asks-take { flex: none; height: 28px; padding: 0 12px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; }
 .asks-take:hover { color: var(--text); border-color: var(--text-faint); }
 
+/* Who you asked, in the thread's header, and what pressing it shows. */
+.asks-chip-wrap { position: relative; display: inline-flex; }
+.asks-chip { gap: 8px; }
+.asks-faces { display: inline-flex; }
+.asks-faces > * + * { margin-left: -6px; }
+.th-menu.asks-pop { position: absolute; top: calc(100% + 8px); left: auto; right: 0; z-index: 30; width: 320px; padding: 4px 0; }
+.asks-pop-one { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; }
+.asks-pop-one + .asks-pop-one { border-top: 1px solid var(--line); }
+.asks-pop-what { margin: 0; font-size: 13.5px; line-height: 19px; color: var(--text-dim); }
+.asks-pop-what b { font-weight: 500; color: var(--text); }
+.asks-pop-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.chat-under { grid-column: 2; margin-top: 10px; }
+.ask-bar.ask-under { margin: 0; }
+
 /* "Ask a teammate" on an agent's message, there when you point at it. */
 .msg-ask { margin-left: auto; height: 24px; padding: 0 10px; font: inherit; font-size: 12.5px; color: var(--text-faint); background: none; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; opacity: 0; transition: opacity .12s; }
 .msg:hover .msg-ask, .msg-ask:focus-visible { opacity: 1; }
@@ -25,15 +39,16 @@
 .sh-mode-says { margin: 0; font-size: 12.5px; line-height: 18px; color: var(--text-dim); }
 .sh-step { margin: 8px 14px 0; padding: 6px 10px; font-size: 12.5px; line-height: 18px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; background: var(--bg-raised); white-space: pre-wrap; max-height: 90px; overflow: hidden; }
 
-/* A helper on someone's thread: what was asked, and handing it back. */
-.ask-bar { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 14px 16px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 14px; }
-.ask-bar-head { display: flex; align-items: center; gap: 10px; font-size: 14.5px; color: var(--text); }
-.ask-bar-head b { font-weight: 500; }
-.ask-bar-note { margin: 0; font-size: 14px; line-height: 21px; color: var(--text-dim); white-space: pre-wrap; }
-.ask-bar-step { margin: 0; padding: 6px 10px; font-size: 13px; line-height: 19px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
-.ask-bar-acts { display: flex; flex-wrap: wrap; gap: 8px; }
-.ask-bar-acts button { height: 30px; padding: 0 14px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg-selected); border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; }
-.ask-bar-acts button.quiet { background: none; color: var(--text-dim); }
+/* A helper on someone's thread: what was asked, as a message, and handing it back. */
+.ask-bar { display: flex; flex-direction: column; gap: 10px; margin: 28px 0 0; }
+.ask-bar-head { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-dim); }
+.ask-bar-head b { font-weight: 500; color: var(--text); }
+.ask-bar-note { margin: 0; font-size: var(--tp-type, 15px); line-height: 1.55; color: var(--text); white-space: pre-wrap; }
+.ask-bar-step { margin: 0; padding: 6px 12px; font-size: 14px; line-height: 21px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
+.ask-bar-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.ask-bar-acts button { padding: 7px 14px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.ask-bar-acts button:hover:not(:disabled) { color: var(--text); border-color: var(--text-faint); }
+.ask-bar-acts button.quiet { color: var(--text-faint); }
 .ask-bar-acts button:disabled { opacity: .5; cursor: default; }
 .ask-bar-back { display: flex; flex-direction: column; gap: 8px; }
 .ask-bar-back textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 12px; font: inherit; font-size: 14px; line-height: 20px; color: var(--text); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 10px; outline: none; resize: vertical; }
