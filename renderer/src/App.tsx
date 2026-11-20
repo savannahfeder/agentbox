@@ -2552,9 +2552,7 @@ export default function App() {
   const progress = useMemo(() => [
     ...items.filter((i) => {
       if (scope && i.product !== scope) return false;
-      // Your thread says who has it; the task the ask sent them is not a second row.
       if (askIGave(i, team?.me ?? null)) return false;
-      // And the thread itself, out with them, is in progress (out of Needs you until it comes back).
       if (askedOut.has(i.id) && i.status !== 'done') return true;
       const deferredUntil = dueAt(i);
       if (hiddenAt(i) > now && !liveIds.has(i.id)) return false;
