@@ -7,6 +7,12 @@
 // other, and rules about posting, passing and remembering. Runs went on that
 // housekeeping instead of the work. Now a run sees what was said TO it and by
 // the person, and a short list of how to work.
+//
+// 2026-11-20: the length check went red on GitHub's Mac at 9,004 while Linux
+// read 8,932. The brief names the method file under the store's temp folder,
+// which is ~45 characters longer on a Mac, and prints the chat's times in the
+// local time zone. With TMPDIR set to a Mac-length folder it read 9,008 here.
+// A random voice moved it by up to 60 more from run to run.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,6 +20,7 @@ import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
 import { writeChat, methodFile } from '../main/store/teammates-files.mts';
+import { VOICES } from '../shared/teammates.mts';
 
 describe('what a teammate run is told', () => {
   let product; let dir; let mods; let team; let store; let core;
@@ -73,8 +80,16 @@ describe('what a teammate run is told', () => {
 
   it('is short: well under half of what it was', () => {
     const { gm } = setUp();
+    // A teammate's voice is picked from its random id; count the longest.
+    const longest = VOICES.reduce((a, b) => (b.says.length + b.sample.length > a.says.length + a.sample.length ? b : a));
+    team.update(gm.id, { voice: longest.id });
     for (let i = 0; i < 30; i += 1) writeChat(team.dir(), { kind: 'msg', from: 'you', to: [], text: `x${i}`.repeat(10) }, Date.now() + i);
-    expect(team.briefFor(runOf(gm)).length).toBeLessThan(9000);
+    // The store path and the chat's clock times differ by machine and time
+    // zone, so they are counted at a fixed size.
+    const brief = team.briefFor(runOf(gm))
+      .split(appHome()).join('<home>')
+      .replace(/\[\w{3} \d{1,2}:\d{2}\s[AP]M\]/g, '[Mon 9:00 AM]');
+    expect(brief.length).toBeLessThan(9000);
   });
 
   it('tells the run the work is the deliverable and to check it before showing it', () => {

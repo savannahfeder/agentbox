@@ -33,6 +33,9 @@ export interface HarnessDefinition {
   readonly commandRoute: string;
   readonly casks: readonly string[];
   readonly installer: { readonly shell: string; readonly url: string; readonly pipe: string };
+  // The vendor's own PowerShell script for Windows, or only the page to install
+  // it from by hand when there is none.
+  readonly windowsInstaller: { readonly url?: string; readonly page: string };
   readonly loginArgs: readonly string[];
   readonly statusArgs: readonly string[];
   readonly credentialFiles: readonly string[];
@@ -58,6 +61,7 @@ export const HARNESS_DEFINITIONS: readonly HarnessDefinition[] = freeze([
     commandMenu: 'claude', commandRoute: 'claude',
     casks: ['claude-code', 'claude-code@latest'],
     installer: { shell: '/bin/bash', url: 'https://claude.ai/install.sh', pipe: 'bash' },
+    windowsInstaller: { url: 'https://claude.ai/install.ps1', page: 'https://code.claude.com/docs/en/setup' },
     loginArgs: ['auth', 'login', '--claudeai'], statusArgs: ['auth', 'status', '--json'],
     credentialFiles: ['.claude.json', '.credentials.json'],
     // THE OLDEST CLAUDE CODE THE WORKER LINE BELOW RUNS ON. Measured 2026-10-15
@@ -98,6 +102,7 @@ export const HARNESS_DEFINITIONS: readonly HarnessDefinition[] = freeze([
     homeEnv: 'CODEX_HOME', accountPrefix: 'codex:', package: '@openai/codex', casks: ['codex'],
     commandMenu: 'codex', commandRoute: 'codex',
     installer: { shell: '/bin/sh', url: 'https://chatgpt.com/codex/install.sh', pipe: 'sh' },
+    windowsInstaller: { url: 'https://chatgpt.com/codex/install.ps1', page: 'https://github.com/openai/codex' },
     loginArgs: ['login'], statusArgs: ['login', 'status'], credentialFiles: ['auth.json'],
     // NO `run`, AND THAT IS THE POINT OF THE SHAPE. Codex is driven over its
     // app-server RPC: the prompt is a turn's `input`, the system block a
@@ -130,6 +135,8 @@ export const HARNESS_DEFINITIONS: readonly HarnessDefinition[] = freeze([
     commandMenu: 'opencode', commandRoute: 'opencode',
     casks: ['opencode', 'sst/tap/opencode'],
     installer: { shell: '/bin/bash', url: 'https://opencode.ai/install', pipe: 'bash' },
+    // Its docs give Windows a zip or the desktop app, and no script.
+    windowsInstaller: { page: 'https://opencode.ai/docs' },
     loginArgs: ['auth', 'login'], statusArgs: ['auth', 'list'],
     credentialFiles: ['auth.json'],
     scrubPatterns: [
