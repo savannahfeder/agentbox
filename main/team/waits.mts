@@ -5,10 +5,12 @@
 import { endedWaits } from '../../shared/thread-waits.mts';
 import { endedTaskBlocks } from '../../shared/team-tasks.mts';
 import type { TeamProduct } from './index.mts';
+import type { LedgerLine } from './sync.mts';
 import type { TaskRow } from '../../shared/team-tasks.mts';
 import type { WaitCard, WaitingItem } from '../../shared/thread-waits.mts';
 import { askedThread } from '../../shared/thread-ask.mts';
 import { sentBackWords } from '../../shared/review-sent-back.mts';
+import { askFiles, shownRoomFile } from '../../shared/room-needs-you.mts';
 
 /** A chat as these rules read it: its messages and the marks on its files. */
 export interface ReviewChat {
@@ -22,17 +24,39 @@ export interface ReviewChat {
  * in the words of the verdict's comment (shared/review-sent-back.mts).
  */
 export function reviewedInChat(chats: readonly ReviewChat[], me: string | null, item: Pick<WaitingItem, 'id'>, person: string): string | null {
+  const theirs = reviewMarksInChat(chats, me, item, person).map((m) => m.mark);
+  const notes = theirs.filter((m) => m.do === 'note');
+  const note = String(notes[0]?.text ?? '');
+  if (theirs.some((m) => m.do === 'approve')) return sentBackWords({ verdict: 'approved', notes: notes.length, note });
+  return notes.length ? sentBackWords({ verdict: 'changes', notes: notes.length, note }) : null;
+}
+
+type ReviewMark = { do?: unknown; file?: unknown; text?: unknown; v?: unknown; owner?: unknown };
+
+/** Their notes and approvals on the files of the newest review ask about this thread in a chat. */
+function reviewMarksInChat(chats: readonly ReviewChat[], me: string | null, item: Pick<WaitingItem, 'id'>, person: string): { at: number; mark: ReviewMark }[] {
   for (const chat of chats) {
     const ask = chat.messages.filter((m) => m.by === me && !m.deleted && askedThread(m.body)?.id === item.id).at(-1);
     if (!ask) continue;
-    const files = new Set([...ask.body.matchAll(/\]\(attachments\/([^)\s]+)\)/g)].map((f) => f[1]));
-    const theirs = chat.marks.filter((m) => m.by === person && m.at > ask.at).map((m) => m.mark as { do?: unknown; file?: unknown; text?: unknown })
-      .filter((m) => files.has(String(m.file ?? '').replace(/#\d+$/, '')));
-    const notes = theirs.filter((m) => m.do === 'note');
-    if (notes.length) return sentBackWords({ verdict: 'changes', notes: notes.length, note: String(notes[0].text ?? '') });
-    if (theirs.some((m) => m.do === 'approve')) return sentBackWords({ verdict: 'approved', notes: 0, note: '' });
+    const files = new Set(askFiles(ask.body));
+    const theirs = chat.marks.filter((m) => m.by === person && m.at > ask.at).map((m) => ({ at: m.at, mark: m.mark as ReviewMark }))
+      .filter((m) => (m.mark.do === 'note' || m.mark.do === 'approve') && files.has(String(m.mark.file ?? '').replace(/#\d+$/, '')));
+    if (theirs.length) return theirs;
   }
-  return null;
+  return [];
+}
+
+/**
+ * Those notes and approvals as lines on the owner's thread, on the file as the
+ * owner named it, so its Notes panel holds them. The chat's version number is
+ * the chat's own, so it does not come along.
+ */
+export function reviewLinesFromChat(chats: readonly ReviewChat[], me: string | null, item: Pick<WaitingItem, 'id'>, person: string): LedgerLine[] {
+  return reviewMarksInChat(chats, me, item, person).map(({ at, mark }) => {
+    const { v: _v, owner: _owner, ...rest } = mark;
+    const file = shownRoomFile(String(mark.file ?? '').replace(/#\d+$/, ''));
+    return { id: item.id, ts: at, source: 'system', by: person, uid: `review-${item.id}-${String((mark as { id?: unknown }).id ?? `${String(mark.do)}-${at}`)}`, patch: { artifact: { ...rest, file } } };
+  });
 }
 
 export type WaitRow = TaskRow & { id: string };
@@ -53,7 +77,7 @@ const lastWordIn = (rows: WaitRow[], person: string): { ts: number; text: string
 export const chatsForReviews = (rooms: { messages?: Record<string, ReviewChat['messages']>; fileMarks?: Record<string, ReviewChat['marks']> } | null | undefined): ReviewChat[] =>
   Object.keys(rooms?.messages ?? {}).map((id) => ({ messages: rooms!.messages![id] ?? [], marks: rooms?.fileMarks?.[id] ?? [] }));
 
-export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me = null, chats: talks = [] }: {
+export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me = null, chats: talks = [], append }: {
   products: TeamProduct[];
   read: (product: TeamProduct) => WaitRow[];
   write: (dir: string, id: string, patch: Record<string, unknown>) => unknown;
@@ -62,6 +86,8 @@ export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me
   now: number;
   me?: string | null;
   chats?: readonly ReviewChat[];
+  /** Lines written under someone else's name (main/store/work-items.mts appendForeignLines). */
+  append?: (dir: string, lines: LedgerLine[]) => unknown;
 }): number {
   const chats = products.filter((p) => p.team?.direct);
   // `chats` holds only projects with a team record.
@@ -82,6 +108,8 @@ export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me
       ? (me ? endedTaskBlocks(items, { items: everything, cards, me, lastWordFrom, nameOf }) : [])
       : endedWaits(items, { items, cards, lastWordFrom, lastWordsFrom, nameOf, now, reviewedIn: (item, person) => reviewedInChat(talks, me, item, person) });
     for (const { item, said } of ended) {
+      const reviewed = append ? (item.blockedBy ?? []).map(String).flatMap((id) => (id.startsWith('person:') ? reviewLinesFromChat(talks, me, item, id.slice('person:'.length)) : [])) : [];
+      if (reviewed.length) append!(product.dir, reviewed);
       write(product.dir, item.id, { blockedBy: [], waitEnded: { said, at: now } });
       told += 1;
     }

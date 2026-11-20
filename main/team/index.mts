@@ -613,6 +613,7 @@ export function createTeamService({
           noticeEndedWaits({
             products: products(), read: (p: TeamProduct) => disk.readWorkItems(p.dir), cards, now: now(), me: state.me?.id ?? null,
             chats: chatsForReviews(rooms?.state()),
+            append: (dir, lines) => disk.appendForeignLines(dir, lines),
             nameOf: (id: string) => people.find((p) => p.id === id)?.name ?? 'Someone',
             write: (dir: string, id: string, patch: Record<string, unknown>) => disk.updateWorkItem(dir, id, patch, { source: 'system' }),
           });

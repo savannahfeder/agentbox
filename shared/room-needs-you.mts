@@ -207,3 +207,37 @@ export function reviewStillAsked(m: RoomSaid, { me, cards, marks }: {
   const waits = Array.isArray(card?.blockedBy) && card.blockedBy.some((b: { id?: unknown; want?: unknown } | null) => b?.id === personWait(me) && b?.want === 'review');
   return waits && !marks.some((k) => k.by === me && k.at > m.at);
 }
+
+const REVIEW_HEAD = `${WANT_WORDS.review}: `;
+const fileOf = (mark: object): string => String((mark as { file?: unknown }).file ?? '').replace(/#\d+$/, '');
+const doOf = (mark: object): unknown => (mark as { do?: unknown }).do;
+const countNotes = (n: number) => `${n} note${n === 1 ? '' : 's'}`;
+
+/** The files a review ask put in the chat, as the chat keeps them. */
+export function askFiles(body: string | null | undefined): string[] {
+  const text = String(body ?? '');
+  return text.startsWith(REVIEW_HEAD) ? [...text.matchAll(/\]\(attachments\/([^)\s]+)\)/g)].map((f) => f[1]) : [];
+}
+
+/** The review someone else asked of me about this file in the chat: who asked, and their note. */
+export function reviewAskIn(messages: readonly RoomSaid[], stored: string, me: string | null): { by: string | null; note: string } | null {
+  const m = [...messages].reverse().find((x) => !x.deleted && x.by !== me && askFiles(x.body).includes(stored.replace(/#\d+$/, '')));
+  return m ? { by: m.by, note: m.body.split('\n')[0].slice(REVIEW_HEAD.length).trim() } : null;
+}
+
+/** Under a review ask in the chat: what each reviewer did with its files since, or null. */
+export function reviewLine(m: RoomSaid, marks: readonly RoomMarkLike[], me: string | null, nameOf: (id: string | null) => string): string | null {
+  const files = askFiles(m.body);
+  if (!files.length) return null;
+  const done = marks.filter((k) => k.by !== m.by && k.at > m.at && files.includes(fileOf(k.mark)));
+  const said = [...new Set(done.map((k) => k.by))].map((by) => {
+    const theirs = done.filter((k) => k.by === by);
+    const notes = theirs.filter((k) => doOf(k.mark) === 'note').length;
+    const approved = theirs.some((k) => doOf(k.mark) === 'approve');
+    const named = shownRoomFile(fileOf(theirs[0].mark));
+    const who = by === me ? 'You' : nameOf(by);
+    if (approved) return `${who} approved ${named}${notes ? ` with ${countNotes(notes)}` : ''}`;
+    return notes ? `${who} sent back ${named} with ${countNotes(notes)}` : null;
+  }).filter(Boolean);
+  return said.length ? said.join(' · ') : null;
+}

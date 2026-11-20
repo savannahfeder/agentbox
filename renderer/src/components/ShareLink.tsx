@@ -168,6 +168,10 @@ export function SendTo({ targets, busy, sent, onPick }: { targets: readonly Send
 
 const baseName = (src: string) => src.split('/').pop() || src;
 
+/** What the Share button says for a moment once the panel sent the file. */
+export const sharedWords = (name: string, want: 'review' | null): string => (want === 'review' ? `Sent to ${name} for review` : `Sent to ${name}`);
+const WENT_MS = 6000;
+
 /** Sending to a person: the thread's other files to add, then the thread's own send sheet. */
 export function FileSendSheet({ name, others, also, onAlso, people, to, onSend }: {
   name: string;
@@ -224,10 +228,18 @@ export function ShareLink({ product, thread, src, signedIn, icon = false, others
     setSentTo(to);
     return true;
   };
+  const [went, setWent] = useState<string | null>(null);
+  const wentFor = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(wentFor.current), []);
   const sendFromSheet = async (ids: string[], note: string, want: 'review' | null) => {
     setSheet(null);
     for (const id of ids) if (!(await sendTo(id, { also, note, want }))) return;
     setAlso([]);
+    const names = ids.map((id) => (team?.state.people.find((p) => p.id === id)?.name ?? '').split(/\s+/)[0] || 'them').join(' and ');
+    setOpen(false);
+    setWent(sharedWords(names, want));
+    window.clearTimeout(wentFor.current);
+    wentFor.current = window.setTimeout(() => setWent(null), WENT_MS);
   };
 
   const [stopAsked, setStopAsked] = useState(false);
@@ -317,6 +329,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false, others
       {icon
         ? <button type="button" className={`doc-mark${link ? ' is-shared av-share-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? live : 'Share'} aria-label={link ? live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link && <span>{shareWords.sharedMark}</span>}</button>
         : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link ? live : 'Share'}</button>}
+      {went && <span className="av-share-went" role="status">{went}</span>}
       {open && sheet && team && (
         <FileSendSheet name={name} others={others.filter((o) => o !== src)} also={also} onAlso={(o) => setAlso((was) => (was.includes(o) ? was.filter((x) => x !== o) : [...was, o]))}
           people={team.state.people.filter((p) => p.id !== team.me)} to={sheet} onSend={(ids, note, want) => void sendFromSheet(ids, note, want)} />

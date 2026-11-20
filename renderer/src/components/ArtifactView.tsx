@@ -63,7 +63,7 @@ const keyIsOn = (target: EventTarget | null): 'box' | 'control' | 'nothing' => {
 };
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false, nameShown = (n: string) => n, asked = null }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** Each path's number on its file's version line, which every surface counts by. */
@@ -103,6 +103,10 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   below?: ReactNode;
   /** Opened to write in, so the editor takes the cursor. */
   typing?: boolean;
+  /** The file's name as a person reads it, where its copy is kept under another. */
+  nameShown?: (name: string) => string;
+  /** What was asked of you about this file, said above its notes. */
+  asked?: string | null;
 }) {
   const files = useMemo(() => {
     const reviewed = filesInLines(lines);
@@ -793,7 +797,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
         <button type="button" className="doc-mark av-back" aria-label="Back" title="Back to the thread (esc)" onClick={leave}><ArtifactControlGlyph><path d="M16 10H4m5-5-5 5 5 5" /></ArtifactControlGlyph></button>
-        <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
+        <span className="av-name">{nameShown(familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? ''))}</span>
         {family && version && family.versions.length > 1 && (
           <span className="av-versions">
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>
@@ -851,6 +855,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0 || linkNotes.comments.length > 0) && <aside className="av-side" aria-label="Notes">
+          {asked && <p className="av-asked">{asked}</p>}
           <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
           {(offers.approve || othersApproved.length > 0 || earlier || (canSendAll && sendBeside)) && (
             <div className="av-verdict">

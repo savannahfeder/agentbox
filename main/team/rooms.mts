@@ -7,7 +7,7 @@ import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
 import type { WallCard, TeamCardLike } from '../../shared/room-cards.mts';
 import type { AgentHoursSummary } from '../../shared/agent-hours.mts';
-import { groupFileRow, groupRow, reviewStillAsked } from '../../shared/room-needs-you.mts';
+import { askFiles, groupFileRow, groupRow, reviewStillAsked } from '../../shared/room-needs-you.mts';
 import type { GroupRow } from '../../shared/room-needs-you.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mts';
 import { carryIntoRoom } from './carry-files.mts';
@@ -380,7 +380,10 @@ export function createRooms({
         stillAsked: (m) => reviewStillAsked(m, { me: who, cards: t.cards ?? [], marks: fileMarks.get(r.id) ?? [] }),
       });
       if (row) mentions.push(row);
-      const fileRow = groupFileRow({ roomId: r.id, roomName: r.name, marks: fileMarks.get(r.id) ?? [], me: who, myName: me()?.name ?? null, doneAt: p.doneAt[r.id] ?? 0, nameOf });
+      // A review I asked about a thread of mine comes back on that thread (main/team/waits.mts).
+      const onMyThreads = new Set(held.filter((m) => m.by === who && askedThread(m.body)).flatMap((m) => askFiles(m.body)));
+      const marksHere = (fileMarks.get(r.id) ?? []).filter((k) => !onMyThreads.has(String((k.mark as { file?: unknown }).file ?? '').replace(/#\d+$/, '')));
+      const fileRow = groupFileRow({ roomId: r.id, roomName: r.name, marks: marksHere, me: who, myName: me()?.name ?? null, doneAt: p.doneAt[r.id] ?? 0, nameOf });
       if (fileRow) mentions.push(fileRow);
       const wall = wallCards({ members: people.get(r.id) ?? [], profiles: [...profiles.values()], presence, teammates, teamCards: t.cards ?? [], meId: who, now: at, mine, names: called, listed: !!r.listed }) as WallCard[];
       return {
