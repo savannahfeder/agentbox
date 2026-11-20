@@ -8,8 +8,8 @@ export type Want = 'help' | 'review' | 'hand';
 export const WANTS: readonly Want[] = ['help', 'review', 'hand'];
 export const WANT_WORDS: Record<Want, string> = { help: 'Help with this step', review: 'Review and send back', hand: 'Hand it over' };
 
-/** One message of the thread: when it was written, and its words on one line. */
-export interface Step { at: number; words: string }
+/** One message of the thread: when it was written, its words on one line, and whether it asks for a decision. */
+export interface Step { at: number; words: string; decides?: boolean }
 
 const STEP_CHARS = 140;
 
@@ -25,18 +25,31 @@ function plainLines(text: string): string[] {
 
 const cut = (s: string) => (s.length > STEP_CHARS ? `${s.slice(0, STEP_CHARS - 1).trimEnd()}…` : s);
 
-/** The agent's newest words, as the step a help ask points at: its question when it asks one. */
+// The numbered items under an "## Options" heading, as the agent offers them.
+function optionsIn(text: string): string[] {
+  const lines = text.split('\n');
+  const at = lines.findIndex((l) => /^#{1,6}\s*options\b/i.test(l.trim()));
+  if (at < 0) return [];
+  return lines.slice(at + 1).map((l) => /^\s*\d+[.)]\s+(.+)$/.exec(l)?.[1]).filter((o): o is string => !!o)
+    .map((o) => o.replace(/[*_`]+/g, '').replace(/\s*\(recommended\)\s*$/i, '').trim()).filter(Boolean);
+}
+
+const orList = (all: string[]) => (all.length < 2 ? all.join('') : `${all.slice(0, -1).join(', ')} or ${all[all.length - 1]}`);
+
+/** The agent's newest words, as the step a help ask points at: its question, else the options it offers. */
 export function latestStep(item: { result?: string | null; note?: string | null; wrote?: { result?: { ts?: number }; note?: { ts?: number } } } | null | undefined): Step | null {
   const noteAt = item?.wrote?.note?.ts ?? 0;
   const resultAt = item?.wrote?.result?.ts ?? 0;
   const [text, at] = noteAt > resultAt ? [item?.note, noteAt] : [item?.result, resultAt];
+  const options = optionsIn(String(text ?? ''));
   const lines = plainLines(String(text ?? ''));
-  const line = lines.find((l) => /\?(\s|$)/.test(l)) ?? lines[0];
-  return line && at ? { at, words: cut(line) } : null;
+  const asked = lines.find((l) => /\?(\s|$)/.test(l));
+  const line = asked ?? (options.length ? orList(options) : lines[0]);
+  return line && at ? { at, words: cut(line), decides: !!asked || options.length > 0 } : null;
 }
 
-/** What the sheet starts on: help when the agent's newest words ask something. */
-export const wantFirst = (step: Step | null): Want | null => (step && /\?(\s|$)/.test(step.words) ? 'help' : null);
+/** What Share… and Waits on… both start on: Help for a decision, Review for anything else. */
+export const firstWant = (step: Step | null): 'help' | 'review' => (step?.decides ? 'help' : 'review');
 
 /** A thread's link that opens at one step. */
 export const linkAtStep = (link: string, step: Step | null | undefined): string => (step ? `${link}?at=${step.at}` : link);

@@ -46,7 +46,7 @@ import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
 import { ChooseList, CopiedSheet, SeeList, SendSheet, ShareList } from './SharePanel';
-import { wantFirst, type Step, type Want } from '../../../shared/thread-ask.mts';
+import { firstWant, type Step, type Want } from '../../../shared/thread-ask.mts';
 import { sendFirst, type SeenBy } from './share-rules';
 
 export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
@@ -509,7 +509,7 @@ export function ThreadMenu({ share = null, step = null, onCopyLink, onSendTo, on
           </button>}
           {waitChoices.map((c) => <button key={c.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => {
             const ask = personToAsk(c.id, { blocks, canAsk: !!share });
-            if (ask) { setWaiting(false); openSend([ask], wantFirst(step) ?? 'review'); return; }
+            if (ask) { setWaiting(false); openSend([ask], firstWant(step)); return; }
             close(false); onWait?.(c.id);
           }}>
             <span className="ico"><WaitMark /></span><span className="ts-more-label">{c.label}</span>
@@ -540,8 +540,8 @@ export function ThreadMenu({ share = null, step = null, onCopyLink, onSendTo, on
         const first = sendFirst(share.people, share.last);
         return <ShareList link={!!share.link} first={first} others={share.people.length > (first ? 1 : 0)} seen={share.seenWord}
           onCopy={copyLink}
-          onSendFirst={() => { if (first) openSend([first.id], wantFirst(step)); }}
-          onSendOther={() => openSend([], wantFirst(step))}
+          onSendFirst={() => { if (first) openSend([first.id], firstWant(step)); }}
+          onSendOther={() => openSend([], firstWant(step))}
           onSee={() => setSharing('see')} />;
       })()}
       {open && sharing === 'send' && (share || sendWant === 'hand') && <SendSheet people={sendPeople} start={sendTo} link={!!share?.link} onCopy={copyLink}
@@ -553,7 +553,7 @@ export function ThreadMenu({ share = null, step = null, onCopyLink, onSendTo, on
           if (p) onGive?.({ id: p.id, name: p.name || p.email }, note);
         }} />}
       {open && share && sharing === 'copied' && share.link && <CopiedSheet link={share.link} people={share.people}
-        onSend={(id) => openSend([id], wantFirst(step))} />}
+        onSend={(id) => openSend([id], firstWant(step))} />}
       {open && share && sharing === 'see' && <SeeList seen={share.seen} teamName={share.teamName}
         onPick={(to) => { if (to === 'people') { setSharing('choose'); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
       {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} />}

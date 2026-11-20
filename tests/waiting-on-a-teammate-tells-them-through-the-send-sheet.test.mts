@@ -26,6 +26,6 @@ describe('a wait that is a person', () => {
   it('is what the Waits on menu does on a press', () => {
     const menu = fs.readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
     expect(menu).toContain("const ask = personToAsk(c.id, { blocks, canAsk: !!share });");
-    expect(menu).toContain("if (ask) { setWaiting(false); openSend([ask], wantFirst(step) ?? 'review'); return; }");
+    expect(menu).toContain("if (ask) { setWaiting(false); openSend([ask], firstWant(step)); return; }");
   });
 });

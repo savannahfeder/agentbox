@@ -22,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { askWords, askedNow, askedPatch, askedSaid, latestStep, linkAtStep, stepLine, wantFirst } from '../shared/thread-ask.mts';
+import { askWords, askedNow, askedPatch, askedSaid, firstWant, latestStep, linkAtStep, stepLine } from '../shared/thread-ask.mts';
 import { endedWaits, personWait, waitWords } from '../shared/thread-waits.mts';
 import { threadOfLink, threadLink } from '../shared/thread-link.mts';
 import { buildLine, foldWorkItems } from '../shared/work-items.mts';
@@ -40,10 +40,10 @@ const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '
 
 describe('the step a help ask points at', () => {
   it('is the agent\'s newest words, at their question', () => {
-    expect(latestStep({ result: QUESTION, wrote: { result: { ts: 50 } } })).toEqual({ at: 50, words: 'Where should idempotency keys be stored?' });
+    expect(latestStep({ result: QUESTION, wrote: { result: { ts: 50 } } })).toEqual({ at: 50, words: 'Where should idempotency keys be stored?', decides: true });
   });
   it('is the newer of the answer and the note', () => {
-    expect(latestStep({ result: 'Old?', note: 'Picked Postgres, carrying on.', wrote: { result: { ts: 1 }, note: { ts: 2 } } })).toEqual({ at: 2, words: 'Picked Postgres, carrying on.' });
+    expect(latestStep({ result: 'Old?', note: 'Picked Postgres, carrying on.', wrote: { result: { ts: 1 }, note: { ts: 2 } } })).toEqual({ at: 2, words: 'Picked Postgres, carrying on.', decides: false });
   });
   it('is the first line when nothing is asked, cut short when long', () => {
     expect(latestStep({ result: 'Done. Tests pass.', wrote: { result: { ts: 3 } } })?.words).toBe('Done. Tests pass.');
@@ -53,10 +53,10 @@ describe('the step a help ask points at', () => {
     expect(latestStep({})).toBeNull();
     expect(latestStep({ result: '   ', wrote: { result: { ts: 3 } } })).toBeNull();
   });
-  it('starts the sheet on help only when the step asks something', () => {
-    expect(wantFirst({ at: 1, words: 'Where should idempotency keys be stored?' })).toBe('help');
-    expect(wantFirst({ at: 1, words: 'Done. Tests pass.' })).toBeNull();
-    expect(wantFirst(null)).toBeNull();
+  it('starts the sheet on help when the step asks for a decision, review otherwise (since the rerun)', () => {
+    expect(firstWant({ at: 1, words: 'Where should idempotency keys be stored?', decides: true })).toBe('help');
+    expect(firstWant({ at: 1, words: 'Done. Tests pass.', decides: false })).toBe('review');
+    expect(firstWant(null)).toBe('review');
   });
 });
 
