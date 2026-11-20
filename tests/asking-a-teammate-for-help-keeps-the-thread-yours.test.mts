@@ -215,6 +215,10 @@ describe('the wiring', () => {
     expect(app).toContain("if (askedOut.has(i.id) && !asking(i)) return false;");
     expect(app).toMatch(/const askedOut = useMemo\(\(\) => new Set\(items\.flatMap\(\(r\) => \{\s*const a = askIGave\(r, team\?\.me \?\? null\);\s*return a && r\.status !== 'done' \? \[a\.thread\] : \[\];/);
   });
+  // Round two: Dana handed Priya a task, Priya started it in a thread of her own, and Dana could not find it.
+  it('a thread started from a task someone handed you leaves its link on that task', () => {
+    expect(read('renderer/src/threads/ThreadComposer.tsx')).toContain('answer: `Started on this in a thread of my own: [${message.title}](${startedAt})`');
+  });
   // Round two: Dana's returned review sat under week-old rows because its project ranks last.
   it('a thread handed back ranks with a teammate\'s message, not with its project', () => {
     expect(read('renderer/src/App.tsx')).toContain('handedBackBy(i as Parameters<typeof handedBackBy>[0]) ? new Set([i.product]) : directSlugs');
