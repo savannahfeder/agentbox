@@ -67,7 +67,7 @@ import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, thread
 const SHARE_LAST = 'agentbox:share-last';
 import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
-import { AskSentLine, AsksLine } from './team/AsksLine';
+import { AskSentLine, AsksLine, askAboutStep } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
 import { askIGave, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
 import { SEE_SAID, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
@@ -7691,6 +7691,11 @@ export default function App() {
         return;
       }
       case 'give': void giveThread(item, { id: d.to, name: d.name }); return;
+      case 'ask':
+        if (!focused || keyOf(focused) !== keyOf(item)) { setFocused(item); markSeen(item); }
+        // Next tick: the sheet is on the thread's page, which may only just be opening.
+        setTimeout(() => askAboutStep('', { id: d.to, name: d.name }), 60);
+        return;
       case 'shipped': void markShipped(item, d.on); return;
       case 'wait': void waitOn(item, d.on); return;
       case 'decide': {

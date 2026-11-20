@@ -11,7 +11,8 @@ import './asks.css';
 export const AskAboutContext = createContext(false);
 
 /** Opens the thread menu's people list with this message as the step (threads/ThreadMenu.tsx). */
-export const askAboutStep = (text: string) => window.dispatchEvent(new CustomEvent('zero:ask-step', { detail: stepOf(text) }));
+export interface AskStep { step: string; to: { id: string; name: string } | null }
+export const askAboutStep = (text: string, to: AskStep['to'] = null) => window.dispatchEvent(new CustomEvent<AskStep>('zero:ask-step', { detail: { step: stepOf(text), to } }));
 
 /** On the ask you sent, as its giver: who has it, and the way back to your thread. */
 export function AskSentLine({ task, onOpenThread }: { task: WorkItem; onOpenThread: () => void }) {

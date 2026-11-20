@@ -27,7 +27,7 @@ import { pickFields } from '../shared/work-items.mts';
 import { askIGave, askOnMe, asksOnThread, handedBackAsks, handedBackBy, handedBackWords, helpAskOpen, stepOf } from '../shared/thread-asks.mts';
 import { GiveSheet } from '../renderer/src/threads/SharePanel.tsx';
 import { machineryPath } from '../main/store/home.mts';
-import { byWorkHere } from '../renderer/src/thread-commands.ts';
+import { byWorkHere, threadCommands } from '../renderer/src/thread-commands.ts';
 import { AskBar, askChange } from '../renderer/src/team/AskBar.tsx';
 import { offerIsLive } from '../renderer/src/format.ts';
 import { changePath } from '../main/code-change.mts';
@@ -249,6 +249,13 @@ describe('the wiring', () => {
   it('a helper\'s words on your thread are passed on by your own supervisor', () => {
     expect(read('main/main.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
     expect(read('main/serve.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
+  });
+});
+
+describe('asking from the command bar', () => {
+  it('offers asking each person, and never an AI teammate', () => {
+    const rows = threadCommands({ give: [{ id: 'u-dev', name: 'Dev' }, { id: 'mate:t1', name: 'Maintainer' }] });
+    expect(rows.filter((r) => r.does.act === 'ask').map((r) => r.label)).toEqual(['Ask Dev for help or a review']);
   });
 });
 
