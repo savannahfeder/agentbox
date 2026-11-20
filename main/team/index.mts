@@ -1357,11 +1357,13 @@ export function createTeamService({
     sharedFileByHash: (hash: string, o?: { fetch?: boolean }) => threadShare?.fileByHash(hash, o) ?? Promise.resolve(null),
 
     // Words to a thread's owner. The cloud decides who may: whoever can read the card.
-    async commentOnThread(owner: string, threadId: string, text: unknown) {
+    /** `answers`: the step its owner asked this person to help with (shared/thread-ask.mts). */
+    async commentOnThread(owner: string, threadId: string, text: unknown, { answers = false }: { answers?: boolean } = {}) {
       if (!backend || !threadShare) throw new Error('sign in first');
       const words = String(text ?? '').trim();
       if (!words) throw new Error('a comment needs some words');
-      await backend.addThreadComment(owner, threadId, words);
+      const made = await backend.addThreadComment(owner, threadId, words) as { id?: unknown } | undefined;
+      if (answers && typeof made?.id === 'string') threadShare.noteAnswered(made.id);
       await threadShare.refreshComments();
       onChange();
       syncNow();

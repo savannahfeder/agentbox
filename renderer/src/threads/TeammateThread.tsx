@@ -37,6 +37,9 @@ const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
+/** A pressed option, with whatever was typed in the box under it. */
+export const optionWithNote = (option: string, draft: string): string => (draft.trim() ? `${option}\n\n${draft.trim()}` : option);
+
 /** The options the agent's newest words offer, for a helper to press; none once anyone spoke after them. */
 export function optionsToAnswer({ events, outcome }: { events: readonly AgentEvent[]; outcome?: { at: number; text: string } | null }) {
   const said = events.filter((e): e is AgentSaid => !e.kind);
@@ -154,7 +157,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
     const text = said.trim();
     if (!text || sending) return;
     setSending(true);
-    const out = await api.teamComment({ personId, threadId, text });
+    const out = await api.teamComment({ personId, threadId, text, ...(helping ? { answers: true } : {}) });
     setSending(false);
     if (!out?.ok) { onNotice(out?.error ?? 'That comment did not send.'); return; }
     setDraft('');
@@ -242,7 +245,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
           )}
           <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             {options.length > 0 && <div className="tp-options" role="group" aria-label="The agent's options">
-              {options.map((o) => <button key={o.n} type="button" disabled={sending} onClick={() => void send(o.text.replace(/\s*\(recommended\)\s*$/i, ''))}>{o.n}. {o.text}</button>)}
+              {options.map((o) => <button key={o.n} type="button" disabled={sending} onClick={() => void send(optionWithNote(o.text.replace(/\s*\(recommended\)\s*$/i, ''), draft))}>{o.n}. {o.text}</button>)}
             </div>}
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />

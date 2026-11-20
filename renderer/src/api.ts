@@ -1052,7 +1052,7 @@ export const api = {
     return got.ok === false ? none : got;
   },
   warmFindInThreads(): void { void window.zero?.warmFindInThreads?.()?.catch?.(() => {}); },
-  async teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
+  async teamComment(p: { personId: string; threadId: string; text: string; answers?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
   async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
   async fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
     if (!window.zero?.fileMark) return { ok: false, error: `quit and reopen ${NAME} to comment here` };

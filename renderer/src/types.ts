@@ -1840,7 +1840,7 @@ declare global {
       filesCloud?(): Promise<FilesCloudStatus>;
       fileElsewhere?(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
       fileLine?(p: { product: string; id: string; room?: string }): Promise<FileLine[]>;
-      teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;
+      teamComment(p: { personId: string; threadId: string; text: string; answers?: boolean }): Promise<TeamCallResult>;
       teamContinueBrief(p: { personId: string; threadId: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[]; from: { personId: string; threadId: string } }>;
       teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult>;
       teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult>;

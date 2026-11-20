@@ -1179,7 +1179,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }: { product: string; visibility?: string; people?: string[] }) => team!.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team!.syncNow()));
   ipcMain.handle('zero:team-thread-work', (_e, { personId, threadId }: { personId: string; threadId: string } = {} as { personId: string; threadId: string }) => team?.threadWork(personId, threadId) ?? { shared: false, lines: [], earlier: 0, product: null, dir: null });
-  ipcMain.handle('zero:team-comment', teamCall(({ personId, threadId, text }: { personId: string; threadId: string; text: string }) => team!.commentOnThread(personId, threadId, text)));
+  ipcMain.handle('zero:team-comment', teamCall(({ personId, threadId, text, answers }: { personId: string; threadId: string; text: string; answers?: boolean }) => team!.commentOnThread(personId, threadId, text, { answers: answers === true })));
   // Seeds a thread of your own; it runs only once you send it, on this Mac.
   ipcMain.handle('zero:team-continue-brief', (_e, { personId, threadId }: { personId: string; threadId: string } = {} as { personId: string; threadId: string }) => {
     if (!team) throw new Error('This build has no team cloud set up.');

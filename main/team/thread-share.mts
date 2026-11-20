@@ -137,6 +137,8 @@ export interface ThreadShare {
   fileNews(): ThreadFileNews[];
   talk(): ThreadTalk[];
   refreshComments(): Promise<void>;
+  /** A comment this person sent as the answer to a step they were asked to help with. */
+  noteAnswered(commentId: string): void;
 }
 
 // What one file call takes. A file over it goes in parts, up to MAX_SENT_BYTES.
@@ -292,6 +294,14 @@ export function createThreadShare({
   const deliveredMarks = new Set<string>();
   const missed = new Map<string, number>();
   const waitingFile = `${root}.marks-waiting.json`;
+  // Kept on disk: the owner's copy may not have published the answer before a restart.
+  const answeredFile = `${root}.answered.json`;
+  let answered: Set<string> | null = null;
+  const answeredIds = (): Set<string> => {
+    if (answered) return answered;
+    try { const ids: unknown = JSON.parse(fs.readFileSync(answeredFile, 'utf8')); answered = new Set(Array.isArray(ids) ? ids.map(String) : []); } catch { answered = new Set(); }
+    return answered;
+  };
   let waiting: ThreadFileMark[] | null = null;
   let logged = '';
   const quietly = async <T, F = null>(what: string, fn: () => Promise<T>, fallback: F = null as F): Promise<T | F> => {
@@ -687,8 +697,11 @@ export function createThreadShare({
       const ok = THREAD_ID.test(String(owner)) && THREAD_ID.test(String(threadId));
       const local = ok ? readLocal(owner, threadId) : null;
       const carried = new Set((local?.lines ?? []).map((l) => l.uid).filter(Boolean));
+      // An answer of yours reads as one until the owner's copy publishes it as their thread's reply.
+      const mine = answeredIds();
       const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`)).map((c): SharedLine => ({
-        id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
+        id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`,
+        patch: mine.has(c.id) ? { answer: c.text, from: { teammate: c.by, name: myName() || 'You' } } : { comment: { text: c.text } },
       }));
       return {
         shared: !!local,
@@ -826,6 +839,17 @@ export function createThreadShare({
     /** After a comment, so its writer sees it without waiting for the next pass. */
     async refreshComments() {
       comments = await quietly('reading comments', () => backend.threadComments(), comments);
+    },
+
+    noteAnswered(commentId) {
+      const ids = answeredIds();
+      ids.add(String(commentId));
+      try {
+        fs.mkdirSync(path.dirname(answeredFile), { recursive: true });
+        const tmp = `${answeredFile}.${process.pid}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify([...ids].slice(-500)));
+        fs.renameSync(tmp, answeredFile);
+      } catch { /* drawn as an answer until the app restarts */ }
     },
   };
 }
