@@ -23,6 +23,17 @@
 .chat-msg .msg-who { font-size: 14.5px; font-weight: 500; color: var(--text); }
 .chat-msg .msg-when { font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
 
+/* A narrow pane (a file open beside the chat) puts the face on the name's line
+   and gives the words the whole width; a face column there leaves them little. */
+@container (max-width: 560px) {
+  .chat-msg { grid-template-columns: 20px minmax(0, 1fr); column-gap: 8px; }
+  .chat-gutter { grid-row: 1; align-self: center; padding-top: 0; }
+  .chat-gutter .tm-av.lg, .chat-gutter .agent-face { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }
+  .chat-msg.cont .chat-gutter { display: none; }
+  .chat-msg > :not(.chat-gutter, .msg-head) { grid-column: 1 / -1; }
+  .focus:has(> .focus-body .thread.is-chat) > .message-files { margin-left: 0; width: 100%; }
+}
+
 /* A message that carries on a run sits close under it, and its time waits in
    the face column until the pointer is on it. */
 .thread-block.is-chat-cont { margin-top: -12px; }
