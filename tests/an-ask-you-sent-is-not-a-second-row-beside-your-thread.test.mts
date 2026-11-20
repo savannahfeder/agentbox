@@ -18,6 +18,11 @@ describe('an ask you sent', () => {
   it('is kept out of In progress', () => {
     expect(block('const progress = useMemo(() => [')).toMatch(/if \(askIGave\(i, team\?\.me \?\? null\)\) return false;/);
   });
+  // Round seven: the board still showed it, "Nothing running" beside "Theo is helping".
+  it('is kept off the board', () => {
+    expect(app).toMatch(/const boardItemsHere = useMemo\(\(\) => items\.filter\(\(i\) => !askIGave\(i, team\?\.me \?\? null\)\), \[items, team\?\.me\]\);/);
+    expect(block('const boardArgs = useMemo(')).toMatch(/items: evBoard \? boardItems\(boardItemsHere, evBoard, teammateIdOf\) : boardItemsHere/);
+  });
   it('is kept out of Done', () => {
     expect(block('const done = useMemo(() => {')).toMatch(/!askIGave\(i, team\?\.me \?\? null\)/);
   });
