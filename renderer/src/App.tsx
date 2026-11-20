@@ -7815,8 +7815,11 @@ export default function App() {
   // The Inbox button is only on an inbox thread: anywhere else the sidebar's
   // own Inbox is as close, and on the inbox it would lead to itself.
   const onInboxThread = !!focused && !settingsOpen && !inChats;
+  // A teammate's thread opened from the Inbox is an inbox thread too.
+  const onTeammateThread = teamShown && !!openCard && !cardFromPlace;
   const backForward = backForwardOn
-    ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward} onInbox={onInboxThread ? () => openView('inbox') : undefined} name={stopName} />
+    ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward}
+      onInbox={onInboxThread ? () => openView('inbox') : onTeammateThread ? () => { setOpenCard(null); setTeamOpen(false); openView('inbox'); } : undefined} name={stopName} />
     : null;
   // Everything else is the cards and the picked card's work; a chat is on the Chats page.
   const evKey = teamMode ? evPick ?? 'me' : null;
@@ -8150,7 +8153,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${(focused && !settingsOpen && !inChats) || (teamShown && !focused && openCard && snap?.team?.signedIn && snap.team.team) ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}${skyOnPlace ? ' sky-shown sky-place' : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${teamShown && openCard && snap?.team?.signedIn && snap.team.team ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}${skyOnPlace ? ' sky-shown sky-place' : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put

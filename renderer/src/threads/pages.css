@@ -445,7 +445,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
   --tp-type: clamp(16px, calc(0.25cqi + 13px), 18px);
   --tp-measure: min(calc(var(--tp-type) * 47.5), calc(100cqi - 96px));
   display: grid; grid-template-columns: minmax(0, var(--tp-measure)); gap: 48px; align-items: start;
-  padding: 12px 32px 0 max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
+  padding: 29px 32px 0 max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
 }
 .tp-grid.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
 .tp-col :is(.msg-body, .appendix) { font-size: var(--tp-type); }
