@@ -49,7 +49,7 @@ jobs:
       - name: The build, if made before
         id: cached
         if: inputs.build_url == ''
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: built
           key: ${{ steps.app.outputs.key }}
@@ -71,7 +71,7 @@ jobs:
           cp -R "$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' | head -1)" ../built/
       - name: Keep the build
         if: inputs.build_url == '' && steps.cached.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: built
           key: ${{ steps.app.outputs.key }}
