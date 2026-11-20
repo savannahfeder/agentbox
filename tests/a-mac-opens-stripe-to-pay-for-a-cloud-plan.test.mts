@@ -83,8 +83,8 @@ describe('paying', () => {
     await start();
     await signIn();
     await payForCloud({ plan: 'plus', openExternal: open, env, home });
-    expect(stripe.returns.success).toMatch(/^https:\/\/[^/]+\/v1\/paid\?plan=plus$/);
-    expect(stripe.returns.cancel).toMatch(/^https:\/\/[^/]+\/v1\/paid\?cancelled=1$/);
+    expect(stripe.returns.success).toBe('https://app.agentbox.ac/paid?plan=plus');
+    expect(stripe.returns.cancel).toBe('https://app.agentbox.ac/paid?cancelled=1');
   });
 
   it('someone already paying is sent to their billing page', async () => {
