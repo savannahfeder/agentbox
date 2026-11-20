@@ -161,8 +161,8 @@ describe('a click away leaves a listening box open', () => {
 
   it('the new-thread box\'s backdrop does not close it while it listens', () => {
     const composer = read('renderer/src/threads/ThreadComposer.tsx');
-    expect(composer).toContain('<div className="modal-backdrop tc-veil" onClick={() => { if (!talk.on) onClose(); }}>{box}</div>');
-    expect(composer).not.toContain('<div className="modal-backdrop tc-veil" onClick={onClose}>');
+    expect(composer).toContain('<div className="modal-backdrop tc-veil" {...closesOnPress(() => { if (!talk.on) onClose(); })}>{box}</div>');
+    expect(composer).not.toContain('<div className="modal-backdrop tc-veil" {...closesOnPress(onClose)}>');
   });
 });
 

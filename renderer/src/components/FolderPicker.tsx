@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import type { FolderListing } from '../types';
 import { tabStop } from '../setup-split';
+import { closesOnPress } from '../press';
 
 type Props = {
   title?: string;
@@ -104,7 +105,7 @@ export default function FolderPicker({ title, startIn, onPick, onClose }: Props)
   useRef_.current = use;
 
   return (
-    <div className="modal-backdrop fp-backdrop" onClick={onClose}>
+    <div className="modal-backdrop fp-backdrop" {...closesOnPress(onClose)}>
       <div
         className="modal fp-card"
         ref={card}
