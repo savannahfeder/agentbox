@@ -151,13 +151,15 @@ const drawn = (over = {}) => ({ id: 'room-mention:r', messageId: '1', roomId: 'r
 describe('the row on screen', () => {
   it('says the words and who wrote them', () => {
     const html = draw([drawn()]);
-    expect(html).toContain('<b class="th-msg-who">Maya</b>');
+    expect(html).toContain('<span class="th-who-name">Maya</span>');
     expect(html).toContain('>Dev, the bug?<');
   });
 
   it('says a thread reply is one', () => {
-    expect(draw([drawn({ thread: 'yours', byName: 'Sofia', body: 'looks right' })])).toContain('>in your thread: looks right<');
-    expect(draw([drawn({ thread: 'theirs', byName: 'Sofia', body: 'looks right' })])).toContain('>in a thread: looks right<');
+    const yours = draw([drawn({ thread: 'yours', byName: 'Sofia', body: 'looks right' })]);
+    expect(yours).toContain('>looks right<');
+    expect(yours).toContain('>Sofia in your thread<');
+    expect(draw([drawn({ thread: 'theirs', byName: 'Sofia', body: 'looks right' })])).toContain('>Sofia in a thread<');
   });
 
   it('wears the new mark only while unread', () => {

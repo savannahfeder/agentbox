@@ -73,6 +73,6 @@ describe('the conversation with these people is never the thread', () => {
 describe('the inbox row of a thread about work', () => {
   it('leads with the work, not the people', () => {
     const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
-    expect(pages).toMatch(/name=\{item\.label \|\| \(isWorkThread\(item\) \? item\.title : null\)\}/);
+    expect(pages).toMatch(/const subject = item\.label \|\| \(isWorkThread\(item\) \? item\.title : null\);[\s\S]{0,400}title=\{subject \?\?/);
   });
 });

@@ -20,7 +20,8 @@ export function MentionRows({ mentions, faces, now, onOpen, selected = null }: {
       onClick={() => onOpen(m)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(m); }}>
       <span className="mark" aria-hidden="true" />
       <RowCells status={WAITING}
-        title={<span className="th-msg"><Face person={who} /><b className="th-msg-who">{m.byName || 'Someone'}</b><span className="th-msg-text">{m.thread ? `in ${m.thread === 'yours' ? 'your' : 'a'} thread: ` : ''}{firstRealLine(m.body) || 'sent a file'}</span></span>}
+        who={{ face: <Face person={who} />, name: `${m.byName || 'Someone'}${m.thread ? ` in ${m.thread === 'yours' ? 'your' : 'a'} thread` : ''}` }}
+        title={firstRealLine(m.body) || 'Sent a file'}
         where={<span className="rm-where">{I.hash()}{m.roomName}</span>}
         priority={null} updatedAt={m.at} now={now} />
     </div>;
