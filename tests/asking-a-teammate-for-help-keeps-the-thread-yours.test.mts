@@ -29,6 +29,7 @@ import { GiveSheet } from '../renderer/src/threads/SharePanel.tsx';
 import { machineryPath } from '../main/store/home.mts';
 import { byWorkHere } from '../renderer/src/thread-commands.ts';
 import { AskBar, askChange } from '../renderer/src/team/AskBar.tsx';
+import { offerIsLive } from '../renderer/src/format.ts';
 import { changePath } from '../main/code-change.mts';
 
 async function aMac(cloud, personId, tellThread) {
@@ -201,6 +202,12 @@ describe('the rules, without a cloud', () => {
     expect(handedBackBy({ ...back, wrote: { ...back.wrote, result: { ts: 9 } } })).toBeNull();
     expect(handedBackBy({ ...back, status: 'open' })).toBeNull();
     expect(handedBackBy({ status: 'blocked', wrote: { answer: { ts: 5 } } })).toBeNull();
+  });
+  // Round three: Theo handed Sam's thread back, and the agent's two options could no longer be picked.
+  it('a hand-back leaves the agent\'s options open for you to pick', () => {
+    const offer = { result: 'Which way?\n\n## Options\n1. Keep it\n2. Drop it', answer: 'Theo handed this back.', wrote: { result: { ts: 1, source: 'agent' }, answer: { ts: 2, source: 'system', teammate: 'theo' } } };
+    expect(offerIsLive(offer as never)).toBe(true);
+    expect(offerIsLive({ ...offer, wrote: { ...offer.wrote, answer: { ts: 2, source: 'founder' } } } as never)).toBe(false);
   });
   it('the words say what came back', () => {
     expect(handedBackWords({ kind: 'review', name: 'Priya', verdict: 'yes', words: '' })).toBe('Priya reviewed this and it looks good.');
