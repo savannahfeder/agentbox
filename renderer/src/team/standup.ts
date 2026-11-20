@@ -107,14 +107,17 @@ function postOf(p: TodayPerson, live: boolean): StandupPost {
     working: [...g.working, ...(p.waiting ?? [])].sort(byNewest).map(titled),
     // What is stuck is only known as of now, so only today's post says it.
     // A teammate's post also says what they handed you; your own Needs you is the inbox's to say.
-    needs: live ? [
+    // Two rows under one name (a thread and the ask about it) are said once.
+    needs: live ? onceEach([
       ...g.blocked.map((l) => ({ line: titled(l), on: l.on ?? null })),
       ...(p.kind === 'me' ? [] : p.waitingOnYou.map((l) => ({ line: titled(l), on: 'you' }))),
-    ] : [],
+    ]) : [],
     privateDone: p.privateDone,
     privateWorking: p.privateWorking ?? 0,
   };
 }
+
+const onceEach = (needs: StandupNeed[]): StandupNeed[] => needs.filter((n, i) => needs.findIndex((m) => titleOf(m.line) === titleOf(n.line) && m.on === n.on) === i);
 
 const says = (p: StandupPost) => p.done.length + p.working.length + p.needs.length + (p.helped?.length ?? 0) + p.privateDone + (p.privateWorking ?? 0) > 0;
 

@@ -162,6 +162,14 @@ describe('what a teammate handed you is in their post', () => {
   it('a past day does not say it', () => {
     expect(postsOf(dayOf().people, { mates: true, live: false }).flatMap((p) => p.needs)).toEqual([]);
   });
+  // Round ten: "Priya's standup shows 'Needs you on Bookings list empty states' twice
+  // consecutively with no visible distinction." Two rows wait on you under one name.
+  it('says a name it needs you on once', () => {
+    const twin = item({ id: 'r2', title: 'Booking fix', labels: ['teammate:t-fix'], updatedAt: on(12, 15) });
+    const day = teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [review, twin], needs: [review, twin] as never });
+    const mate = postsOf(day.people, { mates: true, live: true }).find((p) => p.key === 'mate:t-fix');
+    expect(mate?.needs.map((n) => [n.line.title, n.on])).toEqual([['Booking fix', 'you']]);
+  });
   it('your own post does not repeat your Needs you', () => {
     const mine = teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [item({ id: 'x', title: 'My ask', status: 'done', updatedAt: on(12, 11) })], needs: [item({ id: 'q', title: 'Agent asks me' })] as never });
     expect(postsOf(mine.people, { mates: true, live: true }).find((p) => p.key === 'me')?.needs ?? []).toEqual([]);
