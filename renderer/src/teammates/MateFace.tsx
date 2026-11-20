@@ -16,10 +16,10 @@ export function FacePick({ seed, onPick }: { seed: string; onPick: (seed: string
   const [page, setPage] = useState(0);
   const [base] = useState(seed);
   const others = otherFaces(base, 6, page).filter((s) => s !== seed);
-  return <span className="fp-row">
-    <MateFace seed={seed} className="fp-face fp-now" />
-    {others.map((s) => <button key={s} type="button" className="fp-pick" aria-label="Use this face" onClick={() => onPick(s)}><MateFace seed={s} className="fp-face" /></button>)}
-    <span role="button" tabIndex={0} className="tq-link fp-more" onClick={() => setPage(page + 1)}
+  return <span className="mf-row">
+    <MateFace seed={seed} className="mf-face mf-now" />
+    {others.map((s) => <button key={s} type="button" className="mf-pick" aria-label="Use this face" onClick={() => onPick(s)}><MateFace seed={s} className="mf-face" /></button>)}
+    <span role="button" tabIndex={0} className="tq-link mf-more" onClick={() => setPage(page + 1)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPage(page + 1); } }}>More</span>
   </span>;
 }

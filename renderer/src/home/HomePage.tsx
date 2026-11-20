@@ -8,7 +8,7 @@ import { enterIsTheButtons } from '../focused-button';
 
 /** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox; an invitation has no time. */
 export type NeedsRow = { key: string; letter: string; face?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
-export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; line: string; state: TeamRowState; week: number[]; total: number };
+export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; photo?: string; line: string; state: TeamRowState; week: number[]; total: number };
 export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
 
 const ICONS: Record<DoorKey, JSX.Element> = {
@@ -114,7 +114,8 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
                 <button type="button" key={m.key} className="hm-row hm-mate" onClick={() => onMember(m.key)}>
                   {m.face
                     ? <MateFace seed={m.face} className={`hm-face${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`} />
-                    : <span className={`hm-face${m.ai ? ' ai' : ''}${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`}>{m.letter}</span>}
+                    : <span className={`hm-face${m.ai ? ' ai' : ''}${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`}>
+                      {m.photo ? <img className="hm-photo" src={m.photo} alt="" referrerPolicy="no-referrer" /> : m.letter}</span>}
                   <span className="hm-text"><b>{m.name}</b><small>{m.line}</small></span>
                   <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>
                 </button>
