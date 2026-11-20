@@ -2,7 +2,7 @@
 // and pressed, who, since when and Take it back. What they write to your agent
 // and what they hand back land in the thread itself.
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { askIsOpen, asksOnThread, stepOf } from '../../../shared/thread-asks.mts';
+import { askIsOpen, askedOutWord, asksOnThread, stepOf } from '../../../shared/thread-asks.mts';
 import { updatedWords } from '../threads/page-rules';
 import type { WorkItem } from '../types';
 import { Face, TeamContext, firstName } from './people';
@@ -55,13 +55,14 @@ export function AsksChip({ item, items, now = Date.now(), onTakeBack }: {
   if (!team) return null;
   const asks = asksOnThread(items, team.me, item.id).filter((a) => a.open);
   if (!asks.length) return null;
-  const names = asks.map((a) => firstName(team.byId.get(a.to) ?? null) || 'Someone');
-  const word = asks.every((a) => a.ask.kind === 'review') ? 'reviewing' : 'helping';
+  const seenOf = (row: { id: string; assignee?: string | null; product?: string }) => team.state.seen?.[`${row.product}/${row.id}`]?.[row.assignee ?? ''] ?? 0;
+  // The board's own words, so the chip and the row never disagree about whether it was opened.
+  const label = askedOutWord(items, team.me, item.id, (id) => team.byId.get(id)?.name ?? '', seenOf);
   return (
     <span className="asks-chip-wrap" ref={box}>
       <button type="button" className="ts-done asks-chip" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className="asks-faces">{asks.map((a) => <Face key={a.row.id} person={team.byId.get(a.to) ?? null} size={18} />)}</span>
-        {names.length === 1 ? `${names[0]} is ${word}` : `${names.length} people are ${word}`}
+        {label}
       </button>
       {open && <div className="th-menu asks-pop" role="dialog" aria-label="Who you asked">
         {asks.map((a) => {
@@ -71,7 +72,7 @@ export function AsksChip({ item, items, now = Date.now(), onTakeBack }: {
             <div key={a.row.id} className="asks-pop-one">
               <p className="asks-pop-what">{a.ask.kind === 'help'
                 ? <><b>{first}</b> can write to your agent until they hand it back.</>
-                : <><b>{first}</b> is reviewing this and will hand it back.</>}</p>
+                : <><b>{first}</b> reviews this and hands it back.</>}</p>
               {a.ask.note && <p className="asks-note">{a.ask.note}</p>}
               <div className="asks-pop-foot">
                 <span className="asks-when">{seenAt >= a.at ? `Seen ${updatedWords(seenAt, now)}` : `Asked ${updatedWords(a.at, now)}, not opened yet`}</span>

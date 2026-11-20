@@ -54,11 +54,19 @@ describe('when the agent says the change is not ready', () => {
     expect(agentSaidNotReady('The full suite has a failure in the export test, and the retry store is in memory.')).toBe(true);
     expect(agentSaidNotReady('Two tests failed: the export test and the refund test.')).toBe(true);
     expect(agentSaidNotReady('Coordinate durable storage with Sam before it goes to production.')).toBe(true);
+    // Round twelve's retest.
+    expect(agentSaidNotReady('The full suite had four passing tests and one failure.')).toBe(true);
+    expect(agentSaidNotReady('The full suite has one existing failure in the overlap test.')).toBe(true);
+    expect(agentSaidNotReady('The full suite still fails the existing overlap test.')).toBe(true);
+    expect(agentSaidNotReady('Mixed time formats or offsets can produce incorrect results.')).toBe(true);
+    expect(agentSaidNotReady('Keys are lost on restart, so a retry after a deploy can charge twice.')).toBe(true);
   });
   it('does not read a passing suite or a past fix as not ready', () => {
     expect(agentSaidNotReady('0 tests failed and 41 passed.')).toBe(false);
     expect(agentSaidNotReady('The test that failed before now passes.')).toBe(false);
     expect(agentSaidNotReady('I ran the suite before committing. Everything passes.')).toBe(false);
+    expect(agentSaidNotReady('All 13 tests pass with no failures.')).toBe(false);
+    expect(agentSaidNotReady('It no longer produces incorrect totals.')).toBe(false);
   });
   it('does not hold it for a change that is ready, or one committed without pushing', () => {
     expect(agentSaidNotReady('Committed on the branch without pushing. Ready to ship.')).toBe(false);

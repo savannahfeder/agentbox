@@ -146,6 +146,10 @@ const NOT_READY = new RegExp([
   String.raw`\bbefore (?:it )?goes to production\b`,
   String.raw`\bsuite (?:has|had) (?:a |one |\d+ )?failures?\b`,
   String.raw`\b(?:[1-9]\d*|one|two|three|four|five|several|some) (?:tests? )?(?:failed|fail|failing)\b`,
+  String.raw`\b(?:[1-9]\d*|a|an|one|two|three) (?:existing |remaining |pre-existing )?failures?\b`,
+  String.raw`\bsuite (?:still )?fails\b`,
+  String.raw`\b(?:can|could|may|will) (?:still )?(?:produce|return|give) (?:incorrect|wrong) results?\b`,
+  String.raw`\b(?:lost|lose|is lost|are lost) on (?:restart|deploy)\b`,
 ].join('|'), 'i');
 export const agentSaidNotReady = (result: string | null | undefined): boolean => NOT_READY.test(result ?? '');
 
