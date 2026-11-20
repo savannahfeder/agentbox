@@ -148,8 +148,6 @@ export function SetupSplit(p: SetupSplitProps) {
   stepsNow.current = steps;
   const pastAccount = useCallback(() => { setError(null); setAt((i) => (stepsNow.current[i] === 'account' ? i + 1 : i)); }, []);
   useEffect(() => { if (step === 'account' && signedIn) pastAccount(); }, [step, signedIn, pastAccount]);
-  const backTo = stepBefore(steps, at, signedIn);
-  const back = backTo !== null || p.onBack ? () => { setError(null); if (backTo !== null) setAt(backTo); else p.onBack?.(); } : null;
 
   const me = p.snap?.team?.me;
 
@@ -165,14 +163,17 @@ export function SetupSplit(p: SetupSplitProps) {
     return () => { live = false; };
   }, [step, hasTeam]);
   const offer = proOffer(proFreeDays(hasTeam, seen));
+  const paid = plan === 'pro' || teamPaid(seen);
+  const backTo = stepBefore(steps, at, signedIn, paid);
+  const back = backTo !== null || p.onBack ? () => { setError(null); if (backTo !== null) setAt(backTo); else p.onBack?.(); } : null;
   const pay = useCallback(async () => {
-    if (plan === 'pro') { next(); return; }
+    if (paid) { next(); return; }
     setPayState('opening'); setError(null);
     // The account step signed in to the team; the payment is the cloud's. Terms were named on that step, and only there.
     const out = await startProTrial({ hasTeam, name: me?.name, acceptTerms: !signedInAtStart });
     if (!out.ok) { setPayState('idle'); setError(out.message); return; }
     setPayState('waiting');
-  }, [plan, next, signedInAtStart, hasTeam, me?.name]);
+  }, [paid, next, signedInAtStart, hasTeam, me?.name]);
   useEffect(() => {
     if (payState !== 'waiting') return undefined;
     let live = true;
@@ -315,8 +316,8 @@ export function SetupSplit(p: SetupSplitProps) {
         <div><span className="ss-pricing-label">{offer.paid.label}</span><b className="ss-pricing-price">{offer.paid.price}<small>{offer.paid.per}</small></b><span className="ss-pricing-line">{offer.paid.line}</span></div>
       </div>
       {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
-      <div className="ss-acts">{go(plan === 'pro' ? 'Continue' : payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : offer.cta, () => void pay(), payState !== 'opening')}{plan !== 'pro' && quiet(PRO_PITCH.free, next)}</div>
-      {plan !== 'pro' && <p className="ss-price-line">{PRO_PITCH.terms}</p>}
+      <div className="ss-acts">{go(paid ? 'Continue' : payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : offer.cta, () => void pay(), payState !== 'opening')}{!paid && quiet(PRO_PITCH.free, next)}</div>
+      {!paid && <p className="ss-price-line">{PRO_PITCH.terms}</p>}
     </>;
   } else if (step === 'teammates') {
     head = ['Add your own AI teammates.', ''];
@@ -366,7 +367,7 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-left">
         <div className="ss-brand"><Mark />{Name}</div>
         <div className="ss-steps">
-          {steps.map((s, i) => (dashGoesBack(steps, i, at, signedIn)
+          {steps.map((s, i) => (dashGoesBack(steps, i, at, signedIn, paid)
             ? <button type="button" key={s} className="ss-was" tabIndex={-1} disabled={busy} aria-label={`Back to step ${i + 1}`} onClick={() => { setError(null); setAt(i); }} />
             : <i key={s} className={i < at ? 'ss-was' : i === at ? 'ss-is' : ''} />))}
           <span>{step ? stepLabel(steps, step) : 'All set'}</span>

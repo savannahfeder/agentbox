@@ -37,16 +37,17 @@ export async function bringInWithin(bring: () => Promise<number>, ms = BRING_IN_
 export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
 
-/** Where Back goes, from a step or from the page after the last one. It passes over the account step once
- *  the account is made: that step only sends you forward again. */
-export function stepBefore(steps: readonly SetupStep[], at: number, signedIn: boolean): number | null {
+// The account step once the account is made, and the plan page once Pro is paid for, only send you forward again.
+const passedOver = (step: SetupStep, signedIn: boolean, paid: boolean) => (step === 'account' && signedIn) || (step === 'plan' && paid);
+/** Where Back goes, from a step or from the page after the last one, passing over steps that are done for good. */
+export function stepBefore(steps: readonly SetupStep[], at: number, signedIn: boolean, paid = false): number | null {
   let to = Math.min(at, steps.length) - 1;
-  if (to >= 0 && steps[to] === 'account' && signedIn) to -= 1;
+  while (to >= 0 && passedOver(steps[to], signedIn, paid)) to -= 1;
   return to >= 0 ? to : null;
 }
 /** A dash at the top takes you back to its step once you have passed it. */
-export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number, signedIn: boolean): boolean =>
-  i < at && !(steps[i] === 'account' && signedIn);
+export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number, signedIn: boolean, paid = false): boolean =>
+  i < at && !passedOver(steps[i], signedIn, paid);
 
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the

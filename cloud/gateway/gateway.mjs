@@ -770,10 +770,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (!team?.id) throw new Refusal(404, 'no-team', 'You are not on a team.');
     if (!(team.owners || []).includes(person)) throw new Refusal(403, 'owner', 'Only your team\'s owner can pay for the team. Ask them to choose the team plan.');
     const bill = (await readJson(teamKey(team.id))) || {};
-    if (PAYING.has(bill.stripe?.status) && bill.stripe.customer) return { url: await stripe.billing({ customer: bill.stripe.customer, returnUrl: `${WEB_APP}/paid?billing=1` }), where: 'billing' };
+    const toBilling = async (customer) => ({ url: await stripe.billing({ customer, returnUrl: `${WEB_APP}/paid?billing=1` }), where: 'billing' });
+    if (PAYING.has(bill.stripe?.status) && bill.stripe.customer) return toBilling(bill.stripe.customer);
     if (bill.checkout?.id) {
-      const open = await stripe.session(bill.checkout.id).catch(() => null);
-      if (open?.status === 'open') return { url: open.url, where: 'checkout' };
+      const last = await stripe.session(bill.checkout.id).catch(() => null);
+      if (last?.status === 'open') return { url: last.url, where: 'checkout' };
+      // Paid before Stripe's webhook has landed.
+      if (last?.status === 'complete' && last.customer) return toBilling(last.customer);
     }
     // Paid for inside the team's free days, the card is charged when they end.
     const freeDays = teamFreeDays(Number(team.createdAt) + teamPlan.trialDays * DAY_MS, now());
