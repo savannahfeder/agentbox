@@ -220,6 +220,12 @@ describe('the wiring', () => {
   it('a thread started from a task someone handed you leaves its link on that task', () => {
     expect(read('renderer/src/threads/ThreadComposer.tsx')).toContain('answer: `Started on this in a thread of my own: [${message.title}](${startedAt})`');
   });
+  // Round two: Priya messaged Dana from Dana's thread and had to spell out which thread she meant.
+  it('a message started from a teammate\'s thread starts by linking that thread', () => {
+    const app = read('renderer/src/App.tsx');
+    expect(app).toContain("const about = link ? `About [${openCard.title || 'your thread'}](${link})\\n\\n` : '';");
+    expect(app).toContain('if (about && !readDraft(convo).trim()) { saveDraft(convo, about);');
+  });
   // Round two: Dana's returned review sat under week-old rows because its project ranks last.
   it('a thread handed back ranks with a teammate\'s message, not with its project', () => {
     expect(read('renderer/src/App.tsx')).toContain('handedBackBy(i as Parameters<typeof handedBackBy>[0]) ? new Set([i.product]) : directSlugs');
