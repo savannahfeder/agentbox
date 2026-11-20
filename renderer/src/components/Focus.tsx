@@ -116,7 +116,7 @@ import { applyDockHeight } from '../dock-height';
 import { ClipGlyph, SendGlyph } from './reply-glyphs';
 import { bringIntoView, resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
-import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
+import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, saidNotToShip, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw, stripUnderThePointer } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
@@ -1718,7 +1718,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // AND WHICH WORDS IT ASKS IN COME OFF THE FOLDER, not off a fixed pair:
   // work with a commit on it is shipped, work nobody committed is committed
   // first, and work that has been thrown away is not asked about at all.
-  const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir)) : null;
+  const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir), { held: saidNotToShip(item.body, item.answer) }) : null;
   const shipOffer = !!shipAsk;
   const stripShown = showOptions || shipOffer;
   // A pick is held a few seconds for Z before it is written, and the card it

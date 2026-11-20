@@ -132,7 +132,18 @@ export function standingFrom(change: unknown): Standing {
  * `onlyFiles` is `onlyNamedFiles`: set, everything loose is a file the thread
  * already shows.
  */
-export function shipOfferFor(stands: Standing, onlyFiles?: readonly string[] | null): { ask: string; options: ParsedOption[]; headed: boolean } | null {
+// THE PERSON SAID NOT TO. Two rounds of team testers asked an agent not to merge or
+// deploy and were shown "Ship it (recommended)" under its answer. Both choices stay;
+// neither is recommended over their own words.
+const HOLD_IT = /\b(?:do not|don['’]t|dont|never|without)\s+(?:merg(?:e|ing)|ship(?:ping)?|deploy(?:ing)?|push(?:ing)?)\b/i;
+export const saidNotToShip = (...words: readonly (string | null | undefined)[]): boolean => words.some((w) => HOLD_IT.test(w ?? ''));
+
+export function shipOfferFor(stands: Standing, onlyFiles?: readonly string[] | null, { held = false }: { held?: boolean } = {}): { ask: string; options: ParsedOption[]; headed: boolean } | null {
+  const offer = shipOfferForStanding(stands, onlyFiles);
+  return offer && held ? { ...offer, options: offer.options.map((o) => ({ ...o, recommended: false })) } : offer;
+}
+
+function shipOfferForStanding(stands: Standing, onlyFiles?: readonly string[] | null): { ask: string; options: ParsedOption[]; headed: boolean } | null {
   if (stands.committed === false && stands.uncommitted === false) return null;
   if (stands.committed === false && stands.uncommitted === true) {
     if (stands.knowsYou === false) return { ask: NAME_YOURSELF_ASK, options: NAME_YOURSELF_OFFER, headed: true };
