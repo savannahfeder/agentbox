@@ -38,6 +38,7 @@ import type { MessageMarks } from '../decisions';
 import { LINE_MISSING } from '../../reveal-line';
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
+import { reviewLine } from '../../../../shared/room-needs-you.mts';
 import { clockOf } from '../../teammates/chat-lines';
 import { attachedName, drawnRoots, holdsRead, madeOnce, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
 
@@ -254,7 +255,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
           {m.id === newAt && <div className="rm-new" role="separator"><span>New</span></div>}
           <div className={`rm-cm${headed ? '' : ' cont'}${root && i === 0 ? ' root' : ''}`}>
             {headed && <div className="h">
-              <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 32 : 16} />
+              <Face name={m.voice ? m.voice.name : p?.name ?? '?'} url={m.voice ? undefined : p?.avatarUrl} agent={!!m.voice} size={hang ? 32 : 16} />
               <span>{m.voice ? voiceName(m.voice, p?.name ?? '', { mine }) : nameOf(m.by)}</span><em>{clockOf(m.at)}</em>
               {m.editedAt && !m.deleted && <em className="rm-edited">edited</em>}
             </div>}
@@ -271,6 +272,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
                 ? <div className="tx rm-gone">This message was deleted.</div>
                 : <div className="tx">{body(m)}</div>}
             {where && !m.deleted && <button type="button" className="rm-there" onClick={where.onOpen}>{where.label}</button>}
+            {!m.deleted && (() => { const line = calls.files ? reviewLine(m, calls.files.marks, meId, nameOf) : null; return line ? <em className="rm-reviewed">{line}</em> : null; })()}
             {!headed && m.editedAt && !m.deleted && editing !== m.id && <em className="rm-edited">edited</em>}
             {!m.deleted && marks?.get(m.id) && <em className="rm-decided">{marks.get(m.id)?.priority ? 'This week’s priorities' : 'Decision'}</em>}
             {!m.deleted && onReact && <Reactions on={m.reactions} me={meId} nameOf={(id) => who(id)?.name} onReact={(emoji, off) => onReact(m.id, emoji, !off)} />}
