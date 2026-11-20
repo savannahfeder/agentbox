@@ -27,7 +27,8 @@ import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
 import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard, WorkItem } from '../types';
 import { AskBar } from '../team/AskBar';
-import { MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
+import { DoneTrail, MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
+import { doneSteps } from '../../../shared/thread-cards.mts';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
@@ -179,6 +180,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
   };
   const owner = firstName(person) || 'Someone';
+  const tried = card.visible ? doneSteps(card.progress) : [];
   const helping = ask?.ask?.kind === 'help';
   const openMark = useCallback((link: FileMarkLink) => setBig({ file: link.file, note: link.id, at: Date.now() }), []);
   const files = useMemo(() => filesOnThread(work?.lines ?? [], marks.notes).map((f) => ({
@@ -248,6 +250,10 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             {/* While you were asked in, the ask at the end says where it stands, not "waiting on" its owner. */}
             {card.visible && !ask && <TeammateStanding card={card} person={person} now={now} />}
           </header>
+          {tried.length > 0 && <section className="tp-tried" aria-label={`What ${owner}'s agent already tried`}>
+            <h2>What {owner}'s agent already tried</h2>
+            <DoneTrail steps={tried} />
+          </section>}
           {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
           {work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
           <FileMarkOpener.Provider value={openMark}>
@@ -276,7 +282,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           </form>
         </section>
         {about && <aside className="tp-side" aria-label="About this thread">
-          <TeammateCard card={card} person={person} files={files} />
+          <TeammateCard card={card} person={person} files={files} done={!tried.length} />
         </aside>}
       </div>
     </div>

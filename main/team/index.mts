@@ -32,7 +32,7 @@ import { GIVEN_TASK, WORK_THREAD, isTaskRow, isWorkThread, teamPeopleShown } fro
 import { referencedFiles } from '../../shared/referenced-files.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { taskTitle } from '../../shared/team-tasks.mts';
-import { firstSentence } from '../../shared/thread-cards.mts';
+import { doneSteps, firstSentence } from '../../shared/thread-cards.mts';
 import { openTo, seenNow, sentWords, threadLink } from '../../shared/thread-link.mts';
 import { cardsFor, type WontStart } from '../../shared/thread-cards.mts';
 import fs from 'node:fs';
@@ -230,6 +230,7 @@ export interface TeamRow {
   title?: string;
   body?: string;
   result?: string;
+  progress?: string;
   labels?: string[];
   status?: string;
   priority?: number;
@@ -540,7 +541,12 @@ export function createTeamService({
     const brief = row.body || row.title;
     // The receiver reads it as a person's message, drawn as typed, where bold marks show as marks.
     const unbold = (s: string) => s.replace(/\*\*([^*\n]+)\*\*/g, '$1');
-    const words = [brief, row.result ? `Where it got to:\n\n${unbold(row.result)}` : ''].filter(Boolean).join('\n\n');
+    const tried = doneSteps(row.progress);
+    const words = [
+      brief,
+      tried.length ? `What the agent already tried:\n\n${tried.map((t) => `- ${unbold(t)}`).join('\n')}` : '',
+      row.result ? `Where it got to:\n\n${unbold(row.result)}` : '',
+    ].filter(Boolean).join('\n\n');
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];
     const tooBig: string[] = [];

@@ -680,3 +680,10 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .phone-status-dismissible > button { display: grid; place-items: center; flex: 0 0 44px; min-height: 44px; margin-block: -9px; padding: 0; border: 0; border-radius: var(--radius); background: transparent; color: inherit; cursor: pointer; }
 .phone-status-dismissible > button:hover { color: var(--text); }
 .phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
+
+/* What the owner's agent already did, under the thread's name: the first thing someone picking it up reads. */
+.tp-tried { margin: 4px 0 28px; }
+.tp-tried h2 { margin: 0 0 10px; font-size: 13px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
+.tp-tried .ts-trail { font-size: 14px; line-height: 21px; color: var(--text); }
+.tp-tried .ts-step::before { top: 8px; }
+.tp-tried .ts-step:not(:last-child)::after { top: 15px; }
