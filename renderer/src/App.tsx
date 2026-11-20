@@ -8535,9 +8535,12 @@ export default function App() {
                 <TicketItems.Provider value={items}>
                 <ChatsFrame current={inChats ? chatsDirectKey(focused.id) : null}>
                 {/* Asked of you: the answer sits under the message that asked, where a reply goes. */}
-                <UnderTheAsk.Provider value={team && focused.ask && focused.assignee === team.me && askIsOpen(focused)
-                  ? <AskBar task={focused} owner={team.byId.get(focused.ask.owner) ?? null} under onHandBack={(verdict, words) => handAskBack(focused, verdict, words)} />
-                  : null}>
+                <UnderTheAsk.Provider value={!team || !focused.ask ? null
+                  : focused.assignee === team.me && askIsOpen(focused)
+                    ? <AskBar task={focused} owner={team.byId.get(focused.ask.owner) ?? null} under onHandBack={(verdict, words) => handAskBack(focused, verdict, words)} />
+                    : focused.ask.owner === team.me
+                      ? <AskSentLine task={focused} onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />
+                      : null}>
                 <Focus
                   cloudKeys={snap.cloud?.setUp ? (snap.cloud.keys ?? []).map((k) => k.name) : null}
                   // A run of a repeating task carries its rule into the
@@ -8554,10 +8557,6 @@ export default function App() {
                   onGive={(to, note) => { void giveThread(focused, to, note); }}
                   onAsk={team ? (to, kind, note, step) => { void askOnThread(focused, to, kind, note, step); } : undefined}
                   asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
-                  asksSlot={!team || (focused.ask && focused.assignee === team.me && askIsOpen(focused)) ? null
-                    : focused.ask && focused.ask.owner === team.me
-                    ? <AskSentLine task={focused} onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />
-                    : null}
                   asksCorner={team && !focused.ask ? <AsksChip item={focused} items={items} now={now} onTakeBack={(task) => { void takeAskBack(task); }} /> : null}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}
