@@ -227,6 +227,15 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           <header className="tp-top">
             {card.title && <h1 className="th-card-title">{card.title}</h1>}
             <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
+            {files.length > 0 && <ul className="tp-files" aria-label="Files on this thread">
+              {files.map((f) => <li key={f.src}>
+                <button type="button" onClick={f.open} title={`Open ${f.name}`}>
+                  <span className="ts-tk-ext" aria-hidden="true">{(f.name.includes('.') ? f.name.split('.').pop() ?? '' : 'file').slice(0, 4)}</span>
+                  <span className="ts-tk-fname">{f.name}</span>
+                  {f.notes > 0 && <span className="ts-tk-notes">{f.notes === 1 ? '1 note' : `${f.notes} notes`}</span>}
+                </button>
+              </li>)}
+            </ul>}
             {/* While you were asked in, the ask at the end says where it stands, not "waiting on" its owner. */}
             {card.visible && !ask && <TeammateStanding card={card} person={person} now={now} />}
           </header>

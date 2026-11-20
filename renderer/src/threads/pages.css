@@ -436,6 +436,9 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-top { margin: 0 0 28px; }
 .tp-whose { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--text-dim); }
 .tp-whose .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }
+.tp-files { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; }
+.tp-files button { display: flex; align-items: center; gap: 9px; max-width: 320px; padding: 5px 10px 5px 5px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.tp-files button:hover { background: var(--wash); border-color: var(--line-strong); }
 .tp-top .th-card-title { margin: 0 0 10px; font-size: calc(var(--tp-type) * 1.7); line-height: 1.2; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
 .tp-standing { display: flex; align-items: center; flex-wrap: wrap; gap: 0 10px; margin: 0; font-size: 14px; color: var(--text-dim); }
 .tp-standing .ts-st { margin-right: 0; }
