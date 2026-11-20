@@ -68,7 +68,7 @@ describe('a row', () => {
   });
   it('opens their page in the group when pressed', () => {
     expect(html.match(/<button type="button" class="gr-prow"/g)).toHaveLength(4);
-    expect(hook).toContain('<PeoplePanel room={open} onPerson={(id) => setPane(`person:${id}`)} />');
+    expect(hook).toContain('<PeoplePanel room={open} onPerson={(id) => setPane(`person:${id}`)} threadOf={threadOf} />');
   });
 });
 
