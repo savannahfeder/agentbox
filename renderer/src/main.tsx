@@ -26,6 +26,8 @@ import { bootSharedThread } from './shared-thread/boot';
 import { sharedThreadOf } from './shared-thread/shared-thread';
 import { paidPageOf } from './paid/paid';
 import { bootPaid } from './paid/PaidPage';
+import { invitedPageOf } from './invited/invited';
+import { bootInvited } from './invited/InvitedPage';
 import { readCloudConfig } from './cloud-bridge';
 import { keepACopyOfTheDrafts } from './draft-copy';
 
@@ -74,7 +76,8 @@ const sharedFile = onASharedFilePage();
 const sharedThread = sharedFile ? null : sharedThreadOf(location.pathname, !!readCloudConfig(document));
 // Where Stripe sends people back to, signed in or not.
 const paid = sharedFile || sharedThread ? null : paidPageOf(location.pathname, location.search, !!readCloudConfig(document));
-if (!sharedFile && !sharedThread && !paid) normalizeSavedLook(localStorage, machineTheme());
+const invited = !sharedFile && !sharedThread && !paid && invitedPageOf(location.pathname, !!readCloudConfig(document));
+if (!sharedFile && !sharedThread && !paid && !invited) normalizeSavedLook(localStorage, machineTheme());
 applyTheme(resolveTheme(localStorage.getItem(THEME_KEY)));
 // And the picture, for the same reason and one worse: a skin changes what the
 // surfaces are made of, so a frame drawn before it lands is an opaque card
@@ -125,4 +128,5 @@ const cloud = readCloudConfig();
 if (sharedFile && cloud) bootSharedFile(sharedFile, cloud);
 else if (sharedThread && cloud) bootSharedThread(sharedThread, cloud);
 else if (paid) bootPaid(paid);
+else if (invited) bootInvited();
 else if (!theDoorNeedsItsKey()) boot();

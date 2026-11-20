@@ -101,6 +101,7 @@ describe('the page on the web app', () => {
   it('opens before the web app asks anyone to sign in, and its button goes back to the app', () => {
     const boot = fs.readFileSync('renderer/src/main.tsx', 'utf8');
     expect(boot).toMatch(/paidPageOf\(location\.pathname, location\.search/);
+    expect(boot.indexOf('bootPaid(')).toBeGreaterThan(-1);
     expect(boot.indexOf('bootPaid(')).toBeLessThan(boot.indexOf('else if (!theDoorNeedsItsKey()) boot();'));
     const page = fs.readFileSync('renderer/src/paid/PaidPage.tsx', 'utf8');
     expect(page).toMatch(/href=\{`\$\{JOIN_SCHEME\}:\/\/cloud`\}/);
