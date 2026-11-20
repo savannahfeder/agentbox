@@ -230,9 +230,9 @@ describe('the wiring', () => {
     expect(read('renderer/src/threads/ThreadComposer.tsx')).toContain('answer: `Started on this in a thread of my own: [${message.title}](${startedAt})`');
   });
   // Round two: Priya messaged Dana from Dana's thread and had to spell out which thread she meant.
-  it('a message started from a teammate\'s thread starts by linking that thread', () => {
+  it('a message started from a teammate\'s thread starts by naming that thread', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toContain("const about = link ? `About [${openCard.title || 'your thread'}](${link})\\n\\n` : '';");
+    expect(app).toContain("const about = openCard.title ? `About “${openCard.title}”: ` : '';");
     expect(app).toContain('if (about && !readDraft(convo).trim()) { saveDraft(convo, about);');
   });
   // Round two: Dana's returned review sat under week-old rows because its project ranks last.

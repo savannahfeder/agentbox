@@ -8442,8 +8442,8 @@ export default function App() {
                   onMessage={() => {
                     const convo = conversationWith(openCard.personId, { products: snap.products, items, me: team?.me ?? null });
                     // The message starts by naming the thread it is about (round two of the team test).
-                    const link = threadLink(openCard.personId, openCard.threadId);
-                    const about = link ? `About [${openCard.title || 'your thread'}](${link})\n\n` : '';
+                    // By name, not link: the box shows a link as raw markdown, and the thread is theirs.
+                    const about = openCard.title ? `About “${openCard.title}”: ` : '';
                     if (convo) {
                       if (about && !readDraft(convo).trim()) { saveDraft(convo, about); window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(convo) })); }
                       openConversation(convo);
