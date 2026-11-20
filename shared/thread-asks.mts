@@ -107,6 +107,16 @@ export function handedBackBy(row: { status?: string; wrote?: Record<string, { ts
   return (answer.ts ?? 0) >= after ? answer.teammate : null;
 }
 
+/** On your thread's row while someone you asked has it: "Theo is reviewing", or null. */
+export function askedOutWord(rows: readonly AskRow[], me: string | null, thread: string, nameOf: (id: string) => string): string | null {
+  const open = asksOnThread(rows, me, thread).filter((a) => a.open);
+  if (!open.length) return null;
+  const first = (nameOf(open[0].to) || 'Someone').split(/\s+/)[0];
+  const who = open.length === 1 ? first : `${open.length} people`;
+  const verb = open.every((a) => a.ask.kind === 'review') ? 'reviewing' : 'helping';
+  return `${who} ${open.length === 1 ? 'is' : 'are'} ${verb}`;
+}
+
 /** The word under an ask's name in a list, where "Task" goes on any other. */
 export const askWord = (kind: AskKind): string => (kind === 'help' ? 'Help' : 'Review');
 

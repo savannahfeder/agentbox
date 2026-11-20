@@ -2554,6 +2554,8 @@ export default function App() {
       if (scope && i.product !== scope) return false;
       // Your thread says who has it; the task the ask sent them is not a second row.
       if (askIGave(i, team?.me ?? null)) return false;
+      // And the thread itself, out with them, is in progress (out of Needs you until it comes back).
+      if (askedOut.has(i.id) && i.status !== 'done') return true;
       const deferredUntil = dueAt(i);
       if (hiddenAt(i) > now && !liveIds.has(i.id)) return false;
       // The grace window: the write waits for Z, the signal must not, because a
@@ -2587,7 +2589,7 @@ export default function App() {
     // threads/page-rules.ts): a queued row is told by its Status cell, and
     // what you just sent is on top.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, scope, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds]);
+  [items, agentList, agentMode, scope, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut]);
 
   // AND THE TAB COUNTS EACH THREAD ONCE: the list, less what Needs you holds,
   // the way `tabState` below has it for the board and `done` for the archive.

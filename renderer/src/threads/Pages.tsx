@@ -20,7 +20,7 @@ import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
 import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { waitWords } from '../../../shared/thread-waits.mts';
-import { handedBackBy } from '../../../shared/thread-asks.mts';
+import { askedOutWord, handedBackBy } from '../../../shared/thread-asks.mts';
 import { needsLeft, needsWord } from '../../../shared/cloud-needs.mts';
 import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mts';
 import { commentLine, linkCommentLine } from './teammate-thread';
@@ -762,8 +762,11 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // Handed back by someone you asked (shared/thread-asks.mts): their words are the newest thing on it.
   const toldBy = inNeedsYou ? handedBackBy(item as Parameters<typeof handedBackBy>[0]) : null;
   const backFrom = toldBy && team?.byId.has(toldBy) ? `Back from ${nameFirst(toldBy)}` : null;
-  const shownWord = wants ?? backFrom ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
-  const status = shownWord === null ? undefined : { ...worded, word: shownWord };
+  // Out with someone you asked: say who, not that nothing is running.
+  const askedOut = team && !cell.live && !backFrom ? askedOutWord(allItems ?? [], team.me, item.id, (id) => team.byId.get(id)?.name ?? '') : null;
+  const shownWord = wants ?? backFrom ?? askedOut ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
+  // Out with a person, it is no agent's state, so it wears no agent mark and offers no try again.
+  const status = shownWord === null ? undefined : askedOut && shownWord === askedOut ? { ...worded, word: shownWord, agent: false, title: undefined } : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
   // people on a thread the team or chosen people can see, the lock on one only
   // you can see. A thread shared with chosen people (w-41ff964775) carries the
@@ -838,7 +841,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
     return <RowCells status={{ ...(status ?? cell), word: CAUSE_WAIT_WORD }} title={rowTitle(item)} aside={stuckOn.title} where={product?.name ?? ''} person={person}
       priority={shownPriority(item)} updatedAt={when} when={CAUSE_BACK_WORDS} now={now} />;
   }
-  return <RowCells status={status} retry={retry} lead={handedFace ?? <TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
+  return <RowCells status={status} retry={askedOut ? undefined : retry} lead={handedFace ?? <TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
     priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
 }
 
@@ -1139,7 +1142,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const cardWaits = e.card && e.card.state !== 'done' ? linkWords(e.card.blockedBy, team?.byId) : null;
           const stuckOn = e.item ? causeOf(e.item, allItems ?? []) : null;
           const waitWord = e.item
-            ? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
+            ? (team ? askedOutWord(allItems ?? [], team.me, e.item.id, (id: string) => team.byId.get(id)?.name ?? '') : null) ?? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
             : cardWaits && `Waits on ${cardWaits}`;
           const messageProduct = e.message && e.item ? products.find((p) => p.slug === e.item!.product) : null;
           const onThem = messageProduct && iSpokeLast(e.item!, messageProduct, team?.me ?? null)

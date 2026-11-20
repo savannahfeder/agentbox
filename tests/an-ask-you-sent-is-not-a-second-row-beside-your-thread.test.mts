@@ -23,6 +23,12 @@ describe('an ask you sent', () => {
     expect(app).toMatch(/const boardItemsHere = useMemo\(\(\) => items\.filter\(\(i\) => !askIGave\(i, team\?\.me \?\? null\)\), \[items, team\?\.me\]\);/);
     expect(block('const boardArgs = useMemo(')).toMatch(/items: evBoard \? boardItems\(boardItemsHere, evBoard, teammateIdOf\) : boardItemsHere/);
   });
+  // Photographed on Sam's copy: with the sent task gone from In progress the list
+  // said "Nothing is running." while his thread was out with Theo. The thread is
+  // the row, and it is in progress until it comes back.
+  it('leaves your thread itself in In progress while it is out', () => {
+    expect(block('const progress = useMemo(() => [')).toMatch(/if \(askedOut\.has\(i\.id\) && i\.status !== 'done'\) return true;/);
+  });
   it('is kept out of Done', () => {
     expect(block('const done = useMemo(() => {')).toMatch(/!askIGave\(i, team\?\.me \?\? null\)/);
   });
