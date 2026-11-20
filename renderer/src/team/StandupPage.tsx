@@ -100,9 +100,6 @@ function Settings({ s, onChange, onClose }: { s: StandupSettings; onChange: (s: 
   </section>;
 }
 
-let pickedDay: { day: number; at: number } | null = null;
-const PICK_KEPT_MS = 10 * 60_000;
-
 export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }: {
   now: number;
   faces: ReadonlyMap<string, Member>;
@@ -114,9 +111,7 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
   onPerson?: (key: string) => void;
 }) {
   const [s, setS] = useState<StandupSettings>(() => readStandup(store() ?? { getItem: () => null }));
-  // Kept for the session, so a redraw of the page does not put you back on today (round five: Thursday would not stay picked).
-  const [picked, setPickedHere] = useState<number | null>(() => (pickedDay && Date.now() - pickedDay.at < PICK_KEPT_MS ? pickedDay.day : null));
-  const setPicked = (day: number | null) => { pickedDay = day === null ? null : { day, at: Date.now() }; setPickedHere(day); };
+  const [picked, setPicked] = useState<number | null>(null);
   const [q, setQ] = useState('');
   const [setting, setSetting] = useState(false);
   const change = (next: StandupSettings) => { setS(next); const st = store(); if (st) keepStandup(st, next); };
