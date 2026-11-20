@@ -30,6 +30,7 @@ import { machineryPath } from '../main/store/home.mts';
 import { byWorkHere } from '../renderer/src/thread-commands.ts';
 import { AskBar, askChange } from '../renderer/src/team/AskBar.tsx';
 import { offerIsLive } from '../renderer/src/format.ts';
+import { rowSummary } from '../renderer/src/list-rules.ts';
 import { changePath } from '../main/code-change.mts';
 
 async function aMac(cloud, personId, tellThread) {
@@ -208,6 +209,13 @@ describe('the rules, without a cloud', () => {
     const offer = { result: 'Which way?\n\n## Options\n1. Keep it\n2. Drop it', answer: 'Theo handed this back.', wrote: { result: { ts: 1, source: 'agent' }, answer: { ts: 2, source: 'system', teammate: 'theo' } } };
     expect(offerIsLive(offer as never)).toBe(true);
     expect(offerIsLive({ ...offer, wrote: { ...offer.wrote, answer: { ts: 2, source: 'founder' } } } as never)).toBe(false);
+  });
+  // Round three: the returned row previewed words the status already said, not Theo's answer.
+  it('a handed-back row previews the helper\'s own words', () => {
+    const row = { answer: 'Theo reviewed this and it looks good.\n\nShip it after the migration runs.', status: 'blocked', wrote: { answer: { ts: 5, by: 'sam', teammate: 'theo' }, result: { ts: 1 } } };
+    expect(rowSummary(row, 'inbox')).toBe('Ship it after the migration runs.');
+    expect(rowSummary({ ...row, answer: 'Theo handed this back.' }, 'inbox')).toBe('Theo handed this back.');
+    expect(rowSummary({ ...row, wrote: { ...row.wrote, answer: { ts: 5, by: 'sam' } } }, 'inbox')).toBe('Theo reviewed this and it looks good.');
   });
   it('the words say what came back', () => {
     expect(handedBackWords({ kind: 'review', name: 'Priya', verdict: 'yes', words: '' })).toBe('Priya reviewed this and it looks good.');
