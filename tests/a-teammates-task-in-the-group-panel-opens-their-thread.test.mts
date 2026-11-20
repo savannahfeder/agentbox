@@ -6,7 +6,7 @@
 // The whole row was one button to the profile. Measured on the panel's own
 // elements: the task line is now a button that opens the thread when it is a
 // shared thread you can read, while the face and the name still open the
-// profile; and on which card a line names (threadOnLine).
+// profile; and on which thread a line opens (threadOnLine).
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import React, { createElement, isValidElement, type ReactElement, type ReactNode } from 'react';
@@ -24,36 +24,35 @@ const thread = (personId: string, threadId: string, o: Partial<ThreadCard> = {})
   personId, threadId, visible: true, title: null, project: 'Payments API', state: 'running', priority: null, problem: null, progress: null, solution: null,
   blockedBy: [], blocks: [], people: null, updatedAt: 1000, ...o,
 });
-const sam = person('sam', { agents: 1, workingOn: 'Payments API health endpoint' });
+const sam = person('sam', { agents: 1, workingOn: 'Payments API health endpoint', workingThread: 'health' });
 
-describe('which thread a line names', () => {
-  it('their running shared thread with that title', () => {
-    const cards = [thread('sam', 'old', { title: 'Runbook', updatedAt: 2000 }), thread('sam', 'health', { title: 'Payments API health endpoint' })];
-    expect(threadOnLine(sam, cards)?.threadId).toBe('health');
+// The line once matched a card by its title; the title changed three times in
+// a minute on the rerun and the link fell through to the profile. It goes by id.
+describe('which thread a line opens', () => {
+  it('the card the line carries the id of', () => {
+    const cards = [thread('sam', 'old', { title: 'Payments API health endpoint', updatedAt: 2000 }), thread('sam', 'health', { title: 'Payments API health endpoint' })];
+    expect(threadOnLine(sam, cards)).toEqual({ personId: 'sam', threadId: 'health' });
   });
-  it('a title the line cut short', () => {
-    const long = 'Find every route in the payments api that has no input validation and add it';
-    expect(threadOnLine(person('theo', { agents: 2, workingOn: long.slice(0, 64) }), [thread('theo', 'w', { title: long }), thread('theo', 'x', { title: 'Other' })])?.threadId).toBe('w');
+  it('the same thread after its title changed', () => {
+    expect(threadOnLine(sam, [thread('sam', 'health', { title: 'Health endpoint with uptime' })])?.threadId).toBe('health');
   });
-  it('their only running shared thread when the line words it differently', () => {
-    expect(threadOnLine(sam, [thread('sam', 'h', { title: 'Add a /health endpoint' })])?.threadId).toBe('h');
+  it('a thread that is waiting, not only one running', () => {
+    expect(threadOnLine(sam, [thread('sam', 'health', { state: 'waiting' })])?.threadId).toBe('health');
   });
-  it('not someone else’s thread of the same name', () => {
-    expect(threadOnLine(sam, [thread('lena', 'h', { title: 'Payments API health endpoint' })])).toBeNull();
+  it('not a card of that title with another id', () => {
+    expect(threadOnLine(sam, [thread('sam', 'other', { title: 'Payments API health endpoint' })])).toBeNull();
+  });
+  it('not someone else’s card with that id', () => {
+    expect(threadOnLine(sam, [thread('lena', 'health')])).toBeNull();
   });
   it('not one they keep from you', () => {
-    expect(threadOnLine(sam, [thread('sam', 'h', { title: 'Payments API health endpoint', visible: false })])).toBeNull();
+    expect(threadOnLine(sam, [thread('sam', 'health', { visible: false })])).toBeNull();
   });
-  it('not a finished one', () => {
-    expect(threadOnLine(sam, [thread('sam', 'h', { title: 'Payments API health endpoint', state: 'done' })])).toBeNull();
+  it('none when the line carries no id', () => {
+    expect(threadOnLine({ ...sam, workingThread: null }, [thread('sam', 'health')])).toBeNull();
   });
-  it('none when two run and the line names neither', () => {
-    expect(threadOnLine(sam, [thread('sam', 'a', { title: 'One' }), thread('sam', 'b', { title: 'Two' })])).toBeNull();
-  });
-  it('none when they run nothing or the line is hidden', () => {
-    const cards = [thread('sam', 'h', { title: 'Payments API health endpoint' })];
-    expect(threadOnLine({ ...sam, agents: 0 }, cards)).toBeNull();
-    expect(threadOnLine({ ...sam, workingOn: null, workingPrivate: true }, cards)).toBeNull();
+  it('your own thread, which has no card when it is private', () => {
+    expect(threadOnLine(person('me', { me: true, agents: 1, workingOn: 'Mine', workingThread: 'w-1' }), [])).toEqual({ personId: 'me', threadId: 'w-1' });
   });
 });
 
