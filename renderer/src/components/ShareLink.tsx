@@ -8,6 +8,7 @@ import { shareSignInStartsOn, signInWasSkipped } from '../sign-in-ask';
 import { NoteGlyph } from './NoteGlyphs';
 import { placeWords, shownName, type NotePlace } from '../../../shared/artifact-marks.mts';
 import { TeamContext } from '../team/people';
+import { SendSheet } from '../threads/SharePanel';
 import type { Person as TeamPerson } from '../types';
 
 /** A link comment's place, short: "at 0:24", "a pin", the quote. */
@@ -154,20 +155,50 @@ export function sendTargets({ me, people, rooms }: { me: string | null; people: 
 }
 
 /** The row of chats a file can be sent into, and where it went. */
-export function SendTo({ targets, busy, sent, onSend }: { targets: readonly SendTarget[]; busy: string | null; sent: string | null; onSend: (to: string) => void }) {
+export function SendTo({ targets, busy, sent, onPick }: { targets: readonly SendTarget[]; busy: string | null; sent: string | null; onPick: (to: string) => void }) {
   if (!targets.length) return null;
   const went = targets.find((t) => t.to === sent);
   return (
     <div className="av-share-send-to" role="group" aria-label="Send to">
       <span className="av-share-send-l">{went ? `Sent to ${went.name}` : 'Send to'}</span>
-      {targets.map((t) => <button type="button" key={t.to} className={`av-share-chip${t.to === sent ? ' is-sent' : ''}`} disabled={!!busy} onClick={() => onSend(t.to)}>{t.name}</button>)}
+      {targets.map((t) => <button type="button" key={t.to} className={`av-share-chip${t.to === sent ? ' is-sent' : ''}`} disabled={!!busy} onClick={() => onPick(t.to)}>{t.name}</button>)}
+    </div>
+  );
+}
+
+const baseName = (src: string) => src.split('/').pop() || src;
+
+/** Sending to a person: the thread's other files to add, then the thread's own send sheet. */
+export function FileSendSheet({ name, others, also, onAlso, people, to, onSend }: {
+  name: string;
+  /** The thread's other files, newest version of each. */
+  others: readonly string[];
+  also: readonly string[];
+  onAlso: (src: string) => void;
+  people: readonly TeamPerson[];
+  to: string;
+  onSend: (to: string[], note: string, want: 'review' | null) => void;
+}) {
+  return (
+    <div className="av-share-box av-share-sheet">
+      <p className="av-share-title">Send <span>{name}</span></p>
+      {others.length > 0 && (
+        <div className="av-share-send-to" role="group" aria-label="Files">
+          <span className="av-share-send-l">With</span>
+          {others.map((src) => <button type="button" key={src} className="av-share-chip" aria-pressed={also.includes(src)} onClick={() => onAlso(src)}>{baseName(src)}</button>)}
+        </div>
+      )}
+      <SendSheet people={people} start={[to]} link={false} onCopy={() => {}} want="review" wants={['review']}
+        onSend={(ids, note, want) => onSend(ids, note, want === 'review' ? 'review' : null)} />
     </div>
   );
 }
 
 /** `icon`: drawn as the side pane's square mark rather than a worded button. */
-export function ShareLink({ product, thread, src, signedIn, icon = false }: {
+export function ShareLink({ product, thread, src, signedIn, icon = false, others = [] }: {
   product: string; thread: string; src: string;
+  /** The thread's other files, which can go with this one to a person. */
+  others?: readonly string[];
   /** From the window's snapshot, so signing in elsewhere moves the panel on. */
   signedIn: boolean;
   icon?: boolean;
@@ -183,12 +214,20 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
   const targets = team ? sendTargets({ me: team.me, people: team.state.people, rooms: team.state.rooms?.rooms ?? [] }) : [];
   const [sending, setSending] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
-  const sendTo = async (to: string) => {
+  const [sheet, setSheet] = useState<string | null>(null);
+  const [also, setAlso] = useState<string[]>([]);
+  const sendTo = async (to: string, more: { also?: string[]; note?: string; want?: 'review' | null } = {}) => {
     setSending(to); setProblem(null); setSentTo(null);
-    const out = await api.fileToChat({ ...ask, to });
+    const out = await api.fileToChat({ ...ask, to, ...more });
     setSending(null);
-    if (!out.ok) { setProblem(out.error ?? 'That did not send.'); return; }
+    if (!out.ok) { setProblem(out.error ?? 'That did not send.'); return false; }
     setSentTo(to);
+    return true;
+  };
+  const sendFromSheet = async (ids: string[], note: string, want: 'review' | null) => {
+    setSheet(null);
+    for (const id of ids) if (!(await sendTo(id, { also, note, want }))) return;
+    setAlso([]);
   };
 
   const [stopAsked, setStopAsked] = useState(false);
@@ -256,7 +295,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     setState({ ...state, link: null });
     setSaid(shareWords.stopped);
   };
-  const toggle = () => { setOpen(!open); setSaid(null); setProblem(null); setStopAsked(false); setSentTo(null); };
+  const toggle = () => { setOpen(!open); setSaid(null); setProblem(null); setStopAsked(false); setSentTo(null); setSheet(null); setAlso([]); };
   const copyIt = async (url: string) => {
     if (!(await copy(url))) { setProblem('This browser would not copy. Open the link and copy it from there.'); return; }
     setCopied(true);
@@ -278,10 +317,14 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
       {icon
         ? <button type="button" className={`doc-mark${link ? ' is-shared av-share-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : link ? live : 'Share'} aria-label={link ? live : 'Share'} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link && <span>{shareWords.sharedMark}</span>}</button>
         : <button type="button" className={`av-btn${open ? ' is-on' : ''}${flagged ? ' is-behind' : ''}`} title={behind ? shareWords.behind : unseen ? shareWords.newComments : undefined} aria-expanded={open} aria-haspopup="dialog" onClick={toggle}><NoteGlyph name="globe" />{link ? live : 'Share'}</button>}
-      {open && (
+      {open && sheet && team && (
+        <FileSendSheet name={name} others={others.filter((o) => o !== src)} also={also} onAlso={(o) => setAlso((was) => (was.includes(o) ? was.filter((x) => x !== o) : [...was, o]))}
+          people={team.state.people.filter((p) => p.id !== team.me)} to={sheet} onSend={(ids, note, want) => void sendFromSheet(ids, note, want)} />
+      )}
+      {open && !sheet && (
         <div className="av-share-box" role="dialog" aria-label="Share">
           <p className="av-share-title">Share <span>{name}</span></p>
-          {state.signedIn && <SendTo targets={targets} busy={sending} sent={sentTo} onSend={(to) => void sendTo(to)} />}
+          {state.signedIn && <SendTo targets={targets} busy={sending} sent={sentTo} onPick={(to) => (to === 'team' ? void sendTo(to) : setSheet(to))} />}
           {!state.signedIn ? (() => {
             const offer = shareSignedOutWords(shareSignInStartsOn({ skipped: signInWasSkipped() }));
             return <>

@@ -1987,7 +1987,7 @@ declare global {
       writeDoc?(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }>;
       fileLink?(p: FileLinkAsk): Promise<FileLinkState>;
       fileLinkShare?(p: FileLinkAsk): Promise<FileLinkState>;
-      fileToChat?(p: FileLinkAsk & { to: string }): Promise<{ ok: boolean; roomId?: string; error?: string }>;
+      fileToChat?(p: FileLinkAsk & { to: string; also?: string[]; note?: string; want?: 'review' | null }): Promise<{ ok: boolean; roomId?: string; error?: string }>;
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;

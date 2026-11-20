@@ -806,7 +806,7 @@ export const api = {
     return zero.fileLinkShare(p);
   },
   /** The file into a chat: a teammate's id, or 'team' for the team's group. */
-  async fileToChat(p: FileLinkAsk & { to: string }): Promise<{ ok: boolean; roomId?: string; error?: string }> {
+  async fileToChat(p: FileLinkAsk & { to: string; also?: string[]; note?: string; want?: 'review' | null }): Promise<{ ok: boolean; roomId?: string; error?: string }> {
     const zero = window.zero;
     if (!zero?.fileToChat) return { ok: false, error: `quit and reopen ${NAME} to send files` };
     return zero.fileToChat(p);

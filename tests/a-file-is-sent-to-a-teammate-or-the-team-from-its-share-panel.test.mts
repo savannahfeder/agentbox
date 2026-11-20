@@ -55,7 +55,7 @@ describe('sending a file into a chat', () => {
   const said = (m: Mac, roomId: string) => (m.rooms.state().messages?.[roomId] ?? []).map((x: { body: string }) => x.body);
 
   it('puts it in the chat with Priya, the reported one, and she has it', async () => {
-    const roomId = await sendFileToChat({ rooms: lena.rooms, me: lena.id, to: priya.id, toName: priya.name, file });
+    const roomId = await sendFileToChat({ rooms: lena.rooms, me: lena.id, to: priya.id, toName: priya.name, files: [file] });
     await flush();
     await priya.rooms.refresh();
     const body = said(priya, roomId).at(-1) ?? '';
@@ -64,13 +64,13 @@ describe('sending a file into a chat', () => {
   });
 
   it('uses the same chat with her the next time', async () => {
-    const first = await sendFileToChat({ rooms: lena.rooms, me: lena.id, to: priya.id, toName: priya.name, file });
+    const first = await sendFileToChat({ rooms: lena.rooms, me: lena.id, to: priya.id, toName: priya.name, files: [file] });
     await lena.rooms.refresh();
-    expect(await sendFileToChat({ rooms: lena.rooms, me: lena.id, to: priya.id, toName: priya.name, file })).toBe(first);
+    expect(await sendFileToChat({ rooms: lena.rooms, me: lena.id, to: priya.id, toName: priya.name, files: [file] })).toBe(first);
   });
 
   it('puts it in the team’s group for everyone', async () => {
-    const roomId = await sendFileToChat({ rooms: lena.rooms, me: lena.id, to: TEAM_CHAT, toName: 'Agentbox Team', file });
+    const roomId = await sendFileToChat({ rooms: lena.rooms, me: lena.id, to: TEAM_CHAT, toName: 'Agentbox Team', files: [file] });
     const group = lena.rooms.state().rooms.find((r: { teamId?: string | null }) => r.teamId);
     expect(roomId).toBe(group?.id);
     await theo.rooms.refresh();
@@ -78,7 +78,7 @@ describe('sending a file into a chat', () => {
   });
 
   it('says so when there is no file there', async () => {
-    await expect(sendFileToChat({ rooms: lena.rooms, me: lena.id, to: priya.id, toName: priya.name, file: `${file}.gone` })).rejects.toThrow(/could not be read/);
+    await expect(sendFileToChat({ rooms: lena.rooms, me: lena.id, to: priya.id, toName: priya.name, files: [`${file}.gone`] })).rejects.toThrow(/could not be read/);
   });
 });
 
@@ -105,13 +105,13 @@ describe('who the Share panel offers', () => {
   });
 
   it('draws each one as a button that names them', () => {
-    const html = renderToStaticMarkup(React.createElement(SendTo, { targets: sendTargets({ me: 'p-lena', people, rooms: [group] }), busy: null, sent: null, onSend: () => {} }));
+    const html = renderToStaticMarkup(React.createElement(SendTo, { targets: sendTargets({ me: 'p-lena', people, rooms: [group] }), busy: null, sent: null, onPick: () => {} }));
     expect(html).toContain('Send to');
     for (const name of ['Agentbox Team', 'Priya', 'Theo']) expect(html).toContain(`>${name}</button>`);
   });
 
   it('says where it went once sent', () => {
-    const html = renderToStaticMarkup(React.createElement(SendTo, { targets: sendTargets({ me: 'p-lena', people, rooms: [group] }), busy: null, sent: 'p-priya', onSend: () => {} }));
+    const html = renderToStaticMarkup(React.createElement(SendTo, { targets: sendTargets({ me: 'p-lena', people, rooms: [group] }), busy: null, sent: 'p-priya', onPick: () => {} }));
     expect(html).toContain('Sent to Priya');
   });
 

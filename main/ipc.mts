@@ -2928,20 +2928,26 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   }));
   ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => withEditable(arg, await team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg, team)) }))));
   // The same file into a chat: the team's group or one teammate's (main/team/file-to-chat.mts).
-  ipcMain.handle('zero:file-to-chat', async (_e, arg: LinkArg & { to?: unknown } = {}) => {
+  ipcMain.handle('zero:file-to-chat', async (_e, arg: LinkArg & { to?: unknown; also?: unknown; note?: unknown; want?: unknown } = {}) => {
     const rooms = team?.rooms;
     const me = team?.state()?.me?.id;
     if (!rooms || !me) return { ok: false, error: 'Sign in to send it to your team.' };
     const to = String(arg.to ?? '');
     const person = (team.state()?.people ?? []).find((p) => p.id === to);
     if (to !== TEAM_CHAT && (!person || to === me)) return { ok: false, error: 'That person is not on your team.' };
+    // The thread's other files go with it, each found the way the one on screen is.
+    const srcs = [arg.src, ...(Array.isArray(arg.also) ? arg.also.filter((x): x is string => typeof x === 'string') : [])].slice(0, 10);
     try {
-      const found = await resolveArtifact({
-        src: arg.src, product: arg.product, thread: typeof arg.thread === 'string' ? arg.thread : null,
-        products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team.firstNameOf,
-      });
-      if (!found.ok) return { ok: false, error: found.error || 'This file is not on this computer.' };
-      const roomId = await sendFileToChat({ rooms, me, to, toName: person?.name ?? '', file: found.path });
+      const files: string[] = [];
+      for (const src of srcs) {
+        const found = await resolveArtifact({
+          src, product: arg.product, thread: typeof arg.thread === 'string' ? arg.thread : null,
+          products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team.firstNameOf,
+        });
+        if (!found.ok) return { ok: false, error: found.error || `${String(src)} is not on this computer.` };
+        files.push(found.path);
+      }
+      const roomId = await sendFileToChat({ rooms, me, to, toName: person?.name ?? '', files, note: String(arg.note ?? ''), want: arg.want === 'review' ? 'review' : null });
       push();
       return { ok: true, roomId };
     } catch (err) {

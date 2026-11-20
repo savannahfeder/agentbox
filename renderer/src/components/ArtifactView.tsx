@@ -802,7 +802,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
         {canRestore && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
         <span className="doc-marks">
           {(thread ?? shareThread) && version && foundNow === 'open' && canShareFile(version.path) && (
-            <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
+            <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me}
+              others={families.filter((f) => f !== family).map((f) => f.versions[f.versions.length - 1].path)} />
           )}
           {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
           {/* The side pane has no versions to step, so it shows the newest. */}
