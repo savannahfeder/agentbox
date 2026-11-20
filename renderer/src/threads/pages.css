@@ -542,9 +542,6 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-follow.on { border-color: var(--line); color: var(--text-faint); }
 .th-work-note { margin: 0 0 18px; font-size: 13px; color: var(--text-dim); }
 .th-comment { margin: 28px 0 0; }
-.tp-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.th-comment .tp-options button { height: auto; min-height: 30px; padding: 5px 12px; font: inherit; font-size: 13px; text-align: left; color: var(--text); background: none; border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; }
-.th-comment .tp-options button:hover:not(:disabled) { background: var(--bg-selected); }
 .tp-comment-box { display: flex; align-items: flex-start; gap: 10px; padding: 10px 10px 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--wash); }
 .tp-comment-box:focus-within { border-color: var(--text-faint); }
 .tp-comment-box > .tm-av { margin-top: 5px; }

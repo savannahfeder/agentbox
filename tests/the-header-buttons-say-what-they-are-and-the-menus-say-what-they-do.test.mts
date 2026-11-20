@@ -40,6 +40,6 @@ describe('a menu over a thread says what picking does', () => {
   });
 
   it('Waits on says where it goes and when it comes back', () => {
-    expect(read('renderer/src/threads/ThreadMenu.tsx')).toMatch(/<p className="ts-menu-say">\{blocks \? 'Blocked until that is done\.' : 'It moves to Later and comes back when that is done\.'\}<\/p>/);
+    expect(read('renderer/src/threads/ThreadMenu.tsx')).toMatch(/<p className="ts-menu-say">\{blocks \? 'Blocked until that is done\.' : 'It comes back to you when that is done\.'\}<\/p>/);
   });
 });

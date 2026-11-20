@@ -503,7 +503,7 @@ export function ThreadMenu({ share = null, step = null, onCopyLink, onSendTo, on
       </button>}
       {open && waiting && (
         <div className="th-menu ts-more-menu ts-wait-menu" role="menu" aria-label={blocks ? 'Blocked by' : 'Waits on'}>
-          <p className="ts-menu-say">{blocks ? 'Blocked until that is done.' : 'It moves to Later and comes back when that is done.'}</p>
+          <p className="ts-menu-say">{blocks ? 'Blocked until that is done.' : 'It comes back to you when that is done.'}</p>
           {waitsNow && <button type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); onWait?.(null); }}>
             <span className="ico"><WaitMark /></span><span className="ts-more-label">{blocks ? 'Not blocked' : 'Stop waiting'}</span>
           </button>}

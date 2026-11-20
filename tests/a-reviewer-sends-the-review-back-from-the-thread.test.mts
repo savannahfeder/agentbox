@@ -75,10 +75,10 @@ describe('the thread page', () => {
     expect(page.indexOf('<SendBack')).toBeGreaterThan(page.indexOf('built.outcome && ('));
   });
   it('heads the page with the ask to you, then that it went', () => {
-    expect(page).toContain("said={reviewing ? reviewAskWords(owner, '') : review ? sentBack : null}");
+    expect(page).toContain("reviewing ? reviewAskWords(owner, '') : review ? sentBack : null} />");
   });
   it('does not offer to take the thread while the review is yours', () => {
-    expect(page).toContain('{onContinue && !reviewing && canContinue(');
+    expect(page).toMatch(/\{onContinue && !reviewing && (!helping && )?canContinue\(/);
   });
   it('the box is not a white block', () => {
     const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');

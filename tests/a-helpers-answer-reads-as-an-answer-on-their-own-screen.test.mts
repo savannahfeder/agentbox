@@ -90,7 +90,7 @@ describe('an option pressed with words in the box', () => {
   });
   it('is what the option buttons send, and the helper is told it went', () => {
     const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-    expect(page).toContain("onClick={() => void send(optionWithNote(o.text.replace(/\\s*\\(recommended\\)\\s*$/i, ''), draft))}");
+    expect(page).toContain("if (o) void send(optionWithNote(o.text.replace(/\\s*\\(recommended\\)\\s*$/i, ''), draft));");
     expect(page).toContain('api.teamComment({ personId, threadId, text, ...(helping ? { answers: true } : {}) })');
   });
 });

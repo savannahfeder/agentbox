@@ -29,7 +29,8 @@ import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './team
 import { canContinue } from './continue-thread';
 import { SendBack, reviewAskedOf, reviewAskWords } from './SendBack';
 import { answersTheStep, stepLine } from '../../../shared/thread-ask.mts';
-import { parseOptions } from '../format';
+import { parseOptions, stripOptionsSection } from '../format';
+import { OptionsOffer } from '../components/OptionsOffer';
 import { revealLine } from '../reveal-line';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -162,7 +163,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
     if (!out?.ok) { onNotice(out?.error ?? 'That comment did not send.'); return; }
     setDraft('');
     // Their copy starts the agent on it at its next sync (main/team/thread-share.mts).
-    if (helping) onNotice(`Sent to ${owner}'s agent`);
+    if (helping) { onNotice(`Sent to ${owner}'s agent`); setAnsweredStep(true); }
     setReread((n) => n + 1);
     following?.follow(card);
   };
@@ -187,6 +188,26 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
   const helping = answersTheStep(card, team?.me ?? null);
   const options = helping ? optionsToAnswer({ events, outcome: built.outcome }) : [];
   const box = helping ? `Answer for ${owner}'s agent` : `Comment to ${owner}`;
+  // Until their copy takes the answer up, the header says it went rather than the wait it ended.
+  const [answeredStep, setAnsweredStep] = useState(false);
+  useEffect(() => { setAnsweredStep(false); }, [personId, threadId]);
+  const sentToAgent = answeredStep && !helping && card.state !== 'running' && card.state !== 'done';
+  const pickOption = (n: number) => {
+    const o = options.find((x) => x.n === n);
+    if (o) void send(optionWithNote(o.text.replace(/\s*\(recommended\)\s*$/i, ''), draft));
+  };
+  const pickRef = useRef<HTMLButtonElement>(null);
+  // 1-9 picks, as on the owner's own page, unless a box has the keys.
+  useEffect(() => {
+    if (!options.length) return undefined;
+    const keys = (e: globalThis.KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return;
+      if (/^[1-9]$/.test(e.key) && options.some((o) => o.n === Number(e.key))) { e.preventDefault(); pickOption(Number(e.key)); }
+    };
+    window.addEventListener('keydown', keys);
+    return () => window.removeEventListener('keydown', keys);
+  });
   const openMark = useCallback((link: FileMarkLink) => setBig({ file: link.file, note: link.id, at: Date.now() }), []);
   const files = useMemo(() => filesOnThread(work?.lines ?? [], marks.notes).map((f) => ({
     ...f, open: () => open(f.src),
@@ -221,7 +242,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
             onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
             {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
           </button>}
-          {onContinue && !reviewing && canContinue(work, card, team?.me ?? null) && (
+          {onContinue && !reviewing && !helping && canContinue(work, card, team?.me ?? null) && (
             <button type="button" className="th-follow" onClick={onContinue}
               title={`Start a thread of your own with ${owner}'s conversation and files.`}>
               Continue it yourself
@@ -233,7 +254,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
       <header className="tp-top">
         <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
         {card.title && <h1 className="th-card-title">{card.title}</h1>}
-        {card.visible && <TeammateStanding card={card} person={person} now={now} said={reviewing ? reviewAskWords(owner, '') : review ? sentBack : null} />}
+        {card.visible && <TeammateStanding card={card} person={person} now={now} said={helping ? `${owner} asked you to help with this step` : sentToAgent ? `Sent to ${owner}'s agent` : reviewing ? reviewAskWords(owner, '') : review ? sentBack : null} />}
       </header>
       <div className="tp-grid">
         <section className="th-work" aria-label="The conversation">
@@ -245,15 +266,16 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
           {built.outcome && (
             <div className="appendix appendix-foot" data-line={`at-${built.outcome.at}`}>
               <div className="appendix-label">{built.outcome.field === 'result' ? 'Result' : 'Latest checkpoint'}</div>
-              {md(built.outcome.text)}
+              {md(options.length ? stripOptionsSection(built.outcome.text) : built.outcome.text)}
             </div>
           )}
+          {/* Out of the form, whose button styles would square its rows. */}
+          {options.length > 0 && !reviewing && <OptionsOffer bare ask="" askAll="" options={options} peekOption={null} askPeek={false}
+            selectedOption={null} selRef={pickRef} onPick={pickOption}
+            onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />}
           {reviewing ? (
             <SendBack owner={owner} note={review.note} notes={myOpenNotes} face={<Face person={team?.me ? team.byId.get(team.me) : null} me />} onSend={sendBack} />
           ) : <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-            {options.length > 0 && <div className="tp-options" role="group" aria-label="The agent's options">
-              {options.map((o) => <button key={o.n} type="button" disabled={sending} onClick={() => void send(optionWithNote(o.text.replace(/\s*\(recommended\)\s*$/i, ''), draft))}>{o.n}. {o.text}</button>)}
-            </div>}
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
               <textarea value={draft} rows={2} placeholder={box} aria-label={box}
