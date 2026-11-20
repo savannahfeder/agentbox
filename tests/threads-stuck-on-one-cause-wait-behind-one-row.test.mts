@@ -70,7 +70,7 @@ describe('a thread behind a cause says so in Later', () => {
   it('is drawn as waiting, with the cause beside its name, back when fixed', () => {
     const page = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
     expect(page).toMatch(/causeOf\(item, allItems \?\? \[\]\)/);
-    expect(page).toMatch(/word: CAUSE_WAIT_WORD \}\} title=\{rowTitle\(item\)\} aside=\{stuckOn\.title\}/);
+    expect(page).toMatch(/word: CAUSE_WAIT_WORD \}\} who=\{from\} title=\{rowTitle\(item\)\} aside=\{stuckOn\.title\}/);
     expect([CAUSE_WAIT_WORD, CAUSE_BACK_WORDS]).toEqual(['Waiting', 'When fixed']);
   });
 });
