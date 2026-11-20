@@ -1,3 +1,4 @@
+import { GivenDock, givenState, type Handing } from './GivenDock';
 import { RemoteControl } from './RemoteControl';
 import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor } from '../reply-keys';
 import { onPhone } from '../phone-screen';
@@ -730,7 +731,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, handing = null, onMessageHanded = null, onRetryHand, onKeepHand }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -910,6 +911,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onReopen: () => void;
   /** Opens a done thread again. */
   onReopenDone?: () => void;
+  /** A hand-over of this thread under way, or the reason it failed. */
+  handing?: Handing | null;
+  onMessageHanded?: (() => void) | null;
+  onRetryHand?: () => void;
+  onKeepHand?: () => void;
   /** Opens ⌘K on its Move to rows. */
   onMove?: () => void;
   /** Sets the thread's level, from the thread's own menu. */
@@ -1027,6 +1033,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // A thread about work is named for the work, and these are the people it is with.
   const audience = teamCtx ? workAudience(item, teamCtx.products.get(item.product), teamCtx.me, (id) => firstName(teamCtx.byId.get(id) ?? null)) : null;
   const handedName = handedTo(item);
+  const given = givenState(item, handing);
   const handedTask = handedName ? taskHandedFrom(items ?? [], item.id, teamCtx?.me ?? null) : null;
   const summarised = !agent && !made && !direct;
   // Read before the first paint, so the thread's width is right from the start.
@@ -2614,7 +2621,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               looks like it sends is the failure this codebase cares about most.
               What to do instead is in the message itself, per cause.
            */}
-          {update || trouble ? null : replyBlocked ? (
+          {update || trouble ? null : given ? (
+            <GivenDock state={given} onMessage={onMessageHanded} onReopen={onReopenDone ?? null} onRetry={onRetryHand} onKeep={onKeepHand} />
+          ) : replyBlocked ? (
             /*
              * NO REPLY BOX ON AN AGENT A REPLY CANNOT CLEAR. It is frozen on a
                box asking to approve something, and a message queues behind that

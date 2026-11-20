@@ -60,7 +60,7 @@ import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, aWordFollows, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS, WORD_FOLLOWS_MS } from './reply-keys';
 import { chosenNames, whoSees } from './threads/summary-rules';
-import { replyOnHandedOn, shownToPeople } from '../../shared/thread-cards.mts';
+import { handedToName, replyOnHandedOn, shownToPeople } from '../../shared/thread-cards.mts';
 import { SEEN_SENT } from '../../shared/phone-settings.mts';
 import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
 import { askWords, askedNow, askedPatch, askedSaid, latestStep } from '../../shared/thread-ask.mts';
@@ -275,6 +275,7 @@ import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, o
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
+import type { Handing } from './components/GivenDock';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
 import { homeNeedsRows } from './home/home-needs';
 import { needsYouList, openNeedsEntry } from './threads/needs-you-list';
@@ -760,6 +761,8 @@ export default function App() {
   // A TEAMMATE'S THREAD, opened from the Team board: its card, never its conversation.
   const [openCard, setOpenCard] = useState<ThreadCard | null>(null);
   const [cardOpenAt, setCardOpenAt] = useState<ArtifactOpen | null>(null);
+  // Hand-overs under way, by thread, until they end; a failed one keeps its reason.
+  const [handing, setHanding] = useState<Record<string, Handing>>({});
   const [cardStep, setCardStep] = useState<number | null>(null);
   // THERE IS NO MEMBERS PAGE ANY MORE (w-8415594d19, 2026-10-01). Team
   // management is a pane in Settings, so the sidebar's two team rows are one
@@ -7635,10 +7638,14 @@ export default function App() {
       await api.routeThread({ product: item.product, id: item.id, to: to.id }).then(() => showToast(`Given to ${to.name}`), (err) => showToast(String(err?.message ?? err)));
       return;
     }
+    const key = keyOf(item);
+    setHanding((was) => ({ ...was, [key]: { name: to.name } }));
     showToast(sendingTo(to.name.split(/\s+/)[0] || to.name));
     const out = await api.teamHandOn({ product: item.product, id: item.id, to: to.id, ...(note.trim() ? { note: note.trim() } : {}) });
     showToast(out.ok ? handedToWhom(to.name) : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
-    if (out.ok) await refresh();
+    if (!out.ok) { setHanding((was) => ({ ...was, [key]: { name: to.name, error: out.error ?? 'that did not work', retry: () => void giveThread(item, to, note) } })); return; }
+    await refresh();
+    setHanding(({ [key]: _done, ...rest }) => rest);
   };
   const runThreadCommand = (item: WorkItem, c: ThreadCommand) => {
     setModal(null);
@@ -8652,6 +8659,14 @@ export default function App() {
                   onSnooze={walking ? undefined : () => openSnooze(focused)}
                   onReopen={() => sendBack(focused)}
                   onReopenDone={() => reopenDone(focused)}
+                  handing={handing[keyOf(focused)] ?? null}
+                  onRetryHand={() => handing[keyOf(focused)]?.retry?.()}
+                  onKeepHand={() => setHanding(({ [keyOf(focused)]: _gone, ...rest }) => rest)}
+                  onMessageHanded={(() => {
+                    const name = handedToName(focused);
+                    const person = name ? team?.state.people.find((p) => p.name === name) : null;
+                    return person ? () => { setFocused(null); pickMember(`person:${person.id}`, 'messages'); } : null;
+                  })()}
                   onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
                   onPriority={(value) => { void retag([focused], value); }}
                   session={snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null}

@@ -85,7 +85,8 @@ describe('the dock hides the reply box only where a message is swallowed', () =>
     // that row at all. Nor does a made update row, if one is ever opened; the
     // new version is announced in the sidebar now (w-7a39dace23), so its
     // button left this slot.
-    expect(focus).toMatch(/\{update \|\| trouble \? null : replyBlocked \? \(/);
+    // A thread given away has its own line there (GivenDock), ahead of this gate.
+    expect(focus).toMatch(/\{update \|\| trouble \? null : given \? \([\s\S]*?\) : replyBlocked \? \(/);
   });
 
   it('keeps the box sentence for the one that has a box', () => {

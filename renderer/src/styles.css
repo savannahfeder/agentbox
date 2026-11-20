@@ -2561,6 +2561,12 @@ body {
    click, because a message here would not reach it. */
 .dock-pill-static { cursor: default; }
 .dock-pill-static .dock-pill-text { padding-right: 16px; }
+/* A thread given away: what happened, and what you can still do, in the reply box's place. */
+.dock-given { gap: 6px; padding-right: 8px; }
+.dock-given .dock-pill-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-given.is-failed .dock-pill-text { color: var(--text-dim); }
+.dock-given-act { flex: none; height: 28px; padding: 0 12px; font: inherit; font-size: 13px; color: var(--text); background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.dock-given-act:hover { border-color: var(--line-strong); }
 /* THE BOX GROWS AS SHE WRITES. The height is written by dock-height.ts on every
    render, because the ceiling is 40% of the PANE and no stylesheet can read
    that: the pane is 568px on a 13 inch and 931px on a 16 inch, so the same line

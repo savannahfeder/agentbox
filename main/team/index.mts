@@ -1275,7 +1275,15 @@ export function createTeamService({
      * in your hand rather than the app's, or Done would read it as news and put
      * it in your own Needs you.
      */
-    async handOn({ product: slug, id, to, note = '' }: { product: string; id: string; to: string; note?: string }) {
+    async handOn(ask: { product: string; id: string; to: string; note?: string }) {
+      try { return await this.handOnNow(ask); } catch (err) {
+        const { id, to } = ask;
+        log(`team: could not give ${id} to ${state.people.find((p) => p.id === to)?.name ?? to}: ${(err as Error)?.message ?? err}`);
+        throw err;
+      }
+    },
+
+    async handOnNow({ product: slug, id, to, note = '' }: { product: string; id: string; to: string; note?: string }) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const product = products().find((p) => p.slug === slug);
       const row = product ? store.readItem(slug, id) : null;
