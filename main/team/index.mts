@@ -1065,7 +1065,7 @@ export function createTeamService({
       // Groups keep their own card; a failure there leaves Settings saved.
       await rooms?.followMe({ was, ...fields }).catch((err: Error) => log(`rooms: following your profile: ${err.message}`));
       const me = await backend.me();
-      const people = state.team ? teamPeopleShown(await backend.teamPeople(state.team.id)) : state.people;
+      const people = state.team ? await backend.teamPeople(state.team.id).then(teamPeopleShown) : state.people;
       set({ me: me ?? state.me, people });
       return state;
     },
