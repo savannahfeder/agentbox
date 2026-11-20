@@ -104,7 +104,7 @@ import { openInBrowser } from './open-in-browser.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
 import type { SettingsConfig } from './settings.mts';
-import type { createTeamService } from './team/index.mts';
+import type { createTeamService, PictureIn } from './team/index.mts';
 import type { UpdateTerminals } from './agent-updates.mts';
 import type { AttachmentFile } from './save-attachments.mts';
 import type { PostInput } from './teammates.mts';
@@ -1162,6 +1162,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }: { teamId: string }) => team!.acceptInvite(teamId)));
   ipcMain.handle('zero:team-invite', teamCall(({ email }: { email: string }) => team!.invite(email)));
   ipcMain.handle('zero:team-rename', teamCall(({ name }: { name: string }) => team!.renameTeam(name)));
+  ipcMain.handle('zero:team-update-me', teamCall(({ name, photo }: { name?: unknown; photo?: PictureIn | null }) => team!.updateMe({ name, photo })));
+  ipcMain.handle('zero:team-logo', teamCall(({ photo }: { photo: PictureIn | null }) => team!.setTeamLogo(photo ?? null)));
   ipcMain.handle('zero:team-remove-member', teamCall(({ personId, handTo, mates }: { personId: string; handTo?: unknown; mates?: unknown }) => team!.removeMember(personId, { handTo: typeof handTo === 'string' ? handTo : null, mates: Array.isArray(mates) ? mates : [] })));
   ipcMain.handle('zero:team-leave', teamCall(() => team!.leaveTeam()));
   ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }: { email: string }) => team!.cancelInvite(email)));

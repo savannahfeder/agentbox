@@ -52,6 +52,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   teamCreate: 'zero:team-create',
   teamInvite: 'zero:team-invite',
   teamRename: 'zero:team-rename',
+  teamUpdateMe: 'zero:team-update-me',
+  teamSetLogo: 'zero:team-logo',
   teamRemoveMember: 'zero:team-remove-member',
   teamLeave: 'zero:team-leave',
   teamCancelInvite: 'zero:team-cancel-invite',

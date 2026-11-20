@@ -190,6 +190,9 @@ export interface Product {
 }
 
 /** A person on the team, as the cloud knows them. */
+/** A picture the window shrank to send: base64 bytes and their type. */
+export interface PictureIn { data: string; type: 'image/png' | 'image/jpeg' }
+
 export interface Person {
   id: string;
   email: string;
@@ -535,7 +538,7 @@ export interface TeamState {
   /** A Google sign-in waiting on the browser, with the link it opened. */
   signingIn?: { url: string } | null;
   me: Person | null;
-  team: { id: string; name: string } | null;
+  team: { id: string; name: string; logoUrl?: string | null } | null;
   /** Invites waiting for your confirmed email, while you are in no team. Joining one needs your yes. */
   invites?: TeamInvite[];
   people: Person[];
@@ -1796,6 +1799,8 @@ declare global {
       teamSignOut(): Promise<TeamCallResult>;
       teamSignInEmail(p: { email: string; password: string }): Promise<TeamCallResult>;
       teamRename(p: { name: string }): Promise<TeamCallResult>;
+      teamUpdateMe?(p: { name?: string; photo?: PictureIn | null }): Promise<TeamCallResult>;
+      teamSetLogo?(p: { photo: PictureIn | null }): Promise<TeamCallResult>;
       teamRemoveMember(p: { personId: string; handTo?: string | null; mates?: { id: string; to: string | null }[] }): Promise<TeamCallResult>;
       teamLeave(): Promise<TeamCallResult>;
       teamCancelInvite(p: { email: string }): Promise<TeamCallResult>;

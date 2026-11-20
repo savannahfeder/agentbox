@@ -184,6 +184,45 @@ export function supabaseBackend(client: SupabaseClient) {
       return clean ? { text: clean, until: clean && until ? until : null } : null;
     },
 
+    // Your name and photo. people_update_self keeps the row yours; only these
+    // two columns are granted (20261001000500_security.sql).
+    async setProfile({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
+      const me = await myId();
+      const patch: Record<string, unknown> = {};
+      if (name !== undefined) patch.name = name;
+      if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
+      must(await client.from('people').update(patch).eq('id', me), 'saving your name and photo');
+    },
+
+    // A picture in the public `pictures` bucket (20261120000000), named for its
+    // bytes, so the same picture twice is already there.
+    async putPicture(name: string, bytes: Buffer, type: string) {
+      await myId();
+      const bucket = client.storage.from('pictures');
+      const { error }: { error: StorageFailure | null } = await bucket.upload(name, bytes, { contentType: type, upsert: false });
+      if (error && !/exists|duplicate/i.test(`${error.message} ${error.statusCode ?? ''}`) && String(error.statusCode) !== '409') throw new Error(`saving the picture: ${error.message}`);
+      return bucket.getPublicUrl(name).data.publicUrl as string;
+    },
+
+    async setTeamLogo(teamId: string, logoUrl: string | null) {
+      await myId();
+      const rows = must<{ id: string }[]>(await client.from('teams').update({ logo_url: logoUrl }).eq('id', teamId).select('id'), 'saving the team’s logo');
+      if (!rows.length) throw new Error('only the team’s owner can change its logo');
+    },
+
+    // The team's name and logo, read again on every pass so a teammate's
+    // change reaches this Mac. A cloud from before the logo answers without it.
+    async teamInfo(teamId: string) {
+      await myId();
+      const withLogo = await client.from('teams').select('id,name,logo_url').eq('id', teamId).limit(1);
+      if (!withLogo.error) {
+        const [r] = (withLogo.data ?? []) as { id: string; name: string; logo_url: string | null }[];
+        return r ? { id: r.id, name: r.name, logoUrl: r.logo_url ?? null } : null;
+      }
+      const [r] = must<{ id: string; name: string }[]>(await client.from('teams').select('id,name').eq('id', teamId).limit(1), 'reading your team');
+      return r ? { id: r.id, name: r.name, logoUrl: null } : null;
+    },
+
     // THE INVITES WAITING FOR YOU, to the email Google confirmed. Nothing is
     // joined by reading them: joining is acceptInvite, one team, on a yes.
     async pendingInvites() {

@@ -930,6 +930,20 @@ export function createRooms({
       return got.length;
     },
 
+    // My card follows a name or photo I changed in Settings, keeping whether
+    // it shows my full name. Its photo is a link of up to 500 characters.
+    async followMe({ was, name, avatarUrl }: { was: string; name?: string; avatarUrl?: string | null }) {
+      const mine = state.me;
+      if (!mine || !backend() || !started) return null;
+      const patch: Record<string, unknown> = {};
+      if (name !== undefined) {
+        const full = mine.display_name === displayNameOf(was, { full: true }) && displayNameOf(was, { full: true }) !== displayNameOf(was);
+        patch.display_name = displayNameOf(name, { full }) || mine.display_name;
+      }
+      if (avatarUrl !== undefined) patch.avatar_url = avatarUrl && /^https:\/\//.test(avatarUrl) && avatarUrl.length <= 500 ? avatarUrl : null;
+      return Object.keys(patch).length ? api.saveProfile(patch) : null;
+    },
+
     // My card: what it says and who sees what.
     async saveProfile(fields: Record<string, unknown> = {}) {
       const b = need();

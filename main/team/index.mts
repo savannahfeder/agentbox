@@ -12,6 +12,7 @@
 //   - answers the window's questions: who am I, who is on my team, what are
 //     my teammates' private tasks doing.
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mts';
 import { createThreadShare } from './thread-share.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
@@ -62,7 +63,9 @@ export interface TeamPerson {
   role?: string;
   connections?: string[];
 }
-export interface TeamRef { id: string; name: string }
+export interface TeamRef { id: string; name: string; logoUrl?: string | null }
+/** A picture the window shrank and sent: base64 bytes and their type. */
+export interface PictureIn { data: string; type: string }
 export type TeamCard = SyncCard & { personId: string; title?: string | null; updatedAt?: number };
 export interface TeamInvite { teamId: string; teamName: string; invitedBy: string | null; invitedByName: string | null }
 export interface TeamSentInvite { email: string; invitedBy: string | null }
@@ -139,6 +142,10 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   listInvites?(teamId: string): Promise<TeamSentInvite[]>;
   createTeam(name: string): Promise<TeamRef>;
   renameTeam(teamId: string, name: string): Promise<unknown>;
+  setProfile?(fields: { name?: string; avatarUrl?: string | null }): Promise<unknown>;
+  putPicture?(name: string, bytes: Buffer, type: string): Promise<string>;
+  setTeamLogo?(teamId: string, logoUrl: string | null): Promise<unknown>;
+  teamInfo?(teamId: string): Promise<TeamRef | null>;
   removeMember(teamId: string, personId: string, handover?: TeamHandover | null): Promise<void>;
   departures?(teamId: string): Promise<Departure[]>;
   setConnections?(ids: unknown): Promise<unknown>;
@@ -539,12 +546,32 @@ export function createTeamService({
   // backdated created_at and an invite moved your work into it unasked. Now
   // the first team is remembered, and a remembered team you are no longer on
   // leaves you in no team rather than in another one.
+  // A teammate's rename or new logo, which this Mac otherwise never reads again.
+  // A failed read keeps what is shown.
+  async function readTeamInfo(team: TeamRef): Promise<TeamRef | null> {
+    if (!backend?.teamInfo) return null;
+    const info = await backend.teamInfo(team.id).catch(() => null);
+    return info && info.id === team.id ? { ...team, ...info } : null;
+  }
+
+  // Only what its first bytes say is a png or jpg, up to the bucket's 1 MB.
+  async function savePicture(folder: 'people' | 'teams', id: string, photo: PictureIn) {
+    const bytes = Buffer.from(String(photo?.data ?? ''), 'base64');
+    const png = bytes.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const jpg = bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
+    if (!png && !jpg) throw new Error('that picture is not a png or jpg');
+    if (bytes.length > 1_048_576) throw new Error('that picture is over 1 MB');
+    const hash = crypto.createHash('md5').update(bytes).digest('hex');
+    return backend!.putPicture!(`${folder}/${id}/${hash}.${png ? 'png' : 'jpg'}`, bytes, png ? 'image/png' : 'image/jpeg');
+  }
+
   async function refreshTeam() {
     const me = state.me?.id;
     const teams = await backend!.myTeams();
     const remembered = me ? kept().getTeam(me) : null;
     // '' is "left a team, and joins nothing until asked": never quietly the next one.
-    const team = remembered === '' ? null : remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
+    const found = remembered === '' ? null : remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
+    const team = found ? (await readTeamInfo(found)) ?? found : null;
     if (team && !remembered && me) kept().setTeam(me, team.id);
     // The moment sharing starts on this Mac, kept so it never moves later.
     if (team && me && !kept().getSince(me)) kept().setSince(me, Date.now());
@@ -604,10 +631,10 @@ export function createTeamService({
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
         // on the first line of theirs that arrives here.
-        const [cards, people, me] = state.team
-          ? await Promise.all([backend!.listCards(), backend!.teamPeople(state.team.id).then(teamPeopleShown), backend!.me()])
-          : [[], [], state.me];
-        set(withCards(cards, { lastSyncAt: Date.now(), error: null, people, me: me ?? state.me, ...(await readSeen()) }));
+        const [cards, people, me, info] = state.team
+          ? await Promise.all([backend!.listCards(), backend!.teamPeople(state.team.id).then(teamPeopleShown), backend!.me(), readTeamInfo(state.team)])
+          : [[], [], state.me, null];
+        set(withCards(cards, { lastSyncAt: Date.now(), error: null, people, me: me ?? state.me, ...(info ? { team: info } : {}), ...(await readSeen()) }));
         if (state.team) {
           noticeEndedWaits({
             products: products(), read: (p: TeamProduct) => disk.readWorkItems(p.dir), cards, now: now(), me: state.me?.id ?? null,
@@ -1019,6 +1046,36 @@ export function createTeamService({
       if (!clean) throw new Error('a team needs a name');
       await backend.renameTeam(state.team.id, clean);
       await refreshTeam();
+      return state;
+    },
+
+    // Your name and photo, from Settings. `photo` null takes it away;
+    // absent leaves it as it is.
+    async updateMe({ name, photo }: { name?: unknown; photo?: PictureIn | null } = {}) {
+      if (!backend?.setProfile || !state.me) throw new Error('sign in first');
+      const fields: { name?: string; avatarUrl?: string | null } = {};
+      if (name !== undefined) {
+        const clean = String(name ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+        if (!clean) throw new Error('your name cannot be empty');
+        fields.name = clean;
+      }
+      if (photo !== undefined) fields.avatarUrl = photo === null ? null : await savePicture('people', state.me.id, photo);
+      const was = state.me.name ?? '';
+      await backend.setProfile(fields);
+      // Groups keep their own card; a failure there leaves Settings saved.
+      await rooms?.followMe({ was, ...fields }).catch((err: Error) => log(`rooms: following your profile: ${err.message}`));
+      const me = await backend.me();
+      const people = state.team ? teamPeopleShown(await backend.teamPeople(state.team.id)) : state.people;
+      set({ me: me ?? state.me, people });
+      return state;
+    },
+
+    // The owner's alone; the database refuses anyone else.
+    async setTeamLogo(photo: PictureIn | null) {
+      if (!backend?.setTeamLogo || !state.team) throw new Error('start or join a team first');
+      const url = photo === null ? null : await savePicture('teams', state.team.id, photo);
+      await backend.setTeamLogo(state.team.id, url);
+      set({ team: { ...state.team, logoUrl: url } });
       return state;
     },
 

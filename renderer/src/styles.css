@@ -3371,6 +3371,8 @@ img.product-mark { object-fit: cover; opacity: 1; }
    on the orange plate a team's initial sits on, in the text colour. */
 .th-mark.th-mark-app { background: none; color: var(--text); }
 .th-mark.th-mark-app svg { display: block; }
+/* A team's own logo, on no plate, so a transparent one shows the sidebar. */
+.th-mark.th-mark-logo { background: none; object-fit: contain; }
 /* In the panel it is dimmer than anywhere else it appears, because here it is
    the only mark on the screen and a full-strength logo in an empty corner is a
    spot of ink the eye goes to first. */

@@ -130,9 +130,11 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   } : {};
   const me = team?.signedIn ? team.me : null;
   const teamName = team?.team?.name ?? Name;
-  // A team wears its initial. With no team the corner names the app itself, so
-  // it wears the Agentbox icon rather than a letter A.
-  const mark = team?.team?.name
+  // A team wears its logo, else its initial. With no team the corner names the
+  // app itself, so it wears the Agentbox icon rather than a letter A.
+  const logo = team?.team?.logoUrl;
+  const mark = logo ? <img className="th-mark th-mark-logo" src={logo} alt="" referrerPolicy="no-referrer" />
+    : team?.team?.name
     ? <span className="th-mark" aria-hidden="true">{teamName.slice(0, 1).toUpperCase()}</span>
     : <span className="th-mark th-mark-app" aria-hidden="true"><AppMark size={12} /></span>;
   // THE BOTTOM-LEFT CORNER, AND IT IS NULL WHEN THERE IS NOBODY TO PUT IN IT.
