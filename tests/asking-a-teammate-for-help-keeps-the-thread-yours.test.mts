@@ -24,7 +24,7 @@ import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mts';
 import { GIVEN_TASK, whatATeammateMaySet } from '../shared/team-rules.mts';
 import { pickFields } from '../shared/work-items.mts';
-import { askIGave, askOnMe, asksOnThread, handedBackAsks, handedBackWords, helpAskOpen, stepOf } from '../shared/thread-asks.mts';
+import { askIGave, askOnMe, asksOnThread, handedBackAsks, handedBackBy, handedBackWords, helpAskOpen, stepOf } from '../shared/thread-asks.mts';
 import { GiveSheet } from '../renderer/src/threads/SharePanel.tsx';
 import { machineryPath } from '../main/store/home.mts';
 import { changePath } from '../main/code-change.mts';
@@ -183,6 +183,14 @@ describe('the rules, without a cloud', () => {
     expect(stepOf('Done: added `/health`.\n\nAll tests pass.')).toBe('Done: added /health.');
     expect(stepOf('')).toBe('');
     expect(stepOf(`${'x'.repeat(700)}?`)).toHaveLength(601);
+  });
+  // Round two: a thread Priya handed back read "Answered" in Needs you, like every other row.
+  it('a thread handed back says by whom while their words are the newest on it', () => {
+    const back = { status: 'blocked', wrote: { answer: { ts: 5, teammate: 'priya' }, result: { ts: 3 } } };
+    expect(handedBackBy(back)).toBe('priya');
+    expect(handedBackBy({ ...back, wrote: { ...back.wrote, result: { ts: 9 } } })).toBeNull();
+    expect(handedBackBy({ ...back, status: 'open' })).toBeNull();
+    expect(handedBackBy({ status: 'blocked', wrote: { answer: { ts: 5 } } })).toBeNull();
   });
   it('the words say what came back', () => {
     expect(handedBackWords({ kind: 'review', name: 'Priya', verdict: 'yes', words: '' })).toBe('Priya reviewed this and it looks good.');

@@ -20,6 +20,7 @@ import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
 import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { waitWords } from '../../../shared/thread-waits.mts';
+import { handedBackBy } from '../../../shared/thread-asks.mts';
 import { needsLeft, needsWord } from '../../../shared/cloud-needs.mts';
 import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mts';
 import { commentLine, linkCommentLine } from './teammate-thread';
@@ -758,7 +759,10 @@ export function ThreadCells({ item, product, now, person, tab }: {
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;
   // A cloud run that asked for a key is waiting on it, not finished (round one of the key power test).
   const wants = inNeedsYou && !cell.live && !waits && !peopleWaitOnYou ? needsWord(needsLeft(item, savedKeys)) : null;
-  const shownWord = wants ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
+  // Handed back by someone you asked (shared/thread-asks.mts): their words are the newest thing on it.
+  const toldBy = inNeedsYou ? handedBackBy(item as Parameters<typeof handedBackBy>[0]) : null;
+  const backFrom = toldBy && team?.byId.has(toldBy) ? `Back from ${nameFirst(toldBy)}` : null;
+  const shownWord = wants ?? backFrom ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
   const status = shownWord === null ? undefined : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
   // people on a thread the team or chosen people can see, the lock on one only

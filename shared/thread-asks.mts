@@ -96,6 +96,14 @@ export function stepOf(text: string): string {
   return asked.length > 600 ? `${asked.slice(0, 600)}…` : asked;
 }
 
+/** Who handed this thread back to you, when their words are the newest thing on it and it waits for you. */
+export function handedBackBy(row: { status?: string; wrote?: Record<string, { ts?: number; teammate?: string } | undefined> | null } | null | undefined): string | null {
+  const answer = row?.wrote?.answer;
+  if (row?.status !== 'blocked' || !answer?.teammate) return null;
+  const after = Math.max(row.wrote?.result?.ts ?? 0, row.wrote?.note?.ts ?? 0);
+  return (answer.ts ?? 0) >= after ? answer.teammate : null;
+}
+
 /** The word under an ask's name in a list, where "Task" goes on any other. */
 export const askWord = (kind: AskKind): string => (kind === 'help' ? 'Help' : 'Review');
 
