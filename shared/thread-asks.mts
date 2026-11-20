@@ -111,12 +111,14 @@ export function handedBackBy(row: { status?: string; wrote?: Record<string, { ts
 export const askWord = (kind: AskKind): string => (kind === 'help' ? 'Help' : 'Review');
 
 /** What the giver's thread says once the ask comes back. */
-export function handedBackWords({ kind, name, verdict, words }: { kind: AskKind; name: string; verdict: Verdict | null; words: string }): string {
+export function handedBackWords({ kind, name, verdict, words, asked = null }: { kind: AskKind; name: string; verdict: Verdict | null; words: string; asked?: { by: string; note: string } | null }): string {
   const said = words.trim();
   const head = kind === 'review'
     ? verdict === 'yes' ? `${name} reviewed this and it looks good.` : verdict === 'changes' ? `${name} reviewed this and asked for changes.` : `${name} reviewed this.`
     : `${name} handed this back.`;
-  return said ? `${head}\n\n${said}` : head;
+  // What was asked lived only on the task, so the thread lost it once the ask came back (round four of the team test).
+  const ask = asked?.note.trim() ? `${asked.by} had asked: “${asked.note.trim()}”` : '';
+  return [head, said, ask].filter(Boolean).join('\n\n');
 }
 
 /** The first lines of the task the helper gets: who asked, for what, and the step if one was picked. */
