@@ -168,7 +168,7 @@ img.tm-av { background: var(--bg-selected); }
 /* Your photo and the team's logo, with what changes them beside it. */
 .tm-pic-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .tm-pic-row .tm-line-act { margin-left: 0; }
-.tm-logo { width: 40px; height: 40px; flex: none; border-radius: var(--radius); object-fit: contain; }
+.tm-logo, .th-mark.tm-logo { width: 40px; height: 40px; flex: none; border-radius: var(--radius); object-fit: contain; }
 .th-mark.tm-logo { font-size: 17px; }
 .tm-pic-note { color: var(--text-faint); font-size: 12.5px; }
 .tm-handover { margin: 2px 0 12px 38px; padding: 12px 14px 0; border-left: 2px solid var(--line-strong); }
