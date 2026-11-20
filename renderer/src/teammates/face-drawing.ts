@@ -6,23 +6,28 @@ import * as notionists from '@dicebear/notionists';
 
 const drawn = new Map<string, string>();
 
-/** A data URI of the drawing, made once per seed. */
-export function faceDrawing(seed: string): string {
-  let uri = drawn.get(seed);
-  if (!uri) {
-    uri = createAvatar(notionists, { seed }).toDataUri();
-    drawn.set(seed, uri);
+/** The drawing as SVG markup, made once per seed. The phone draws this. */
+export function faceSvg(seed: string): string {
+  let svg = drawn.get(seed);
+  if (!svg) {
+    svg = createAvatar(notionists, { seed }).toString();
+    drawn.set(seed, svg);
   }
-  return uri;
+  return svg;
+}
+
+/** The drawing as a data URI, for an <img>. */
+export function faceDrawing(seed: string): string {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(faceSvg(seed))}`;
 }
 
 /** `count` faces other than `seed`'s, a new set for each `page`, none drawn twice. */
 export function otherFaces(seed: string, count = 7, page = 0): string[] {
-  const seen = new Set([faceDrawing(seed)]);
+  const seen = new Set([faceSvg(seed)]);
   const out: string[] = [];
   for (let n = page * 100; out.length < count && n < page * 100 + 100; n++) {
     const next = `${seed}.${n}`;
-    const art = faceDrawing(next);
+    const art = faceSvg(next);
     if (seen.has(art)) continue;
     seen.add(art);
     out.push(next);
