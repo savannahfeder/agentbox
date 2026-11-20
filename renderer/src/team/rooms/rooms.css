@@ -480,7 +480,10 @@
 .gr-page .rm-full .rm-cm .h { font-size: 15px; }
 .gr-page .rm-full .rm-cm .h em { font-family: inherit; font-size: 12px; }
 .gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 24px; }
-.gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 16px; }
+/* Slack's face: 36px, its top level with the top of the name's line. */
+.gr-page .rm-full.hang .rm-cm { padding-left: 48px; }
+.gr-page .rm-full.hang .rm-cm .h { line-height: 20px; }
+.gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 14px; }
 .gr-page .rm-compose-input { font-size: 15px; line-height: 22px; }
 /* One sender's lines sit close; a new sender, a day or the New line sets them apart. */
 .gr-page .rm-full .rm-cm { padding-top: 14px; padding-bottom: 2px; }

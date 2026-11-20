@@ -474,15 +474,14 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 code={code}
               />
             : slot ? (<>
-              {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
-                  column; a message that carries on a run keeps the column for
-                  its time, shown on pointing. None of the agent thread's
-                  chapters: no rule above or below your words and no larger
-                  type, because a turn means nothing between two people. */}
+              {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face sits beside
+                  the name once per run. None of the agent thread's chapters: no
+                  rule above or below your words and no larger type, because a
+                  turn means nothing between two people. */}
               <div className={`msg chat-msg${slot.head ? '' : ' cont'}${e.pending ? ' sending' : ''}`}>
-                <div className="chat-gutter">{slot.head
-                  ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!voiceOf(e) && !teammateOf(e) && e.who === 'you'} agent={e.who === 'it' || !!voiceOf(e)} size="lg" />
-                  : <span className="chat-gt">{clock(e.at)}</span>}</div>
+                {slot.head && <div className="chat-gutter">
+                  <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!voiceOf(e) && !teammateOf(e) && e.who === 'you'} agent={e.who === 'it' || !!voiceOf(e)} size="lg" />
+                </div>}
                 {slot.head && (
                   <div className="msg-head">
                     <span className="msg-who">{voiceOf(e) ?? teammateOf(e)?.name ?? (e.who === 'you' ? 'You' : name)}</span>
