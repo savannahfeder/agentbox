@@ -436,7 +436,7 @@ export function createTeamService({
     return { ...rest, cards: cards.map((c) => (c.title ? { ...c, title: shortTitle(String(c.title)) } : c)), teamMates: mates };
   };
   const rooms = roomsSetup ? createRooms({
-    backend: () => backend, me: () => state.me, team: () => state, now, log, onChange,
+    backend: () => backend, me: () => state.me, team: () => state, threadTalk: () => threadShare?.talk() ?? [], now, log, onChange,
     findFile: (ref, how = {}) => findFileToSend({ ref, meant: how.meant === true, products: store.listProducts({ includeArchived: true }) }),
     ...roomsSetup,
     enabled: () => roomsSetup.enabled({ onTeam: isOnTeam(state) }),

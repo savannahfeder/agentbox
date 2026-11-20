@@ -158,6 +158,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
     setSending(false);
     if (!out?.ok) { onNotice(out?.error ?? 'That comment did not send.'); return; }
     setDraft('');
+    // Their copy starts the agent on it at its next sync (main/team/thread-share.mts).
+    if (helping) onNotice(`Sent to ${owner}'s agent`);
     setReread((n) => n + 1);
     following?.follow(card);
   };

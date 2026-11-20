@@ -404,6 +404,9 @@ export function ThreadMenu({ share = null, step = null, onCopyLink, onSendTo, on
       }
       // Typing in the menu's own box is typing.
       if (document.activeElement?.tagName === 'INPUT' && wrap.current?.contains(document.activeElement)) return;
+      // A letter with the send sheet open is for its note, never the thread's reply box.
+      const note = wrap.current?.querySelector<HTMLTextAreaElement>('.sh-note');
+      if (note && document.activeElement !== note && e.key.length === 1 && e.key !== ' ' && !e.metaKey && !e.ctrlKey && !e.altKey) { note.focus(); e.stopImmediatePropagation(); return; }
       if ((e.key === 'Enter' || e.key === ' ') && wrap.current?.contains(document.activeElement)) { e.stopImmediatePropagation(); return; }
       if (e.key === 'Tab') close(false);
     };

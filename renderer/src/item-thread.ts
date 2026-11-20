@@ -374,7 +374,8 @@ function placedIsSaid(p: Placed): p is Placed & { node: AgentSaid } {
  *   A message that is nothing BUT its opening keeps it, since there would be
  *   no message left underneath.
  *
- * THE USER'S OWN WORDS ARE NEVER FOLDED AWAY, whatever they repeat.
+ * THE USER'S OWN WORDS ARE NEVER FOLDED AWAY, whatever they repeat, and nor
+ * are a teammate's (`from`), though they are drawn on the agent's side.
  */
 
 /**
@@ -424,7 +425,7 @@ function supersededFields(placed: Placed[]): Set<number> {
   const seen = new Map<string, number>();
   placed.forEach((p, i) => {
     if (!isSaid(p.node)) return;
-    if (p.node.who === 'you') { seen.clear(); return; }
+    if (p.node.who === 'you' || p.node.from) { seen.clear(); return; }
     if (!p.answer) return;
     const key = `${p.answer.field}\n${flat(p.answer.text)}`;
     const before = seen.get(key);
@@ -459,7 +460,8 @@ function collapseRepeats(placed: Placed[]): Placed[] {
     // here rules out nothing at runtime; it is how the compiler knows that.
     const before = prev >= 0 ? placed[prev] : null;
     const last = before && placedIsSaid(before) ? before : null;
-    if (!last || last.node.who !== 'it' || here.node.who !== 'it') { prev = i; continue; }
+    // A teammate's words are a person's, and are never folded away either.
+    if (!last || last.node.who !== 'it' || here.node.who !== 'it' || last.node.from || here.node.from) { prev = i; continue; }
 
     const a = flat(last.node.text ?? '');
     const b = flat(here.node.text ?? '');

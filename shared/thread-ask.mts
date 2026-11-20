@@ -2,6 +2,7 @@
 // back, or handing it over for good. Help and review leave the thread yours,
 // waiting on them (shared/thread-waits.mts); a hand-over is main/team handOn.
 import { personWait, setByPerson } from './thread-waits.mts';
+import { threadOfLink } from './thread-link.mts';
 
 export type Want = 'help' | 'review' | 'hand';
 export const WANTS: readonly Want[] = ['help', 'review', 'hand'];
@@ -48,6 +49,20 @@ export function askWords({ want, title, link, note, step }: { want: 'help' | 're
   return [`${WANT_WORDS[want]}: ${said || name}`, `[${name}](${linkAtStep(link, at)})`, at ? `> ${at.words}` : ''].filter(Boolean).join('\n\n');
 }
 
+/** A message `askWords` made: what is wanted, then a thread's link. */
+export function isAsk(body: string | null | undefined): boolean {
+  const [head, , link] = String(body ?? '').split('\n');
+  return (head.startsWith(`${WANT_WORDS.help}: `) || head.startsWith(`${WANT_WORDS.review}: `)) && /^\[[^\]]*\]\(https:\/\/[^)\s]+\/t\/[^)\s]+\)$/.test(link ?? '');
+}
+
+/** The thread an ask is about. */
+export function askedThread(body: string | null | undefined): { owner: string; id: string } | null {
+  if (!isAsk(body)) return null;
+  const link = /\]\(([^)\s]+)\)$/.exec(String(body).split('\n')[2] ?? '');
+  const t = link ? threadOfLink(link[1]) : null;
+  return t ? { owner: t.owner, id: t.id } : null;
+}
+
 /** What the thread says while it waits on them. */
 export function askedSaid(want: 'help' | 'review', names: string, note: string): string {
   const said = note.replace(/\s+/g, ' ').trim();
@@ -56,19 +71,21 @@ export function askedSaid(want: 'help' | 'review', names: string, note: string):
 }
 
 /** The edit that leaves the thread yours, waiting on them, saying what you asked. */
-export const askedPatch = (to: readonly string[], said: string, now: number, want: 'help' | 'review') => ({ blockedBy: to.map(personWait), asked: { said, at: now, want } });
+export const askedPatch = (to: readonly string[], said: string, now: number, want: 'help' | 'review') => ({ blockedBy: to.map(personWait), asked: { said, at: now, want, to: [...to] } });
 
 export interface AskedItem {
   status?: string;
   blockedBy?: readonly string[];
-  asked?: { said: string; at?: number; want?: 'help' | 'review' } | null;
+  asked?: { said: string; at?: number; want?: 'help' | 'review'; to?: readonly string[] } | null;
   wrote?: Record<string, { ts?: number; source?: string } | undefined>;
 }
 
 /** What you asked, while the wait it set is still the thread's wait. */
 export function askedOf(item: AskedItem | null | undefined): { said: string; at: number; want: 'help' | 'review' | null } | null {
   if (!item?.asked?.said || !setByPerson(item)) return null;
-  if ((item.wrote?.asked?.ts ?? 0) < (item.wrote?.blockedBy?.ts ?? Infinity)) return null;
+  // Still the wait it set while it still names them, whoever wrote the wait again since (an agent mirrors it).
+  const to = item.asked.to;
+  if (to?.length ? !to.every((p) => item.blockedBy?.includes(personWait(p))) : (item.wrote?.asked?.ts ?? 0) < (item.wrote?.blockedBy?.ts ?? Infinity)) return null;
   return { said: item.asked.said, at: item.asked.at ?? item.wrote?.asked?.ts ?? 0, want: item.asked.want ?? null };
 }
 

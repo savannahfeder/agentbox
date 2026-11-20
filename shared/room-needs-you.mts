@@ -1,6 +1,7 @@
 // WHICH GROUP MESSAGES ARE TO YOU, AND THE ONE ROW A GROUP PUTS IN NEEDS YOU.
 // tests/a-group-message-to-you-reaches-needs-you-until-you-answer.
 import { fileNewsFor, fileNewsLine, marksOf } from './artifact-marks.mts';
+import { isAsk } from './thread-ask.mts';
 
 /** Someone in a group, by the name others call them. */
 export interface RoomNamed { id: string; name?: string | null }
@@ -149,7 +150,7 @@ export function groupFileRow({ roomId, roomName, marks = [], me, myName = null, 
 // my writing in the group, my comment or approval on a file in it
 // (`answeredAt`) or my Mark done (`doneAt`) ends it, never reading.
 // It says the group's newest words, so a thread reply moves it and says so.
-export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, people = [], pair = false, doneAt = 0, answeredAt = 0, readAt = 0, nameOf = () => '' }: {
+export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, people = [], pair = false, doneAt = 0, answeredAt = 0, readAt = 0, nameOf = () => '', answeredOnItsThread = () => false }: {
   roomId: string;
   roomName: string;
   messages?: readonly RoomSaid[];
@@ -161,13 +162,17 @@ export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, 
   answeredAt?: number;
   readAt?: number;
   nameOf?: NameOf;
+  /** An ask (shared/thread-ask.mts) I answered on the thread it is about. */
+  answeredOnItsThread?: (m: RoomSaid) => boolean;
 }): GroupRow | null {
   const pool = [...new Map([...mentioned, ...messages].map((m) => [m.id, m])).values()].sort((a, b) => a.at - b.at);
   const mine = pool.filter((m) => m.by === me && !m.deleted);
-  const settled = Math.max(doneAt, answeredAt, mine.at(-1)?.at ?? 0);
+  // An ask of mine (shared/thread-ask.mts) is not an answer to theirs: two asks cross in one chat.
+  const answers = mine.filter((m) => !isAsk(m.body));
+  const settled = Math.max(doneAt, answeredAt, answers.at(-1)?.at ?? 0);
   const myRoots = new Set(mine.filter((m) => !m.inReplyTo).map((m) => m.id));
   const myThreads = new Set([...myRoots, ...mine.map((m) => m.inReplyTo).filter(Boolean)]);
-  const fresh = pool.filter((m) => m.by !== me && !m.deleted && m.at > settled);
+  const fresh = pool.filter((m) => m.by !== me && !m.deleted && m.at > settled && !answeredOnItsThread(m));
   type Ids = readonly (string | null)[];
   const toMe = (m: RoomSaid): boolean => pair || ((m.mentions ?? []) as Ids).includes(me) || (mentionsIn(m.body, people) as Ids).includes(me)
     || (addressedByOpening(m.body, people) as Ids).includes(me) || (!!m.inReplyTo && myThreads.has(m.inReplyTo));

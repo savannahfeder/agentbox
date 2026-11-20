@@ -107,8 +107,8 @@ describe('the thread you asked about', () => {
     id: 'w-1', status: 'open', labels: ['founder'], result: QUESTION, ...askedPatch(['p-theo'], askedSaid('help', 'Theo', 'could you look at this question?'), at, 'help'),
     wrote: { result: { source: 'agent', ts: at - 10 }, blockedBy: { source: 'founder', ts: at }, asked: { source: 'founder', ts: at } }, ...o,
   });
-  it('waits on them in Later, not Answered in Needs you, saying who has it', () => {
-    expect(waitsInLater(asked(), [])).toBe(true);
+  it('waits on them, not Answered in Needs you, saying who has it (In progress since the rerun)', () => {
+    expect(waitsInLater(asked(), [])).toBe(false);
     expect(belongsInInbox(asked(), { now: at + 1 })).toBe(false);
     expect(waitWords(asked(), { nameOf: () => 'Theo Park' })?.word).toBe('Waits on Theo');
   });
@@ -118,7 +118,7 @@ describe('the thread you asked about', () => {
   });
   it('drops the note once the wait ends, or is changed after', () => {
     expect(askedNow(asked({ blockedBy: [] }))).toBeNull();
-    expect(askedNow(asked({ wrote: { blockedBy: { source: 'founder', ts: at + 5 }, asked: { source: 'founder', ts: at } } }))).toBeNull();
+    expect(askedNow(asked({ blockedBy: [personWait('p-jun')], wrote: { blockedBy: { source: 'founder', ts: at + 5 }, asked: { source: 'founder', ts: at } } }))).toBeNull();
     expect(askedNow(asked({ status: 'done' }))).toBeNull();
   });
   it('keeps what was asked on the ledger', () => {
@@ -128,7 +128,7 @@ describe('the thread you asked about', () => {
       buildLine({ id, patch: askedPatch(['p-theo'], 'Asked Theo for help with this step', at, 'help'), source: 'founder', now: at }),
     ], at);
     const item = (Array.isArray(out) ? out : [...out.values()]).find((i: { id: string }) => i.id === id);
-    expect(item.asked).toEqual({ said: 'Asked Theo for help with this step', at, want: 'help' });
+    expect(item.asked).toEqual({ said: 'Asked Theo for help with this step', at, want: 'help', to: ['p-theo'] });
     expect(askedNow(item)).toBe('Asked Theo for help with this step');
   });
 });

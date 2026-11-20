@@ -844,7 +844,8 @@ export function ActLine({ act }: { act: AgentWork }) {
   // A TEAMMATE'S ACTION is theirs: their first name where "You" would be.
   const team = useContext(TeamContext);
   const who = team && act.by && act.by !== team.me ? team.byId.get(act.by) ?? { id: act.by, email: '', name: 'A teammate', avatarUrl: null } : null;
-  const words = actWords(act, who ? firstName(who) : null);
+  // On a team a pick always says whose it was, yours too: a teammate may have answered the step.
+  const words = actWords(act, who ? firstName(who) : team && /^You picked option \d+$/.test(act.verb) ? 'You' : null);
   const openFile = useContext(FileMarkOpener);
   return (
     <div className={`act-line ${words.picked ? 'is-pick' : ''}`}>

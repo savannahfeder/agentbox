@@ -7,6 +7,7 @@ import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { asksToClose } from '../../shared/asks-to-close.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
+import { askedOf } from '../../shared/thread-ask.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
 import { shownTitle } from '../../shared/thread-title.mts';
 import { firstRealLine, offerIsLive, previewText, searchText } from './format';
@@ -39,6 +40,7 @@ export interface InboxItem {
   parent?: string;
   /** The threads this one waits on. Written by whoever set the wait. */
   blockedBy?: string[];
+  asked?: { said: string; at?: number; want?: 'help' | 'review'; to?: string[] } | null;
   createdAt?: number;
   updatedAt?: number;
   wrote?: Record<string, { ts: number; source: string } | undefined>;
@@ -241,6 +243,7 @@ export function belongsInInbox(
   // when the last thread it names finishes (`resumeFinishedWaits`). Only a wait
   // that can end counts (`waitsThatCanEnd`), so a loop of waits stays here.
   if (waitsInLater(i, waitingOn)) return false;
+  if (askedOf(i)) return false;
   if (waitCameBack(i)) return true;
   if (runsAgainOnItsOwn(i)) return false;
   if (parkedByAgent(i, now)) return true; // an agent stopped: what happens next is hers
@@ -301,7 +304,8 @@ export function isProposal(i: InboxItem): boolean {
 export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolean {
   // A blocked task stays where its people read it, saying what blocks it.
   if (isTaskRow(i)) return false;
-  if (setByPerson(i)) return true;
+  // Asked of a teammate, it is under way, not put off: In progress (`belongsInProgress`).
+  if (setByPerson(i)) return !askedOf(i);
   return waitingOn.length > 0 && i.status === 'blocked' && i.wrote?.status?.source !== 'founder';
 }
 
@@ -407,6 +411,7 @@ export function belongsInProgress(
   // Nothing will start it, so it is in Needs you (`belongsInInbox`).
   if (stopped) return false;
   if (i.status === 'claimed') return true;
+  if (askedOf(i)) return true;
   if (setByPerson(i)) return false;
   // A session acted on her answer and finished, so nothing is coming and the
   // inbox shows it instead. Both lists read the same fact.

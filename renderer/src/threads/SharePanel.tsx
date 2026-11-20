@@ -1,6 +1,6 @@
 // The panels Share… opens under the thread's dots, drawn with the menu's own
 // parts (.th-menu, .row-i) so they sit where its rows were.
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Face } from '../team/people';
 import type { Person } from '../types';
 import { WANT_WORDS, type Step, type Want } from '../../../shared/thread-ask.mts';
@@ -102,7 +102,9 @@ export function SendSheet({ people, start, link, onCopy, onSend, step = null, wa
   const [note, setNote] = useState('');
   const [want, setWant] = useState<Want | null>(first && wants.includes(first) ? first : null);
   const found = typed ? matchPeople(people, typed, to).slice(0, 5) : [];
-  const add = (id: string) => { setTo((was) => [...new Set([...was, id])]); setTyped(''); };
+  // The sheet owns the typing: once a person or a want is picked, the note has the keys.
+  const noteBox = useRef<HTMLTextAreaElement>(null);
+  const add = (id: string) => { setTo((was) => [...new Set([...was, id])]); setTyped(''); noteBox.current?.focus(); };
   const ready = want === 'hand' ? to.length === 1 : to.length > 0;
   const send = () => { if (ready) onSend(to, note.trim(), want); };
   const picked = to.map((id) => people.find((x) => x.id === id)).filter((p): p is Person => !!p);
@@ -123,10 +125,10 @@ export function SendSheet({ people, start, link, onCopy, onSend, step = null, wa
         {found.map((p) => <button key={p.id} type="button" className={row} onClick={() => add(p.id)}><span className="ico"><Face person={p} size={18} /></span><span className="ts-more-label">{p.name || p.email}</span></button>)}
       </div>}
       {wants.length > 0 && <div className="sh-wants" role="group" aria-label="What you want">
-        {wants.map((w) => <button key={w} type="button" className="sh-want" aria-pressed={want === w} onClick={() => setWant((was) => (was === w ? null : w))}>{WANT_WORDS[w]}</button>)}
+        {wants.map((w) => <button key={w} type="button" className="sh-want" aria-pressed={want === w} onClick={() => { setWant((was) => (was === w ? null : w)); noteBox.current?.focus(); }}>{WANT_WORDS[w]}</button>)}
       </div>}
       {want === 'help' && step && <blockquote className="sh-step">{step.words}</blockquote>}
-      <textarea className="sh-note" autoFocus={to.length > 0} placeholder="Add a note" value={note} aria-label="Add a note" rows={2}
+      <textarea ref={noteBox} className="sh-note" autoFocus={to.length > 0} placeholder="Add a note" value={note} aria-label="Add a note" rows={2}
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }} />
       <div className="sh-foot">

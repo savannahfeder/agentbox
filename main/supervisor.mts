@@ -14555,8 +14555,8 @@ function accountRefusedTheRun(session: RunState) {
 // Those fields describe the thread; they never ask it anything.
 // Moving an answer out of the inbox is not asking the agent to answer again.
 // runAt also covers snoozes written before the inbox reminder had its own field.
-// visibleTo is Add people, and label a rename.
-const NOT_A_WORD = new Set(['visibility', 'visibleTo', 'label', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks', 'runAt', 'snoozedUntil', 'shippedAt']);
+// visibleTo is Add people, and label a rename. asked is what she asked a teammate (shared/thread-ask.mts).
+const NOT_A_WORD = new Set(['visibility', 'visibleTo', 'label', 'priority', 'problem', 'progress', 'solution', 'blockedBy', 'blocks', 'runAt', 'snoozedUntil', 'shippedAt', 'asked']);
 // A teammate's pulled line keeps the source they gave it, so a "founder" line
 // written by somebody else is not your word.
 function lastFounderWrite(item: WorkItem | null | undefined, me: string | null = process.env.AGENTBOX_PERSON_ID || null) {

@@ -16,6 +16,7 @@ import { readRoomMessage, roomBody } from '../../shared/agent-voice.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { cleanMark } from '../../shared/artifact-marks.mts';
 import { isPairRoom, pairRooms } from '../../shared/pair-room.mts';
+import { askedThread } from '../../shared/thread-ask.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
 import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mts';
 
@@ -229,6 +230,8 @@ export interface RoomsOptions {
   backend: () => RoomsBackend | null;
   me: () => { id: string; name?: string; avatarUrl?: string | null; status?: { text?: string | null; until?: number | string | null } | null } | null | undefined;
   team: () => { people?: { id: string; name?: string }[]; cards?: TeamCardLike[]; team?: unknown } | null | undefined;
+  /** Comments on shared threads (./thread-share.mts talk), so an ask answered there leaves Needs you. */
+  threadTalk?: () => readonly { kind: string; owner: string; threadId: string; by: string; at?: number }[];
   enabled: () => boolean;
   device: () => string;
   presenceFacts: () => PresenceFacts | null | undefined;
@@ -301,6 +304,7 @@ export function createRooms({
   backend, // () => the signed-in backend, or null
   me, // () => { id, name } of who is signed in, or null
   team, // () => { people, cards } from the team service
+  threadTalk, // () => comments on shared threads
   enabled, // () => whether Rooms is switched on
   device, // () => this Mac's 12-hex id
   presenceFacts, // () => { running, items, products, summary }
@@ -350,6 +354,7 @@ export function createRooms({
     const muted = new Set(p.muted);
     const marked = new Set(p.markedUnread);
     const at = now();
+    const talk = threadTalk?.() ?? [];
     const mentions: GroupRow[] = [];
     const mine = ownWork();
     const shown = new Map<string, ReturnType<typeof withReactions>>();
@@ -368,6 +373,10 @@ export function createRooms({
         people: [...(called?.map((n) => ({ id: n.person_id, name: n.name })) ?? []), { id: who as string, name: me()?.name ?? '' }, { id: who as string, name: profiles.get(who as string)?.display_name ?? '' }],
         doneAt: p.doneAt[r.id] ?? 0, nameOf,
         answeredAt: Math.max(0, ...(fileMarks.get(r.id) ?? []).filter((m) => m.by === who).map((m) => m.at)),
+        answeredOnItsThread: (m) => {
+          const on = askedThread(m.body);
+          return !!on && talk.some((t) => t.kind === 'comment' && t.by === who && t.owner === on.owner && t.threadId === on.id && (t.at ?? 0) > m.at);
+        },
       });
       if (row) mentions.push(row);
       const fileRow = groupFileRow({ roomId: r.id, roomName: r.name, marks: fileMarks.get(r.id) ?? [], me: who, myName: me()?.name ?? null, doneAt: p.doneAt[r.id] ?? 0, nameOf });

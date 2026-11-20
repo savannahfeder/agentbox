@@ -635,7 +635,8 @@ export function createThreadShare({
       const reopen = thread.item.status === 'done' || thread.item.status === 'blocked' ? { status: 'open' } : {};
       const first = String(name ?? '').split(/\s+/)[0] || 'A teammate';
       added += disk.appendForeignLines(thread.product.dir, [{
-        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`,
+        // An answer is written by this copy, as its owner's app, so it may start their agent here (mayRunHere).
+        id: c.threadId, ts: c.at, source: 'system', by: answers ? me : c.by, uid: `comment-${c.id}`,
         patch: answers
           ? { answer: c.text, from: { teammate: c.by, name: name || 'A teammate' }, blockedBy: [], waitEnded: { said: `${first} answered this step`, at: now() }, ...reopen }
           : { comment: { text: c.text, ...(name ? { name } : {}) } },
