@@ -150,7 +150,7 @@ import { personChatShows, personPressOpens } from './team/one-conversation';
 import { pairLine, pairTimeline, type PairEntry, type PairOpens } from './team/pair-timeline';
 import type { ChatAlong } from './team/rooms/RoomChat';
 import { listedIn, pairRooms } from '../../shared/pair-room.mts';
-import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
+import { isPresenceCard, roomMateCards, roomMatesById, threadOnLine } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
 import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
@@ -4321,6 +4321,7 @@ export default function App() {
     renderBoard: (people, { later }) => <RoomBoard items={items} products={snap?.products ?? []} display={DEFAULT_DISPLAY.team} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
       cards={[...cards, ...roomMateCards(snap?.team?.rooms?.rooms ?? [])]} picked={people} onOpenCard={(c) => { if (!isPresenceCard(c)) openTeammateCard(c); }} columnOrder={columnOrder} later={later}
       onOpenItem={(item) => { setFocused(item); markSeen(item); }} />,
+    threadOf: (c) => { const t = threadOnLine(c, weekCards); return t ? () => openContinuedFrom(t.personId, t.threadId) : null; },
   });
   // Two people have one conversation while Rooms is live: the chat on the person's page.
   const oneChat = roomsUi.live && homeLayout === 'chats';

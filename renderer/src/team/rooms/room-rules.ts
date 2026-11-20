@@ -34,6 +34,25 @@ export function activityCards(card: RoomCard, cards: readonly ThreadCard[]): Thr
   }));
 }
 
+type Line = Pick<RoomCard, 'id' | 'agents' | 'workingOn'>;
+type Readable = Pick<ThreadCard, 'personId' | 'threadId' | 'visible' | 'title' | 'state' | 'updatedAt'>;
+
+/**
+ * The shared thread a person's "working on" line names, or null. The line is
+ * cut at 64 characters and comes from their own Mac, which may word the thread
+ * differently from its card; then their one running shared thread is the one.
+ */
+export function threadOnLine<C extends Readable>(person: Line, cards: readonly C[]): C | null {
+  const said = person.workingOn?.trim();
+  if (!said || !person.agents) return null;
+  const theirs = cards.filter((c) => c.personId === person.id && c.visible && c.state !== 'done' && !isPresenceCard(c))
+    .sort((a, b) => Number(b.state === 'running') - Number(a.state === 'running') || b.updatedAt - a.updatedAt);
+  const named = theirs.find((c) => c.title && (c.title.trim() === said || c.title.trim().startsWith(said)));
+  if (named) return named;
+  const running = theirs.filter((c) => c.state === 'running');
+  return running.length === 1 ? running[0] : null;
+}
+
 /** Everyone on my rooms' walls but me, as people the board can name and draw. */
 export function roomMatesById(rooms: readonly Pick<Room, 'wall'>[]): Map<string, Person> {
   const out = new Map<string, Person>();
