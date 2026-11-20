@@ -32,9 +32,10 @@ describe('the note beside a project in the picker', () => {
     expect(note({ repoPath: undefined })).toBe('For personal tasks');
   });
 
-  it('says nothing for a project with a folder, shared or not', () => {
+  it('says nothing for your own project with a folder; a teammate\'s shared one still says whose', () => {
     expect(note({ repoPath: '/code/web-app', team: null })).toBeNull();
-    expect(note({ repoPath: '/code/payments-api', team: team(THEO.id) })).toBeNull();
+    expect(note({ repoPath: '/code/payments-api', team: team(LENA) })).toBeNull();
+    expect(note({ repoPath: '/code/payments-api', team: team(THEO.id) })).toBe('Shared by Theo');
   });
 
   it('is what the picker draws', () => {

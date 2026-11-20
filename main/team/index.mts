@@ -20,7 +20,7 @@ import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
 import { findFileToSend } from './carry-files.mts';
 import { readableSharedThreads } from '../everything-found.mts';
 import { plainRef } from '../../shared/carried-files.mts';
-import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mts';
+import { listSharedProjects, joinSharedProject, linkSharedFolders, markShared, makeDirect } from './projects.mts';
 import type { TeamRecord } from './projects.mts';
 import type { SyncBackend, SyncCard, SyncDisk, SyncReport, SyncState } from './sync.mts';
 import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
@@ -602,6 +602,7 @@ export function createTeamService({
         else if (state.multiplayer === false) set({ multiplayer: await readMultiplayer() });
         await clearLapsedStatus();
         const report = await sync!.syncOnce();
+        for (const l of linkSharedFolders(products())) log(`team: ${path.basename(l.dir)} now works in ${l.repoPath}, your own project of the same name`);
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
         // on the first line of theirs that arrives here.
@@ -1271,8 +1272,6 @@ export function createTeamService({
     },
 
     /**
-     * GIVE A THREAD TO A PERSON: its new name, brief, priority, due day and files
-    /**
      * A thread sent to people is opened to them, as Share's Send opens it, and
      * its card goes up before any link to it can arrive.
      */
@@ -1287,6 +1286,8 @@ export function createTeamService({
       if (sync) await syncNow();
     },
 
+    /**
+     * GIVE A THREAD TO A PERSON: its new name, brief, priority, due day and files
      * go as a task, and the thread closes here saying who has it. The close is
      * in your hand rather than the app's, or Done would read it as news and put
      * it in your own Needs you.

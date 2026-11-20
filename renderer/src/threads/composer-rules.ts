@@ -340,10 +340,10 @@ export function projectNote(
   p: { repoPath?: string | null; team?: { sharedBy?: string | null; direct?: boolean } | null },
   { me, byId }: { me: string | null; byId: ReadonlyMap<string, Person> },
 ): string | null {
-  if (p.repoPath) return null;
-  if (!p.team || p.team.direct) return 'For personal tasks';
+  if (!p.team || p.team.direct) return p.repoPath ? null : 'For personal tasks';
   const by = p.team.sharedBy && p.team.sharedBy !== me ? byId.get(p.team.sharedBy) : undefined;
-  return by ? `Shared by ${firstName(by)}` : 'Your team’s';
+  if (by) return `Shared by ${firstName(by)}`;
+  return p.repoPath ? null : 'Your team’s';
 }
 
 /**

@@ -181,6 +181,28 @@ export function joinSharedProject(accountRoot: string, cloudProject: CloudProjec
   return { projectId: cloudProject.id, dir, name: cloudProject.name, slug, direct: cloudProject.direct === true };
 }
 
+const sameName = (name: unknown) => String(name ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+/**
+ * A shared project with no folder on this computer takes the folder of your
+ * own project of the same name, when exactly one has one: without a folder its
+ * agents cannot touch code. The cloud does not say which repository a project
+ * is, so the name is what ties them.
+ */
+export function linkSharedFolders(products: readonly { dir: string; name?: string; repoPath?: string | null; team?: Partial<TeamRecord> | null }[]): { dir: string; repoPath: string }[] {
+  const linked: { dir: string; repoPath: string }[] = [];
+  for (const shared of products) {
+    if (!shared.team || shared.team.direct || shared.repoPath) continue;
+    const own = products.filter((p) => !p.team && p.repoPath && sameName(p.name) === sameName(shared.name));
+    if (own.length !== 1 || !fs.existsSync(own[0].repoPath!)) continue;
+    const project = readProject(shared.dir);
+    if (!project || project.repoPath) continue;
+    writeProject(shared.dir, { ...project, repoPath: own[0].repoPath });
+    linked.push({ dir: shared.dir, repoPath: own[0].repoPath! });
+  }
+  return linked;
+}
+
 // THE RECORD A MESSAGE BETWEEN TWO PEOPLE LIVES IN, made on the sender's Mac
 // the first time they write to that person. Its folder is named for nobody, so
 // it can never collide with a project, and both people are on it from the
