@@ -72,7 +72,7 @@ describe('the row', () => {
   // (tests/a-thread-the-whole-team-sees-wears-no-mark.test.mts).
   it('draws nothing after the title of a thread the team can see, and no Unshare', () => {
     const html = draw(row({ createdAt: SINCE + DAY }));
-    expect(html).toMatch(/th-cell-title[^>]*><span class="th-slot"><i class="th-own"[^>]*><\/i><\/span>Acme renewal terms<\/div>/);
+    expect(html).toMatch(/th-cell-title[^>]*><span class="th-slot"><span class="agent-face"[^>]*><svg[\s\S]*?<\/svg><\/span><\/span>Acme renewal terms<\/div>/);
     expect(text(html)).not.toContain('Unshare');
   });
   // A private thread wears the LOCK here rather than nothing: the mark is

@@ -674,8 +674,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* Every row: a 20px slot, the title, then who it is from in grey (w-585619d660).
    The name is an inline block so the row's underline stops at the title. */
 .th-slot { display: inline-flex; vertical-align: top; align-items: center; justify-content: center; width: 20px; height: 20px; margin-right: 12px; flex: none; }
-.th-slot .tm-av, .th-slot .tq { width: 20px; height: 20px; line-height: 18px; font-size: 9px; }
-.th-own { display: block; width: 14px; height: 14px; box-sizing: border-box; border: 1px solid var(--text-faint, var(--line-strong)); border-radius: 50%; }
+.th-slot .tm-av, .th-slot .tq, .th-slot .agent-face { width: 20px; height: 20px; line-height: 18px; font-size: 9px; }
 .th-who-name { display: inline-block; vertical-align: top; margin-left: 12px; color: var(--text-dim); white-space: nowrap; }
 .th-cell-title.with-aside > .th-who-name { flex: none; }
 .th-head .th-grid > :first-child { padding-left: 32px; }

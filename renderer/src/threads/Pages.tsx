@@ -41,6 +41,7 @@ import { shownToPeople } from '../../../shared/thread-cards.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { FleetContext } from '../fleet';
 import { TeammateLead, useTeammateWho } from '../teammates/row-lead';
+import { AgentFace } from '../components/AgentFace';
 import { factsFor, laterCell, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
 import { voiceName } from '../../../shared/agent-voice.mts';
@@ -705,10 +706,9 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   </div>;
 }
 
-/** Who a row is from: their face, and their name in grey after the title. Your own threads carry the plain ring and no name. */
+/** Who a row is from: their face, and their name in grey after the title. Your own threads carry the agent's face and no name. */
 export type Who = { face: ReactNode; name?: string };
-export const OwnMark = () => <i className="th-own" aria-label="Your thread" />;
-export const YOURS: Who = { face: <OwnMark /> };
+export const YOURS: Who = { face: <AgentFace /> };
 
 /** A message's line: the other person's face and name, then what was said,
  *  "You: " first when you spoke last. A group names everyone else. `mark`

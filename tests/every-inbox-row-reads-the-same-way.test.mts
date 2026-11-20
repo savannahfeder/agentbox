@@ -35,10 +35,21 @@ const nameOf = (html) => titleCell(html).match(/<span class="th-who-name">([^<]*
 const slotOf = (html) => titleCell(html).match(/^<span class="th-slot">([\s\S]*?)<\/span>(?=[^<]|<span class="th-(title-text|who-name)|$)/)?.[1] ?? null;
 
 describe('every row starts with the same slot', () => {
-  it('your own thread has the plain ring and no name', () => {
+  // The agent's face with two eyes, as everywhere else an agent is drawn (2026-11-20).
+  it("your own thread has the agent's face and no name", () => {
     const html = draw(row());
-    expect(slotOf(html)).toContain('th-own');
+    expect(slotOf(html)).toContain('class="agent-face"');
+    expect(slotOf(html)).toContain('agent-eyes');
     expect(nameOf(html)).toBeNull();
+  });
+
+  it('a person with a photo shows the photo, and one without shows their initials, both in the slot', () => {
+    const photo = { ...team, byId: new Map([...team.byId, [MAYA, { ...people[MAYA], avatarUrl: 'https://example.com/maya.jpg' }]]) };
+    const handed = row({ createdBy: MAYA, people: [MAYA, ME], assignee: ME });
+    const withPhoto = renderToStaticMarkup(React.createElement(TeamContext.Provider, { value: photo }, React.createElement(TeammatesContext.Provider, { value: mates }, React.createElement(ThreadCells, { item: handed, product: shared, now: T + 60_000, tab: 'inbox' }))));
+    expect(slotOf(withPhoto)).toContain('maya.jpg');
+    expect(slotOf(draw(handed))).toMatch(/class="tm-av"[^>]*>Ma</);
+    expect(nameOf(withPhoto)).toBe('Maya Chen');
   });
 
   it("an AI teammate's thread has its mark first and its name in grey after the title", () => {
