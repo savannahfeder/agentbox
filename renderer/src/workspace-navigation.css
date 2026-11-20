@@ -308,8 +308,7 @@
 .instr-part textarea { display:block; resize:none; width:100%; min-height:220px; margin-top:10px; field-sizing:content;
   padding:16px 18px; border:0; border-left:2px solid transparent; border-radius:var(--radius);
   background:var(--wash); color:var(--text); caret-color:var(--text);
-  font:14px/1.75 inherit; font-family:inherit;
-  transition:background .12s ease, border-color .12s ease; }
+  font:14px/1.75 inherit; font-family:inherit; }
 .instr-part textarea:hover { background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); }
 .instr-part textarea:focus { outline:none; background:color-mix(in srgb, var(--wash) 100%, var(--text) 4%); border-left-color:var(--underline); }
 .instr-part textarea::placeholder { color:var(--text-faint); }

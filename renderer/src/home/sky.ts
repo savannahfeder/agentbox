@@ -212,3 +212,26 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
     }
   }
 }
+
+const drawn = new Map<string, HTMLCanvasElement>();
+const KEPT = 3;
+
+/** drawSky, copying a sky already drawn with the same art at the same size instead of drawing it again. */
+export function paintSky(canvas: HTMLCanvasElement, art: SkyArt, opts: Parameters<typeof drawSky>[2]) {
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  if (!W || !H) return;
+  const key = JSON.stringify([art, W, H, opts]);
+  const kept = drawn.get(key);
+  if (kept) {
+    canvas.width = kept.width; canvas.height = kept.height;
+    canvas.getContext('2d')?.drawImage(kept, 0, 0);
+    drawn.delete(key); drawn.set(key, kept);
+    return;
+  }
+  drawSky(canvas, art, opts);
+  const copy = document.createElement('canvas');
+  copy.width = canvas.width; copy.height = canvas.height;
+  copy.getContext('2d')?.drawImage(canvas, 0, 0);
+  drawn.set(key, copy);
+  for (const old of drawn.keys()) { if (drawn.size <= KEPT) break; drawn.delete(old); }
+}
