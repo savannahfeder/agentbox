@@ -46,7 +46,6 @@ import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
 import { ChooseList, CopiedSheet, GiveSheet, SeeList, SendSheet, ShareList } from './SharePanel';
-import type { AskStep } from '../team/AsksLine';
 import { sendFirst, type SeenBy } from './share-rules';
 
 export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
@@ -368,13 +367,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   // "Ask about this step" on one of the agent's messages opens the people list with that message as the step.
   useEffect(() => {
     if (!onAsk || !giveTo.length) return undefined;
-    const askAbout = (e: Event) => {
-      const { step: s, to } = (e as CustomEvent<AskStep>).detail ?? { step: '', to: null };
-      setStep(s || null);
-      setGiving(true);
-      if (to) setGivingTo(to);
-      setOpen(true);
-    };
+    const askAbout = (e: Event) => { setStep(String((e as CustomEvent<string>).detail ?? '') || null); setGiving(true); setOpen(true); };
     window.addEventListener('zero:ask-step', askAbout);
     return () => window.removeEventListener('zero:ask-step', askAbout);
   }, [!!onAsk, giveTo.length]);
