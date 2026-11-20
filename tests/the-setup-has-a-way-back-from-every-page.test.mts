@@ -54,13 +54,13 @@ describe('the page', () => {
   const split = read('renderer/src/components/SetupSplit.tsx');
   const css = read('renderer/src/components/setup-split.css');
   it('draws Back on the last page too', () => {
-    expect(split).toContain('const backTo = stepBefore(steps, at, signedIn);');
+    expect(split).toContain('const backTo = stepBefore(steps, at, signedIn, paid);');
     expect(split).toContain('const back = backTo !== null || p.onBack ? () => { setError(null); if (backTo !== null) setAt(backTo); else p.onBack?.(); } : null;');
     expect(split).not.toMatch(/const back = !finished/);
   });
   // Out of the Tab ring: Back is the keyboard's way, and six stops before the first field would be in the way of it.
   it('makes each passed dash a button that goes to its step', () => {
-    expect(split).toMatch(/dashGoesBack\(steps, i, at, signedIn\)\s*\? <button type="button" key=\{s\} className="ss-was" tabIndex=\{-1\} disabled=\{busy\} aria-label=\{`Back to step \$\{i \+ 1\}`\} onClick=\{\(\) => \{ setError\(null\); setAt\(i\); \}\} \/>/);
+    expect(split).toMatch(/dashGoesBack\(steps, i, at, signedIn, paid\)\s*\? <button type="button" key=\{s\} className="ss-was" tabIndex=\{-1\} disabled=\{busy\} aria-label=\{`Back to step \$\{i \+ 1\}`\} onClick=\{\(\) => \{ setError\(null\); setAt\(i\); \}\} \/>/);
   });
   it('gives a dash room to press and shows it can be', () => {
     expect(css).toMatch(/\.setup-split \.ss-steps button \{[^}]*height: 18px;[^}]*cursor: pointer;/);

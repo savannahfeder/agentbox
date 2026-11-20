@@ -87,7 +87,7 @@ describe('checkout', () => {
     expect(made.form).toMatchObject({
       mode: 'subscription', 'line_items[0][price]': 'price_pro', 'line_items[0][quantity]': '1',
       client_reference_id: A, 'subscription_data[metadata][person]': A,
-      success_url: `https://${HOST}/v1/paid?plan=pro`, cancel_url: `https://${HOST}/v1/paid?cancelled=1`,
+      success_url: 'https://app.agentbox.ac/paid?plan=pro', cancel_url: 'https://app.agentbox.ac/paid?cancelled=1',
     });
     expect(made.form.customer).toBeUndefined();
     expect(stripe.calls.every((c) => c.deadline && c.auth === 'Bearer sk_test_x')).toBe(true);
@@ -217,7 +217,7 @@ describe('billing', () => {
     await paysFor('sub_1', 'active', 'pro', { customer: 'cus_9' });
     const r = await call('POST', '/v1/billing');
     expect(r.body).toEqual({ url: 'https://billing.stripe.com/p/session/test_1' });
-    expect(stripe.calls.find((c) => c.path === '/v1/billing_portal/sessions').form).toMatchObject({ customer: 'cus_9', return_url: `https://${HOST}/v1/paid?billing=1` });
+    expect(stripe.calls.find((c) => c.path === '/v1/billing_portal/sessions').form).toMatchObject({ customer: 'cus_9', return_url: 'https://app.agentbox.ac/paid?billing=1' });
   });
 
   it('someone who never paid has none', async () => {

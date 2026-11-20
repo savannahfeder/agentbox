@@ -31,6 +31,8 @@ function world({ named = true } = {}) {
   git(seed, 'push', '-q', 'origin', 'HEAD:main');
   const folder = path.join(dir, 'task');
   fs.mkdirSync(folder);
+  // Its push runs this checkout's gate (scripts/private-push-gate.mjs).
+  fs.symlinkSync(path.resolve(import.meta.dirname, '..', 'scripts'), path.join(folder, 'scripts'));
   if (named) put(path.join(folder, '.agentbox/private.json'), JSON.stringify({ path: '.claude/skills', url: remote }));
   const at = path.join(folder, '.claude/skills');
   git(dir, 'clone', '-q', remote, at);

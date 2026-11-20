@@ -37,7 +37,9 @@ describe('a teammate\'s chat', () => {
     const chat = page.slice(page.indexOf('function ChatColumn('), page.indexOf('\nfunction ', page.indexOf('function ChatColumn(') + 10));
     // Since 2026-10-26 the card is the thread's own inbox row
     // (a-thread-a-teammate-sent-you-looks-like-its-row-in-your-inbox).
-    expect(chat).toMatch(/e\.verb === 'sent'[\s\S]{0,300}<SentCard /);
+    // Since 2026-11-20 a thread it opened joins the same card (8e78c119).
+    expect(chat).toMatch(/const aThread = [^\n]*e\.verb === 'sent'/);
+    expect(chat).toMatch(/else if \(aThread\(e\)\)[\s\S]{0,300}<SentCard /);
     expect(page).toMatch(/function SentCard\(/);
   });
 
