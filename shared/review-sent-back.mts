@@ -27,6 +27,20 @@ export function verdictOf(text: string | null | undefined): { verdict: Verdict; 
   return { verdict: m[1] === 'Approved' ? 'approved' : 'changes', notes: Number(m[2] ?? 0), note: (m[3] ?? '').trim() };
 }
 
+/** The newest comment that carries a review's verdict. */
+export function reviewBack(comments: readonly { by: string; ts: number; text?: string }[] | null | undefined) {
+  const c = [...(comments ?? [])].reverse().find((x) => verdictOf(x.text));
+  return c ? { by: c.by, at: c.ts, ...verdictOf(c.text)! } : null;
+}
+
+/** A verdict as the reviewer's message says it on the owner's thread: what they did, then their note. */
+export function verdictMessage(text: string | null | undefined): string | null {
+  const v = verdictOf(text);
+  if (!v) return null;
+  const did = v.verdict === 'approved' ? 'Approved it' : v.notes > 0 ? `Sent it back with ${notesWord(v.notes)}` : 'Sent it back';
+  return v.note ? `${did}: ${v.note}` : `${did}.`;
+}
+
 /** What the owner's thread says came back, before any quote of the note. */
 export function cameBack(first: string, text: string | null | undefined): string | null {
   const v = verdictOf(text);

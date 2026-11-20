@@ -43,7 +43,7 @@ export function SendBack({ owner, note: asked, notes, onSend }: {
     if (ok) setNote('');
   };
   return (
-    <form className="th-comment tp-dock-form tp-send-back" aria-label={`Send back to ${owner}`} title={reviewAskWords(owner, asked)} onSubmit={(e) => { e.preventDefault(); void send('approved'); }}>
+    <form className="tp-dock-form tp-send-back" aria-label={`Send back to ${owner}`} title={reviewAskWords(owner, asked)} onSubmit={(e) => { e.preventDefault(); void send('approved'); }}>
       <textarea className="dock-input" value={note} rows={1} placeholder={`Notes for ${owner}`} aria-label={`Notes for ${owner}`} onChange={(e) => setNote(e.target.value)} />
       <div className="compose-sentence dock-bar">
         <button type="button" className="ts-done tp-send-back-notes" disabled={busy || (!notes && !note.trim())} onClick={() => void send('changes')}>

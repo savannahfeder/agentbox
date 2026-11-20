@@ -141,7 +141,8 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
   const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run');
   // The newest answer is drawn under the conversation, not in it, and is a step too.
   const stepAt = step ? stepLine([...events, ...(built.outcome ? [{ at: built.outcome.at }] : [])], step) : null;
-  useEffect(() => (stepAt ? revealLine(stepAt) : undefined), [stepAt, personId, threadId]);
+  // The newest answer is already on screen under the title; only an earlier step is scrolled to.
+  useEffect(() => (stepAt && stepAt !== newestLine ? revealLine(stepAt) : undefined), [stepAt, personId, threadId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Their copy publishes its marks with its messages; everyone's come together here.
   const own = useMemo(() => marksOf((work?.lines ?? [])
@@ -246,6 +247,7 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
   const said = events.filter((e): e is AgentSaid => !e.kind);
   const lastIt = !built.outcome ? [...said].reverse().find((e) => e.who === 'it') ?? null : null;
   const newest = built.outcome ? { at: built.outcome.at, text: built.outcome.text } : lastIt ? { at: lastIt.at, text: lastIt.text } : null;
+  const newestLine = lastIt?.uid ?? (newest ? `at-${newest.at}` : null);
   const before = lastIt ? events.filter((e: AgentEvent) => e !== lastIt) : events;
   const [earlierOpen, setEarlierOpen] = useState(false);
   useEffect(() => { setEarlierOpen(false); }, [personId, threadId]);
@@ -292,7 +294,7 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
       <div className="focus-scroll" data-thread-id={threadId}>
         <div className="focus">
           <div className="focus-body markdown agent-thread">
-            <QueueSummary title={title} context={card.problem} earlier={earlierCount} open={earlierOpen} onToggle={() => setEarlierOpen((o) => !o)} />
+            <QueueSummary title={title} context={card.problem && card.problem !== card.title ? card.problem : null}earlier={earlierCount} open={earlierOpen} onToggle={() => setEarlierOpen((o) => !o)} />
             {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
             {work && work.earlier > 0 && earlierOpen && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
             {earlierOpen && before.length > 0 && (
@@ -324,7 +326,7 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
           <div className="dock-card">
             {reviewing ? (
               <SendBack owner={owner} note={review.note} notes={myOpenNotes} face={<Face person={me} me />} onSend={sendBack} />
-            ) : <form className="th-comment tp-dock-form" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+            ) : <form className="tp-dock-form"onSubmit={(e) => { e.preventDefault(); void send(); }}>
               <textarea ref={replyBox} className="dock-input" value={draft} rows={1} placeholder={box} aria-label={box}
                 onChange={(e) => write(e.target.value)} onKeyDown={onKey} />
               <div className="compose-sentence dock-bar">

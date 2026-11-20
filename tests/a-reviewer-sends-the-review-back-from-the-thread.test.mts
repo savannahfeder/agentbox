@@ -57,7 +57,7 @@ describe('the reviewer\'s reply box', () => {
   });
   it('is the reply box\'s own shape, Approve where Send goes', () => {
     const html = draw(1);
-    expect(html).toContain('class="th-comment tp-dock-form tp-send-back"');
+    expect(html).toContain('class="tp-dock-form tp-send-back"');
     expect(html).toContain('<textarea class="dock-input"');
     expect(html).toContain('<span class="dock-send-pair solo"><button type="submit" class="dock-send">Approve</button></span>');
     expect(html).not.toContain('is-primary');

@@ -684,7 +684,4 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-ask .one-by em { font: inherit; color: var(--text-dim); }
 .tp-ask-note { margin: 8px 0 0; font-size: 15px; line-height: 24px; color: var(--text); }
 .tp-dock-form { margin: 0; }
-.review-back { margin-top: 36px; }
-.review-back .one-by span { color: var(--text); }
-.review-back-verdict { font-weight: 600; }
 .tp-dock-form .compose-clauses, .tp-dock-form .tp-send-back-notes { margin-right: auto; }

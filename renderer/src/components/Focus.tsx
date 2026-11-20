@@ -32,7 +32,7 @@ import { providerCommand } from '../../../shared/provider-commands.mts';
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as BoxKeyEvent, type ReactNode } from 'react';
 import { Face, TeamContext, firstName } from '../team/people';
-import { ReviewCameBack, reviewBack } from '../threads/ReviewCameBack';
+import { reviewBack } from '../../../shared/review-sent-back.mts';
 import { handedInitials, handedTo, isDirect, taskHandedFrom, peopleInConversation, peopleToAdd, workAudience } from '../threads/page-rules';
 import {
   allModels, joinNames, moreCount, recentModels, replyBoxAsk, replyWaitsUntil, type Harness, type ModelPick,
@@ -2276,8 +2276,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             and which two versions this is between (w-86452550e5). */}
         <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
-        {/* A task handed to you opens as any thread does: its name, then where it came from. */}
-        {givenTask && <h2 className="one-title given-title">{threadName}</h2>}
+        {/* A task handed to you says only where it came from; its name heads the conversation. */}
         {givenTask && <HandedFrom item={item} />}
         {made
           ? <div className="outcome">{md(item.body ?? '')}</div>
@@ -2359,7 +2358,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               } : undefined}
             />
           )}
-        <ReviewCameBack comments={item.waitingComments} />
 
         {/* NEITHER OF THOSE TWO ROWS HAS A CONVERSATION TO PUT THE LIST IN, so
             the list keeps its old place under what they said instead. */}

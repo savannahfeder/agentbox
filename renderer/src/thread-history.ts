@@ -25,6 +25,7 @@ import { instructionOf } from '../../shared/repeats.mts';
 import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
 import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
+import { verdictMessage } from '../../shared/review-sent-back.mts';
 import { handedToName } from '../../shared/thread-cards.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
@@ -311,7 +312,10 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     const comment = (patch as { comment?: { text?: unknown } } | null)?.comment;
     if (comment) {
       const text = words(comment.text);
+      // A review sent back reads as the reviewer's message: what they did, then their note.
+      const review = verdictMessage(text);
       if (isContinuedNote(comment.text)) events.push({ at, who: 'you', said: 'continued this in their own thread' });
+      else if (review) events.push({ at, who: 'you', said: 'They sent back a review', words: review, message: true });
       else if (text) events.push({ at, who: 'you', said: 'They commented', words: text, message: true, says: 'comment', ...(lastReply > at ? { carried: true } : {}) });
       continue;
     }
