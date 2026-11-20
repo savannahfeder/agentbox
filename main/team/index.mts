@@ -537,7 +537,9 @@ export function createTeamService({
     const said = store.readThread(product.slug, row.id).map((t) => t.text).filter(Boolean);
     // A one-line thread has only a title, and a rename must not lose those words.
     const brief = row.body || row.title;
-    const words = [brief, row.result ? `Where it got to:\n\n${row.result}` : ''].filter(Boolean).join('\n\n');
+    // The receiver reads it as a person's message, drawn as typed, where bold marks show as marks.
+    const unbold = (s: string) => s.replace(/\*\*([^*\n]+)\*\*/g, '$1');
+    const words = [brief, row.result ? `Where it got to:\n\n${unbold(row.result)}` : ''].filter(Boolean).join('\n\n');
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];
     const tooBig: string[] = [];
