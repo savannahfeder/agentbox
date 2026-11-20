@@ -70,7 +70,7 @@ import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksLine } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
 import { askIGave, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
-import { SEE_SAID, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
+import { SEE_SAID, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
 import { ImportAgents } from './components/ImportAgents';
@@ -7628,7 +7628,7 @@ export default function App() {
   // WHO A THREAD CAN BE HANDED ON TO: the people, then the AI teammates working.
   const giveToFor = (item: WorkItem): GiveTo[] => {
     if (isTroubleRow(item) || isUpdateRow(item)) return [];
-    const people = team ? giveRows(item, { me: team.me, people: team.state.people ?? [], product: team.products.get(item.product) }) : [];
+    const people = team ? byWorkHere(giveRows(item, { me: team.me, people: team.state.people ?? [], product: team.products.get(item.product) }), weekCards, team.products.get(item.product)?.name ?? item.productName, now) : [];
     if (!people.length) return [];
     const mates = teammatesUi.list.filter((t) => !t.paused && t.status !== 'draft' && item.routed?.to !== `mate:${t.id}`);
     return [...people, ...mates.map((t) => ({ id: `mate:${t.id}`, name: t.name }))];

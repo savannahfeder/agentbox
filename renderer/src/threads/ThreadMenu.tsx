@@ -281,7 +281,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   /** Null stops waiting. */
   onWait?: (id: string | null) => void;
   /** Who it can be handed on to; the row is only there when somebody is. */
-  giveTo?: readonly { id: string; name: string }[];
+  giveTo?: readonly { id: string; name: string; detail?: string }[];
   /** `note`: what the giver wants from a person; empty for an AI teammate. */
   onGive?: (to: { id: string; name: string }, note: string) => void;
   /** Help or a review from a person, keeping the thread; `step` is the message picked, if one was. */
@@ -549,6 +549,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
           {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
             <span className="ico"><GiveMark /></span>
             <span className="ts-more-label">{p.name}</span>
+            {p.detail && <kbd>{p.detail}</kbd>}
           </button>)}
         </div>
         : <ThreadMenuList rows={rows} change={change} onPick={pick} />)}

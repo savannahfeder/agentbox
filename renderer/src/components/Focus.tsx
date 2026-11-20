@@ -760,7 +760,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  when pressed is worse than no word. */
   onHandToAgent?: (item: WorkItem, message?: AgentTurn) => void;
   /** Who this thread can be handed on to, for its menu. */
-  giveTo?: readonly { id: string; name: string }[];
+  giveTo?: readonly { id: string; name: string; detail?: string }[];
   onGive?: (to: { id: string; name: string }, note: string) => void;
   /** Help or a review from a person, keeping the thread yours. */
   onAsk?: (to: { id: string; name: string }, kind: 'help' | 'review', note: string, step: string | null) => void;

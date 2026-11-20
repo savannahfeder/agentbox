@@ -27,6 +27,7 @@ import { pickFields } from '../shared/work-items.mts';
 import { askIGave, askOnMe, asksOnThread, handedBackAsks, handedBackBy, handedBackWords, helpAskOpen, stepOf } from '../shared/thread-asks.mts';
 import { GiveSheet } from '../renderer/src/threads/SharePanel.tsx';
 import { machineryPath } from '../main/store/home.mts';
+import { byWorkHere } from '../renderer/src/thread-commands.ts';
 import { changePath } from '../main/code-change.mts';
 
 async function aMac(cloud, personId, tellThread) {
@@ -226,6 +227,20 @@ describe('the wiring', () => {
   it('a helper\'s words on your thread are passed on by your own supervisor', () => {
     expect(read('main/main.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
     expect(read('main/serve.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
+  });
+});
+
+describe('whom to ask', () => {
+  const now = 10 * 86_400_000;
+  const people = [{ id: 'dana', name: 'Dana' }, { id: 'theo', name: 'Theo' }, { id: 'priya', name: 'Priya' }];
+  const card = (personId, project, ago = 0) => ({ personId, project, updatedAt: now - ago });
+  it('puts whoever worked in this project this week first, saying how much', () => {
+    const out = byWorkHere(people, [card('theo', 'Payments API'), card('theo', 'Payments API'), card('priya', 'Payments API'), card('dana', 'Web app')], 'Payments API', now);
+    expect(out.map((p) => [p.name, p.detail])).toEqual([['Theo', '2 in Payments API this week'], ['Priya', '1 in Payments API this week'], ['Dana', undefined]]);
+  });
+  it('counts nothing older than a week, and keeps the team\'s order when nobody worked there', () => {
+    expect(byWorkHere(people, [card('theo', 'Payments API', 8 * 86_400_000)], 'Payments API', now).map((p) => p.name)).toEqual(['Dana', 'Theo', 'Priya']);
+    expect(byWorkHere(people, [], null, now)).toEqual(people);
   });
 });
 
