@@ -167,6 +167,9 @@ describe('who may do what', () => {
     await both();
     expect(asksOnThread(sam.store.listItems(), sam.personId, t.id).filter((a) => a.open)).toEqual([]);
     expect(askOnMe(theo.store.listItems(), theo.personId, sam.personId, t.id)).toBeNull();
+    // Round six: the thank-you reopened the task, so it read "asked Dana" and moved back to In progress.
+    expect(sam.store.listItems().find((i) => i.ask)?.status).toBe('done');
+    expect(theo.store.listItems().find((i) => i.ask)?.status).toBe('done');
   });
 
   it('only the person asked hands it back, and only once', async () => {

@@ -625,8 +625,9 @@ export class Store {
     }
     // The pane may still show a running row after Stop or a provider result.
     // Resolve omitted reply status against the ledger that was just written.
+    // Except an ask handed back (shared/thread-asks.mts): a thank-you there is a message, not more work.
     if (status == null && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)'
-      && (item?.status === 'blocked' || item?.status === 'done')) status = 'open';
+      && (item?.status === 'blocked' || item?.status === 'done') && !(item?.ask && item?.verdict)) status = 'open';
     // WHAT THE ANSWER ITSELF MAY DO does not go on the ledger. It is a grant,
     // the ledger is an append-only file every worker writes, and every line on
     // it names its own author with nothing checking the name. It goes in the

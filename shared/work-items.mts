@@ -1182,6 +1182,8 @@ export const WORK_THREAD = 'work-thread';
 function reopenIfWrittenPastTheClose(item: FoldingItem, said: Said[]): void {
   const close = item.status === 'done' ? item.wrote.status : null;
   if (!close?.by) return;
+  // An ask handed back (shared/thread-asks.mts) stays handed back: a thank-you after it is a message, not more work.
+  if (item.ask && item.verdict) return;
   const others = said.filter((s) => s.by !== close.by && !s.body);
   const crossed = others.filter((s) => s.crossed === close.ts);
   if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;

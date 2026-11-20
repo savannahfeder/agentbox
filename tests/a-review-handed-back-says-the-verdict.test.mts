@@ -38,6 +38,9 @@ describe('the line under a review that was handed back', () => {
   it('says handed back for help, which has no verdict to tell', () => {
     expect(said('dana', { verdict: 'done', ask: { kind: 'help', owner: 'priya', thread: 'w', product: 'web' } })).toContain('you handed this back');
   });
+  it('still says it, after a thank-you from an older copy reopened the task', () => {
+    expect(said('priya', { verdict: 'yes', status: 'open', wrote: { status: { by: 'priya', ts: 2 }, verdict: { by: 'dana', ts: 1 } } })).toContain('Dana said it looks good');
+  });
   it('says taken back when the one who asked closed it', () => {
     expect(said('dana', { wrote: { status: { by: 'priya', ts: 1 } } })).toContain('Priya took this back');
   });

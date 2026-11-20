@@ -30,9 +30,10 @@ export function TeamSaid({ item }: { item: WorkItem }) {
   const name = firstName(team.byId.get(other ?? ''));
   const due = dueWords(item.due);
   const task = isGivenTask(item, team.products.get(item.product));
-  const closer = item.wrote?.status?.by;
   const ask = task ? item.ask?.kind ?? null : null;
-  const said = task && item.status === 'done'
+  // Handed back stays handed back, whatever a thank-you since did to the status.
+  const closer = (ask && item.verdict ? item.wrote?.verdict?.by : null) ?? item.wrote?.status?.by;
+  const said = task && (item.status === 'done' || (ask && item.verdict))
     ? ask ? (closer === item.assignee
       ? `${mine ? 'you' : name} ${item.verdict === 'changes' ? 'asked for changes' : item.verdict === 'yes' ? 'said it looks good' : 'handed this back'}`
       : `${mine ? name : 'you'} took this back`)
