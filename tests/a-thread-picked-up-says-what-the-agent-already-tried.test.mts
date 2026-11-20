@@ -75,7 +75,7 @@ describe('the task a hand-over makes', () => {
   it('says the work is not committed and carries every edit with it', async () => {
     // Round eleven: the receiver's agent could not find the test the summary named; it was only on the giver's computer.
     const task = await handed('Added a focused test', { uncommitted: true });
-    expect(task.body).toContain("Not committed yet: this work is only on Theo's computer. Every edit the agent made is in Retries charge twice change.change, attached.");
+    expect(task.body).toContain("Not committed yet: this work is only on Theo's computer. The file below holds every edit the agent made.");
     expect(task.body).toMatch(/\]\(attachments\/[^)]*change\.change\)/);
   });
   it('says nothing of it when the work is committed, and still carries the change', async () => {

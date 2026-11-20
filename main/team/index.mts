@@ -1326,7 +1326,7 @@ export function createTeamService({
       const { words, files, tooBig } = briefOfThread(row, product);
       const change = changeOfThread(product, id, String(row.label || row.title || ''));
       const giver = state.me.name?.split(/\s+/)[0] || 'the giver';
-      const loose = change.loose ? `Not committed yet: this work is only on ${giver}'s computer. Every edit the agent made is in ${change.name}, attached.` : '';
+      const loose = change.loose ? `Not committed yet: this work is only on ${giver}'s computer. The file below holds every edit the agent made.` : '';
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
       // What the giver wants from them comes first, over the thread's own words.
       const brief = [String(note ?? '').trim(), words, loose, left].filter(Boolean).join('\n\n');
