@@ -36,10 +36,12 @@ describe('a menu over a thread says what picking does', () => {
   });
 
   // Since a person can be asked for help or a review as well (shared/thread-asks.mts), the list says so when they can.
-  it('Ask or hand off says what a person gets, and that an AI teammate starts on it', () => {
+  // The AI half only when an AI teammate is in the list: with only Priya there,
+  // the PM tester could not tell whether a person or an AI got it (round six).
+  it('Ask or hand off says what a person gets, and that an AI teammate starts on it when one is listed', () => {
     const menu = read('renderer/src/threads/ThreadMenu.tsx');
-    expect(menu).toContain("'Ask a person for help or a review, or hand it over. An AI teammate starts on it.'");
-    expect(menu).toContain("'A person gets it as a task in their Needs you. An AI teammate starts on it.'");
+    expect(menu).toContain("(onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')");
+    expect(menu).toContain("(giveTo.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')");
   });
 
   it('Waits on says where it goes and when it comes back', () => {

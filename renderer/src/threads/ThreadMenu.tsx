@@ -545,7 +545,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
           onAsk={onAsk ? (kind, note) => { const s = step; close(false); onAsk(givingTo, kind, note, s); } : undefined} />
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">
-          <p className="ts-menu-say">{onAsk ? 'Ask a person for help or a review, or hand it over. An AI teammate starts on it.' : 'A person gets it as a task in their Needs you. An AI teammate starts on it.'}</p>
+          <p className="ts-menu-say">{(onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
+            + (giveTo.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
           {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
             <span className="ico"><GiveMark /></span>
             <span className="ts-more-label">{p.name}</span>

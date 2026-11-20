@@ -563,6 +563,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // and the pickup above already said it.
       if (status === 'claimed') continue;
       if (status === 'done') {
+        // Handing it over closes your copy; "Given to …" just above already says what happened.
+        const prev = events.at(-1);
+        if (mine && prev?.field === 'answer' && /^Given to /.test(prev.words ?? '') && at - prev.at < 2000) continue;
         events.push({ at, who, said: mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
         continue;
       }
@@ -593,7 +596,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         // repeated once per attempt over a thread out of usage
         // (tests/an-out-of-usage-thread-does-not-say-it-handed-this-back).
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
-        events.push({ at, who, said: mine ? 'You sent it back' : 'It handed this back', ...(mine ? { personal: true as const } : {}) });
+        const said = mine ? 'You sent it back' : 'It handed this back';
+        // One press can write the reopening twice (the notes path does), so the same words within a second are one.
+        const last = events.at(-1);
+        if (last?.said === said && Math.abs(at - last.at) < 1000) continue;
+        events.push({ at, who, said, ...(mine ? { personal: true as const } : {}) });
         continue;
       }
     }
