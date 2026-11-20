@@ -9,13 +9,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
-import type { Snapshot } from '../types';
+import type { CloudPlan, Snapshot } from '../types';
 import type { SessionThread } from '../agent-import-card';
 import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, bringInWithin, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, bringInWithin, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
@@ -156,6 +156,15 @@ export function SetupSplit(p: SetupSplitProps) {
   // ---- Starting Pro: the cloud account, the team its seats are bought for, its Stripe checkout in the browser, then wait for the seats.
   const [payState, setPayState] = useState<'idle' | 'opening' | 'waiting'>('idle');
   const hasTeam = !!p.snap?.team?.team;
+  // A team already made may have used some or all of its free days, and only the cloud knows which.
+  const [seen, setSeen] = useState<CloudPlan | null>(null);
+  useEffect(() => {
+    if (step !== 'plan' || !hasTeam) return undefined;
+    let live = true;
+    void api.cloudAccountPlan().then((plan) => { if (live) setSeen(plan); });
+    return () => { live = false; };
+  }, [step, hasTeam]);
+  const offer = proOffer(proFreeDays(hasTeam, seen));
   const pay = useCallback(async () => {
     if (plan === 'pro') { next(); return; }
     setPayState('opening'); setError(null);
@@ -302,11 +311,11 @@ export function SetupSplit(p: SetupSplitProps) {
     body = <>
       <div className="ss-perks">{PRO_PITCH.perks.map((k) => <div key={k.id} className="ss-perk"><span className="ss-perk-icon">{PERK_ICONS[k.id]}</span>{k.title}{'tag' in k && <span className="ss-perk-tag">{k.tag}</span>}</div>)}</div>
       <div className="ss-pricing">
-        <div><span className="ss-pricing-label">{PRO_PITCH.trial.label}</span><b className="ss-pricing-price">{PRO_PITCH.trial.price}</b><span className="ss-pricing-line">{PRO_PITCH.trial.line}</span></div>
-        <div><span className="ss-pricing-label">{PRO_PITCH.paid.label}</span><b className="ss-pricing-price">{PRO_PITCH.paid.price}<small>{PRO_PITCH.paid.per}</small></b><span className="ss-pricing-line">{PRO_PITCH.paid.line}</span></div>
+        {offer.trial && <div><span className="ss-pricing-label">{offer.trial.label}</span><b className="ss-pricing-price">{offer.trial.price}</b><span className="ss-pricing-line">{offer.trial.line}</span></div>}
+        <div><span className="ss-pricing-label">{offer.paid.label}</span><b className="ss-pricing-price">{offer.paid.price}<small>{offer.paid.per}</small></b><span className="ss-pricing-line">{offer.paid.line}</span></div>
       </div>
       {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
-      <div className="ss-acts">{go(plan === 'pro' ? 'Continue' : payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : PRO_PITCH.cta, () => void pay(), payState !== 'opening')}{plan !== 'pro' && quiet(PRO_PITCH.free, next)}</div>
+      <div className="ss-acts">{go(plan === 'pro' ? 'Continue' : payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : offer.cta, () => void pay(), payState !== 'opening')}{plan !== 'pro' && quiet(PRO_PITCH.free, next)}</div>
       {plan !== 'pro' && <p className="ss-price-line">{PRO_PITCH.terms}</p>}
     </>;
   } else if (step === 'teammates') {

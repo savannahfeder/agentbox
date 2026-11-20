@@ -95,7 +95,7 @@ describe('the page on screen', () => {
   });
   it('lists what Pro brings, and can be skipped', () => {
     expect(split).toMatch(/PRO_PITCH\.perks\.map\(\(k\) => <div key=\{k\.id\} className="ss-perk">/);
-    expect(split).toMatch(/: PRO_PITCH\.cta, \(\) => void pay\(\), payState !== 'opening'\)\}\{plan !== 'pro' && quiet\(PRO_PITCH\.free, next\)\}/);
+    expect(split).toMatch(/: offer\.cta, \(\) => void pay\(\), payState !== 'opening'\)\}\{plan !== 'pro' && quiet\(PRO_PITCH\.free, next\)\}/);
   });
   it('makes the team as Pro starts, before anyone is invited, since its seats are what is paid for', () => {
     expect(trial).toMatch(/if \(!hasTeam\) \{\n    const made = await api\.teamCreate\(teamNameFor\(name\)\);[\s\S]*await api\.cloudAccountPay\('team'\)/);

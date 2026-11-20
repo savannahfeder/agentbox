@@ -3,7 +3,7 @@
 // tests/the-setup-beside-the-app-asks-only-what-applies.test.mjs reads them.
 
 import { MATCH_SKY } from './home/sky';
-import { TEAM } from '../../cloud/gateway/plans.mjs';
+import { TEAM, teamFreeDays } from '../../cloud/gateway/plans.mjs';
 
 /** Where the app sits beside the setup, in window pixels: the steps panel's
  *  width, the app's top-left corner and scale, and, in the app's own pixels,
@@ -81,6 +81,22 @@ export const PRO_PITCH = {
   terms: 'Cancel any time.',
   free: 'Stay on Free',
 };
+
+type PlanSeen = { team?: { trial: boolean; endsAt: number | null } | null } | null | undefined;
+
+/** The free days Pro starts with. A team is made when Pro starts, so without one they are all there;
+ *  a team already made has what its checkout would give, and none unless the cloud says its trial is on. */
+export function proFreeDays(hasTeam: boolean, plan: PlanSeen, now = Date.now()): number {
+  if (!hasTeam) return TEAM.trialDays;
+  return plan?.team?.trial && plan.team.endsAt ? teamFreeDays(plan.team.endsAt, now) : 0;
+}
+
+/** The plan page's pricing and button for `days` free days: with none, no free column and no free claim. */
+export function proOffer(days: number) {
+  if (!days) return { trial: null, paid: { ...PRO_PITCH.paid, label: 'From today' }, cta: 'Start Pro now' };
+  if (days === TEAM.trialDays) return { trial: PRO_PITCH.trial, paid: PRO_PITCH.paid, cta: PRO_PITCH.cta };
+  return { trial: { ...PRO_PITCH.trial, label: `First ${days} days` }, paid: PRO_PITCH.paid, cta: `Try Pro free for ${days} days` };
+}
 
 /** A team is made when Pro starts, before anyone has named it; Settings › Team renames it. */
 export function teamNameFor(person: string | null | undefined): string {

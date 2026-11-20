@@ -10,7 +10,7 @@
 // in tests, and behind a plain HTTP server (gatewayServer).
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { PLANS, PLAN_TRIAL, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE, FILES_LAPSE_DAYS } from './plans.mjs';
+import { PLANS, PLAN_TRIAL, TEAM, teamFreeDays, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE, FILES_LAPSE_DAYS } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
 import { isKeyObject } from '../../shared/cloud-keys.mts';
@@ -776,12 +776,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       if (open?.status === 'open') return { url: open.url, where: 'checkout' };
     }
     // Paid for inside the team's free days, the card is charged when they end.
-    // Stripe trials nothing that ends within 48 hours, so a team that close pays now.
-    const trialEnds = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
-    // Stripe words the free time in whole days, rounded down, so 6 days 23 hours read "6 days free" beside
-    // the app's 7. It is given whole days, rounded up: never less than promised, and under a day more.
-    const left = trialEnds - now();
-    const trialEnd = left > 2 * DAY_MS ? now() + Math.ceil(left / DAY_MS) * DAY_MS : null;
+    const freeDays = teamFreeDays(Number(team.createdAt) + teamPlan.trialDays * DAY_MS, now());
+    const trialEnd = freeDays ? now() + freeDays * DAY_MS : null;
     const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${WEB_APP}/paid?plan=team`, cancelUrl: `${WEB_APP}/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
     return { url: made.url, where: 'checkout' };
