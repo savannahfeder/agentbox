@@ -118,9 +118,9 @@ export function SendSheet({ people, start, link, onCopy, onSend }: {
 export type GiveMode = 'help' | 'review' | 'give';
 
 const MODES: { id: GiveMode; label: string; detail: (first: string) => string; ask: string; go: (first: string) => string }[] = [
-  { id: 'help', label: 'Help with a step', detail: (f) => `Stays yours. ${f} talks to your agent, then hands it back.`, ask: 'What do you need help with?', go: (f) => `Ask ${f} to help` },
-  { id: 'review', label: 'Review it', detail: (f) => `${f} looks it over and sends back an answer.`, ask: 'What should they look at?', go: (f) => `Ask ${f} to review` },
-  { id: 'give', label: 'Hand it over', detail: (f) => `It becomes ${f}'s. This thread closes.`, ask: 'Add a note', go: (f) => `Give to ${f}` },
+  { id: 'help', label: 'Help', detail: (f) => `${f} can write to your agent, then hands it back to you.`, ask: 'What do you need help with?', go: (f) => `Ask ${f} to help` },
+  { id: 'review', label: 'Review', detail: (f) => `${f} reads it and tells you it looks good or what to change.`, ask: 'What should they look at?', go: (f) => `Ask ${f} to review` },
+  { id: 'give', label: 'Hand over', detail: (f) => `It becomes ${f}’s thread from now on.`, ask: 'Add a note', go: (f) => `Give to ${f}` },
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
@@ -142,11 +142,11 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help' }: {
   return (
     <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Bring in ${first}`}>
       <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
-      {onAsk && <div className="sh-modes" role="radiogroup" aria-label="What you want from them">
-        {MODES.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => setMode(x.id)}>
-          <span className="sh-mode-dot" aria-hidden="true" />
-          <span className="sh-mode-words"><b>{x.label}</b><span>{x.detail(first)}</span></span>
-        </button>)}
+      {onAsk && <div className="sh-modes">
+        <div className="sh-switch" role="radiogroup" aria-label="What you want from them">
+          {MODES.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => setMode(x.id)}>{x.label}</button>)}
+        </div>
+        <p className="sh-mode-says">{m.detail(first)}</p>
       </div>}
       {step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>}
       <textarea className="sh-note" autoFocus placeholder={m.ask} value={note} aria-label={m.ask} rows={2}

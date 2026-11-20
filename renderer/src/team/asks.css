@@ -14,18 +14,15 @@
 .msg:hover .msg-ask, .msg-ask:focus-visible { opacity: 1; }
 .msg-ask:hover { color: var(--text); border-color: var(--line-strong); }
 
-/* The three ways in the Ask or hand off sheet. Its parts keep their height: the menu's card would squeeze them. */
+/* The three ways in the Ask or hand off sheet, as one switch. Its parts keep their height: the menu's card would squeeze them. */
 .th-menu.sh-give { max-height: none; height: auto; overflow: visible; }
 .sh-give > * { flex: none; }
-.sh-modes { display: flex; flex-direction: column; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line); }
-.sh-mode { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px; text-align: left; font: inherit; color: var(--text-dim); background: none; border: 0; border-radius: 10px; cursor: pointer; }
-.sh-mode:hover { background: var(--bg-hover, var(--bg-selected)); }
-.sh-mode.on { background: var(--bg-selected); color: var(--text); }
-.sh-mode-dot { flex: none; width: 14px; height: 14px; margin-top: 2px; border: 1.5px solid var(--line-strong); border-radius: 50%; box-sizing: border-box; }
-.sh-mode.on .sh-mode-dot { border: 4px solid var(--accent, var(--text)); }
-.sh-mode-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sh-mode-words b { font-weight: 500; font-size: 13.5px; color: var(--text); }
-.sh-mode-words span { font-size: 12.5px; line-height: 17px; color: var(--text-faint); }
+.sh-modes { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.sh-switch { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px; background: var(--wash); border: 1px solid var(--line); border-radius: 10px; }
+.sh-mode { height: 28px; padding: 0 10px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 0; border-radius: 8px; cursor: pointer; }
+.sh-mode:hover { color: var(--text); }
+.sh-mode.on { background: var(--bg-selected); color: var(--text); box-shadow: 0 0 0 1px var(--line-strong) inset; }
+.sh-mode-says { margin: 0; font-size: 12.5px; line-height: 18px; color: var(--text-dim); }
 .sh-step { margin: 8px 14px 0; padding: 6px 10px; font-size: 12.5px; line-height: 18px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; background: var(--bg-raised); white-space: pre-wrap; max-height: 90px; overflow: hidden; }
 
 /* A helper on someone's thread: what was asked, and handing it back. */

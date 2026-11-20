@@ -313,17 +313,32 @@ describe('whom to ask', () => {
   });
 });
 
+// The founder on the first sheet, three radio rows each with a line under it:
+// "this is lowkey confusing". Now one switch of three short words, and one
+// sentence for the picked one only.
 describe('the sheet after you pick a person', () => {
-  it('offers help, a review or handing it over, and starts on help', () => {
-    const html = renderToStaticMarkup(h(GiveSheet, { to: { id: 'u', name: 'Theo Okafor' }, onGive() {}, onAsk() {} }));
-    expect(html).toContain('Help with a step');
-    expect(html).toContain('Review it');
-    expect(html).toContain('Hand it over');
+  const sheet = (o = {}) => renderToStaticMarkup(h(GiveSheet, { to: { id: 'u', name: 'Theo Okafor' }, onGive() {}, onAsk() {}, ...o }));
+  it('offers help, a review or handing it over as one switch, and starts on help', () => {
+    const html = sheet();
+    expect(html).toContain('role="radiogroup"');
+    expect((html.match(/role="radio"/g) ?? []).length).toBe(3);
+    expect(html).toMatch(/>Help<\/button>/);
+    expect(html).toMatch(/>Review<\/button>/);
+    expect(html).toMatch(/>Hand over<\/button>/);
     expect(html).toContain('Ask Theo to help');
+  });
+  it('says what the picked one does in one sentence, and only that one', () => {
+    const help = sheet();
+    expect(help).toContain('Theo can write to your agent, then hands it back to you.');
+    expect(help).not.toContain('from now on');
+    const give = sheet({ start: 'give' });
+    expect(give).toContain('It becomes Theo’s thread from now on.');
+    expect(give).not.toContain('write to your agent');
+    expect(sheet({ start: 'review' })).toContain('Theo reads it and tells you it looks good or what to change.');
   });
   it('offers only handing over when asking is not possible', () => {
     const html = renderToStaticMarkup(h(GiveSheet, { to: { id: 'u', name: 'Theo Okafor' }, onGive() {} }));
-    expect(html).not.toContain('Help with a step');
+    expect(html).not.toContain('role="radiogroup"');
     expect(html).toContain('Give to Theo');
   });
 });

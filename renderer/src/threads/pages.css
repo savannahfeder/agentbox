@@ -111,33 +111,29 @@
 .th-pr i:nth-child(1) { height: 5px; } .th-pr i:nth-child(2) { height: 8px; } .th-pr i:nth-child(3) { height: 11px; }
 .th-pr i.on { background: var(--text-dim); }
 .th-urgent { display: inline-grid; place-items: center; width: 12px; height: 12px; border-radius: var(--tag-radius); background: var(--accent); color: #1a1817; font: 700 9px var(--mono); margin-right: 8px; position: relative; top: 1px; flex: none; }
-/* THE ROW'S UNDERLINE RUNS THROUGH THESE MARKS (w-afb66e6661, 2026-10-02).
-   Her screenshot: an underlined title, then the people mark sitting in a gap in
-   the line, "which looks a little bit strange". A row's hover and selected
-   underline is a text-decoration on the title (styles.css, `.row .subject`),
-   and a decoration does not paint across an inline-BLOCK box: this file already
-   carries the same lesson for `.th-msg` and inline-flex. So all three marks are
-   plain inline, and the line is continuous from the first letter to the last
-   mark. */
-.th-lock { display: inline; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
+/* THE ROW'S UNDERLINE STOPS AT THE TITLE (w-f702d60afe). The underline is a
+   text-decoration on the title (styles.css, `.row .subject`). A picture never
+   takes one, so with plain inline marks the line broke at the icon and went on
+   under the count. A decoration is not drawn into an inline-block, so every
+   mark is one and the line ends where the words do. */
+.th-lock { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 /* WHO SEES A ROW (2026-10-02): only the unusual case wears a mark. The lock on
    a thread only you can see, two people on one a few chosen people see, and
    nothing on one the whole team sees, which is the default. */
-.th-shared { display: inline; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
+.th-shared { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -1px; }
 /* AND HOW WIDELY (w-41ff964775): a thread only a few people see carries their
    count beside the mark, in the mark's own faint colour. Raised 0.75px
    (2026-10-02): on the baseline it read too low, at 1.5px too high, so it
    sits halfway between. */
-/* PINNED (w-20323283e6): the same faint ink and the same plain inline box, so
-   the row's underline runs through it like the others. Its weight is in its
+/* PINNED (w-20323283e6): the same faint ink and box as the others. Its weight is in its
    head, so with its tip level with the lock's foot it still read as high; it
    hangs about two thirds of a pixel past it. */
-.th-pin { display: inline; margin-left: 9px; color: var(--text-faint); vertical-align: -3px; }
+.th-pin { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -3px; }
 /* A run in the cloud: the running mark is a cloud, pulsing with the dot.
    14px wide with 6px after it, so its title starts where a dot's does. */
 .th-st-cloud { display: inline; flex: none; margin-right: 6px; color: var(--accent); vertical-align: -1px; animation: th-breathe 1.6s ease-in-out infinite; }
 @keyframes th-breathe { 50% { opacity: .45; } }
-.th-shared-n { display: inline; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0.75px; }
+.th-shared-n { display: inline-block; margin-left: 3px; font: 10.5px var(--mono); color: var(--text-faint); vertical-align: 0.75px; }
 
 /* NOT STARTED, ON THE ROW (w-afb66e6661) was a boxed capital tag here. It is
    faint words after the title now, `.th-aside` below (w-4189a5c1a0): the box
