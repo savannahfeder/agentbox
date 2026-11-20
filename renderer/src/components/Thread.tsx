@@ -250,6 +250,11 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
     const id = (e as { fromId?: string }).fromId;
     return team && id ? team.byId.get(id) ?? null : null;
   };
+  // The name over a message in an agent's thread.
+  const whoSaid = (e: AgentTurn): ReactNode => (voiceOf(e) ? <><Face person={teammateOf(e)} agent />{voiceOf(e)}</> : teammateOf(e)
+    ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
+    : helperOf(e) ? <><Face person={helperOf(e)} />{firstName(helperOf(e))}</>
+    : e.who === 'you' ? 'You' : ((e as { from?: string }).from ?? nameOf?.(e) ?? name));
   // AN AGENT'S MESSAGE IS ITS OWN, on its owner's screen as well as anyone's.
   const voiceOf = (e: AgentEvent): string | null => {
     const { voice } = e as { voice?: AgentVoice };
@@ -551,10 +556,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
               <div className={`msg ${e.who === 'you' && !teammateOf(e) && !voiceOf(e) ? 'yours' : ''} ${turnStarts[n] ? 'turn' : ''} ${turnEnds[n] ? 'turn-end' : ''}${e.same && !e.resumed ? 'same' : ''} ${e.pending ? 'sending' : ''}`}>
                 {(!e.same || e.resumed) && (
                   <div className="msg-head">
-                    <span className="msg-who">{voiceOf(e) ? <><Face person={teammateOf(e)} agent />{voiceOf(e)}</> : teammateOf(e)
-                      ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
-                      : helperOf(e) ? <><Face person={helperOf(e)} />{firstName(helperOf(e))}</>
-                      : e.who === 'you' ? 'You' : ((e as { from?: string }).from ?? nameOf?.(e) ?? name)}</span>
+                    <span className="msg-who">{whoSaid(e)}</span>
                     {headFacts(e, when(e.at))}
                     <MessageKind e={e} />
                     {askAbout && e.who !== 'you' && !helperOf(e) && !voiceOf(e) && e.text && (

@@ -470,6 +470,7 @@ export function ItemThread({ askAbout = false, onOpenFileMark, item, engine, eng
   // The app's own note ("Shipped to main as …") goes under the agent's answer rather than in its place.
   const byApp = !!queue && appWrote(outcome, item.wrote);
   const newest = queue ? newestAnswer(events, byApp ? null : outcome) : null;
+  const helper = newest?.fromId ? team?.byId.get(newest.fromId) ?? null : null;
   // While an agent works, its sentences are steps, not answers: drawn from where this round began.
   const working = !!queue && !!session;
   // Answered since (a reply or a pick the agent is working on): drawn from that answer down.
@@ -513,8 +514,7 @@ export function ItemThread({ askAbout = false, onOpenFileMark, item, engine, eng
     return (
       <>
         {queueHead}
-        <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null}
-          person={newest.fromId && team?.byId.get(newest.fromId) ? { p: team.byId.get(newest.fromId)!, at: newest.at } : null} />
+        <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} person={helper ? { p: helper, at: newest.at } : null} />
         <TeammateOffer item={item} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
