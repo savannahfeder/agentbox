@@ -121,7 +121,7 @@ jobs:
           echo "$url" > "$RUNNER_TEMP/at/address"
           echo "The iPhone is at $url"
       - name: Name the address
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: iphone-at-${{ steps.open.outputs.name }}
           path: ${{ runner.temp }}/at/
