@@ -892,7 +892,7 @@ export function createTeamService({
       // ARCHIVED ONES COUNT AS HERE. Asked of the visible list, a shared
       // project you archived read as missing and was joined again beside it.
       listShared: () => { try { return listSharedProjects(store.listProducts({ includeArchived: true })); } catch { return []; } },
-      joinProject: (project) => joinSharedProject(accountRoot, project),
+      joinProject: (project) => joinSharedProject(accountRoot, project, state.people.find((p) => p.id === project.createdBy)?.name?.split(/\s+/)[0] || null),
       listCards,
       teamIdOf: () => state.team?.id ?? null,
       threadShare,
