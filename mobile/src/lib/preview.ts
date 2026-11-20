@@ -118,6 +118,8 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(45), source: 'agent', patch: { body: 'Try sign-up the way a new user would, on a slow connection.' } },
         { ts: at(30), source: 'agent', patch: { status: 'blocked', note: qualityNote } },
       ]),
+      // A thread that run opened for an agent, which its chat lists (a-thread-an-ai-teammate-opens-shows-in-its-chat-on-the-phone).
+      thread('agentbox', { id: 'w-t4d5e6f7a8', parent: 'w-t2b3c4d5e6', labels: [], title: 'Retry sign-up once when the connection drops', status: 'open', priority: 5, body: 'Sign-up gives up on a slow connection. Retry it once before showing an error.', createdAt: at(28), updatedAt: at(28), wrote: { body: agent(at(28)) } }, []),
       thread('film', { id: 'w-t1a2b3c4d5', title: 'Cut the launch film to 60 seconds', labels: ['founder', 'teammate:t-launch0001'], status: 'claimed', priority: 5, body: 'Cut the launch film to 60 seconds. Open on the inbox.', createdAt: at(21), updatedAt: at(1), wrote: { body: agent(at(21)) } }, [
         { ts: at(21), source: 'agent', patch: { body: 'Cut the launch film to 60 seconds. Open on the inbox.' } },
       ], { attached: PREVIEW_FILM_ATTACHED, live: { since: at(20), at: STILL_GOING, where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
@@ -301,6 +303,7 @@ export function previewGroups(now = Date.now()) {
   const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
   return {
     rpc(name: string, args: Record<string, string>) {
+      if (name === 'i_have_multiplayer') return true;
       if (name === 'my_rooms') return rooms;
       if (name === 'room_people') return members[args.r] ?? [];
       if (name === 'room_names') return (members[args.r] ?? []).map((id) => ({ person_id: id, name: profiles.find((p) => p.person_id === id)?.display_name ?? names[id], avatar_url: null, has_card: true }));

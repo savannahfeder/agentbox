@@ -198,7 +198,7 @@ describe('what the screens say', () => {
     expect(PRO_PITCH.paid).toEqual({ label: 'Then', price: '$40', per: 'a month', line: '400 cloud hours a month' });
     expect(PRO_PITCH.terms).toBe('Cancel any time.');
     const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
-    expect(split).toMatch(/PRO_PITCH\.trial/);
-    expect(split).toMatch(/PRO_PITCH\.paid/);
+    expect(split).toMatch(/offer\.trial/);
+    expect(split).toMatch(/offer\.paid/);
   });
 });

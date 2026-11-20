@@ -58,10 +58,9 @@ export function TeammateOffer({ item }: { item: WorkItem }) {
   const seenRef = useSeen(item, !!offer && !answered && !folded);
   if (!offer) return null;
   const card = offerCard(offer);
-  if (answered === 'made') {
-    return <p className="to-made"><span className="to-face to-face-small">{card.letter}</span>You made {aRole(offer.role)} for work like this.</p>;
-  }
-  if (answered === 'no' && !error) return null;
+  // Only the press itself is answered with this line; an offer made on an earlier visit, or answered on another thread, draws nothing.
+  if (pressed === 'made') return <p className="to-made"><span className="to-face to-face-small">{card.letter}</span>You made {aRole(offer.role)} for work like this.</p>;
+  if (answered && !error) return null;
   const answer = (make: boolean) => {
     setError(null);
     setPressed(make ? 'made' : 'no');

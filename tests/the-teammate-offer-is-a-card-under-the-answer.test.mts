@@ -103,10 +103,9 @@ describe('the card', () => {
     expect(renderToStaticMarkup(h(TeammateOffer, { item: row({ role: 'Marketer', why: '', answered: 'no' }) }))).toBe('');
   });
 
-  it('once made, says so in one line instead of the card', () => {
-    const html = renderToStaticMarkup(h(TeammateOffer, { item: row({ role: 'Marketer', why: '', answered: 'made' }) }));
-    expect(html).not.toContain('to-card');
-    expect(html).toContain('You made a Marketer for work like this.');
+  // The one line saying so answers the press only (tests/a-teammate-made-long-ago-leaves-no-line-under-the-answer).
+  it('once made, draws no card', () => {
+    expect(renderToStaticMarkup(h(TeammateOffer, { item: row({ role: 'Marketer', why: '', answered: 'made' }) }))).toBe('');
   });
 
   it('is waiting only while unanswered on a thread that did not go to a teammate whose job it is', () => {
