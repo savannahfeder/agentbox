@@ -15,6 +15,7 @@ import path from 'node:path';
 import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mts';
 import { createThreadShare } from './thread-share.mts';
 import { createAsks, type TellThread } from './asks.mts';
+import { changePath } from '../code-change.mts';
 import { askBody, askOf, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
@@ -1342,11 +1343,15 @@ export function createTeamService({
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const title = String(row.label || row.title || 'A thread');
       const link = threadLink(state.me.id, id);
+      // The code it changed lives only on this computer; it goes with the ask so they can read it.
+      const change = machineryPath(product.dir, changePath(id));
+      const files = fs.existsSync(change) ? [{ name: `${shortTitle(title) || 'the'} change.change`, srcPath: change }] : [];
       const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,
         body: link ? sentWords(title, link, brief) : brief,
         priority: row.priority,
+        files,
         ask: {
           kind, owner: state.me.id, thread: id, product: slug,
           ...(String(step).trim() ? { step: String(step).trim().slice(0, 1200) } : {}),

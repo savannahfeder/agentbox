@@ -26,6 +26,8 @@ import { GIVEN_TASK, whatATeammateMaySet } from '../shared/team-rules.mts';
 import { pickFields } from '../shared/work-items.mts';
 import { askIGave, askOnMe, asksOnThread, handedBackAsks, handedBackWords, helpAskOpen } from '../shared/thread-asks.mts';
 import { GiveSheet } from '../renderer/src/threads/SharePanel.tsx';
+import { machineryPath } from '../main/store/home.mts';
+import { changePath } from '../main/code-change.mts';
 
 async function aMac(cloud, personId, tellThread) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-a-teammate-'));
@@ -108,6 +110,25 @@ describe('an ask for help', () => {
 });
 
 describe('an ask for a review', () => {
+  // Round one of the team test: "Reviewer cannot access health diff from handed-off task". The change lived only on the owner's computer.
+  it('carries the change the thread made, so the reviewer can read it', async () => {
+    disk.setLineAuthor(sam.personId);
+    const t = sam.store.composeItem('api', { title: 'Add a health endpoint', body: 'Add /health.' });
+    const dir = sam.store.listProducts().find((p) => p.slug === 'api').dir;
+    const file = machineryPath(dir, changePath(t.id));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ item: t.id, files: [{ path: 'src/health.js', hunks: [{ rows: [['+', 'export const ok = true;']], plus: 1, minus: 0 }], plus: 1, minus: 0 }], plus: 1, minus: 0 }));
+    await sam.service.syncNow();
+    await sam.service.askTeammate({ product: 'api', id: t.id, to: theo.personId, kind: 'review' });
+    await both();
+    expect(theTask().body).toMatch(/\(attachments\/[\w.-]*Add-a-health-endpoint-change\.change\)/);
+  });
+
+  it('carries nothing when the thread changed no code', async () => {
+    await asked('review');
+    expect(theTask().body).not.toContain('.change)');
+  });
+
   it('does not pass their comments to the agent, and brings their verdict back', async () => {
     const t = await asked('review');
     disk.setLineAuthor(theo.personId);
