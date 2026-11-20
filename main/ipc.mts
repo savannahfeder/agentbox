@@ -61,6 +61,8 @@ import { teamForWindow } from './team/index.mts';
 import { isOnTeam } from '../shared/rooms-on.mts';
 import { liveForTheWholeTeam, liveRoomFor } from './team/live-room.mts';
 import { sendFileToChat, TEAM_CHAT } from './team/file-to-chat.mts';
+import { askedPatch, askedSaid } from '../shared/thread-ask.mts';
+import { threadLink } from '../shared/thread-link.mts';
 import { openForThePerson } from './opens-a-program.mts';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
@@ -2954,7 +2956,14 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
         if (!found.ok) return { ok: false, error: found.error || `${String(src)} is not on this computer.` };
         files.push(found.path);
       }
-      const roomId = await sendFileToChat({ rooms, me, to, toName: person?.name ?? '', files, note: String(arg.note ?? ''), want: arg.want === 'review' ? 'review' : null });
+      const want = arg.want === 'review' ? 'review' : null;
+      const note = String(arg.note ?? '');
+      // A review of a thread's file asks about the thread, which waits on them as a thread review does.
+      const item = want && to !== TEAM_CHAT && typeof arg.thread === 'string' && typeof arg.product === 'string' ? store.readItem(arg.product, arg.thread) : null;
+      const link = item ? threadLink(me, item.id) : null;
+      const about = item && link ? { title: String(item.label || item.title || 'A thread'), link } : null;
+      const roomId = await sendFileToChat({ rooms, me, to, toName: person?.name ?? '', files, note, want, about });
+      if (about) store.threadEdit(arg.product as string, item!.id, askedPatch([to], askedSaid('review', team.firstNameOf(to) || 'them', note), Date.now(), 'review'));
       push();
       return { ok: true, roomId };
     } catch (err) {

@@ -4,27 +4,34 @@
 // mockups", approved empty-state-a.png, sent Lena a note on it ("Sent to
 // Lena"), and closed the picture. The thread still read "Waits on Priya" and
 // nothing on the page sent the review back, so she could not tell whether
-// Lena had it. While the owner's review ask waits on you, the top of their
-// thread now holds a box for your notes with Approve and Send back with N
-// notes (your open notes on its files). Either sends the verdict as your
-// comment, which ends the owner's wait (a-review-sent-back-ends-the-wait-...),
-// and the box becomes the line that says it went back. Measured on the panel
-// drawn on its own and on the page that holds it.
+// Lena had it. While the owner's review ask waits on you, the thread's reply
+// box, at its foot, says the ask with the owner's note and offers Approve and
+// Send back with N notes (your open notes on its files). Either sends the
+// verdict as your comment, which ends the owner's wait
+// (a-review-sent-back-ends-the-wait-...), and the header then says it went.
+//
+// The first version sat at the top with a solid white Approve; the design
+// review of the rerun asked for the reply box's own place and shape, outline
+// buttons, a header that reads as the ask to you rather than "Waits on Priya",
+// and no "Continue it yourself" while the review is yours. Measured on the
+// box drawn on its own and on the page that holds it.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SendBack, reviewIsMine, sentBackSaid } from '../renderer/src/threads/SendBack.tsx';
+import { SendBack, reviewAskedOf, reviewIsMine, sentBackSaid } from '../renderer/src/threads/SendBack.tsx';
 import { personWait } from '../shared/thread-waits.mts';
+import { askedSaid } from '../shared/thread-ask.mts';
+import { askedNote } from '../shared/review-sent-back.mts';
 
-const draw = (o: { notes?: number; open?: boolean }) =>
-  renderToStaticMarkup(h(SendBack, { owner: 'Lena', notes: o.notes ?? 0, open: o.open ?? true, onSend: async () => true }));
+const draw = (notes = 0) => renderToStaticMarkup(h(SendBack, { owner: 'Lena', note: 'Check the v2 empty state', notes, onSend: async () => true }));
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map((m) => ({ words: m[1], off: /disabled=""/.test(m[0]) }));
 
 describe('whose review it is', () => {
-  const card = { blockedBy: [{ id: personWait('p-priya'), title: null, want: 'review' as const }] };
-  it('the person the owner\'s review ask waits on', () => {
+  const card = { blockedBy: [{ id: personWait('p-priya'), title: null, want: 'review' as const, note: 'Check the v2' }] };
+  it('the person the owner\'s review ask waits on, with the owner\'s note', () => {
     expect(reviewIsMine(card, 'p-priya')).toBe(true);
+    expect(reviewAskedOf(card, 'p-priya')).toEqual({ note: 'Check the v2' });
   });
   it('must NOT be someone else, a help ask, or a plain wait', () => {
     expect(reviewIsMine(card, 'p-theo')).toBe(false);
@@ -32,19 +39,27 @@ describe('whose review it is', () => {
     expect(reviewIsMine({ blockedBy: [{ id: personWait('p-priya'), title: null }] }, 'p-priya')).toBe(false);
     expect(reviewIsMine(card, null)).toBe(false);
   });
+  it('the card carries the note the owner wrote with the ask', () => {
+    expect(askedNote(askedSaid('review', 'Priya', 'Check the v2'))).toBe('Check the v2');
+    expect(askedNote(askedSaid('review', 'Priya', ''))).toBe('');
+  });
 });
 
-describe('the send-back box', () => {
-  it('offers Approve and Send back with her notes counted: the reported case', () => {
-    const html = draw({ notes: 2 });
+describe('the reviewer\'s reply box', () => {
+  it('says the ask and offers Approve and Send back with her notes counted: the reported case', () => {
+    const html = draw(2);
+    expect(html).toContain('Lena asked you to review and send back: Check the v2 empty state');
     expect(html).toContain('Notes for Lena');
     expect(buttons(html)).toEqual([{ words: 'Approve', off: false }, { words: 'Send back with 2 notes', off: false }]);
   });
   it('cannot send back with no notes to send', () => {
-    expect(buttons(draw({ notes: 0 }))).toEqual([{ words: 'Approve', off: false }, { words: 'Send back with notes', off: true }]);
+    expect(buttons(draw(0))).toEqual([{ words: 'Approve', off: false }, { words: 'Send back with notes', off: true }]);
   });
-  it('is not there when the review is not yours', () => {
-    expect(draw({ open: false })).toBe('');
+  it('is the reply box\'s shape, with no filled button', () => {
+    const html = draw(1);
+    expect(html).toContain('class="th-comment tp-send-back"');
+    expect(html).toContain('class="tp-comment-box"');
+    expect(html).not.toContain('is-primary');
   });
   it('says plainly that it went back', () => {
     expect(sentBackSaid('approved', 0, 'Lena')).toBe('Approved and sent back to Lena');
@@ -55,13 +70,18 @@ describe('the send-back box', () => {
 
 describe('the thread page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-  it('holds the box at the top while the review is yours, counting your open notes', () => {
-    expect(page).toMatch(/<SendBack key=\{threadId\} owner=\{owner\} notes=\{myOpenNotes\} open=\{reviewIsMine\(card, team\?\.me \?\? null\)\}/);
-    expect(page.indexOf('<SendBack')).toBeLessThan(page.indexOf('className="tp-grid"'));
+  it('puts the box where the reply box goes, at the foot', () => {
+    expect(page).toMatch(/\{reviewing \? \(\s*<SendBack owner=\{owner\} note=\{review\.note\} notes=\{myOpenNotes\}/);
+    expect(page.indexOf('<SendBack')).toBeGreaterThan(page.indexOf('built.outcome && ('));
   });
-  it('the box is rounded', () => {
+  it('heads the page with the ask to you, then that it went', () => {
+    expect(page).toContain("said={reviewing ? reviewAskWords(owner, '') : review ? sentBack : null}");
+  });
+  it('does not offer to take the thread while the review is yours', () => {
+    expect(page).toContain('{onContinue && !reviewing && canContinue(');
+  });
+  it('the box is not a white block', () => {
     const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
-    expect(css).toMatch(/\.tp-send-back \{[^}]*border-radius/);
-    expect(css).toMatch(/\.tp-send-back button \{[^}]*border-radius/);
+    expect(css).not.toMatch(/\.tp-send-back[^{]*\{[^}]*background: var\(--text\)/);
   });
 });

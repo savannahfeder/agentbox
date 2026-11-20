@@ -34,3 +34,7 @@ export function cameBack(first: string, text: string | null | undefined): string
   if (v.verdict === 'approved') return `${first} approved`;
   return v.notes > 0 ? `${first} sent it back with ${notesWord(v.notes)}` : `${first} sent it back`;
 }
+
+/** The owner's note in what their thread says it asked (thread-ask askedSaid). */
+export const askedNote = (said: string | null | undefined): string =>
+  /^(?:Asked .+? for help with this step|Sent to .+? to review and send back): ([\s\S]*)$/.exec(String(said ?? ''))?.[1].trim() ?? '';

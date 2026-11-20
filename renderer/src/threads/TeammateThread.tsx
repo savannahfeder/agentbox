@@ -27,7 +27,7 @@ import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, File
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
-import { SendBack, reviewIsMine } from './SendBack';
+import { SendBack, reviewAskedOf, reviewAskWords } from './SendBack';
 import { answersTheStep, stepLine } from '../../../shared/thread-ask.mts';
 import { parseOptions } from '../format';
 import { revealLine } from '../reveal-line';
@@ -166,9 +166,15 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
     setReread((n) => n + 1);
     following?.follow(card);
   };
-  const sendBack = async (text: string) => {
+  // Asked to review it, the reply box sends a verdict; what it said stands until their copy clears the wait.
+  const review = reviewAskedOf(card, team?.me ?? null);
+  const [sentBack, setSentBack] = useState<string | null>(null);
+  useEffect(() => { setSentBack(null); }, [personId, threadId]);
+  const reviewing = !!review && !sentBack;
+  const sendBack = async (text: string, said: string) => {
     const out = await api.teamComment({ personId, threadId, text });
     if (!out?.ok) { onNotice(out?.error ?? 'That did not send.'); return false; }
+    setSentBack(said);
     setReread((n) => n + 1);
     return true;
   };
@@ -215,7 +221,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
             onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
             {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
           </button>}
-          {onContinue && canContinue(work, card, team?.me ?? null) && (
+          {onContinue && !reviewing && canContinue(work, card, team?.me ?? null) && (
             <button type="button" className="th-follow" onClick={onContinue}
               title={`Start a thread of your own with ${owner}'s conversation and files.`}>
               Continue it yourself
@@ -227,8 +233,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
       <header className="tp-top">
         <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
         {card.title && <h1 className="th-card-title">{card.title}</h1>}
-        {card.visible && <TeammateStanding card={card} person={person} now={now} />}
-        <SendBack key={threadId} owner={owner} notes={myOpenNotes} open={reviewIsMine(card, team?.me ?? null)} onSend={sendBack} />
+        {card.visible && <TeammateStanding card={card} person={person} now={now} said={reviewing ? reviewAskWords(owner, '') : review ? sentBack : null} />}
       </header>
       <div className="tp-grid">
         <section className="th-work" aria-label="The conversation">
@@ -243,7 +248,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
               {md(built.outcome.text)}
             </div>
           )}
-          <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+          {reviewing ? (
+            <SendBack owner={owner} note={review.note} notes={myOpenNotes} face={<Face person={team?.me ? team.byId.get(team.me) : null} me />} onSend={sendBack} />
+          ) : <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             {options.length > 0 && <div className="tp-options" role="group" aria-label="The agent's options">
               {options.map((o) => <button key={o.n} type="button" disabled={sending} onClick={() => void send(optionWithNote(o.text.replace(/\s*\(recommended\)\s*$/i, ''), draft))}>{o.n}. {o.text}</button>)}
             </div>}
@@ -253,7 +260,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
                 onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
               <button type="submit" disabled={!draft.trim() || sending}>{helping ? `Send to ${owner}'s agent` : `Send to ${owner}`}</button>
             </div>
-          </form>
+          </form>}
         </section>
         <aside className="tp-side" aria-label="About this thread">
           <TeammateCard card={card} person={person} files={files} />

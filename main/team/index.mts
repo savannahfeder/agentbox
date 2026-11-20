@@ -44,7 +44,7 @@ import { readRunTails } from '../run-traces.mts';
 import { machineryPath } from '../store/home.mts';
 import { createRooms } from './rooms.mts';
 import { isOnTeam } from '../../shared/rooms-on.mts';
-import { noticeEndedWaits } from './waits.mts';
+import { chatsForReviews, noticeEndedWaits } from './waits.mts';
 import { handOverDepartures } from './departures.mts';
 import { handedChange } from './handed-change.mts';
 import type { Departure } from './departures.mts';
@@ -612,6 +612,7 @@ export function createTeamService({
         if (state.team) {
           noticeEndedWaits({
             products: products(), read: (p: TeamProduct) => disk.readWorkItems(p.dir), cards, now: now(), me: state.me?.id ?? null,
+            chats: chatsForReviews(rooms?.state()),
             nameOf: (id: string) => people.find((p) => p.id === id)?.name ?? 'Someone',
             write: (dir: string, id: string, patch: Record<string, unknown>) => disk.updateWorkItem(dir, id, patch, { source: 'system' }),
           });

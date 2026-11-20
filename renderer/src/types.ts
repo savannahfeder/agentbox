@@ -495,7 +495,7 @@ export interface ThreadCard {
   problem: string | null;
   progress: string | null;
   solution: string | null;
-  blockedBy: { id: string; title: string | null; want?: 'help' | 'review' }[];
+  blockedBy: { id: string; title: string | null; want?: 'help' | 'review'; note?: string }[];
   blocks: { id: string; title: string | null }[];
   /** Whom it reaches: the chosen people, or null for the whole team. */
   people: string[] | null;

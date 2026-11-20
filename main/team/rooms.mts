@@ -7,7 +7,7 @@ import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
 import type { WallCard, TeamCardLike } from '../../shared/room-cards.mts';
 import type { AgentHoursSummary } from '../../shared/agent-hours.mts';
-import { groupFileRow, groupRow } from '../../shared/room-needs-you.mts';
+import { groupFileRow, groupRow, reviewStillAsked } from '../../shared/room-needs-you.mts';
 import type { GroupRow } from '../../shared/room-needs-you.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mts';
 import { carryIntoRoom } from './carry-files.mts';
@@ -377,6 +377,7 @@ export function createRooms({
           const on = askedThread(m.body);
           return !!on && talk.some((t) => t.kind === 'comment' && t.by === who && t.owner === on.owner && t.threadId === on.id && (t.at ?? 0) > m.at);
         },
+        stillAsked: (m) => reviewStillAsked(m, { me: who, cards: t.cards ?? [], marks: fileMarks.get(r.id) ?? [] }),
       });
       if (row) mentions.push(row);
       const fileRow = groupFileRow({ roomId: r.id, roomName: r.name, marks: fileMarks.get(r.id) ?? [], me: who, myName: me()?.name ?? null, doneAt: p.doneAt[r.id] ?? 0, nameOf });

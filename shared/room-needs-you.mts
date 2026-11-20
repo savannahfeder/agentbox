@@ -1,7 +1,8 @@
 // WHICH GROUP MESSAGES ARE TO YOU, AND THE ONE ROW A GROUP PUTS IN NEEDS YOU.
 // tests/a-group-message-to-you-reaches-needs-you-until-you-answer.
 import { fileNewsFor, fileNewsLine, marksOf } from './artifact-marks.mts';
-import { isAsk } from './thread-ask.mts';
+import { WANT_WORDS, askedThread, isAsk } from './thread-ask.mts';
+import { personWait } from './thread-waits.mts';
 
 /** Someone in a group, by the name others call them. */
 export interface RoomNamed { id: string; name?: string | null }
@@ -122,6 +123,9 @@ export function addressedByOpening(body: string | null | undefined, people: read
   return [...out];
 }
 
+// A file put in a chat is kept under a random prefix (main/team/file-to-chat.mts).
+export const shownRoomFile = (stored: string): string => stored.replace(/^[0-9a-f]{8}-(?=.)/, '');
+
 // The same row for a file in the group: a comment on my file, naming me or
 // answering me, or an approval of my file. Opening the file or Mark done ends it.
 export function groupFileRow({ roomId, roomName, marks = [], me, myName = null, doneAt = 0, nameOf = () => '' }: {
@@ -140,7 +144,7 @@ export function groupFileRow({ roomId, roomName, marks = [], me, myName = null, 
   if (!newest) return null;
   return {
     id: `room-mention:${roomId}`, messageId: newest.id, roomId, roomName, by: newest.by, byName: nameOf(newest.by),
-    body: fileNewsLine(news, () => '')!.trim(), at: newest.ts, thread: null, unread: true,
+    body: fileNewsLine(news.map((n) => ({ ...n, file: shownRoomFile(n.file) })), () => '')!.trim(), at: newest.ts, thread: null, unread: true,
     note: newest.kind === 'approved' ? null : newest.on ?? newest.id, file: newest.file,
   };
 }
@@ -150,7 +154,7 @@ export function groupFileRow({ roomId, roomName, marks = [], me, myName = null, 
 // my writing in the group, my comment or approval on a file in it
 // (`answeredAt`) or my Mark done (`doneAt`) ends it, never reading.
 // It says the group's newest words, so a thread reply moves it and says so.
-export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, people = [], pair = false, doneAt = 0, answeredAt = 0, readAt = 0, nameOf = () => '', answeredOnItsThread = () => false }: {
+export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, people = [], pair = false, doneAt = 0, answeredAt = 0, readAt = 0, nameOf = () => '', answeredOnItsThread = () => false, stillAsked = () => false }: {
   roomId: string;
   roomName: string;
   messages?: readonly RoomSaid[];
@@ -164,6 +168,8 @@ export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, 
   nameOf?: NameOf;
   /** An ask (shared/thread-ask.mts) I answered on the thread it is about. */
   answeredOnItsThread?: (m: RoomSaid) => boolean;
+  /** A review asked of me that I have not sent back: it stays whatever I wrote since. */
+  stillAsked?: (m: RoomSaid) => boolean;
 }): GroupRow | null {
   const pool = [...new Map([...mentioned, ...messages].map((m) => [m.id, m])).values()].sort((a, b) => a.at - b.at);
   const mine = pool.filter((m) => m.by === me && !m.deleted);
@@ -172,7 +178,7 @@ export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, 
   const settled = Math.max(doneAt, answeredAt, answers.at(-1)?.at ?? 0);
   const myRoots = new Set(mine.filter((m) => !m.inReplyTo).map((m) => m.id));
   const myThreads = new Set([...myRoots, ...mine.map((m) => m.inReplyTo).filter(Boolean)]);
-  const fresh = pool.filter((m) => m.by !== me && !m.deleted && m.at > settled && !answeredOnItsThread(m));
+  const fresh = pool.filter((m) => m.by !== me && !m.deleted && (m.at > settled || stillAsked(m)) && !answeredOnItsThread(m));
   type Ids = readonly (string | null)[];
   const toMe = (m: RoomSaid): boolean => pair || ((m.mentions ?? []) as Ids).includes(me) || (mentionsIn(m.body, people) as Ids).includes(me)
     || (addressedByOpening(m.body, people) as Ids).includes(me) || (!!m.inReplyTo && myThreads.has(m.inReplyTo));
@@ -183,4 +189,21 @@ export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, 
     thread: !newest.inReplyTo ? null : myRoots.has(newest.inReplyTo) ? 'yours' : 'theirs',
     unread: newest.at > readAt,
   };
+}
+
+/**
+ * A review asked of me in a chat that I have not sent back: its thread's card
+ * still waits on me for it, and I have put no note or approval on its files
+ * since (shared/review-sent-back.mts, main/team/waits.mts reviewedInChat).
+ */
+export function reviewStillAsked(m: RoomSaid, { me, cards, marks }: {
+  me: string | null;
+  cards: readonly { personId?: string; threadId?: string; blockedBy?: unknown }[];
+  marks: readonly RoomMarkLike[];
+}): boolean {
+  const on = m.by !== me && m.body.startsWith(`${WANT_WORDS.review}: `) ? askedThread(m.body) : null;
+  if (!on || !me) return false;
+  const card = cards.find((c) => c.personId === on.owner && c.threadId === on.id);
+  const waits = Array.isArray(card?.blockedBy) && card.blockedBy.some((b: { id?: unknown; want?: unknown } | null) => b?.id === personWait(me) && b?.want === 'review');
+  return waits && !marks.some((k) => k.by === me && k.at > m.at);
 }

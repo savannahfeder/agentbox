@@ -6,7 +6,34 @@ import { endedWaits } from '../../shared/thread-waits.mts';
 import { endedTaskBlocks } from '../../shared/team-tasks.mts';
 import type { TeamProduct } from './index.mts';
 import type { TaskRow } from '../../shared/team-tasks.mts';
-import type { WaitCard } from '../../shared/thread-waits.mts';
+import type { WaitCard, WaitingItem } from '../../shared/thread-waits.mts';
+import { askedThread } from '../../shared/thread-ask.mts';
+import { sentBackWords } from '../../shared/review-sent-back.mts';
+
+/** A chat as these rules read it: its messages and the marks on its files. */
+export interface ReviewChat {
+  messages: readonly { by: string | null; body: string; at: number; deleted?: boolean }[];
+  marks: readonly { by: string | null; mark: object; at: number }[];
+}
+
+/**
+ * A review of a thread's files asked in a chat (main/team/file-to-chat.mts)
+ * and answered there with notes or an approval on those files: what came back,
+ * in the words of the verdict's comment (shared/review-sent-back.mts).
+ */
+export function reviewedInChat(chats: readonly ReviewChat[], me: string | null, item: Pick<WaitingItem, 'id'>, person: string): string | null {
+  for (const chat of chats) {
+    const ask = chat.messages.filter((m) => m.by === me && !m.deleted && askedThread(m.body)?.id === item.id).at(-1);
+    if (!ask) continue;
+    const files = new Set([...ask.body.matchAll(/\]\(attachments\/([^)\s]+)\)/g)].map((f) => f[1]));
+    const theirs = chat.marks.filter((m) => m.by === person && m.at > ask.at).map((m) => m.mark as { do?: unknown; file?: unknown; text?: unknown })
+      .filter((m) => files.has(String(m.file ?? '').replace(/#\d+$/, '')));
+    const notes = theirs.filter((m) => m.do === 'note');
+    if (notes.length) return sentBackWords({ verdict: 'changes', notes: notes.length, note: String(notes[0].text ?? '') });
+    if (theirs.some((m) => m.do === 'approve')) return sentBackWords({ verdict: 'approved', notes: 0, note: '' });
+  }
+  return null;
+}
 
 export type WaitRow = TaskRow & { id: string };
 
@@ -22,7 +49,11 @@ const lastWordIn = (rows: WaitRow[], person: string): { ts: number; text: string
   return last;
 };
 
-export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me = null }: {
+/** The chats in the rooms' state, for reviewedInChat. */
+export const chatsForReviews = (rooms: { messages?: Record<string, ReviewChat['messages']>; fileMarks?: Record<string, ReviewChat['marks']> } | null | undefined): ReviewChat[] =>
+  Object.keys(rooms?.messages ?? {}).map((id) => ({ messages: rooms!.messages![id] ?? [], marks: rooms?.fileMarks?.[id] ?? [] }));
+
+export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me = null, chats: talks = [] }: {
   products: TeamProduct[];
   read: (product: TeamProduct) => WaitRow[];
   write: (dir: string, id: string, patch: Record<string, unknown>) => unknown;
@@ -30,6 +61,7 @@ export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me
   nameOf: (id: string) => string;
   now: number;
   me?: string | null;
+  chats?: readonly ReviewChat[];
 }): number {
   const chats = products.filter((p) => p.team?.direct);
   // `chats` holds only projects with a team record.
@@ -48,7 +80,7 @@ export function noticeEndedWaits({ products, read, write, cards, nameOf, now, me
     // does not, so a giver's copy clearing first would leave the holder untold.
     const ended = product.team?.direct
       ? (me ? endedTaskBlocks(items, { items: everything, cards, me, lastWordFrom, nameOf }) : [])
-      : endedWaits(items, { items, cards, lastWordFrom, lastWordsFrom, nameOf, now });
+      : endedWaits(items, { items, cards, lastWordFrom, lastWordsFrom, nameOf, now, reviewedIn: (item, person) => reviewedInChat(talks, me, item, person) });
     for (const { item, said } of ended) {
       write(product.dir, item.id, { blockedBy: [], waitEnded: { said, at: now } });
       told += 1;

@@ -174,12 +174,16 @@ export function ThreadCrumb({ from, name, audience = null, onBack, onRename, thr
 /* ----------------------------------------------------------- a teammate's */
 
 /** What a teammate's thread waits on, and from whom: the line under its name. */
-export function TeammateStanding({ card, person, now = Date.now() }: { card: ThreadCard; person: Person | null; now?: number }) {
+export function TeammateStanding({ card, person, now = Date.now(), said = null }: {
+  card: ThreadCard; person: Person | null; now?: number;
+  /** What it is to you, in place of its state: an ask to you, or that you answered it. */
+  said?: string | null;
+}) {
   const team = useContext(TeamContext);
   const owner = firstName(person) || 'Someone';
   const waits = card.state !== 'done' ? linkWords(card.blockedBy, team?.byId) : null;
-  const word = card.shippedAt ? 'Shipped' : waits ? `Waits on ${waits}` : card.state === 'waiting' ? `Waiting on ${owner}` : STATE_WORD[card.state];
-  const line = card.shippedAt ? null : standingLine(card.state, owner, waits);
+  const word = said ?? (card.shippedAt ? 'Shipped' : waits ? `Waits on ${waits}` : card.state === 'waiting' ? `Waiting on ${owner}` : STATE_WORD[card.state]);
+  const line = said || card.shippedAt ? null : standingLine(card.state, owner, waits);
   return (
     <p className="tp-standing">
       <Glyph kind={stateGlyph(card.state, false)} />
