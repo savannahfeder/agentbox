@@ -35,7 +35,7 @@ describe('the email', () => {
     expect(mail.text.split('\n')[2]).toBe('To join:');
   });
   it('has a button that goes where Agentbox is downloaded, which is a page that exists', () => {
-    expect(mail.html).toContain(`<a href="${DOWNLOAD}"`);
+    expect(mail.html).toContain('<a href="https://app.agentbox.ac/invited"');
     expect(mail.html).toContain('>Join Northwind</a>');
   });
   // The first drawing was a default-looking email: "looks visually extremely ugly". Five were drawn in

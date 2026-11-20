@@ -29,6 +29,15 @@ export const PLAN_TRIAL = Object.freeze({ days: 7, hours: 50 });
 // from PLANS, which are one person's.
 export const TEAM = Object.freeze({ trialDays: 7, trialHoursPerMember: 50, hoursPerSeat: 400, dollarsPerSeat: 40, filesGBPerSeat: 100 });
 
+/** The free days a team's checkout gives now, for a trial ending at `endsAt`. Stripe trials nothing that
+ *  ends within 48 hours, and words the free time in whole days rounded down, so they are whole days rounded
+ *  up: never fewer than the app said. The checkout and the plan page that offers it both use this. */
+export function teamFreeDays(endsAt, now) {
+  const DAY = 24 * 60 * 60_000;
+  const left = endsAt - now;
+  return left > 2 * DAY ? Math.ceil(left / DAY) : 0;
+}
+
 // Files in the cloud are a paid plan's (the owner, 2026-11-09): a free plan
 // keeps them on the computer, and a lapsed plan's are deleted after this,
 // once the app has had the time to bring them back down.

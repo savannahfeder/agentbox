@@ -36,6 +36,7 @@ function world() {
   const named = JSON.stringify({ path: '.claude/skills', url: remote });
   const app = path.join(dir, 'app');
   put(path.join(app, '.agentbox/private.json'), named);
+  fs.symlinkSync(path.resolve(import.meta.dirname, '..', 'scripts'), path.join(app, 'scripts'));
   git(dir, 'clone', '-q', remote, path.join(app, '.claude/skills'));
   git(path.join(app, '.claude/skills'), 'config', 'commit.gpgsign', 'false');
   const folder = path.join(dir, 'task');
