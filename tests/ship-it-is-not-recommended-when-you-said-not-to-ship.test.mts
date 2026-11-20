@@ -47,6 +47,8 @@ describe('when the agent says the change is not ready', () => {
     expect(agentSaidNotReady('The payment route is not production-ready. Persistence must come first.')).toBe(true);
     expect(agentSaidNotReady('It is not ready to ship until retries are covered.')).toBe(true);
     expect(agentSaidNotReady('It is not yet ready to merge.')).toBe(true);
+    // Round eight: "shared durable storage is required before production and nothing shipped".
+    expect(agentSaidNotReady('Shared durable storage is required before production, so nothing shipped.')).toBe(true);
   });
   it('does not hold it for a change that is ready, or one committed without pushing', () => {
     expect(agentSaidNotReady('Committed on the branch without pushing. Ready to ship.')).toBe(false);

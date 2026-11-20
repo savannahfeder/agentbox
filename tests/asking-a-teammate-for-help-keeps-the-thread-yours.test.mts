@@ -83,7 +83,8 @@ describe('an ask for help', () => {
     expect(sam.store.readItem('api', t.id).status).not.toBe('done');
     // The line over the message already says who asked and what for, so the words do not say it again.
     // Round seven: Theo wrote his instructions in this task's reply box, which reaches Sam, not the agent.
-    expect(task.body).toContain("Write to Sam's agent on Sam's thread. A reply here goes to Sam.");
+    // Round eight: Sam read his own sent ask as an instruction to himself. Addressed by name, it reads as sent.
+    expect(task.body).toContain("Theo, write to Sam's agent on Sam's thread. A reply here goes to Sam.");
     expect(task.body).not.toMatch(/asked you to help/);
   });
 

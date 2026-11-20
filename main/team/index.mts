@@ -1349,7 +1349,7 @@ export function createTeamService({
       // The code it changed and the files it made live only on this computer; they go with the ask so they can be read.
       const change = machineryPath(product.dir, changePath(id));
       const files = [...(fs.existsSync(change) ? [{ name: `${shortTitle(title) || 'the'} change.change`, srcPath: change }] : []), ...briefOfThread(row, product).files];
-      const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', note: String(note), step: String(step) });
+      const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', helper: person.name?.split(/\s+/)[0] || null, note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,
         body: link ? sentWords(title, link, brief) : brief,
