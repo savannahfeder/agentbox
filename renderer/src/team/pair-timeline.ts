@@ -31,6 +31,8 @@ export type PairOpens =
   | { to: 'file'; owner: string; threadId: string; file: string; note: string };
 
 export type PairKind = 'message' | 'task' | 'handoff' | 'help' | 'review' | 'back' | 'reply' | 'comment' | 'note';
+/** The kinds that are a thread passing between the two, drawn as a card that opens it. */
+export const THREAD_KINDS: ReadonlySet<PairKind> = new Set(['task', 'handoff', 'help', 'review', 'back']);
 
 export interface PairEntry {
   key: string;

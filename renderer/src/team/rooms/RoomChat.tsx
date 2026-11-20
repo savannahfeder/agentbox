@@ -44,7 +44,7 @@ import { attachedName, drawnRoots, holdsRead, madeOnce, mentionMarkdown, myNewes
 export type ChatPerson = { id: string; name: string; avatarUrl: string | null; me: boolean };
 
 export type ChatWhere = { label: string; onOpen: () => void };
-export type ChatAlongRow = { key: string; at: number; by: string; text: string; where: ChatWhere };
+export type ChatAlongRow = { key: string; at: number; by: string; text: string; where: ChatWhere; card?: boolean };
 /** What a person's page draws among the messages: tasks, replies on them, comments, file notes. `on` is a message's own place. */
 export type ChatAlong = { rows: readonly ChatAlongRow[]; on: ReadonlyMap<string, ChatWhere> };
 
@@ -230,18 +230,8 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
       {drawn.map((d, i) => {
         const slot = slots[i];
         if (d.a) {
-          const a = d.a, p = who(a.by);
-          return <div key={a.key} data-along={a.key}>
-            {slot.day && <div className="rm-day"><span className="rm-label">{slot.day}</span></div>}
-            <div className={`rm-cm rm-along${slot.head ? '' : ' cont'}`}>
-              {slot.head && <div className="h">
-                <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 32 : 16} />
-                <span>{nameOf(a.by)}</span><em>{clockOf(a.at)}</em>
-              </div>}
-              <div className="tx">{a.text}</div>
-              <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
-            </div>
-          </div>;
+          const p = who(d.a.by);
+          return <AlongRow key={d.a.key} a={d.a} day={slot.day} head={slot.head} face={p} name={nameOf(d.a.by)} size={hang ? 32 : 16} />;
         }
         const m = d.m;
         const where = root ? undefined : along?.on.get(m.id);
@@ -447,26 +437,41 @@ const staged = (a: PendingAttachment): PendingAttachment => (a.storedAs ? a : { 
 /** What two people did together before they ever chatted (pair-timeline.ts), in the chat's own rows. */
 export function AlongHistory({ rows, who }: {
   rows: readonly ChatAlongRow[];
-  who: (id: string) => { name: string; avatarUrl: string | null } | undefined;
+  who: (id: string) => { name: string; avatarUrl: string | null; me?: boolean } | undefined;
 }) {
   const sorted = [...rows].sort((a, b) => a.at - b.at);
   const slots = chatLayout(sorted.map((a) => ({ at: a.at, by: a.by })));
-  return <div className="rm-chat-list pl-history"><div className="rm-chat-msgs">
+  return <div className="rm-full hang pl-history"><div className="rm-chat-list"><div className="rm-chat-msgs">
     {sorted.map((a, i) => {
       const p = who(a.by);
-      return <div key={a.key} data-along={a.key}>
-        {slots[i].day && <div className="rm-day"><span className="rm-label">{slots[i].day}</span></div>}
-        <div className={`rm-cm rm-along${slots[i].head ? '' : ' cont'}`}>
-          {slots[i].head && <div className="h">
-            <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={16} />
-            <span>{p?.name ?? 'Someone'}</span><em>{clockOf(a.at)}</em>
-          </div>}
+      return <AlongRow key={a.key} a={a} day={slots[i].day} head={slots[i].head} face={p} name={p ? cardName({ me: !!p.me, name: p.name }) : 'Someone'} size={32} />;
+    })}
+  </div></div></div>;
+}
+
+/** A task, an ask or a hand-back is a card you can open; a comment or a note is words with where they were left. */
+function AlongRow({ a, day, head, face, name, size }: {
+  a: ChatAlongRow; day: string | null | undefined; head: boolean; name: string; size: number;
+  face: { name: string; avatarUrl?: string | null } | undefined;
+}) {
+  return <div data-along={a.key}>
+    {day && <div className="rm-day"><span className="rm-label">{day}</span></div>}
+    <div className={`rm-cm rm-along${head ? '' : ' cont'}`}>
+      {head && <div className="h">
+        <Face name={face?.name ?? '?'} url={face?.avatarUrl} size={size} />
+        <span>{name}</span><em>{clockOf(a.at)}</em>
+      </div>}
+      {a.card
+        ? <button type="button" className="rm-thread-card" onClick={a.where.onOpen}>
+          <span className="rm-thread-title">{a.where.label}</span>
+          <span className="rm-thread-what">{a.text}</span>
+        </button>
+        : <>
           <div className="tx">{a.text}</div>
           <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
-        </div>
-      </div>;
-    })}
-  </div></div>;
+        </>}
+    </div>
+  </div>;
 }
 
 export function FirstChatBox({ person, placeholder, open, send, putFile, putFileFrom, sending, onNotice }: {

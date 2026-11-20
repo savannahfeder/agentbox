@@ -147,9 +147,9 @@ import { queuedTeammateRun, threadsItOpened } from './teammates/chat-lines';
 import { teammateIdOf } from '../../shared/teammates.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
-import { directConversations } from './team/rooms/conversations';
+import { directConversations, shortName } from './team/rooms/conversations';
 import { personChatShows, personPressOpens } from './team/one-conversation';
-import { pairLine, pairTimeline, type PairEntry, type PairOpens } from './team/pair-timeline';
+import { pairLine, pairTimeline, THREAD_KINDS, type PairEntry, type PairOpens } from './team/pair-timeline';
 import { AlongHistory, type ChatAlong } from './team/rooms/RoomChat';
 import { listedIn, pairRooms } from '../../shared/pair-room.mts';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
@@ -8025,7 +8025,7 @@ export default function App() {
         const there = (w: PairEntry['where']) => w && { label: w.label, onOpen: () => openPairEntry(w.open) };
         const nameOf = (p: string) => team?.byId.get(p)?.name ?? '';
         return {
-          rows: entries.flatMap((e) => { const w = there(e.where); return e.kind !== 'message' && w ? [{ key: e.key, at: e.at, by: e.by, text: pairLine(e, team?.me ?? '', nameOf), where: w }] : []; }),
+          rows: entries.flatMap((e) => { const w = there(e.where); return e.kind !== 'message' && w ? [{ key: e.key, at: e.at, by: e.by, text: pairLine(e, team?.me ?? '', nameOf), where: w, card: THREAD_KINDS.has(e.kind) }] : []; }),
           on: new Map(entries.flatMap((e) => { const w = there(e.where); return e.kind === 'message' && w ? [[e.key, w] as const] : []; })),
         };
       };
@@ -8043,7 +8043,7 @@ export default function App() {
         </>}
         chat={chatShows === 'chat' && room ? roomsUi.chatIn(room, (messages, pairRoomIds) => along(pairTimeline({ me: team?.me ?? '', other: id, rooms: pairRoomIds, messages, directItems: items, talk: snap.team?.threadTalk ?? [], titleOf }))) : chatShows === 'not yet' ? null
           : chatShows === 'first message'
-          ? <ChatStart empty={history.rows.length ? <AlongHistory rows={history.rows} who={(p) => { const t = team?.byId.get(p); return t ? { name: t.name || t.email || 'Someone', avatarUrl: t.avatarUrl ?? null } : undefined; }} /> : <EmptyChat name={first} />}
+          ? <ChatStart empty={history.rows.length ? <AlongHistory rows={history.rows} who={(p) => { const t = team?.byId.get(p); return t ? { name: shortName(t.name || t.email || 'Someone'), avatarUrl: t.avatarUrl ?? null, me: p === team?.me } : undefined; }} /> : <EmptyChat name={first} />}
             box={roomsUi.firstChat({ id, name: placeMember.name, avatarUrl: placeMember.avatarUrl ?? null }, `Message ${first}`)} />
           : <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
             onSend={async (text) => { setComposeInitial({ to: id, body: text }); setModal('compose'); return null; }} />}
