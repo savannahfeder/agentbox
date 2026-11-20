@@ -69,7 +69,7 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksLine } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askIGave, askOnMe, asksOnThread } from '../../shared/thread-asks.mts';
+import { askIGave, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
 import { SEE_SAID, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -2385,7 +2385,8 @@ export default function App() {
   const directSlugs = useMemo(() => conversationSlugs(snap?.products ?? []), [snap?.products]);
   const score = useCallback(
     // A thread she dragged runs where she put it (w-6e5b532a95).
-    (i: WorkItem) => placedScore(i.place, placeScore(snap?.supervisor.productOrder ?? [], i.product, directSlugs) + itemPriority(i)),
+    // So does a thread a teammate just handed back to you: their words are what waits.
+    (i: WorkItem) => placedScore(i.place, placeScore(snap?.supervisor.productOrder ?? [], i.product, handedBackBy(i as Parameters<typeof handedBackBy>[0]) ? new Set([i.product]) : directSlugs) + itemPriority(i)),
     [snap?.supervisor.productOrder, directSlugs],
   );
 

@@ -215,6 +215,10 @@ describe('the wiring', () => {
     expect(app).toContain("if (askedOut.has(i.id) && !asking(i)) return false;");
     expect(app).toMatch(/const askedOut = useMemo\(\(\) => new Set\(items\.flatMap\(\(r\) => \{\s*const a = askIGave\(r, team\?\.me \?\? null\);\s*return a && r\.status !== 'done' \? \[a\.thread\] : \[\];/);
   });
+  // Round two: Dana's returned review sat under week-old rows because its project ranks last.
+  it('a thread handed back ranks with a teammate\'s message, not with its project', () => {
+    expect(read('renderer/src/App.tsx')).toContain('handedBackBy(i as Parameters<typeof handedBackBy>[0]) ? new Set([i.product]) : directSlugs');
+  });
   it('a helper\'s words on your thread are passed on by your own supervisor', () => {
     expect(read('main/main.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
     expect(read('main/serve.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
