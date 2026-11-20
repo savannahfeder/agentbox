@@ -118,9 +118,9 @@ export function SendSheet({ people, start, link, onCopy, onSend }: {
 export type GiveMode = 'help' | 'review' | 'give';
 
 const MODES: { id: GiveMode; label: string; detail: (first: string) => string; ask: string; go: (first: string) => string }[] = [
-  { id: 'help', label: 'Help with a step', detail: (f) => `Stays yours. ${f} can talk to your agent here, then hands it back.`, ask: 'What do you need help with?', go: (f) => `Ask ${f} to help` },
-  { id: 'review', label: 'Review it', detail: (f) => `${f} looks it over and sends it back with an answer.`, ask: 'What should they look at?', go: (f) => `Ask ${f} to review` },
-  { id: 'give', label: 'Hand it over', detail: (f) => `It becomes ${f}'s, and this thread closes here.`, ask: 'Add a note', go: (f) => `Give to ${f}` },
+  { id: 'help', label: 'Help with a step', detail: (f) => `Stays yours. ${f} talks to your agent, then hands it back.`, ask: 'What do you need help with?', go: (f) => `Ask ${f} to help` },
+  { id: 'review', label: 'Review it', detail: (f) => `${f} looks it over and sends back an answer.`, ask: 'What should they look at?', go: (f) => `Ask ${f} to review` },
+  { id: 'give', label: 'Hand it over', detail: (f) => `It becomes ${f}'s. This thread closes.`, ask: 'Add a note', go: (f) => `Give to ${f}` },
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */

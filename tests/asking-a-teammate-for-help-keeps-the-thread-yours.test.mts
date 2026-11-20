@@ -103,7 +103,7 @@ describe('an ask for help', () => {
     await both();
     await both();
     const back = told.filter((x) => x.hold);
-    expect(back).toEqual([{ slug: 'api', id: t.id, hold: true, from: { teammate: theo.personId, name: 'Theo Okafor' }, text: 'Theo Okafor handed this back.\n\nSafe to drop. I told your agent to do it concurrently.' }]);
+    expect(back).toEqual([{ slug: 'api', id: t.id, hold: true, from: { teammate: theo.personId, name: 'Theo Okafor' }, text: 'Theo handed this back.\n\nSafe to drop. I told your agent to do it concurrently.' }]);
   });
 });
 
@@ -116,7 +116,7 @@ describe('an ask for a review', () => {
     await both();
     await both();
     expect(told.filter((x) => !x.hold)).toEqual([]);
-    expect(told.filter((x) => x.hold).map((x) => x.text)).toEqual(['Theo Okafor reviewed this and asked for changes.\n\nSay "Book a visit", not Submit.']);
+    expect(told.filter((x) => x.hold).map((x) => x.text)).toEqual(['Theo reviewed this and asked for changes.\n\nSay "Book a visit", not Submit.']);
   });
 });
 

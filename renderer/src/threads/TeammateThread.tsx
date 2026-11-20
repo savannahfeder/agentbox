@@ -201,7 +201,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
       <header className="tp-top">
         <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
         {card.title && <h1 className="th-card-title">{card.title}</h1>}
-        {card.visible && <TeammateStanding card={card} person={person} now={now} />}
+        {/* While you were asked in, the bar below says where it stands, not "waiting on" its owner. */}
+        {card.visible && !ask && <TeammateStanding card={card} person={person} now={now} />}
       </header>
       <div className="tp-grid">
         <section className="th-work" aria-label="The conversation">

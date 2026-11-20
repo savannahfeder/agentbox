@@ -76,7 +76,7 @@ export function createAsks({ file, me, products, readRows, nameOf, tell, putAway
         if (!where) { k.back.push(r.id); continue; }
         const helper = String((r as { assignee?: string }).assignee);
         const name = nameOf(helper);
-        const text = handedBackWords({ kind: a.kind, name, verdict: ((r as { verdict?: Verdict }).verdict ?? null), words: String((r as { answer?: string }).answer ?? '') });
+        const text = handedBackWords({ kind: a.kind, name: name.split(/\s+/)[0] || name, verdict: ((r as { verdict?: Verdict }).verdict ?? null), words: String((r as { answer?: string }).answer ?? '') });
         k.back.push(r.id);
         void Promise.resolve(tell(a.product, a.thread, { text, from: { teammate: helper, name }, hold: true }))
           .catch((err) => log(`asks: ${name}'s hand-back did not reach the thread: ${err?.message ?? err}`));

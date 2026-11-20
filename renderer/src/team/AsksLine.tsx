@@ -33,7 +33,7 @@ export function AsksLine({ item, items, now = Date.now(), onTakeBack }: {
             <Face person={person} size={22} />
             <span className="asks-words">
               <span>{a.ask.kind === 'help'
-                ? <><b>{first}</b> is helping. What they write here goes to your agent.</>
+                ? <><b>{first}</b> is helping and can write to your agent.</>
                 : <><b>{first}</b> is reviewing this.</>}</span>
               <span className="asks-when">Asked {updatedWords(a.at, now)}</span>
             </span>
