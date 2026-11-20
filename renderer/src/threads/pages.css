@@ -673,3 +673,14 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .phone-status-dismissible > button { display: grid; place-items: center; flex: 0 0 44px; min-height: 44px; margin-block: -9px; padding: 0; border: 0; border-radius: var(--radius); background: transparent; color: inherit; cursor: pointer; }
 .phone-status-dismissible > button:hover { color: var(--text); }
 .phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
+
+.tp-send-back { margin: 18px 0 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--wash); }
+.tp-send-back:focus-within { border-color: var(--text-faint); }
+.tp-send-back textarea { display: block; width: 100%; padding: 4px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; line-height: 20px; resize: none; }
+.tp-send-back textarea:focus { outline: none; }
+.tp-send-back-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.tp-send-back button { height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.tp-send-back button:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
+.tp-send-back button.is-primary { background: var(--text); border-color: var(--text); color: var(--bg); }
+.tp-send-back button:disabled { color: var(--text-faint); border-color: var(--line); background: none; cursor: default; }
+.tp-sent-back { margin: 18px 0 0; font-size: 14px; color: var(--text-dim); }

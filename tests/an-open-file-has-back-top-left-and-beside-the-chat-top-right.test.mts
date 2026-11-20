@@ -53,7 +53,7 @@ describe('the open file header', () => {
     expect(header).toMatch(/aria-label="Newer version"/);
     expect(header).not.toMatch(/Approve/);
     expect(side).toMatch(/className="av-verdict"/);
-    expect(side).toMatch(/'Approved' : 'Approve'/);
+    expect(side).toMatch(/approveWords\(\{ approved: mineApproved/);
   });
 
   it('has no Side by side, thread-name link or kind tag', () => {

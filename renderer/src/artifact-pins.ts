@@ -312,6 +312,9 @@ export function whoTalksOnFile(notes: readonly Pick<FileNote, 'file' | 'by' | 't
 }
 
 /** What the button says once the note it sent has saved: who it went to, or null for a comment kept on the file. */
+/** Words typed when you approve go with the approval. */
+export const approveWords = ({ approved, typed }: { approved: boolean; typed: boolean }): string => (approved ? 'Approved' : typed ? 'Approve and send' : 'Approve');
+
 export const noteSentWords = (sendWords: string): string | null => (sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
 
 /**

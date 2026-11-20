@@ -13,7 +13,7 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
+import { approveWords, hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
@@ -309,9 +309,9 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     setGo({ place: note.place, at: Date.now() });
   };
 
-  const send = async (now = false) => {
+  const send = async (now = false): Promise<boolean> => {
     const typed = words.trim();
-    if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
+    if ((!typed && !pictures.length) || !version || sending || attaching.length) return false;
     // "Sofia, approved v4" names Sofia as surely as @Sofia does: it reaches her, not the agent.
     const others = people.filter((p) => p.id !== me);
     const to = addressedTo(typed, others);
@@ -325,7 +325,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     try { links = await persistAttachments(product, pictures); } catch (err) {
       setSending(false);
       failed({ ok: false, error: (err as Error).message }, 'That picture did not save.');
-      return;
+      return false;
     }
     const text = noteWithPictures(typed, links);
     const sentPictures = pictures;
@@ -346,7 +346,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       setSavingNotes((was) => was.filter((n) => n.id !== id));
       setWords(typed);
       setPictures(sentPictures);
-      return;
+      return false;
     }
     if (!withIt.length || (await toAgent(withIt))) setJustSent(went);
     setNamed([]);
@@ -357,6 +357,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       const carried = readLooseDraft({ product, thread, file: version.id, across }).words;
       if (carried) { setWords(carried); setNamed(people.filter((p) => carried.includes(`@${firstName(p)}`))); }
     }
+    return true;
   };
 
   const settle = async (note: FileNote, resolved: boolean) => {
@@ -394,7 +395,11 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (mineApproved) return approveNow(version, true);
     const ask = approveAsk(family, at.vi, marks.notes, offeredTogether(lines, family));
     if (ask) { setApproveAsked(ask); return; }
-    return approveNow(version);
+    return approveWithNote(version);
+  };
+  const approveWithNote = async (v: FileVersion) => {
+    if (v.id === version?.id && (words.trim() || pictures.length) && !(await send())) return;
+    return approveNow(v);
   };
   const approveNewest = (v: FileVersion) => {
     setAt({ fi: at!.fi, vi: family!.versions.indexOf(v) });
@@ -819,7 +824,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
             <p className="av-told av-ask" role="alertdialog">
               {approveAsked.text}
               {approveAsked.newest && <button type="button" className="av-btn is-on" onClick={() => approveNewest(approveAsked.newest!)}>Approve v{approveAsked.newest.n}</button>}
-              <button type="button" className="av-btn" onClick={() => void approveNow(version)}>{approveAsked.yes}</button>
+              <button type="button" className="av-btn" onClick={() => void approveWithNote(version)}>{approveAsked.yes}</button>
               <button type="button" className="av-btn" onClick={() => setApproveAsked(null)}>Not yet</button>
             </p>
           )}
@@ -854,7 +859,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
               {canSendAll && sendBeside && <button type="button" className="av-btn av-unsent-send" title={unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
-              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
+              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{approveWords({ approved: mineApproved, typed: !!(words.trim() || pictures.length) })}</button>}
             </div>
           )}
           <div className="av-list">

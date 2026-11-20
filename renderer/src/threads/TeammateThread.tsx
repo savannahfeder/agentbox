@@ -27,6 +27,7 @@ import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, File
 import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
+import { SendBack, reviewIsMine } from './SendBack';
 import { answersTheStep, stepLine } from '../../../shared/thread-ask.mts';
 import { parseOptions } from '../format';
 import { revealLine } from '../reveal-line';
@@ -160,6 +161,13 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
     setReread((n) => n + 1);
     following?.follow(card);
   };
+  const sendBack = async (text: string) => {
+    const out = await api.teamComment({ personId, threadId, text });
+    if (!out?.ok) { onNotice(out?.error ?? 'That did not send.'); return false; }
+    setReread((n) => n + 1);
+    return true;
+  };
+  const myOpenNotes = marks.notes.filter((n) => n.by === team?.me && !n.resolved).length;
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
   };
@@ -215,6 +223,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
         <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
         {card.title && <h1 className="th-card-title">{card.title}</h1>}
         {card.visible && <TeammateStanding card={card} person={person} now={now} />}
+        <SendBack key={threadId} owner={owner} notes={myOpenNotes} open={reviewIsMine(card, team?.me ?? null)} onSend={sendBack} />
       </header>
       <div className="tp-grid">
         <section className="th-work" aria-label="The conversation">

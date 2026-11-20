@@ -7,6 +7,7 @@
 // An agent's wait on other people (`person:`, `card:`) is this too, since
 // only the team sync can see those end. An agent's wait on threads is not: the
 // supervisor resumes those (resumeFinishedWaits).
+import { cameBack, verdictOf } from './review-sent-back.mts';
 
 export interface WaitingItem {
   id: string;
@@ -20,7 +21,7 @@ export interface WaitingItem {
   updatedAt?: number;
   agent?: unknown;
   wrote?: Record<string, { ts?: number; source?: string } | undefined>;
-  waitingComments?: readonly { by: string; ts: number }[];
+  waitingComments?: readonly { by: string; ts: number; text?: string }[];
 }
 
 export interface WaitCard {
@@ -102,8 +103,13 @@ const quoted = (text: string | null | undefined): string => {
 function oneEnd(item: WaitingItem, id: string, since: number, { items, cards, lastWordFrom, lastWordsFrom, nameOf }: WaitEndContext): string | null {
   const w = waitParts(id);
   if (w.kind === 'person') {
-    if (lastWordFrom(w.person) > since) return `${FIRST(nameOf(w.person))} wrote to you${quoted(lastWordsFrom?.(w.person))}`;
-    return item.waitingComments?.some((c) => c.by === w.person && c.ts > since) ? `${FIRST(nameOf(w.person))} commented` : null;
+    const first = FIRST(nameOf(w.person));
+    const comments = (item.waitingComments ?? []).filter((c) => c.by === w.person && c.ts > since);
+    // A review sent back says its verdict, whatever else they wrote.
+    const verdict = comments.findLast((c) => verdictOf(c.text));
+    if (verdict) return `${cameBack(first, verdict.text)}${quoted(verdictOf(verdict.text)!.note)}`;
+    if (lastWordFrom(w.person) > since) return `${first} wrote to you${quoted(lastWordsFrom?.(w.person))}`;
+    return comments.length ? `${first} commented` : null;
   }
   if (w.kind === 'name') return null;
   if (w.kind === 'card') {
