@@ -44,7 +44,7 @@ function tidy(words: string): string {
     .replace(/(^|\s)[*_](\S)/g, '$1$2').replace(/(\S)[*_](?=\s|$|[.,:;])/g, '$1')
     .replace(/\(\s*\)|\[\s*\]/g, '')
     .replace(/\s+/g, ' ')
-    .replace(/^[\s:—–-]+|[\s:—–-]+$/g, '');
+    .replace(/^[\s:\u2014\u2013-]+|[\s:\u2014\u2013-]+$/g, '');
 }
 
 const isLabel = (words: string): boolean => words.length <= MOST && (words.match(/\p{L}/gu) ?? []).length >= 2;
