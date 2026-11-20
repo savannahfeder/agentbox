@@ -54,6 +54,7 @@ import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { newUserTitle, newUserWindow } from './new-user-window.mts';
 import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
+import { tintWindowButtons, windowFrame } from './window-buttons.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -80,6 +81,7 @@ import { writeHeldThenReload } from './write-before-reload.mts';
 import { answerDraftCopy } from './draft-copy.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
+import { APP_USER_MODEL_ID } from '../shared/app-user-model-id.mts';
 import { JOIN_SCHEME, ourLink, threadFromAppLink, tokenFromLink } from '../shared/room-links.mts';
 import { fileLinkToken } from './bring-shared-file.mts';
 import { getMic } from './mic.mts';
@@ -172,6 +174,8 @@ const appDir = path.join(__dirname, '..');
 const PROFILE = String(process.env.AGENTBOX_PROFILE ?? '').trim().replace(/[^a-z0-9-]/gi, '');
 if (PROFILE) app.setName(`${NAME}-${PROFILE}`);
 if (dataFolderName(app.getName()) !== app.getName()) app.setName(dataFolderName(app.getName()));
+// Before any window or notification: Windows groups and names both by this id.
+if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
 
 // "ASTRAL NEW USER" IS A STRANGER EVERY TIME IT OPENS.
 //
@@ -817,7 +821,7 @@ async function createWindow() {
       height: 900,
     }),
     ...glass,
-    titleBarStyle: 'hiddenInset',
+    ...windowFrame(process.platform),
     webPreferences: {
       preload: path.join(appDir, 'preload.cjs'),
       contextIsolation: true,
@@ -1199,6 +1203,7 @@ async function createWindow() {
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.
   ipcMain.handle('zero:glass-tone', (_e, payload) => { nativeTheme.themeSource = glassTone(payload?.tone); });
+  ipcMain.handle('zero:window-buttons', (_e, payload) => { tintWindowButtons(window, process.platform, payload?.dark); });
   ipcMain.handle('zero:boot-info', () => {
     const info = {
       reloaded: reloadRequested, builtAt: builtAt(), recovered: pendingRecovery,
@@ -1422,6 +1427,19 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform === 'linux' && !app.isPackaged) {
       import('../scripts/linux-launcher.mjs')
         .then(({ installLinuxLauncher }) => installLinuxLauncher({ appDir, env: process.env }))
+        .catch(() => { /* a launcher is never a reason to stop a launch */ });
+    }
+    // The Windows Start menu shortcut is written here, not at install: only
+    // Electron's writer gives it the app's id (scripts/windows-launcher.mjs).
+    if (process.platform === 'win32' && !app.isPackaged) {
+      import('../scripts/windows-launcher.mjs')
+        .then(({ installWindowsLauncher }) => installWindowsLauncher({
+          appDir,
+          env: process.env,
+          electronExe: process.execPath,
+          writeShortcut: (file: string, operation: 'create', options: Electron.ShortcutDetails) => shell.writeShortcutLink(file, operation, options),
+          readShortcut: (file: string) => shell.readShortcutLink(file),
+        }))
         .catch(() => { /* a launcher is never a reason to stop a launch */ });
     }
     // THE ABOUT BOX SAYS AGENTBOX AND ITS OWN VERSION (w-db6f5e331e). Run from

@@ -127,7 +127,7 @@ import { repeatTag } from './repeat-words';
 import { applyTheme, machineTheme, onMachineTheme, resolvePick, resolveTheme, THEME_KEY, type ThemePick } from './theme';
 import { hintScheduler, type HintScheduler } from './hint-timing';
 import { HINTS } from './hint-plate';
-import { MAC, chord, sayKeys } from './this-keyboard';
+import { MAC, WINDOWS, chord, sayKeys } from './this-keyboard';
 import { HintPlate } from './components/HintPlate';
 import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, wornSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
@@ -3022,6 +3022,8 @@ export default function App() {
   const homeSet = useHomeSettings();
   const [homeOpen, setHomeOpen] = useState(homeOn);
   const darkWindow = useDarkWindow();
+  // The Windows title bar buttons are drawn by the system, in glyphs that have to follow the page.
+  useEffect(() => { if (WINDOWS) window.zero?.windowButtons?.({ dark: darkWindow }); }, [darkWindow]);
   // A sky theme is worn only while the window wears its look.
   const skyPicked = homeOn ? skyTheme(homeSet.skyTheme) : null;
   const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;

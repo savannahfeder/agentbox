@@ -66,8 +66,8 @@ describe('one adapter boundary for every harness', () => {
     expect(signInCommand('codex', '/tool').args).toEqual(['login']);
     expect(statusCommand('claude', '/tool').args).toEqual(['auth', 'status', '--json']);
     expect(statusCommand('codex', '/tool').args).toEqual(['login', 'status']);
-    expect(installCommand('claude').file).toBe('/bin/bash');
-    expect(installCommand('codex').file).toBe('/bin/sh');
+    expect(installCommand('claude', 'darwin').file).toBe('/bin/bash');
+    expect(installCommand('codex', 'darwin').file).toBe('/bin/sh');
     expect(() => signInCommand('unknown', '/tool')).toThrow(/Unknown/);
   });
   it('keeps credential watching on the selected login only', () => {
