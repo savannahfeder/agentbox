@@ -24,7 +24,7 @@ import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mts';
 import { GIVEN_TASK, whatATeammateMaySet } from '../shared/team-rules.mts';
 import { pickFields } from '../shared/work-items.mts';
-import { askIGave, askOnMe, asksOnThread, handedBackAsks, handedBackWords, helpAskOpen } from '../shared/thread-asks.mts';
+import { askIGave, askOnMe, asksOnThread, handedBackAsks, handedBackWords, helpAskOpen, stepOf } from '../shared/thread-asks.mts';
 import { GiveSheet } from '../renderer/src/threads/SharePanel.tsx';
 import { machineryPath } from '../main/store/home.mts';
 import { changePath } from '../main/code-change.mts';
@@ -177,6 +177,12 @@ describe('the rules, without a cloud', () => {
     expect(askOnMe([row()], 'theo', 'sam', 't')).toBeTruthy();
     expect(askOnMe([row()], 'priya', 'sam', 't')).toBeNull();
     expect(asksOnThread([row()], 'sam', 't')).toHaveLength(1);
+  });
+  it('the step is the paragraph that asks, without its markdown', () => {
+    expect(stepOf('I added a check.\n\nOne decision. **Should I drop it?** It locks writes.\n\n1. Drop it\n2. Keep it')).toBe('One decision. Should I drop it? It locks writes.');
+    expect(stepOf('Done: added `/health`.\n\nAll tests pass.')).toBe('Done: added /health.');
+    expect(stepOf('')).toBe('');
+    expect(stepOf(`${'x'.repeat(700)}?`)).toHaveLength(601);
   });
   it('the words say what came back', () => {
     expect(handedBackWords({ kind: 'review', name: 'Priya', verdict: 'yes', words: '' })).toBe('Priya reviewed this and it looks good.');
