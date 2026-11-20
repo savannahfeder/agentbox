@@ -436,7 +436,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
               return (
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
-                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
+                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} who={{ face: <Face person={team?.byId.get(c.personId) ?? null} />, name: team?.byId.get(c.personId)?.name ?? undefined }} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );

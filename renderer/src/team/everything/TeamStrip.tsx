@@ -172,11 +172,10 @@ function CardRow({ c, who, now, onOpen, items = [], products = [] }: { c: Thread
   const task = cardTaskWord(c, { items, products, cards: team?.state.cards ?? [], me: team?.me ?? null, nameOf: (id) => (team?.byId.get(id)?.name ?? 'Someone').split(/\s+/)[0] });
   // The Status column's word for a running thread, as on the inbox's own rows beside it.
   const status: StatusCell = { word: c.shippedAt ? 'Shipped' : task ? task : waits ? `Waits on ${waits}` : c.state === 'running' ? 'Working' : c.state === 'waiting' && who ? `Waiting on ${who.name.split(/\s+/)[0]}` : STATE_WORD[c.state], mark: CARD_MARK[c.state], agent: c.state === 'running', live: c.state === 'running', cloud: false };
-  const title = who ? <><span className="tq-from"><Face name={who.name} url={who.url} size={18} /><b>{who.name}</b></span>{c.title ?? 'A thread'}</> : c.title ?? 'A thread';
   return <div className="row" role="button" tabIndex={0} onClick={() => onOpen(c)}
     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onOpen(c); } }}>
     <span className="mark" aria-hidden="true" />
-    <RowCells status={status} title={title} where={cardPlace(c)} priority={c.priority} updatedAt={c.updatedAt} now={now} />
+    <RowCells status={status} who={who ? { face: <Face name={who.name} url={who.url} />, name: who.name } : undefined} title={c.title ?? 'A thread'} where={cardPlace(c)} priority={c.priority} updatedAt={c.updatedAt} now={now} />
   </div>;
 }
 

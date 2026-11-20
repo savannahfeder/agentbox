@@ -24,7 +24,7 @@ export function SharedFileRows({ news, cards, team, now, onOpen }: {
       onClick={() => onOpen(n, card)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(n, card); }}>
       <span className="mark" aria-hidden="true" />
       <RowCells status={WAITING}
-        title={<span className="th-msg"><Face person={who} /><b className="th-msg-who">{firstName(who)}</b><span className="th-msg-text">{newsWords(n)}</span></span>}
+        who={{ face: <Face person={who} />, name: `${firstName(who)} on ${n.file.replace(/#\d+$/, '')}` }} title={n.text}
         where={<span className="rm-where">{card.title ?? 'Shared thread'}</span>}
         priority={null} updatedAt={n.ts} now={now} />
     </div>;
