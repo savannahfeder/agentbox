@@ -143,6 +143,15 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const numbered = useMemo(() => lineAsThread(line), [line]);
   const viewLines = useMemo(() => (numbered.lines.length ? [...(work?.lines ?? []), ...numbered.lines as LedgerLine[]] : work?.lines ?? []), [work?.lines, numbered]);
   const [big, setBig] = useState<ArtifactOpen | null>(null);
+  // Asked onto it, you land where the ask and the box to write in are, once per thread.
+  const pageEl = useRef<HTMLDivElement>(null);
+  const landed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ask || !work || landed.current === threadId) return;
+    landed.current = threadId;
+    const pane = pageEl.current?.closest('.th-pane');
+    if (pane) pane.scrollTop = pane.scrollHeight;
+  }, [ask, work, threadId]);
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
 
@@ -185,7 +194,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   );
 
   return (
-    <div className="tp-page">
+    <div className="tp-page" ref={pageEl}>
       {big && product && (
         <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={viewLines} numbers={numbered.numbers} marks={marks}
           me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
