@@ -8537,7 +8537,7 @@ export default function App() {
                 {/* Asked of you: the answer sits under the message that asked, where a reply goes. */}
                 <UnderTheAsk.Provider value={!team || !focused.ask ? null
                   : focused.assignee === team.me && askIsOpen(focused)
-                    ? <AskBar key={`${focused.product}/${focused.id}`} task={focused} owner={team.byId.get(focused.ask.owner) ?? null} under onHandBack={(verdict, words) => handAskBack(focused, verdict, words)} />
+                    ? <AskBar key={`${focused.product}/${focused.id}`} task={focused} owner={team.byId.get(focused.ask.owner) ?? null} under onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} onHandBack={(verdict, words) => handAskBack(focused, verdict, words)} />
                     : focused.ask.owner === team.me
                       ? <AskSentLine task={focused} onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />
                       : null}>

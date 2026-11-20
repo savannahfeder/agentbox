@@ -17,3 +17,14 @@ describe('the hand-back box', () => {
     expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/<AskBar key=\{`\$\{ask\.product\}\/\$\{ask\.id\}`\} task=\{ask\}/);
   });
 });
+
+// Round seven: under a help ask on the task page there was only Hand back, so
+// the way to the owner's agent was a link in the words, and the helper wrote in
+// the task's own reply box instead. The first button opens the owner's thread.
+describe('the buttons under an ask on the task page', () => {
+  it('open the owner\'s thread first', () => {
+    const bar = read('renderer/src/team/AskBar.tsx');
+    expect(bar).toMatch(/\{onOpenThread && <button type="button" onClick=\{onOpenThread\}>Open \{first\}'s thread<\/button>\}/);
+    expect(read('renderer/src/App.tsx')).toMatch(/<AskBar key=\{`\$\{focused\.product\}\/\$\{focused\.id\}`\} task=\{focused\}[^\n]*under onOpenThread=\{\(\) => openContinuedFrom\(focused\.ask!\.owner, focused\.ask!\.thread\)\}/);
+  });
+});

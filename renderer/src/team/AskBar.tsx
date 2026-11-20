@@ -67,7 +67,7 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
         </div>
       ) : (
         <div className="ask-bar-acts">
-          {onOpenThread && !under && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
+          {onOpenThread && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
           {change && !under && <button type="button" onClick={() => onOpenChange?.(change)}>View the change</button>}
           {ask.kind === 'review'
             ? <>
