@@ -3,7 +3,7 @@
 // An ask is a task to one person (team-rules GIVEN_TASK) whose `ask` names the
 // giver's thread. Two kinds:
 //   help    they jump in: what they write on the thread goes to its agent, as
-//           theirs, until they hand it back (main/team/index.mts relays it)
+//           theirs, until they hand it back (main/team/asks.mts relays it)
 //   review  they look and comment; their answer comes back to you, and your
 //           agent hears it only when you next reply
 // Handing back is closing the task with words and a verdict. The thread stays
