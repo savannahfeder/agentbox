@@ -14,6 +14,9 @@ function git(cwd: string, args: string[]): string | null {
   try { return execFileSync('git', args, { cwd, encoding: 'utf8', timeout: GIT_MS, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return null; }
 }
 
+/** An error as words for the screen: a local path becomes its file's name. */
+export const withoutPaths = (message: string): string => message.replace(/(?:~|\/)[^\s'"`,:]*\/([^\s'"`,:/]+)/g, '$1');
+
 export interface HandedChange { file: { rel: string; name: string; srcPath: string } | null; words: string }
 
 export function handedChange({ repoPath, id, owner, outDir, maxBytes = MAX_MESSAGE_FILE_BYTES }: {
@@ -27,16 +30,21 @@ export function handedChange({ repoPath, id, owner, outDir, maxBytes = MAX_MESSA
   if (!base) return none;
   const count = Number(git(repoPath, ['rev-list', '--count', `${base}..refs/heads/${branch}`])?.trim() || 0);
   if (!count) return none;
-  const commits = `${count} ${count === 1 ? 'commit' : 'commits'} from ${owner}’s branch ${branch}`;
+  // The branch is only ever named inside a command: alone, even quoted, the window links it as a thread.
+  const commits = `${count} ${count === 1 ? 'commit' : 'commits'} from ${owner}’s branch`;
   const patch = git(repoPath, ['format-patch', '--stdout', '--binary', `${base}..refs/heads/${branch}`]);
   if (patch === null) return { file: null, words: `The work so far is ${commits}, which could not be read to send. Ask ${owner} for it.` };
   if (Buffer.byteLength(patch) > maxBytes) {
-    return { file: null, words: `The work so far is ${commits}, too big to send here (${Math.ceil(Buffer.byteLength(patch) / 1024 / 1024)} MB). Ask ${owner} to push it.` };
+    return { file: null, words: `The work so far is ${commits}, too big to send here (${Math.ceil(Buffer.byteLength(patch) / 1024 / 1024)} MB). Ask ${owner} to push it (\`git push origin ${branch}\`).` };
   }
   const name = `${id}.patch`;
-  fs.mkdirSync(outDir, { recursive: true });
   const srcPath = path.join(outDir, name);
-  fs.writeFileSync(srcPath, patch);
+  try {
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(srcPath, patch);
+  } catch (err) {
+    return { file: null, words: `Couldn’t package the change: ${withoutPaths(String((err as Error)?.message ?? err))}. The work so far is ${commits}; ask ${owner} for it (\`git format-patch ${base.slice(0, 12)}..${branch}\`).` };
+  }
   return {
     file: { rel: name, name, srcPath },
     words: `The work so far is [${name}](${name}), ${commits}. Apply it on a new branch first (\`git switch -c ${branch}\`, then \`git am\` the file), and carry on from there.`,

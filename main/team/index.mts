@@ -46,7 +46,7 @@ import { createRooms } from './rooms.mts';
 import { isOnTeam } from '../../shared/rooms-on.mts';
 import { chatsForReviews, noticeEndedWaits } from './waits.mts';
 import { handOverDepartures } from './departures.mts';
-import { handedChange } from './handed-change.mts';
+import { handedChange, withoutPaths } from './handed-change.mts';
 import type { Departure } from './departures.mts';
 import type { CloudPhoneCommand } from './supabase-backend.mts';
 import { mateCard, splitCards } from '../../shared/mate-cards.mts';
@@ -1296,7 +1296,8 @@ export function createTeamService({
       try { return await this.handOnNow(ask); } catch (err) {
         const { id, to } = ask;
         log(`team: could not give ${id} to ${state.people.find((p) => p.id === to)?.name ?? to}: ${(err as Error)?.message ?? err}`);
-        throw err;
+        // The screen gets the reason without this computer's paths.
+        throw new Error(withoutPaths(String((err as Error)?.message ?? err)));
       }
     },
 
@@ -1312,7 +1313,7 @@ export function createTeamService({
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
-      const change = handedChange({ repoPath: product.repoPath, id, owner: (state.me.name || 'the giver').split(/\s+/)[0], outDir: path.join(product.dir, 'runs', id) });
+      const change = handedChange({ repoPath: product.repoPath, id, owner: (state.me.name || 'the giver').split(/\s+/)[0], outDir: path.dirname(machineryPath(product.dir, path.join('runs', id, `${id}.patch`))) });
       // What the giver wants from them comes first, over the thread's own words.
       const brief = [String(note ?? '').trim(), words, change.words, left].filter(Boolean).join('\n\n');
       // The task leads back to the thread, opened to them as Share's Send opens it.
