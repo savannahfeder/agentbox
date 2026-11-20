@@ -106,7 +106,10 @@ export function SetupSplit(p: SetupSplitProps) {
   const [plan, setPlan] = useState<SetupPlan>('free');
   const [engine, setEngine] = useState<'claude' | 'codex'>('claude');
   const agents = p.engines?.length ?? 1;
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents]);
+  // Found once the account is signed in. Joining takes it off the list, so the page remembers it.
+  const invite = p.snap?.team?.invites?.[0] ?? null;
+  const [joined, setJoined] = useState<string | null>(null);
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents, invited: !!invite || !!joined }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents, invite, joined]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
@@ -318,6 +321,22 @@ export function SetupSplit(p: SetupSplitProps) {
       {payState === 'waiting' && <p className="ss-note">Finish in your browser. This moves on once Stripe has your card.</p>}
       <div className="ss-acts">{go(paid ? 'Continue' : payState === 'opening' ? 'Opening Stripe…' : payState === 'waiting' ? 'Open Stripe again' : offer.cta, () => void pay(), payState !== 'opening')}{!paid && quiet(PRO_PITCH.free, next)}</div>
       {!paid && <p className="ss-price-line">{PRO_PITCH.terms}</p>}
+    </>;
+  } else if (step === 'join') {
+    const name = joined ?? invite?.teamName ?? 'your team';
+    head = [`Join ${name}.`, ''];
+    const join = async () => {
+      if (!invite) return;
+      setBusy(true); setError(null);
+      const out = await api.teamAcceptInvite(invite.teamId);
+      setBusy(false);
+      if (!out.ok) { setError((out as { error?: string }).error ?? 'That invitation could not be taken up.'); return; }
+      setJoined(invite.teamName);
+      next();
+    };
+    body = <>
+      <div className="ss-list"><Row face={name[0]?.toUpperCase() ?? '·'} name={name} sub={invite?.invitedByName ? `${invite.invitedByName} invited you` : undefined} end={joined ? <span className="ss-dim"><Tick />Joined</span> : undefined} /></div>
+      <div className="ss-acts">{joined ? go('Continue', next) : <>{go(`Join ${name}`, () => void join(), true, 'Joining…')}{quiet('Not now', next)}</>}</div>
     </>;
   } else if (step === 'teammates') {
     head = ['Add your own AI teammates.', ''];

@@ -34,7 +34,7 @@ export async function bringInWithin(bring: () => Promise<number>, ms = BRING_IN_
   }
 }
 
-export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'join' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
 
 // The account step once the account is made, and the plan page once Pro is paid for, only send you forward again.
@@ -52,14 +52,15 @@ export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number,
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */
-export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1 }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number }): SetupStep[] {
+export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1, invited = false }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number; invited?: boolean }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
   // With Claude Code and Codex both ready, which one starts your threads is yours to say.
   if (agents > 1) out.push('agent');
   // Signing in is required, so it is a step, and what needs it comes after.
   if (team && !signedIn) out.push('account');
   // One page offers Pro and takes its payment. The team is a paid thing, so inviting comes only once Pro is started.
-  if (team && !onTeam) out.push('plan');
+  // Someone invited joins a team whose owner pays for their seat.
+  if (team && !onTeam) out.push(invited ? 'join' : 'plan');
   if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
