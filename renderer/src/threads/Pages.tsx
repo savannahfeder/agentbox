@@ -76,6 +76,10 @@ export const LockMark = () => <svg className="th-lock" width="11" height="12" vi
  *  than KEEP_WHOLE keeps only its last letters with the mark; the card lets the
  *  rest break anywhere, so a long link never pushes the card wider. */
 const KEEP_WHOLE = 16;
+/** When the person asked last opened the ask, from the team's read marks. */
+const askSeen = (seen: Record<string, Record<string, number>> | undefined) =>
+  (row: { id: string; assignee?: string | null; product?: string }) => seen?.[`${row.product}/${row.id}`]?.[row.assignee ?? ''] ?? 0;
+
 export function TitleThenMark({ title, mark }: { title: string; mark: ReactNode }) {
   if (!mark) return <>{title}</>;
   const text = title.trimEnd();
@@ -763,7 +767,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const toldBy = inNeedsYou ? handedBackBy(item as Parameters<typeof handedBackBy>[0]) : null;
   const backFrom = toldBy && team?.byId.has(toldBy) ? `Back from ${nameFirst(toldBy)}` : null;
   // Out with someone you asked: say who, not that nothing is running.
-  const askedOut = team && !cell.live && !backFrom ? askedOutWord(allItems ?? [], team.me, item.id, (id) => team.byId.get(id)?.name ?? '') : null;
+  const askedOut = team && !cell.live && !backFrom ? askedOutWord(allItems ?? [], team.me, item.id, (id) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null;
   const shownWord = wants ?? backFrom ?? askedOut ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
   // Out with a person, it is no agent's state, so it wears no agent mark and offers no try again.
   const status = shownWord === null ? undefined : askedOut && shownWord === askedOut ? { ...worded, word: shownWord, agent: false, title: undefined } : { ...worded, word: shownWord };
@@ -1142,7 +1146,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const cardWaits = e.card && e.card.state !== 'done' ? linkWords(e.card.blockedBy, team?.byId) : null;
           const stuckOn = e.item ? causeOf(e.item, allItems ?? []) : null;
           const waitWord = e.item
-            ? (team ? askedOutWord(allItems ?? [], team.me, e.item.id, (id: string) => team.byId.get(id)?.name ?? '') : null) ?? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
+            ? (team ? askedOutWord(allItems ?? [], team.me, e.item.id, (id: string) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null) ?? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
             : cardWaits && `Waits on ${cardWaits}`;
           const messageProduct = e.message && e.item ? products.find((p) => p.slug === e.item!.product) : null;
           const onThem = messageProduct && iSpokeLast(e.item!, messageProduct, team?.me ?? null)
