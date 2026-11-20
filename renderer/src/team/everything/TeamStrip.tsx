@@ -3,6 +3,7 @@
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { Product, ThreadCard, WorkItem } from '../../types';
 import { Face, TeamContext } from '../people';
+import { MateFace } from '../../teammates/MateFace';
 import { linkWords } from '../../threads/summary-rules';
 import { LiveMark } from '../../components/LiveMark';
 import { RowCells, ThreadCells } from '../../threads/Pages';
@@ -16,9 +17,9 @@ import './everything.css';
 
 const agentsWords = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'} working`;
 
-/** A person's photo or initials, an AI teammate's dashed letter, a chat's faces. */
+/** A person's photo or initials, an AI teammate's face, a chat's faces. */
 export function MemberFace({ m, size }: { m: Member; size: number }) {
-  if (m.kind === 'mate') return <span className="ev-ai" style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }} aria-hidden="true">{m.letter}</span>;
+  if (m.kind === 'mate') return <MateFace seed={m.face ?? m.name} className="ev-ai" style={{ width: size, height: size }} />;
   if (m.kind === 'chat') {
     const faces = m.faces ?? [];
     if (!faces.length) return <span className="ev-hash" style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }} aria-hidden="true">#</span>;

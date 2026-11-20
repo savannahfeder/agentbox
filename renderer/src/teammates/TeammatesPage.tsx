@@ -14,6 +14,8 @@ import { rememberedProject } from '../compose-project';
 import { answerOf, answersMessage, chatEntries, chatWith, openedLines, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
+import { FacePick } from './MateFace';
+import { faceSeed } from '../../../shared/teammate-face.mts';
 import { AskBeforeDeleting } from '../team/MessageMore';
 import { keyInTheReplyBox, sendKeyFor } from '../reply-keys';
 import { Face } from '../team/people';
@@ -654,6 +656,8 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
   const settings = <dl>
     <dt>Name</dt>
     <dd><EditName key={t.name} name={t.name} onSave={(name) => keep({ name })} /></dd>
+    <dt>Face</dt>
+    <dd><FacePick seed={faceSeed(t)} onPick={(face) => keep({ face })} /></dd>
     <dt>Model</dt>
     <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
       effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>

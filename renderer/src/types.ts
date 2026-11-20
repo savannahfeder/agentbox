@@ -709,6 +709,8 @@ export interface TeammateWorks { every: 'day' | 'weekday' | 'week'; at: string; 
 export interface TeammateRef { id: string; product: string; title: string }
 export interface Teammate {
   id: string; name: string; letter: string; role: string | null; job: string | null; goal: string | null;
+  /** The face picked for it; absent, its face follows its id (shared/teammate-face.mts). */
+  face?: string | null;
   counted: string | null; asksFirst: string | null; works: TeammateWorks | null; worksLabel: string | null;
   product: string; engine: string | null; model: string | null; effort: string | null; limit: number;
   paused: boolean; status: 'draft' | 'active'; memory: TeammateMemory[]; createdAt: number; starter?: string | null;

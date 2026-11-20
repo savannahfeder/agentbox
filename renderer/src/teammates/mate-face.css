@@ -1,0 +1,9 @@
+/* Element and class, so it wins over the box a caller's class draws. */
+i.mate-face { box-sizing: border-box; border: none; border-radius: 50%; padding: 0; font-style: normal; }
+.fp-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fp-face { display: block; width: 28px; height: 28px; }
+.fp-now { box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 2.5px var(--text-dim); margin-right: 6px; }
+.tq-details dd .fp-pick, .fp-pick { padding: 0; margin: 0; border: none; background: none; border-radius: 50%; cursor: default; }
+.fp-pick:hover, .fp-pick:focus-visible { outline: none; box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 2.5px var(--line-strong); }
+.fp-more { margin-left: 6px; }
+i.mate-face > img { display: block; width: 100%; height: 100%; border-radius: inherit; }
