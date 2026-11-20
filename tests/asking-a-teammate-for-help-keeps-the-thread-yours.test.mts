@@ -194,6 +194,19 @@ describe('the rules, without a cloud', () => {
   });
 });
 
+describe('the wiring', () => {
+  const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+  it('a thread someone you asked has is out of your Needs you until it comes back', () => {
+    const app = read('renderer/src/App.tsx');
+    expect(app).toContain("if (askedOut.has(i.id) && !asking(i)) return false;");
+    expect(app).toMatch(/const askedOut = useMemo\(\(\) => new Set\(items\.flatMap\(\(r\) => \{\s*const a = askIGave\(r, team\?\.me \?\? null\);\s*return a && r\.status !== 'done' \? \[a\.thread\] : \[\];/);
+  });
+  it('a helper\'s words on your thread are passed on by your own supervisor', () => {
+    expect(read('main/main.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
+    expect(read('main/serve.mts')).toContain('tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),');
+  });
+});
+
 describe('the sheet after you pick a person', () => {
   it('offers help, a review or handing it over, and starts on help', () => {
     const html = renderToStaticMarkup(h(GiveSheet, { to: { id: 'u', name: 'Theo Okafor' }, onGive() {}, onAsk() {} }));

@@ -13,6 +13,26 @@ export const AskAboutContext = createContext(false);
 /** Opens the thread menu's people list with this message as the step (threads/ThreadMenu.tsx). */
 export const askAboutStep = (text: string) => window.dispatchEvent(new CustomEvent('zero:ask-step', { detail: stepOf(text) }));
 
+/** On the ask you sent, as its giver: who has it, and the way back to your thread. */
+export function AskSentLine({ task, onOpenThread }: { task: WorkItem; onOpenThread: () => void }) {
+  const team = useContext(TeamContext);
+  if (!team || !task.ask || !task.assignee) return null;
+  const person = team.byId.get(task.assignee) ?? null;
+  const first = firstName(person) || 'Your teammate';
+  const back = task.status === 'done';
+  return (
+    <div className="asks-line" role="status">
+      <div className="asks-one">
+        <Face person={person} size={22} />
+        <span className="asks-words"><span>{back
+          ? <>The thread is yours again.</>
+          : task.ask.kind === 'help' ? <><b>{first}</b> is helping on your thread.</> : <><b>{first}</b> is reviewing your thread.</>}</span></span>
+        <button type="button" className="asks-take" onClick={onOpenThread}>Open your thread</button>
+      </div>
+    </div>
+  );
+}
+
 export function AsksLine({ item, items, now = Date.now(), onTakeBack }: {
   item: WorkItem;
   items: readonly WorkItem[];

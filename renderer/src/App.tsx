@@ -67,9 +67,9 @@ import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, thread
 const SHARE_LAST = 'agentbox:share-last';
 import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
-import { AsksLine } from './team/AsksLine';
+import { AskSentLine, AsksLine } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askOnMe, asksOnThread } from '../../shared/thread-asks.mts';
+import { askIGave, askOnMe, asksOnThread } from '../../shared/thread-asks.mts';
 import { SEE_SAID, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -2304,6 +2304,11 @@ export default function App() {
   // the other rows, so it works this out and hands it to each list.
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const waitingOn = useCallback((i: WorkItem) => waitsThatCanEnd(i, byId), [byId]);
+  // Your threads someone you asked for help or a review has right now: In progress until they hand it back.
+  const askedOut = useMemo(() => new Set(items.flatMap((r) => {
+    const a = askIGave(r, team?.me ?? null);
+    return a && r.status !== 'done' ? [a.thread] : [];
+  })), [items, team?.me]);
 
   // A comment that asks you by name is news to you (fileNewsFor).
   const myName = team?.byId.get(team.me ?? '')?.name ?? null;
@@ -2330,6 +2335,8 @@ export default function App() {
     // And the app is still to ship it, which is the same: nobody needs to look
     // until it has (`shipping` in list-rules, w-0c1ba766eb).
     if (shippingIds.has(i.id) && !stillAsksYou(i) && !asking(i)) return false;
+    // Someone you asked has it; it comes back here when they hand it back (shared/thread-asks.mts).
+    if (askedOut.has(i.id) && !asking(i)) return false;
     if (owedAnAnswer.has(i.id)) return true;
     // The rule itself lives in list-rules.ts, pure and pinned by tests. What
     // is left here is the view's own business: the grace window, the clock,
@@ -2347,7 +2354,7 @@ export default function App() {
     if (asking(i)) return true;
     if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
     return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id), seen: seenAt[i.id] ?? unreadSince });
-  }), [items, hiddenAt, scope, now, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName]);
+  }), [items, hiddenAt, scope, now, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName, askedOut]);
   // A task asked for in a chat answers in that chat: Needs you lists the chat
   // instead (team/answers-in-the-chat.ts), and closing the chat closes them.
   const liftedBy = useRef(new Map<string, WorkItem[]>());
@@ -8519,6 +8526,8 @@ export default function App() {
                   asksSlot={!team ? null : focused.ask && focused.assignee === team.me && focused.status !== 'done'
                     ? <AskBar task={focused} owner={team.byId.get(focused.ask.owner) ?? null} onHandBack={(verdict, words) => handAskBack(focused, verdict, words)}
                       onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />
+                    : focused.ask && focused.ask.owner === team.me
+                    ? <AskSentLine task={focused} onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)} />
                     : <AsksLine item={focused} items={items} onTakeBack={(task) => { void takeAskBack(task); }} />}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}
