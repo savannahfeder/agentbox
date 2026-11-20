@@ -20,7 +20,7 @@ import { fileMessage } from '../main/team/file-to-chat.mts';
 import { askedThread, askedPatch } from '../shared/thread-ask.mts';
 import { endedWaits, personWait } from '../shared/thread-waits.mts';
 import { noticeEndedWaits, reviewedInChat } from '../main/team/waits.mts';
-import { groupFileRow, groupRow, reviewStillAsked } from '../shared/room-needs-you.mts';
+import { groupFileRow, groupRow, askStillOpen } from '../shared/room-needs-you.mts';
 
 const link = 'https://app.agentbox.ac/t/p-theo/w-gaps';
 const stored = '91c4e598-validation-gaps.md';
@@ -40,7 +40,7 @@ describe('the message a file review sends', () => {
   });
   it('the Share panel\'s send ties the review to the thread it came from', () => {
     const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
-    expect(ipc).toContain("askedPatch([to], askedSaid('review', team.firstNameOf(to) || 'them', note), Date.now(), 'review')");
+    expect(ipc).toMatch(/if \(about\) store\.threadEdit\([^\n]*askedPatch\(\[to\], askedSaid\('review', team\.firstNameOf\(to\) \|\| 'them', note\), Date\.now\(\), 'review'/);
     expect(ipc).toContain('sendFileToChat({ rooms, me, to, toName: person?.name ?? \'\', files, note, want, about })');
   });
 });
@@ -75,22 +75,22 @@ describe('what came back, on the thread', () => {
 });
 
 describe('the request in the reviewer\'s Needs you', () => {
-  const card = (waits: boolean) => ({ personId: 'p-theo', threadId: 'w-gaps', blockedBy: waits ? [{ id: personWait('p-sam'), title: null, want: 'review' }] : [] });
-  const row = (o: { waits?: boolean; marks?: ReturnType<typeof note>[] } = {}) => groupRow({
+  const card = (done: boolean) => ({ personId: 'p-theo', threadId: 'w-gaps', state: done ? 'done' : 'waiting', blockedBy: [{ id: personWait('p-sam'), title: null, want: 'review' }] });
+  const row = (o: { done?: boolean; marks?: ReturnType<typeof note>[] } = {}) => groupRow({
     roomId: 'r-1', roomName: 'Theo', pair: true, me: 'p-sam',
     messages: [ask, { id: 'm-2', by: 'p-sam', body: 'On it after lunch', at: at + 10 }],
-    stillAsked: (m) => reviewStillAsked(m, { me: 'p-sam', cards: [card(o.waits ?? true)], marks: o.marks ?? [] }),
+    stillAsked: (m) => askStillOpen(m, { me: 'p-sam', cards: [card(o.done ?? false)], marks: o.marks ?? [] }),
   });
   it('stays after the reviewer wrote in the chat: the reported case', () => {
     expect(row()?.messageId).toBe('m-1');
   });
-  it('goes once the review is sent back on the file, or the thread no longer waits on them', () => {
+  it('goes once the review is sent back on the file, or the thread is done', () => {
     expect(row({ marks: [note('p-sam', at + 20)] })).toBeNull();
-    expect(row({ waits: false })).toBeNull();
+    expect(row({ done: true })).toBeNull();
   });
   it('must NOT keep an ordinary message once answered', () => {
     const plain = groupRow({ roomId: 'r-1', roomName: 'Theo', pair: true, me: 'p-sam', messages: [{ id: 'm-1', by: 'p-theo', body: 'lunch?', at }, { id: 'm-2', by: 'p-sam', body: 'yes', at: at + 10 }],
-      stillAsked: (m) => reviewStillAsked(m, { me: 'p-sam', cards: [card(true)], marks: [] }) });
+      stillAsked: (m) => askStillOpen(m, { me: 'p-sam', cards: [card(false)], marks: [] }) });
     expect(plain).toBeNull();
   });
 });

@@ -2,7 +2,6 @@
 // tests/a-group-message-to-you-reaches-needs-you-until-you-answer.
 import { fileNewsFor, fileNewsLine, marksOf } from './artifact-marks.mts';
 import { WANT_WORDS, askedThread, isAsk } from './thread-ask.mts';
-import { personWait } from './thread-waits.mts';
 
 /** Someone in a group, by the name others call them. */
 export interface RoomNamed { id: string; name?: string | null }
@@ -168,7 +167,7 @@ export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, 
   nameOf?: NameOf;
   /** An ask (shared/thread-ask.mts) I answered on the thread it is about. */
   answeredOnItsThread?: (m: RoomSaid) => boolean;
-  /** A review asked of me that I have not sent back: it stays whatever I wrote since. */
+  /** An ask to me I have not answered where it was asked: it stays whatever I wrote since, until Mark done. */
   stillAsked?: (m: RoomSaid) => boolean;
 }): GroupRow | null {
   const pool = [...new Map([...mentioned, ...messages].map((m) => [m.id, m])).values()].sort((a, b) => a.at - b.at);
@@ -178,7 +177,7 @@ export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, 
   const settled = Math.max(doneAt, answeredAt, answers.at(-1)?.at ?? 0);
   const myRoots = new Set(mine.filter((m) => !m.inReplyTo).map((m) => m.id));
   const myThreads = new Set([...myRoots, ...mine.map((m) => m.inReplyTo).filter(Boolean)]);
-  const fresh = pool.filter((m) => m.by !== me && !m.deleted && (m.at > settled || stillAsked(m)) && !answeredOnItsThread(m));
+  const fresh = pool.filter((m) => m.by !== me && !m.deleted && (m.at > settled || (m.at > doneAt && stillAsked(m))) && !answeredOnItsThread(m));
   type Ids = readonly (string | null)[];
   const toMe = (m: RoomSaid): boolean => pair || ((m.mentions ?? []) as Ids).includes(me) || (mentionsIn(m.body, people) as Ids).includes(me)
     || (addressedByOpening(m.body, people) as Ids).includes(me) || (!!m.inReplyTo && myThreads.has(m.inReplyTo));
@@ -192,20 +191,22 @@ export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, 
 }
 
 /**
- * A review asked of me in a chat that I have not sent back: its thread's card
- * still waits on me for it, and I have put no note or approval on its files
- * since (shared/review-sent-back.mts, main/team/waits.mts reviewedInChat).
+ * An ask to me in a chat (shared/thread-ask.mts) that I have not answered where
+ * it was asked. Reading the chat or writing in it does not answer it: my comment
+ * on its thread does (groupRow's answeredOnItsThread), and for a review so does
+ * a note or approval on its files. A thread that is done asks nothing more. Not
+ * whether the thread still waits on me: a later ask on it can take that wait.
  */
-export function reviewStillAsked(m: RoomSaid, { me, cards, marks }: {
+export function askStillOpen(m: RoomSaid, { me, cards, marks }: {
   me: string | null;
-  cards: readonly { personId?: string; threadId?: string; blockedBy?: unknown }[];
+  cards: readonly { personId?: string; threadId?: string; state?: string }[];
   marks: readonly RoomMarkLike[];
 }): boolean {
-  const on = m.by !== me && m.body.startsWith(`${WANT_WORDS.review}: `) ? askedThread(m.body) : null;
-  if (!on || !me) return false;
-  const card = cards.find((c) => c.personId === on.owner && c.threadId === on.id);
-  const waits = Array.isArray(card?.blockedBy) && card.blockedBy.some((b: { id?: unknown; want?: unknown } | null) => b?.id === personWait(me) && b?.want === 'review');
-  return waits && !marks.some((k) => k.by === me && k.at > m.at);
+  const on = me && m.by !== me ? askedThread(m.body) : null;
+  if (!on) return false;
+  if (cards.find((c) => c.personId === on.owner && c.threadId === on.id)?.state === 'done') return false;
+  const files = askFiles(m.body);
+  return !marks.some((k) => k.by === me && k.at > m.at && files.includes(fileOf(k.mark)));
 }
 
 const REVIEW_HEAD = `${WANT_WORDS.review}: `;

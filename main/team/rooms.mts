@@ -7,7 +7,7 @@ import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
 import type { WallCard, TeamCardLike } from '../../shared/room-cards.mts';
 import type { AgentHoursSummary } from '../../shared/agent-hours.mts';
-import { askFiles, groupFileRow, groupRow, reviewStillAsked } from '../../shared/room-needs-you.mts';
+import { askFiles, askStillOpen, groupFileRow, groupRow } from '../../shared/room-needs-you.mts';
 import type { GroupRow } from '../../shared/room-needs-you.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mts';
 import { carryIntoRoom } from './carry-files.mts';
@@ -377,7 +377,7 @@ export function createRooms({
           const on = askedThread(m.body);
           return !!on && talk.some((t) => t.kind === 'comment' && t.by === who && t.owner === on.owner && t.threadId === on.id && (t.at ?? 0) > m.at);
         },
-        stillAsked: (m) => reviewStillAsked(m, { me: who, cards: t.cards ?? [], marks: fileMarks.get(r.id) ?? [] }),
+        stillAsked: (m) => askStillOpen(m, { me: who, cards: t.cards ?? [], marks: fileMarks.get(r.id) ?? [] }),
       });
       if (row) mentions.push(row);
       // A review I asked about a thread of mine comes back on that thread (main/team/waits.mts).
