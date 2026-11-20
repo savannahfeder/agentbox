@@ -1,7 +1,7 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { cardStateOf, handedOn, shippedAtOf, type WontStart } from '../../../shared/thread-cards.mts';
+import { cardStateOf, handedOn, shippedAtOf, summaryOf, type WontStart } from '../../../shared/thread-cards.mts';
 import { agentOnOrComing } from '../list-rules';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
 import { isShared, isTaskRow, runnerOf, taskNewsAt } from '../../../shared/team-rules.mts';
@@ -97,6 +97,9 @@ const oneLine = (s: string) => {
   const line = withoutFiles(s).split('\n').find((l) => l.trim())?.trim() || 'Sent a file';
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
+
+// Closed with no answer and no summary, a thread was stopped, not finished.
+const madeSomething = (s: { progress?: string | null; solution?: string | null }) => !!(s.progress || s.solution);
 
 export function teamToday({ range, window, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false, supervisor = {}, undoing = new Set() }: {
   /** A span of its own, in place of the range's: a standup covers from the one before it. */
@@ -222,7 +225,7 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     const shipped = shippedAtOf(i);
     if (inRange(shipped)) { who.shipped.push(line(shipped!)); continue; }
     if (i.status === 'done') {
-      if (handedOn(i)) continue;
+      if (handedOn(i) || (!task && !madeSomething(summaryOf(i)))) continue;
       const doneAt = i.wrote?.status?.ts ?? i.updatedAt;
       // A task you gave is finished by whoever closed it, in their words, not yours.
       const closer = task ? keyOfPerson(i.wrote?.status?.by) : null;
@@ -263,7 +266,7 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     const line: TodayLine = { key: `card/${c.personId}/${c.threadId}`, title: c.title ?? '', at: c.updatedAt, card: c };
     if (inRange(c.shippedAt)) { if (named) who.shipped.push({ ...line, at: c.shippedAt! }); else who.privateDone += 1; continue; }
     if (c.state === 'done') {
-      if (inRange(c.updatedAt) && !handedOn({ status: 'done', answer: c.solution })) { if (named) who.finished.push(line); else who.privateDone += 1; }
+      if (inRange(c.updatedAt) && !handedOn({ status: 'done', answer: c.solution }) && madeSomething(c)) { if (named) who.finished.push(line); else who.privateDone += 1; }
       continue;
     }
     if (!named) {
