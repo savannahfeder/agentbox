@@ -363,6 +363,7 @@ import { filmPiece, linkAddress, linkSiteFor } from '../file-link.mts';
 import { noticeLinkComments } from './link-comments.mts';
 import type { LinkComment } from './link-comments.mts';
 import { bringLinkEditsHome, type LinkEdit } from './link-edits.mts';
+import { shownName } from '../../shared/artifact-marks.mts';
 
 const LINK_COMMENTS_EVERY_MS = 60_000;
 const LINK_EDITS_EVERY_MS = 60_000;
@@ -549,7 +550,7 @@ export function createTeamService({
       try { real = fs.realpathSync(path.join(product.dir, rel)); } catch { continue; }
       if (!real.startsWith(root + path.sep) || !fs.statSync(real).isFile()) continue;
       if (fs.statSync(real).size > MAX_MESSAGE_FILE_BYTES) tooBig.push(path.basename(rel));
-      else files.push({ rel, name: path.basename(rel), srcPath: real });
+      else files.push({ rel, name: shownName(rel), srcPath: real });
     }
     return { words, files, tooBig };
   }

@@ -156,6 +156,22 @@ describe('an ask for a review', () => {
     expect(theTask().body).toMatch(/\[the table\]\(attachments\/[\w.-]*bookings-v2\.csv\)/);
   });
 
+  // Photographed on the help task: a file Sam had attached to the thread arrived
+  // named "a1b2c3d4e5f6-retry-plan.md", its stored prefix and all.
+  it('names a carried file by its own name, without the prefix it is stored under', async () => {
+    disk.setLineAuthor(sam.personId);
+    const t = sam.store.composeItem('api', { title: 'Plan the retries', body: 'Plan it.' });
+    const dir = sam.store.listProducts().find((p) => p.slug === 'api').dir;
+    fs.mkdirSync(path.join(dir, 'attachments'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'attachments', 'a1b2c3d4e5f6-retry-plan.md'), '# Plan\n');
+    sam.store.recordSessionResult('api', t.id, { result: 'Wrote [retry-plan.md](attachments/a1b2c3d4e5f6-retry-plan.md).' });
+    await sam.service.syncNow();
+    await sam.service.askTeammate({ product: 'api', id: t.id, to: theo.personId, kind: 'help' });
+    await both();
+    expect(theTask().body).toMatch(/\[retry-plan\.md\]\(attachments\//);
+    expect(theTask().body).not.toContain('[a1b2c3d4e5f6-retry-plan.md]');
+  });
+
   it('carries nothing when the thread changed no code', async () => {
     await asked('review');
     expect(theTask().body).not.toContain('.change)');
