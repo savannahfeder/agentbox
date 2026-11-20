@@ -79,17 +79,22 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const product = work?.product ?? '';
   const dir = work?.dir ?? '';
-  // The notes are read below; a ref keeps `open` steady for the markdown it is memoized into.
+  // What changes on every sync is read through refs, so `open` and the markdown it is
+  // memoized into stay the same and the links are not thrown away and drawn again.
   const notesHere = useRef<{ file: string }[]>([]);
-  const beside = useCallback((src: string) => onOpenDoc(product, src, notesOnFile(work?.lines ?? [], notesHere.current, src)), [product, onOpenDoc, work?.lines]);
+  const linesHere = useRef<LedgerLine[]>([]);
+  linesHere.current = work?.lines ?? [];
+  const calls = useRef({ onOpenDoc, onNotice });
+  calls.current = { onOpenDoc, onNotice };
+  const beside = useCallback((src: string) => calls.current.onOpenDoc(product, src, notesOnFile(linesHere.current, notesHere.current, src)), [product]);
   const open = useCallback((src?: string) => {
     if (!src || !product) return;
     // Beside the chat a teammate's copy is read-only, so a document or table opens big, where it is edited live.
     const goes = opensBigInAGroup(src) ? 'full' : whereAFileOpens(src);
     if (goes === 'full') setBig({ path: src, at: Date.now() });
     else if (goes === 'beside' || docKind(src)) beside(src);
-    else void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error ?? `${src} could not be opened.`); });
-  }, [product, beside, onNotice]);
+    else void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) calls.current.onNotice(r.error ?? `${src} could not be opened.`); });
+  }, [product, beside]);
   const md = useMemo(() => {
     const roots = dir ? [dir] : [];
     const components = {
@@ -105,7 +110,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
       img: ({ src, alt }: { src?: string; alt?: string }) => <ArtifactImg key={src} src={src} alt={alt} roots={roots} onOpen={open} />,
     };
     return (text: string) => <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={artifactUrlTransform}>{text}</ReactMarkdown>;
-  }, [product, dir, open]);
+  }, [product, dir]);
 
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
