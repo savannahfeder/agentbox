@@ -242,7 +242,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             </div>
           )}
           {/* The ask is the newest thing said here, so it comes last, as a message. */}
-          {ask && onHandBack && <AskBar task={ask} owner={person} onHandBack={onHandBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+          {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={onHandBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
           <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />

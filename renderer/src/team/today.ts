@@ -199,7 +199,14 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     const back = task && i.ask && i.verdict ? i.wrote?.verdict ?? i.wrote?.status : null;
     if (back) {
       const helper = keyOfPerson(back.by === i.assignee ? i.assignee : null);
-      if (helper && inRange(back.ts)) byKey.get(helper)?.helped?.push({ key: `${i.product}/${i.id}`, title: '', at: back.ts, item: i });
+      const list = helper && inRange(back.ts) ? byKey.get(helper)?.helped : null;
+      if (list) {
+        // Help and then a review on one thread name it once, by the newer.
+        const same = list.findIndex((l) => l.item?.ask?.thread === i.ask!.thread && l.item?.ask?.product === i.ask!.product);
+        const line = { key: `${i.product}/${i.id}`, title: '', at: back.ts, item: i };
+        if (same < 0) list.push(line);
+        else if (list[same].at < back.ts) list[same] = line;
+      }
       continue;
     }
     if (task && i.ask && i.status === 'done') continue;
