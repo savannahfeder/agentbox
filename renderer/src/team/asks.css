@@ -2,7 +2,7 @@
    a message on the helper's side. Rounded, as the design is. */
 .asks-when { font-size: 12.5px; color: var(--text-faint); }
 .asks-note { flex-basis: 100%; font-size: 13px; line-height: 19px; color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }
-.asks-take { flex: none; height: 28px; padding: 0 12px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 1px solid var(--line-strong); border-radius: 999px; cursor: pointer; }
+.asks-take { flex: none; padding: 6px 12px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
 .asks-take:hover { color: var(--text); border-color: var(--text-faint); }
 
 /* Who you asked, in the thread's header, and what pressing it shows. */
