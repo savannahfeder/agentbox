@@ -6,7 +6,8 @@
 // only the recommendation goes, because the person's own words outrank it.
 // Measured by the pure offer the thread page draws.
 import { describe, it, expect } from 'vitest';
-import { saidNotToShip, shipOfferFor } from '../renderer/src/ship-offer.ts';
+import fs from 'node:fs';
+import { agentSaidNotReady, saidNotToShip, shipOfferFor } from '../renderer/src/ship-offer.ts';
 
 const committed = { committed: true, uncommitted: false } as never;
 
@@ -34,5 +35,26 @@ describe('the offer', () => {
   });
   it('still offers nothing when the run left nothing', () => {
     expect(shipOfferFor({ committed: false, uncommitted: false } as never, null, { held: true })).toBeNull();
+  });
+});
+
+// Round seven: the agent itself wrote that the route "is not production-ready"
+// and persistence must come first, and "Ship it" sat right under it. The agent's
+// own answer counts when it says the change is not ready; its usual "without
+// pushing" does not, or every committed change would lose the recommendation.
+describe('when the agent says the change is not ready', () => {
+  it('holds the recommendation', () => {
+    expect(agentSaidNotReady('The payment route is not production-ready. Persistence must come first.')).toBe(true);
+    expect(agentSaidNotReady('It is not ready to ship until retries are covered.')).toBe(true);
+    expect(agentSaidNotReady('It is not yet ready to merge.')).toBe(true);
+  });
+  it('does not hold it for a change that is ready, or one committed without pushing', () => {
+    expect(agentSaidNotReady('Committed on the branch without pushing. Ready to ship.')).toBe(false);
+    expect(agentSaidNotReady('All tests pass.')).toBe(false);
+    expect(agentSaidNotReady(null)).toBe(false);
+  });
+  it('is read from the result where Focus asks', () => {
+    const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
+    expect(focus).toMatch(/held: saidNotToShip\(item\.body, item\.answer\) \|\| agentSaidNotReady\(item\.result\)/);
   });
 });

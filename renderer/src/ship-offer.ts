@@ -138,6 +138,10 @@ export function standingFrom(change: unknown): Standing {
 const HOLD_IT = /\b(?:do not|don['’]t|dont|never|without)\s+(?:merg(?:e|ing)|ship(?:ping)?|deploy(?:ing)?|push(?:ing)?)\b/i;
 export const saidNotToShip = (...words: readonly (string | null | undefined)[]): boolean => words.some((w) => HOLD_IT.test(w ?? ''));
 
+// And the agent saying the change is not ready. Its usual "committed without pushing" is not that.
+const NOT_READY = /\bnot (?:yet )?(?:production[- ]ready|ready to (?:ship|merge|deploy|go out))\b/i;
+export const agentSaidNotReady = (result: string | null | undefined): boolean => NOT_READY.test(result ?? '');
+
 export function shipOfferFor(stands: Standing, onlyFiles?: readonly string[] | null, { held = false }: { held?: boolean } = {}): { ask: string; options: ParsedOption[]; headed: boolean } | null {
   const offer = shipOfferForStanding(stands, onlyFiles);
   return offer && held ? { ...offer, options: offer.options.map((o) => ({ ...o, recommended: false })) } : offer;
