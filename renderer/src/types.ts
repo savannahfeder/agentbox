@@ -590,6 +590,8 @@ export interface RoomCard {
   status: string | null;
   workingOn: string | null;
   workingPrivate: boolean;
+  /** The thread `workingOn` names, when you can open it: a teammate's shared card, or your own. */
+  workingThread?: string | null;
 }
 
 export interface RoomActivity {
