@@ -519,6 +519,27 @@ function CarriedNote({ src, always = false }: { src: string; always?: boolean })
   );
 }
 
+/** Beside a file named in a conversation's words, while it has not reached this computer. */
+function InlineCarry({ src }: { src?: string }) {
+  const { direct, product } = useContext(MessagePlace);
+  const [carry, setCarry] = useState<CarryState | null>(null);
+  const [looks, setLooks] = useState(0);
+  useEffect(() => {
+    if (!direct || !product || !src || /^https?:/.test(src)) return;
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    api.resolveDoc({ product, src }).then((r) => {
+      if (!live) return;
+      setCarry(r.carry ?? null);
+      if (r.coming || r.waits || r.carry?.state === 'coming') timer = setTimeout(() => setLooks((n) => n + 1), NOTE_LOOKS_MS);
+    }).catch(() => {});
+    return () => { live = false; if (timer) clearTimeout(timer); };
+  }, [direct, product, src, looks]);
+  const said = carryLine(carry);
+  if (!said || said.state === 'sent') return null;
+  return <span className="carried-inline"> · {said.label}</span>;
+}
+
 // A FOLDER A WORKER NAMES ON ITS OWN LINE SHOWS WHAT IS IN IT (2026-10-04).
 //
 // Her words: the previews she should be able to open from the chat, "and maybe
@@ -632,7 +653,7 @@ export function ArtifactLink({ kind, product, src, fallback, onOpen, children }:
       .then((r: { ok: boolean; opened?: string }) => { if (r?.ok && r.opened) setHref(`file://${r.opened}`); })
       .catch(() => {});
   }, [product, src]);
-  return <><Mention kind={kind} href={href} title={src} onClick={(e) => { e.preventDefault(); onOpen(e, e.currentTarget); }}>{children}</Mention></>;
+  return <><Mention kind={kind} href={href} title={src} onClick={(e) => { e.preventDefault(); onOpen(e, e.currentTarget); }}>{children}</Mention><InlineCarry src={src} /></>;
 }
 
 // What a link's own words become. A path or an address the worker wrote out
