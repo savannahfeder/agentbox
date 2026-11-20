@@ -24,8 +24,10 @@ import { firstName, Face, TeamContext } from '../team/people';
 import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
 import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
-import { MessagePerson, TeammateCard, TeammateStanding } from './Summary';
-import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
+import { ThreadCrumb } from './Summary';
+import { QueueAnswer, QueueSummary } from '../components/OneThingAtATime';
+import { createPortal } from 'react-dom';
+import { earlierWords, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
 import { SendBack, reviewAskedOf, reviewAskWords } from './SendBack';
 import { answersTheStep, stepLine } from '../../../shared/thread-ask.mts';
@@ -60,8 +62,11 @@ export function optionsToAnswer({ events, outcome }: { events: readonly AgentEve
   return last?.who === 'it' ? parseOptions(last.text) : [];
 }
 
-export function TeammateThread({ card, person, now, syncedAt, openAt, step = null, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue }: {
+export function TeammateThread({ card, person, syncedAt, openAt, step = null, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, headerTarget = null, cornerTarget = null }: {
   card: ThreadCard; person: Person | null; now: number;
+  /** The window's bar, where its crumb goes, and its corner, where its buttons go. */
+  headerTarget?: HTMLElement | null;
+  cornerTarget?: HTMLElement | null;
   /** Carry it on in a thread of your own. */
   onContinue?: () => void;
   /** Where the back button goes: Threads, or the group it was opened from. */
@@ -211,7 +216,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
   useEffect(() => { if (helping) setAnsweringKept(true); }, [helping]);
   const answering = helping || answeringKept;
   const [picked, setPicked] = useState<number | null>(null);
-  const box = answering ? `Answer for ${owner}'s agent` : `Comment to ${owner}`;
+  const box = answering ? 'What should the agent do next?' : `Reply to ${owner}`;
   const replyBox = useRef<HTMLTextAreaElement>(null);
   // Until their copy takes the answer up, the header says it went rather than the wait it ended.
   const [answeredStep, setAnsweredStep] = useState(false);
@@ -236,12 +241,34 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
     return () => window.removeEventListener('keydown', keys);
   });
   const openMark = useCallback((link: FileMarkLink) => setBig({ file: link.file, note: link.id, at: Date.now() }), []);
-  const files = useMemo(() => filesOnThread(work?.lines ?? [], marks.notes).map((f) => ({
-    ...f, open: () => open(f.src),
-  })), [work?.lines, marks, open]);
+
+  // The page reads as one of your own: the newest answer is its headline, and what came before folds above it.
+  const said = events.filter((e): e is AgentSaid => !e.kind);
+  const lastIt = !built.outcome ? [...said].reverse().find((e) => e.who === 'it') ?? null : null;
+  const newest = built.outcome ? { at: built.outcome.at, text: built.outcome.text } : lastIt ? { at: lastIt.at, text: lastIt.text } : null;
+  const before = lastIt ? events.filter((e: AgentEvent) => e !== lastIt) : events;
+  const [earlierOpen, setEarlierOpen] = useState(false);
+  useEffect(() => { setEarlierOpen(false); }, [personId, threadId]);
+  const earlierCount = before.filter((e: AgentEvent) => !e.kind).length;
+  const askNote = card.blockedBy?.find((b) => b.want === 'help' && b.note)?.note ?? '';
+  const askWords = helping ? `asked you to help with this step` : sentToAgent ? `Sent to ${owner}'s agent` : reviewing ? 'asked you to review and send back' : review ? sentBack : null;
+  const me = team?.me ? team.byId.get(team.me) ?? null : null;
+  const title = card.title || 'Untitled thread';
 
   return (
-    <div className="tp-page">
+    <div className="focus-pane tp-thread">
+      {headerTarget && createPortal(<ThreadCrumb from={backLabel} name={title} onBack={onBack} />, headerTarget)}
+      {cornerTarget && createPortal(
+        <span className="ts-top tp-corner">
+          {following && card.state !== 'done' && <button type="button" className={`ts-done${followed ? ' on' : ''}`} aria-pressed={followed}
+            onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
+            {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
+          </button>}
+          {onContinue && !reviewing && !helping && canContinue(work, card, team?.me ?? null) && (
+            <button type="button" className="ts-done" onClick={onContinue} title={`Start a thread of your own with ${owner}'s conversation and files.`}>Continue it yourself</button>
+          )}
+          <button type="button" className="ts-done" onClick={onMessage}><Face person={person} size={18} />Message {owner}</button>
+        </span>, cornerTarget)}
       {big && product && (
         <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={viewLines} numbers={numbered.numbers} marks={marks}
           me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
@@ -262,58 +289,53 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, step = nul
           onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}
-      <div className="tp-bar">
-        <button type="button" className="th-back" onClick={onBack}><span aria-hidden="true">←</span>{backLabel}</button>
-        <div className="tp-acts">
-          {following && card.state !== 'done' && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
-            onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
-            {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
-          </button>}
-          {onContinue && !reviewing && !helping && canContinue(work, card, team?.me ?? null) && (
-            <button type="button" className="th-follow" onClick={onContinue}
-              title={`Start a thread of your own with ${owner}'s conversation and files.`}>
-              Continue it yourself
-            </button>
-          )}
-          <MessagePerson person={person} onMessage={onMessage} />
+      <div className="focus-scroll" data-thread-id={threadId}>
+        <div className="focus">
+          <div className="focus-body markdown agent-thread">
+            <QueueSummary title={title} context={card.problem} earlier={earlierCount} open={earlierOpen} onToggle={() => setEarlierOpen((o) => !o)} />
+            {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
+            {work && work.earlier > 0 && earlierOpen && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
+            {earlierOpen && before.length > 0 && (
+              <FileMarkOpener.Provider value={openMark}>
+                <Thread events={before} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />
+              </FileMarkOpener.Provider>
+            )}
+            {askWords && (
+              <div className="tp-ask">
+                <div className="one-by"><Face person={person} /><span>{owner}</span><em>{askWords}</em></div>
+                {helping && askNote && <p className="tp-ask-note">{askNote}</p>}
+                {reviewing && review.note && <p className="tp-ask-note">{review.note}</p>}
+              </div>
+            )}
+            {newest && (
+              <div data-line={`at-${newest.at}`}>
+                <QueueAnswer text={options.length ? stripOptionsSection(newest.text) : newest.text} md={md} name={title} />
+              </div>
+            )}
+            {/* Out of the form, whose button styles would square its rows. */}
+            {options.length > 0 && !reviewing && <OptionsOffer bare ask="" askAll="" options={options} peekOption={null} askPeek={false}
+              selectedOption={picked} selRef={pickRef} onPick={pickOption}
+              onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />}
+          </div>
         </div>
       </div>
-      <header className="tp-top">
-        <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
-        {card.title && <h1 className="th-card-title">{card.title}</h1>}
-        {card.visible && <TeammateStanding card={card} person={person} now={now} said={helping ? `${owner} asked you to help with this step` : sentToAgent ? `Sent to ${owner}'s agent` : reviewing ? reviewAskWords(owner, '') : review ? sentBack : null} />}
-      </header>
-      <div className="tp-grid">
-        <section className="th-work" aria-label="The conversation">
-          {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
-          {work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
-          <FileMarkOpener.Provider value={openMark}>
-            {events.length > 0 && <Thread events={events} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />}
-          </FileMarkOpener.Provider>
-          {built.outcome && (
-            <div className="appendix appendix-foot" data-line={`at-${built.outcome.at}`}>
-              <div className="appendix-label">{built.outcome.field === 'result' ? 'Result' : 'Latest checkpoint'}</div>
-              {md(options.length ? stripOptionsSection(built.outcome.text) : built.outcome.text)}
-            </div>
-          )}
-          {/* Out of the form, whose button styles would square its rows. */}
-          {options.length > 0 && !reviewing && <OptionsOffer bare ask="" askAll="" options={options} peekOption={null} askPeek={false}
-            selectedOption={picked} selRef={pickRef} onPick={pickOption}
-            onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />}
-          {reviewing ? (
-            <SendBack owner={owner} note={review.note} notes={myOpenNotes} face={<Face person={team?.me ? team.byId.get(team.me) : null} me />} onSend={sendBack} />
-          ) : <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-            <div className="tp-comment-box">
-              <Face person={team?.me ? team.byId.get(team.me) : null} me />
-              <textarea ref={replyBox} value={draft} rows={2} placeholder={box} aria-label={box}
+      <div className="focus-dock">
+        <div className="focus-dock-inner">
+          <div className="dock-card">
+            {reviewing ? (
+              <SendBack owner={owner} note={review.note} notes={myOpenNotes} face={<Face person={me} me />} onSend={sendBack} />
+            ) : <form className="th-comment tp-dock-form" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+              <textarea ref={replyBox} className="dock-input" value={draft} rows={1} placeholder={box} aria-label={box}
                 onChange={(e) => write(e.target.value)} onKeyDown={onKey} />
-              <button type="submit" disabled={!helperAnswer(options, picked, draft) || sending}>{answering ? `Send to ${owner}'s agent` : `Send to ${owner}`}</button>
-            </div>
-          </form>}
-        </section>
-        <aside className="tp-side" aria-label="About this thread">
-          <TeammateCard card={card} person={person} files={files} />
-        </aside>
+              <div className="compose-sentence dock-bar">
+                <span className="compose-clauses"><span className="dim">{answering ? `Goes to ${owner}'s agent.` : `Goes to ${owner}.`}</span></span>
+                <span className="dock-send-pair solo">
+                  <button type="submit" className="dock-send" disabled={!helperAnswer(options, picked, draft) || sending}>Send <kbd>↵</kbd></button>
+                </span>
+              </div>
+            </form>}
+          </div>
+        </div>
       </div>
     </div>
   );

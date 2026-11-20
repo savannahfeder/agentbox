@@ -73,9 +73,13 @@ describe('the comment box explains nothing', () => {
 
 describe('the page uses the window', () => {
   const css = read('renderer/src/threads/pages.css');
-  it('puts the conversation and what it is about side by side', () => {
-    expect(rule(css, '.tp-grid')).toMatch(/grid-template-columns: minmax\(0, 1fr\) 340px/);
-    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/<aside className="tp-side"/);
+  it('draws it as a thread of your own: crumb, reading column, reply box at the foot', () => {
+    const page = read('renderer/src/threads/TeammateThread.tsx');
+    expect(page).toContain('<div className="focus-pane tp-thread">');
+    expect(page).toContain('createPortal(<ThreadCrumb from={backLabel} name={title} onBack={onBack} />, headerTarget)');
+    expect(page).toContain('<QueueSummary title={title}');
+    expect(page).toMatch(/<div className="focus-dock">\s*<div className="focus-dock-inner">\s*<div className="dock-card">/);
+    expect(page).not.toContain('tp-side');
   });
   it('no longer caps the whole page at 760px', () => {
     expect(css).not.toMatch(/\.th-card-page \{[^}]*max-width: 760px/);

@@ -89,7 +89,8 @@ describe('a teammate’s thread opened from their page in Team', () => {
   const app = read('renderer/src/App.tsx');
   it('stays titled Team, with Team lit in the sidebar', () => {
     expect(app).toContain("const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;");
-    expect(app).toContain("<h1 className=\"workspace-title\">{openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'}</h1>");
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup'");
+    expect(app).toContain('<div className="workspace-task-header" ref={setTeamCardHeader} />');
     expect(app).toContain('roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
   });
   it('goes back to the page it came from, by name', () => {

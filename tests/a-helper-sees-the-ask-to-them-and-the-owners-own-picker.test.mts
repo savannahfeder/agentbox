@@ -43,7 +43,8 @@ describe('the helper\'s page', () => {
     expect(page).toMatch(/\/\^\[1-9\]\$\/\.test\(e\.key\)/);
   });
   it('heads the page with the ask to them, then that it went', () => {
-    expect(page).toContain('`${owner} asked you to help with this step`');
+    expect(page).toContain('helping ? `asked you to help with this step`');
+    expect(page).toContain('<div className="one-by"><Face person={person} /><span>{owner}</span><em>{askWords}</em></div>');
     expect(page).toContain("`Sent to ${owner}'s agent`");
   });
 });

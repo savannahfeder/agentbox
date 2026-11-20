@@ -672,3 +672,19 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
 
 .tp-asked { margin: 0 0 8px; font-size: 13px; line-height: 18px; color: var(--text-dim); }
+
+/* A teammate's thread opened from the Inbox is drawn as a thread of your own (TeammateThread.tsx). */
+.tm-team-pane.th-pane:has(> .tp-thread) { display: flex; flex-direction: column; overflow: hidden; }
+.tp-corner { display: inline-flex; align-items: center; gap: 8px; }
+.tp-corner .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 7px; }
+.ts-done.on { color: var(--text-faint); }
+.tp-ask { margin: 28px 0 0; }
+.tp-ask .one-by { margin: 0; }
+.tp-ask .one-by span { color: var(--text); }
+.tp-ask .one-by em { font: inherit; color: var(--text-dim); }
+.tp-ask-note { margin: 8px 0 0; font-size: 15px; line-height: 24px; color: var(--text); }
+.tp-dock-form { margin: 0; }
+.review-back { margin-top: 36px; }
+.review-back .one-by span { color: var(--text); }
+.review-back-verdict { font-weight: 600; }
+.tp-dock-form .compose-clauses, .tp-dock-form .tp-send-back-notes { margin-right: auto; }

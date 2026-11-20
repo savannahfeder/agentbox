@@ -50,15 +50,16 @@ describe('the reviewer\'s reply box', () => {
     const html = draw(2);
     expect(html).toContain('Lena asked you to review and send back: Check the v2 empty state');
     expect(html).toContain('Notes for Lena');
-    expect(buttons(html)).toEqual([{ words: 'Approve', off: false }, { words: 'Send back with 2 notes', off: false }]);
+    expect(buttons(html)).toEqual([{ words: 'Send back with 2 notes', off: false }, { words: 'Approve', off: false }]);
   });
   it('cannot send back with no notes to send', () => {
-    expect(buttons(draw(0))).toEqual([{ words: 'Approve', off: false }, { words: 'Send back with notes', off: true }]);
+    expect(buttons(draw(0))).toEqual([{ words: 'Send back with notes', off: true }, { words: 'Approve', off: false }]);
   });
-  it('is the reply box\'s shape, with no filled button', () => {
+  it('is the reply box\'s own shape, Approve where Send goes', () => {
     const html = draw(1);
-    expect(html).toContain('class="th-comment tp-send-back"');
-    expect(html).toContain('class="tp-comment-box"');
+    expect(html).toContain('class="th-comment tp-dock-form tp-send-back"');
+    expect(html).toContain('<textarea class="dock-input"');
+    expect(html).toContain('<span class="dock-send-pair solo"><button type="submit" class="dock-send">Approve</button></span>');
     expect(html).not.toContain('is-primary');
   });
   it('says plainly that it went back', () => {
@@ -72,10 +73,12 @@ describe('the thread page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
   it('puts the box where the reply box goes, at the foot', () => {
     expect(page).toMatch(/\{reviewing \? \(\s*<SendBack owner=\{owner\} note=\{review\.note\} notes=\{myOpenNotes\}/);
-    expect(page.indexOf('<SendBack')).toBeGreaterThan(page.indexOf('built.outcome && ('));
+    expect(page.indexOf('<SendBack')).toBeGreaterThan(page.indexOf('<QueueAnswer'));
+    expect(page).toMatch(/<div className="focus-dock">[\s\S]*<SendBack/);
   });
   it('heads the page with the ask to you, then that it went', () => {
-    expect(page).toContain("reviewing ? reviewAskWords(owner, '') : review ? sentBack : null} />");
+    expect(page).toContain("reviewing ? 'asked you to review and send back' : review ? sentBack : null;");
+    expect(page).toContain('{reviewing && review.note && <p className="tp-ask-note">{review.note}</p>}');
   });
   it('does not offer to take the thread while the review is yours', () => {
     expect(page).toMatch(/\{onContinue && !reviewing && (!helping && )?canContinue\(/);

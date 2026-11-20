@@ -156,6 +156,6 @@ describe('the helper\'s page', () => {
   it('offers the step\'s options and says the box answers the agent', () => {
     expect(page).toContain('answersTheStep(card, team?.me ?? null)');
     expect(page).toContain('const options = helping ? optionsToAnswer({ events, outcome: built.outcome }) : [];');
-    expect(page).toContain("`Answer for ${owner}'s agent`");
+    expect(page).toContain("`Goes to ${owner}'s agent.`");
   });
 });

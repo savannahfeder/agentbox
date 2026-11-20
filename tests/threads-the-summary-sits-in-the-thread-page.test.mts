@@ -29,7 +29,7 @@ describe('the top bar', () => {
     // went, and its place and arrows, beside the dots, in that mode only.
     // The faces sit with them so the header is one row (2026-11-02); Add
     // people is a row in the menu since w-c25aae4035.
-    expect(portal.startsWith('createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)')).toBe(true);
+    expect(portal.startsWith('createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && !givenTask && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)')).toBe(true);
     expect(focus).toContain('lead={summarised ? <ThreadStateMark item={item} /> : null}');
   });
 });

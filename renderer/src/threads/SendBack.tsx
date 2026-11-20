@@ -24,7 +24,7 @@ export function sentBackSaid(verdict: Verdict, notes: number, owner: string): st
   return notes > 0 ? `Sent back to ${owner} with ${notesWord(notes)}` : `Sent back to ${owner}`;
 }
 
-export function SendBack({ owner, note: asked, notes, face, onSend }: {
+export function SendBack({ owner, note: asked, notes, onSend }: {
   owner: string;
   /** The owner's note with the ask. */
   note: string;
@@ -43,15 +43,15 @@ export function SendBack({ owner, note: asked, notes, face, onSend }: {
     if (ok) setNote('');
   };
   return (
-    <form className="th-comment tp-send-back" aria-label={`Send back to ${owner}`} onSubmit={(e) => { e.preventDefault(); void send('approved'); }}>
-      <p className="tp-asked">{reviewAskWords(owner, asked)}</p>
-      <div className="tp-comment-box">
-        {face}
-        <textarea value={note} rows={2} placeholder={`Notes for ${owner}`} aria-label={`Notes for ${owner}`} onChange={(e) => setNote(e.target.value)} />
-        <button type="submit" disabled={busy}>Approve</button>
-        <button type="button" disabled={busy || (!notes && !note.trim())} onClick={() => void send('changes')}>
+    <form className="th-comment tp-dock-form tp-send-back" aria-label={`Send back to ${owner}`} title={reviewAskWords(owner, asked)} onSubmit={(e) => { e.preventDefault(); void send('approved'); }}>
+      <textarea className="dock-input" value={note} rows={1} placeholder={`Notes for ${owner}`} aria-label={`Notes for ${owner}`} onChange={(e) => setNote(e.target.value)} />
+      <div className="compose-sentence dock-bar">
+        <button type="button" className="ts-done tp-send-back-notes" disabled={busy || (!notes && !note.trim())} onClick={() => void send('changes')}>
           {notes ? `Send back with ${notesWord(notes)}` : 'Send back with notes'}
         </button>
+        <span className="dock-send-pair solo">
+          <button type="submit" className="dock-send" disabled={busy}>Approve</button>
+        </span>
       </div>
     </form>
   );

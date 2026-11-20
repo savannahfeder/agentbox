@@ -45,7 +45,7 @@ describe('the page', () => {
   });
   it('keeps the box\'s name until it sends', () => {
     expect(page).toContain('const answering = helping || answeringKept;');
-    expect(page).toContain("const box = answering ? `Answer for ${owner}'s agent` : `Comment to ${owner}`;");
+    expect(page).toContain("const box = answering ? 'What should the agent do next?' : `Reply to ${owner}`;");
   });
   it('keeps what is typed across a file opened and closed', () => {
     expect(page).toMatch(/sessionStorage\.setItem\(draftKey/);
