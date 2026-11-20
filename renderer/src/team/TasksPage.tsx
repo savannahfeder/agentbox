@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MemberFace } from './everything/TeamStrip';
 import type { Member } from './everything/members';
-import { tasksInOrder, tasksLine, type TaskGroups, type TaskRow } from './tasks';
+import { agentOnTaskWord, tasksInOrder, tasksLine, type TaskGroups, type TaskRow } from './tasks';
 import './tasks.css';
 
 function Row({ r, picked, face, from, onOpen, onOpenBlock, onOpenAgent }: {
@@ -17,7 +17,7 @@ function Row({ r, picked, face, from, onOpen, onOpenBlock, onOpenAgent }: {
       <span className="tk-block">{r.block && <>Blocked on {opens
         ? <button type="button" className="tk-link" onClick={(e) => { e.stopPropagation(); onOpenBlock(r); }}>{r.block.on}</button>
         : <span className="tk-on">{r.block.on}</span>}</>}
-        {!r.block && r.agent && !r.done && <button type="button" className="tk-link" onClick={(e) => { e.stopPropagation(); onOpenAgent?.(r); }}>With {r.agent.name}</button>}</span>
+        {!r.block && r.agent && !r.done && <button type="button" className="tk-link" onClick={(e) => { e.stopPropagation(); onOpenAgent?.(r); }}>{agentOnTaskWord(r.agent)}</button>}</span>
       <span className="tk-from">{from && `from ${from}`}</span>
       <span className={`tk-due${r.due?.late ? ' late' : ''}`}>{r.due?.word}</span>
     </div>

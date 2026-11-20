@@ -10,7 +10,7 @@ import { isDirect, peopleInConversation, peopleToAdd } from '../threads/page-rul
 import { shownPriority } from '../../../shared/rank.mts';
 import { priorityIdOf, priorityLabelOf } from '../priority';
 import { Face, TeamContext, dueWords, firstName, type TeamView } from './people';
-import { agentOnTask } from './tasks';
+import { agentOnTask, agentOnTaskWord } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { askWord } from '../../../shared/thread-asks.mts';
@@ -159,7 +159,7 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
   if (on && item.status !== 'done') {
     return <div className="opt-strip">
       <button type="button" className="opt-row" onClick={() => onOpenItem?.(on.item)}>
-        <span className="opt-text">With {on.name}</span><span className="tm-with-thread">{shownTitle(on.item)}</span>
+        <span className="opt-text">{agentOnTaskWord(on)}</span><span className="tm-with-thread">{shownTitle(on.item)}</span>
       </button>
     </div>;
   }
