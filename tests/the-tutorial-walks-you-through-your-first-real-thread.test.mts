@@ -448,7 +448,9 @@ describe('the folder chip before a choice', () => {
   // And then: "I thought it was actually a folder ... that can run code. It's just for personal tasks."
   it('says in the menu what a project with no folder is for', async () => {
     const box = await read();
-    expect(box).toContain('{!p.repoPath && <span className="tc-row-note">For personal tasks</span>}');
+    expect(box).toContain('{note && <span className="tc-row-note">{note}</span>}');
+    const { projectNote } = await import('../renderer/src/threads/composer-rules.ts');
+    expect(projectNote({ repoPath: null, team: null }, { me: null, byId: new Map() })).toBe('For personal tasks');
   });
 });
 

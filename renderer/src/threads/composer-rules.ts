@@ -334,6 +334,18 @@ export function projectsOffered<T extends ProjectLike>(products: readonly T[]): 
   return products.filter((p) => !isDirect(p));
 }
 
+/** The words beside a project in the picker: a project with no folder here is
+ *  a teammate's shared one, or one for personal tasks. */
+export function projectNote(
+  p: { repoPath?: string | null; team?: { sharedBy?: string | null; direct?: boolean } | null },
+  { me, byId }: { me: string | null; byId: ReadonlyMap<string, Person> },
+): string | null {
+  if (p.repoPath) return null;
+  if (!p.team || p.team.direct) return 'For personal tasks';
+  const by = p.team.sharedBy && p.team.sharedBy !== me ? byId.get(p.team.sharedBy) : undefined;
+  return by ? `Shared by ${firstName(by)}` : 'Your team’s';
+}
+
 /**
  * Which project the card opens on: the one on screen, else the one she last
  * sent to, else the first real one. The practice project is only ever chosen

@@ -70,7 +70,7 @@ import {
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInTo, findInvited, type ToSection,
   agentOnThisWork, atOffers, atWordAt, cardDraftPlace, cardDraftToKeep, handedFromLabel, withoutAtWord,
-  startingWhen, whenOnDraft, whenToSend, whenWords,
+  startingWhen, whenOnDraft, whenToSend, whenWords, projectNote,
   type AtOffer, type HandFrom, type Harness, type Keyboard, type ModelPick, type SendAs, type SendWhen, type Visibility,
 } from './composer-rules';
 import { sameRule } from '../../../shared/repeats.mts';
@@ -1048,13 +1048,14 @@ export function ThreadComposer({
           <button type="button" className="tc-head-link" onClick={onReorderProjects}>Reorder</button>
         </span>
       ) : <span className="tc-menu-head">Project</span>}
-      {offered.map((p) => (
-        <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerMove={hover}
+      {offered.map((p) => {
+        const note = projectNote(p, { me: team?.me ?? null, byId: team?.byId ?? new Map() });
+        return <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => { pickProject(p.slug); setProjectChosen(true); close('text'); }}>
           <Swatch slug={p.slug} /><span className="tc-row-label">{p.name}</span>
-          {!p.repoPath && <span className="tc-row-note">For personal tasks</span>}
-        </button>
-      ))}
+          {note && <span className="tc-row-note">{note}</span>}
+        </button>;
+      })}
       {/* MAKING A PROJECT IS A THING YOU CAN DO FROM HERE, ALWAYS (approved
           2026-10-05). Not only when the list is empty: somebody with ten
           projects who wants an eleventh is in this menu too, and the old
