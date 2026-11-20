@@ -444,6 +444,31 @@ function sendingWords(sending: Record<string, { done: number; total: number }> |
 const staged = (a: PendingAttachment): PendingAttachment => (a.storedAs ? a : { ...a, storedAs: storedName(a.name) });
 
 /** The chat's own box before there is a chat with this person; the first thing it sends makes the chat. */
+/** What two people did together before they ever chatted (pair-timeline.ts), in the chat's own rows. */
+export function AlongHistory({ rows, who }: {
+  rows: readonly ChatAlongRow[];
+  who: (id: string) => { name: string; avatarUrl: string | null } | undefined;
+}) {
+  const sorted = [...rows].sort((a, b) => a.at - b.at);
+  const slots = chatLayout(sorted.map((a) => ({ at: a.at, by: a.by })));
+  return <div className="rm-chat-list pl-history"><div className="rm-chat-msgs">
+    {sorted.map((a, i) => {
+      const p = who(a.by);
+      return <div key={a.key} data-along={a.key}>
+        {slots[i].day && <div className="rm-day"><span className="rm-label">{slots[i].day}</span></div>}
+        <div className={`rm-cm rm-along${slots[i].head ? '' : ' cont'}`}>
+          {slots[i].head && <div className="h">
+            <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={16} />
+            <span>{p?.name ?? 'Someone'}</span><em>{clockOf(a.at)}</em>
+          </div>}
+          <div className="tx">{a.text}</div>
+          <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
+        </div>
+      </div>;
+    })}
+  </div></div>;
+}
+
 export function FirstChatBox({ person, placeholder, open, send, putFile, putFileFrom, sending, onNotice }: {
   person: ChatPerson; placeholder: string;
   /** The chat's id, made if there is none; throws with why it could not be. */

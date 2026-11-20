@@ -150,7 +150,7 @@ import { RoomBoard } from './team/rooms/RoomBoard';
 import { directConversations } from './team/rooms/conversations';
 import { personChatShows, personPressOpens } from './team/one-conversation';
 import { pairLine, pairTimeline, type PairEntry, type PairOpens } from './team/pair-timeline';
-import type { ChatAlong } from './team/rooms/RoomChat';
+import { AlongHistory, type ChatAlong } from './team/rooms/RoomChat';
 import { listedIn, pairRooms } from '../../shared/pair-room.mts';
 import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
@@ -8028,6 +8028,10 @@ export default function App() {
           on: new Map(entries.flatMap((e) => { const w = there(e.where); return e.kind === 'message' && w ? [[e.key, w] as const] : []; })),
         };
       };
+      // With no chat yet, what you did together still shows over the first message's box.
+      const history = chatShows === 'first message'
+        ? along(pairTimeline({ me: team?.me ?? '', other: id, rooms: [], messages: [], directItems: items, talk: snap.team?.threadTalk ?? [], titleOf }))
+        : { rows: [] };
       const theirMates = members.filter((m) => m.key.startsWith(`theirmate:${id}:`))
         .map((m) => ({ ...m, name: teamMates.find((t) => `theirmate:${t.owner}:${t.id}` === m.key)?.name ?? m.name }));
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} onBack={back} backTo={backTo}
@@ -8038,7 +8042,7 @@ export default function App() {
         </>}
         chat={chatShows === 'chat' && room ? roomsUi.chatIn(room, (messages, pairRoomIds) => along(pairTimeline({ me: team?.me ?? '', other: id, rooms: pairRoomIds, messages, directItems: items, talk: snap.team?.threadTalk ?? [], titleOf }))) : chatShows === 'not yet' ? null
           : chatShows === 'first message'
-          ? <ChatStart empty={<EmptyChat name={first} />}
+          ? <ChatStart empty={history.rows.length ? <AlongHistory rows={history.rows} who={(p) => { const t = team?.byId.get(p); return t ? { name: t.name || t.email || 'Someone', avatarUrl: t.avatarUrl ?? null } : undefined; }} /> : <EmptyChat name={first} />}
             box={roomsUi.firstChat({ id, name: placeMember.name, avatarUrl: placeMember.avatarUrl ?? null }, `Message ${first}`)} />
           : <SendBox placeholder={`Message ${first}`} empty={<EmptyChat name={first} />}
             onSend={async (text) => { setComposeInitial({ to: id, body: text }); setModal('compose'); return null; }} />}
