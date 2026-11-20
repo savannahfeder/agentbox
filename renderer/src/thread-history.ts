@@ -237,6 +237,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // her.
   const claudeCode = (engine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
   let askedACommand = false;
+  // When an ask's verdict was written: the close right after it is the hand-back (shared/thread-asks.mts).
+  let verdictAt = -Infinity;
   // The newest ask written from your side, for an imported Codex
   // conversation's opening (see the relabel branch in the loop).
   let yourBody: string | null = null;
@@ -297,6 +299,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     markVoice = (line.patch?.voice as AgentVoice | undefined) ?? undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
+    if (has(patch, 'verdict')) verdictAt = Number(line.ts) || 0;
     if (has(patch, 'engine')) ranEngine = String(patch!.engine ?? '') || undefined;
     if (has(patch, 'model')) ranModel = String(patch!.model ?? '') || undefined;
     const mine = line.source === 'founder';
@@ -566,7 +569,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         // Handing it over closes your copy; "Given to …" just above already says what happened.
         const prev = events.at(-1);
         if (mine && prev?.field === 'answer' && /^Given to /.test(prev.words ?? '') && at - prev.at < 2000) continue;
-        events.push({ at, who, said: mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
+        const handedBack = Number(line.ts) - verdictAt < 2000;
+        events.push({ at, who, said: handedBack ? (mine ? 'You handed it back' : 'It was handed back') : mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
         continue;
       }
       if (status === 'blocked') {
