@@ -19,6 +19,7 @@ import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, 
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
+import { paletteIsOpen, pressedInThePalette } from '../palette-rows';
 import { ArtifactStage, StageLink, StageProject, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
 import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding, type MovedDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
@@ -637,7 +638,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // on its way up, so the thread behind stays still.
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || document.querySelector('[data-own-escape]')) return;
+      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || paletteIsOpen(document) || document.querySelector('[data-own-escape]')) return;
       e.stopImmediatePropagation();
       e.preventDefault();
       if (link) setLink(null);
@@ -648,6 +649,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       else leave();
     };
     const rest = (e: KeyboardEvent) => {
+      if (pressedInThePalette(e.target)) return;
       const at = e.target as HTMLElement | null;
       const typing = at?.tagName === 'TEXTAREA' || !!at?.isContentEditable;
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !typing && !e.defaultPrevented && unsent.ids.length) {

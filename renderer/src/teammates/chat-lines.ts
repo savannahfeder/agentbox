@@ -355,3 +355,12 @@ export function toggleFold(raw: string | null, key: string): string {
   if (set.has(key)) set.delete(key); else set.add(key);
   return JSON.stringify([...set]);
 }
+
+const SENT_WORDS: Partial<Record<string, string>> = { inbox: 'Waiting on you', progress: 'In progress', done: 'Done' };
+// A thread it opened for an agent waits in Later until you start it.
+const OPENED_WORDS: Partial<Record<string, string>> = { ...SENT_WORDS, snoozed: 'Not started' };
+
+/** The word before a thread it sent you or opened: the list the thread is on, or what it did. */
+export function sentWord(r: Pick<TeamRunLine, 'verb'>, tab: string | null): string {
+  return r.verb === 'opened' ? (tab && OPENED_WORDS[tab]) ?? 'Opened' : (tab && SENT_WORDS[tab]) ?? 'Sent you';
+}

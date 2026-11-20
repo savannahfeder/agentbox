@@ -3,7 +3,7 @@
 // tests/the-setup-beside-the-app-asks-only-what-applies.test.mjs reads them.
 
 import { MATCH_SKY } from './home/sky';
-import { TEAM } from '../../cloud/gateway/plans.mjs';
+import { TEAM, teamFreeDays } from '../../cloud/gateway/plans.mjs';
 
 /** Where the app sits beside the setup, in window pixels: the steps panel's
  *  width, the app's top-left corner and scale, and, in the app's own pixels,
@@ -34,31 +34,33 @@ export async function bringInWithin(bring: () => Promise<number>, ms = BRING_IN_
   }
 }
 
-export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'teammates' | 'look';
+export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'join' | 'teammates' | 'look';
 export type SetupPlan = 'free' | 'pro';
 
-/** Where Back goes, from a step or from the page after the last one. It passes over the account step once
- *  the account is made: that step only sends you forward again. */
-export function stepBefore(steps: readonly SetupStep[], at: number, signedIn: boolean): number | null {
+// The account step once the account is made, and the plan page once Pro is paid for, only send you forward again.
+const passedOver = (step: SetupStep, signedIn: boolean, paid: boolean) => (step === 'account' && signedIn) || (step === 'plan' && paid);
+/** Where Back goes, from a step or from the page after the last one, passing over steps that are done for good. */
+export function stepBefore(steps: readonly SetupStep[], at: number, signedIn: boolean, paid = false): number | null {
   let to = Math.min(at, steps.length) - 1;
-  if (to >= 0 && steps[to] === 'account' && signedIn) to -= 1;
+  while (to >= 0 && passedOver(steps[to], signedIn, paid)) to -= 1;
   return to >= 0 ? to : null;
 }
 /** A dash at the top takes you back to its step once you have passed it. */
-export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number, signedIn: boolean): boolean =>
-  i < at && !(steps[i] === 'account' && signedIn);
+export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number, signedIn: boolean, paid = false): boolean =>
+  i < at && !passedOver(steps[i], signedIn, paid);
 
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */
-export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1 }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number }): SetupStep[] {
+export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1, invited = false }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number; invited?: boolean }): SetupStep[] {
   const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
   // With Claude Code and Codex both ready, which one starts your threads is yours to say.
   if (agents > 1) out.push('agent');
   // Signing in is required, so it is a step, and what needs it comes after.
   if (team && !signedIn) out.push('account');
   // One page offers Pro and takes its payment. The team is a paid thing, so inviting comes only once Pro is started.
-  if (team && !onTeam) out.push('plan');
+  // Someone invited joins a team whose owner pays for their seat.
+  if (team && !onTeam) out.push(invited ? 'join' : 'plan');
   if (teammates && project) out.push('teammates');
   out.push('look');
   return out;
@@ -81,6 +83,22 @@ export const PRO_PITCH = {
   terms: 'Cancel any time.',
   free: 'Stay on Free',
 };
+
+type PlanSeen = { team?: { trial: boolean; endsAt: number | null } | null } | null | undefined;
+
+/** The free days Pro starts with. A team is made when Pro starts, so without one they are all there;
+ *  a team already made has what its checkout would give, and none unless the cloud says its trial is on. */
+export function proFreeDays(hasTeam: boolean, plan: PlanSeen, now = Date.now()): number {
+  if (!hasTeam) return TEAM.trialDays;
+  return plan?.team?.trial && plan.team.endsAt ? teamFreeDays(plan.team.endsAt, now) : 0;
+}
+
+/** The plan page's pricing and button for `days` free days: with none, no free column and no free claim. */
+export function proOffer(days: number) {
+  if (!days) return { trial: null, paid: { ...PRO_PITCH.paid, label: 'From today' }, cta: 'Start Pro now' };
+  if (days === TEAM.trialDays) return { trial: PRO_PITCH.trial, paid: PRO_PITCH.paid, cta: PRO_PITCH.cta };
+  return { trial: { ...PRO_PITCH.trial, label: `First ${days} days` }, paid: PRO_PITCH.paid, cta: `Try Pro free for ${days} days` };
+}
 
 /** A team is made when Pro starts, before anyone has named it; Settings › Team renames it. */
 export function teamNameFor(person: string | null | undefined): string {

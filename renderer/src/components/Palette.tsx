@@ -20,6 +20,10 @@ export interface Command {
   id: string;
   label: string;
   hint?: string;
+  /** A thread's line under its title: the sentence the query was found in. */
+  sub?: string;
+  /** A finished thread, drawn dimmed. */
+  done?: boolean;
   // Words she might TYPE that the label does not say. Matched, never shown;
   // the hint is shown, never matched (../palette-rows).
   keywords?: string;
@@ -549,7 +553,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
           {filtered.map((c, i) => (<Fragment key={keys[i]}>
             {labels.has(i) && <div className="palette-section">{labels.get(i)}</div>}
             <div
-              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${i === selected ? 'selected' : ''}`}
+              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${!phone && c.sub ? 'palette-two ' : ''}${c.done ? 'palette-done ' : ''}${i === selected ? 'selected' : ''}`}
               role="option"
               aria-selected={i === selected}
               onClick={c.run}
@@ -571,6 +575,8 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
                 </span>
                 : phone
                 ? <span className="palette-text"><span className="palette-label">{c.label}</span>{isThread(c) && c.hint && <span className="palette-sub">{c.hint}</span>}</span>
+                : c.sub
+                ? <span className="palette-text"><span className="palette-label">{c.label}</span><span className="palette-sub">{markedWords(c.sub, query.trim()).map((run, j) => (run.hit ? <b className="hit" key={j}>{run.text}</b> : <span key={j}>{run.text}</span>))}</span></span>
                 : <span className="palette-label">{c.label}</span>}
               {!phone && (c.keyHint ? <span className="palette-key">{c.keyHint}</span> : c.hint && <span className="palette-hint">{c.hint}</span>)}
             </div>
