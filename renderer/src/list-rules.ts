@@ -306,6 +306,15 @@ export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolea
 }
 
 /**
+ * Later holds a put-off or waiting row only once no run is on it or queued for
+ *  it. Until then it is In progress, which is "running or queued", so it is
+ *  counted in one tab (tests/a-queued-thread-put-off-stays-in-progress-until-its-run-ends).
+ */
+export function putOffInLater(i: InboxItem, { hiddenUntil, now, waitingOn, runOnIt }: { hiddenUntil: number; now: number; waitingOn: readonly string[]; runOnIt: boolean }): boolean {
+  return (hiddenUntil > now || waitsInLater(i, waitingOn)) && !runOnIt;
+}
+
+/**
  * The threads this one waits on that can still finish. It fails open, because
  * hiding a thread is the dangerous direction. Not a wait: a blocker that is
  * done, one this window cannot see (another project, archived, past the 8 MB

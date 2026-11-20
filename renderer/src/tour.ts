@@ -100,6 +100,11 @@ type Press = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shi
 /** ↵ alone is the key the last tip names: it closes the tip and reaches nothing else. */
 export const keyClosesFinish = (e: Press): boolean => e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
 
+/** Whether the urgent tip, once gone, can count as done. When it is the last lesson that starts the
+ * finishing moment, which goes to Home, so it waits until nothing the person opened would be taken away. */
+export const urgentCountsNow = (t: Tour, s: TourScreen): boolean =>
+  !tourOver(finishLesson(t, 'urgent')) || (!s.thread && !s.palette && s.composer !== 'card' && !s.menu && !s.covered);
+
 /** The last tip stands above Home's greeting, on its left edge. */
 export const finishedPlace = (hello: { left: number; top: number }, cardHeight: number) =>
   ({ left: hello.left, top: Math.max(12, hello.top - 20 - cardHeight) });
