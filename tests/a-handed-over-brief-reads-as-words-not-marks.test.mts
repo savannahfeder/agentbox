@@ -8,22 +8,23 @@
 // review.**" under "Where it got to:". A person's message is drawn as typed, so
 // both came out as marks.
 //
-// A line that is only a link is drawn as the link, as an attached file already
-// is, and the brief carries the agent's words without its bold marks.
+// A line that is only a thread's link is drawn as the link, as an attached file
+// already is (a web link you type yourself stays as typed), and the brief carries the agent's words without its bold marks.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { typedParts } from '../renderer/src/typed-message';
 
 describe('a person\'s message', () => {
-  it('draws a line that is only a web link as the link', () => {
+  it('draws a line that is only a thread\'s link as the link', () => {
     expect(typedParts('Priya Shah asked:\n\n[Clinic bookings list empty states](https://app.agentbox.ac/t/c5/w-ebd3c6261e)\n\nThe design is ready.')).toEqual([
       { text: 'Priya Shah asked:' },
       { embed: '[Clinic bookings list empty states](https://app.agentbox.ac/t/c5/w-ebd3c6261e)' },
       { text: 'The design is ready.' },
     ]);
   });
-  it('keeps a link written inside a sentence as typed', () => {
+  it('keeps a link written inside a sentence, or any other web link, as typed', () => {
     expect(typedParts('See [the doc](https://example.com/a) first.')).toEqual([{ text: 'See [the doc](https://example.com/a) first.' }]);
+    expect(typedParts('the docs:\n[guide](https://example.com/guide)')).toEqual([{ text: 'the docs:\n[guide](https://example.com/guide)' }]);
   });
 });
 
