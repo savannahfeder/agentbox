@@ -4328,6 +4328,7 @@ export default function App() {
       cards={[...cards, ...roomMateCards(snap?.team?.rooms?.rooms ?? [])]} picked={people} onOpenCard={(c) => { if (!isPresenceCard(c)) openTeammateCard(c); }} columnOrder={columnOrder} later={later}
       onOpenItem={(item) => { setFocused(item); markSeen(item); }} />,
     threadOf: (c) => { const t = threadOnLine(c, weekCards); return t ? () => openContinuedFrom(t.personId, t.threadId) : null; },
+    onTeammate: (id) => pickMember(`person:${id}`),
   });
   // Two people have one conversation while Rooms is live: the chat on the person's page.
   const oneChat = roomsUi.live && homeLayout === 'chats';
