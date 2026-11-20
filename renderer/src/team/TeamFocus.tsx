@@ -33,7 +33,9 @@ export function TeamSaid({ item }: { item: WorkItem }) {
   const closer = item.wrote?.status?.by;
   const ask = task ? item.ask?.kind ?? null : null;
   const said = task && item.status === 'done'
-    ? ask ? (closer === item.assignee ? `${mine ? 'you' : name} handed this back` : `${mine ? name : 'you'} took this back`)
+    ? ask ? (closer === item.assignee
+      ? `${mine ? 'you' : name} ${item.verdict === 'changes' ? 'asked for changes' : item.verdict === 'yes' ? 'said it looks good' : 'handed this back'}`
+      : `${mine ? name : 'you'} took this back`)
       : `${closer === team.me ? 'you' : firstName(team.byId.get(closer ?? '') ?? team.byId.get(other ?? ''))} marked this done`
     : ask ? (mine ? `${name} asked you` : `asked ${name}`)
     : mine ? `${name} gave you this` : `with ${name}`;

@@ -2,7 +2,7 @@
 // their note, the step they picked, and handing it back with your answer. On
 // the task's own page the same buttons sit under the message that asked
 // (`AskActions`), since that message already says the rest.
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Person, WorkItem } from '../types';
 import { Face, firstName } from './people';
 import { clock, dayHeading } from '../thread-history';
@@ -28,6 +28,11 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
   const [giving, setGiving] = useState<Verdict | null>(null);
   const [words, setWords] = useState('');
   const [busy, setBusy] = useState(false);
+  // The ask is often the last thing on the page, so its box would open under the window's edge.
+  const backBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (giving) backBox.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [giving]);
   const ask = task.ask;
   if (!ask) return null;
   const first = firstName(owner) || 'Your teammate';
@@ -51,7 +56,7 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
       {ask.note && !onOpenThread && !under && <p className="ask-bar-note">{ask.note}</p>}
       {ask.step && !onOpenThread && !under && <blockquote className="ask-bar-step">{ask.step.length > 400 ? `${ask.step.slice(0, 400)}…` : ask.step}</blockquote>}
       {giving ? (
-        <div className="ask-bar-back">
+        <div className="ask-bar-back" ref={backBox}>
           <textarea autoFocus value={words} placeholder={ask4} aria-label={ask4} rows={2}
             onChange={(e) => setWords(e.target.value)}
             onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void back(); } }} />
