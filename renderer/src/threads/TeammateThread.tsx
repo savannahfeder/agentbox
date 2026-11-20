@@ -30,6 +30,7 @@ import { AskBar } from '../team/AskBar';
 import { MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
+import { readDraft, saveDraft } from '../drafts';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
 const COPY = /^attachments\//;
@@ -60,17 +61,20 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   onNotice: (text: string) => void;
 }) {
   const [work, setWork] = useState<Work | null>(null);
-  const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [reread, setReread] = useState(0);
   // What it is about, its files and its properties, beside the thread when asked for.
   const [about, setAbout] = useState(false);
   const { personId, threadId } = card;
+  // Kept in the draft store, so a page drawn again from nothing still has what you were writing.
+  const draftAt = useMemo(() => ({ product: `teammate:${personId}`, id: threadId }), [personId, threadId]);
+  const [draft, setDraftHere] = useState(() => readDraft(draftAt));
+  const setDraft = (text: string) => { setDraftHere(text); saveDraft(draftAt, text); };
   const team = useContext(TeamContext);
   const following = useContext(FollowContext);
   const followed = !!following?.is(card);
 
-  useEffect(() => { setWork(null); setDraft(''); }, [personId, threadId]);
+  useEffect(() => { setWork(null); setDraftHere(readDraft(draftAt)); }, [draftAt]);
   useEffect(() => {
     let live = true;
     api.teamThreadWork({ personId, threadId }).then((w) => { if (live) setWork(w as Work); });
