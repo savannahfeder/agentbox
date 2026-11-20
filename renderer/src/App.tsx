@@ -2304,7 +2304,8 @@ export default function App() {
   // the other rows, so it works this out and hands it to each list.
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const waitingOn = useCallback((i: WorkItem) => waitsThatCanEnd(i, byId), [byId]);
-  // Your threads someone you asked for help or a review has right now: In progress until they hand it back.
+  // Your threads someone you asked for help or a review has right now: out of Needs you, notes and
+  // comments included, until they hand it back (shared/thread-asks.mts).
   const askedOut = useMemo(() => new Set(items.flatMap((r) => {
     const a = askIGave(r, team?.me ?? null);
     return a && r.status !== 'done' ? [a.thread] : [];
@@ -2315,7 +2316,6 @@ export default function App() {
   const inboxCandidates = useMemo(() => items.filter((i) => {
     if (pendingIds.has(i.id)) return false; // action held in the grace window: already sent, as far as the inbox is concerned
     if (i.product && scope && i.product !== scope) return false;
-    // Someone you asked has it, notes and comments included; it comes back here when they hand it back (shared/thread-asks.mts).
     if (askedOut.has(i.id) && !asking(i)) return false;
     if (commentsWaitOnYou(i, seenAt[i.id] ?? unreadSince)) return true;
     if (i.linkComments?.length) return true;

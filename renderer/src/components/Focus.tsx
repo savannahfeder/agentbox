@@ -2275,7 +2275,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
         {givenTask && <div className="focus-meta by-lead"><TeamSaid item={item} /></div>}
-        {givenTask && !item.ask && <HandedFrom item={item} />}
+        {givenTask && <HandedFrom item={item} />}
         {made
           ? <div className="outcome">{md(item.body ?? '')}</div>
           : !agent && (
