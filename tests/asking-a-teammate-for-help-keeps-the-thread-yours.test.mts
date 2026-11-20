@@ -81,6 +81,9 @@ describe('an ask for help', () => {
     expect(task.ask).toMatchObject({ kind: 'help', owner: sam.personId, thread: t.id, product: 'api', note: 'Is dropping the index safe?', step: 'Should I drop the old unique index first?' });
     expect(task.assignee).toBe(theo.personId);
     expect(sam.store.readItem('api', t.id).status).not.toBe('done');
+    // The line over the message already says who asked and what for, so the words do not say it again.
+    expect(task.body).toContain("What you write on this thread goes to Sam's agent until you hand it back.");
+    expect(task.body).not.toMatch(/asked you to help/);
   });
 
   it('passes what they write on your thread to its agent, once, as theirs', async () => {

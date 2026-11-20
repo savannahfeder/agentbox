@@ -123,9 +123,10 @@ export function handedBackWords({ kind, name, verdict, words, asked = null }: { 
 
 /** The first lines of the task the helper gets: who asked, for what, and the step if one was picked. */
 export function askBody({ kind, owner, note, step }: { kind: AskKind; owner: string; note: string; step?: string | null }): string {
+  // The line over the message says who asked and what for; this says only what it means.
   const lead = kind === 'help'
-    ? `${owner} asked you to help on this thread. What you write there goes to ${owner}'s agent until you hand it back.`
-    : `${owner} asked you to review this thread and send it back with your answer.`;
+    ? `What you write on this thread goes to ${owner}'s agent until you hand it back.`
+    : 'Say whether it looks good or what to change.';
   const quoted = step?.trim() ? step.trim().split('\n').map((l) => `> ${l}`).join('\n') : '';
   return [note.trim(), quoted, lead].filter(Boolean).join('\n\n');
 }
