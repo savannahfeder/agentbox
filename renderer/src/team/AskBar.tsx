@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import type { Person, WorkItem } from '../types';
 import { Face, firstName } from './people';
+import { clock, dayHeading } from '../thread-history';
 import './asks.css';
 
 type Verdict = 'done' | 'yes' | 'changes';
@@ -44,6 +45,7 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
       {!under && <div className="ask-bar-head">
         <Face person={owner} size={22} />
         <b>{first}</b><span>{ask.kind === 'help' ? 'asked you to help' : 'asked for your review'}</span>
+        {task.createdAt ? <span className="ask-bar-when">{`${dayHeading(task.createdAt)} ${clock(task.createdAt)}`}</span> : null}
       </div>}
       {/* On the task's own page its message already says both. */}
       {ask.note && !onOpenThread && !under && <p className="ask-bar-note">{ask.note}</p>}

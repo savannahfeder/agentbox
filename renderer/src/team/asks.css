@@ -37,9 +37,10 @@
 .sh-step { margin: 8px 14px 0; padding: 6px 10px; font-size: 12.5px; line-height: 18px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; background: var(--bg-raised); white-space: pre-wrap; max-height: 90px; overflow: hidden; }
 
 /* A helper on someone's thread: what was asked, as a message, and handing it back. */
-.ask-bar { display: flex; flex-direction: column; gap: 10px; margin: 28px 0 0; }
+.ask-bar { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 0; }
 .ask-bar-head { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-dim); }
 .ask-bar-head b { font-weight: 500; color: var(--text); }
+.ask-bar-when { font-size: 13px; color: var(--text-faint); }
 .ask-bar-note { margin: 0; font-size: var(--tp-type, 15px); line-height: 1.55; color: var(--text); white-space: pre-wrap; }
 .ask-bar-step { margin: 0; padding: 6px 12px; font-size: 14px; line-height: 21px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
 .ask-bar-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
