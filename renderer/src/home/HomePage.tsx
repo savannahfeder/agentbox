@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { agoShort, doors, type DoorKey, type TeamRowState } from './home-model';
+import { doors, type DoorKey, type TeamRowState } from './home-model';
+import { updatedWords } from '../threads/page-rules';
 import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
 import './home.css';
@@ -96,7 +97,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
                     {r.project && <span className="hm-tag">{r.project}</span>}
                   </span>
                 </span>
-                {r.at !== null && <time>{agoShort(r.at, now)}</time>}
+                {r.at !== null && <time>{updatedWords(r.at, now)}</time>}
               </button>
             ))}
           </div>
@@ -130,7 +131,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
                 <button type="button" key={r.key} className="hm-row" onClick={() => onOpen(r.key)}>
                   <span className="hm-face live">{r.letter}</span>
                   <span className="hm-text"><b>{r.title}</b><small>{r.line}</small></span>
-                  <time>{agoShort(r.at, now)}</time>
+                  <time>{updatedWords(r.at, now)}</time>
                 </button>
               ))}
             </div>
