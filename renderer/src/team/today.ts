@@ -1,7 +1,7 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { cardStateOf, handedOn, shippedAtOf, summaryOf, type WontStart } from '../../../shared/thread-cards.mts';
+import { cardStateOf, handedToName, shippedAtOf, summaryOf, type WontStart } from '../../../shared/thread-cards.mts';
 import { agentOnOrComing } from '../list-rules';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
 import { isShared, isTaskRow, runnerOf, taskNewsAt } from '../../../shared/team-rules.mts';
@@ -47,6 +47,8 @@ export interface TodayLine {
   file?: string;
   /** Whom a blocked line waits on. */
   on?: string | null;
+  /** Whom a handed-on thread went to. */
+  to?: string;
   /** How far it got, in its own words. */
   says?: string;
   /** A task's deadline, said as the row says it, and what blocks it. */
@@ -65,6 +67,10 @@ export interface TodayPerson {
   waiting?: TodayLine[];
   /** Every open task they hold, whatever the range. */
   tasks: TodayLine[];
+  /** Threads they handed to someone else in the range. */
+  handed?: TodayLine[];
+  /** Your own threads in the range that wait on you, which the standup counts as yours to finish. */
+  asked?: TodayLine[];
   /** Private threads they finished: counted, never named. */
   privateDone: number;
   /** Private threads an agent is on for them in the range: counted, never named. */
@@ -134,7 +140,7 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
   const byKey = new Map<string, TodayPerson>();
   const order: string[] = [];
   const add = (key: string, name: string, kind: TodayPerson['kind']) => {
-    byKey.set(key, { key, name, kind, finished: [], shipped: [], decided: [], blocked: [], waitingOnYou: [], working: [], waiting: [], tasks: [], privateDone: 0 });
+    byKey.set(key, { key, name, kind, finished: [], shipped: [], decided: [], blocked: [], waitingOnYou: [], working: [], waiting: [], tasks: [], handed: [], asked: [], privateDone: 0 });
     order.push(key);
   };
   add('me', 'You', 'me');
@@ -205,20 +211,26 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     const shipped = shippedAtOf(i);
     if (inRange(shipped)) { who.shipped.push(line(shipped!)); continue; }
     if (i.status === 'done') {
-      if (handedOn(i) || (!task && !madeSomething(summaryOf(i)))) continue;
       const doneAt = i.wrote?.status?.ts ?? i.updatedAt;
+      const to = handedToName(i);
+      if (to) { if (inRange(doneAt)) who.handed!.push({ ...line(doneAt), to }); continue; }
+      if (!task && !madeSomething(summaryOf(i))) continue;
       // A task you gave is finished by whoever closed it, in their words, not yours.
       const closer = task ? keyOfPerson(i.wrote?.status?.by) : null;
       if (inRange(doneAt)) (closer && closer !== 'me' ? byKey.get(closer)! : who).finished.push(line(doneAt));
       continue;
     }
-    if (inNeeds.has(`${i.product}/${i.id}`) || undoing.has(i.id)) continue;
+    if (undoing.has(i.id)) continue;
+    const card = cardStateOf(i, { now, live: agentOn.has(i.id), wontStart: supervisor });
+    if (inNeeds.has(`${i.product}/${i.id}`)) {
+      if (!task && inRange(i.updatedAt) && card.state !== 'scheduled' && !later(i)) who.asked!.push(line(i.updatedAt));
+      continue;
+    }
     if (task) {
       const holder = byKey.get(keyOfPerson(i.assignee) ?? '');
       if (holder) holder.tasks.push(taskLine(i, line(taskNewsAt(i, null))));
       continue;
     }
-    const card = cardStateOf(i, { now, live: agentOn.has(i.id), wontStart: supervisor });
     const on = blockOn([...(card.waitsOn ? [card.waitsOn] : []), ...(i.blockedBy ?? [])], k);
     if (on) who.blocked.push(line(i.updatedAt, on));
     else if (i.status === 'blocked') who.blocked.push(line(i.updatedAt, null));
@@ -246,7 +258,9 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     const line: TodayLine = { key: `card/${c.personId}/${c.threadId}`, title: c.title ?? '', at: c.updatedAt, card: c };
     if (inRange(c.shippedAt)) { if (named) who.shipped.push({ ...line, at: c.shippedAt! }); else who.privateDone += 1; continue; }
     if (c.state === 'done') {
-      if (inRange(c.updatedAt) && !handedOn({ status: 'done', answer: c.solution }) && madeSomething(c)) { if (named) who.finished.push(line); else who.privateDone += 1; }
+      const to = handedToName({ status: 'done', answer: c.solution });
+      if (to) { if (inRange(c.updatedAt) && named) who.handed!.push({ ...line, to }); continue; }
+      if (inRange(c.updatedAt) && madeSomething(c)) { if (named) who.finished.push(line); else who.privateDone += 1; }
       continue;
     }
     if (!named) {
@@ -296,12 +310,12 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
   // Titles only for the lines a section draws: a week on a big store finishes thousands.
   for (const p of all) {
     p.tasks.sort(byDue);
-    for (const list of [p.finished, p.shipped, p.decided, p.blocked, p.waitingOnYou, p.working, p.waiting!, p.tasks]) {
+    for (const list of [p.finished, p.shipped, p.decided, p.blocked, p.waitingOnYou, p.working, p.waiting!, p.tasks, p.handed!, p.asked!]) {
       if (list !== p.tasks) list.sort(newest);
       for (const l of list.slice(0, SHOWN)) if (!l.title && l.item) l.title = shownTitle(l.item);
     }
   }
-  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.privateDone + (p.privateWorking ?? 0) > 0;
+  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.handed!.length + p.privateDone + (p.privateWorking ?? 0) > 0;
   return {
     people: all.filter(says),
     quiet: all.filter((p) => p.kind !== 'me' && !says(p)).map(quietName),

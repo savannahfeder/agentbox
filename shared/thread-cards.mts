@@ -349,6 +349,10 @@ export function cardStateOf(item: CardItem & { id: string }, { now = Date.now(),
 export const handedOn = (item: { status?: string; answer?: string | null }): boolean =>
   item.status === 'done' && /^Given to /.test(item.answer ?? '');
 
+/** Whom a handed-on thread went to, by the name its close wrote. */
+export const handedToName = (item: { status?: string; answer?: string | null }): string | null =>
+  (handedOn(item) ? String(item.answer).slice('Given to '.length).split(/:\s/)[0].replace(/\.$/, '') : null);
+
 export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [], wontStart = {} }: {
   products: readonly P[];
   readItems: (product: P) => readonly (CardItem & { id: string })[];

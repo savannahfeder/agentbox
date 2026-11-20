@@ -5511,7 +5511,7 @@ export default function App() {
         // what it cost are in list-rules (`withdrawReply`): restoring the
         // status only when the reply had changed one left an already-open row
         // sitting blocked after the kill, where nothing carries an answer.
-        await api.answer({ product: item.product, id: item.id, ...(runStays ? { answer: '(withdrawn)' } : withdrawReply(item.status)) });
+        await api.answer({ product: item.product, id: item.id, ...(runStays ? { answer: '(withdrawn)' } : withdrawReply(item.status, item.answer)) });
         // Taking the command back ends the watch with it, so the next Escape
         // means what it always meant.
         setFollowing(null);
@@ -5698,7 +5698,7 @@ export default function App() {
         // reply's undo makes. Hardcoding 'open' was right while a pick could
         // only ever happen on an open row; a pick on a finished one would have
         // undone into her inbox instead of back into Done.
-        await api.answer({ product: item.product, id: item.id, ...withdrawReply(item.status) });
+        await api.answer({ product: item.product, id: item.id, ...withdrawReply(item.status, item.answer) });
       } });
       // "Sent", because the arrow says where the answer went and nothing said
       // what happened to it: "Option 1 → Practice" was read off the QA box as

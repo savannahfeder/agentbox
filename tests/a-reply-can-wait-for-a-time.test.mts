@@ -237,7 +237,7 @@ describe('the reply box and the app', () => {
   it('Z on a reply set for later leaves an agent already working on the thread running', () => {
     const undo = answerWith.slice(answerWith.indexOf('pushUndo({'));
     expect(undo).toMatch(/if \(!runStays\) await window\.zero\?\.stopSession\?\./);
-    expect(undo).toMatch(/\.\.\.\(runStays \? \{ answer: '\(withdrawn\)' \} : withdrawReply\(item\.status\)\)/);
+    expect(undo).toMatch(/\.\.\.\(runStays \? \{ answer: '\(withdrawn\)' \} : withdrawReply\(item\.status, item\.answer\)\)/);
   });
 
   it('the line that says where it went names the time it goes', () => {

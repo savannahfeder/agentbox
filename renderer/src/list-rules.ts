@@ -481,8 +481,11 @@ export function statusForReply(status: string): 'open' | undefined {
 // `zero:stop-session`). So the undo always writes back the status the reply
 // found, even when the reply did not change it. Otherwise a withdrawn reply on
 // an open row leaves it blocked, and no session claims the next send.
-export function withdrawReply(statusWhenReplied: string): { answer: string; status: string } {
-  return { answer: '(withdrawn)', status: statusWhenReplied };
+// A finished row gets its own answer back: nothing carries a done row's answer
+// to a worker, and that answer may be what says it was handed on.
+export function withdrawReply(statusWhenReplied: string, answerWhenReplied?: string | null): { answer: string; status: string } {
+  const kept = statusWhenReplied === 'done' && answerWhenReplied && answerWhenReplied !== '(withdrawn)' ? answerWhenReplied : null;
+  return { answer: kept ?? '(withdrawn)', status: statusWhenReplied };
 }
 
 // A reply lifts a reminder, which only hides the row. A moment to run is left
