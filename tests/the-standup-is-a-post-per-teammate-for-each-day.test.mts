@@ -228,15 +228,20 @@ describe('an ask for help or a review, handed back', () => {
   const ask = (o: Record<string, unknown>) => item({ product: 'dm', labels: ['given-task'], status: 'done', title: 'Bookings empty state', updatedAt: on(12, 12), ask: { kind: 'review', owner: 'p-me', thread: 't1', product: 'lumen' }, ...o });
   const day = (items: Record<string, unknown>[]) => teamToday({ ...base, products: [...base.products, dm] as never, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: items as never });
   it('is help said by the person who handed it back, not finished by anyone', () => {
-    const d = day([ask({ id: 'a1', createdBy: 'p-me', assignee: 'p-dev', wrote: { status: { ts: on(12, 12), by: 'p-dev' } } })]);
+    const d = day([ask({ id: 'a1', createdBy: 'p-me', assignee: 'p-dev', verdict: 'yes', wrote: { status: { ts: on(12, 12), by: 'p-dev' }, verdict: { ts: on(12, 12), by: 'p-dev' } } })]);
     const dev = d.people.find((p) => p.key === 'person:p-dev')!;
     expect(dev.helped?.map((l) => l.title)).toEqual(['Bookings empty state']);
     expect(d.people.flatMap((p) => p.finished)).toEqual([]);
     expect(words(sentenceOf(postsOf(d.people, { mates: true }).find((p) => p.key === 'person:p-dev')!))).toBe('Helped on [Bookings empty state].');
   });
   it('is your own help in your post when you were the one asked', () => {
-    const d = day([ask({ id: 'a2', createdBy: 'p-dev', assignee: 'p-me', ask: { kind: 'help', owner: 'p-dev', thread: 't9', product: 'lumen' }, wrote: { status: { ts: on(12, 12), by: 'p-me' } } })]);
+    const d = day([ask({ id: 'a2', createdBy: 'p-dev', assignee: 'p-me', verdict: 'done', ask: { kind: 'help', owner: 'p-dev', thread: 't9', product: 'lumen' }, wrote: { status: { ts: on(12, 12), by: 'p-me' }, verdict: { ts: on(12, 12), by: 'p-me' } } })]);
     expect(d.people.find((p) => p.key === 'me')!.helped?.map((l) => l.title)).toEqual(['Bookings empty state']);
+  });
+  it('stays help, not an open task, after a thank-you reopened the task', () => {
+    const d = day([ask({ id: 'a4', status: 'open', createdBy: 'p-me', assignee: 'p-dev', verdict: 'yes', wrote: { status: { ts: on(12, 13), by: 'p-me' }, verdict: { ts: on(12, 12), by: 'p-dev' } } })]);
+    expect(d.people.find((p) => p.key === 'person:p-dev')!.helped?.map((l) => l.title)).toEqual(['Bookings empty state']);
+    expect(d.people.flatMap((p) => p.tasks)).toEqual([]);
   });
   it('is nobody\'s news when its owner took it back', () => {
     const d = day([ask({ id: 'a3', createdBy: 'p-me', assignee: 'p-dev', wrote: { status: { ts: on(12, 12), by: 'p-me' } } })]);

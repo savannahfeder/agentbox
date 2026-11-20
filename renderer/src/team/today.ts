@@ -194,10 +194,17 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     if (direct.has(i.product) && !task) continue;
     if (runBy(i) !== me) continue;
     // A task someone gave you is theirs to say finished; open, it is one of yours.
+    // An ask handed back is help on a thread its owner still finishes, said by the helper, whatever a thank-you
+    // did to the task's status since; taken back, it is nobody's news (shared/thread-asks.mts).
+    const back = task && i.ask && i.verdict ? i.wrote?.verdict ?? i.wrote?.status : null;
+    if (back) {
+      const helper = keyOfPerson(back.by === i.assignee ? i.assignee : null);
+      if (helper && inRange(back.ts)) byKey.get(helper)?.helped?.push({ key: `${i.product}/${i.id}`, title: '', at: back.ts, item: i });
+      continue;
+    }
+    if (task && i.ask && i.status === 'done') continue;
     if (task && i.createdBy && i.createdBy !== me) {
       if (i.status !== 'done' && !inNeeds.has(`${i.product}/${i.id}`)) byKey.get('me')!.tasks.push(taskLine(i, { key: `${i.product}/${i.id}`, title: '', at: i.updatedAt, item: i }));
-      const backAt = i.wrote?.status?.ts ?? i.updatedAt;
-      if (i.ask && i.status === 'done' && i.wrote?.status?.by === me && inRange(backAt)) byKey.get('me')!.helped?.push({ key: `${i.product}/${i.id}`, title: '', at: backAt, item: i });
       continue;
     }
     const k = owner.get(i.id) ?? 'me';
@@ -210,11 +217,6 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
       const doneAt = i.wrote?.status?.ts ?? i.updatedAt;
       // A task you gave is finished by whoever closed it, in their words, not yours.
       const closer = task ? keyOfPerson(i.wrote?.status?.by) : null;
-      // An ask handed back is help on a thread its owner still finishes; taken back, it is nobody's news.
-      if (task && i.ask) {
-        if (inRange(doneAt) && closer && i.wrote?.status?.by === i.assignee) byKey.get(closer)?.helped?.push(line(doneAt));
-        continue;
-      }
       if (inRange(doneAt)) (closer && closer !== 'me' ? byKey.get(closer)! : who).finished.push(line(doneAt));
       continue;
     }

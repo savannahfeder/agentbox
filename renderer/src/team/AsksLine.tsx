@@ -1,7 +1,7 @@
 // ABOVE YOUR REPLY BOX, WHILE SOMEONE YOU ASKED IS ON YOUR THREAD: who, since
 // when, and Take it back. What they hand back lands in the thread itself.
 import { createContext, useContext } from 'react';
-import { asksOnThread, stepOf } from '../../../shared/thread-asks.mts';
+import { askIsOpen, asksOnThread, stepOf } from '../../../shared/thread-asks.mts';
 import { updatedWords } from '../threads/page-rules';
 import type { WorkItem } from '../types';
 import { Face, TeamContext, firstName } from './people';
@@ -19,7 +19,7 @@ export function AskSentLine({ task, onOpenThread }: { task: WorkItem; onOpenThre
   if (!team || !task.ask || !task.assignee) return null;
   const person = team.byId.get(task.assignee) ?? null;
   const first = firstName(person) || 'Your teammate';
-  const back = task.status === 'done';
+  const back = !askIsOpen(task);
   return (
     <div className="asks-line" role="status">
       <div className="asks-one">

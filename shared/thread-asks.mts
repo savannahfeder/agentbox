@@ -44,7 +44,10 @@ export function askIGave(row: AskRow | null | undefined, me: string | null): Ask
   return by === me ? a : null;
 }
 
-const isOpen = (row: AskRow) => row.status !== 'done';
+// Handed back is final: a thank-you on the task reopens the conversation, not the ask
+// (round three of the team test). Asking again is a new ask.
+export const askIsOpen = (row: Pick<AskRow, 'status' | 'verdict'>): boolean => row.status !== 'done' && !row.verdict;
+const isOpen = askIsOpen;
 
 /** The open help ask you gave this person on this thread: their words then go to its agent. */
 export function helpAskOpen(rows: readonly AskRow[], me: string | null, thread: string, helper: string): AskRow | null {

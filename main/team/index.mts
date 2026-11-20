@@ -16,7 +16,7 @@ import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mt
 import { createThreadShare } from './thread-share.mts';
 import { createAsks, type TellThread } from './asks.mts';
 import { changePath } from '../code-change.mts';
-import { askBody, askOf, type AskKind } from '../../shared/thread-asks.mts';
+import { askBody, askIsOpen, askOf, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
 import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
@@ -1369,7 +1369,7 @@ export function createTeamService({
       const a = askOf(row as never);
       if (!row || !a) throw new Error('that ask is gone');
       if (row.assignee !== state.me.id) throw new Error('that ask is not yours to hand back');
-      if (row.status === 'done') throw new Error('that was already handed back');
+      if (!askIsOpen(row as never)) throw new Error('that was already handed back');
       const said = String(words ?? '').trim();
       const dir = products().find((p) => p.slug === slug)?.dir;
       if (!dir) throw new Error('that ask is gone');

@@ -154,6 +154,20 @@ describe('an ask for a review', () => {
 });
 
 describe('who may do what', () => {
+  // Round three: Sam thanked Theo on a returned review, and it read "Theo is reviewing your thread" again.
+  it('a reply on an ask handed back does not open the ask again', async () => {
+    const t = await asked('help');
+    disk.setLineAuthor(theo.personId);
+    await theo.service.handBack({ product: theTask().product, id: theTask().id, words: 'Done.' });
+    await both();
+    disk.setLineAuthor(sam.personId);
+    const onSams = sam.store.listItems().find((i) => i.ask);
+    sam.store.answerItem(onSams.product, onSams.id, { answer: 'Thanks!' });
+    await both();
+    expect(asksOnThread(sam.store.listItems(), sam.personId, t.id).filter((a) => a.open)).toEqual([]);
+    expect(askOnMe(theo.store.listItems(), theo.personId, sam.personId, t.id)).toBeNull();
+  });
+
   it('only the person asked hands it back, and only once', async () => {
     await asked('help');
     disk.setLineAuthor(sam.personId);
@@ -238,7 +252,7 @@ describe('the wiring', () => {
   it('a thread someone you asked has is out of your Needs you until it comes back', () => {
     const app = read('renderer/src/App.tsx');
     expect(app).toContain("if (askedOut.has(i.id) && !asking(i)) return false;");
-    expect(app).toMatch(/const askedOut = useMemo\(\(\) => new Set\(items\.flatMap\(\(r\) => \{\s*const a = askIGave\(r, team\?\.me \?\? null\);\s*return a && r\.status !== 'done' \? \[a\.thread\] : \[\];/);
+    expect(app).toMatch(/const askedOut = useMemo\(\(\) => new Set\(items\.flatMap\(\(r\) => \{\s*const a = askIGave\(r, team\?\.me \?\? null\);\s*return a && askIsOpen\(r\) \? \[a\.thread\] : \[\];/);
   });
   // Round two: Dana handed Priya a task, Priya started it in a thread of her own, and Dana could not find it.
   it('a thread started from a task someone handed you leaves its link on that task', () => {

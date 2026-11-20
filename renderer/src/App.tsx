@@ -69,7 +69,7 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksLine } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askIGave, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
+import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
 import { SEE_SAID, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -2308,7 +2308,7 @@ export default function App() {
   // comments included, until they hand it back (shared/thread-asks.mts).
   const askedOut = useMemo(() => new Set(items.flatMap((r) => {
     const a = askIGave(r, team?.me ?? null);
-    return a && r.status !== 'done' ? [a.thread] : [];
+    return a && askIsOpen(r) ? [a.thread] : [];
   })), [items, team?.me]);
 
   // A comment that asks you by name is news to you (fileNewsFor).
@@ -8538,7 +8538,7 @@ export default function App() {
                   onGive={(to, note) => { void giveThread(focused, to, note); }}
                   onAsk={team ? (to, kind, note, step) => { void askOnThread(focused, to, kind, note, step); } : undefined}
                   asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
-                  asksSlot={!team ? null : focused.ask && focused.assignee === team.me && focused.status !== 'done'
+                  asksSlot={!team ? null : focused.ask && focused.assignee === team.me && askIsOpen(focused)
                     ? <AskBar task={focused} owner={team.byId.get(focused.ask.owner) ?? null} onHandBack={(verdict, words) => handAskBack(focused, verdict, words)}
                       onOpenThread={() => openContinuedFrom(focused.ask!.owner, focused.ask!.thread)}
                       onOpenChange={(src) => setOpenDoc({ product: focused.product, src, readOnly: true })} />
