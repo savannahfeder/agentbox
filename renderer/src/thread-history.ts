@@ -25,6 +25,7 @@ import { instructionOf } from '../../shared/repeats.mts';
 import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
 import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
+import { handedToName } from '../../shared/thread-cards.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
@@ -566,7 +567,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // and the pickup above already said it.
       if (status === 'claimed') continue;
       if (status === 'done') {
-        events.push({ at, who, said: mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
+        // A hand-over writes its "Given to …" answer, then this close (main/team handOn).
+        const given = mine ? handedToName({ status, answer: String(lines[at_ - 1]?.patch?.answer ?? patch?.answer ?? '') }) : null;
+        events.push({ at, who, said: given ? `You gave it to ${given.split(/\s+/)[0]}` : mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
         continue;
       }
       if (status === 'blocked') {

@@ -7,7 +7,7 @@ import { whereTheWorkStands, type WorkStands } from './git-change.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mts';
-import { projectSeenBy } from '../shared/thread-cards.mts';
+import { projectSeenBy, replyOnHandedOn } from '../shared/thread-cards.mts';
 import { phoneSeenOf } from '../shared/phone-settings.mts';
 import { createEngineSetup, engineSetUpHere } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
@@ -938,6 +938,13 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       if (refused) return refused;
       const said = closeUnshipped ? closedAnywayNote(row) : null;
       if (said) store.noteItem(product, id, said);
+    }
+    // A reply on a thread you gave away would take it back without a word to them.
+    if (product && id && typeof answer === 'string') {
+      let row = null;
+      try { row = store.readItem(product, id); } catch { row = null; }
+      const handed = row ? replyOnHandedOn(row, answer) : null;
+      if (handed) return { ok: false, error: handed };
     }
     // A level picked from ⌘K arrives here with no words, and gives way the
     // same as one picked on the summary (zero:thread-edit). A reply that

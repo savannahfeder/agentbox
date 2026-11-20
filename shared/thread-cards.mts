@@ -353,6 +353,14 @@ export const handedOn = (item: { status?: string; answer?: string | null }): boo
 export const handedToName = (item: { status?: string; answer?: string | null }): string | null =>
   (handedOn(item) ? String(item.answer).slice('Given to '.length).split(/:\s/)[0].replace(/\.$/, '') : null);
 
+/** A reply here would reopen a thread someone else now has, so it is refused with the way to take it back. */
+export function replyOnHandedOn(item: { status?: string; answer?: string | null }, answer: unknown): string | null {
+  const to = handedToName(item)?.split(/\s+/)[0];
+  const words = String(answer ?? '').trim();
+  if (!to || !words || words === '(withdrawn)') return null;
+  return `You gave this to ${to}. Write to ${to}, or reopen it to take it back.`;
+}
+
 export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [], wontStart = {} }: {
   products: readonly P[];
   readItems: (product: P) => readonly (CardItem & { id: string })[];
