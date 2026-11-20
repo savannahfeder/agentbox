@@ -105,7 +105,9 @@ type Node = { type: string; value?: string; url?: string; alt?: string; children
 
 // `anyFull`: in a conversation a whole path may be a teammate's, from their
 // computer, and the app knows it by that name once it has come.
-export type Options = { dir?: string | null; anyFull?: boolean };
+// `folder`: the thread's own code folder, where its runs write. The app opens a
+// short name from there first (main/artifact-path.mts).
+export type Options = { dir?: string | null; anyFull?: boolean; folder?: string | null };
 
 // The short path a full one names, or null when it is not inside `dir`.
 // Focus's code span asks the same question of a path in backticks.
@@ -121,13 +123,18 @@ export function productPath(full: string, dir: string): string | null {
   return abs.startsWith(root + '/') ? abs.slice(root.length + 1) : null;
 }
 
+/** The short path a full one names, in the project's folder or else the thread's own. */
+export function shortPath(full: string, dir: string | null | undefined, folder?: string | null): string | null {
+  return (dir ? productPath(full, dir) : null) ?? (folder && full.startsWith('/') ? productPath(full, folder) : null);
+}
+
 type Hit = { at: number; text: string; url: string; asIs?: true };
 
 // A person reads a file by its name; the path is the app's to follow.
 const nameOf = (written: string) => written.replace(/\/+$/, '').split('/').pop() || written;
 const PATH_LIKE = /^(?:~\/|\/|\.?\/?[\w-])[^\s:]*\.[A-Za-z0-9]{1,8}$/;
 
-function pieces(text: string, dir: string, anyFull = false): Node[] {
+function pieces(text: string, dir: string, anyFull = false, folder: string | null = null): Node[] {
   const hits: Hit[] = [];
   const quoted: { start: number; end: number }[] = [];
   for (const m of text.matchAll(QUOTED)) {
@@ -138,7 +145,7 @@ function pieces(text: string, dir: string, anyFull = false): Node[] {
     quoted.push({ start: at, end: at + name.length });
     if (!/^(?:~\/|\/|\.?\/?[\w-])[\w ./()-]*$/u.test(name)) continue;
     const full = /^(?:~\/|\/)/.test(name);
-    let url = full ? productPath(name, dir) : name;
+    let url = full ? shortPath(name, dir, folder) : name;
     // "Downloads as <quoted filename>" explicitly names its folder. Do not
     // add Downloads to the general filename search or infer it across sentences.
     const home = dir.match(/^\/(?:Users|home)\/[^/]+/)?.[0];
@@ -151,18 +158,18 @@ function pieces(text: string, dir: string, anyFull = false): Node[] {
   for (const m of text.matchAll(PATH)) {
     if (!inQuote(m.index!)) hits.push({ at: m.index!, text: m[0], url: m[0] });
   }
-  if (dir) {
+  if (dir || folder) {
     for (const m of text.matchAll(FULL)) {
       if (inQuote(m.index!)) continue;
-      const rel = productPath(m[0], dir) ?? (anyFull && m[0].startsWith('/') ? m[0] : null);
+      const rel = shortPath(m[0], dir, folder) ?? (anyFull && m[0].startsWith('/') ? m[0] : null);
       if (rel) hits.push({ at: m.index ?? 0, text: m[0], url: rel });
     }
     for (const m of text.matchAll(FOLDER_LINE)) {
-      const [, lead, pad, folder, slash] = m;
-      if (FILE_LIKE.test(folder)) continue;
-      const rel = productPath(folder, dir);
+      const [, lead, pad, named, slash] = m;
+      if (FILE_LIKE.test(named)) continue;
+      const rel = productPath(named, dir);
       if (!rel) continue;
-      hits.push({ at: m.index! + lead.length + pad.length, text: folder + slash, url: `${rel}/`, asIs: true });
+      hits.push({ at: m.index! + lead.length + pad.length, text: named + slash, url: `${rel}/`, asIs: true });
     }
   }
   for (const m of text.matchAll(LOCAL)) {
@@ -197,7 +204,7 @@ export function linkArtifactPaths(node: Node, options: Options = {}): void {
   const out: Node[] = [];
   for (const child of node.children) {
     if (child.type === 'text' && typeof child.value === 'string') {
-      const split = pieces(child.value, dir, !!options?.anyFull);
+      const split = pieces(child.value, dir, !!options?.anyFull, options?.folder ?? null);
       if (split.length) { out.push(...split); continue; }
       out.push(child);
       continue;
