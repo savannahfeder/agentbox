@@ -74,7 +74,7 @@ describe('drawn', () => {
 
 describe('every number on the page says what it covers', () => {
   const card = { id: 'maya', me: false, name: 'Maya C.', avatarUrl: null, headline: null, bio: null, agents: 1, level: 5, hoursTotal: 0.5, hoursWeek: 0.5, hoursToday: 0.2, streak: 1, byMonth: months([['2026-10', 0.5]]), teammate: false, showActivity: true, status: null, workingOn: null, workingPrivate: false };
-  const room = { id: 'r1', name: 'Astral', members: 5, wall: [card] };
+  const room = { id: 'r1', name: 'Astral', wall: [card] };
   const html = renderToStaticMarkup(React.createElement(ProfilePage, { card, room, rooms: [room], cards: [], rank: 2, onRanks: () => {} }));
   it('the rank in the room is this week, the rank on the app all time', () => {
     expect(html).toContain('In Astral this week');

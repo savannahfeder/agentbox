@@ -36,6 +36,7 @@ function world() {
   const named = JSON.stringify({ path: '.claude/skills', url: remote });
   const app = path.join(dir, 'app');
   put(path.join(app, '.agentbox/private.json'), named);
+  fs.symlinkSync(path.resolve(import.meta.dirname, '..', 'scripts'), path.join(app, 'scripts'));
   git(dir, 'clone', '-q', remote, path.join(app, '.claude/skills'));
   git(path.join(app, '.claude/skills'), 'config', 'commit.gpgsign', 'false');
   const folder = path.join(dir, 'task');
@@ -118,6 +119,16 @@ describe('a ship and a private folder a worker could write', () => {
     fs.cpSync(path.join(w.at, '.git'), common, { recursive: true });
     git(w.dir, '--git-dir', common, 'config', 'core.fsmonitor', `touch '${w.marker}'; false`);
     fs.writeFileSync(path.join(w.at, '.git/commondir'), `${common}\n`);
+    expect(ship(w).pushed).toBe(false);
+    expect(fs.existsSync(w.marker)).toBe(false);
+  });
+
+  // A sparse checkout in the app folder's copy writes config.worktree there, so the worker's may hold anything.
+  it('reads no worktree settings that differ from the app folder\'s', () => {
+    const w = world();
+    for (const at of [path.join(w.app, '.claude/skills'), w.at]) git(at, 'config', 'extensions.worktreeConfig', 'true');
+    put(path.join(w.app, '.claude/skills/.git/config.worktree'), '[core]\n\tsparseCheckout = false\n');
+    put(path.join(w.at, '.git/config.worktree'), `[core]\n\tfsmonitor = touch '${w.marker}'; false\n`);
     expect(ship(w).pushed).toBe(false);
     expect(fs.existsSync(w.marker)).toBe(false);
   });

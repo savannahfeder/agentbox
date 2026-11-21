@@ -12,15 +12,19 @@
 //   - answers the window's questions: who am I, who is on my team, what are
 //     my teammates' private tasks doing.
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mts';
 import { createThreadShare } from './thread-share.mts';
+import { createAsks, type TellThread } from './asks.mts';
+import { changePath, readChangeSummary } from '../code-change.mts';
+import { askBody, askIsOpen, askOf, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
 import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
 import { findFileToSend } from './carry-files.mts';
 import { readableSharedThreads } from '../everything-found.mts';
 import { plainRef } from '../../shared/carried-files.mts';
-import { listSharedProjects, joinSharedProject, linkSharedFolders, markShared, makeDirect } from './projects.mts';
+import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mts';
 import type { TeamRecord } from './projects.mts';
 import type { SyncBackend, SyncCard, SyncDisk, SyncReport, SyncState } from './sync.mts';
 import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
@@ -29,7 +33,7 @@ import { GIVEN_TASK, WORK_THREAD, isTaskRow, isWorkThread, teamPeopleShown } fro
 import { referencedFiles } from '../../shared/referenced-files.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { taskTitle } from '../../shared/team-tasks.mts';
-import { firstSentence } from '../../shared/thread-cards.mts';
+import { doneSteps, firstSentence } from '../../shared/thread-cards.mts';
 import { openTo, seenNow, sentWords, threadLink } from '../../shared/thread-link.mts';
 import { cardsFor, type WontStart } from '../../shared/thread-cards.mts';
 import fs from 'node:fs';
@@ -44,9 +48,8 @@ import { readRunTails } from '../run-traces.mts';
 import { machineryPath } from '../store/home.mts';
 import { createRooms } from './rooms.mts';
 import { isOnTeam } from '../../shared/rooms-on.mts';
-import { chatsForReviews, noticeEndedWaits } from './waits.mts';
+import { noticeEndedWaits } from './waits.mts';
 import { handOverDepartures } from './departures.mts';
-import { handedChange, withoutPaths } from './handed-change.mts';
 import type { Departure } from './departures.mts';
 import type { CloudPhoneCommand } from './supabase-backend.mts';
 import { mateCard, splitCards } from '../../shared/mate-cards.mts';
@@ -63,7 +66,9 @@ export interface TeamPerson {
   role?: string;
   connections?: string[];
 }
-export interface TeamRef { id: string; name: string }
+export interface TeamRef { id: string; name: string; logoUrl?: string | null }
+/** A picture the window shrank and sent: base64 bytes and their type. */
+export interface PictureIn { data: string; type: string }
 export type TeamCard = SyncCard & { personId: string; title?: string | null; updatedAt?: number };
 export interface TeamInvite { teamId: string; teamName: string; invitedBy: string | null; invitedByName: string | null }
 export interface TeamSentInvite { email: string; invitedBy: string | null }
@@ -140,6 +145,10 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   listInvites?(teamId: string): Promise<TeamSentInvite[]>;
   createTeam(name: string): Promise<TeamRef>;
   renameTeam(teamId: string, name: string): Promise<unknown>;
+  setProfile?(fields: { name?: string; avatarUrl?: string | null }): Promise<unknown>;
+  putPicture?(name: string, bytes: Buffer, type: string): Promise<string>;
+  setTeamLogo?(teamId: string, logoUrl: string | null): Promise<unknown>;
+  teamInfo?(teamId: string): Promise<TeamRef | null>;
   removeMember(teamId: string, personId: string, handover?: TeamHandover | null): Promise<void>;
   departures?(teamId: string): Promise<Departure[]>;
   setConnections?(ids: unknown): Promise<unknown>;
@@ -223,10 +232,12 @@ export interface TeamItem {
 /** A row of the store as far as handing a thread on or moving a message reads it. */
 export interface TeamRow {
   id: string;
+  assignee?: string;
   label?: string;
   title?: string;
   body?: string;
   result?: string;
+  progress?: string;
   labels?: string[];
   status?: string;
   priority?: number;
@@ -258,7 +269,7 @@ export interface TeamLinePatch {
   comment?: { text?: unknown } | null;
 }
 
-export interface TeamAnswer { answer: string; voice?: unknown; forAgent?: unknown; inReplyTo?: string; status?: string }
+export interface TeamAnswer { answer?: string; voice?: unknown; forAgent?: unknown; inReplyTo?: string; status?: string; putAway?: boolean }
 
 export interface TeamStore {
   listProducts(opts?: { includeArchived?: boolean }): TeamProduct[];
@@ -340,6 +351,8 @@ export interface TeamServiceOptions {
   rooms?: TeamRoomsSetup | null;
   /** Settings › Alpha features › Multiplayer. Off, no thread of this person's is shared. */
   sharing?: () => boolean;
+  /** Words from someone you asked for help, to your thread's agent, through your own supervisor. */
+  tellThread?: TellThread | null;
 }
 
 /** A file handed to a task; one with a `rel` is a file the words name. */
@@ -348,6 +361,7 @@ interface TaskFile extends AttachmentFile { rel?: string }
 interface TaskInput {
   title?: unknown; body?: unknown; priority?: number | null; due?: unknown; files?: TaskFile[]; voice?: unknown;
   visibility?: unknown; visibleTo?: unknown[]; blockedBy?: unknown;
+  ask?: { kind: AskKind; owner: string; thread: string; product: string; step?: string; note?: string };
 }
 
 /** What rides along with a message: a voice note, the agent it is for, a subject that makes it its own thread. */
@@ -357,6 +371,7 @@ import { filmPiece, linkAddress, linkSiteFor } from '../file-link.mts';
 import { noticeLinkComments } from './link-comments.mts';
 import type { LinkComment } from './link-comments.mts';
 import { bringLinkEditsHome, type LinkEdit } from './link-edits.mts';
+import { shownName } from '../../shared/artifact-marks.mts';
 
 const LINK_COMMENTS_EVERY_MS = 60_000;
 const LINK_EDITS_EVERY_MS = 60_000;
@@ -393,6 +408,7 @@ export function createTeamService({
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
   sharing = () => true,
+  tellThread = null,
 }: TeamServiceOptions) {
   // The phone site's address, only an https one, and its code for Settings.
   const site = typeof phone?.site === 'string' && /^https:\/\/[^\s/]+(\/[^\s]*)?$/.test(phone.site) ? phone.site : null;
@@ -437,7 +453,7 @@ export function createTeamService({
     return { ...rest, cards: cards.map((c) => (c.title ? { ...c, title: shortTitle(String(c.title)) } : c)), teamMates: mates };
   };
   const rooms = roomsSetup ? createRooms({
-    backend: () => backend, me: () => state.me, team: () => state, threadTalk: () => threadShare?.talk() ?? [], now, log, onChange,
+    backend: () => backend, me: () => state.me, team: () => state, now, log, onChange,
     findFile: (ref, how = {}) => findFileToSend({ ref, meant: how.meant === true, products: store.listProducts({ includeArchived: true }) }),
     ...roomsSetup,
     enabled: () => roomsSetup.enabled({ onTeam: isOnTeam(state) }),
@@ -447,6 +463,17 @@ export function createTeamService({
   function products() {
     try { return store.listProducts(); } catch { return []; }
   }
+
+  const asks = createAsks({
+    file: path.join(path.dirname(stateFile), '.team-asks.json'),
+    me: () => state.me?.id ?? null,
+    products,
+    readRows: (dir) => disk.readWorkItems(dir),
+    nameOf: (id) => state.people.find((p) => p.id === id)?.name || 'A teammate',
+    tell: tellThread,
+    putAway: (slug, id) => { try { store.answerItem(slug, id, { putAway: true }); } catch (err) { log(`asks: ${(err as Error).message}`); } },
+    log,
+  });
 
   // A status the owner set has run out: wipe it where it is stored, so old
   // text does not sit in the cloud. Everyone who READS it already saw it go,
@@ -519,7 +546,14 @@ export function createTeamService({
     const said = store.readThread(product.slug, row.id).map((t) => t.text).filter(Boolean);
     // A one-line thread has only a title, and a rename must not lose those words.
     const brief = row.body || row.title;
-    const words = [brief, row.result ? `Where it got to:\n\n${row.result}` : ''].filter(Boolean).join('\n\n');
+    // The receiver reads it as a person's message, drawn as typed, where bold marks show as marks.
+    const unbold = (s: string) => s.replace(/\*\*([^*\n]+)\*\*/g, '$1');
+    const tried = doneSteps(row.progress);
+    const words = [
+      brief,
+      tried.length ? `What the agent already tried:\n\n${tried.map((t) => `- ${unbold(t)}`).join('\n')}` : '',
+      row.result ? `Where it got to:\n\n${unbold(row.result)}` : '',
+    ].filter(Boolean).join('\n\n');
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];
     const tooBig: string[] = [];
@@ -529,9 +563,19 @@ export function createTeamService({
       try { real = fs.realpathSync(path.join(product.dir, rel)); } catch { continue; }
       if (!real.startsWith(root + path.sep) || !fs.statSync(real).isFile()) continue;
       if (fs.statSync(real).size > MAX_MESSAGE_FILE_BYTES) tooBig.push(path.basename(rel));
-      else files.push({ rel, name: path.basename(rel), srcPath: real });
+      else files.push({ rel, name: shownName(rel), srcPath: real });
     }
     return { words, files, tooBig };
+  }
+
+  // The code a thread's agent changed lives only on this computer, so it goes with an ask or a hand-over.
+  function changeOfThread(product: TeamProduct, id: string, title: string) {
+    const file = machineryPath(product.dir, changePath(id));
+    if (!fs.existsSync(file)) return { files: [], loose: false, name: '' };
+    const name = `${shortTitle(title) || 'the'} change.change`;
+    let loose = false;
+    try { loose = readChangeSummary(file).uncommitted === true; } catch { /* unreadable: say nothing about it */ }
+    return { files: [{ name, srcPath: file }], loose, name };
   }
 
   // THE TEAM THIS MAC IS IN IS THE ONE IT REMEMBERS. Found by review
@@ -540,12 +584,32 @@ export function createTeamService({
   // backdated created_at and an invite moved your work into it unasked. Now
   // the first team is remembered, and a remembered team you are no longer on
   // leaves you in no team rather than in another one.
+  // A teammate's rename or new logo, which this Mac otherwise never reads again.
+  // A failed read keeps what is shown.
+  async function readTeamInfo(team: TeamRef): Promise<TeamRef | null> {
+    if (!backend?.teamInfo) return null;
+    const info = await backend.teamInfo(team.id).catch(() => null);
+    return info && info.id === team.id ? { ...team, ...info } : null;
+  }
+
+  // Only what its first bytes say is a png or jpg, up to the bucket's 1 MB.
+  async function savePicture(folder: 'people' | 'teams', id: string, photo: PictureIn) {
+    const bytes = Buffer.from(String(photo?.data ?? ''), 'base64');
+    const png = bytes.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const jpg = bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
+    if (!png && !jpg) throw new Error('that picture is not a png or jpg');
+    if (bytes.length > 1_048_576) throw new Error('that picture is over 1 MB');
+    const hash = crypto.createHash('md5').update(bytes).digest('hex');
+    return backend!.putPicture!(`${folder}/${id}/${hash}.${png ? 'png' : 'jpg'}`, bytes, png ? 'image/png' : 'image/jpeg');
+  }
+
   async function refreshTeam() {
     const me = state.me?.id;
     const teams = await backend!.myTeams();
     const remembered = me ? kept().getTeam(me) : null;
     // '' is "left a team, and joins nothing until asked": never quietly the next one.
-    const team = remembered === '' ? null : remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
+    const found = remembered === '' ? null : remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
+    const team = found ? (await readTeamInfo(found)) ?? found : null;
     if (team && !remembered && me) kept().setTeam(me, team.id);
     // The moment sharing starts on this Mac, kept so it never moves later.
     if (team && me && !kept().getSince(me)) kept().setSince(me, Date.now());
@@ -602,23 +666,21 @@ export function createTeamService({
         else if (state.multiplayer === false) set({ multiplayer: await readMultiplayer() });
         await clearLapsedStatus();
         const report = await sync!.syncOnce();
-        for (const l of linkSharedFolders(products())) log(`team: ${path.basename(l.dir)} now works in ${l.repoPath}, your own project of the same name`);
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
         // on the first line of theirs that arrives here.
-        const [cards, people, me] = state.team
-          ? await Promise.all([backend!.listCards(), backend!.teamPeople(state.team.id).then(teamPeopleShown), backend!.me()])
-          : [[], [], state.me];
-        set(withCards(cards, { lastSyncAt: Date.now(), error: null, people, me: me ?? state.me, ...(await readSeen()) }));
+        const [cards, people, me, info] = state.team
+          ? await Promise.all([backend!.listCards(), backend!.teamPeople(state.team.id).then(teamPeopleShown), backend!.me(), readTeamInfo(state.team)])
+          : [[], [], state.me, null];
+        set(withCards(cards, { lastSyncAt: Date.now(), error: null, people, me: me ?? state.me, ...(info ? { team: info } : {}), ...(await readSeen()) }));
         if (state.team) {
           noticeEndedWaits({
             products: products(), read: (p: TeamProduct) => disk.readWorkItems(p.dir), cards, now: now(), me: state.me?.id ?? null,
-            chats: chatsForReviews(rooms?.state()),
-            append: (dir, lines) => disk.appendForeignLines(dir, lines),
             nameOf: (id: string) => people.find((p) => p.id === id)?.name ?? 'Someone',
             write: (dir: string, id: string, patch: Record<string, unknown>) => disk.updateWorkItem(dir, id, patch, { source: 'system' }),
           });
           await handOverWhatLeft(cards, people);
+          if (asks.carryBack()) onChange();
         }
         if (report.joined.length || report.pulled) log(`team: joined ${report.joined.length}, pulled ${report.pulled}, pushed ${report.pushed}`);
         if (report.notJoined) log(`team: left ${report.notJoined} shared project(s) unjoined, this computer already holds the most it takes on by itself`);
@@ -866,6 +928,7 @@ export function createTeamService({
       onChange,
       log,
       now,
+      relay: (c, thread) => asks.relay(c, thread),
     });
     sync = createTeamSync({
       backend,
@@ -875,7 +938,7 @@ export function createTeamService({
       // ARCHIVED ONES COUNT AS HERE. Asked of the visible list, a shared
       // project you archived read as missing and was joined again beside it.
       listShared: () => { try { return listSharedProjects(store.listProducts({ includeArchived: true })); } catch { return []; } },
-      joinProject: (project) => joinSharedProject(accountRoot, project),
+      joinProject: (project) => joinSharedProject(accountRoot, project, state.people.find((p) => p.id === project.createdBy)?.name?.split(/\s+/)[0] || null),
       listCards,
       teamIdOf: () => state.team?.id ?? null,
       threadShare,
@@ -1023,6 +1086,36 @@ export function createTeamService({
       if (!clean) throw new Error('a team needs a name');
       await backend.renameTeam(state.team.id, clean);
       await refreshTeam();
+      return state;
+    },
+
+    // Your name and photo, from Settings. `photo` null takes it away;
+    // absent leaves it as it is.
+    async updateMe({ name, photo }: { name?: unknown; photo?: PictureIn | null } = {}) {
+      if (!backend?.setProfile || !state.me) throw new Error('sign in first');
+      const fields: { name?: string; avatarUrl?: string | null } = {};
+      if (name !== undefined) {
+        const clean = String(name ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
+        if (!clean) throw new Error('your name cannot be empty');
+        fields.name = clean;
+      }
+      if (photo !== undefined) fields.avatarUrl = photo === null ? null : await savePicture('people', state.me.id, photo);
+      const was = state.me.name ?? '';
+      await backend.setProfile(fields);
+      // Groups keep their own card; a failure there leaves Settings saved.
+      await rooms?.followMe({ was, ...fields }).catch((err: Error) => log(`rooms: following your profile: ${err.message}`));
+      const me = await backend.me();
+      const people = state.team ? await backend.teamPeople(state.team.id).then(teamPeopleShown) : state.people;
+      set({ me: me ?? state.me, people });
+      return state;
+    },
+
+    // The owner's alone; the database refuses anyone else.
+    async setTeamLogo(photo: PictureIn | null) {
+      if (!backend?.setTeamLogo || !state.team) throw new Error('start or join a team first');
+      const url = photo === null ? null : await savePicture('teams', state.team.id, photo);
+      await backend.setTeamLogo(state.team.id, url);
+      set({ team: { ...state.team, logoUrl: url } });
       return state;
     },
 
@@ -1231,7 +1324,7 @@ export function createTeamService({
      * (shared/team-rules.mts). A file with a `rel` is one the words name: its
      * links are pointed at the copy.
      */
-    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy }: TaskInput = {}, { sync = true }: { sync?: boolean } = {}) {
+    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy, ask }: TaskInput = {}) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const me = state.me.id;
       const list = [...new Set(([] as string[]).concat(toIn ?? []).filter(Boolean))];
@@ -1264,26 +1357,11 @@ export function createTeamService({
       const blocks = (Array.isArray(blockedBy) ? blockedBy : []).filter((id) => typeof id === 'string' && /^(person|card|name):./.test(id));
       const item = store.composeItem(product.slug, {
         title: named, body: full, priority: level, assignee: to, ...(due ? { due } : {}), people: [me, to], labels: [GIVEN_TASK], voice,
-        ...seen, ...(blocks.length ? { blockedBy: blocks } : {}),
+        ...seen, ...(blocks.length ? { blockedBy: blocks } : {}), ...(ask ? { ask } : {}),
       });
       onChange();
-      if (sync) await syncNow();
+      await syncNow();
       return item;
-    },
-
-    /**
-     * A thread sent to people is opened to them, as Share's Send opens it, and
-     * its card goes up before any link to it can arrive.
-     */
-    async openThreadTo(slug: string, id: string, to: string[], { sync = true }: { sync?: boolean } = {}) {
-      if (!state.me) throw new Error('start or join a team first');
-      const product = products().find((p) => p.slug === slug);
-      const row = product ? store.readItem(slug, id) : null;
-      if (!product || !row) throw new Error('that thread is gone');
-      const seen = seenNow(row, product, kept().getSince(state.me.id));
-      if (seen === 'team') return;
-      store.threadEdit(slug, id, openTo(seen, row.visibleTo, to));
-      if (sync) await syncNow();
     },
 
     /**
@@ -1292,16 +1370,7 @@ export function createTeamService({
      * in your hand rather than the app's, or Done would read it as news and put
      * it in your own Needs you.
      */
-    async handOn(ask: { product: string; id: string; to: string; note?: string }) {
-      try { return await this.handOnNow(ask); } catch (err) {
-        const { id, to } = ask;
-        log(`team: could not give ${id} to ${state.people.find((p) => p.id === to)?.name ?? to}: ${(err as Error)?.message ?? err}`);
-        // The screen gets the reason without this computer's paths.
-        throw new Error(withoutPaths(String((err as Error)?.message ?? err)));
-      }
-    },
-
-    async handOnNow({ product: slug, id, to, note = '' }: { product: string; id: string; to: string; note?: string }) {
+    async handOn({ product: slug, id, to, note = '' }: { product: string; id: string; to: string; note?: string }) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const product = products().find((p) => p.slug === slug);
       const row = product ? store.readItem(slug, id) : null;
@@ -1312,24 +1381,81 @@ export function createTeamService({
       if (!person) throw new Error('that person is not on your team');
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
+      const change = changeOfThread(product, id, String(row.label || row.title || ''));
+      const giver = state.me.name?.split(/\s+/)[0] || 'the giver';
+      const loose = change.loose ? `Not committed yet: this work is only on ${giver}'s computer. The file below holds every edit the agent made.` : '';
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
-      const change = handedChange({ repoPath: product.repoPath, id, owner: (state.me.name || 'the giver').split(/\s+/)[0], outDir: path.dirname(machineryPath(product.dir, path.join('runs', id, `${id}.patch`))) });
       // What the giver wants from them comes first, over the thread's own words.
-      const brief = [String(note ?? '').trim(), words, change.words, left].filter(Boolean).join('\n\n');
+      const brief = [String(note ?? '').trim(), words, loose, left].filter(Boolean).join('\n\n');
       // The task leads back to the thread, opened to them as Share's Send opens it.
-      await this.openThreadTo(slug, id, [to], { sync: false });
+      const seen = seenNow(row, product, kept().getSince(state.me.id));
+      if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const link = threadLink(state.me.id, id);
       const made = await this.giveTask(to, {
         title: row.label || row.title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
-        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...files, ...(change.file ? [change.file] : [])],
-      }, { sync: false });
+        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...change.files, ...files],
+      });
       // As your own words: a note would be drawn as the agent's checkpoint.
-      const asked = String(note ?? '').replace(/\s+/g, ' ').trim();
-      store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}${asked ? `: ${asked}` : '.'}`, status: 'done' });
+      const said = String(note ?? '').trim();
+      store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}.${said ? `\n\n${said}` : ''}`, status: 'done' });
+      onChange();
+      return made;
+    },
+
+    /**
+     * ASK SOMEONE FOR HELP OR A REVIEW ON YOUR THREAD, KEEPING IT YOURS. It is
+     * opened to them, and a task names the thread and the step you picked. With
+     * help, what they write there goes to the agent until they hand it back.
+     */
+    async askTeammate({ product: slug, id, to, kind, note = '', step = '' }: { product: string; id: string; to: string; kind: string; note?: string; step?: string }) {
+      if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
+      if (kind !== 'help' && kind !== 'review') throw new Error('ask for help or a review');
+      const product = products().find((p) => p.slug === slug);
+      const row = product ? store.readItem(slug, id) : null;
+      if (!product || !row) throw new Error('that thread is gone');
+      if (product.team?.direct) throw new Error('a conversation cannot be asked about');
+      const person = state.people.find((p) => p.id === to);
+      if (!person) throw new Error('that person is not on your team');
+      if (to === state.me.id) throw new Error('that thread is yours already');
+      const seen = seenNow(row, product, kept().getSince(state.me.id));
+      if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
+      const title = String(row.label || row.title || 'A thread');
+      const link = threadLink(state.me.id, id);
+      const files = [...changeOfThread(product, id, title).files, ...briefOfThread(row, product).files];
+      const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', helper: person.name?.split(/\s+/)[0] || null, note: String(note), step: String(step) });
+      const made = await this.giveTask(to, {
+        title,
+        body: link ? sentWords(title, link, brief) : brief,
+        priority: row.priority,
+        files,
+        ask: {
+          kind, owner: state.me.id, thread: id, product: slug,
+          ...(String(step).trim() ? { step: String(step).trim().slice(0, 1200) } : {}),
+          ...(String(note).trim() ? { note: String(note).trim().slice(0, 1200) } : {}),
+        },
+      });
+      onChange();
+      return made;
+    },
+
+    /** The person asked hands it back: their words and verdict close the task, and the owner's copy puts them on the thread. */
+    async handBack({ product: slug, id, verdict = 'done', words = '' }: { product: string; id: string; verdict?: string; words?: string }) {
+      if (!state.me) throw new Error('sign in first');
+      const row = store.readItem(slug, id);
+      const a = askOf(row as never);
+      if (!row || !a) throw new Error('that ask is gone');
+      if (row.assignee !== state.me.id) throw new Error('that ask is not yours to hand back');
+      if (!askIsOpen(row as never)) throw new Error('that was already handed back');
+      const said = String(words ?? '').trim();
+      const dir = products().find((p) => p.slug === slug)?.dir;
+      if (!dir) throw new Error('that ask is gone');
+      // Before the close, so the owner's copy never reads a close without its verdict.
+      disk.updateWorkItem(dir, id, { verdict: verdict === 'yes' || verdict === 'changes' ? verdict : 'done' }, { source: 'founder' });
+      store.answerItem(slug, id, { ...(said ? { answer: said } : {}), status: 'done' });
       onChange();
       await syncNow();
-      return made;
+      return { ok: true };
     },
 
     /** A task's words and files, for a new thread of your own: its links would point at nothing there. */
@@ -1383,13 +1509,11 @@ export function createTeamService({
     sharedFileByHash: (hash: string, o?: { fetch?: boolean }) => threadShare?.fileByHash(hash, o) ?? Promise.resolve(null),
 
     // Words to a thread's owner. The cloud decides who may: whoever can read the card.
-    /** `answers`: the step its owner asked this person to help with (shared/thread-ask.mts). */
-    async commentOnThread(owner: string, threadId: string, text: unknown, { answers = false }: { answers?: boolean } = {}) {
+    async commentOnThread(owner: string, threadId: string, text: unknown) {
       if (!backend || !threadShare) throw new Error('sign in first');
       const words = String(text ?? '').trim();
       if (!words) throw new Error('a comment needs some words');
-      const made = await backend.addThreadComment(owner, threadId, words) as { id?: unknown } | undefined;
-      if (answers && typeof made?.id === 'string') threadShare.noteAnswered(made.id);
+      await backend.addThreadComment(owner, threadId, words);
       await threadShare.refreshComments();
       onChange();
       syncNow();

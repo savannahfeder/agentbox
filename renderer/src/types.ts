@@ -137,8 +137,10 @@ export interface WorkItem {
   waitEnded?: { said: string; at: number };
   /** Where it went when someone left the team (main/team/departures.mts). */
   handedOver?: { said: string; at: number };
-  /** What its owner asked a teammate, with the wait on them (shared/thread-ask.mts). */
-  asked?: { said: string; at: number; want?: 'help' | 'review'; to?: string[] };
+  /** A task asking for help or a review on someone's thread (shared/thread-asks.mts). */
+  ask?: { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string };
+  /** How that ask was handed back. */
+  verdict?: 'done' | 'yes' | 'changes';
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -192,6 +194,9 @@ export interface Product {
 }
 
 /** A person on the team, as the cloud knows them. */
+/** A picture the window shrank to send: base64 bytes and their type. */
+export interface PictureIn { data: string; type: 'image/png' | 'image/jpeg' }
+
 export interface Person {
   id: string;
   email: string;
@@ -495,7 +500,7 @@ export interface ThreadCard {
   problem: string | null;
   progress: string | null;
   solution: string | null;
-  blockedBy: { id: string; title: string | null; want?: 'help' | 'review'; note?: string }[];
+  blockedBy: { id: string; title: string | null }[];
   blocks: { id: string; title: string | null }[];
   /** Whom it reaches: the chosen people, or null for the whole team. */
   people: string[] | null;
@@ -537,7 +542,7 @@ export interface TeamState {
   /** A Google sign-in waiting on the browser, with the link it opened. */
   signingIn?: { url: string } | null;
   me: Person | null;
-  team: { id: string; name: string } | null;
+  team: { id: string; name: string; logoUrl?: string | null } | null;
   /** Invites waiting for your confirmed email, while you are in no team. Joining one needs your yes. */
   invites?: TeamInvite[];
   people: Person[];
@@ -585,8 +590,6 @@ export interface RoomCard {
   status: string | null;
   workingOn: string | null;
   workingPrivate: boolean;
-  /** The thread `workingOn` names, when you can open it: a teammate's shared card, or your own. */
-  workingThread?: string | null;
 }
 
 export interface RoomActivity {
@@ -713,6 +716,8 @@ export interface TeammateWorks { every: 'day' | 'weekday' | 'week'; at: string; 
 export interface TeammateRef { id: string; product: string; title: string }
 export interface Teammate {
   id: string; name: string; letter: string; role: string | null; job: string | null; goal: string | null;
+  /** The face picked for it; absent, its face follows its id (shared/teammate-face.mts). */
+  face?: string | null;
   counted: string | null; asksFirst: string | null; works: TeammateWorks | null; worksLabel: string | null;
   product: string; engine: string | null; model: string | null; effort: string | null; limit: number;
   paused: boolean; status: 'draft' | 'active'; memory: TeammateMemory[]; createdAt: number; starter?: string | null;
@@ -1139,14 +1144,14 @@ export interface AgentTurn {
   /** An agent teammate that handed this thread work: drawn as an agent's
    *  message under that teammate's name, never as yours. */
   from?: string;
+  /** Whose words those were, by id: a person you asked to help draws with their face. */
+  fromId?: string;
   /** The agent that wrote this message on its owner's behalf (`by`). */
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
   fileMark?: FileMarkLink;
   /** A teammate's comment, or an agent's checkpoint (thread-history.ts). */
-  says?: 'comment' | 'progress';
-  /** A comment the owner's reply after it took to the agent. */
-  carried?: boolean;
+  says?: 'comment' | 'progress' | 'to-agent';
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
@@ -1762,6 +1767,7 @@ declare global {
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       draftCopy?: { read(): string | null; write(text: string): void };
       glassTone?(p: { tone: 'light' | 'dark' | 'system' }): Promise<unknown>;
+      windowButtons?(p: { dark: boolean }): Promise<unknown>;
       blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
@@ -1800,6 +1806,8 @@ declare global {
       teamSignOut(): Promise<TeamCallResult>;
       teamSignInEmail(p: { email: string; password: string }): Promise<TeamCallResult>;
       teamRename(p: { name: string }): Promise<TeamCallResult>;
+      teamUpdateMe?(p: { name?: string; photo?: PictureIn | null }): Promise<TeamCallResult>;
+      teamSetLogo?(p: { photo: PictureIn | null }): Promise<TeamCallResult>;
       teamRemoveMember(p: { personId: string; handTo?: string | null; mates?: { id: string; to: string | null }[] }): Promise<TeamCallResult>;
       teamLeave(): Promise<TeamCallResult>;
       teamCancelInvite(p: { email: string }): Promise<TeamCallResult>;
@@ -1840,7 +1848,7 @@ declare global {
       filesCloud?(): Promise<FilesCloudStatus>;
       fileElsewhere?(p: { product: string; id: string; room?: string; copies: { path: string; file: string }[] }): Promise<FileElsewhere[]>;
       fileLine?(p: { product: string; id: string; room?: string }): Promise<FileLine[]>;
-      teamComment(p: { personId: string; threadId: string; text: string; answers?: boolean }): Promise<TeamCallResult>;
+      teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult>;
       teamContinueBrief(p: { personId: string; threadId: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[]; from: { personId: string; threadId: string } }>;
       teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult>;
       teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult>;
@@ -1852,6 +1860,8 @@ declare global {
       teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult>;
       teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult>;
       teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult>;
+      teamAsk(p: { product: string; id: string; to: string; kind: 'help' | 'review'; note?: string; step?: string }): Promise<TeamCallResult>;
+      teamHandBack(p: { product: string; id: string; verdict?: 'done' | 'yes' | 'changes'; words?: string }): Promise<TeamCallResult>;
       teamTaskBrief(p: { product: string; id: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[] }>;
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;
@@ -1989,7 +1999,6 @@ declare global {
       writeDoc?(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }>;
       fileLink?(p: FileLinkAsk): Promise<FileLinkState>;
       fileLinkShare?(p: FileLinkAsk): Promise<FileLinkState>;
-      fileToChat?(p: FileLinkAsk & { to: string; also?: string[]; note?: string; want?: 'review' | null }): Promise<{ ok: boolean; roomId?: string; error?: string }>;
       fileLinkStop?(p: { token: string }): Promise<{ ok: boolean; error?: string }>;
       fileLinks?(): Promise<{ ok: boolean; error?: string; links?: PublicLink[] }>;
       fileLinkComments?(p: { token: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }>;

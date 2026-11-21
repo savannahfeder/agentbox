@@ -58,7 +58,7 @@ describe('the line while it goes', () => {
 
 describe('the app', () => {
   const give = app.slice(app.indexOf('const giveThread = async'), app.indexOf('const runThreadCommand ='));
-  const share = app.slice(app.indexOf('send: async (target, to, note, want = null) =>'), app.indexOf('see: (item, to) =>'));
+  const share = app.slice(app.indexOf('send: async (target, to, note) =>'), app.indexOf('see: (item, to) =>'));
 
   it('says the hand-off is going at the press, and who has it once it went', () => {
     expect(give.indexOf('showToast(sendingTo(')).toBeGreaterThan(-1);
@@ -69,7 +69,6 @@ describe('the app', () => {
   it('says a share is going at the press, and keeps who it went to up long enough to read', () => {
     expect(share.indexOf('showToast(sendingTo(names))')).toBeGreaterThan(-1);
     expect(share.indexOf('showToast(sendingTo(names))')).toBeLessThan(share.indexOf('await api.teamSync()'));
-    expect(share).toContain("asks === 'review' ? `Sent to ${names} for review` : `Sent to ${names}`;");
-    expect(share).toMatch(/showToast\(!out\.ok \? \(out\.error \?\? `It did not reach \$\{names\}\.`\) : [\s\S]{0,120}? : sent, out\.ok \? \{ product: item\.product, id: item\.id \} : undefined\);/);
+    expect(share).toMatch(/showToast\(out\.ok \? `Sent to \$\{names\}` : \(out\.error \?\? `It did not reach \$\{names\}\.`\), out\.ok \? \{ product: item\.product, id: item\.id \} : undefined\);/);
   });
 });

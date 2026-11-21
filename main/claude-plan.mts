@@ -55,6 +55,7 @@ interface OAuthAccount {
   userRateLimitTier?: string | null;
   organizationType?: string | null;
   billingType?: string | null;
+  planDisplayName?: unknown;
   [field: string]: unknown;
 }
 
@@ -157,7 +158,10 @@ function readPlanNow(at: string): ClaudePlan {
   if (account.billingType === 'none') {
     return { known: true, ended: true, max: false, label: 'Subscription ended', tier, from, file: at };
   }
-  return { known: true, ended: false, max: isMaxTier(tier), label: planLabel(tier), tier, from, file: at };
+  // Claude Code saves the plan's current name beside a tier string that kept
+  // the old one: "Ultra" next to `default_claude_max_20x`.
+  const named = typeof account.planDisplayName === 'string' ? account.planDisplayName.trim() : '';
+  return { known: true, ended: false, max: isMaxTier(tier), label: named || planLabel(tier), tier, from, file: at };
 }
 
 /**

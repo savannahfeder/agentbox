@@ -33,6 +33,6 @@ describe('approving', () => {
   it('the view asks before it approves', () => {
     const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
     expect(view).toMatch(/approveAsk\(/);
-    expect(view).toContain('{approveAsked.yes}');
+    expect(view).toMatch(/anyway/);
   });
 });

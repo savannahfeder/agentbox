@@ -9,9 +9,14 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 // The sandboxed preload runs while the document is still loading, and
 // documentElement is null then. Reading it here throws, and a throw on this
 // line skips the bridge below, so the window draws the canned inbox.
+//
+// Windows draws its own buttons in the top-right corner instead
+// (main/window-buttons.mts), so the band above the pane stays there.
 if (process.platform !== 'darwin') {
   const markFlat = () => {
-    if (document.documentElement) document.documentElement.dataset.window = 'flat';
+    if (!document.documentElement) return;
+    document.documentElement.dataset.window = 'flat';
+    if (process.platform === 'win32') document.documentElement.dataset.windowButtons = 'right';
   };
   if (document.documentElement) markFlat();
   else document.addEventListener('DOMContentLoaded', markFlat);
@@ -86,6 +91,8 @@ contextBridge.exposeInMainWorld('zero', {
   teamAcceptInvite: (payload) => ipcRenderer.invoke('zero:team-accept-invite', payload),
   teamInvite: (payload) => ipcRenderer.invoke('zero:team-invite', payload),
   teamRename: (payload) => ipcRenderer.invoke('zero:team-rename', payload),
+  teamUpdateMe: (payload) => ipcRenderer.invoke('zero:team-update-me', payload),
+  teamSetLogo: (payload) => ipcRenderer.invoke('zero:team-logo', payload),
   teamRemoveMember: (payload) => ipcRenderer.invoke('zero:team-remove-member', payload),
   teamLeave: () => ipcRenderer.invoke('zero:team-leave'),
   teamCancelInvite: (payload) => ipcRenderer.invoke('zero:team-cancel-invite', payload),
@@ -132,6 +139,8 @@ contextBridge.exposeInMainWorld('zero', {
   teamMessageMate: (payload) => ipcRenderer.invoke('zero:team-message-mate', payload),
   teamGiveTask: (payload) => ipcRenderer.invoke('zero:team-give-task', payload),
   teamHandOn: (payload) => ipcRenderer.invoke('zero:team-hand-on', payload),
+  teamAsk: (payload) => ipcRenderer.invoke('zero:team-ask', payload),
+  teamHandBack: (payload) => ipcRenderer.invoke('zero:team-hand-back', payload),
   teamTaskBrief: (payload) => ipcRenderer.invoke('zero:team-task-brief', payload),
   rooms: (payload) => ipcRenderer.invoke('zero:rooms', payload),
   teammates: (payload) => ipcRenderer.invoke('zero:teammates', payload),
@@ -188,6 +197,8 @@ contextBridge.exposeInMainWorld('zero', {
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
   // Which appearance the window's glass is drawn in (main/window-glass.mts).
   glassTone: (payload) => ipcRenderer.invoke('zero:glass-tone', payload),
+  // The Windows title bar buttons' glyphs, for a light or dark page (main/window-buttons.mts).
+  windowButtons: (payload) => ipcRenderer.invoke('zero:window-buttons', payload),
   // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the
   // snapshot, so these two are only the verbs: look again now, and restart onto
   // the version that has already downloaded. Nothing here can start a download,
@@ -308,7 +319,6 @@ contextBridge.exposeInMainWorld('zero', {
   // A link anyone can open, to one of her files (main/file-link.mts).
   fileLink: (payload) => ipcRenderer.invoke('zero:file-link', payload),
   fileLinkShare: (payload) => ipcRenderer.invoke('zero:file-link-share', payload),
-  fileToChat: (payload) => ipcRenderer.invoke('zero:file-to-chat', payload),
   fileLinkStop: (payload) => ipcRenderer.invoke('zero:file-link-stop', payload),
   fileLinks: () => ipcRenderer.invoke('zero:file-links'),
   fileLinkComments: (payload) => ipcRenderer.invoke('zero:file-link-comments', payload),

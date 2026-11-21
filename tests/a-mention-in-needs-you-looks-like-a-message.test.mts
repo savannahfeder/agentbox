@@ -42,7 +42,7 @@ describe('a mention row', () => {
 
   it('names someone who left no name as Someone, and draws their face from that word', () => {
     const html = draw([mention({ by: null, byName: '' })]);
-    expect(html).toContain('<b class="th-msg-who">Someone</b>');
+    expect(html).toContain('<span class="th-who-name">Someone</span>');
     expect(html).toMatch(/<span class="tm-av"[^>]*>So<\/span>/);
   });
 });

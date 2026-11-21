@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Room, RoomCard } from '../../types';
 import { I } from './icons';
 import { Face } from '../people';
-import { cardName, chartNamed, hoursWords, profileRanks, weekRank } from './room-rules';
+import { cardName, chartNamed, hoursWords, weekRank } from './room-rules';
 import { useOutside } from './RoomsPage';
 import { Name } from '../../../../shared/product-name.mjs';
 
@@ -38,7 +38,6 @@ export function ProfilePage({ card, room, rooms, rank, onMessage, onRanks, onRoo
   onSaveBio?: (bio: string | null) => Promise<string | null>;
 }) {
   const shared = rooms.filter((r) => r.wall.some((c) => c.id === card.id));
-  const ranks = profileRanks(room, card, rank);
   const firstMonth = card.byMonth.find((m) => m.hours > 0)?.month ?? null;
   return <div className="rm-prof">
     <div className="rm-ph">
@@ -52,8 +51,8 @@ export function ProfilePage({ card, room, rooms, rank, onMessage, onRanks, onRoo
         {onMessage && !card.me && <div className="acts"><button type="button" className="rm-btn" onClick={onMessage}>{I.chat()}Message</button></div>}
       </div>
       <div className="rm-stats">
-        {ranks.week != null && <div><button type="button" className="lnk" onClick={onRanks}>#{ranks.week}</button><span className="rm-label">In {room.name} this week</span></div>}
-        {ranks.allTime != null && <div><b>#{ranks.allTime}</b><span className="rm-label">On {Name} all time</span></div>}
+        <div><button type="button" className="lnk" onClick={onRanks}>#{weekRank(room.wall, card.id)}</button><span className="rm-label">In {room.name} this week</span></div>
+        {rank != null && <div><b>#{rank}</b><span className="rm-label">On {Name} all time</span></div>}
         <div><b>{I.flame()}{card.streak}</b><span className="rm-label">Days in a row</span></div>
       </div>
     </div>

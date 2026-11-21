@@ -37,7 +37,6 @@ import { MAC } from './this-keyboard';
 import { whyWords, type WhyCard } from './where-why';
 import { FIRST_RUN_LABEL } from './onboarding';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
-import { askedOf } from '../../shared/thread-ask.mts';
 
 // THE FIFTH STATE, AND IT IS THE ONE SOMEBODY OUTSIDE THIS BUILDING ASKED FOR.
 //
@@ -417,9 +416,6 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   }
 
   if (!inProgress) return null;
-
-  // Asked of a teammate (shared/thread-ask.mts): it waits on them, and the Status column says whom.
-  if (askedOf(item)) return null;
 
   // THE APP IS SHIPPING IT (w-0c1ba766eb). No agent is on it and none is
   // coming, so "Nothing running" would read as forgotten. The sentence says

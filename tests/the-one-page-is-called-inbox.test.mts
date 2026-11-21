@@ -51,8 +51,7 @@ describe('the page says Inbox too', () => {
   });
   it('on the way back from a teammate’s card, and in the heading over it', () => {
     expect(app).toContain(": 'Inbox')}\n");
-    // The heading over a teammate's thread is its crumb, which starts with that same word.
-    expect(app).toContain('<div className="workspace-task-header" ref={setTeamCardHeader} />');
+    expect(app).toContain("openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'");
   });
   it('and the first tab still says Needs you, where the inbox meaning is true', () => {
     expect(INBOX_TABS[0]).toMatchObject({ view: 'inbox', label: 'Needs you' });

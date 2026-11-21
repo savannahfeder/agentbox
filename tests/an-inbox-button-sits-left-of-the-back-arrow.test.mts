@@ -37,11 +37,15 @@ describe('the Inbox button', () => {
 
   // Reported: it showed on every page, and on Chats it pushed the forward
   // arrow into the page's name. On the inbox it led to the inbox itself.
+  // And on a teammate's thread opened from the Inbox, which is laid out as an
+  // opened thread of your own (w-f702d60afe).
   it('is drawn only on an inbox thread, and opens the inbox', () => {
     const app = read('renderer/src/App.tsx');
-    const tag = app.split('\n').find((l) => l.includes('<BackForward ')) ?? '';
-    expect(tag).toContain("onInbox={onInboxThread ? () => openView('inbox') : undefined}");
+    const at = app.indexOf('<BackForward ');
+    const tag = app.slice(at, app.indexOf('/>', at));
+    expect(tag).toContain("onInbox={onInboxThread ? () => openView('inbox') : onTeammateThread ? () => { setOpenCard(null); setTeamOpen(false); openView('inbox'); } : undefined}");
     expect(app).toContain('const onInboxThread = !!focused && !settingsOpen && !inChats;');
+    expect(app).toContain('const onTeammateThread = teamShown && !!openCard && !cardFromPlace;');
     expect(bf).toMatch(/\{onInbox && <button/);
   });
 });

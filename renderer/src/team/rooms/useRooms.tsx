@@ -3,10 +3,10 @@
 // App.tsx only places them beside the narrow sidebar (GroupsSidebar.tsx).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../../api';
-import type { ArtifactMark, Person, Room, RoomCard, RoomMention, RoomMessage, RoomsState, TeamMessageFile } from '../../types';
+import type { ArtifactMark, Person, Room, RoomMention, RoomMessage, RoomsState, TeamMessageFile } from '../../types';
 import { listedIn, oneConversation, pairRooms } from '../../../../shared/pair-room.mts';
 import './rooms.css';
-import { boardPeople, boardPicked, chatPeople, groupInTab, mentionRows, noticeShown, personOpens, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
+import { boardPeople, boardPicked, chatPeople, groupInTab, mentionRows, noticeShown, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
 import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
@@ -29,7 +29,7 @@ import { DecisionsList } from '../TeamLists';
 
 type Direct = Conversation & { people: string[] };
 
-export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team = [], directs = [], now, toast, onOpenDirect, onTeamMessage, onLeavePage, renderBoard, threadOf, onTeammate, inline = false }: {
+export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team = [], directs = [], now, toast, onOpenDirect, onTeamMessage, onLeavePage, renderBoard, inline = false }: {
   rooms: RoomsState | null | undefined; on: boolean; meId: string | null; myName: string; fullName?: string; hasTeam: boolean;
   /** Everyone on your team, for a teammate in a direct record who is not on Groups yet. */
   team?: Person[];
@@ -44,10 +44,6 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   onLeavePage: () => void;
   /** The room's board, for these people's threads. */
   renderBoard?: (people: string[], opts: { later: boolean }) => ReactNode;
-  /** Opens the shared thread a person's "working on" line names, when you can read it. */
-  threadOf?: (c: RoomCard) => (() => void) | null;
-  /** Opens a teammate's own page, where their threads are. */
-  onTeammate?: (id: string) => void;
   /** Drawn under Everything else's cards (w-b5f23cff71), which list the groups and the team instead. */
   inline?: boolean;
 }) {
@@ -304,11 +300,6 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const answerNotice = (id: string) => { const next = [...answered, id]; setAnswered(next); writeNoticeSeen(next); };
 
   const meInChat = meId ? { id: meId, name: rooms?.me?.display_name || myName, avatarUrl: rooms?.me?.avatar_url ?? null, me: true } : null;
-  const openPerson = (id: string, wall: readonly RoomCard[], profile: () => void) => {
-    const c = wall.find((x) => x.id === id);
-    if (c && personOpens(c) === 'page' && onTeammate) { onTeammate(id); return; }
-    profile();
-  };
   const backTitle = (title: string) => <h1 className="workspace-title">
     <button type="button" className="rm-backt" title="Back (esc)" onClick={close}>{I.back()}<span>{title}</span></button></h1>;
   // A page of its own takes the top bar's title and hides the state tabs.
@@ -351,7 +342,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
         return <RoomChat room={c.room} messages={c.messages} people={withMe(chatPeople(c.room, meId), meInChat)} meId={meId} now={now}
           full hang head={<></>} {...c.calls} />;
       })()}
-      people={inline && (open.teamId || open.members <= 2) ? null : <PeoplePanel room={open} onPerson={(id) => openPerson(id, open.wall, () => setPane(`person:${id}`))} threadOf={threadOf} />}      list={<GroupsColumn rows={rows} current={`room:${open.id}`} now={now} onOpen={pickGroup} />} />;
+      people={inline && (open.teamId || open.members <= 2) ? null : <PeoplePanel room={open} onPerson={(id) => setPane(`person:${id}`)} />}      list={<GroupsColumn rows={rows} current={`room:${open.id}`} now={now} onOpen={pickGroup} />} />;
     heading = { title: <GroupsHead current={currentRow} onFind={() => setFinderOpen(true)} /> };
     if (inline) heading = null;
   } else if (open && rooms) {
@@ -475,7 +466,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     /** Who is in a direct record's chat, listed the way a group lists its people. */
     chatPeople: (people: string[]) => {
       const { members, wall, roomOf } = directPeople({ people, rooms: all, team, meId });
-      return <PeoplePanel room={{ members, wall }} onPerson={(id) => openPerson(id, wall, () => { if (!roomOf[id]) return; openRoom(roomOf[id]); setPane(`person:${id}`); })} threadOf={threadOf} />;
+      return <PeoplePanel room={{ members, wall }} onPerson={(id) => { if (!roomOf[id]) return; openRoom(roomOf[id]); setPane(`person:${id}`); }} />;
     },
   };
 }

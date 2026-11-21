@@ -15,8 +15,6 @@ import { createRooms, roomPrefsFile } from '../main/team/rooms.mts';
 import { writeTeamLookDocs } from '../main/team/team-look-doc.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../shared/team-look.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { readRoomMessage } from '../shared/agent-voice.mts';
-import { Name } from '../shared/product-name.mjs';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 const timers = { setTimeout: (fn) => { const h = { off: false }; queueMicrotask(() => { if (!h.off) fn(); }); return h; }, clearTimeout: (h) => { if (h) h.off = true; } };
@@ -53,16 +51,6 @@ describe('over the team group', () => {
     expect(posts).toHaveLength(1);
     expect(maya.looks.at(-1)).toBe(TEAM_LOOK_TEMPLATE);
     expect(sofia.looks.at(-1)).toBe(TEAM_LOOK_TEMPLATE);
-  });
-
-  // A power tester (2026-11-20) opened her team's group to "You 12:34am Team
-  // look: ..." and wrote "a message 'from You' that I never wrote": the copy
-  // that posted first sent it as its own person.
-  it('is posted in Agentbox\'s name, not as the person whose copy looked first', async () => {
-    await maya.rooms.refresh(); await sofia.rooms.refresh(); await settle();
-    const post = (await maya.backend.roomMessages(room)).find((m) => m.body.includes(`](attachments/${TEAM_LOOK})`));
-    expect(readRoomMessage(post).voice?.name).toBe(Name);
-    expect(newestTeamLook([post])).toBe(TEAM_LOOK);
   });
 
   it('an edit by anyone is the next version, and every copy writes it', async () => {

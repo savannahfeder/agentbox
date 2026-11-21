@@ -7,7 +7,7 @@ import { whereTheWorkStands, type WorkStands } from './git-change.mts';
 import { gitJob } from './git-change-offthread.mts';
 import { taskFolderPath } from './task-folders.mts';
 import { GROUPS } from '../shared/connections-catalog.mts';
-import { projectSeenBy, replyOnHandedOn } from '../shared/thread-cards.mts';
+import { projectSeenBy } from '../shared/thread-cards.mts';
 import { phoneSeenOf } from '../shared/phone-settings.mts';
 import { createEngineSetup, engineSetUpHere } from './engine-setup.mts';
 // IPC: a thin, typed-by-convention surface. The renderer asks; the main
@@ -60,9 +60,6 @@ import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
 import { isOnTeam } from '../shared/rooms-on.mts';
 import { liveForTheWholeTeam, liveRoomFor } from './team/live-room.mts';
-import { sendFileToChat, TEAM_CHAT } from './team/file-to-chat.mts';
-import { askedPatch, askedSaid } from '../shared/thread-ask.mts';
-import { threadLink } from '../shared/thread-link.mts';
 import { openForThePerson } from './opens-a-program.mts';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
@@ -107,7 +104,7 @@ import { openInBrowser } from './open-in-browser.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
 import type { SettingsConfig } from './settings.mts';
-import type { createTeamService } from './team/index.mts';
+import type { createTeamService, PictureIn } from './team/index.mts';
 import type { UpdateTerminals } from './agent-updates.mts';
 import type { AttachmentFile } from './save-attachments.mts';
 import type { PostInput } from './teammates.mts';
@@ -941,13 +938,6 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       const said = closeUnshipped ? closedAnywayNote(row) : null;
       if (said) store.noteItem(product, id, said);
     }
-    // A reply on a thread you gave away would take it back without a word to them.
-    if (product && id && typeof answer === 'string') {
-      let row = null;
-      try { row = store.readItem(product, id); } catch { row = null; }
-      const handed = row ? replyOnHandedOn(row, answer) : null;
-      if (handed) return { ok: false, error: handed };
-    }
     // A level picked from ⌘K arrives here with no words, and gives way the
     // same as one picked on the summary (zero:thread-edit). A reply that
     // happens to carry its row's level does not.
@@ -1172,6 +1162,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }: { teamId: string }) => team!.acceptInvite(teamId)));
   ipcMain.handle('zero:team-invite', teamCall(({ email }: { email: string }) => team!.invite(email)));
   ipcMain.handle('zero:team-rename', teamCall(({ name }: { name: string }) => team!.renameTeam(name)));
+  ipcMain.handle('zero:team-update-me', teamCall(({ name, photo }: { name?: unknown; photo?: PictureIn | null }) => team!.updateMe({ name, photo })));
+  ipcMain.handle('zero:team-logo', teamCall(({ photo }: { photo: PictureIn | null }) => team!.setTeamLogo(photo ?? null)));
   ipcMain.handle('zero:team-remove-member', teamCall(({ personId, handTo, mates }: { personId: string; handTo?: unknown; mates?: unknown }) => team!.removeMember(personId, { handTo: typeof handTo === 'string' ? handTo : null, mates: Array.isArray(mates) ? mates : [] })));
   ipcMain.handle('zero:team-leave', teamCall(() => team!.leaveTeam()));
   ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }: { email: string }) => team!.cancelInvite(email)));
@@ -1181,7 +1173,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:team-share', teamCall(({ product, visibility, people }: { product: string; visibility?: string; people?: string[] }) => team!.share(product, { visibility, people })));
   ipcMain.handle('zero:team-sync', teamCall(() => team!.syncNow()));
   ipcMain.handle('zero:team-thread-work', (_e, { personId, threadId }: { personId: string; threadId: string } = {} as { personId: string; threadId: string }) => team?.threadWork(personId, threadId) ?? { shared: false, lines: [], earlier: 0, product: null, dir: null });
-  ipcMain.handle('zero:team-comment', teamCall(({ personId, threadId, text, answers }: { personId: string; threadId: string; text: string; answers?: boolean }) => team!.commentOnThread(personId, threadId, text, { answers: answers === true })));
+  ipcMain.handle('zero:team-comment', teamCall(({ personId, threadId, text }: { personId: string; threadId: string; text: string }) => team!.commentOnThread(personId, threadId, text)));
   // Seeds a thread of your own; it runs only once you send it, on this Mac.
   ipcMain.handle('zero:team-continue-brief', (_e, { personId, threadId }: { personId: string; threadId: string } = {} as { personId: string; threadId: string }) => {
     if (!team) throw new Error('This build has no team cloud set up.');
@@ -1204,6 +1196,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     supervisor.setThreadPins({ [id]: null });
     return made;
   }));
+  ipcMain.handle('zero:team-ask', teamCall(({ product, id, to, kind, note, step }: { product: string; id: string; to: string; kind: string; note?: string; step?: string }) => team!.askTeammate({ product, id, to, kind, note, step })));
+  ipcMain.handle('zero:team-hand-back', teamCall(({ product, id, verdict, words }: { product: string; id: string; verdict?: string; words?: string }) => team!.handBack({ product, id, verdict, words })));
   ipcMain.handle('zero:team-task-brief', (_e, { product, id }: { product: string; id: string }) => {
     if (!team) throw new Error('This build has no team cloud set up.');
     return team.taskBrief(product, id);
@@ -2684,7 +2678,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       const { execFile } = await import('node:child_process');
       return new Promise<boolean>((resolve) => {
         const into = /\.(mp4|mov|m4v|webm|mkv)$/i.test(src) ? ['-ss', '1'] : [];
-        execFile('ffmpeg', ['-y', '-loglevel', 'error', ...into, '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', to], { timeout: 30_000 },
+        execFile('ffmpeg', ['-y', '-loglevel', 'error', ...into, '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', to], { timeout: 30_000, windowsHide: true },
           (err) => resolve(!err && fsWatch.existsSync(to)));
       });
     },
@@ -2936,41 +2930,6 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return withEditable(arg, await team.fileLink(linkOf(arg), now?.hash ?? null, now?.version ?? null));
   }));
   ipcMain.handle('zero:file-link-share', linkCall(async (arg, team) => withEditable(arg, await team.shareFile({ source: linkOf(arg), ...(await fileOnScreen(arg, team)) }))));
-  // The same file into a chat: the team's group or one teammate's (main/team/file-to-chat.mts).
-  ipcMain.handle('zero:file-to-chat', async (_e, arg: LinkArg & { to?: unknown; also?: unknown; note?: unknown; want?: unknown } = {}) => {
-    const rooms = team?.rooms;
-    const me = team?.state()?.me?.id;
-    if (!rooms || !me) return { ok: false, error: 'Sign in to send it to your team.' };
-    const to = String(arg.to ?? '');
-    const person = (team.state()?.people ?? []).find((p) => p.id === to);
-    if (to !== TEAM_CHAT && (!person || to === me)) return { ok: false, error: 'That person is not on your team.' };
-    // The thread's other files go with it, each found the way the one on screen is.
-    const srcs = [arg.src, ...(Array.isArray(arg.also) ? arg.also.filter((x): x is string => typeof x === 'string') : [])].slice(0, 10);
-    try {
-      const files: string[] = [];
-      for (const src of srcs) {
-        const found = await resolveArtifact({
-          src, product: arg.product, thread: typeof arg.thread === 'string' ? arg.thread : null,
-          products: readableProducts(), accountRoot: config.accountRoot, storeRoot: config.storeRoot, nameOf: team.firstNameOf,
-        });
-        if (!found.ok) return { ok: false, error: found.error || `${String(src)} is not on this computer.` };
-        files.push(found.path);
-      }
-      const want = arg.want === 'review' ? 'review' : null;
-      const note = String(arg.note ?? '');
-      // A review of a thread's file asks about the thread, which waits on them as a thread review does.
-      const item = want && to !== TEAM_CHAT && typeof arg.thread === 'string' && typeof arg.product === 'string' ? store.readItem(arg.product, arg.thread) : null;
-      const link = item ? threadLink(me, item.id) : null;
-      const about = item && link ? { title: String(item.label || item.title || 'A thread'), link } : null;
-      if (about) await team.openThreadTo(arg.product as string, item!.id, [to]);
-      const roomId = await sendFileToChat({ rooms, me, to, toName: person?.name ?? '', files, note, want, about });
-      if (about) store.threadEdit(arg.product as string, item!.id, askedPatch([to], askedSaid('review', team.firstNameOf(to) || 'them', note), Date.now(), 'review'));
-      push();
-      return { ok: true, roomId };
-    } catch (err) {
-      return { ok: false, error: String((err as Error)?.message ?? err) };
-    }
-  });
   type AccessArg = LinkArg & { access?: unknown; can?: unknown; email?: unknown };
   ipcMain.handle('zero:file-link-access', linkCall(async ({ token, access, can }: AccessArg, team) => {
     await team.setFileLinkAccess(String(token ?? ''), String(access ?? ''), String(can ?? ''));

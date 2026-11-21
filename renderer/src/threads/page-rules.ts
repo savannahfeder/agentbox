@@ -1001,24 +1001,10 @@ export function workAudience(item: WorkItem, product: Product | undefined | null
   return ids.length ? `with ${ids.map(nameOf).join(', ')}` : null;
 }
 
-/**
- * Who gave you a thread of yours: the giver of the task it was started from
- * (`handed-from:<project>:<task>`, composer-rules) or the person who left the
- * team (`handed-from:<person>`, shared/team-departures.mts).
- */
-export function givenBy<T extends TeamRow & { id: string; product?: string }>(item: { labels?: string[] }, items: readonly T[], me: string | null): string | null {
-  for (const label of item.labels ?? []) {
-    const parts = label.startsWith('handed-from:') ? label.slice('handed-from:'.length).split(':') : [];
-    const task = parts.length === 2 ? items.find((t) => t.product === parts[0] && t.id === parts[1]) : null;
-    const from = parts.length === 1 ? parts[0] : task && isTaskRow(task) ? taskGiver(task) : null;
-    if (from && from !== me) return from;
-  }
-  return null;
-}
-
 /** Whom a thread was handed to: it is closed, but it did not finish. */
 export function handedTo(item: { status?: string; answer?: string | null }): string | null {
-  return handedOn(item) ? String(item.answer).slice('Given to '.length).split(/:\s/)[0].replace(/\.$/, '') : null;
+  // The giver's note, when there was one, follows on the next lines.
+  return handedOn(item) ? String(item.answer).split('\n')[0].slice('Given to '.length).replace(/\.$/, '') : null;
 }
 
 export function handedInitials(name: string): string {

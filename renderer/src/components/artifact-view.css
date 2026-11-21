@@ -18,6 +18,8 @@
 .av-top { -webkit-app-region: drag; }
 .av-top * { -webkit-app-region: no-drag; }
 .av-top .av-name, .av-top .av-spring { -webkit-app-region: drag; }
+/* Short of the Windows buttons, which sit over the other corner. */
+:root[data-window-buttons="right"] .av-top { padding-right: 150px; }
 /* The side pane's corner marks (direct-review.css), which only reach inside the main layout. */
 .av-top .doc-marks { gap: 6px; }
 .av-top :is(.doc-mark, .focus-bare) {
@@ -32,6 +34,8 @@
 /* The glyph, not its hit area, lines up with the content edge. */
 .av-top > .av-back { margin: 0 -4px 0 -6px; }
 .av-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+/* Gives way before the name does. */
+.av-label { flex: 0 4 auto; min-width: 0; max-width: 60ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
 .av-versions { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
 .av-of { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; padding: 0 2px; white-space: nowrap; }
 .av-newest { flex: none; height: 24px; margin-left: 4px; padding: 0 6px; background: none; border: 0; border-radius: var(--radius); font: inherit; font-size: 13px; color: var(--text); white-space: nowrap; }
@@ -263,17 +267,6 @@
 .av-share-box p { margin: 0; font-size: 13px; line-height: 18px; color: var(--text); }
 .av-share-box .av-share-title { padding: 12px 14px 4px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .av-share-title span { font-weight: 400; color: var(--text-dim); }
-/* The chats it can go into, above the public link. */
-.av-share-send-to { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 14px 4px; }
-.av-share-send-l { font-size: 12.5px; color: var(--text-dim); margin-right: 2px; }
-.av-share-chip { height: 26px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--wash); font: inherit; font-size: 12.5px; color: var(--text); cursor: pointer; }
-.av-share-chip:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
-.av-share-chip:disabled { opacity: 0.6; cursor: default; }
-.av-share-chip.is-sent { border-color: var(--accent); }
-.av-share-chip[aria-pressed="true"] { background: var(--wash-strong, var(--wash)); border-color: var(--text-dim); }
-/* The thread's send sheet, held in the panel rather than dropped below it. */
-.av-share-sheet { width: 400px; }
-.av-share-sheet .sh-send { position: static; width: auto; border: 0; box-shadow: none; background: none; }
 /* Who can open it: one row, as it is before sharing and after. */
 .av-share-who-sees { display: flex; align-items: center; gap: 10px; padding: 8px 14px 12px; }
 .av-share-icon { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--radius); background: var(--wash); color: var(--text-dim); }
@@ -346,5 +339,3 @@
 .av-share-copy:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
 .av-share-copy:disabled { opacity: 0.6; cursor: default; }
 .av-share-copy.is-copied .av-glyph { color: var(--accent); }
-.av-side .av-asked { margin: 0; padding: 10px 16px 0; font-size: 13px; line-height: 18px; color: var(--text-dim); }
-.av-share-went { align-self: center; margin-left: 8px; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }

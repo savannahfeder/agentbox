@@ -27,7 +27,7 @@ const inboxSky = read('home/InboxSky.tsx');
 describe('the empty Inbox sky', () => {
   it('is drawn where Home draws it, from the top of the card, the streak not moved', () => {
     expect(app).toContain('<SkyBackdrop art={sky.home ?? sky.art} from={sky.dark || sky.home ? 40 : 150} span={sky.dark || sky.home ? 300 : 240} />');
-    expect(inboxSky).toMatch(/shape === 'zero'\) \{ drawSky\(canvas, art, \{ from: 40, span: 300, dpr, quiet: words\(\) \}\); return; \}/);
+    expect(inboxSky).toMatch(/shape === 'zero'\) \{ paintSky\(canvas, art, \{ from: 40, span: 300, dpr, quiet: words\(\) \}\); return; \}/);
   });
 
   describe('turns the line down behind the words without emptying anything', () => {

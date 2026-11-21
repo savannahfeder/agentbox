@@ -76,7 +76,7 @@ export function instructionsTarget(definition: InstructionsSource | null | undef
 export function fileIsTracked(file: string, cwd?: string | null): boolean {
   const where = cwd ?? path.dirname(file);
   try {
-    execFileSync('git', ['ls-files', '--error-unmatch', '--', file], { cwd: where, stdio: 'ignore' });
+    execFileSync('git', ['ls-files', '--error-unmatch', '--', file], { cwd: where, stdio: 'ignore', windowsHide: true });
     return true;
   } catch {
     return false;   // not tracked, or not a repository at all

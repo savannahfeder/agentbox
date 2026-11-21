@@ -1,8 +1,10 @@
-// A TEAMMATE'S SHARED THREAD, the whole window: its name and what it waits on
-// at the top, then the conversation as its owner sees it (drawn by the owner's
-// own Thread from the lines their copy published) with a box for a comment,
-// and beside it what it is about, its files and its properties. Read-only.
+// A TEAMMATE'S SHARED THREAD, laid out as an opened thread of your own: its
+// crumb and buttons in the window's header, then in the same reading column its
+// name and what it waits on, the conversation as its owner sees it (drawn by
+// the owner's own Thread from the lines their copy published) and a box for a
+// comment. About puts what it is about, its files and its properties beside it.
 import { useCallback, useContext, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
@@ -23,50 +25,27 @@ import { artifactUrlTransform, isMediaPath } from '../remark-artifact-paths';
 import { firstName, Face, TeamContext } from '../team/people';
 import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
-import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard } from '../types';
-import { ThreadCrumb } from './Summary';
-import { QueueAnswer, QueueSummary } from '../components/OneThingAtATime';
-import { createPortal } from 'react-dom';
-import { earlierWords, notSharedWords, notesOnFile } from './teammate-thread';
+import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard, WorkItem } from '../types';
+import { AskBar } from '../team/AskBar';
+import { DoneTrail, MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
+import { doneSteps } from '../../../shared/thread-cards.mts';
+import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
-import { SendBack, reviewAskedOf, reviewAskWords } from './SendBack';
-import { answersTheStep, stepLine } from '../../../shared/thread-ask.mts';
-import { parseOptions, stripOptionsSection } from '../format';
-import { OptionsOffer } from '../components/OptionsOffer';
-import { revealLine } from '../reveal-line';
+import { readDraft, saveDraft } from '../drafts';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
 const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
-/** A press on an option picks it; a second press on the picked one sends, as the owner's picker does. */
-export function helperPress(picked: number | null, n: number): { picked: number; send: boolean } {
-  return { picked: n, send: picked === n };
-}
-
-/** The one send: the picked option, then why, in the helper's words. */
-export function helperAnswer(options: readonly { n: number; text: string }[], picked: number | null, draft: string): string {
-  const o = picked === null ? null : options.find((x) => x.n === picked);
-  return o ? optionWithNote(o.text.replace(/\s*\(recommended\)\s*$/i, ''), draft) : draft.trim();
-}
-
-/** A pressed option, with whatever was typed in the box under it. */
-export const optionWithNote = (option: string, draft: string): string => (draft.trim() ? `${option}\n\n${draft.trim()}` : option);
-
-/** The options the agent's newest words offer, for a helper to press; none once anyone spoke after them. */
-export function optionsToAnswer({ events, outcome }: { events: readonly AgentEvent[]; outcome?: { at: number; text: string } | null }) {
-  const said = events.filter((e): e is AgentSaid => !e.kind);
-  const last = said[said.length - 1];
-  if (outcome && (!last || outcome.at >= last.at)) return parseOptions(outcome.text);
-  return last?.who === 'it' ? parseOptions(last.text) : [];
-}
-
-export function TeammateThread({ card, person, syncedAt, openAt, step = null, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, headerTarget = null, cornerTarget = null }: {
+export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack, headerTarget = null, cornerTarget = null }: {
   card: ThreadCard; person: Person | null; now: number;
-  /** The window's bar, where its crumb goes, and its corner, where its buttons go. */
+  /** The window's header, where an opened thread's crumb and buttons go. */
   headerTarget?: HTMLElement | null;
   cornerTarget?: HTMLElement | null;
+  /** Their open ask of you on this thread: help puts your words to their agent. */
+  ask?: WorkItem | null;
+  onHandBack?: (verdict: 'done' | 'yes' | 'changes', words: string) => Promise<boolean>;
   /** Carry it on in a thread of your own. */
   onContinue?: () => void;
   /** Where the back button goes: Threads, or the group it was opened from. */
@@ -75,8 +54,6 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
   onMessage: () => void;
   /** Open this file at this comment, from a row in Needs you. */
   openAt?: ArtifactOpen | null;
-  /** When the message a link was sent about was written: the page lands on it. */
-  step?: number | null;
   /** The sync that last ran, which is when there can be anything new to read. */
   syncedAt: number | null;
   /** Open a copied file in the side pane. */
@@ -85,21 +62,20 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
   onNotice: (text: string) => void;
 }) {
   const [work, setWork] = useState<Work | null>(null);
-  const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [reread, setReread] = useState(0);
+  // What it is about, its files and its properties, beside the thread when asked for.
+  const [about, setAbout] = useState(false);
   const { personId, threadId } = card;
+  // Kept in the draft store, so a page drawn again from nothing still has what you were writing.
+  const draftAt = useMemo(() => ({ product: `teammate:${personId}`, id: threadId }), [personId, threadId]);
+  const [draft, setDraftHere] = useState(() => readDraft(draftAt));
+  const setDraft = (text: string) => { setDraftHere(text); saveDraft(draftAt, text); };
   const team = useContext(TeamContext);
   const following = useContext(FollowContext);
   const followed = !!following?.is(card);
 
-  // What is typed survives opening one of the thread's files and coming back.
-  const draftKey = `teammate-draft:${personId}:${threadId}`;
-  useEffect(() => { setWork(null); setDraft(sessionStorage.getItem(draftKey) ?? ''); }, [personId, threadId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const write = (text: string) => {
-    setDraft(text);
-    try { if (text) sessionStorage.setItem(draftKey, text); else sessionStorage.removeItem(draftKey); } catch { /* kept for this page only */ }
-  };
+  useEffect(() => { setWork(null); setDraftHere(readDraft(draftAt)); }, [draftAt]);
   useEffect(() => {
     let live = true;
     api.teamThreadWork({ personId, threadId }).then((w) => { if (live) setWork(w as Work); });
@@ -108,17 +84,22 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
 
   const product = work?.product ?? '';
   const dir = work?.dir ?? '';
-  // The notes are read below; a ref keeps `open` steady for the markdown it is memoized into.
+  // What changes on every sync is read through refs, so `open` and the markdown it is
+  // memoized into stay the same and the links are not thrown away and drawn again.
   const notesHere = useRef<{ file: string }[]>([]);
-  const beside = useCallback((src: string) => onOpenDoc(product, src, notesOnFile(work?.lines ?? [], notesHere.current, src)), [product, onOpenDoc, work?.lines]);
+  const linesHere = useRef<LedgerLine[]>([]);
+  linesHere.current = work?.lines ?? [];
+  const calls = useRef({ onOpenDoc, onNotice });
+  calls.current = { onOpenDoc, onNotice };
+  const beside = useCallback((src: string) => calls.current.onOpenDoc(product, src, notesOnFile(linesHere.current, notesHere.current, src)), [product]);
   const open = useCallback((src?: string) => {
     if (!src || !product) return;
     // Beside the chat a teammate's copy is read-only, so a document or table opens big, where it is edited live.
     const goes = opensBigInAGroup(src) ? 'full' : whereAFileOpens(src);
     if (goes === 'full') setBig({ path: src, at: Date.now() });
     else if (goes === 'beside' || docKind(src)) beside(src);
-    else void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error ?? `${src} could not be opened.`); });
-  }, [product, beside, onNotice]);
+    else void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) calls.current.onNotice(r.error ?? `${src} could not be opened.`); });
+  }, [product, beside]);
   const md = useMemo(() => {
     const roots = dir ? [dir] : [];
     const components = {
@@ -134,15 +115,13 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
       img: ({ src, alt }: { src?: string; alt?: string }) => <ArtifactImg key={src} src={src} alt={alt} roots={roots} onOpen={open} />,
     };
     return (text: string) => <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={artifactUrlTransform}>{text}</ReactMarkdown>;
-  }, [product, dir, open]);
+  }, [product, dir]);
 
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
-  const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run');
-  // The newest answer is drawn under the conversation, not in it, and is a step too.
-  const stepAt = step ? stepLine([...events, ...(built.outcome ? [{ at: built.outcome.at }] : [])], step) : null;
-  // The newest answer is already on screen under the title; only an earlier step is scrolled to.
-  useEffect(() => (stepAt && stepAt !== newestLine ? revealLine(stepAt) : undefined), [stepAt, personId, threadId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const helpingNow = ask?.ask?.kind === 'help';
+  const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run')
+    .map((e: AgentEvent) => (helpingNow && 'says' in e && e.says === 'comment' && (e as { by?: string }).by === team?.me ? { ...e, says: 'to-agent' as const } : e));
 
   // Their copy publishes its marks with its messages; everyone's come together here.
   const own = useMemo(() => marksOf((work?.lines ?? [])
@@ -174,103 +153,59 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
   const numbered = useMemo(() => lineAsThread(line), [line]);
   const viewLines = useMemo(() => (numbered.lines.length ? [...(work?.lines ?? []), ...numbered.lines as LedgerLine[]] : work?.lines ?? []), [work?.lines, numbered]);
   const [big, setBig] = useState<ArtifactOpen | null>(null);
+  // Asked onto it, you land where the ask and the box to write in are, once per thread.
+  const pageEl = useRef<HTMLDivElement>(null);
+  const landed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ask || !work || landed.current === threadId) return;
+    landed.current = threadId;
+    const pane = pageEl.current?.closest('.th-pane');
+    if (pane) pane.scrollTop = pane.scrollHeight;
+  }, [ask, work, threadId]);
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
 
-  const send = async (said?: string) => {
-    const text = (said ?? helperAnswer(options, picked, draft)).trim();
+  const send = async () => {
+    const text = draft.trim();
     if (!text || sending) return;
     setSending(true);
-    const out = await api.teamComment({ personId, threadId, text, ...(answering ? { answers: true } : {}) });
+    const out = await api.teamComment({ personId, threadId, text });
     setSending(false);
     if (!out?.ok) { onNotice(out?.error ?? 'That comment did not send.'); return; }
-    write('');
-    setPicked(null);
-    // Their copy starts the agent on it at its next sync (main/team/thread-share.mts).
-    if (answering) { onNotice(`Sent to ${owner}'s agent`); setAnsweredStep(true); setAnsweringKept(false); }
+    setDraft('');
     setReread((n) => n + 1);
     following?.follow(card);
   };
-  // Asked to review it, the reply box sends a verdict; what it said stands until their copy clears the wait.
-  const review = reviewAskedOf(card, team?.me ?? null);
-  const [sentBack, setSentBack] = useState<string | null>(null);
-  useEffect(() => { setSentBack(null); }, [personId, threadId]);
-  const reviewing = !!review && !sentBack;
-  const sendBack = async (text: string, said: string) => {
-    const out = await api.teamComment({ personId, threadId, text });
-    if (!out?.ok) { onNotice(out?.error ?? 'That did not send.'); return false; }
-    setSentBack(said);
-    setReread((n) => n + 1);
-    return true;
-  };
-  const myOpenNotes = marks.notes.filter((n) => n.by === team?.me && !n.resolved).length;
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
   };
   const owner = firstName(person) || 'Someone';
-  // Asked to help with a step, what they write answers it on the owner's agent.
-  const helping = answersTheStep(card, team?.me ?? null);
-  const options = helping ? optionsToAnswer({ events, outcome: built.outcome }) : [];
-  // Once asked, the box stays an answer until it sends, whatever arrives meanwhile.
-  const [answeringKept, setAnsweringKept] = useState(false);
-  useEffect(() => { setAnsweringKept(false); setPicked(null); }, [personId, threadId]);
-  useEffect(() => { if (helping) setAnsweringKept(true); }, [helping]);
-  const answering = helping || answeringKept;
-  const [picked, setPicked] = useState<number | null>(null);
-  const box = answering ? 'What should the agent do next?' : `Reply to ${owner}`;
-  const replyBox = useRef<HTMLTextAreaElement>(null);
-  // Until their copy takes the answer up, the header says it went rather than the wait it ended.
-  const [answeredStep, setAnsweredStep] = useState(false);
-  useEffect(() => { setAnsweredStep(false); }, [personId, threadId]);
-  const sentToAgent = answeredStep && !helping && card.state !== 'running' && card.state !== 'done';
-  const pickOption = (n: number) => {
-    const press = helperPress(picked, n);
-    setPicked(press.picked);
-    if (press.send) void send(helperAnswer(options, press.picked, draft));
-    else replyBox.current?.focus();
-  };
-  const pickRef = useRef<HTMLButtonElement>(null);
-  // 1-9 picks, as on the owner's own page, unless a box has the keys.
-  useEffect(() => {
-    if (!options.length) return undefined;
-    const keys = (e: globalThis.KeyboardEvent) => {
-      const el = document.activeElement as HTMLElement | null;
-      if (e.metaKey || e.ctrlKey || e.altKey || el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return;
-      if (/^[1-9]$/.test(e.key) && options.some((o) => o.n === Number(e.key))) { e.preventDefault(); pickOption(Number(e.key)); }
-    };
-    window.addEventListener('keydown', keys);
-    return () => window.removeEventListener('keydown', keys);
-  });
+  const tried = card.visible ? doneSteps(card.progress) : [];
+  const helping = ask?.ask?.kind === 'help';
   const openMark = useCallback((link: FileMarkLink) => setBig({ file: link.file, note: link.id, at: Date.now() }), []);
+  const files = useMemo(() => filesOnThread(work?.lines ?? [], marks.notes).map((f) => ({
+    ...f, open: () => open(f.src),
+  })), [work?.lines, marks, open]);
 
-  // The page reads as one of your own: the newest answer is its headline, and what came before folds above it.
-  const said = events.filter((e): e is AgentSaid => !e.kind);
-  const lastIt = !built.outcome ? [...said].reverse().find((e) => e.who === 'it') ?? null : null;
-  const newest = built.outcome ? { at: built.outcome.at, text: built.outcome.text } : lastIt ? { at: lastIt.at, text: lastIt.text } : null;
-  const newestLine = lastIt?.uid ?? (newest ? `at-${newest.at}` : null);
-  const before = lastIt ? events.filter((e: AgentEvent) => e !== lastIt) : events;
-  const [earlierOpen, setEarlierOpen] = useState(false);
-  useEffect(() => { setEarlierOpen(false); }, [personId, threadId]);
-  const earlierCount = before.filter((e: AgentEvent) => !e.kind).length;
-  const askNote = card.blockedBy?.find((b) => b.want === 'help' && b.note)?.note ?? '';
-  const askWords = helping ? `asked you to help with this step` : sentToAgent ? `Sent to ${owner}'s agent` : reviewing ? 'asked you to review and send back' : review ? sentBack : null;
-  const me = team?.me ? team.byId.get(team.me) ?? null : null;
-  const title = card.title || 'Untitled thread';
+  const acts = (
+    <div className="tp-acts">
+      {following && card.state !== 'done' && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
+        onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
+        {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
+      </button>}
+      {onContinue && !ask && canContinue(work, card, team?.me ?? null) && (
+        <button type="button" className="th-follow" onClick={onContinue}
+          title={`Start a thread of your own with ${owner}'s conversation and files.`}>
+          Continue it yourself
+        </button>
+      )}
+      <MessagePerson person={person} onMessage={onMessage} />
+      <button type="button" className={`th-follow tp-about${about ? ' on' : ''}`} aria-pressed={about} onClick={() => setAbout(!about)}>About</button>
+    </div>
+  );
 
   return (
-    <div className="focus-pane tp-thread">
-      {headerTarget && createPortal(<ThreadCrumb from={backLabel} name={title} onBack={onBack} />, headerTarget)}
-      {cornerTarget && createPortal(
-        <span className="ts-top tp-corner">
-          {following && card.state !== 'done' && <button type="button" className={`ts-done${followed ? ' on' : ''}`} aria-pressed={followed}
-            onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
-            {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
-          </button>}
-          {onContinue && !reviewing && !helping && canContinue(work, card, team?.me ?? null) && (
-            <button type="button" className="ts-done" onClick={onContinue} title={`Start a thread of your own with ${owner}'s conversation and files.`}>Continue it yourself</button>
-          )}
-          <button type="button" className="ts-done" onClick={onMessage}><Face person={person} size={18} />Message {owner}</button>
-        </span>, cornerTarget)}
+    <div className="tp-page" ref={pageEl}>
       {big && product && (
         <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={viewLines} numbers={numbered.numbers} marks={marks}
           me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
@@ -291,58 +226,64 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
           onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}
-      <div className="focus-scroll" data-thread-id={threadId}>
-        <div className="focus">
-          <div className="focus-body markdown agent-thread">
-            <QueueSummary title={title} context={card.problem && card.problem !== card.title ? card.problem : null}earlier={earlierCount} open={earlierOpen} onToggle={() => setEarlierOpen((o) => !o)} />
-            {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
-            {work && work.earlier > 0 && earlierOpen && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
-            {earlierOpen && before.length > 0 && (
-              <FileMarkOpener.Provider value={openMark}>
-                <Thread events={before} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />
-              </FileMarkOpener.Provider>
-            )}
-            {askWords && (
-              <div className="tp-ask">
-                {/* The ask is theirs and signed; once you have answered, the line says what you did. */}
-                {helping || reviewing
-                  ? <div className="one-by"><Face person={person} /><span>{owner}</span><em>{askWords}</em></div>
-                  : <div className="one-by"><Face person={me} me /><em>{askWords}</em></div>}
-                {helping && askNote && <p className="tp-ask-note">{askNote}</p>}
-                {reviewing && review.note && <p className="tp-ask-note">{review.note}</p>}
-              </div>
-            )}
-            {newest && (
-              <div data-line={`at-${newest.at}`}>
-                <QueueAnswer text={options.length ? stripOptionsSection(newest.text) : newest.text} md={md} name={title} />
-              </div>
-            )}
-          </div>
+      {headerTarget ? createPortal(<ThreadCrumb from={backLabel} name={card.title || `${owner}'s thread`} onBack={onBack} />, headerTarget) : (
+        <div className="tp-bar">
+          <button type="button" className="th-back" onClick={onBack}><span aria-hidden="true">←</span>{backLabel}</button>
+          {acts}
         </div>
-      </div>
-      <div className="focus-dock">
-        <div className="focus-dock-inner">
-          {/* On the reply box, as on a thread of your own; out of the form, whose button styles would square its rows. */}
-          {options.length > 0 && !reviewing && <div className="one-choices">
-            <OptionsOffer bare ask="" askAll="" options={options} peekOption={null} askPeek={false}
-              selectedOption={picked} selRef={pickRef} onPick={pickOption}
-              onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />
-          </div>}
-          <div className="dock-card">
-            {reviewing ? (
-              <SendBack owner={owner} note={review.note} notes={myOpenNotes} face={<Face person={me} me />} onSend={sendBack} />
-            ) : <form className="tp-dock-form"onSubmit={(e) => { e.preventDefault(); void send(); }}>
-              <textarea ref={replyBox} className="dock-input" value={draft} rows={1} placeholder={box} aria-label={box}
-                onChange={(e) => write(e.target.value)} onKeyDown={onKey} />
-              <div className="compose-sentence dock-bar">
-                <span className="compose-clauses"><span className="dim">{answering ? `Goes to ${owner}'s agent.` : `Goes to ${owner}.`}</span></span>
-                <span className="dock-send-pair solo">
-                  <button type="submit" className="dock-send" disabled={!helperAnswer(options, picked, draft) || sending}>Send <kbd>↵</kbd></button>
-                </span>
-              </div>
-            </form>}
-          </div>
-        </div>
+      )}
+      {headerTarget && cornerTarget && createPortal(acts, cornerTarget)}
+      <div className={`tp-grid${about ? ' tp-with-about' : ''}`}>
+        <section className="th-work tp-col" aria-label="The conversation">
+          <header className="tp-top">
+            {card.title && <h1 className="th-card-title">{card.title}</h1>}
+            <p className="tp-whose"><Face person={person} />{owner}'s thread{card.project ? ` in ${card.project}` : ''}</p>
+            {files.length > 0 && <ul className="tp-files" aria-label="Files on this thread">
+              {files.map((f) => <li key={f.src}>
+                <button type="button" onClick={f.open} title={`Open ${f.name}`}>
+                  <span className="ts-tk-ext" aria-hidden="true">{(f.name.includes('.') ? f.name.split('.').pop() ?? '' : 'file').slice(0, 4)}</span>
+                  <span className="ts-tk-fname">{f.name}</span>
+                  {f.notes > 0 && <span className="ts-tk-notes">{f.notes === 1 ? '1 note' : `${f.notes} notes`}</span>}
+                </button>
+              </li>)}
+            </ul>}
+            {/* While you were asked in, the ask at the end says where it stands, not "waiting on" its owner. */}
+            {card.visible && !ask && <TeammateStanding card={card} person={person} now={now} />}
+          </header>
+          {tried.length > 0 && <section className="tp-tried" aria-label={`What ${owner}'s agent already tried`}>
+            <h2>What {owner}'s agent already tried</h2>
+            <DoneTrail steps={tried} />
+          </section>}
+          {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
+          {work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
+          <FileMarkOpener.Provider value={openMark}>
+            {events.length > 0 && <Thread events={events} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />}
+          </FileMarkOpener.Provider>
+          {built.outcome && (
+            <div className="appendix appendix-foot">
+              <div className="appendix-label">{built.outcome.field === 'result' ? 'Result' : 'Latest checkpoint'}</div>
+              {md(built.outcome.text)}
+            </div>
+          )}
+          {/* The ask is the newest thing said here, so it comes last, as a message. */}
+          {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={onHandBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+          <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+            <div className="tp-comment-box">
+              <Face person={team?.me ? team.byId.get(team.me) : null} me />
+              {helping
+                ? <textarea value={draft} rows={2} placeholder={`Write to ${owner}'s agent`} aria-label={`Write to ${owner}'s agent`}
+                  onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
+                : <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
+                  onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />}
+              {helping
+                ? <button type="submit" disabled={!draft.trim() || sending}>Send to the agent</button>
+                : <button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>}
+            </div>
+          </form>
+        </section>
+        {about && <aside className="tp-side" aria-label="About this thread">
+          <TeammateCard card={card} person={person} files={files} done={!tried.length} />
+        </aside>}
       </div>
     </div>
   );

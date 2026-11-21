@@ -16,7 +16,7 @@ import {
 // Thursday 12 November 2026, 3pm.
 const NOW = new Date(2026, 10, 12, 15, 0).getTime();
 const on = (d: number, h: number, m = 0) => new Date(2026, 10, d, h, m).getTime();
-const item = (o: Record<string, unknown>) => ({ product: 'lumen', status: 'open', labels: [], updatedAt: on(12, 10), createdAt: on(12, 8), title: String(o.id), ...(o.status === 'done' ? { result: 'Done.' } : {}), ...o });
+const item = (o: Record<string, unknown>) => ({ product: 'lumen', status: 'open', labels: [], updatedAt: on(12, 10), createdAt: on(12, 8), title: String(o.id), ...o });
 const base = {
   range: 'today' as const, now: NOW, me: 'p-me', products: [{ slug: 'lumen', name: 'Lumen', team: {} }],
   decisions: [], mentions: [], people: [{ id: 'p-dev', name: 'Dev Patel' }], mates: [{ id: 't-fix', name: 'Maintainer' }],
@@ -113,7 +113,7 @@ describe('each teammate posts once a day, in a sentence with links', () => {
 // A tester's teammate was busy in projects she had not shared: her standup had
 // no post at all, so she read as idle. Private work is counted, never named.
 describe('a teammate working in private projects', () => {
-  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: false, title: null, state: 'running', project: null, blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...(o.state === 'done' ? { solution: 'Done.' } : {}), ...o });
+  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: false, title: null, state: 'running', project: null, blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...o });
   const day = (cards: unknown[]) => teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [], cards: cards as never });
   it('posts how many private threads they are on, without naming any', () => {
     const posts = postsOf(day([card({ threadId: 'x1' }), card({ threadId: 'x2' })]).people, { mates: true });
@@ -133,7 +133,7 @@ describe('a teammate working in private projects', () => {
 // Thursday too: what is stuck is only known as of now. And a teammate's post
 // vanished once her agent answered and the thread waited on her.
 describe('what a post says on a past day and while a thread waits on its owner', () => {
-  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...(o.state === 'done' ? { solution: 'Done.' } : {}), ...o });
+  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...o });
   const dayOf = (window: { from: number; to: number }, items: unknown[], cards: unknown[] = []) => teamToday({ ...base, window, items: items as never, cards: cards as never });
   const stuck = item({ id: 's', title: 'Investor update', status: 'blocked', blockedBy: ['name:Codex usage'], updatedAt: on(12, 14) });
   it('today\'s post says what is stuck', () => {
@@ -161,6 +161,14 @@ describe('what a teammate handed you is in their post', () => {
   });
   it('a past day does not say it', () => {
     expect(postsOf(dayOf().people, { mates: true, live: false }).flatMap((p) => p.needs)).toEqual([]);
+  });
+  // Round ten: "Priya's standup shows 'Needs you on Bookings list empty states' twice
+  // consecutively with no visible distinction." Two rows wait on you under one name.
+  it('says a name it needs you on once', () => {
+    const twin = item({ id: 'r2', title: 'Booking fix', labels: ['teammate:t-fix'], updatedAt: on(12, 15) });
+    const day = teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [review, twin], needs: [review, twin] as never });
+    const mate = postsOf(day.people, { mates: true, live: true }).find((p) => p.key === 'mate:t-fix');
+    expect(mate?.needs.map((n) => [n.line.title, n.on])).toEqual([['Booking fix', 'you']]);
   });
   it('your own post does not repeat your Needs you', () => {
     const mine = teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [item({ id: 'x', title: 'My ask', status: 'done', updatedAt: on(12, 11) })], needs: [item({ id: 'q', title: 'Agent asks me' })] as never });
@@ -216,5 +224,45 @@ describe('teamToday reads any window, not only its three ranges', () => {
       items: [item({ id: 'in', title: 'Inside', status: 'done', updatedAt: on(10, 15) }), item({ id: 'out', title: 'Outside', status: 'done', updatedAt: on(11, 10) })],
     });
     expect(day.people.find((p) => p.key === 'me')!.finished.map((l) => l.title)).toEqual(['Inside']);
+  });
+});
+
+// Round two of the team test: Priya's standup read "Finished Empty bookings list
+// visual options and Empty bookings list visual options". One was her thread, the
+// other a review she was asked for, under the same name. An ask handed back is
+// help on someone else's thread, said as such, and never a second finished thing.
+describe('an ask for help or a review, handed back', () => {
+  const dm = { slug: 'dm', name: 'Dev', team: { direct: true, projectId: 'dm-1', people: ['p-me', 'p-dev'] } };
+  const ask = (o: Record<string, unknown>) => item({ product: 'dm', labels: ['given-task'], status: 'done', title: 'Bookings empty state', updatedAt: on(12, 12), ask: { kind: 'review', owner: 'p-me', thread: 't1', product: 'lumen' }, ...o });
+  const day = (items: Record<string, unknown>[]) => teamToday({ ...base, products: [...base.products, dm] as never, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: items as never });
+  it('is help said by the person who handed it back, not finished by anyone', () => {
+    const d = day([ask({ id: 'a1', createdBy: 'p-me', assignee: 'p-dev', verdict: 'yes', wrote: { status: { ts: on(12, 12), by: 'p-dev' }, verdict: { ts: on(12, 12), by: 'p-dev' } } })]);
+    const dev = d.people.find((p) => p.key === 'person:p-dev')!;
+    expect(dev.helped?.map((l) => l.title)).toEqual(['Bookings empty state']);
+    expect(d.people.flatMap((p) => p.finished)).toEqual([]);
+    expect(words(sentenceOf(postsOf(d.people, { mates: true }).find((p) => p.key === 'person:p-dev')!))).toBe('Helped on [Bookings empty state].');
+  });
+  it('is your own help in your post when you were the one asked', () => {
+    const d = day([ask({ id: 'a2', createdBy: 'p-dev', assignee: 'p-me', verdict: 'done', ask: { kind: 'help', owner: 'p-dev', thread: 't9', product: 'lumen' }, wrote: { status: { ts: on(12, 12), by: 'p-me' }, verdict: { ts: on(12, 12), by: 'p-me' } } })]);
+    expect(d.people.find((p) => p.key === 'me')!.helped?.map((l) => l.title)).toEqual(['Bookings empty state']);
+  });
+  it('stays help, not an open task, after a thank-you reopened the task', () => {
+    const d = day([ask({ id: 'a4', status: 'open', createdBy: 'p-me', assignee: 'p-dev', verdict: 'yes', wrote: { status: { ts: on(12, 13), by: 'p-me' }, verdict: { ts: on(12, 12), by: 'p-dev' } } })]);
+    expect(d.people.find((p) => p.key === 'person:p-dev')!.helped?.map((l) => l.title)).toEqual(['Bookings empty state']);
+    expect(d.people.flatMap((p) => p.tasks)).toEqual([]);
+  });
+  // Round six: "Dana's update says she helped on Clinic bookings list empty
+  // states and Clinic bookings list empty states". She helped, then reviewed,
+  // the same thread: two asks, one thread to name.
+  it('names a thread once when they helped and then reviewed it', () => {
+    const d = day([
+      ask({ id: 'a5', createdBy: 'p-me', assignee: 'p-dev', verdict: 'done', ask: { kind: 'help', owner: 'p-me', thread: 't1', product: 'lumen' }, wrote: { status: { ts: on(12, 11), by: 'p-dev' }, verdict: { ts: on(12, 11), by: 'p-dev' } } }),
+      ask({ id: 'a6', createdBy: 'p-me', assignee: 'p-dev', verdict: 'yes', wrote: { status: { ts: on(12, 12), by: 'p-dev' }, verdict: { ts: on(12, 12), by: 'p-dev' } } }),
+    ]);
+    expect(d.people.find((p) => p.key === 'person:p-dev')!.helped?.map((l) => l.key)).toEqual(['dm/a6']);
+  });
+  it('is nobody\'s news when its owner took it back', () => {
+    const d = day([ask({ id: 'a3', createdBy: 'p-me', assignee: 'p-dev', wrote: { status: { ts: on(12, 12), by: 'p-me' } } })]);
+    expect(d.people.flatMap((p) => [...p.finished, ...(p.helped ?? [])])).toEqual([]);
   });
 });

@@ -34,6 +34,7 @@ import { PhoneStatus } from '../components/PhoneStatus';
 import { SEND } from '../this-keyboard';
 import { Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { PRACTICE_TASK } from '../../../shared/first-run-practice.mts';
+import { threadLink } from '../../../shared/thread-link.mts';
 import type { Product, TeamMessageFile, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mts';
 import { ENGINES } from '../../../shared/engines.mts';
@@ -70,7 +71,7 @@ import {
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInTo, findInvited, type ToSection,
   agentOnThisWork, atOffers, atWordAt, cardDraftPlace, cardDraftToKeep, handedFromLabel, withoutAtWord,
-  startingWhen, whenOnDraft, whenToSend, whenWords, projectNote,
+  startingWhen, whenOnDraft, whenToSend, whenWords,
   type AtOffer, type HandFrom, type Harness, type Keyboard, type ModelPick, type SendAs, type SendWhen, type Visibility,
 } from './composer-rules';
 import { sameRule } from '../../../shared/repeats.mts';
@@ -81,6 +82,7 @@ import { shownTitle } from '../../../shared/thread-title.mts';
 import { dayDeadline, dueFromWords, dueSaid } from '../../../shared/team-tasks.mts';
 import { nameWait } from '../../../shared/thread-waits.mts';
 import { continuedFromLabel } from '../../../shared/thread-continued.mts';
+import { closesOnPress } from '../press';
 
 /** What went out, so the caller can say so and offer the way back. */
 export interface ThreadSent {
@@ -681,6 +683,9 @@ export function ThreadComposer({
         });
         dropComposeDraft(taken, undefined, place);
         if (initial?.continueFrom) void api.teamContinued(initial.continueFrom);
+        // The person who handed it over can follow the work to where it went (round two of the team test).
+        const startedAt = initial?.handFrom && made?.id && team?.me ? threadLink(team.me, made.id) : null;
+        if (startedAt && initial?.handFrom) void api.answer({ product: initial.handFrom.product, id: initial.handFrom.id, answer: `Started on this in a thread of my own: [${message.title}](${startedAt})` }).catch(() => {});
         onSent(made, { kind: 'task', product: product.slug, title: message.title, draft: taken, ...(when.runAt ? { runAt: when.runAt } : {}), ...(when.start ? { start: when.start } : {}) });
       }
     } catch (err) {
@@ -1048,14 +1053,14 @@ export function ThreadComposer({
           <button type="button" className="tc-head-link" onClick={onReorderProjects}>Reorder</button>
         </span>
       ) : <span className="tc-menu-head">Project</span>}
-      {offered.map((p) => {
-        const note = projectNote(p, { me: team?.me ?? null, byId: team?.byId ?? new Map() });
-        return <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerMove={hover}
+      {offered.map((p) => (
+        <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => { pickProject(p.slug); setProjectChosen(true); close('text'); }}>
           <Swatch slug={p.slug} /><span className="tc-row-label">{p.name}</span>
-          {note && <span className="tc-row-note">{note}</span>}
-        </button>;
-      })}
+          {/* A project a teammate shared has no folder here either, and is the team's, not personal (round four). */}
+          {p.team?.projectId ? <span className="tc-row-note">Shared with your team</span> : !p.repoPath && <span className="tc-row-note">For personal tasks</span>}
+        </button>
+      ))}
       {/* MAKING A PROJECT IS A THING YOU CAN DO FROM HERE, ALWAYS (approved
           2026-10-05). Not only when the list is empty: somebody with ten
           projects who wants an eleventh is in this menu too, and the old
@@ -1554,7 +1559,7 @@ export function ThreadComposer({
   );
   if (inline) return box;
   // Closing the box ends its dictation, so a click outside it waits for Stop.
-  return <div className="modal-backdrop tc-veil" onClick={() => { if (!talk.on) onClose(); }}>{box}</div>;
+  return <div className="modal-backdrop tc-veil" {...closesOnPress(() => { if (!talk.on) onClose(); })}>{box}</div>;
 }
 
 /* ------------------------------- glyphs --------------------------------- */

@@ -1,13 +1,12 @@
 // SHARE… ON A THREAD: send it by link, put it in a teammate's inbox, and,
 // last and small, who can open it (w-d19fcb9309, approved send-0, -2, -3, -4).
 import { threadOfLink, type SeenBy } from '../../../shared/thread-link.mts';
-import type { Want } from '../../../shared/thread-ask.mts';
 
 export { LINK_SITE, openTo, seenNow, sentWords, threadLink, threadOfLink, type SeenBy } from '../../../shared/thread-link.mts';
 export interface SharePerson { id: string; name?: string | null; email?: string | null }
 
 /** The thread a plain click on this link opens in the app; a ⌘, Ctrl or Shift click is the browser's. */
-export function threadToOpen(href: string | null | undefined, keys: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): { owner: string; id: string; at?: number } | null {
+export function threadToOpen(href: string | null | undefined, keys: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): { owner: string; id: string } | null {
   return keys.metaKey || keys.ctrlKey || keys.shiftKey ? null : threadOfLink(href);
 }
 
@@ -63,7 +62,7 @@ export interface ShareActs {
   /** The teammate last sent a thread, named first in the menu. */
   last: string | null;
   copy: (item: { product: string; id: string }) => Promise<boolean>;
-  send: (item: { product: string; id: string }, to: string[], note: string, want?: Want | null) => void;
+  send: (item: { product: string; id: string }, to: string[], note: string) => void;
   see: (item: { product: string; id: string }, to: SeenBy) => void;
   choose: (item: { product: string; id: string }, id: string) => void;
 }

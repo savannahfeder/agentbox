@@ -1,11 +1,11 @@
 // WHAT A MESSAGE IN A THREAD IS, when it is not an ordinary message: a
-// teammate's comment (it reaches the owner, and the agent with the owner's next reply), a note pinned
+// teammate's comment (it reaches the owner and starts no agent), a note pinned
 // to a place in a file, or an agent's checkpoint on the way to its answer.
 import type { AgentTurn } from '../types';
 
 export interface MessageKindWords { word: string; why?: string; file?: true }
 
-export function messageKind(e: Pick<AgentTurn, 'says' | 'fileMark' | 'carried'> | null | undefined): MessageKindWords | null {
+export function messageKind(e: Pick<AgentTurn, 'says' | 'fileMark'> | null | undefined): MessageKindWords | null {
   if (!e) return null;
   if (e.fileMark?.kind === 'note') {
     const file = e.fileMark.shown ?? e.fileMark.file.replace(/#\d+$/, '');
@@ -13,7 +13,9 @@ export function messageKind(e: Pick<AgentTurn, 'says' | 'fileMark' | 'carried'> 
     return { word: `Note on ${file}${place}`, file: true, ...(e.fileMark.unsent ? { why: 'Goes with your next reply' } : {}) };
   }
   if (e.fileMark?.kind === 'edited') return { word: `Edited ${e.fileMark.shown ?? e.fileMark.file}`, file: true };
-  if (e.says === 'comment') return { word: 'Comment', why: e.carried ? 'Went to the agent with the next reply' : 'Goes to the agent with the next reply' };
+  if (e.says === 'comment') return { word: 'Comment', why: 'did not start the agent' };
+  // Yours, on a thread you were asked to help on: its owner's computer passes it to their agent.
+  if (e.says === 'to-agent') return { word: 'To the agent' };
   if (e.says === 'progress') return { word: 'Checkpoint', why: 'progress so far' };
   return null;
 }

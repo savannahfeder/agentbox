@@ -11,7 +11,7 @@
 import { catchUpDue } from '../../shared/agent-import.mts';
 import { liveLine, shortWord, type LiveFacts } from './live-line';
 import { STATE_WORD, stateWordOf } from './threads/summary-rules';
-import { handedToName, threadState } from '../../shared/thread-cards.mts';
+import { threadState } from '../../shared/thread-cards.mts';
 import { closedUnshipped, notShippedLine, shippedAs } from '../../shared/not-shipped.mts';
 import { asksWho, isAuto } from '../../shared/auto-route.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
@@ -81,8 +81,6 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
 
   if (state === 'done') {
     if (shipped) return shipped;
-    const given = handedToName(item);
-    if (given) return says(`Given to ${given.split(/\s+/)[0]}`, 'done', false, String(item.answer));
     if (closedUnshipped(item)) return says('Not shipped', 'done', false, 'Closed without its work reaching main');
     return plain(stateWordOf(item, state), 'done');
   }

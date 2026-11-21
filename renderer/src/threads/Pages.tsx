@@ -20,7 +20,7 @@ import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
 import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { waitWords } from '../../../shared/thread-waits.mts';
-import { askedNow } from '../../../shared/thread-ask.mts';
+import { askedOutWord, handedBackBy } from '../../../shared/thread-asks.mts';
 import { needsLeft, needsWord } from '../../../shared/cloud-needs.mts';
 import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mts';
 import { commentLine, linkCommentLine } from './teammate-thread';
@@ -32,7 +32,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { asksForYourWords, cellUnderTab, givenBy, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
+import { asksForYourWords, cellUnderTab, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -41,7 +41,8 @@ import { bandDrag, cardClickIntent, clickMarks, marqueeMarks, type Box } from '.
 import { shownToPeople } from '../../../shared/thread-cards.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { FleetContext } from '../fleet';
-import { TeammateLead } from '../teammates/row-lead';
+import { TeammateLead, useTeammateWho } from '../teammates/row-lead';
+import { AgentFace } from '../components/AgentFace';
 import { factsFor, laterCell, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
 import { voiceName } from '../../../shared/agent-voice.mts';
@@ -53,6 +54,7 @@ import { CLOUD_KEY, CLOUD_WHEN_ON, cloudButtonCount, cloudFootLine, cloudIsOn, c
 import { brokenAccounts, buttonAsksSignIn, menuSetupLine, readBrokenSeen, seenAfter, SETUP, writeBrokenSeen } from '../cloud-setup';
 import type { Offer, OfferGo } from '../cloud-upgrade';
 import { isCause, causeOf, waitingOn, causeWord, causePlace, CAUSE_WAIT_WORD, CAUSE_BACK_WORDS } from '../../../shared/causes.mts';
+import { actsOnPress } from '../press';
 import './pages.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no
@@ -76,6 +78,10 @@ export const LockMark = () => <svg className="th-lock" width="11" height="12" vi
  *  than KEEP_WHOLE keeps only its last letters with the mark; the card lets the
  *  rest break anywhere, so a long link never pushes the card wider. */
 const KEEP_WHOLE = 16;
+/** When the person asked last opened the ask, from the team's read marks. */
+const askSeen = (seen: Record<string, Record<string, number>> | undefined) =>
+  (row: { id: string; assignee?: string | null; product?: string }) => seen?.[`${row.product}/${row.id}`]?.[row.assignee ?? ''] ?? 0;
+
 export function TitleThenMark({ title, mark }: { title: string; mark: ReactNode }) {
   if (!mark) return <>{title}</>;
   const text = title.trimEnd();
@@ -521,11 +527,11 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
   const press = (t: TabView) => (states ? (t === 'inbox' ? team!.onNeeds() : states.onTab(t)) : team ? team.onNeeds() : onView(t));
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
-    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} onClick={() => press(t.view)}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
-    {team && !states && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} onClick={team.onEverything}>{EVERYTHING_ELSE}</button>}
-    {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} onClick={team.today.onToday}>Today</button>}
-    {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} onClick={team.tasks.onTasks}>Tasks</button>}
-    {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} onClick={team.done.onDone}>{DONE.short}</button>}
+    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} {...actsOnPress(() => press(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
+    {team && !states && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} {...actsOnPress(team.onEverything)}>{EVERYTHING_ELSE}</button>}
+    {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} {...actsOnPress(team.today.onToday)}>Today</button>}
+    {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} {...actsOnPress(team.tasks.onTasks)}>Tasks</button>}
+    {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} {...actsOnPress(team.done.onDone)}>{DONE.short}</button>}
     {after}
   </div>{team?.corner}{onSearch && <SearchButton onSearch={onSearch} />}</div>;
 }
@@ -656,7 +662,7 @@ export const RepeatMark = () => <svg className="th-repeat" width="13" height="13
   <path d="M13 6.5A5.5 5.5 0 0 0 3.2 4.8M3 2.5v2.6h2.6" /><path d="M3 9.5a5.5 5.5 0 0 0 9.8 1.7M13 13.5v-2.6h-2.6" />
 </svg>;
 
-export function RowCells({ status, retry, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, pinned = false, aside, late = false, where, person, priority, updatedAt, when, now, action }: {
+export function RowCells({ status, retry, lead, title, hidden = false, lock = false, shared = false, chosen = 0, held = false, pinned = false, aside, late = false, where, person, priority, updatedAt, when, now, action, who }: {
   /** Try again, on a thread nothing will start (TryAgainButton). */
   retry?: ReactNode;
   /** Pinned to the top of the list (w-20323283e6): a faint pin after the title. */
@@ -683,13 +689,18 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   priority: number | null; updatedAt: number; now: number; action?: ReactNode;
   /** Words for the time cell instead of how long ago: a repeating task's next run. */
   when?: string;
+  /** Who the thread is from: a person, an AI teammate, or you. */
+  who?: Who;
 }) {
   const id = rowPriorityId(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
+    {/* EVERY ROW READS THE SAME WAY (w-585619d660): a mark in one slot, the
+        title, then who it is from in grey. The titles line up because the
+        slot is there on every row, empty or not. */}
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}${aside ? ' with-aside' : ''}`}>{lead}{aside ? <span className="th-title-text">{title}</span> : title}{aside && <span className="th-aside-box"><span className={`th-aside${late ? ' late' : ''}`}>{aside}</span></span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}${aside ? ' with-aside' : ''}`}><span className="th-slot">{who?.face ?? lead}</span>{aside ? <span className="th-title-text">{title}</span> : title}{who?.name && <span className="th-who-name">{who.name}</span>}{aside && <span className="th-aside-box"><span className={`th-aside${late ? ' late' : ''}`}>{aside}</span></span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
     <div className={`th-cell-state${status?.why ? ' has-card' : ''}${retry ? ' can-retry' : ''}`} title={status?.why ? undefined : status?.title}>{status && <><StatusMark status={status} />{status.word}</>}{retry}
       {status?.why && <span className="th-why-card" role="tooltip"><b>{status.why.head}</b><span>{status.why.body}</span></span>}</div>
     <div className="th-cell-proj th-col-proj">{where}</div>
@@ -700,6 +711,10 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
     <div className={`th-cell-when num${action ? ' has-act' : ''}`}><span className="th-when">{when ?? updatedWords(updatedAt, now)}</span>{action}</div>
   </div>;
 }
+
+/** Who a row is from: their face, and their name in grey after the title. Your own threads carry the agent's face and no name. */
+export type Who = { face: ReactNode; name?: string };
+export const YOURS: Who = { face: <AgentFace /> };
 
 /** A message's line: the other person's face and name, then what was said,
  *  "You: " first when you spoke last. A group names everyone else. `mark`
@@ -715,6 +730,7 @@ export function MessageTitle({ people, fromMe, text, mark, name }: { people: str
   </span>;
 }
 
+const fullName = (p: Person | null | undefined) => p?.name || firstName(p ?? null);
 const taskCell = (word: string): StatusCell => ({ word, mark: word === 'Done' ? 'done' : 'need', agent: false, live: false, cloud: false });
 
 /** The cells of one row in the inbox's table: thread, project (or who a message is from), priority, updated.
@@ -748,6 +764,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const allItems = useContext(ItemsContext);
   const allProducts = useContext(ProductsContext);
   const savedKeys = useContext(SavedKeysContext);
+  const mateFrom = useTeammateWho(item);
   const waits = team ? waitWords(item, { items: allItems, cards: team.state.cards ?? [], nameOf: (id: string) => team.byId.get(id)?.name ?? 'Someone' }) : null;
   const nameFirst = (id: string) => firstName(team?.byId.get(id) ?? null);
   const inNeedsYou = tab === 'inbox';
@@ -759,8 +776,14 @@ export function ThreadCells({ item, product, now, person, tab }: {
       : team && (cell.word === STATE_WORD.waiting || iSpokeLast(item, product, team.me)) ? { ...cell, word: waitingWord(item, product, team.me, nameFirst, { inNeedsYou: tab === 'inbox' }) } : cell;
   // A cloud run that asked for a key is waiting on it, not finished (round one of the key power test).
   const wants = inNeedsYou && !cell.live && !waits && !peopleWaitOnYou ? needsWord(needsLeft(item, savedKeys)) : null;
-  const shownWord = wants ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
-  const status = shownWord === null ? undefined : { ...worded, word: shownWord };
+  // Handed back by someone you asked (shared/thread-asks.mts): their words are the newest thing on it.
+  const toldBy = inNeedsYou ? handedBackBy(item as Parameters<typeof handedBackBy>[0]) : null;
+  const backFrom = toldBy && team?.byId.has(toldBy) ? `Back from ${nameFirst(toldBy)}` : null;
+  // Out with someone you asked: say who, not that nothing is running.
+  const askedOut = team && !cell.live && !backFrom ? askedOutWord(allItems ?? [], team.me, item.id, (id) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null;
+  const shownWord = wants ?? backFrom ?? askedOut ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
+  // Out with a person, it is no agent's state, so it wears no agent mark and offers no try again.
+  const status = shownWord === null ? undefined : askedOut && shownWord === askedOut ? { ...worded, word: shownWord, agent: false, title: undefined } : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
   // people on a thread the team or chosen people can see, the lock on one only
   // you can see. A thread shared with chosen people (w-41ff964775) carries the
@@ -789,14 +812,18 @@ export function ThreadCells({ item, product, now, person, tab }: {
     const taskVoice = item.wrote?.body?.voice;
     const cell = task.held ? { ...taskCell(task.word), mark: 'held' as const, title: task.title } : taskCell(task.word);
     const unblocked = waitCameBack(item) ? item.waitEnded?.said : null;
-    return <RowCells status={cell} title={<><span className="tq-from"><Face person={other} agent={!!taskVoice} /><b>{taskVoice ? voiceName(taskVoice, firstName(team?.byId.get(item.wrote?.body?.by ?? '') ?? null), { mine: item.wrote?.body?.by === team?.me }) : firstName(other)}</b></span>{rowTitle(item)}</>}
+    const from: Who = { face: <Face person={other} agent={!!taskVoice} />, name: taskVoice ? voiceName(taskVoice, firstName(team?.byId.get(item.wrote?.body?.by ?? '') ?? null), { mine: item.wrote?.body?.by === team?.me }) : fullName(other) };
+    return <RowCells status={cell} who={from} title={rowTitle(item)}
       aside={unblocked ?? due?.word ?? undefined} late={!unblocked && !!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={shownPriority(item)} updatedAt={task.at} when={back} now={now} />;
   }
   if (said) {
     const fileNews = fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => (said.people.length > 1 ? firstName(team?.byId.get(id ?? '') ?? null) : ''))?.trim();
     const agent = fileNews ? null : agentSaidLast(item, allItems);
-    return <RowCells status={status} title={<MessageTitle people={said.people} fromMe={!fileNews && !agent && said.fromMe} text={fileNews ?? (agent ? `${agent.who}: ${agent.text}` : said.text)} name={item.label || (isWorkThread(item) ? item.title : null)} />} aside={due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
+    const text = fileNews ?? (agent ? `${agent.who}: ${agent.text}` : said.text);
+    const subject = item.label || (isWorkThread(item) ? item.title : null);
+    const from: Who = { face: <Face person={team?.byId.get(said.people[0] ?? '') ?? null} />, name: said.people.map((id) => (said.people.length > 1 ? nameFirst(id) : fullName(team?.byId.get(id) ?? null))).join(', ') };
+    return <RowCells status={status} who={from} title={subject ?? (!fileNews && !agent && said.fromMe ? `You: ${text}` : text)} aside={subject ? text : due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={messagePriority(item)} updatedAt={when} when={back} now={now} action={action} />;
   }
   // ONLY THE UNUSUAL CASE WEARS A MARK (2026-10-02). Shared with the team is
@@ -813,12 +840,11 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // places on one row is what the column was drawn to end. `FreeAgentContext`
   // is untouched and still decides whether the cloud offers itself.
   const handed = team ? handedBy(item, product ?? undefined, team.me) : null;
-  const from = handed?.from ?? (team ? givenBy(item, allItems ?? [], team.me) : null);
-  const handedFace = from ? <span className="tq-from"><Face person={team?.byId.get(from) ?? null} /><b>{nameFirst(from)}</b></span> : null;
+  const handedFrom: Who | null = handed ? { face: <Face person={team?.byId.get(handed.from) ?? null} />, name: fullName(team?.byId.get(handed.from) ?? null) } : null;
+  const from: Who = handedFrom ?? mateFrom ?? YOURS;
   const commented = (handed?.note ?? null) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? linkCommentLine(item.linkComments)
-    ?? askedNow(item)
     ?? (waitCameBack(item) ? item.waitEnded?.said : null)
     ?? item.handedOver?.said;
   // ONE ROW PER CAUSE (shared/causes.mts): how many threads wait behind it, and from where.
@@ -828,16 +854,16 @@ export function ThreadCells({ item, product, now, person, tab }: {
     const place = causePlace(item, behind, nameOfProduct);
     // The count stays whole when a long name is cut short.
     const where = <><span className="th-proj-name">{place.name}</span>{place.more ? <span className="th-proj-more">+{place.more}</span> : null}</>;
-    return <RowCells status={{ ...(status ?? cell), word: causeWord(behind.length) }} title={rowTitle(item)} pinned={!!item.pinned} where={where} person={person}
+    return <RowCells status={{ ...(status ?? cell), word: causeWord(behind.length) }} who={from} title={rowTitle(item)} pinned={!!item.pinned} where={where} person={person}
       priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
   }
   // And a thread behind one says what it waits on, and that it comes back when that is fixed.
   const stuckOn = tab === 'snoozed' ? causeOf(item, allItems ?? []) : null;
   if (stuckOn) {
-    return <RowCells status={{ ...(status ?? cell), word: CAUSE_WAIT_WORD }} title={rowTitle(item)} aside={stuckOn.title} where={product?.name ?? ''} person={person}
+    return <RowCells status={{ ...(status ?? cell), word: CAUSE_WAIT_WORD }} who={from} title={rowTitle(item)} aside={stuckOn.title} where={product?.name ?? ''} person={person}
       priority={shownPriority(item)} updatedAt={when} when={CAUSE_BACK_WORDS} now={now} />;
   }
-  return <RowCells status={status} retry={retry} lead={handedFace ?? <TeammateLead item={item} />} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
+  return <RowCells status={status} retry={askedOut ? undefined : retry} who={from} title={rowTitle(item)} aside={asideBesides(rowTitle(item), commented ?? (toApproveWords(waiting.get(`${item.product}/${item.id}`)) || null)) ?? undefined} shared={seen === 'people'} chosen={chosen} lock={lock} held={notStarted(item)} pinned={!!item.pinned && item.status !== 'done'} where={product?.name ?? ''} person={person}
     priority={shownPriority(item)} updatedAt={when} when={back} now={now} action={action} />;
 }
 
@@ -1138,7 +1164,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const cardWaits = e.card && e.card.state !== 'done' ? linkWords(e.card.blockedBy, team?.byId) : null;
           const stuckOn = e.item ? causeOf(e.item, allItems ?? []) : null;
           const waitWord = e.item
-            ? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
+            ? (team ? askedOutWord(allItems ?? [], team.me, e.item.id, (id: string) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null) ?? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
             : cardWaits && `Waits on ${cardWaits}`;
           const messageProduct = e.message && e.item ? products.find((p) => p.slug === e.item!.product) : null;
           const onThem = messageProduct && iSpokeLast(e.item!, messageProduct, team?.me ?? null)

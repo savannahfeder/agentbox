@@ -7,7 +7,6 @@
 // An agent's wait on other people (`person:`, `card:`) is this too, since
 // only the team sync can see those end. An agent's wait on threads is not: the
 // supervisor resumes those (resumeFinishedWaits).
-import { cameBack, verdictOf } from './review-sent-back.mts';
 
 export interface WaitingItem {
   id: string;
@@ -21,7 +20,6 @@ export interface WaitingItem {
   updatedAt?: number;
   agent?: unknown;
   wrote?: Record<string, { ts?: number; source?: string } | undefined>;
-  waitingComments?: readonly { by: string; ts: number; text?: string }[];
 }
 
 export interface WaitCard {
@@ -87,32 +85,13 @@ export interface WaitEndContext {
   items: readonly WaitingItem[];
   cards: readonly WaitCard[];
   lastWordFrom: (person: string) => number;
-  /** The words of that newest message, quoted where the wait ends so the thread shows them. */
-  lastWordsFrom?: (person: string) => string | null;
   nameOf: NameOf;
   now: number;
-  /** A review of the thread's files sent back in a chat, as the verdict's comment would say it. */
-  reviewedIn?: (item: WaitingItem, person: string, since: number) => string | null;
 }
 
-const QUOTE_CHARS = 80;
-const quoted = (text: string | null | undefined): string => {
-  const line = String(text ?? '').replace(/\s+/g, ' ').trim();
-  if (!line) return '';
-  return `: “${line.length > QUOTE_CHARS ? `${line.slice(0, QUOTE_CHARS - 1).trimEnd()}…` : line}”`;
-};
-
-function oneEnd(item: WaitingItem, id: string, since: number, { items, cards, lastWordFrom, lastWordsFrom, nameOf, reviewedIn }: WaitEndContext): string | null {
+function oneEnd(id: string, since: number, { items, cards, lastWordFrom, nameOf }: WaitEndContext): string | null {
   const w = waitParts(id);
-  if (w.kind === 'person') {
-    const first = FIRST(nameOf(w.person));
-    const comments = (item.waitingComments ?? []).filter((c) => c.by === w.person && c.ts > since);
-    // A review sent back says its verdict, whatever else they wrote.
-    const verdict = comments.findLast((c) => verdictOf(c.text))?.text ?? reviewedIn?.(item, w.person, since) ?? null;
-    if (verdict) return `${cameBack(first, verdict)}${quoted(verdictOf(verdict)!.note)}`;
-    if (lastWordFrom(w.person) > since) return `${first} wrote to you${quoted(lastWordsFrom?.(w.person))}`;
-    return comments.length ? `${first} commented` : null;
-  }
+  if (w.kind === 'person') return lastWordFrom(w.person) > since ? `${FIRST(nameOf(w.person))} wrote to you` : null;
   if (w.kind === 'name') return null;
   if (w.kind === 'card') {
     const card = cards.find((c) => c.personId === w.person && c.threadId === w.thread);
@@ -141,7 +120,7 @@ export function endedWaits<T extends WaitingItem>(rows: readonly T[], ctx: WaitE
       out.push({ item, said: `Still waiting on ${waitingOnWords(item.blockedBy![0], ctx)} after 3 days` });
       continue;
     }
-    const ends = item.blockedBy!.map((id) => oneEnd(item, id, since, ctx));
+    const ends = item.blockedBy!.map((id) => oneEnd(id, since, ctx));
     if (ends.every(Boolean)) out.push({ item, said: ends.at(-1)! });
   }
   return out;

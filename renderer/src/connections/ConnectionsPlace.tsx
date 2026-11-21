@@ -13,6 +13,7 @@ import { SERVICES } from '../../../shared/cloud-needs.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { keyLooksWrong } from '../key-asks';
 import './connections.css';
+import { closesOnPress } from '../press';
 
 function Mark({ id, name }: { id: string; name: string }) {
   const src = logoOf(id);
@@ -63,7 +64,7 @@ function SheetFrame({ label, onClose, children }: { label: string; onClose: () =
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
-  return <div className="modal-backdrop cn-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+  return <div className="modal-backdrop cn-backdrop" {...closesOnPress(onClose)}>
     <div className="cn-sheet" role="dialog" aria-label={label}>{children}</div>
   </div>;
 }

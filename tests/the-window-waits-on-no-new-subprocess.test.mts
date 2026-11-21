@@ -36,7 +36,7 @@ const ALLOWED = {
   'scripts/brand-electron.mjs': [1, 'codesign, just before the app restarts itself from source'],
 };
 // Scripts the app's own process imports (main/main.mts, main/source-updater.mts).
-const IMPORTED_SCRIPTS = ['scripts/brand-electron.mjs', 'scripts/linux-launcher.mjs'];
+const IMPORTED_SCRIPTS = ['scripts/brand-electron.mjs', 'scripts/linux-launcher.mjs', 'scripts/windows-launcher.mjs'];
 
 function files(dir) {
   return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {

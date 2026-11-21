@@ -13,8 +13,7 @@ import type { ProjectSeen } from './thread-cards.mts';
 interface Row { id?: string; product?: string; label?: string; title?: string; visibility?: string }
 type Seen = ProjectSeen;
 type Stamp = string | number | null | undefined;
-/** `workingThread`: the id of the shared thread the line names, for the panel to open; null when there is none you can open. */
-type Working = { workingOn: string | null; workingPrivate: boolean; workingThread: string | null };
+type Working = { workingOn: string | null; workingPrivate: boolean };
 type MonthRow = { month?: unknown; hours?: unknown } | null;
 
 /** One room_presence row, as the cloud sends it. */
@@ -55,7 +54,6 @@ export interface WallProfile {
 /** The cards of the team that a person's own working-on name is read from. */
 export interface TeamCardLike {
   personId?: string;
-  threadId?: string;
   state?: string;
   visible?: boolean;
   title?: unknown;
@@ -141,18 +139,17 @@ function sumPresence(rows: readonly PresenceRowLike[], now: number) {
 }
 
 function workingOf({ profile, lead, teammate, cards }: { profile: WallProfile; lead: PresenceRowLike | null; teammate: boolean; cards: readonly TeamCardLike[] }): Working {
-  const none = { workingOn: null, workingPrivate: false, workingThread: null };
+  const none = { workingOn: null, workingPrivate: false };
   if (!lead) return none;
+  if (profile.show_working === 'none' || lead.working_private) return { workingOn: null, workingPrivate: true };
+  if (profile.show_working === 'everyone' && lead.working_on) return { workingOn: lead.working_on, workingPrivate: false };
   // Running, and no name this viewer may read: it says Private thread.
-  const hidden = { workingOn: null, workingPrivate: true, workingThread: null };
-  if (profile.show_working === 'none' || lead.working_private) return hidden;
-  // A teammate's line is a shared card's, so it says what the card says and opens it.
-  const card = teammate ? cards
+  const hidden = { workingOn: null, workingPrivate: true };
+  if (!teammate) return hidden;
+  const card = cards
     .filter((c) => c.state === 'running' && c.visible !== false && c.title)
-    .sort((a, b) => num(b.updatedAt) - num(a.updatedAt))[0] : undefined;
-  if (card) return { workingOn: String(card.title).slice(0, WORKING_ON_MAX), workingPrivate: false, workingThread: card.threadId ?? null };
-  if (profile.show_working === 'everyone' && lead.working_on) return { workingOn: lead.working_on, workingPrivate: false, workingThread: null };
-  return hidden;
+    .sort((a, b) => num(b.updatedAt) - num(a.updatedAt))[0];
+  return card ? { workingOn: String(card.title).slice(0, WORKING_ON_MAX), workingPrivate: false } : hidden;
 }
 
 // One card per member with a profile, sorted by name so cards never jump.
@@ -170,7 +167,7 @@ export function wallCards({ members = [], profiles = [], presence = [], teammate
   teamCards?: readonly TeamCardLike[];
   meId?: string | null;
   now?: number;
-  mine?: { agents?: number; workingOn?: string | null; workingThread?: string | null } | null;
+  mine?: { agents?: number; workingOn?: string | null } | null;
   names?: readonly { person_id: string; has_card?: boolean; name?: string; avatar_url?: string | null }[] | null;
   listed?: boolean;
 }): WallCard[] {
@@ -211,15 +208,15 @@ export function wallCards({ members = [], profiles = [], presence = [], teammate
     out.push({
       id: n.person_id, me: false, away: true, name: displayNameOf(n.name), avatarUrl: n.avatar_url ?? null, headline: null, bio: null,
       agents: null, hoursTotal: 0, hoursWeek: 0, hoursToday: 0, streak: 0, byMonth: [],
-      teammate: mates.has(n.person_id), showActivity: false, activity: null, status: null, workingOn: null, workingPrivate: false, workingThread: null,
+      teammate: mates.has(n.person_id), showActivity: false, activity: null, status: null, workingOn: null, workingPrivate: false,
     });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 
-const ownWorking = (mine: { workingOn?: string | null; workingThread?: string | null }, hidden: boolean): Working => (hidden
-  ? { workingOn: null, workingPrivate: !!mine.workingOn, workingThread: null }
-  : { workingOn: mine.workingOn ?? null, workingPrivate: false, workingThread: mine.workingThread ?? null });
+const ownWorking = (mine: { workingOn?: string | null }, hidden: boolean): Working => (hidden
+  ? { workingOn: null, workingPrivate: !!mine.workingOn }
+  : { workingOn: mine.workingOn ?? null, workingPrivate: false });
 
 const shortName = (item: Row | undefined): string => (String(item?.label ?? '').trim() || String(item?.title ?? '')).slice(0, WORKING_ON_MAX);
 

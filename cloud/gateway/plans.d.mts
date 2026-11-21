@@ -9,6 +9,7 @@ export interface Plan {
 export const PLANS: Readonly<{ none: Plan; pro: Plan & { dollarsPerMonth: number }; plus: Plan & { dollarsPerMonth: number }; max: Plan & { dollarsPerMonth: number } }>;
 export const PLAN_TRIAL: Readonly<{ days: number; hours: number }>;
 export const TEAM: Readonly<{ trialDays: number; trialHoursPerMember: number; hoursPerSeat: number; dollarsPerSeat: number; filesGBPerSeat: number }>;
+export function teamFreeDays(endsAt: number, now: number): number;
 export const FILES_LAPSE_DAYS: number;
 export const RUN_CEILING_MS: number;
 export const SIGNIN_CEILING_MS: number;

@@ -1,4 +1,3 @@
-import { GivenDock, givenState, type Handing } from './GivenDock';
 import { RemoteControl } from './RemoteControl';
 import { dropHalfMention, heldKeyThatOpenedTheBox, keyInTheReplyBox, replyName, replyTarget, sendKeyFor } from '../reply-keys';
 import { onPhone } from '../phone-screen';
@@ -32,7 +31,6 @@ import { providerCommand } from '../../../shared/provider-commands.mts';
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent as BoxKeyEvent, type ReactNode } from 'react';
 import { Face, TeamContext, firstName } from '../team/people';
-import { reviewBack } from '../../../shared/review-sent-back.mts';
 import { handedInitials, handedTo, isDirect, taskHandedFrom, peopleInConversation, peopleToAdd, workAudience } from '../threads/page-rules';
 import {
   allModels, joinNames, moreCount, recentModels, replyBoxAsk, replyWaitsUntil, type Harness, type ModelPick,
@@ -83,7 +81,7 @@ import { connectedReply, lateReply, needsIn, needId, keysOf, type Need } from '.
 import type { KeySource } from '../../../shared/cloud-key-sources.mts';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
 import { referencedFiles, isImagePath } from '../referenced-files';
-import { pictureRoots } from '../message-folders';
+import { pictureRoots, taskFolder } from '../message-folders';
 import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
 import { embeddedDocuments, isBookkeeping, messageDocuments } from '../message-artifacts';
@@ -97,7 +95,7 @@ import { fileNewsFor, shownName, type ThreadLine } from '../../../shared/artifac
 import { whereAFileOpens } from '../artifact-layout';
 import { carryLine, type CarryState } from '../../../shared/carried-files.mts';
 import { watchScrollGutter } from '../scroll-gutter';
-import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
+import { CODE_PATH, artifactUrlTransform, isMediaPath, remarkArtifactPaths, shortPath } from '../remark-artifact-paths';
 import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, readDraftWhen, saveDraftWhen, type SentDraft } from '../drafts';
 import { ReplyLater } from './ReplyLater';
@@ -118,7 +116,7 @@ import { applyDockHeight } from '../dock-height';
 import { ClipGlyph, SendGlyph } from './reply-glyphs';
 import { bringIntoView, resumeTo } from '../thread-bottom';
 import { optionIsClipped, optionPeek } from '../option-peek';
-import { changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
+import { agentSaidNotReady, changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, saidNotToShip, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw, stripUnderThePointer } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
 import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
@@ -134,15 +132,15 @@ import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
 import { ContinuedFrom, HandedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
 import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
-import { latestStep } from '../../../shared/thread-ask.mts';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle, showsWhenItComesBack } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
 import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
-import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
+import { TeamRouteStrip, TeamSaid, teamHeld } from '../team/TeamFocus';
 import { HandedLine } from '../team/HandedBy';
+import { askAboutStep } from '../team/AsksLine';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
@@ -521,6 +519,27 @@ function CarriedNote({ src, always = false }: { src: string; always?: boolean })
   );
 }
 
+/** Beside a file named in a conversation's words, while it has not reached this computer. */
+function InlineCarry({ src }: { src?: string }) {
+  const { direct, product } = useContext(MessagePlace);
+  const [carry, setCarry] = useState<CarryState | null>(null);
+  const [looks, setLooks] = useState(0);
+  useEffect(() => {
+    if (!direct || !product || !src || /^https?:/.test(src)) return;
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    api.resolveDoc({ product, src }).then((r) => {
+      if (!live) return;
+      setCarry(r.carry ?? null);
+      if (r.coming || r.waits || r.carry?.state === 'coming') timer = setTimeout(() => setLooks((n) => n + 1), NOTE_LOOKS_MS);
+    }).catch(() => {});
+    return () => { live = false; if (timer) clearTimeout(timer); };
+  }, [direct, product, src, looks]);
+  const said = carryLine(carry);
+  if (!said || said.state === 'sent') return null;
+  return <span className="carried-inline"> · {said.label}</span>;
+}
+
 // A FOLDER A WORKER NAMES ON ITS OWN LINE SHOWS WHAT IS IN IT (2026-10-04).
 //
 // Her words: the previews she should be able to open from the chat, "and maybe
@@ -634,7 +653,7 @@ export function ArtifactLink({ kind, product, src, fallback, onOpen, children }:
       .then((r: { ok: boolean; opened?: string }) => { if (r?.ok && r.opened) setHref(`file://${r.opened}`); })
       .catch(() => {});
   }, [product, src]);
-  return <><Mention kind={kind} href={href} title={src} onClick={(e) => { e.preventDefault(); onOpen(e, e.currentTarget); }}>{children}</Mention></>;
+  return <><Mention kind={kind} href={href} title={src} onClick={(e) => { e.preventDefault(); onOpen(e, e.currentTarget); }}>{children}</Mention><InlineCarry src={src} /></>;
 }
 
 // What a link's own words become. A path or an address the worker wrote out
@@ -732,7 +751,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, handing = null, onMessageHanded = null, onRetryHand, onKeepHand }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, asked = false, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -762,8 +781,15 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  when pressed is worse than no word. */
   onHandToAgent?: (item: WorkItem, message?: AgentTurn) => void;
   /** Who this thread can be handed on to, for its menu. */
-  giveTo?: readonly { id: string; name: string }[];
+  giveTo?: readonly { id: string; name: string; detail?: string }[];
   onGive?: (to: { id: string; name: string }, note: string) => void;
+  /** Help or a review from a person, keeping the thread yours. */
+  onAsk?: (to: { id: string; name: string }, kind: 'help' | 'review', note: string, step: string | null) => void;
+  /** Above the reply box: who you asked, and what came back. */
+  /** Who you asked onto this thread, in its header. */
+  asksCorner?: ReactNode;
+  /** Someone you asked has it now, so the foot does not offer asking again. */
+  asked?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shippedMark?: boolean | null;
   onShipped?: (on: boolean) => void;
@@ -912,11 +938,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onReopen: () => void;
   /** Opens a done thread again. */
   onReopenDone?: () => void;
-  /** A hand-over of this thread under way, or the reason it failed. */
-  handing?: Handing | null;
-  onMessageHanded?: (() => void) | null;
-  onRetryHand?: () => void;
-  onKeepHand?: () => void;
   /** Opens ⌘K on its Move to rows. */
   onMove?: () => void;
   /** Sets the thread's level, from the thread's own menu. */
@@ -1034,7 +1055,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // A thread about work is named for the work, and these are the people it is with.
   const audience = teamCtx ? workAudience(item, teamCtx.products.get(item.product), teamCtx.me, (id) => firstName(teamCtx.byId.get(id) ?? null)) : null;
   const handedName = handedTo(item);
-  const given = givenState(item, handing);
   const handedTask = handedName ? taskHandedFrom(items ?? [], item.id, teamCtx?.me ?? null) : null;
   const summarised = !agent && !made && !direct;
   // Read before the first paint, so the thread's width is right from the start.
@@ -1412,7 +1432,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       // A file opens beside the chat, a deck full screen, a web address in the
       // pane, and a ⌘-click sends any of them out (../link-click.ts).
       const goes = whereALinkGoes(href, click, { pane: !!onOpenDoc });
-      if (goes === 'thread' && openLinkedThread) { const t = threadOfLink(href)!; openLinkedThread(t.owner, t.id, t.at); return; }
+      if (goes === 'thread' && openLinkedThread) { const t = threadOfLink(href)!; openLinkedThread(t.owner, t.id); return; }
       if (!asksForANewTab(click) && opensBig(href)) { openBig(href, from); return; }
       if (!asksForANewTab(click) && opensBeside(href)) { openBeside(newestOfFamily(href, edits), from); return; }
       if (goes === 'picture') { openPicture(href, from); return; }
@@ -1492,10 +1512,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         if (!className && ticketReference(value)) return <code>{children}</code>;
         const source = !className && sourceReference(value);
         if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(value)}</ArtifactLink>;
-        // Written out in full into this product's folder counts as the short
-        // path it names, the same rule a full path in a sentence follows.
+        // Written out in full into this product's folder, or the thread's own,
+        // counts as the short path it names, as a full path in a sentence does.
         const shown = value.trim();
-        const path = (!className && productDir && productPath(shown, productDir)) || shown;
+        const path = (!className && shortPath(shown, productDir, taskFolder(repoDir, item.id))) || shown;
         if (!className && (PATH_RE.test(path) || (conversing && path.startsWith('/') && PATH_RE.test(path.slice(1))))) {
           if (/\.(png|jpe?g|gif|webp)$/i.test(path)) {
             return <ArtifactImg key={path} src={path} alt={shown} roots={roots} onOpen={openHref} find={find} />;
@@ -1529,8 +1549,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   }, [productDir, repoDir, item.id, item.result, item.note, item.body, item.answer, direct, product]);
 
   const mdPlugins = useMemo(
-    () => [remarkGfm, remarkTicketReferences, [remarkArtifactPaths, { dir: productDir ?? null, anyFull: direct }], remarkMediaUnderSentences] as NonNullable<Parameters<typeof ReactMarkdown>[0]['remarkPlugins']>,
-    [productDir, direct],
+    () => [remarkGfm, remarkTicketReferences, [remarkArtifactPaths, { dir: productDir ?? null, anyFull: direct, folder: taskFolder(repoDir, item.id) }], remarkMediaUnderSentences] as NonNullable<Parameters<typeof ReactMarkdown>[0]['remarkPlugins']>,
+    [productDir, direct, repoDir, item.id],
   );
 
   // WHAT A CLOUD RUN ASKED FOR is a card in its message (NeedCard.tsx). A saved
@@ -1720,7 +1740,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // AND WHICH WORDS IT ASKS IN COME OFF THE FOLDER, not off a fixed pair:
   // work with a commit on it is shipped, work nobody committed is committed
   // first, and work that has been thrown away is not asked about at all.
-  const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir)) : null;
+  const shipAsk = shipOfferLive(item, { change: !!figures, running: !!session || !!agent }) ? shipOfferFor(standing, onlyNamedFiles(changed, referencedFiles(item.result, item.note, item.body, item.answer, { dir: productDir }), productDir), { held: saidNotToShip(item.body, item.answer) || agentSaidNotReady(item.result) }) : null;
   const shipOffer = !!shipAsk;
   const stripShown = showOptions || shipOffer;
   // A pick is held a few seconds for Z before it is written, and the card it
@@ -1937,8 +1957,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     <ThreadMenu
       share={share}
       onCopyLink={() => onShare!.copy(item)}
-      step={latestStep(item)}
-      onSendTo={(to, note, want) => onShare!.send(item, to, note, want)}
+      onSendTo={(to, note) => onShare!.send(item, to, note)}
       onSee={(to) => onShare!.see(item, to)}
       onChoose={(id) => onShare!.choose(item, id)}
       key={`${item.product}:${item.id}`}
@@ -1973,6 +1992,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onPlace={onPlace}
       giveTo={giveTo}
       onGive={onGive}
+      onAsk={onAsk}
       shipped={shippedMark}
       onShipped={onShipped}
       waitChoices={waitChoices}
@@ -2113,7 +2133,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
-    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && !givenTask && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)}
+    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{asksCorner}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice}
@@ -2208,7 +2228,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             <span className="blocked-by-go">stop waiting</span>
           </button>
         )}
-        {!waitNow && waitEndedWords && !reviewBack(item.waitingComments) && (
+        {!waitNow && waitEndedWords && (
           <div className="blocked-by"><span className="blocked-by-title">{waitEndedWords}</span></div>
         )}
 
@@ -2276,12 +2296,13 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             and which two versions this is between (w-86452550e5). */}
         <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
-        {/* A task handed to you says only where it came from; its name heads the conversation. */}
+        {givenTask && <div className="focus-meta by-lead"><TeamSaid item={item} /></div>}
         {givenTask && <HandedFrom item={item} />}
         {made
           ? <div className="outcome">{md(item.body ?? '')}</div>
           : !agent && (
             <ItemThread
+              askAbout={!!onAsk && giveTo.some((p) => !p.id.startsWith('mate:')) && item.status !== 'done'}
               onOpenFileMark={openFileMark}
               item={item}
               chat={direct}
@@ -2552,6 +2573,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           <span className="focus-when">Opens the app it is running in</span></>
         )}
         {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>Send back to agent</button>}
+        {/* Where the agent stopped is the step a teammate is asked about. */}
+        {!agent && item.status === 'blocked' && onAsk && !asked && giveTo.some((p) => !p.id.startsWith('mate:')) && (
+          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}>Ask a teammate</button>
+        )}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
       </div>
@@ -2622,9 +2647,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               looks like it sends is the failure this codebase cares about most.
               What to do instead is in the message itself, per cause.
            */}
-          {update || trouble ? null : given ? (
-            <GivenDock state={given} onMessage={onMessageHanded} onReopen={onReopenDone ?? null} onRetry={onRetryHand} onKeep={onKeepHand} />
-          ) : replyBlocked ? (
+          {update || trouble ? null : replyBlocked ? (
             /*
              * NO REPLY BOX ON AN AGENT A REPLY CANNOT CLEAR. It is frozen on a
                box asking to approve something, and a message queues behind that
@@ -3080,7 +3103,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   const [nativeNames, setNativeNames] = useState<string[]>([]);
   // While the box starts with a slash, not only while the menu is open: once
   // she types past /loop the box still has to know /loop is a command.
-  const discoveringCommands = !item.agent && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
+  const discoveringCommands = !item.agent && !talkTo?.length && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
   useEffect(() => {
     setNativeNames([]);
     if (!discoveringCommands) return;
@@ -3285,7 +3308,9 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   // because that value is thrown away by the send.
   const canSetMode = !item.agent;
   // Commands are provider-specific; canSetMode still gates every permission path.
-  const query = !item.agent ? slashQuery(text) : null;
+  // A reply that goes to people reaches no agent, so it offers none of an agent's commands.
+  const toAgent = !item.agent && !talkTo?.length;
+  const query = toAgent ? slashQuery(text) : null;
   /*
    * ONE LIST, AND IT IS THE ONE THE MENU DRAWS. This was `modeMatches(query)`
      with a second expression below deciding what to render, which was fine
@@ -3307,7 +3332,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   // and with it went `chipOpen` and the click-away that shut it.
   const slashOpen = menuRows.length > 0;
   // The command waiting on her words, once Enter has put it in the box.
-  const holding = !item.agent ? commandBeingWritten(text, claudeCode, nativeNames) : null;
+  const holding = toAgent ? commandBeingWritten(text, claudeCode, nativeNames) : null;
   // WHAT THIS SEND WILL ACTUALLY RUN AS: the mode picked for this one message
   // if there is one, otherwise whatever the fleet is set to. Never a guess and
   // never a blank: a footer that says nothing when nothing is picked is the

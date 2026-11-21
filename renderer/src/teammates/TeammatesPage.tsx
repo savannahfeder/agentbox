@@ -11,9 +11,11 @@ import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST
 import { ModelPicker } from '../components/Model';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
-import { answerOf, answersMessage, chatEntries, chatWith, openedLines, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
+import { answerOf, answersMessage, chatEntries, chatWith, openedLines, sentWord, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
+import { FacePick } from './MateFace';
+import { faceSeed } from '../../../shared/teammate-face.mts';
 import { AskBeforeDeleting } from '../team/MessageMore';
 import { keyInTheReplyBox, sendKeyFor } from '../reply-keys';
 import { Face } from '../team/people';
@@ -278,10 +280,6 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   </div>;
 }
 
-const SENT_WORDS: Partial<Record<TabView, string>> = { inbox: 'Waiting on you', progress: 'In progress', done: 'Done' };
-// A thread it opened for an agent waits in Later until you start it.
-const OPENED_WORDS: Partial<Record<TabView, string>> = { ...SENT_WORDS, snoozed: 'Not started' };
-
 // What it sent you or opened: one quiet line per thread, where it stands and its title, that opens it.
 function SentCard({ runs, items, tabOf, onOpenThread }: {
   runs: TeamRunLine[]; items: WorkItem[]; tabOf: (item: WorkItem) => TabView | null;
@@ -293,7 +291,7 @@ function SentCard({ runs, items, tabOf, onOpenThread }: {
       const tab = item ? tabOf(item) : null;
       return <button key={r.id} type="button" className="tq-sent-line" onClick={() => onOpenThread(r.product, r.item)}>
         {tab === 'inbox' && <i className="tq-dot-need" aria-hidden="true" />}
-        <span className="v">{r.verb === 'opened' ? (tab && OPENED_WORDS[tab]) ?? 'Opened' : (tab && SENT_WORDS[tab]) ?? 'Sent you'}:</span> <span className="t">{r.said || r.title}</span>
+        <span className="v">{sentWord(r, tab)}:</span> <span className="t">{r.said || r.title}</span>
       </button>;
     })}
   </div>;
@@ -654,6 +652,8 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
   const settings = <dl>
     <dt>Name</dt>
     <dd><EditName key={t.name} name={t.name} onSave={(name) => keep({ name })} /></dd>
+    <dt>Face</dt>
+    <dd><FacePick seed={faceSeed(t)} onPick={(face) => keep({ face })} /></dd>
     <dt>Model</dt>
     <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
       effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>

@@ -17,8 +17,6 @@
 //                from user research): not a wordless one, not a count.
 
 import { shownPriority } from './rank.mts';
-import { askedOf } from './thread-ask.mts';
-import { askedNote } from './review-sent-back.mts';
 import { isShared, isTaskRow, runnerOf, taskGiver } from './team-rules.mts';
 import { deadlineOf, type TaskRow } from './team-tasks.mts';
 import { isShippedNote } from './shipped-note.mts';
@@ -49,8 +47,7 @@ export interface CardItem extends TaskRow {
 
 export type ProjectSeen = { personal?: boolean; seenBy?: string; seenByPeople?: readonly string[] } | null | undefined;
 export type Visibility = 'team' | 'people' | 'private';
-// `want` on a wait for a person: what the owner asked of them (shared/thread-ask.mts).
-type Linked = { id: string; title: string | null; want?: 'help' | 'review'; note?: string };
+type Linked = { id: string; title: string | null };
 
 // A type, not an interface, so it goes up among the cloud's cards (main/team/sync.mts SyncCard).
 export type OwnCard = {
@@ -350,18 +347,6 @@ export function cardStateOf(item: CardItem & { id: string }, { now = Date.now(),
 export const handedOn = (item: { status?: string; answer?: string | null }): boolean =>
   item.status === 'done' && /^Given to /.test(item.answer ?? '');
 
-/** Whom a handed-on thread went to, by the name its close wrote. */
-export const handedToName = (item: { status?: string; answer?: string | null }): string | null =>
-  (handedOn(item) ? String(item.answer).slice('Given to '.length).split(/:\s/)[0].replace(/\.$/, '') : null);
-
-/** A reply here would reopen a thread someone else now has, so it is refused with the way to take it back. */
-export function replyOnHandedOn(item: { status?: string; answer?: string | null }, answer: unknown): string | null {
-  const to = handedToName(item)?.split(/\s+/)[0];
-  const words = String(answer ?? '').trim();
-  if (!to || !words || words === '(withdrawn)') return null;
-  return `You gave this to ${to}. Write to ${to}, or reopen it to take it back.`;
-}
-
 export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [], wontStart = {} }: {
   products: readonly P[];
   readItems: (product: P) => readonly (CardItem & { id: string })[];
@@ -404,10 +389,6 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     }
   }
   const linked = (ids: unknown): Linked[] => (Array.isArray(ids) ? ids : []).map((id) => ({ id, title: titleOf.get(id) ?? null }));
-  const withWant = (all: Linked[], asked: { want: 'help' | 'review' | null; said: string } | null) => {
-    const note = asked ? askedNote(asked.said) : '';
-    return asked?.want ? all.map((l) => (l.id.startsWith('person:') ? { ...l, want: asked.want!, ...(note ? { note } : {}) } : l)) : all;
-  };
   const kept = startOfDay(now - FINISHED_CARDS_KEPT_MS);
   for (const { item, product } of all) {
     if (!shownToTeam(item, since, product)) continue;
@@ -418,7 +399,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     const s = summaryOf(item);
     // The run that got nowhere is said by the wait; as a solution it read as finished.
     // A thread handed on says so, so a teammate's screen never reads its close as finished.
-    const solution = handedOn(item) ? item.answer : waitsOn && gotNowhere ? '' : s.solution;
+    // The first line names who has it; the giver's note under it is theirs to read, not the team board's.
+    const solution = handedOn(item) ? String(item.answer).split('\n')[0] : waitsOn && gotNowhere ? '' : s.solution;
     const shippedAt = shippedAtOf(item);
     cards.push({
       threadId: item.id, visible: true, title: shownTitle(item), project: product.name,
@@ -429,7 +411,7 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
       // The level it runs at, so a teammate reads what the owner reads.
       state, priority: shownPriority(item),
       problem: s.problem || null, progress: s.progress || null, solution: solution || null,
-      blockedBy: [...(waitsOn ? [{ id: waitsOn, title: waitsOn.slice('name:'.length) }] : []), ...withWant(linked(item.blockedBy), askedOf(item))],
+      blockedBy: [...(waitsOn ? [{ id: waitsOn, title: waitsOn.slice('name:'.length) }] : []), ...linked(item.blockedBy)],
       blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
       ...(shippedAt ? { shippedAt } : {}),
     });

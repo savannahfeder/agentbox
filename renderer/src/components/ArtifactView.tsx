@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import {
   addressedTo, agentOfVersion, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
 } from '../../../shared/artifact-marks.mts';
+import { labelSaidFor } from '../../../shared/file-label.mts';
 import { AgentFace } from './AgentFace';
 import type { FileVersion } from '../../../shared/artifact-marks.mts';
 import { api } from '../api';
@@ -13,12 +14,13 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { approveWords, hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
+import { hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
+import { paletteIsOpen, pressedInThePalette } from '../palette-rows';
 import { ArtifactStage, StageLink, StageProject, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
 import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding, type MovedDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
@@ -63,7 +65,7 @@ const keyIsOn = (target: EventTarget | null): 'box' | 'control' | 'nothing' => {
 };
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false, nameShown = (n: string) => n, asked = null }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** Each path's number on its file's version line, which every surface counts by. */
@@ -103,10 +105,6 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   below?: ReactNode;
   /** Opened to write in, so the editor takes the cursor. */
   typing?: boolean;
-  /** The file's name as a person reads it, where its copy is kept under another. */
-  nameShown?: (name: string) => string;
-  /** What was asked of you about this file, said above its notes. */
-  asked?: string | null;
 }) {
   const files = useMemo(() => {
     const reviewed = filesInLines(lines);
@@ -191,6 +189,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // Read by the placing effect above, which runs first, so it says what was true before a version arrived.
   useEffect(() => { newestInHand.current = !!family && !!at && at.vi === family.versions.length - 1; });
   const kind = version ? viewKind(version.path) : null;
+  const label = useMemo(() => (version ? labelSaidFor(lines, [version.path, ...(version.also ?? [])]) : null), [lines, version]);
   const agentHere = family && version ? agentOfVersion(family.versions, version.id) : null;
   const [savingNotes, setSavingNotes] = useState<FileNote[]>([]);
   const [settling, setSettling] = useState<Record<string, boolean>>({});
@@ -313,9 +312,9 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     setGo({ place: note.place, at: Date.now() });
   };
 
-  const send = async (now = false): Promise<boolean> => {
+  const send = async (now = false) => {
     const typed = words.trim();
-    if ((!typed && !pictures.length) || !version || sending || attaching.length) return false;
+    if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     // "Sofia, approved v4" names Sofia as surely as @Sofia does: it reaches her, not the agent.
     const others = people.filter((p) => p.id !== me);
     const to = addressedTo(typed, others);
@@ -329,7 +328,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     try { links = await persistAttachments(product, pictures); } catch (err) {
       setSending(false);
       failed({ ok: false, error: (err as Error).message }, 'That picture did not save.');
-      return false;
+      return;
     }
     const text = noteWithPictures(typed, links);
     const sentPictures = pictures;
@@ -350,7 +349,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       setSavingNotes((was) => was.filter((n) => n.id !== id));
       setWords(typed);
       setPictures(sentPictures);
-      return false;
+      return;
     }
     if (!withIt.length || (await toAgent(withIt))) setJustSent(went);
     setNamed([]);
@@ -361,7 +360,6 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       const carried = readLooseDraft({ product, thread, file: version.id, across }).words;
       if (carried) { setWords(carried); setNamed(people.filter((p) => carried.includes(`@${firstName(p)}`))); }
     }
-    return true;
   };
 
   const settle = async (note: FileNote, resolved: boolean) => {
@@ -386,7 +384,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
 
   // An older version, or one with comments open, is approved only once that is said.
-  const [approveAsked, setApproveAsked] = useState<{ text: string; newest: FileVersion | null; yes: string } | null>(null);
+  const [approveAsked, setApproveAsked] = useState<{ text: string; newest: FileVersion | null } | null>(null);
   useEffect(() => { setApproveAsked(null); }, [version?.id]);
   const approveNow = async (v: FileVersion, undo = false) => {
     const owner = whoseIsTheFile(files, v.id);
@@ -399,11 +397,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (mineApproved) return approveNow(version, true);
     const ask = approveAsk(family, at.vi, marks.notes, offeredTogether(lines, family));
     if (ask) { setApproveAsked(ask); return; }
-    return approveWithNote(version);
-  };
-  const approveWithNote = async (v: FileVersion) => {
-    if (v.id === version?.id && (words.trim() || pictures.length) && !(await send())) return;
-    return approveNow(v);
+    return approveNow(version);
   };
   const approveNewest = (v: FileVersion) => {
     setAt({ fi: at!.fi, vi: family!.versions.indexOf(v) });
@@ -646,7 +640,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // on its way up, so the thread behind stays still.
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || document.querySelector('[data-own-escape]')) return;
+      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || paletteIsOpen(document) || document.querySelector('[data-own-escape]')) return;
       e.stopImmediatePropagation();
       e.preventDefault();
       if (link) setLink(null);
@@ -657,6 +651,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       else leave();
     };
     const rest = (e: KeyboardEvent) => {
+      if (pressedInThePalette(e.target)) return;
       const at = e.target as HTMLElement | null;
       const typing = at?.tagName === 'TEXTAREA' || !!at?.isContentEditable;
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !typing && !e.defaultPrevented && unsent.ids.length) {
@@ -797,7 +792,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
         <button type="button" className="doc-mark av-back" aria-label="Back" title="Back to the thread (esc)" onClick={leave}><ArtifactControlGlyph><path d="M16 10H4m5-5-5 5 5 5" /></ArtifactControlGlyph></button>
-        <span className="av-name">{nameShown(familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? ''))}</span>
+        <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
+        {label && !editing && <span className="av-label" title={label}>{label}</span>}
         {family && version && family.versions.length > 1 && (
           <span className="av-versions">
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>
@@ -811,8 +807,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
         {canRestore && !editing && <button type="button" className="av-btn" disabled={restoring} onClick={() => void restore()}><NoteGlyph name="undo" />Restore this version</button>}
         <span className="doc-marks">
           {(thread ?? shareThread) && version && foundNow === 'open' && canShareFile(version.path) && (
-            <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me}
-              others={families.filter((f) => f !== family).map((f) => f.versions[f.versions.length - 1].path)} />
+            <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
           )}
           {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
           {/* The side pane has no versions to step, so it shows the newest. */}
@@ -828,7 +823,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
             <p className="av-told av-ask" role="alertdialog">
               {approveAsked.text}
               {approveAsked.newest && <button type="button" className="av-btn is-on" onClick={() => approveNewest(approveAsked.newest!)}>Approve v{approveAsked.newest.n}</button>}
-              <button type="button" className="av-btn" onClick={() => void approveWithNote(version)}>{approveAsked.yes}</button>
+              <button type="button" className="av-btn" onClick={() => void approveNow(version)}>Approve v{version.n} anyway</button>
               <button type="button" className="av-btn" onClick={() => setApproveAsked(null)}>Not yet</button>
             </p>
           )}
@@ -855,7 +850,6 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0 || linkNotes.comments.length > 0) && <aside className="av-side" aria-label="Notes">
-          {asked && <p className="av-asked">{asked}</p>}
           <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
           {(offers.approve || othersApproved.length > 0 || earlier || (canSendAll && sendBeside)) && (
             <div className="av-verdict">
@@ -864,7 +858,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
               {canSendAll && sendBeside && <button type="button" className="av-btn av-unsent-send" title={unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
-              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{approveWords({ approved: mineApproved, typed: !!(words.trim() || pictures.length) })}</button>}
+              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>
           )}
           <div className="av-list">

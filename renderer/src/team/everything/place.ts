@@ -89,14 +89,6 @@ export function nowAndFinished<T>(rows: readonly T[], { done, at, now }: { done:
   return { now: on, finished };
 }
 
-type Shared = { personId: string; visible: boolean; state: string; updatedAt: number };
-
-/** A person's page's In progress and Done this week: the shared threads you can read, running ones first. */
-export function personThreads<C extends Shared>(cards: readonly C[], personId: string, { now, skip = () => false }: { now: number; skip?: (c: C) => boolean }): { now: C[]; finished: C[] } {
-  const split = nowAndFinished(cards.filter((c) => c.personId === personId && c.visible && !skip(c)), { done: (c) => c.state === 'done', at: (c) => c.updatedAt, now });
-  return { now: split.now.sort((a, b) => Number(b.state === 'running') - Number(a.state === 'running')), finished: split.finished };
-}
-
 /** You, the team's chat, people, then AI teammates (yours, less paused ones, then everyone else's). Nobody to show when you are alone. */
 export function faceRow(members: readonly Member[]): Member[] {
   const row = [

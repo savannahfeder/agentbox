@@ -25,8 +25,6 @@ import { instructionOf } from '../../shared/repeats.mts';
 import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
 import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
-import { verdictMessage } from '../../shared/review-sent-back.mts';
-import { handedToName } from '../../shared/thread-cards.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
@@ -94,14 +92,14 @@ export interface ThreadEvent {
   field?: 'body' | 'answer' | 'result' | 'note';
   /** The agent teammate who handed this over, on a reply the app wrote for it. */
   from?: string;
+  /** Whose that was, by id: a person you asked to help draws with their face. */
+  fromId?: string;
   /** The agent that wrote this message on its owner's behalf. */
   voice?: AgentVoice;
   /** A comment or approval on a file: which file, and for a comment where on it. */
   fileMark?: FileMarkLink;
   /** A teammate's comment (reaches the owner, starts nothing) or an agent's checkpoint. */
-  says?: 'comment' | 'progress';
-  /** A comment the owner's reply after it took to the agent. */
-  carried?: boolean;
+  says?: 'comment' | 'progress' | 'to-agent';
   // The runs that began at this pickup, oldest first. Set by withRuns, and
   // an array because a session that never got its claim in still has to land
   // somewhere rather than disappear.
@@ -202,8 +200,6 @@ const COMPOSE_GAP_MS = 60_000;
  */
 export function threadEvents(lines: LedgerLine[], engine?: string | null, numbers?: Record<string, number> | null): ThreadEvent[] {
   const events: ThreadEvent[] = [];
-  // The owner's next reply carries the comments since their last one to the agent.
-  const lastReply = Math.max(0, ...lines.filter((l) => l.source === 'founder' && words(l.patch?.answer)).map((l) => l.ts));
   // Folded forward as we walk, so a rename can say what the name WAS. The fold
   // keeps only the latest value per field, so this is the one place the old
   // title still exists.
@@ -241,6 +237,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // her.
   const claudeCode = (engine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
   let askedACommand = false;
+  // When an ask's verdict was written: the close right after it is the hand-back (shared/thread-asks.mts).
+  let verdictAt = -Infinity;
   // The newest ask written from your side, for an imported Codex
   // conversation's opening (see the relabel branch in the loop).
   let yourBody: string | null = null;
@@ -301,6 +299,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     markVoice = (line.patch?.voice as AgentVoice | undefined) ?? undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
+    if (has(patch, 'verdict')) verdictAt = Number(line.ts) || 0;
     if (has(patch, 'engine')) ranEngine = String(patch!.engine ?? '') || undefined;
     if (has(patch, 'model')) ranModel = String(patch!.model ?? '') || undefined;
     const mine = line.source === 'founder';
@@ -312,11 +311,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     const comment = (patch as { comment?: { text?: unknown } } | null)?.comment;
     if (comment) {
       const text = words(comment.text);
-      // A review sent back reads as the reviewer's message: what they did, then their note.
-      const review = verdictMessage(text);
       if (isContinuedNote(comment.text)) events.push({ at, who: 'you', said: 'continued this in their own thread' });
-      else if (review) events.push({ at, who: 'you', said: 'They sent back a review', words: review, message: true });
-      else if (text) events.push({ at, who: 'you', said: 'They commented', words: text, message: true, says: 'comment', ...(lastReply > at ? { carried: true } : {}) });
+      else if (text) events.push({ at, who: 'you', said: 'They commented', words: text, message: true, says: 'comment' });
       continue;
     }
 
@@ -465,9 +461,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     if (has(patch, 'answer') && Array.isArray(patch!.fromNotes) && !typed) continue;
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
-      // A person asked to help with a step answers it through a comment (main/team/thread-share.mts).
-      const answered = String(line.uid ?? '').startsWith('comment-');
-      events.push({ at, who: 'agent', said: answered ? `${from} answered` : `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from });
+      const fromId = (patch!.from as { teammate?: unknown }).teammate;
+      events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from, ...(typeof fromId === 'string' ? { fromId } : {}) });
       continue;
     }
     if (has(patch, 'answer')) {
@@ -571,9 +566,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // and the pickup above already said it.
       if (status === 'claimed') continue;
       if (status === 'done') {
-        // A hand-over writes its "Given to …" answer, then this close (main/team handOn).
-        const given = mine ? handedToName({ status, answer: String(lines[at_ - 1]?.patch?.answer ?? patch?.answer ?? '') }) : null;
-        events.push({ at, who, said: given ? `You gave it to ${given.split(/\s+/)[0]}` : mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
+        // Handing it over closes your copy; "Given to …" just above already says what happened.
+        const prev = events.at(-1);
+        if (mine && prev?.field === 'answer' && /^Given to /.test(prev.words ?? '') && at - prev.at < 2000) continue;
+        const handedBack = Number(line.ts) - verdictAt < 2000;
+        events.push({ at, who, said: handedBack ? (mine ? 'You handed it back' : 'It was handed back') : mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
         continue;
       }
       if (status === 'blocked') {
@@ -583,6 +580,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
           askedACommand = false;
           continue;
         }
+        // Nor is a teammate's hand-back, which holds the thread for you the same way.
+        if (line.source === 'system' && events.at(-1)?.from && events.at(-1)?.field === 'answer') continue;
         // HER OWN BLOCKED IS NOT THE AGENT STOPPING. She has no control that
         // writes it; the one thing that does is a Z putting a row back where
         // her reply found it (`withdrawReply`), and it read as "It stopped and
@@ -603,7 +602,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         // repeated once per attempt over a thread out of usage
         // (tests/an-out-of-usage-thread-does-not-say-it-handed-this-back).
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
-        events.push({ at, who, said: mine ? 'You sent it back' : 'It handed this back', ...(mine ? { personal: true as const } : {}) });
+        const said = mine ? 'You sent it back' : 'It handed this back';
+        // One press can write the reopening twice (the notes path does), so the same words within a second are one.
+        const last = events.at(-1);
+        if (last?.said === said && Math.abs(at - last.at) < 1000) continue;
+        events.push({ at, who, said, ...(mine ? { personal: true as const } : {}) });
         continue;
       }
     }

@@ -89,6 +89,7 @@ function gitIn(appDir: string) {
       // public; anything that asks for credentials is a failure to report.
       env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
       maxBuffer: 4 * 1024 * 1024,
+      windowsHide: true,
     }, (err, stdout, stderr) => {
       resolve({ code: err ? (typeof err.code === 'number' ? err.code : 1) : 0, out: String(stdout).trim(), err: String(stderr).trim() });
     });
@@ -100,7 +101,7 @@ function collect(bin: string, args: string[], { cwd, timeout }: { cwd: string; t
     let out = '';
     let child;
     try {
-      child = spawn(bin, args, { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(bin, args, { cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     } catch (e) {
       resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
@@ -181,7 +182,7 @@ export function createSourceUpdater({
   // code in memory and nothing on disk can change that.
   let bootHead: string | null = null;
   try {
-    bootHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: appDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null;
+    bootHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: appDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).trim() || null;
   } catch { /* not a checkout; check() says so */ }
 
   let state: UpdaterState = {

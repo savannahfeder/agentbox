@@ -8,15 +8,14 @@ import { handedFrom } from '../../../shared/thread-link.mts';
 import { taskGiver } from '../../../shared/team-rules.mts';
 import { firstName, TeamContext } from '../team/people';
 
-/** `at`: the step a link opens at (shared/thread-ask.mts). */
-export const OpenTeammateThread = createContext<((personId: string, threadId: string, at?: number) => void) | null>(null);
+export const OpenTeammateThread = createContext<((personId: string, threadId: string) => void) | null>(null);
 
 /** A link in a chat: a thread's link opens the thread here, anything else a new tab. */
 export function ChatLink({ href, children }: { href?: string; children?: ReactNode }) {
   const open = useContext(OpenTeammateThread);
   return <a href={href} target="_blank" rel="noreferrer" onClick={(e) => {
     const t = open && threadToOpen(href, e);
-    if (t) { e.preventDefault(); open(t.owner, t.id, t.at); }
+    if (t) { e.preventDefault(); open(t.owner, t.id); }
   }}>{children}</a>;
 }
 
@@ -41,6 +40,7 @@ export function ContinuedFrom({ labels }: { labels?: string[] | null }) {
 export function HandedFrom({ item }: { item: WorkItem }) {
   const team = useContext(TeamContext);
   const from = team && item.assignee === team.me ? handedFrom(item.body, taskGiver(item)) : null;
-  if (!from) return null;
+  // An ask is not handed on: its bar opens the thread (team/AskBar.tsx).
+  if (!from || item.ask) return null;
   return <WayBack word="Handed on from" personId={from.owner} threadId={from.id} />;
 }

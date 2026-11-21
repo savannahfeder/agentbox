@@ -65,7 +65,24 @@ export interface ThreadFacts {
   decide?: boolean;
 }
 
-export interface GiveTo { id: string; name: string }
+export interface GiveTo { id: string; name: string; detail?: string }
+
+const WEEK_MS = 7 * 86_400_000;
+
+/**
+ * WHO KNOWS THIS AREA: each person's threads in the same project this week, as
+ * a short word beside their name, the busiest first. "This is more in their
+ * domain" is the reason to hand something over, and nothing said whose it was.
+ */
+export function byWorkHere<P extends GiveTo>(people: readonly P[], cards: readonly { personId: string; project?: string | null; updatedAt?: number }[], project: string | null | undefined, now = Date.now()): P[] {
+  if (!project) return [...people];
+  const count = new Map<string, number>();
+  for (const c of cards) if (c.project === project && (c.updatedAt ?? 0) >= now - WEEK_MS) count.set(c.personId, (count.get(c.personId) ?? 0) + 1);
+  return people
+    .map((p, k) => ({ p, k, n: count.get(p.id) ?? 0 }))
+    .sort((a, b) => b.n - a.n || a.k - b.k)
+    .map(({ p, n }) => (n ? { ...p, detail: `${n} in ${project} this week` } : p));
+}
 
 /** The people a thread can be handed on to: not a conversation, nor a finished
  *  thread, nor one that is a teammate's to give. */

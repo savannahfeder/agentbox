@@ -796,7 +796,6 @@ html, body, #root { height: 100%; }
   border-radius: 10px;
   border: 3px solid transparent;
   background-clip: content-box;
-  transition: background 0.2s;
 }
 *:hover::-webkit-scrollbar-thumb { background: var(--line-strong); background-clip: content-box; }
 *::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: content-box; }
@@ -975,7 +974,6 @@ body {
   display: inline-flex;
   align-items: baseline;
   gap: 11px;
-  transition: color 0.14s, background 0.14s;
 }
 .tab:hover { color: var(--text-dim); }
 .tab.active:hover { color: var(--text); }
@@ -1025,7 +1023,6 @@ body {
   color: var(--text-faint);
   cursor: pointer;
   padding: 0;
-  transition: color 0.14s, background 0.14s;
   -webkit-app-region: no-drag;
 }
 .search-out:hover { color: var(--text); background: var(--wash); }
@@ -1064,7 +1061,6 @@ body {
   border-radius: var(--radius);
   color: var(--text-faint);
   cursor: pointer;
-  transition: color 0.14s, background 0.14s;
 }
 .icon-btn:hover { color: var(--text); background: var(--wash); }
 
@@ -1081,7 +1077,6 @@ body {
   border: none; background: none; border-radius: var(--radius);
   font-family: inherit; font-size: 11.5px; font-variant-numeric: tabular-nums;
   color: var(--text-faint); cursor: pointer;
-  transition: color 0.14s, background 0.14s;
 }
 .usage-pill:hover { color: var(--text); background: var(--wash); }
 
@@ -1096,7 +1091,7 @@ body {
 .usage-meter > i {
   display: block; height: 100%; border-radius: 2px;
   background: var(--text-faint);
-  transition: width 0.3s ease, background 0.14s;
+  transition: width 0.3s ease;
 }
 .usage-pill:hover .usage-meter > i { background: var(--text); }
 .usage-meter.wide { width: 100%; height: 5px; }
@@ -1411,7 +1406,6 @@ body {
 .row .subject {
   text-decoration: underline solid transparent 1.5px;
   text-underline-offset: 4px;
-  transition: text-decoration-color 0.12s ease;
 }
 /* `.pointed`, not `:hover`: J and K take the row back from a pointer that has
    not moved, and `:hover` would keep a second underline on it. `.hovers` is a
@@ -1557,7 +1551,7 @@ body {
   */
   position: absolute; left: var(--gutter); top: 21.5px;
 }
-.mark .dot, .mark .box { transition: opacity .12s ease, border-color .12s ease, background .12s ease; }
+.mark .dot, .mark .box { transition: opacity .12s ease; }
 .mark .box {
   /* LEFT EDGE ON THE GUTTER, not centred in the hit area. Centred, the box sat
      at 10px while every hairline down the list starts at 8px, so a ticked row
@@ -1745,7 +1739,7 @@ body {
   display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
   margin: 4px 0 18px; padding: 10px 14px;
   background: var(--bg-raised); border: 1px solid transparent; border-radius: var(--radius);
-  font: inherit; color: var(--text); cursor: pointer; transition: border-color 0.15s;
+  font: inherit; color: var(--text); cursor: pointer;
 }
 .stalled-bar:hover { border-color: var(--text-faint); }
 .stalled-bar-label { color: var(--text-dim); font-size: 14px; flex: 1; }
@@ -2087,7 +2081,7 @@ body {
   font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-dim);
   background: var(--bg-raised); border: 1px solid var(--line-strong);
   border-radius: var(--radius); padding: 3px 10px; cursor: pointer;
-  opacity: 0; transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+  opacity: 0; transition: opacity 0.15s;
 }
 .code-wrap:hover .code-copy, .code-wrap .code-copy.copied { opacity: 1; }
 .code-wrap .code-copy:hover { color: var(--text); border-color: var(--text-faint); }
@@ -2490,7 +2484,6 @@ body {
   border: 1px solid var(--line);
   border-radius: 0;
   box-shadow: 0 1px 0 transparent inset, var(--shadow-md);
-  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
   display: flex; flex-direction: column;
 }
 .dock-card:focus-within {
@@ -2529,7 +2522,7 @@ body {
   color: var(--text-dim); background: none;
   border: 1px solid var(--line-strong); border-radius: 0;
   padding: 5px 12px; cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.05s;
+  transition: transform 0.05s;
 }
 .dock-stop svg { width: 9px; height: 9px; display: block; }
 .dock-stop:hover { color: var(--text); background: var(--wash); border-color: var(--text-faint); }
@@ -2561,12 +2554,6 @@ body {
    click, because a message here would not reach it. */
 .dock-pill-static { cursor: default; }
 .dock-pill-static .dock-pill-text { padding-right: 16px; }
-/* A thread given away: what happened, and what you can still do, in the reply box's place. */
-.dock-given { gap: 6px; padding-right: 8px; }
-.dock-given .dock-pill-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dock-given.is-failed .dock-pill-text { color: var(--text-dim); }
-.dock-given-act { flex: none; height: 28px; padding: 0 12px; font: inherit; font-size: 13px; color: var(--text); background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
-.dock-given-act:hover { border-color: var(--line-strong); }
 /* THE BOX GROWS AS SHE WRITES. The height is written by dock-height.ts on every
    render, because the ceiling is 40% of the PANE and no stylesheet can read
    that: the pane is 568px on a 13 inch and 931px on a 16 inch, so the same line
@@ -2780,7 +2767,7 @@ body {
   display: flex; align-items: baseline; gap: 5px; flex: 0 1 auto; min-width: 0;
   font: inherit; font-size: 12px; color: var(--text-dim);
   text-align: left; background: none; border: 0; padding: 0;
-  cursor: pointer; transition: color 0.14s;
+  cursor: pointer;
 }
 .approval-task:hover { color: var(--text); }
 .approval-task-title {
@@ -2825,7 +2812,7 @@ body {
 .approval-actions button {
   font: inherit; font-size: 13px; font-weight: 600; border-radius: var(--radius);
   height: 30px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px;
-  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  cursor: pointer;
 }
 /* Neutral, high-contrast: the green wash read as barely-there. Allow is the
    one solid-light button in the app, unmistakable on the dark card. */
@@ -2981,7 +2968,7 @@ body {
   display: inline-flex; align-items: center; gap: 7px;
   font: inherit; font-size: 12px; font-weight: 600; color: var(--text-faint);
   background: var(--wash); border: 1px solid var(--line-strong); border-radius: var(--radius);
-  padding: 4px 11px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  padding: 4px 11px; cursor: pointer;
 }
 .prio-tag:hover { border-color: var(--text-faint); color: var(--text-dim); }
 .prio-tag.set { color: var(--text-dim); }
@@ -3132,7 +3119,7 @@ body {
   /* 0 rather than the standard corner. Send is part of the reply card, and that
      card stays square. Same button in the new-task card, which is also 0. */
   border-radius: 0; padding: 5px 16px; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+  transition: transform 0.05s;
 }
 .dock-send:hover { background: var(--wash-strong); border-color: var(--text-faint); }
 /* Darkens rather than moves: a button that moves under a press loses a press on its edge. */
@@ -3219,7 +3206,7 @@ body {
 .opt-row {
   display: flex; gap: 10px; align-items: baseline; width: 100%; text-align: left;
   background: transparent; border: none; font: inherit; color: var(--text-dim);
-  padding: 7px 16px; cursor: pointer; transition: background 0.15s, color 0.15s;
+  padding: 7px 16px; cursor: pointer;
   font-size: 14px; line-height: 1.45;
 }
 .opt-row:last-child { padding-bottom: 11px; }
@@ -3266,7 +3253,7 @@ body {
 .opt-named-row {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 30px; padding: 0 16px;
   appearance: none; background: transparent; border: 0; cursor: pointer; text-align: left;
-  font: inherit; font-size: 14px; color: var(--text); transition: background 0.15s;
+  font: inherit; font-size: 14px; color: var(--text);
 }
 .opt-named-row:hover { background: var(--wash); }
 .opt-named-row:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
@@ -3313,6 +3300,15 @@ body {
 .reply-dock .compose-note.attach-problem { padding-left: 0; padding-right: 0; }
 
 .attach-thumb { position: relative; }
+.attach-open {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--artifact-corner-small);
+  cursor: zoom-in;
+}
+.attach-open:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .attach-thumb img {
   height: 84px;
   max-width: 220px;
@@ -3377,6 +3373,8 @@ img.product-mark { object-fit: cover; opacity: 1; }
    on the orange plate a team's initial sits on, in the text colour. */
 .th-mark.th-mark-app { background: none; color: var(--text); }
 .th-mark.th-mark-app svg { display: block; }
+/* A team's own logo, on no plate, so a transparent one shows the sidebar. */
+.th-mark.th-mark-logo { background: none; object-fit: contain; }
 /* In the panel it is dimmer than anywhere else it appears, because here it is
    the only mark on the screen and a full-strength logo in an empty corner is a
    spot of ink the eye goes to first. */
@@ -3698,6 +3696,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
      strip drawn after it stands down in workspace-navigation.css. */
   -webkit-app-region: no-drag;
 }
+/* Over a file opened big, under the ⌘F box. Only then: the tour points at the
+   bar from 1000. */
+body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-backdrop { z-index: 9480; }
 
 /* THE IMPORT CARD THAT ENDS SETUP WAS DRAWN DIMMED. Setup's veil is 299 and
    this backdrop was 40, so the veil lay over the card. It goes at 301, with
@@ -3910,7 +3911,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   text-decoration: underline dotted var(--line-strong);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
-  transition: color 0.14s, text-decoration-color 0.14s;
 }
 /* TWO inks in the line and no more: prose is faint, every clickable value is
    dim, and full ink is reserved for the one you are pointing at. A third
@@ -3991,7 +3991,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   display: grid; place-items: center;
   font-size: 12px; line-height: 1; color: var(--text-faint);
   opacity: 0; pointer-events: none;
-  transition: opacity 0.14s ease, color 0.12s, background 0.12s;
+  transition: opacity 0.14s ease;
 }
 .compose-product:hover .chip-hide { opacity: 1; pointer-events: auto; }
 .chip-hide:hover { color: var(--text); background: var(--wash-strong); }
@@ -4003,7 +4003,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   font: inherit; font-size: 12px; color: var(--text-faint);
   background: none; border: 1px dashed var(--line-strong); border-radius: var(--radius);
   padding: 3px 11px; cursor: pointer; flex: 0 0 auto;
-  transition: color 0.15s, border-color 0.15s;
 }
 .compose-reveal:hover, .compose-reveal.on { color: var(--text-dim); border-color: var(--text-faint); }
 .compose-product {
@@ -4029,7 +4028,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
      events do the dragging; touch-action keeps the gesture from being stolen
      by a scroll. */
   touch-action: none;
-  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1), border-color 0.15s, color 0.15s, background 0.15s;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 .compose-product.active { border-color: var(--text-dim); color: var(--text); background: var(--bg-selected); }
 .compose-product:hover { border-color: var(--text-dim); color: var(--text); }
@@ -4167,13 +4166,17 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* A long title gives way, never the project's name. */
 .palette-k .palette-thread .palette-hint { flex: none; }
 /* A line, file, comment or decision found inside something: its words, then who
-   and where under them in the faint ink. Two lines, so the row is taller. */
-.palette-k .palette-found { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
-.palette-k .palette-found .palette-glyph { padding-top: 3px; }
-.palette-k .palette-found .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.palette-k .palette-found .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+   and where under them in the faint ink. A thread: its title, then the line it
+   was found by. Two lines, so the row is taller. */
+.palette-k :is(.palette-found, .palette-two) { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
+.palette-k :is(.palette-found, .palette-two) .palette-glyph { padding-top: 3px; }
+.palette-k :is(.palette-found, .palette-two) .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.palette-k :is(.palette-found, .palette-two) .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
-.palette-k .palette-found .hit { color: var(--text); font-weight: 600; }
+.palette-k :is(.palette-found, .palette-two) .hit { color: var(--text); font-weight: 600; }
+.palette-k .palette-two .palette-hint { padding-top: 2px; }
+/* Finished threads step back; the highlight behind a selected one does not. */
+.palette-k .palette-done > * { opacity: .5; }
 
 /* A found line, landed on from the results: marked for a moment. */
 [data-line] { transition: background-color .5s ease, box-shadow .5s ease; }
@@ -4259,7 +4262,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
-  transition: color 0.14s, border-color 0.14s;
 }
 .zero-btn:hover { color: var(--text); border-color: var(--text-faint); }
 .zero-btn kbd {
@@ -4318,7 +4320,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .idle-zero-agents {
   font: inherit; color: var(--text-dim);
   background: none; border: 0; padding: 0; cursor: pointer;
-  transition: color 0.14s;
 }
 .idle-zero-agents:hover { color: var(--text); }
 .idle-zero-col .idle-field { margin-top: 16px; }
@@ -4342,7 +4343,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   cursor: pointer;
   -webkit-backdrop-filter: blur(var(--skin-blur));
   backdrop-filter: blur(var(--skin-blur));
-  transition: border-color 0.14s;
 }
 :root[data-skin] .idle-field { border-color: var(--skin-pane-line); }
 .idle-field:hover { border-color: var(--text-faint); }
@@ -4634,6 +4634,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   transition: opacity 0.22s ease;
 }
 .zoom-readout.up { opacity: 1; }
+:root[data-window-buttons="right"] .zoom-readout { right: 160px; }
 
 /* ⌘F. A small panel over whatever is on screen, in the toast's shape. The field is a tint of the theme,
    never white (the light-component rule, 2026-09-23).
@@ -4972,7 +4973,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   border: 1px solid transparent; border-radius: var(--radius);
   background: none; font: inherit; color: var(--text-dim);
   cursor: pointer; text-align: left;
-  transition: color .14s ease, border-color .14s ease, background .14s ease;
 }
 /* THE PAGE MARK THE ATTACHMENT CHIPS USED TO WEAR, kept here after that row
    was deleted, because it is the app's existing word for "this is a file and
@@ -5585,7 +5585,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .set-sw {
   width: 38px; height: 22px; border-radius: 22px; flex: 0 0 auto; cursor: pointer;
   background: var(--wash-strong); border: 1px solid var(--line-strong);
-  position: relative; transition: background 0.15s, border-color 0.15s; padding: 0;
+  position: relative; padding: 0;
 }
 /* The knob is the one face that stays opaque under a picture, and the reason is
    that it MOVES: a translucent knob sliding over a track shows the track
@@ -5754,7 +5754,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .proj-search { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
 .proj-search-icon {
   position: absolute; left: 11px; width: 15px; height: 15px;
-  color: var(--text-faint); pointer-events: none; transition: color .12s;
+  color: var(--text-faint); pointer-events: none;
 }
 .proj-search:focus-within .proj-search-icon { color: var(--text-dim); }
 .proj-index-find {
@@ -5949,7 +5949,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   border: 1px solid var(--line);
   position: relative; overflow: hidden;
   display: block;
-  transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s;
+  transition: transform 0.14s;
   /* A TILE WEARS A 480px COPY, NOT THE WINDOW'S PICTURE. Every `.look-swatch.<id>`
      below reads `var(--look-<id>)`, which on :root is the full 3456x2304 file,
      up to 3.2 MB. Opening the picker or Settings decoded all of them at once to
@@ -6291,7 +6291,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   width: 15px; height: 15px; border-radius: 50%; margin-top: -5.5px;
   background: var(--film-strong); border: 1px solid var(--line-strong);
   box-shadow: var(--control-shadow);
-  transition: border-color 0.12s;
 }
 .set-range:hover::-webkit-slider-thumb, .set-range:focus-visible::-webkit-slider-thumb { border-color: var(--accent); }
 
@@ -7167,7 +7166,7 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
   font: inherit; font-size: 12px; color: var(--text);
   opacity: 0.6; cursor: pointer;
   -webkit-app-region: no-drag;
-  transition: opacity 120ms ease, color 120ms ease;
+  transition: opacity 120ms ease;
 }
 .fr-out:hover { opacity: 1; color: var(--text); }
 .fr-out:focus-visible { opacity: 1; outline: 1px solid var(--line-strong); border-radius: var(--radius); }
@@ -8638,7 +8637,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   flex: none; width: 14px; height: 14px; border-radius: var(--radius);
   border: 1px solid var(--line-strong); background: none;
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--text); transition: border-color 90ms ease;
+  color: var(--text);
 }
 .ia-box.is-all, .ia-box.is-some { border-color: var(--line-strong); color: var(--text-dim); }
 .ia-agent:hover .ia-box, .ia-blk-head:hover .ia-box { border-color: var(--text-faint); color: var(--text); }
@@ -8700,7 +8699,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .ia-door {
   display: block; width: 100%; font: inherit; text-align: left; cursor: pointer;
   background: none; border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 15px 16px; transition: border-color 90ms ease, background 90ms ease;
+  padding: 15px 16px;
 }
 .ia-door:hover { border-color: var(--line-strong); background: var(--wash); }
 .ia-door:disabled { cursor: default; opacity: 0.55; }
@@ -8739,7 +8738,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    the row says which way it is rather than only that it moves. */
 .ia-caret {
   flex: none; align-self: center; margin-left: 2px; color: var(--text-faint);
-  transition: transform 140ms ease, color 140ms ease;
+  transition: transform 140ms ease;
 }
 .ia-blk.open .ia-caret { transform: rotate(90deg); color: var(--text-dim); }
 .ia-blk-main:hover .ia-caret { color: var(--text); }
@@ -9062,7 +9061,6 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   font: inherit; font-size: 13px; color: var(--text);
   background: var(--film-strong); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 6px 10px; cursor: pointer;
-  transition: border-color 0.14s;
 }
 .set-picker-now:hover { border-color: var(--line-strong); }
 .set-picker.open .set-picker-now { border-color: var(--line-strong); }
@@ -9419,7 +9417,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .pv-missing { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--read-paper) 62%, transparent); }
 
 /* The controls fade once the pointer rests, leaving only the picture. */
-.pv-chrome { z-index: 2; transition: opacity .35s ease, background .15s, color .15s; }
+.pv-chrome { z-index: 2; transition: opacity .35s ease; }
 .pv-idle { cursor: none; }
 .pv-idle .pv-chrome { opacity: 0; pointer-events: none; }
 
@@ -9427,13 +9425,15 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .pv-top { position: absolute; top: 16px; left: 84px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
   gap: 16px; }
 :root[data-window="flat"] .pv-top { left: 16px; }
+/* And short of the Windows buttons, over the right-hand corner. */
+:root[data-window-buttons="right"] .pv-top { right: 150px; }
 .pv-title { display: flex; align-items: center; gap: 12px; min-width: 0; height: 46px; padding: 0 18px; }
 .pv-name { font-size: 13px; letter-spacing: .01em; color: color-mix(in srgb, var(--read-paper) 86%, transparent);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pv-count { font: 500 11px/1 var(--mono); letter-spacing: .12em; white-space: nowrap; color: color-mix(in srgb, var(--read-paper) 42%, transparent); }
 .pv-tools { display: flex; align-items: center; gap: 2px; flex: none; }
 .pv-icon { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; background: none; cursor: pointer;
-  border-radius: var(--radius); color: color-mix(in srgb, var(--read-paper) 62%, transparent); transition: color .15s, background .15s; }
+  border-radius: var(--radius); color: color-mix(in srgb, var(--read-paper) 62%, transparent); }
 .pv-icon svg { width: 20px; height: 20px; }
 .pv-icon:hover { color: var(--read-paper); background: color-mix(in srgb, var(--read-paper) 9%, transparent); }
 .pv-rule { width: 1px; height: 18px; margin: 0 6px; background: color-mix(in srgb, var(--read-paper) 14%, transparent); }
@@ -9442,7 +9442,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   max-width: calc(100% - 64px); overflow-x: auto; }
 .pv-thumb { flex: none; width: 72px; height: 45px; padding: 0; border: 0; border-radius: var(--artifact-corner-small); overflow: hidden; cursor: pointer;
   background: color-mix(in srgb, var(--read-paper) 6%, transparent); opacity: .38;
-  outline: 1px solid transparent; outline-offset: 3px; transition: opacity .2s, outline-color .2s; }
+  outline: 1px solid transparent; outline-offset: 3px; transition: opacity .2s; }
 .pv-thumb:hover { opacity: .75; }
 .pv-thumb.is-on { opacity: 1; outline-color: color-mix(in srgb, var(--read-paper) 85%, transparent); }
 .pv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }

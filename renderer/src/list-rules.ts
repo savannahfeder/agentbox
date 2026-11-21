@@ -7,7 +7,6 @@ import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { asksToClose } from '../../shared/asks-to-close.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
-import { askedOf } from '../../shared/thread-ask.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
 import { shownTitle } from '../../shared/thread-title.mts';
 import { firstRealLine, offerIsLive, previewText, searchText } from './format';
@@ -40,7 +39,6 @@ export interface InboxItem {
   parent?: string;
   /** The threads this one waits on. Written by whoever set the wait. */
   blockedBy?: string[];
-  asked?: { said: string; at?: number; want?: 'help' | 'review'; to?: string[] } | null;
   createdAt?: number;
   updatedAt?: number;
   wrote?: Record<string, { ts: number; source: string } | undefined>;
@@ -243,7 +241,6 @@ export function belongsInInbox(
   // when the last thread it names finishes (`resumeFinishedWaits`). Only a wait
   // that can end counts (`waitsThatCanEnd`), so a loop of waits stays here.
   if (waitsInLater(i, waitingOn)) return false;
-  if (askedOf(i)) return false;
   if (waitCameBack(i)) return true;
   if (runsAgainOnItsOwn(i)) return false;
   if (parkedByAgent(i, now)) return true; // an agent stopped: what happens next is hers
@@ -304,9 +301,17 @@ export function isProposal(i: InboxItem): boolean {
 export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolean {
   // A blocked task stays where its people read it, saying what blocks it.
   if (isTaskRow(i)) return false;
-  // Asked of a teammate, it is under way, not put off: In progress (`belongsInProgress`).
-  if (setByPerson(i)) return !askedOf(i);
+  if (setByPerson(i)) return true;
   return waitingOn.length > 0 && i.status === 'blocked' && i.wrote?.status?.source !== 'founder';
+}
+
+/**
+ * Later holds a put-off or waiting row only once no run is on it or queued for
+ *  it. Until then it is In progress, which is "running or queued", so it is
+ *  counted in one tab (tests/a-queued-thread-put-off-stays-in-progress-until-its-run-ends).
+ */
+export function putOffInLater(i: InboxItem, { hiddenUntil, now, waitingOn, runOnIt }: { hiddenUntil: number; now: number; waitingOn: readonly string[]; runOnIt: boolean }): boolean {
+  return (hiddenUntil > now || waitsInLater(i, waitingOn)) && !runOnIt;
 }
 
 /**
@@ -411,7 +416,6 @@ export function belongsInProgress(
   // Nothing will start it, so it is in Needs you (`belongsInInbox`).
   if (stopped) return false;
   if (i.status === 'claimed') return true;
-  if (askedOf(i)) return true;
   if (setByPerson(i)) return false;
   // A session acted on her answer and finished, so nothing is coming and the
   // inbox shows it instead. Both lists read the same fact.
@@ -486,11 +490,8 @@ export function statusForReply(status: string): 'open' | undefined {
 // `zero:stop-session`). So the undo always writes back the status the reply
 // found, even when the reply did not change it. Otherwise a withdrawn reply on
 // an open row leaves it blocked, and no session claims the next send.
-// A finished row gets its own answer back: nothing carries a done row's answer
-// to a worker, and that answer may be what says it was handed on.
-export function withdrawReply(statusWhenReplied: string, answerWhenReplied?: string | null): { answer: string; status: string } {
-  const kept = statusWhenReplied === 'done' && answerWhenReplied && answerWhenReplied !== '(withdrawn)' ? answerWhenReplied : null;
-  return { answer: kept ?? '(withdrawn)', status: statusWhenReplied };
+export function withdrawReply(statusWhenReplied: string): { answer: string; status: string } {
+  return { answer: '(withdrawn)', status: statusWhenReplied };
 }
 
 // A reply lifts a reminder, which only hides the row. A moment to run is left
@@ -545,7 +546,9 @@ export function rowSummary(
   const said = i.wrote?.answer;
   if (i.answer && said?.by
     && said.ts >= Math.max(i.wrote?.body?.ts ?? 0, i.wrote?.result?.ts ?? 0)) {
-    return clipToSentence(firstRealLine(i.answer));
+    // A teammate's hand-back opens "Theo handed this back.", which the status says; their own words follow.
+    const theirs = (said as { teammate?: string }).teammate ? i.answer.split(/\n\s*\n/).slice(1).join('\n\n').trim() : '';
+    return clipToSentence(firstRealLine(theirs || i.answer));
   }
   const finished = view === 'done' || i.status === 'done';
   const resultIsNewer = (i.wrote?.result?.ts ?? 0) > (i.wrote?.body?.ts ?? 0);

@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { Person, TeamBillingDetails } from './types';
+import type { Person, PictureIn, TeamBillingDetails } from './types';
 import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, FilesTrashed, FilesCloudStatus, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { NotePlace } from '../../shared/artifact-marks.mts';
@@ -805,12 +805,6 @@ export const api = {
     if (!zero?.fileLinkShare) return { ok: false, error: `quit and reopen ${NAME} to share files` };
     return zero.fileLinkShare(p);
   },
-  /** The file into a chat: a teammate's id, or 'team' for the team's group. */
-  async fileToChat(p: FileLinkAsk & { to: string; also?: string[]; note?: string; want?: 'review' | null }): Promise<{ ok: boolean; roomId?: string; error?: string }> {
-    const zero = window.zero;
-    if (!zero?.fileToChat) return { ok: false, error: `quit and reopen ${NAME} to send files` };
-    return zero.fileToChat(p);
-  },
   async fileLinkStop(p: { token: string }): Promise<{ ok: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.fileLinkStop) return { ok: false, error: `quit and reopen ${NAME} to share files` };
@@ -1029,6 +1023,14 @@ export const api = {
   async teamAcceptInvite(teamId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAcceptInvite({ teamId })); },
   async teamInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamInvite({ email })); },
   async teamRename(name: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRename({ name })); },
+  async teamUpdateMe(p: { name?: string; photo?: PictureIn | null }): Promise<TeamCallResult> {
+    if (!window.zero?.teamUpdateMe) return { ok: false, error: RESTART_NOTE };
+    return teamCall(() => window.zero!.teamUpdateMe!(p));
+  },
+  async teamSetLogo(photo: PictureIn | null): Promise<TeamCallResult> {
+    if (!window.zero?.teamSetLogo) return { ok: false, error: RESTART_NOTE };
+    return teamCall(() => window.zero!.teamSetLogo!({ photo }));
+  },
   async teamRemoveMember(personId: string, handover: { handTo: string; mates: { id: string; to: string | null }[] } | null = null): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRemoveMember({ personId, ...(handover ?? {}) })); },
   async teamLeave(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamLeave()); },
   async teamCancelInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCancelInvite({ email })); },
@@ -1052,7 +1054,7 @@ export const api = {
     return got.ok === false ? none : got;
   },
   warmFindInThreads(): void { void window.zero?.warmFindInThreads?.()?.catch?.(() => {}); },
-  async teamComment(p: { personId: string; threadId: string; text: string; answers?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
+  async teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
   async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
   async fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
     if (!window.zero?.fileMark) return { ok: false, error: `quit and reopen ${NAME} to comment here` };
@@ -1141,6 +1143,8 @@ export const api = {
   async teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMoveToThread(p)); },
   async teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessageMate(p)); },
   async teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
+  async teamAsk(p: { product: string; id: string; to: string; kind: 'help' | 'review'; note?: string; step?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAsk(p)); },
+  async teamHandBack(p: { product: string; id: string; verdict?: 'done' | 'yes' | 'changes'; words?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandBack(p)); },
   async teamTaskBrief(p: { product: string; id: string }) { return window.zero!.teamTaskBrief(p); },
   async teamContinueBrief(p: { personId: string; threadId: string }) { return window.zero!.teamContinueBrief(p); },
   async teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamContinued(p)); },

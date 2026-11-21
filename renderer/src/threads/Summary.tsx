@@ -71,7 +71,7 @@ export interface RepeatHandle {
 const NOT_WRITTEN = 'Not written yet';
 
 /** Each done step a dot, joined to the next by a thin line, oldest at the top (summary.css .ts-trail). */
-function DoneTrail({ steps }: { steps: string[] }) {
+export function DoneTrail({ steps }: { steps: string[] }) {
   return (
     <ol className="ts-trail">
       {steps.map((s, i) => <li key={i} className={`ts-step${i === steps.length - 1 ? ' ts-step-last' : ''}`}><TicketText text={s} /></li>)}
@@ -174,16 +174,12 @@ export function ThreadCrumb({ from, name, audience = null, onBack, onRename, thr
 /* ----------------------------------------------------------- a teammate's */
 
 /** What a teammate's thread waits on, and from whom: the line under its name. */
-export function TeammateStanding({ card, person, now = Date.now(), said = null }: {
-  card: ThreadCard; person: Person | null; now?: number;
-  /** What it is to you, in place of its state: an ask to you, or that you answered it. */
-  said?: string | null;
-}) {
+export function TeammateStanding({ card, person, now = Date.now() }: { card: ThreadCard; person: Person | null; now?: number }) {
   const team = useContext(TeamContext);
   const owner = firstName(person) || 'Someone';
   const waits = card.state !== 'done' ? linkWords(card.blockedBy, team?.byId) : null;
-  const word = said ?? (card.shippedAt ? 'Shipped' : waits ? `Waits on ${waits}` : card.state === 'waiting' ? `Waiting on ${owner}` : STATE_WORD[card.state]);
-  const line = said || card.shippedAt ? null : standingLine(card.state, owner, waits);
+  const word = card.shippedAt ? 'Shipped' : waits ? `Waits on ${waits}` : card.state === 'waiting' ? `Waiting on ${owner}` : STATE_WORD[card.state];
+  const line = card.shippedAt ? null : standingLine(card.state, owner, waits);
   return (
     <p className="tp-standing">
       <Glyph kind={stateGlyph(card.state, false)} />
@@ -201,9 +197,11 @@ export function TeammateStanding({ card, person, now = Date.now(), said = null }
  * private thread's card says only that it is private, because the Mac that
  * published it sent nothing else (shared/thread-cards.mts cardsFor).
  */
-export function TeammateCard({ card, person, files = [] }: {
+export function TeammateCard({ card, person, files = [], done = true }: {
   card: ThreadCard; person: Person | null; now?: number;
   files?: { src: string; name: string; notes: number; open: () => void }[];
+  /** False where the page already shows the Done list. */
+  done?: boolean;
 }) {
   const team = useContext(TeamContext);
   const name = person?.name || 'Someone';
@@ -227,7 +225,7 @@ export function TeammateCard({ card, person, files = [] }: {
         <span className="ts-h">About</span>
         <p className={`ts-tk-lead${card.problem ? '' : ' dim'}`}>{card.problem || NOT_WRITTEN}</p>
       </section>
-      {doneSteps(card.progress).length > 0 && (
+      {done && doneSteps(card.progress).length > 0 && (
         <section className="ts-tk-part ts-tk-done"><span className="ts-h">Done</span><DoneTrail steps={doneSteps(card.progress)} /></section>
       )}
       {files.length > 0 && (

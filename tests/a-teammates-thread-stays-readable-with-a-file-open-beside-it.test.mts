@@ -24,7 +24,7 @@ describe("a teammate's thread page", () => {
 
   it('becomes one column when it is narrow, whatever the window', () => {
     const narrow = block('@container tp (max-width: 980px)');
-    expect(narrow).toMatch(/\.tp-grid \{ grid-template-columns: minmax\(0, 1fr\)/);
+    expect(narrow).toMatch(/\.tp-grid, \.tp-grid\.tp-with-about \{ grid-template-columns: minmax\(0, 1fr\)/);
     expect(narrow).toMatch(/\.tp-side \{ position: static/);
   });
 

@@ -79,11 +79,11 @@ export interface StandupNeed { line: TodayLine; on: string | null }
 export interface StandupPost {
   key: string; name: string; kind: TodayPerson['kind'];
   shipped: TodayLine[]; finished: TodayLine[];
+  /** Teammates' threads they helped on or reviewed and handed back. */
+  helped?: TodayLine[];
   /** Everything done since the standup before, newest first. */
   done: TodayLine[];
   working: TodayLine[];
-  /** Threads given to someone else, each with whom it went to. */
-  handed?: TodayLine[];
   /** What is stuck, and on whom. */
   needs: StandupNeed[];
   privateDone: number;
@@ -101,22 +101,25 @@ function postOf(p: TodayPerson, live: boolean): StandupPost {
     key: p.key, name: p.name, kind: p.kind,
     shipped: [...p.shipped].sort(byNewest).map(titled),
     finished: [...p.finished, ...p.decided].sort(byNewest).map(titled),
+    helped: [...(p.helped ?? [])].sort(byNewest).map(titled),
     done: g.done.map(titled),
     // A thread whose agent answered and now waits on its owner is still theirs to finish.
-    working: [...g.working, ...(p.waiting ?? []), ...(live ? p.asked ?? [] : [])].sort(byNewest).map(titled),
-    handed: [...(p.handed ?? [])].sort(byNewest).map(titled),
+    working: [...g.working, ...(p.waiting ?? [])].sort(byNewest).map(titled),
     // What is stuck is only known as of now, so only today's post says it.
     // A teammate's post also says what they handed you; your own Needs you is the inbox's to say.
-    needs: live ? [
+    // Two rows under one name (a thread and the ask about it) are said once.
+    needs: live ? onceEach([
       ...g.blocked.map((l) => ({ line: titled(l), on: l.on ?? null })),
       ...(p.kind === 'me' ? [] : p.waitingOnYou.map((l) => ({ line: titled(l), on: 'you' }))),
-    ] : [],
+    ]) : [],
     privateDone: p.privateDone,
     privateWorking: p.privateWorking ?? 0,
   };
 }
 
-const says = (p: StandupPost) => p.done.length + p.working.length + (p.handed?.length ?? 0) + p.needs.length + p.privateDone + (p.privateWorking ?? 0) > 0;
+const onceEach = (needs: StandupNeed[]): StandupNeed[] => needs.filter((n, i) => needs.findIndex((m) => titleOf(m.line) === titleOf(n.line) && m.on === n.on) === i);
+
+const says = (p: StandupPost) => p.done.length + p.working.length + p.needs.length + (p.helped?.length ?? 0) + p.privateDone + (p.privateWorking ?? 0) > 0;
 
 /** A post per teammate. With AI teammates off, each AI teammate's work joins yours. */
 export function postsOf(people: readonly TodayPerson[], { mates, live = true }: { mates: boolean; live?: boolean }): StandupPost[] {
@@ -128,7 +131,6 @@ export function postsOf(people: readonly TodayPerson[], { mates, live = true }: 
     mine.finished = [...mine.finished, ...m.finished].sort(byNewest);
     mine.done = [...mine.done, ...m.done].sort(byNewest);
     mine.working = [...mine.working, ...m.working].sort(byNewest);
-    mine.handed = [...(mine.handed ?? []), ...(m.handed ?? [])].sort(byNewest);
     mine.needs = [...mine.needs, ...m.needs];
     mine.privateDone += m.privateDone;
     mine.privateWorking = (mine.privateWorking ?? 0) + (m.privateWorking ?? 0);
@@ -158,9 +160,8 @@ export function sentenceOf(p: StandupPost, { all = false }: { all?: boolean } = 
   };
   say('Shipped', named(p.shipped, 'done', all));
   say('Finished', named(p.finished, 'done', all));
+  say('Helped on', named(p.helped ?? [], 'done', all));
   if (!p.shipped.length && !p.finished.length && p.privateDone) out.push(`Finished ${p.privateDone} private ${p.privateDone === 1 ? 'thread' : 'threads'}.`);
-  const handed = p.handed ?? [];
-  say('Handed', handed.flatMap((l, i): Part[] => [...(i === 0 ? [] : [i === handed.length - 1 ? ' and ' : ', ']), l, ` to ${(l.to ?? '').split(/\s+/)[0] || 'a teammate'}`]));
   const hidden = p.privateWorking ?? 0;
   say('Working on', named(p.working, 'working', all, hidden ? `${hidden} private ${hidden === 1 ? 'thread' : 'threads'}` : ''));
   return out.length ? out : ['Nothing moved.'];
@@ -170,5 +171,5 @@ export function sentenceOf(p: StandupPost, { all = false }: { all?: boolean } = 
 export function postMatches(p: StandupPost, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [p.name, ...p.done.map(titleOf), ...p.working.map(titleOf), ...(p.handed ?? []).map(titleOf), ...p.needs.map((n) => titleOf(n.line))].some((t) => t.toLowerCase().includes(q));
+  return [p.name, ...p.done.map(titleOf), ...p.working.map(titleOf), ...p.needs.map((n) => titleOf(n.line))].some((t) => t.toLowerCase().includes(q));
 }

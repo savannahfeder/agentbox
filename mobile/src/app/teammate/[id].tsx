@@ -7,9 +7,10 @@ import { router } from '../../lib/router';
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { answersMessage } from '../../../../renderer/src/teammates/chat-lines';
-import type { TeamChatLine, TeamRunLine, WorkItem } from '../../../../renderer/src/types';
+import type { TeamChatLine, TeamRunLine } from '../../../../renderer/src/types';
+import type { Row, TabId } from '../../lib/tabs';
 import { screenGate } from '../../lib/thread-gate';
-import { actWords, asideOf, chatRows, clockOf, openQuestions, pauseOnItsWay, runningThread, type ChatRow, type PhoneTeam } from '../../lib/teammates';
+import { actWords, asideOf, chatRows, clockOf, openQuestions, pauseOnItsWay, runningThread, sentWord, tabOfThread, type ChatRow, type PhoneTeam } from '../../lib/teammates';
 import { useCloud } from '../../state/cloud';
 import { Back, More } from '../../ui/icons';
 import { Markdown } from '../../ui/Markdown';
@@ -41,23 +42,18 @@ function Act({ verb, text, onOpen, when, status, children }: { verb: string; tex
 }
 
 /** Threads it sent you one after another, as rows that open them (`SentCard`). */
-function Sent({ runs, team, items }: { runs: TeamRunLine[]; team: PhoneTeam; items: WorkItem[] }) {
+// One quiet line per thread it sent you or opened, where it stands and its title (TeammatesPage.tsx `SentCard`).
+function Sent({ runs, team, tabs }: { runs: TeamRunLine[]; team: PhoneTeam; tabs: Record<TabId, Row[]> }) {
   return (
-    <View style={{ marginTop: 14, marginLeft: 44, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line, backgroundColor: color.fill }}>
-      <T style={{ paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, fontSize: 12.5, color: color.faint, borderBottomWidth: 1, borderBottomColor: color.line }}>{`Sent you · ${clockOf(runs[0].ts)}`}</T>
-      {runs.map((r, i) => {
-        const product = phoneSlug(team.device, r.product);
-        const item = items.find((x) => x.id === r.item && x.product === product);
+    <View style={{ marginVertical: 6, marginLeft: 44, alignItems: 'flex-start', gap: 2 }}>
+      {runs.map((r) => {
+        const product = r.verb === 'opened' ? r.product : phoneSlug(team.device, r.product);
+        const tab = tabOfThread(tabs, product, r.item);
         return (
           <Pressable key={r.id} onPress={() => openThread({ product, id: r.item })} accessibilityRole="button"
-            style={({ pressed }) => ({ paddingHorizontal: 14, paddingVertical: 11, borderTopWidth: i ? 1 : 0, borderTopColor: color.rowLine, backgroundColor: pressed ? color.picked : 'transparent' })}>
-            <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 20 }}>{r.said || item?.title || r.title}</T>
-            {(r.waiting || r.answered) && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 }}>
-                {r.waiting && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />}
-                <T style={{ fontSize: 12.5, color: r.waiting ? color.dim : color.faint }}>{r.waiting ? 'Waiting on you' : 'Answered'}</T>
-              </View>
-            )}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%', paddingHorizontal: 8, paddingVertical: 4, borderRadius: corner.small, backgroundColor: pressed ? color.picked : 'transparent' })}>
+            {tab === 'inbox' && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />}
+            <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 15, lineHeight: 20 }}><T style={{ color: color.faint }}>{sentWord(r, tab)}:</T> {r.said || r.title}</T>
           </Pressable>
         );
       })}
@@ -95,7 +91,7 @@ export default function TeammateChat() {
     );
   }
 
-  const rows = chatRows(team.view, t.id, c.teamPending, c.now);
+  const rows = chatRows(team.view, t.id, c.teamPending, c.now, c.view.items);
   const open = openQuestions(team.view, t.id, c.teamPending);
   const many = open.length > 1;
   const running = runningThread(t, team);
@@ -130,7 +126,7 @@ export default function TeammateChat() {
     if (r.kind === 'day') return <DayRule key={r.key} label={r.label} />;
     if (r.kind === 'saved') return <Act key={r.key} verb="Saved" text="to its instructions" when={r.ts} />;
     if (r.kind === 'answered') return <Act key={r.key} verb="You answered" text={r.count === 1 ? 'its question' : `${r.count} questions`} when={r.ts} />;
-    if (r.kind === 'sent') return <Sent key={r.key} runs={r.runs} team={team} items={c.view.items} />;
+    if (r.kind === 'sent') return <Sent key={r.key} runs={r.runs} team={team} tabs={c.tabs} />;
     if (r.kind === 'act') {
       const w = actWords(r.e, team, t);
       return (

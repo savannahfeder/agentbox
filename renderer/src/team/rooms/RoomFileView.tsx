@@ -9,8 +9,6 @@ import { markGoesTo, withElsewhere } from '../../components/ThreadArtifacts';
 import type { LedgerLine } from '../../thread-history';
 import type { ArtifactMark, FileElsewhere, FileLine, FileMarks, Person, Room, RoomMessage } from '../../types';
 import type { ChatPerson } from './RoomChat';
-import { reviewAskIn, shownRoomFile } from '../../../../shared/room-needs-you.mts';
-import { reviewAskWords } from '../../threads/SendBack';
 
 export interface RoomFiles {
   marks: { id: string; by: string | null; mark: ArtifactMark; at: number }[];
@@ -60,13 +58,10 @@ export function RoomFileView({ room, messages, people, meId, opening, files, onN
     ...(opening.file ? { file: opening.file } : {}),
     at: opening.at,
   }), [opening]);
-  const ask = reviewAskIn(messages, opening.name ?? opening.file ?? '', meId);
-  const askedBy = ask ? people.find((p) => p.id === ask.by)?.name.split(/\s+/)[0] || 'Someone' : '';
   const write = (mark: ArtifactMark) => {
     const key = markGoesTo(mark, elsewhere);
     return key ? api.filesPlaceMark({ key, mark }) : files.write(mark);
   };
   return <ArtifactView product="" draftsAcross={`room:${room.id}`} lines={allLines} numbers={numbered.numbers} marks={marks} me={meId} people={named}
-    open={open} ownerOfRow={null} write={write} onNewVersion={onNewVersion} onClose={onClose} files={stage}
-    nameShown={shownRoomFile} asked={ask ? reviewAskWords(askedBy, ask.note) : null} />;
+    open={open} ownerOfRow={null} write={write} onNewVersion={onNewVersion} onClose={onClose} files={stage} />;
 }

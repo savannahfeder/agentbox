@@ -48,13 +48,13 @@ function machine({ found = false, installs = true, installExit = 0, signedIn = [
 
 // A wait that yields to the timer queue, so a setup polling a browser that
 // never answers cannot starve the test of its own clock.
-const quick = { wait: () => new Promise((r) => setTimeout(r, 0)), env: { PATH: '/usr/bin:/bin', ANTHROPIC_API_KEY: 'sk-nope', OPENAI_API_KEY: 'sk-nope', HOME: '/Users/x' } };
+const quick = { platform: 'darwin' as const, wait: () => new Promise((r) => setTimeout(r, 0)), env: { PATH: '/usr/bin:/bin', ANTHROPIC_API_KEY: 'sk-nope', OPENAI_API_KEY: 'sk-nope', HOME: '/Users/x' } };
 const settle = async (setup, engine) => { for (let i = 0; i < 400; i++) { const s = setup.status(engine); if (s.phase === 'ready' || s.phase === 'failed') return s; await new Promise((r) => setTimeout(r, 0)); } return setup.status(engine); };
 
 describe('the commands are the tools\' own', () => {
   it('installs Claude Code with Anthropic\'s installer and Codex with OpenAI\'s', () => {
-    expect(installCommand('claude')).toEqual({ file: '/bin/bash', args: ['-c', 'curl -fsSL https://claude.ai/install.sh | bash'] }); // public-check: allow
-    expect(installCommand('codex')).toEqual({ file: '/bin/sh', args: ['-c', 'curl -fsSL https://chatgpt.com/codex/install.sh | sh'] }); // public-check: allow
+    expect(installCommand('claude', 'darwin')).toEqual({ file: '/bin/bash', args: ['-c', 'curl -fsSL https://claude.ai/install.sh | bash'] }); // public-check: allow
+    expect(installCommand('codex', 'darwin')).toEqual({ file: '/bin/sh', args: ['-c', 'curl -fsSL https://chatgpt.com/codex/install.sh | sh'] }); // public-check: allow
   });
   it('signs in with the subscription, never the API console', () => {
     expect(signInCommand('claude', '/b/claude')).toEqual({ file: '/b/claude', args: ['auth', 'login', '--claudeai'] });

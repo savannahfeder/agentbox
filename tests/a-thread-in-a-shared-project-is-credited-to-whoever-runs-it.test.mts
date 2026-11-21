@@ -25,7 +25,7 @@ const lenaSite = { slug: 'lena-site', name: 'Lena site', dir: '/nowhere' };
 
 const row = (o: Record<string, unknown>) => ({ product: 'payments-api', status: 'open', labels: [], createdAt: at(8), updatedAt: at(10), ...o }) as { id: string; product: string } & Record<string, unknown>;
 const runbook = row({ id: 'w-runbook', title: 'Stripe runbook', createdBy: THEO, progress: 'Read the Stripe docs\nWrote stripe-key-rotation.md', updatedAt: at(11) });
-const csv = row({ id: 'w-csv', title: 'Payouts CSV export', createdBy: THEO, status: 'done', result: 'The export is in.', updatedAt: at(9), wrote: { status: { ts: at(9), by: THEO } } });
+const csv = row({ id: 'w-csv', title: 'Payouts CSV export', createdBy: THEO, status: 'done', updatedAt: at(9), wrote: { status: { ts: at(9), by: THEO } } });
 const lenaOwn = row({ id: 'w-lena-own', title: 'Refund webhook', createdBy: LENA, updatedAt: at(12) });
 const handed = row({ id: 'w-handed', title: 'Auth audit', createdBy: THEO, runner: LENA, wrote: { runner: { ts: at(9), by: LENA } }, updatedAt: at(13) });
 const fromBefore = row({ id: 'w-before', title: 'Ledger schema', updatedAt: at(10) });
@@ -80,7 +80,7 @@ describe('the cards each Mac publishes for a shared project', () => {
 describe("the Everyone feed on each side", () => {
   const card = (personId: string, item: Record<string, unknown>, o: Record<string, unknown> = {}) => ({
     personId, threadId: item.id, visible: true, title: item.title, project: 'Payments API', people: null,
-    state: 'running', priority: null, problem: null, progress: item.progress ?? null, solution: item.result ?? null,
+    state: 'running', priority: null, problem: null, progress: item.progress ?? null, solution: null,
     blockedBy: [], blocks: [], updatedAt: item.updatedAt, ...o,
   });
   const dayFor = (me: string, other: { id: string; name: string }, cards: Record<string, unknown>[]) => teamToday({

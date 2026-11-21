@@ -163,7 +163,6 @@
   display: inline-flex; align-items: center; height: 28px; padding: 0 11px;
   border: 1px solid var(--line); border-radius: var(--tag-radius); background: var(--wash);
   color: var(--text-dim); font-size: 13px; line-height: 1; white-space: nowrap;
-  transition: color 0.12s, border-color 0.12s;
 }
 .settings-screen[data-pane] .set-ghost:hover:not(:disabled) { background: var(--wash); color: var(--text); border-color: var(--line-strong); }
 

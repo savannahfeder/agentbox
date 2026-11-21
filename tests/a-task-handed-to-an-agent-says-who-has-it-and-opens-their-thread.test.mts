@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { taskHandOff, handedFromLabel } from '../renderer/src/threads/composer-rules';
-import { agentOnTask, teamTasks } from '../renderer/src/team/tasks';
+import { agentOnTask, agentOnTaskWord, teamTasks } from '../renderer/src/team/tasks';
 
 const brief = { body: 'Fix LUM-50: Cancel does not give the seat back.', files: [] };
 const task = { id: 'w-task', product: 'dm-maya', status: 'open', title: 'Fix LUM-50', labels: ['given-task'], assignee: 'dev', createdBy: 'maya', people: ['maya', 'dev'], updatedAt: 10 };
@@ -23,6 +23,22 @@ describe('handing a task over', () => {
   it('the app hands it the task', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toMatch(/handFrom: \{ product: item\.product, id: item\.id, message: message\?\.uid \?\? 'first' \}/);
+  });
+});
+
+// Round eleven (w-f702d60afe): the agent's thread had finished its answer and
+// waited in Needs you, and the task still said "With an agent".
+describe('what the line over the task says', () => {
+  it('With an agent while it works', () => {
+    expect(agentOnTaskWord({ name: 'an agent', item: { status: 'claimed', result: 'Halfway.' } })).toBe('With an agent');
+    expect(agentOnTaskWord({ name: 'an agent', item: { status: 'open' } })).toBe('With an agent');
+  });
+  it('that it answered once it waits on you', () => {
+    expect(agentOnTaskWord({ name: 'an agent', item: { status: 'open', result: 'The fix is in commit f225499.' } })).toBe('The agent answered');
+    expect(agentOnTaskWord({ name: 'Bug fixer', item: { status: 'blocked', result: 'Which store?' } })).toBe('Bug fixer answered');
+  });
+  it('that it finished once it is done', () => {
+    expect(agentOnTaskWord({ name: 'an agent', item: { status: 'done', result: 'Done.' } })).toBe('The agent finished');
   });
 });
 
@@ -56,7 +72,7 @@ describe('who has it', () => {
   it('the row and the task page draw it', () => {
     const page = fs.readFileSync(new URL('../renderer/src/team/TasksPage.tsx', import.meta.url), 'utf8');
     const focus = fs.readFileSync(new URL('../renderer/src/team/TeamFocus.tsx', import.meta.url), 'utf8');
-    expect(page).toMatch(/With \{r\.agent\.name\}/);
-    expect(focus).toMatch(/With \{on\.name\}/);
+    expect(page).toContain('{agentOnTaskWord(r.agent)}');
+    expect(focus).toContain('{agentOnTaskWord(on)}');
   });
 });

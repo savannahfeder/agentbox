@@ -1,5 +1,5 @@
 import { useLayoutEffect } from 'react';
-import { drawSky, type Box, type SkyArt } from './sky';
+import { paintSky, type Box, type SkyArt } from './sky';
 
 /**
  * The Inbox's sky, approved 2026-11-08 (design 86): at full strength behind
@@ -49,9 +49,9 @@ export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; ban
       Object.assign(head.style, { left: `${L}px`, top: `${T}px`, width: `${w}px`, height: `${h}px` });
       const canvas = head.querySelector('canvas')!;
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      if (shape === 'zero') { drawSky(canvas, art, { from: 40, span: 300, dpr, quiet: words() }); return; }
+      if (shape === 'zero') { paintSky(canvas, art, { from: 40, span: 300, dpr, quiet: words() }); return; }
       const start = Math.round(h - band);
-      drawSky(canvas, art, { from: start, span: 120, curveTop: start - 60, dpr });
+      paintSky(canvas, art, { from: start, span: 120, curveTop: start - 60, dpr });
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(paint); };
     paint();

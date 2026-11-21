@@ -14,3 +14,5 @@ export const CLOUD_ADDRESS = Object.freeze({
 // The web app phones open, which signs in to that same database. Only for a
 // copy signed in to it: another team's cloud has its own site or none.
 export const PHONE_SITE = 'https://agentbox-phone.pages.dev';
+// The same site on agentbox.ac: what a person sees in the address bar.
+export const WEB_APP = 'https://app.agentbox.ac';

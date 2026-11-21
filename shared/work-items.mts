@@ -54,6 +54,9 @@ export interface RouteOffer { role: string; why: string; gains?: string[]; answe
 export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: RouteOffer }
 export interface SaidAt { said: string; at: number }
 export interface TeammateFrom { teammate: string; name: string }
+/** A thread owner asking one teammate for something on it (shared/thread-asks.mts). */
+export interface AskPatch { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string }
+export type Verdict = 'done' | 'yes' | 'changes';
 export type MessageEditPatch = { on: string; gone: true; text?: undefined } | { on: string; text: string; gone?: undefined };
 /** `place`: where in the file it points, as an in-app note does (shared/artifact-marks.mts). */
 export interface LinkComment { name: string; file: string; text: string; place?: NotePlace }
@@ -104,7 +107,6 @@ export type WorkItemPatch = {
   shippedAt?: number;
   waitEnded?: SaidAt;
   handedOver?: SaidAt;
-  asked?: SaidAt & { want?: 'help' | 'review'; to?: string[] };
   linkComment?: LinkComment;
   linkReply?: { file: string; text: string };
   comment?: { text: string; name?: string };
@@ -112,6 +114,8 @@ export type WorkItemPatch = {
   putAway?: boolean;
   signIn?: SignInAsk;
   signInAnswer?: SignInAnswer;
+  ask?: AskPatch;
+  verdict?: Verdict;
 };
 export type WorkItemField = keyof WorkItemPatch;
 export type PatchInput = { readonly [K in WorkItemField]?: unknown };
@@ -388,9 +392,6 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // WHERE A THREAD WENT WHEN SOMEONE LEFT THE TEAM: `{ said, at }`, the line
   // each copy writes on what it moved (main/team/departures.mts).
   'handedOver',
-  // WHAT ITS OWNER ASKED A TEAMMATE, with the wait on them: `{ said, at }`
-  // (shared/thread-ask.mts).
-  'asked',
   // SOMEONE'S COMMENT ON THE THREAD'S FILE THROUGH ITS PUBLIC LINK:
   // `{ name, file, text }`, beside the note that says it (main/team/link-comments.mts).
   'linkComment',
@@ -412,6 +413,9 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // A SIGN-IN LINK A RUNNING AGENT IS WAITING ON, AND THE ANSWER TO IT
   // (shared/sign-in-ask.mjs). Latest wins on both, whoever wrote it.
   'signIn', 'signInAnswer',
+  // A TASK THAT ASKS FOR HELP OR A REVIEW ON ONE THREAD, and what its holder
+  // said when they handed it back (shared/thread-asks.mts).
+  'ask', 'verdict',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -808,6 +812,17 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     case 'signIn': return cleanSignIn(value);
     case 'signInAnswer': return cleanSignInAnswer(value);
     case 'putAway': return typeof value === 'boolean' ? value : undefined;
+    case 'ask': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const kind = value.kind === 'help' || value.kind === 'review' ? value.kind : null;
+      const owner = shortId(value.owner);
+      const thread = shortId(value.thread);
+      const product = str(value.product, MAX_SHORT);
+      const step = str(value.step, MAX_SUMMARY);
+      const note = str(value.note, MAX_SUMMARY);
+      return kind && owner && thread && product ? { kind, owner, thread, product, ...(step ? { step } : {}), ...(note ? { note } : {}) } : undefined;
+    }
+    case 'verdict': return value === 'done' || value === 'yes' || value === 'changes' ? value : undefined;
     case 'shippedAt': return Number.isFinite(value) && (value as number) >= 0 ? Math.trunc(value as number) : undefined;
     case 'linkComment': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -822,13 +837,6 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       const file = str(value.file, MAX_SHORT);
       const text = str(value.text, MAX_TEXT_BYTES);
       return file && text ? { file, text } : undefined;
-    }
-    case 'asked': {
-      if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
-      const said = str((value as Fields).said, MAX_SUMMARY);
-      const want = (value as Fields).want === 'help' || (value as Fields).want === 'review' ? (value as Fields).want : undefined;
-      const to = Array.isArray((value as Fields).to) ? ((value as Fields).to as unknown[]).map((p) => shortId(p)).filter((p): p is string => !!p).slice(0, 11) : [];
-      return said ? { said, at: Math.trunc((value as Fields).at as number), ...(want ? { want } : {}), ...(to.length ? { to } : {}) } : undefined;
     }
     case 'waitEnded': case 'handedOver': {
       if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
@@ -1174,6 +1182,8 @@ export const WORK_THREAD = 'work-thread';
 function reopenIfWrittenPastTheClose(item: FoldingItem, said: Said[]): void {
   const close = item.status === 'done' ? item.wrote.status : null;
   if (!close?.by) return;
+  // An ask handed back (shared/thread-asks.mts) stays handed back: a thank-you after it is a message, not more work.
+  if (item.ask && item.verdict) return;
   const others = said.filter((s) => s.by !== close.by && !s.body);
   const crossed = others.filter((s) => s.crossed === close.ts);
   if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;

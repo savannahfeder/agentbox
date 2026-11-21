@@ -64,7 +64,7 @@ export function footprintsFromTop(out: string): Map<number, number> {
 export function readFootprints(platform: string = process.platform): Promise<Map<number, number>> {
   if (platform !== 'darwin') return Promise.resolve(new Map());
   return new Promise((resolve) => {
-    execFile('/usr/bin/top', ['-l', '1', '-stats', 'pid,mem'], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024 },
+    execFile('/usr/bin/top', ['-l', '1', '-stats', 'pid,mem'], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true },
       (_err, stdout) => resolve(footprintsFromTop(String(stdout ?? ''))));
   });
 }
