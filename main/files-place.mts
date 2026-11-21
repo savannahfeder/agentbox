@@ -116,7 +116,7 @@ type HistoryReader = (id: string, o: { max?: number }) => readonly ThreadLine[];
  */
 export interface FileSizes { bytes: number | null; onMac: number; older: number; movable: number; trashable: boolean; cloud?: boolean; poster?: string | null }
 
-export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null } & FileSizes;
+export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null; title?: string } & FileSizes;
 
 export type MarkAnswer =
   | { ok: true; wrote?: { product: string; id: string } }
@@ -148,7 +148,10 @@ const fromCloudFamily = (family: unknown): string => String(family).split('/').m
 const CROSS_EVERY_MS = 10_000;
 const UNDO_KEEP_MS = 10 * 60_000;
 // What New makes, and what it starts with: a table needs its columns to be typed into.
-const MADE: Record<MadeKind, { ext: string; seed: string }> = { document: { ext: '.md', seed: '' }, table: { ext: '.csv', seed: 'Name,Notes\n' } };
+const MADE: Record<MadeKind, { ext: string; seed: string; untitled: string }> = {
+  document: { ext: '.md', seed: '', untitled: 'Untitled document' },
+  table: { ext: '.csv', seed: 'Name,Notes\n', untitled: 'Untitled table' },
+};
 const SEED_OF = new Map(Object.values(MADE).map((m) => [m.ext, m.seed]));
 /** Whether the file at `src` is still exactly what New started it with. */
 async function untouched(src: string): Promise<boolean> {
@@ -1014,8 +1017,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       // Filed in another project's folder, it is listed where it was filed.
       const shownIn = lib.folders.find((x) => x.id === (own ?? beside))?.project ?? project;
       const sizes = await sizesOf(f, roots);
+      const title = lib.titleOf(f.key) ?? (filed ? lib.titleOf(filed.key) : null);
       // A newest version in the cloud draws its poster, not an older version still here.
-      return { ...row, project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
+      return { ...row, ...(title ? { title } : {}), project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
     })).then((all) => all.filter((f) => f.opened || f.cloud || (f.kind !== 'page' && f.kind !== 'code')));
     consider();
     const projects: string[] = [];
@@ -1137,11 +1141,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
      * only what a thread names, so it gets a thread of its own, made closed so
      * no agent starts on it.
      */
-    async newDocument({ project, name, kind = 'document', folder = null, by = team?.state?.().me?.id ?? null }: { project: string; name: string; kind?: string; folder?: string | null; by?: string | null }) {
-      const title = cleanFolderName(name);
-      if (!title) throw new Error(`a ${kind} needs a name`);
+    async newDocument({ project, name = '', kind = 'document', folder = null, by = team?.state?.().me?.id ?? null }: { project: string; name?: string; kind?: string; folder?: string | null; by?: string | null }) {
       const made = MADE[kind as MadeKind] as (typeof MADE)[MadeKind] | undefined;
       if (!made) throw new Error('New makes a document or a table');
+      // New asks for nothing first; the person renames it once it is open.
+      const title = cleanFolderName(name) || made.untitled;
       const { home, into } = whereNew(project, folder);
       const typed = title.toLowerCase().endsWith(made.ext) ? title.slice(0, -made.ext.length) : title;
       const stem = typed.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
@@ -1150,7 +1154,19 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       fs.writeFileSync(path.join(home.dir, 'documents', file), made.seed, { flag: 'wx' });
       holdIn(home, title, [file]);
       placeIn(home, into, [file], by);
-      return { key: fileKeyIn(home.name, file) };
+      const key = fileKeyIn(home.name, file);
+      writeFolderLog(logDir(), { op: 'name', key, project: home.name, name: title, by, at: Date.now() });
+      return { key, title };
+    },
+
+    /** The name Files shows for a file. Its name on disk stays, so every thread and version that names it still finds it. */
+    async renameFile({ key, name, by = team?.state?.().me?.id ?? null }: { key: string; name: string; by?: string | null }) {
+      const clean = cleanFolderName(name);
+      if (!clean) throw new Error('a file needs a name');
+      const file = allFiles().find((f) => f.key === key);
+      if (!file) throw new Error('that file is gone');
+      writeFolderLog(logDir(), { op: 'name', key, project: file.project, name: clean, by, at: Date.now() });
+      return { ok: true, title: clean };
     },
 
     /** Copies of files from this computer, into the project's documents. A kind Files cannot show is left out and named. */
@@ -1196,7 +1212,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           id: f.id, project: f.project, folder: f.name,
           ...(f.parent ? { inside: folders.find((x) => x.id === f.parent)?.name ?? null } : {}),
           files: inside.slice(0, FILES_FOR_AGENTS).map((x) => ({
-            file: x.name, path: x.opened, versions: x.versions, openComments: x.open, approved: x.approvedBy.length > 0,
+            file: x.name, ...(x.title ? { title: x.title } : {}), path: x.opened, versions: x.versions, openComments: x.open, approved: x.approvedBy.length > 0,
           })),
           ...(inside.length > FILES_FOR_AGENTS ? { more: inside.length - FILES_FOR_AGENTS } : {}),
         };
@@ -1289,7 +1305,10 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const coming = !!(newest?.hash && !newest.opened && keeper?.off(newest.hash));
       if (coming) void keeper!.bringBack(newest!.hash!);
       else if (newest?.hash && keeper) keeper.opened(newest.hash);
-      return { ...viewOf(seen.file, seen.opened), ...(coming ? { coming: true } : {}) };
+      const title = shelf().titleOf(key);
+      // A file made in Files is sent in no thread, so only this says where a table saves.
+      const home = seen.file.project ? store.listProducts().find((p) => !p.team?.direct && projectKey(p.name) === projectKey(seen.file.project)) : null;
+      return { ...viewOf(seen.file, seen.opened), ...(home ? { product: home.slug } : {}), ...(title ? { title } : {}), ...(coming ? { coming: true } : {}) };
     },
 
     /**

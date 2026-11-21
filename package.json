@@ -76,6 +76,7 @@
     "setup:feedback": "node scripts/set-up-feedback.mjs",
     "feedback": "node scripts/run.mjs scripts/read-feedback.mjs",
     "fresh": "node scripts/run.mjs scripts/fresh-user.mjs",
+    "accounts": "node scripts/run.mjs scripts/accounts.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "check:public": "node scripts/check-before-public.mjs --all",
     "ship": "node scripts/ship.mjs",

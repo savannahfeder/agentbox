@@ -187,6 +187,12 @@ const startOfDay = (now: number) => { const d = new Date(now); d.setHours(0, 0, 
 const FINISHED_CARDS_KEPT_MS = 7 * 86_400_000;
 
 /** When this thread shipped: a person's word, else the app's own note once its merge lands. An agent saying so does not count. */
+/** When the row was last closed, from its own ledger, or null. */
+export function closedAt(item: { status?: string; wrote?: { status?: { ts?: number } | null } | null } | null | undefined): number | null {
+  const ts = item?.status === 'done' ? item.wrote?.status?.ts : undefined;
+  return Number.isFinite(ts) ? ts! : null;
+}
+
 export function shippedAtOf(item: Pick<CardItem, 'shippedAt' | 'note' | 'wrote'> | null | undefined): number | null {
   if (Number.isFinite(item?.shippedAt)) return item!.shippedAt! > 0 ? item!.shippedAt! : null;
   if (isShippedNote(item?.note) && item?.wrote?.note?.source === 'system') return item.wrote.note.ts ?? null;
@@ -412,7 +418,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
       state, priority: shownPriority(item),
       problem: s.problem || null, progress: s.progress || null, solution: solution || null,
       blockedBy: [...(waitsOn ? [{ id: waitsOn, title: waitsOn.slice('name:'.length) }] : []), ...linked(item.blockedBy)],
-      blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
+      // A finished thread is dated when it finished: a comment on it later is not news that it finished.
+      blocks: linked(item.blocks), updatedAt: (state === 'done' ? closedAt(item) : null) ?? item.updatedAt ?? now,
       ...(shippedAt ? { shippedAt } : {}),
     });
   }

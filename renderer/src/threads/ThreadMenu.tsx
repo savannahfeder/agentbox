@@ -391,6 +391,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
     const away = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) close(false); };
     const keys = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(true); return; }
+      // A note being written keeps every key: Tab to its button, arrows through its lines, ⌘↵ to send.
+      if (document.activeElement?.tagName === 'TEXTAREA' && wrap.current?.contains(document.activeElement)) return;
       const items = [...(wrap.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
         e.preventDefault();

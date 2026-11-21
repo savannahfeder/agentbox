@@ -36,7 +36,8 @@ import {
   allModels, joinNames, moreCount, recentModels, replyBoxAsk, replyWaitsUntil, type Harness, type ModelPick,
 } from '../threads/composer-rules';
 import { createPortal } from 'react-dom';
-import ReactMarkdown from 'react-markdown';
+import type { Options as MarkdownOptions } from 'react-markdown';
+import { MessageMarkdown } from './MessageMarkdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
@@ -101,7 +102,7 @@ import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveD
 import { ReplyLater } from './ReplyLater';
 import { effortSaid, modelShown, pickOnItsWay, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
-import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, threadToOpen } from '../team/chat-threads';
+import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, paneForThread, threadToOpen } from '../team/chat-threads';
 import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
 import { FormatBar } from '../team/FormatBar';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
@@ -138,7 +139,7 @@ import { rowTitle, showsWhenItComesBack } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
 import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
-import { TeamRouteStrip, TeamSaid, teamHeld } from '../team/TeamFocus';
+import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import { HandedLine } from '../team/HandedBy';
 import { askAboutStep } from '../team/AsksLine';
 import {
@@ -751,7 +752,9 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, asked = false, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, asked = false, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
+  /** `supervisor.outOfUsage`, for the reply box's model chip. */
+  outOfUsage?: Record<string, { tool: string; until: number }>;
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -1058,17 +1061,20 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const handedTask = handedName ? taskHandedFrom(items ?? [], item.id, teamCtx?.me ?? null) : null;
   const summarised = !agent && !made && !direct;
   // Read before the first paint, so the thread's width is right from the start.
+  // Only a chat's thread panel reads it, so the sidebar sliding open does not
+  // draw every other conversation again on each frame.
   const paneRef = useRef<HTMLDivElement>(null);
   const [paneWidth, setPaneWidth] = useState(Infinity);
   useLayoutEffect(() => {
     const pane = paneRef.current;
-    if (!pane) return undefined;
-    setPaneWidth(pane.clientWidth);
+    if (!pane || !direct) return undefined;
+    const measure = () => setPaneWidth(paneForThread(pane.clientWidth));
+    measure();
     if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(() => setPaneWidth(pane.clientWidth));
+    const ro = new ResizeObserver(measure);
     ro.observe(pane);
     return () => ro.disconnect();
-  }, []);
+  }, [direct]);
   // A CHAT'S THREAD, OPEN IN THE PANEL BESIDE IT (w-920461cbe6): which one, by
   // its message's uid, and how wide the panel was last dragged. A thread is not
   // carried from one conversation to the next, and a document open beside the
@@ -1549,7 +1555,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   }, [productDir, repoDir, item.id, item.result, item.note, item.body, item.answer, direct, product]);
 
   const mdPlugins = useMemo(
-    () => [remarkGfm, remarkTicketReferences, [remarkArtifactPaths, { dir: productDir ?? null, anyFull: direct, folder: taskFolder(repoDir, item.id) }], remarkMediaUnderSentences] as NonNullable<Parameters<typeof ReactMarkdown>[0]['remarkPlugins']>,
+    () => [remarkGfm, remarkTicketReferences, [remarkArtifactPaths, { dir: productDir ?? null, anyFull: direct, folder: taskFolder(repoDir, item.id) }], remarkMediaUnderSentences] as NonNullable<MarkdownOptions['remarkPlugins']>,
     [productDir, direct, repoDir, item.id],
   );
 
@@ -1677,7 +1683,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const needs = needsIn(text);
     const body = (
       <MessagePlace.Provider value={place}>
-        <ReactMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{needs.length ? needsAsBlocks(text) : text}</ReactMarkdown>
+        <MessageMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{needs.length ? needsAsBlocks(text) : text}</MessageMarkdown>
       </MessagePlace.Provider>
     );
     if (!needs.length) return body;
@@ -2133,7 +2139,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
-    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{asksCorner}{threadMenu}</span>, cornerHeaderTarget)}
+    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && !givenTask && (direct || summarised) && <ConversationAside item={item} />}{asksCorner}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice}
@@ -2296,7 +2302,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             and which two versions this is between (w-86452550e5). */}
         <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
-        {givenTask && <div className="focus-meta by-lead"><TeamSaid item={item} /></div>}
+        {/* A task handed to you says only where it came from; its name heads the conversation. */}
         {givenTask && <HandedFrom item={item} />}
         {made
           ? <div className="outcome">{md(item.body ?? '')}</div>
@@ -2668,7 +2674,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
+            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} outOfUsage={outOfUsage} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -2852,8 +2858,9 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false, f
   );
 }
 
-function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null }: {
+function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null, outOfUsage }: {
   item: WorkItem;
+  outOfUsage?: Record<string, { tool: string; until: number }>;
   /** The pick of a reply still on its way here, until the row carries it. */
   onItsWay?: ReplyPick | null;
   /** The agent whose message this answers, named in place of its owner. */
@@ -3729,6 +3736,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
             )}
             <ReplyModel
               chip
+              out={talkTo?.length ? null : outOfUsage?.[engineShown]}
               label={engineModelLabel(engineShown, model, modelOpts)}
               level={levelSaid}
               pick={pick}
