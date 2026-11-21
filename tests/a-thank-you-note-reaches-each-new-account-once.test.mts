@@ -32,6 +32,7 @@ import {
   DEFAULT_ADDRESS, noteUrl, senderLine, newKey, ownersFrom, secretsFile, vaultSql, heldMigration, resultsSql,
 } from '../scripts/lib/founder-note-setup.mjs';
 import { emptyDatabase } from './an-empty-test-database.mts';
+import { EVERY_TEAM_PAYS } from './every-team-pays.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -271,6 +272,7 @@ create publication supabase_realtime;
     db = new PGlite(await emptyDatabase());
     await db.exec(STAND_IN);
     await db.exec(migrations);
+    await db.exec(EVERY_TEAM_PAYS);
     await signUp(1, 'owner@example.com', { daysAgo: 5 });
     await signUp(2, 'two@x.dev', { daysAgo: 2 });
     await signUp(3, 'three@x.dev', { daysAgo: 3, name: 'Ada Lovelace' });

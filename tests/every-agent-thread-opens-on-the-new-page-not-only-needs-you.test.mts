@@ -34,7 +34,8 @@ describe('which threads get the page', () => {
     expect(app).toMatch(/!directSlugs\.has\(focused\.product\)/);
   });
   it('and the window wears the page\'s look whenever the page is drawn', () => {
-    expect(app).toMatch(/\$\{\(queueSpot \|\| onePage\) && focused \? ' one-at-a-time' : ''\}/);
+    // A teammate's thread opened from the Inbox reads the same way (2026-11-21).
+    expect(app).toMatch(/\$\{\(\(queueSpot \|\| onePage\) && focused\) \|\| \(teamShown && openCard && snap\?\.team\?\.signedIn && snap\.team\.team\) \? ' one-at-a-time' : ''\}/);
   });
 });
 

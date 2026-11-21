@@ -12,7 +12,7 @@ export function HandedLine({ item, now = Date.now() }: { item: WorkItem; now?: n
   const person = team.byId.get(h.from) ?? null;
   return <div className="handed-line">
     <Face person={person} size={20} />
-    <span className="handed-who"><b>{firstName(person)}</b> gave you this <span className="handed-when">{updatedWords(h.at, now)}</span></span>
+    <span className="handed-who"><b>{firstName(person)}</b> handed this over to you <span className="handed-when">{updatedWords(h.at, now)}</span></span>
     {h.note && <span className="handed-note">{h.note}</span>}
   </div>;
 }

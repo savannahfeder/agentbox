@@ -41,7 +41,8 @@ function setup({ members = [A, B], owners = [A], madeAt = MADE, start = MADE + H
   let clock = start;
   const sent = [];
   const objects = memoryObjects();
-  const team = { id: 'team-1', createdAt: madeAt, members, owners };
+  // The trial here is a week given by hand, the only one without a card since 2026-11-21.
+  const team = { id: 'team-1', createdAt: madeAt, freeUntil: madeAt + TEAM.trialDays * DAY, members, owners };
   const gw = createGateway({
     agentcore: {
       async invoke(sessionId, payload) { sent.push({ sessionId, payload }); return { ok: true }; },
@@ -220,7 +221,7 @@ describe('who is on a team, as the database says', () => {
     const asked = [];
     const fetchImpl = async (url) => {
       asked.push(url);
-      const body = url.includes('person_id=eq.') ? rows.mine : rows.all;
+      const body = url.includes('person_id=eq.') ? rows.mine : url.includes('team_plans') ? rows.plan ?? [] : rows.all;
       return { ok: true, status: 200, text: async () => JSON.stringify(body) };
     };
     return { db: supabaseRest({ url: 'https://db.test', serviceKey: 'k', fetchImpl }), asked };
@@ -228,7 +229,12 @@ describe('who is on a team, as the database says', () => {
 
   it('reads the team, when it was made, its members and its owners', async () => {
     const { db } = fakeDb({ mine: [{ team_id: 'team-1', teams: { created_at: '2026-11-17T09:00:00Z' } }], all: [{ person_id: A, role: 'owner' }, { person_id: B, role: 'member' }] });
-    expect(await db.teamOf(A)).toEqual({ id: 'team-1', createdAt: MADE, members: [A, B], owners: [A] });
+    expect(await db.teamOf(A)).toEqual({ id: 'team-1', createdAt: MADE, freeUntil: null, members: [A, B], owners: [A] });
+  });
+
+  it('reads the free days given to the team by hand', async () => {
+    const { db } = fakeDb({ mine: [{ team_id: 'team-1', teams: { created_at: '2026-11-17T09:00:00Z' } }], all: [{ person_id: A, role: 'owner' }], plan: [{ free_until: '2026-12-05T00:00:00Z' }] });
+    expect((await db.teamOf(A)).freeUntil).toBe(Date.UTC(2026, 11, 5));
   });
 
   it('someone on no team is on none', async () => {
@@ -241,10 +247,10 @@ describe('who is on a team, as the database says', () => {
     let t = 0;
     const teams = teamsFrom(db, { now: () => t });
     await teams(A); await teams(A);
-    expect(asked).toHaveLength(2);
+    expect(asked).toHaveLength(3);
     t = 61_000;
     await teams(A);
-    expect(asked).toHaveLength(4);
+    expect(asked).toHaveLength(6);
   });
 });
 

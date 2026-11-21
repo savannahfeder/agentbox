@@ -75,7 +75,7 @@ describe('an opened task wears the treatment exactly once', () => {
     const ground = skinRules.find((r) => /:root\[data-skin\]\s+\.app\.flat$/.test(r.sel));
     expect(ground, 'the one surface that carries the glass is missing').toBeTruthy();
     expect(paints(ground.body, 'background')).toBe('var(--skin-pane)');
-    expect(paints(ground.body, 'backdrop-filter')).toBe('var(--skin-glass)');
+    expect(paints(ground.body, 'backdrop-filter')).toBe('blur(var(--skin-blur))');
   });
 
   // THE INVARIANT. A rule inside .app.flat may say `transparent`, `none` or
@@ -121,7 +121,7 @@ describe('the inbox keeps its variance, because she said so', () => {
     expect(card, 'the inbox card rule is missing').toBeTruthy();
     expect(paints(card.body, 'background')).toBe('var(--skin-pane)');
     expect(paints(card.body, 'border')).toBe('1px solid var(--skin-pane-line)');
-    expect(paints(card.body, 'backdrop-filter')).toBe('var(--skin-glass)');
+    expect(paints(card.body, 'backdrop-filter')).toBe('blur(var(--skin-blur))');
   });
 
   it('scopes every one of the new rules to a skin, so the plain themes are untouched', () => {
@@ -157,7 +157,7 @@ describe('the card shape, while it is one of six she is choosing between', () =>
     const pane = rules.find((r) => /\[data-task-shape="card"\]\[data-skin\] \.app\.flat \.list-pane\.pinned$/.test(r.sel));
     expect(pane, 'the card shape never gives the pane the wash').toBeTruthy();
     expect(paints(pane.body, 'background')).toBe('var(--skin-pane)');
-    expect(paints(pane.body, 'backdrop-filter')).toBe('var(--skin-glass)');
+    expect(paints(pane.body, 'backdrop-filter')).toBe('blur(var(--skin-blur))');
   });
 
   it('takes the inbox card’s own corner and padding rather than typing numbers again', () => {

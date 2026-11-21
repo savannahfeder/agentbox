@@ -27,16 +27,17 @@ export function weekCounts(finishedAt: readonly number[], now: number): number[]
 export type DoorKey = 'inbox' | 'progress' | 'team';
 export type Door = { key: DoorKey; label: string; count: number | null };
 
-/** The places Home opens onto. Team is only there for someone on a team. */
+/** The places Home opens onto. Team is only there for someone on a team, and a door with nothing behind it shows no number. */
 export function doors({ needs, progress, team }: { needs: number; progress: number; team: boolean }): Door[] {
   const out: Door[] = [
-    { key: 'inbox', label: 'Inbox', count: needs },
-    { key: 'progress', label: 'In progress', count: progress },
+    { key: 'inbox', label: 'Inbox', count: needs > 0 ? needs : null },
+    { key: 'progress', label: 'In progress', count: progress > 0 ? progress : null },
   ];
   if (team) out.push({ key: 'team', label: 'Team', count: null });
   return out;
 }
 
+/** The command bar's short age for a thread under a day old. */
 export function agoShort(at: number, now: number): string {
   const m = Math.max(0, Math.floor((now - at) / 60_000));
   if (m < 1) return 'now';

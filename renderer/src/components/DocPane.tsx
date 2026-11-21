@@ -300,7 +300,11 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
   useLayoutEffect(() => {
     const el = card.current;
     if (!el) return;
-    const read = () => setEdge({ x: el.offsetLeft, y: el.offsetTop, h: el.offsetHeight, r: getComputedStyle(el).borderTopLeftRadius || '0px' });
+    // Only a moved edge draws the pane again; the card's width changes every frame the sidebar slides.
+    const read = () => {
+      const next = { x: el.offsetLeft, y: el.offsetTop, h: el.offsetHeight, r: getComputedStyle(el).borderTopLeftRadius || '0px' };
+      setEdge((was) => (was.x === next.x && was.y === next.y && was.h === next.h && was.r === next.r ? was : next));
+    };
     read();
     const watch = new ResizeObserver(read);
     watch.observe(el);
@@ -325,7 +329,8 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
   // A page being browsed has an address rather than a breadcrumb; the bar
   // above it draws that (BrowserChrome).
   const browsingKind: WebChromeKind | null = kind === 'website' ? 'website' : app.local ? 'local' : null;
-  const crumb = crumbParts(resolved ?? doc.src, roots);
+  // A run's change is named by what it is, not by the folder the app keeps it in.
+  const crumb = /(^|\/)runs\/w-[0-9a-f]+\/the-change-it-made\.change$/.test(resolved ?? doc.src) ? ['The change'] : crumbParts(resolved ?? doc.src, roots);
   const canSave = paneCanSave(resolved, roots);
   // WHAT THE FIRST MARK DOES, AND FOR A CHANGE IT IS HER EDITOR.On a markdown
   // file or a page it is unchanged and still hands the file to the operating
@@ -380,7 +385,7 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
             {crumb.map((part, i) => (
               <span key={`${part}-${i}`} className="doc-crumb-part">
                 {i > 0 && <span className="doc-crumb-sep">›</span>}
-                <span className={i === crumb.length - 1 ? 'doc-crumb-leaf' : undefined}>{i === crumb.length - 1 ? shownName(resolved ?? doc.src) || part : part}</span>
+                <span className={i === crumb.length - 1 ? 'doc-crumb-leaf' : undefined}>{i === crumb.length - 1 && part !== 'The change' ? shownName(resolved ?? doc.src) || part : part}</span>
               </span>
             ))}
           </div>

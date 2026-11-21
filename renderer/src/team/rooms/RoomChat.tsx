@@ -7,7 +7,7 @@
 // pointing with its more menu (edit, copy, mark unread, delete), an edited
 // mark, and voice notes and files. The box is the direct chat's too.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { MessageMarkdown } from '../../components/MessageMarkdown';
 import { ConnectionLink } from '../../connections/ConnectionsPlace';
 import { connectionLinkOf, keepConnectionLinks } from '../../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
@@ -76,6 +76,8 @@ export type RoomChatCalls = {
   marks?: ReadonlyMap<string, MessageMarks>;
   onDecide?: (messageId: string, kind: 'decision' | 'priority', on: boolean) => void;
 };
+
+const FileChipMark = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3" strokeLinejoin="round" /></svg>;
 
 export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, along, ...calls }: {
   room: Room; messages: RoomMessage[]; people: ChatPerson[]; meId: string | null; now: number;
@@ -245,7 +247,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
           {m.id === newAt && <div className="rm-new" role="separator"><span>New</span></div>}
           <div className={`rm-cm${headed ? '' : ' cont'}${root && i === 0 ? ' root' : ''}`}>
             {headed && <div className="h">
-              <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 28 : 16} />
+              <Face name={m.voice ? m.voice.name : p?.name ?? '?'} url={m.voice ? undefined : p?.avatarUrl} agent={!!m.voice} size={hang ? 28 : 16} />
               <span>{m.voice ? voiceName(m.voice, p?.name ?? '', { mine }) : nameOf(m.by)}</span><em>{clockOf(m.at)}</em>
               {m.editedAt && !m.deleted && <em className="rm-edited">edited</em>}
             </div>}
@@ -340,7 +342,7 @@ function RoomFile({ name, shown, load, opensBig, film = false, children }: { nam
   const bytes = useCallback(() => load?.(name) ?? Promise.resolve(null), [load, name]);
   const close = useCallback(() => setOpen(false), []);
   return <>
-    <button type="button" className={film ? 'inline-image-open rm-film' : children ? 'inline-image-open' : 'rm-file'} title={`Open ${shown}`} onClick={() => { if (!opensBig?.(name)) setOpen(true); }}>{children ?? shown}</button>
+    <button type="button" className={film ? 'inline-image-open rm-film' : children ? 'inline-image-open' : 'rm-file'} title={`Open ${shown}`} onClick={() => { if (!opensBig?.(name)) setOpen(true); }}>{children ?? <><FileChipMark />{shown}</>}</button>
     {open && createPortal(<FileSheet name={name} shown={shown} load={bytes} onClose={close} />, document.body)}
   </>;
 }
@@ -389,7 +391,7 @@ function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine,
       },
     };
   }, [roomId, mine]);
-  return <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={components} urlTransform={keepConnectionLinks}>{mentionMarkdown(text, names, me)}</ReactMarkdown>;
+  return <MessageMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={components} urlTransform={keepConnectionLinks}>{mentionMarkdown(text, names, me)}</MessageMarkdown>;
 }
 
 // Keeps the newest message in view while you are at the bottom, and leaves

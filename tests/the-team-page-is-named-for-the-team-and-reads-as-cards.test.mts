@@ -55,9 +55,10 @@ describe('the list beside it', () => {
   it('is 240 wide, leaving the rest to the page', () => {
     expect(read('renderer/src/team/rooms/rooms.css')).toMatch(/^\.gc-list \{ width: 240px;/m);
   });
-  it('says no 0 on a section with nothing in it', () => {
+  // Since 2026-11-21 a count shows only from 2, so no "People 1" either.
+  it('says no 0 or 1 on a section', () => {
     const col = read('renderer/src/teammates/ChatsColumn.tsx');
-    expect(col).toContain('{count > 0 && <em>{count}</em>}');
+    expect(col).toContain('{count > 1 && <em>{count}</em>}');
     expect(col).not.toContain('<span>{title}</span><em>{count}</em>');
   });
   it('nor does a board column or a section of threads', () => {
@@ -93,6 +94,6 @@ describe('a teammate’s thread opened from their page in Team', () => {
     expect(app).toContain('roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
   });
   it('goes back to the page it came from, by name', () => {
-    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : chatsPlace === 'tasks' ? 'Tasks' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
   });
 });

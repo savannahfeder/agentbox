@@ -24,7 +24,7 @@ import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
 import { findFileToSend } from './carry-files.mts';
 import { readableSharedThreads } from '../everything-found.mts';
 import { plainRef } from '../../shared/carried-files.mts';
-import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mts';
+import { listSharedProjects, joinSharedProject, linkSharedFolders, markShared, makeDirect } from './projects.mts';
 import type { TeamRecord } from './projects.mts';
 import type { SyncBackend, SyncCard, SyncDisk, SyncReport, SyncState } from './sync.mts';
 import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
@@ -91,6 +91,8 @@ export interface TeamState {
   error: string | null;
   /** False only when the cloud said this person's team is not let in yet; null when it could not say. */
   multiplayer?: boolean | null;
+  /** False only when the cloud said this person's team has no Pro and no free days, so it neither invites nor shares; null when it could not say. */
+  pro?: boolean | null;
   phoneSite?: string | null;
   phoneSiteQr?: string | null;
   phoneError?: string | null;
@@ -142,6 +144,8 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   pendingInvites(): Promise<TeamInvite[]>;
   /** 20261119000000_multiplayer_is_invite_only.sql: whether this person may invite teammates. */
   hasMultiplayer?(): Promise<boolean>;
+  /** 20261121130000_team_features_need_pro.sql: whether this person's team pays for Pro or has free days. */
+  teamPays?(): Promise<boolean>;
   listInvites?(teamId: string): Promise<TeamSentInvite[]>;
   createTeam(name: string): Promise<TeamRef>;
   renameTeam(teamId: string, name: string): Promise<unknown>;
@@ -621,13 +625,17 @@ export function createTeamService({
     // The invites this team has out, so the settings page can say who has not
     // joined yet and let them be cancelled.
     const sent = team && backend!.listInvites ? await backend!.listInvites(team.id).catch(() => []) : [];
-    set(withCards(cards, { team, people, invites, sent, since: me ? kept().getSince(me) : null, multiplayer: await readMultiplayer() }));
+    set(withCards(cards, { team, people, invites, sent, since: me ? kept().getSince(me) : null, multiplayer: await readMultiplayer(), pro: team ? await readPro() : null }));
   }
 
   // An older cloud has no gate, so a failed ask is null and nothing is hidden.
   async function readMultiplayer() {
     if (!backend?.hasMultiplayer) return null;
     return backend.hasMultiplayer().catch((err) => { log(`team: multiplayer: ${err.message}`); return null; });
+  }
+  async function readPro() {
+    if (!backend?.teamPays) return null;
+    return backend.teamPays().catch((err) => { log(`team: pro: ${err.message}`); return null; });
   }
 
   // WHO HAS OPENED EACH CONVERSATION, by `${slug}/${id}` then person. An older
@@ -664,8 +672,11 @@ export function createTeamService({
         // their next sign-in. It is offered, never taken up.
         if (!state.team) await refreshTeam();
         else if (state.multiplayer === false) set({ multiplayer: await readMultiplayer() });
+        // Read before the pass, so the cards it sends follow a team that started or stopped paying.
+        if (state.team) { const pro = await readPro(); if (pro !== state.pro) set({ pro }); }
         await clearLapsedStatus();
         const report = await sync!.syncOnce();
+        for (const l of linkSharedFolders(products())) log(`team: ${path.basename(l.dir)} now works in ${l.repoPath}, your own project of the same name`);
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
         // on the first line of theirs that arrives here.
@@ -901,7 +912,8 @@ export function createTeamService({
     phoneInbox = makePhoneInbox();
     // Off, the window shows no team and no Team / Private choice, so nothing
     // goes up, and what was up comes down as a private thread's card does.
-    const listCards = (): SyncCard[] => (!sharing() ? [] : [
+    // A team without Pro shares nothing either.
+    const listCards = (): SyncCard[] => (!sharing() || state.pro === false ? [] : [
       ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
     ]);
@@ -1396,6 +1408,12 @@ export function createTeamService({
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...change.files, ...files],
       });
+      // The asks on it end with it: what they say back would come to a thread you no longer hold.
+      for (const r of store.listItems()) {
+        const a = askOf(r as never);
+        if (!a || a.owner !== state.me.id || a.thread !== id || !askIsOpen(r as never)) continue;
+        try { store.answerItem(r.product, r.id, { answer: `${giver} handed this thread to ${person.name || 'a teammate'}.`, status: 'done' }); } catch (err) { log(`asks: ${(err as Error).message}`); }
+      }
       // As your own words: a note would be drawn as the agent's checkpoint.
       const said = String(note ?? '').trim();
       store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}.${said ? `\n\n${said}` : ''}`, status: 'done' });

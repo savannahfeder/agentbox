@@ -43,6 +43,7 @@ import { TeamContext, Face, firstName } from '../team/people';
 import { whereAMessageGoes } from '../team/one-conversation';
 import { AgentFace } from '../components/AgentFace';
 import { AutoFace } from '../components/AutoFace';
+import { EngineLogo } from '../components/EngineLogos';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
@@ -52,7 +53,7 @@ import { Listening, MicButton, useWebDictation } from '../components/WebDictatio
 import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { cardPick, clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
 import { codeProjectFor, LAST_PRODUCT_KEY, rememberedProject } from '../compose-project';
-import { practiceRefusal, noProjectYet } from '../compose-says';
+import { practiceRefusal, noProjectYet, outOfUsageNote } from '../compose-says';
 import { onCloudPhone } from '../phone-screen';
 import { defaultModelFor, engineModelLabel, readLastModel, writeLastModel, type ModelChoice } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortPicked, effortShown, readLastEffort, writeLastEffort } from '../effort';
@@ -62,6 +63,7 @@ import { ideasFor, type Idea } from '../first-run';
 import { readRule, repeatsLine } from '../format';
 import { fitMenu } from '../keep-in-window';
 import { ModelMenu } from './ModelMenu';
+import { OutUntil } from '../components/OutUntil';
 import { dropRank, useFitRow } from './fit-row';
 import { useThreadMentions } from '../components/ThreadMentions';
 import {
@@ -141,8 +143,10 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, toChat, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor,
+  products, items, engines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, toChat, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor, outOfUsage,
 }: {
+  /** `supervisor.outOfUsage`: each agent whose account is out of usage, and when it comes back. */
+  outOfUsage?: Record<string, { tool: string; until: number }>;
   /** The default agent from Settings, which every new card opens on. */
   workspaceEngine?: string | null;
   /** First-thread suggestions, offered only while the tutorial is walking someone to their first send. */
@@ -394,6 +398,9 @@ export function ThreadComposer({
   const labelOf = (p: ModelPick) => engineModelLabel(p.engine, p.model, modelOpts);
   // Recent rows say which agent runs them, where there are two.
   const engineTags = agentChoices(engineRows).length > 0;
+  // Said before Send, so nobody files a task expecting an agent that cannot start.
+  const outHere = person || mate ? null : outOfUsage?.[pick.engine] ?? null;
+  const outNote = outOfUsageNote(outHere);
   const recent = useMemo(
     () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered }),
     [items, codexModels, codexDefault, codexOffered, claudeOffered],
@@ -1244,10 +1251,13 @@ export function ThreadComposer({
   const fields: { label: string; node: ReactNode }[] = [
     ...(toShown ? [{ label: 'To', node: (
       <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person ? dropRank('to') : undefined}>
-        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'}
+        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'} title={inline && !mate && !person && !onAuto ? 'To: Agent' : undefined}
           onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
-          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : inline ? null : onAuto ? <AutoFace /> : <AgentFace />}
-          <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>
+          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : onAuto ? <AutoFace /> : <AgentFace />}
+          {/* On the page's narrow box the agent is its face alone, so the bar keeps room for the level. */}
+          {inline && !mate && !person && !onAuto
+            ? <span className="tc-word-text tc-face-only">Agent</span>
+            : <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>}
         </button>
         {extra.map((p) => (
           <span key={p.id} className="tc-also">
@@ -1292,8 +1302,10 @@ export function ThreadComposer({
     ...(rows.includes('model') ? [{ label: 'Model', node: (
       <span className="tc-anchor" ref={anchor('model')} data-drop={inline ? dropRank('model') : undefined}>
         <button type="button" data-trigger className={trigger('model')} aria-haspopup="listbox" aria-expanded={open === 'model'}
-          onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
+          title={outNote ?? undefined} onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
+          <EngineLogo engine={pick.engine} size={14} />
           <span className="tc-word-text">{labelOf(pick)}</span>
+          <OutUntil out={outHere} drop={inline ? dropRank('out-when') : undefined} />
         </button>
         {open === 'model' && modelMenu}
       </span>
@@ -1540,7 +1552,7 @@ export function ThreadComposer({
               </span>
             )}
             <span className="tc-send" ref={anchor('later')}>
-              <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? `Send · ${SEND}`}>
+              <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? outNote ?? `Send · ${SEND}`}>
                 Send <kbd data-drop={inline ? dropRank('send-keys') : undefined}>{SEND}</kbd>
               </button>
               {/* A picked time is said here, on the half that changes it. */}

@@ -5,13 +5,15 @@
 // sentences that bring the thread back to mind, then Done, the steps taken so
 // far as a timeline of dots joined by a thin line, newest last ("defo the
 // timeline view"). Solution is no longer drawn. The side panel this was drawn
-// for went in 2026-11 (w-d143fcb40a); a teammate's card still reads this way.
-// Measured by drawing the real card with react-dom/server.
+// for went in 2026-11 (w-d143fcb40a); a teammate's thread's summary, at the top
+// of its page since w-8a8eac7620, still reads this way, with Done named for
+// what it is there: what their agent already tried.
+// Measured by drawing the real summary with react-dom/server.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TeammateCard } from '../renderer/src/threads/Summary.tsx';
+import { TeammateSummary } from '../renderer/src/threads/Summary.tsx';
 globalThis.React = React;
 
 const NOW = Date.now();
@@ -29,10 +31,10 @@ describe('a teammate’s card', () => {
     problem: 'Cards flicker in Safari when you hover to zoom.', progress: 'Found it\nTests pass', solution: 'Ship the fix.',
     blockedBy: [], blocks: [], updatedAt: NOW, ...o,
   });
-  const drawCard = (o) => renderToStaticMarkup(React.createElement(TeammateCard, { card: card(o), person: null }));
+  const drawCard = (o) => renderToStaticMarkup(React.createElement(TeammateSummary, { card: card(o), owner: 'Lena' }));
   it('leads with the Context, then the same Done trail', () => {
     const html = drawCard();
-    expect(text(html)).toMatch(/^About Cards flicker in Safari when you hover to zoom\. Done Found it Tests pass Owner/);
+    expect(text(html)).toBe('Cards flicker in Safari when you hover to zoom. What Lena&#x27;s agent already tried Found it Tests pass');
     expect(html).toMatch(/<li class="ts-step ts-step-last">Tests pass<\/li>/);
   });
   it('draws no Problem, Solution or solution words', () => {
@@ -40,8 +42,8 @@ describe('a teammate’s card', () => {
     expect(w).not.toMatch(/\bProblem\b|\bSolution\b/);
     expect(w).not.toContain('Ship the fix.');
   });
-  it('leaves Done off when nothing is done', () => {
-    expect(text(drawCard({ progress: null }))).not.toMatch(/\bDone\b/);
+  it('leaves the trail off when nothing is done', () => {
+    expect(text(drawCard({ progress: null }))).not.toMatch(/already tried/);
   });
 });
 

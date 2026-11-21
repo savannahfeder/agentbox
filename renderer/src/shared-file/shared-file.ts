@@ -212,9 +212,7 @@ export function pictureAddress(file: Pick<SharedFile, 'body' | 'type'>): string 
   return URL.createObjectURL(new Blob([fileBytes(file) as BlobPart], { type: blobType('image', file.type) }));
 }
 
-export function initialOf(name: string): string {
-  return (name.trim().match(/\p{L}|\p{N}/u)?.[0] ?? '?').toUpperCase();
-}
+export { initialsOf as initialOf } from '../team/rooms/room-rules';
 
 export function sharedOn(ts: number, now = Date.now()): string {
   const d = new Date(ts);

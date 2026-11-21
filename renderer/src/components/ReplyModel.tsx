@@ -8,16 +8,21 @@
 // the task up, and nothing about a run already going.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { EngineLogo } from './EngineLogos';
 import { fitMenu } from '../keep-in-window';
 import { modelDrawerKey } from '../model-drawer-keys';
 import { ModelMenu } from '../threads/ModelMenu';
 import type { ModelPick } from '../threads/composer-rules';
 import type { EffortChoice } from '../effort';
+import { outOfUsageNote } from '../compose-says';
+import { OutUntil } from './OutUntil';
 
 export function ReplyModel({
   label, level = null, pick, onPick, recent, every, more, labelOf, engineLabel, engineTags = false,
-  effortRows, effortLit, onEffort, title, openAtStart = false, onOpenChange, chip = false,
+  effortRows, effortLit, onEffort, title, openAtStart = false, onOpenChange, chip = false, out = null,
 }: {
+  /** The picked agent is out of usage: the chip carries when it comes back. */
+  out?: { tool: string; until: number } | null;
   /** Drawn as the new thread card's chip. */
   chip?: boolean;
   /** The word on the line, the model's own name. */
@@ -115,7 +120,7 @@ export function ReplyModel({
         type="button"
         data-trigger
         className={`${chip ? 'tc-chip' : 'compose-word set'} ${open ? 'open' : ''}`}
-        title={title ?? 'Which model this conversation runs on'}
+        title={outOfUsageNote(out) ?? title ?? 'Which model this conversation runs on'}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -132,7 +137,7 @@ export function ReplyModel({
           }
         }}
       >{chip
-        ? <span className="tc-chip-label">{label}{level && <span className="tc-chip-level"> · {level}</span>}</span>
+        ? <><EngineLogo engine={pick.engine} size={14} /><span className="tc-chip-label">{label}{level && <span className="tc-chip-level"> · {level}</span>}</span><OutUntil out={out} /></>
         : <>{label}{level && ` · ${level}`}</>}</button>
     </span>
   );

@@ -16,7 +16,7 @@ import {
 // Thursday 12 November 2026, 3pm.
 const NOW = new Date(2026, 10, 12, 15, 0).getTime();
 const on = (d: number, h: number, m = 0) => new Date(2026, 10, d, h, m).getTime();
-const item = (o: Record<string, unknown>) => ({ product: 'lumen', status: 'open', labels: [], updatedAt: on(12, 10), createdAt: on(12, 8), title: String(o.id), ...o });
+const item = (o: Record<string, unknown>) => ({ product: 'lumen', status: 'open', labels: [], updatedAt: on(12, 10), createdAt: on(12, 8), title: String(o.id), ...(o.status === 'done' ? { result: 'Done.' } : {}), ...o });
 const base = {
   range: 'today' as const, now: NOW, me: 'p-me', products: [{ slug: 'lumen', name: 'Lumen', team: {} }],
   decisions: [], mentions: [], people: [{ id: 'p-dev', name: 'Dev Patel' }], mates: [{ id: 't-fix', name: 'Maintainer' }],
@@ -113,7 +113,7 @@ describe('each teammate posts once a day, in a sentence with links', () => {
 // A tester's teammate was busy in projects she had not shared: her standup had
 // no post at all, so she read as idle. Private work is counted, never named.
 describe('a teammate working in private projects', () => {
-  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: false, title: null, state: 'running', project: null, blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...o });
+  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: false, title: null, state: 'running', project: null, blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...(o.state === 'done' ? { solution: 'Done.' } : {}), ...o });
   const day = (cards: unknown[]) => teamToday({ ...base, window: standupWindow(on(12, 0), DEFAULT_STANDUP, NOW), items: [], cards: cards as never });
   it('posts how many private threads they are on, without naming any', () => {
     const posts = postsOf(day([card({ threadId: 'x1' }), card({ threadId: 'x2' })]).people, { mates: true });
@@ -133,7 +133,7 @@ describe('a teammate working in private projects', () => {
 // Thursday too: what is stuck is only known as of now. And a teammate's post
 // vanished once her agent answered and the thread waited on her.
 describe('what a post says on a past day and while a thread waits on its owner', () => {
-  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...o });
+  const card = (o: Record<string, unknown>) => ({ personId: 'p-dev', visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: on(12, 13), ...(o.state === 'done' ? { solution: 'Done.' } : {}), ...o });
   const dayOf = (window: { from: number; to: number }, items: unknown[], cards: unknown[] = []) => teamToday({ ...base, window, items: items as never, cards: cards as never });
   const stuck = item({ id: 's', title: 'Investor update', status: 'blocked', blockedBy: ['name:Codex usage'], updatedAt: on(12, 14) });
   it('today\'s post says what is stuck', () => {

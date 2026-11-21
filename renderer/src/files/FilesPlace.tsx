@@ -14,10 +14,12 @@ import { SAYS_UNDO } from '../toast-parts';
 import type { LedgerLine } from '../thread-history';
 import type { DragEvent } from 'react';
 import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
-import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
+import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, inOrderOf, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, showsTotal, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
+import { fileRenameUndo, moveUndo, renameUndo } from './files-undo';
 import './files-place.css';
 
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
+const HOLD_STILL_MS = 1500;
 const NO_FOLDERS: FileFolder[] = [];
 
 const readers = new Set<() => void>();
@@ -52,7 +54,7 @@ function DocFace({ file }: { file: PlacedFile }) {
       if (live && r.ok) setBlocks(docBlocks(r.text ?? ''));
     });
     return () => { live = false; };
-  }, [file.opened, file.blank]);
+  }, [file.opened, file.versions, file.bytes, file.blank]);
   return <div className="fp-doc" aria-hidden="true">
     {blocks.map((b, i) => (b.kind === 'h1' ? <strong key={i}>{b.text}</strong>
       : b.kind === 'h2' ? <b key={i}>{b.text}</b>
@@ -68,7 +70,7 @@ function PageFace({ file }: { file: PlacedFile }) {
     let live = true;
     void api.readDoc({ product: file.sentIn[0]?.product ?? '', src: file.opened ?? '' }).then((r) => { if (live && r.ok) setText(r.text ?? ''); });
     return () => { live = false; };
-  }, [file.opened]);
+  }, [file.opened, file.versions, file.bytes]);
   // Sandboxed with nothing allowed: a tile runs none of a page's scripts.
   return text === null ? null : <iframe className="fp-page-face" srcDoc={text} title="" tabIndex={-1} sandbox="" />;
 }
@@ -79,7 +81,7 @@ function CodeFace({ file }: { file: PlacedFile }) {
     let live = true;
     void api.readDoc({ product: file.sentIn[0]?.product ?? '', src: file.opened ?? '' }).then((r) => { if (live && r.ok) setText((r.text ?? '').split('\n').slice(0, 12).join('\n')); });
     return () => { live = false; };
-  }, [file.opened]);
+  }, [file.opened, file.versions, file.bytes]);
   return <pre className="fp-code-face" aria-hidden="true">{text}</pre>;
 }
 
@@ -142,10 +144,10 @@ function NameBox({ placeholder, start = '', onDone, onCancel }: { placeholder: s
 // The menu's most height and a little: under this it opens upward, or the window cuts it off.
 const MENU_ROOM = 300;
 
-/** A file's menu, or a group's: where it can go in its project. */
-function MoveMenu({ file, name, keys, folders, act, onNewFolder, onTrash }: {
-  file: PlacedFile; name?: string; keys?: string[]; folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (name: string) => void;
-  onTrash?: () => void;
+/** A file's menu, or a group's: its name, and where it can go in its project. */
+function MoveMenu({ file, name, keys, folders, onMove, onNewFolder, onTrash, onRename }: {
+  file: PlacedFile; name?: string; keys?: string[]; folders: FileFolder[]; onMove: (keys: string[], folder: string | null) => void; onNewFolder: (name: string) => void;
+  onTrash?: () => void; onRename?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [naming, setNaming] = useState(false);
@@ -159,14 +161,18 @@ function MoveMenu({ file, name, keys, folders, act, onNewFolder, onTrash }: {
   }, [open, naming]);
   const here = folders.filter((f) => f.project.toLowerCase() === (file.project ?? '').toLowerCase());
   const tops = here.filter((f) => !f.parent);
-  const move = (folder: string | null) => { setOpen(false); setQuery(''); for (const key of keys ?? [file.key]) act({ do: 'move', key, folder }); };
+  const move = (folder: string | null) => { setOpen(false); setQuery(''); onMove(keys ?? [file.key], folder); };
   const item = (f: FileFolder, sub: boolean) => <button type="button" key={f.id} role="menuitem" className={`fp-menu-item${sub ? ' is-sub' : ''}`} disabled={!keys && file.folder === f.id} onClick={() => move(f.id)}>
     <FolderGlyph />{f.name}
   </button>;
   const found = foldersMatching(here, query);
   return <div className={`fp-more-box${open ? ' is-open' : ''}`} ref={box}>
-    <button type="button" className="fp-more" aria-label={`Move ${name ?? file.name}`} aria-haspopup="menu" aria-expanded={open} onClick={(e) => { setUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < MENU_ROOM); setOpen(!open); }}><MoreGlyph /></button>
+    <button type="button" className="fp-more" aria-label={`${onRename ? 'More for' : 'Move'} ${name ?? shownName(file)}`} aria-haspopup="menu" aria-expanded={open} onClick={(e) => { setUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < MENU_ROOM); setOpen(!open); }}><MoreGlyph /></button>
     {open && <div className={`fp-menu${up ? ' is-up' : ''}`} role="menu">
+      {onRename && !naming && <>
+        <button type="button" role="menuitem" className="fp-menu-item" onClick={() => { setOpen(false); setQuery(''); onRename(); }}>Rename</button>
+        <div className="fp-menu-gap" role="separator" />
+      </>}
       <div className="fp-menu-head">Move to</div>
       {here.length > 3 && <input className="fp-menu-find" autoFocus value={query} placeholder="Find a folder" aria-label="Find a folder" onChange={(e) => setQuery(e.target.value)} onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && found.length === 1) move(found[0].id); }} />}
@@ -282,10 +288,10 @@ function useNear<T extends Element>() {
   return [ref, near] as const;
 }
 
-function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, onTrash, chosen = null, unmovable = false }: {
+function Tile({ file, list, now, me, nameOf, onOpen, folders, onMove, onNewFolder, onTrash, onRename, chosen = null, unmovable = false }: {
   file: PlacedFile; list: boolean; now: number; me: string | null; nameOf: (id: string) => string; onOpen: () => void;
-  folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (file: PlacedFile, name: string) => void;
-  onTrash: (file: PlacedFile) => void;
+  folders: FileFolder[]; onMove: (keys: string[], folder: string | null) => void; onNewFolder: (file: PlacedFile, name: string) => void;
+  onTrash: (file: PlacedFile) => void; onRename: (file: PlacedFile, name: string) => void;
   /** While files are being chosen: whether this one is. */
   chosen?: boolean | null;
   /** Being chosen, and not Files' to move. */
@@ -303,24 +309,30 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, 
   const name = shownName(file);
   const whose = !file.opened && file.by && file.by !== me ? nameOf(file.by) : null;
   const choosing = chosen !== null || unmovable;
+  const [renaming, setRenaming] = useState(false);
   const [faceRef, near] = useNear<HTMLSpanElement>();
-  return <div className={`${list ? 'fp-line' : 'fp-tile'}${file.cloud ? ' is-in-cloud' : ''}${chosen ? ' is-chosen' : ''}${unmovable ? ' is-unmovable' : ''}`} draggable={!!file.project && !choosing} onDragStart={(e) => { e.dataTransfer.setData(DRAGGED, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
+  const shownAs = renaming
+    ? <span className="fp-name"><NameBox placeholder="Name" start={name} onCancel={() => setRenaming(false)} onDone={(n) => { setRenaming(false); onRename(file, n); }} /></span>
+    : <span className="fp-name">{name}</span>;
+  const inside = list
+    ? <>
+      <span ref={faceRef} className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? near && <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
+      {shownAs}
+      <span className="fp-line-marks">{marks}</span>
+      <span className="fp-meta-words">{said}</span>
+    </>
+    : <>
+      <span ref={faceRef} className={`fp-face fp-face-${file.kind ?? 'file'}`}>{near && <Face file={file} whose={whose} />}</span>
+      {shownAs}
+      <span className="fp-meta"><span className="fp-meta-words">{said}</span>{marks}</span>
+    </>;
+  return <div className={`${list ? 'fp-line' : 'fp-tile'}${file.cloud ? ' is-in-cloud' : ''}${chosen ? ' is-chosen' : ''}${unmovable ? ' is-unmovable' : ''}`} draggable={!!file.project && !choosing && !renaming} onDragStart={(e) => { e.dataTransfer.setData(DRAGGED, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
     {chosen !== null && <span className="fp-check" aria-hidden="true">{chosen && <CheckGlyph />}</span>}
-    <button type="button" className="fp-open-file" onClick={onOpen} aria-label={choosing ? `${chosen ? 'Unchoose' : 'Choose'} ${file.name}` : `Open ${file.name}`} aria-pressed={choosing ? !!chosen : undefined} title={name === file.name ? undefined : file.name}>
-      {list
-        ? <>
-          <span ref={faceRef} className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? near && <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
-          <span className="fp-name">{name}</span>
-          <span className="fp-line-marks">{marks}</span>
-          <span className="fp-meta-words">{said}</span>
-        </>
-        : <>
-          <span ref={faceRef} className={`fp-face fp-face-${file.kind ?? 'file'}`}>{near && <Face file={file} whose={whose} />}</span>
-          <span className="fp-name">{name}</span>
-          <span className="fp-meta"><span className="fp-meta-words">{said}</span>{marks}</span>
-        </>}
-    </button>
-    {file.project && !choosing && <MoveMenu file={file} folders={folders} act={act} onNewFolder={(n) => onNewFolder(file, n)} onTrash={file.trashable ? () => onTrash(file) : undefined} />}
+    {/* A box to type in cannot sit inside a button. */}
+    {renaming
+      ? <div className="fp-open-file">{inside}</div>
+      : <button type="button" className="fp-open-file" onClick={onOpen} aria-label={choosing ? `${chosen ? 'Unchoose' : 'Choose'} ${name}` : `Open ${name}`} aria-pressed={choosing ? !!chosen : undefined} title={name === file.name ? undefined : file.name}>{inside}</button>}
+    {file.project && !choosing && !renaming && <MoveMenu file={file} folders={folders} onMove={onMove} onNewFolder={(n) => onNewFolder(file, n)} onTrash={file.trashable ? () => onTrash(file) : undefined} onRename={() => setRenaming(true)} />}
   </div>;
 }
 
@@ -370,8 +382,9 @@ const CheckGlyph = () => <svg viewBox="0 0 16 16" width="11" height="11" fill="n
 const CommentGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" /></svg>;
 
 /** The file opened big, with every place it went to under it. */
-function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
+function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice, onRename }: {
   fileKey: string; typing?: boolean; onClose: () => void; onPlace: (p: FileSentIn) => void; onNotice: (words: string) => void;
+  onRename: (file: Pick<PlacedFile, 'key' | 'name' | 'sentIn' | 'title'>, name: string) => Promise<{ ok: boolean }>;
 }) {
   const team = useContext(TeamContext);
   const [view, setView] = useState<FilesPlaceView | null>(null);
@@ -383,7 +396,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
     const off = api.onChanged(read);
     return () => { live = false; off?.(); };
   }, [fileKey]);
-  const product = view?.sentIn[0]?.product ?? '';
+  const product = view?.sentIn[0]?.product ?? view?.product ?? '';
   const editsTo = view?.editsTo ?? null;
   const below = !!view?.sentIn.length && <footer className="fp-sent">
     <span className="fp-sent-label">Sent in</span>
@@ -418,6 +431,12 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
     onClose={onClose}
     below={below}
     typing={typing}
+    title={view?.title}
+    onRename={view?.project ? (name) => {
+      void onRename(view, name).then((r) => {
+        if (r.ok) void api.filesPlaceOpen({ key: fileKey }).then((v) => { if (v) setView(v); });
+      });
+    } : undefined}
   />;
 }
 
@@ -487,10 +506,9 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   useEffect(() => { setFolderId(null); setNaming((n) => (n && n.project === project ? n : null)); }, [project]);
   const mine = all.mine ?? [];
   const isMine = (p: string | null) => !!p && mine.some((m) => m.toLowerCase() === p.toLowerCase());
-  const makeFile = (kind: 'document' | 'table', name: string) => {
+  const makeFile = (kind: 'document' | 'table', into: string, inFolder: string | null) => {
     setNaming(null);
-    if (!project) return;
-    void api.filesPlaceNew({ project, name, kind, folder }).then((r) => {
+    void api.filesPlaceNew({ project: into, name: '', kind, folder: inFolder }).then((r) => {
       if (r.ok && r.key) { setMadeKey(r.key); setOpenKey(r.key); readAgain(); } else onNotice(r.error || `That ${kind} could not be made.`);
     });
   };
@@ -512,7 +530,23 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const found = looking ? filesShown(below, { query, kind, folders }).filter((f) => !review || needsReview(f)) : here;
   // A search finds a check picture like any file; otherwise they wait under one line.
   const { files: unsorted, scratch } = query ? { files: found, scratch: [] } : apartScratch(found);
-  const shown = sortFiles(unsorted, sort);
+  // A file arriving while the pointer is on its way to a tile moved that tile, and the
+  // click opened another file. The order holds until the pointer has been still a moment.
+  const movedAt = useRef(0);
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, setSettled] = useState(0);
+  const held = useRef<{ tiles: string[]; projects: string[] }>({ tiles: [], projects: [] });
+  useEffect(() => () => { if (settle.current) clearTimeout(settle.current); }, []);
+  // The page as last drawn: an open menu or rename box keeps its tile where it is.
+  const busy = () => !!document.querySelector('.fp-page .fp-more-box.is-open, .fp-page .fp-name > .fp-name-box');
+  const holding = Date.now() - movedAt.current < HOLD_STILL_MS || busy();
+  const pointerMoved = () => {
+    movedAt.current = Date.now();
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => setSettled((n) => n + 1), HOLD_STILL_MS);
+  };
+  const sorted = sortFiles(unsorted, sort);
+  const shown = holding ? inOrderOf(sorted, held.current.tiles, (f) => f.key) : sorted;
   const [scratchOpen, setScratchOpen] = useState(false);
   const [drawn, setDrawn] = useState(TILES_AT_ONCE);
   useEffect(() => { setDrawn(TILES_AT_ONCE); }, [project, folder, query, kind, review, sort]);
@@ -530,7 +564,33 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   }, [drawn, total]);
   const nameOf = (id: string) => firstName(team?.byId.get(id) ?? null) || 'A teammate';
   const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); else readAgain(); return r; });
-  const move = (key: string, to: string | null) => { void act({ do: 'move', key, folder: to }); };
+  const undoable = (u: { label: string; undoes: string }, back: FileFolderAct[]) => onUndoable?.({
+    label: u.label,
+    undoes: u.undoes,
+    run: async () => {
+      for (const p of back) {
+        const r = await api.filesPlaceFolder(p);
+        if (!r.ok) { readAgain(); return { refused: r.error || 'That could not be put back.' }; }
+      }
+      readAgain();
+    },
+  });
+  const moveAll = (keys: string[], to: string | null) => {
+    const before = all.files;
+    void Promise.all(keys.map((key) => act({ do: 'move', key, folder: to }))).then((rs) => {
+      const u = moveUndo(before, keys.filter((_, i) => rs[i].ok), to, folders);
+      if (u) undoable(u, u.back);
+    });
+  };
+  const move = (key: string, to: string | null) => moveAll([key], to);
+  const rename = (id: string, name: string) => {
+    const u = renameUndo(folders, id, name);
+    void act({ do: 'rename', id, name }).then((r) => { if (r.ok && u) undoable(u, [u.back]); });
+  };
+  const renameFile = (file: Pick<PlacedFile, 'key' | 'name' | 'sentIn' | 'title'>, name: string) => {
+    const u = fileRenameUndo(file, name);
+    return act({ do: 'name', key: file.key, name }).then((r) => { if (r.ok && u) undoable(u, [u.back]); return r; });
+  };
   const removeFolder = (f: FileFolder) => {
     const n = countIn(f.id);
     const into = f.project;
@@ -549,7 +609,8 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const countIn = (id: string) => filesBelow(all.files, folders, { project, folder: id }).length;
   const crumbs = crumbsTo(folders, place);
   const cards = looking ? [] : foldersInPlace(folders, place);
-  const projectCards = looking || project ? [] : all.projects;
+  const projectCards = looking || project ? [] : holding ? inOrderOf(all.projects, held.current.projects, (p) => p) : all.projects;
+  held.current = { tiles: shown.map((f) => f.key), projects: projectCards };
   // Folders go one level deep.
   const canNest = !folders.find((f) => f.id === folder)?.parent;
   const choose = (f: PlacedFile) => setChosen((was) => {
@@ -557,11 +618,12 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
     if (next.has(f.key)) next.delete(f.key); else next.add(f.key);
     return next;
   });
-  const tile = (f: PlacedFile) => <Tile key={f.key} file={f} list={asList} now={now} me={team?.me ?? null} nameOf={nameOf} folders={folders} act={(p) => { void act(p); }}
+  const tile = (f: PlacedFile) => <Tile key={f.key} file={f} list={asList} now={now} me={team?.me ?? null} nameOf={nameOf} folders={folders} onMove={moveAll}
     onOpen={() => (!chosen ? setOpenKey(f.key) : f.trashable ? choose(f) : undefined)}
     chosen={chosen && f.trashable ? chosen.has(f.key) : null}
     unmovable={!!chosen && !f.trashable}
     onTrash={(file) => trash([file.key], shownName(file))}
+    onRename={(file, name) => { void renameFile(file, name); }}
     onNewFolder={(file, name) => { void act({ do: 'make', project: file.project ?? '', name }).then((r) => { if (r.ok && r.folder) move(file.key, r.folder); }); }} />;
   const used = onMacOf(below);
   const where = folders.find((f) => f.id === folder)?.name ?? project ?? 'Files';
@@ -572,8 +634,10 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
       : project ? `No files in ${project} yet.` : 'Nothing in Files yet.';
   const pick = (what: Making, p: string) => {
     if (p !== project) onProject(p);
-    if (what === 'upload') upload(p, p === project ? folder : null);
-    else setNaming({ what, project: p });
+    const inFolder = p === project ? folder : null;
+    if (what === 'upload') upload(p, inFolder);
+    else if (what === 'folder') setNaming({ what, project: p });
+    else makeFile(what, p, inFolder);
   };
   const headSlot = useSlot('fp-head-slot');
 
@@ -591,6 +655,24 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
           </span>;
         })}
       </nav>
+      {!chosen && <div className="fp-views">
+        {showsTotal(used.onMac) && <TotalMenu where={where} onMac={used.onMac} older={used.older} sort={sort} onSort={setSort}
+          onOlder={() => {
+            const keys = below.filter((f) => (f.older ?? 0) > 0).map((f) => f.key);
+            trash(keys, 'the older versions', true);
+          }}
+          onChoose={() => setChosen(new Set())}
+          cloud={cloud} onCloud={(paid) => onSettings?.(paid ? 'files' : 'cloud')} />}
+        <div className="fp-switch" role="group" aria-label="Sort">
+          <button type="button" className={`fp-kind${sort === 'recent' ? ' is-on' : ''}`} aria-pressed={sort === 'recent'} onClick={() => setSort('recent')}>Recent</button>
+          <button type="button" className={`fp-kind${sort === 'name' ? ' is-on' : ''}`} aria-pressed={sort === 'name'} onClick={() => setSort('name')}>Name</button>
+          {sort === 'size' && <button type="button" className="fp-kind is-on" aria-pressed="true" onClick={() => setSort('recent')}>Size</button>}
+        </div>
+        <div className="fp-switch" role="group" aria-label="View">
+          <button type="button" className={`fp-kind fp-view-icon${asList ? '' : ' is-on'}`} aria-pressed={!asList} aria-label="Grid" title="Grid" onClick={() => setAsList(false)}><GridGlyph /></button>
+          <button type="button" className={`fp-kind fp-view-icon${asList ? ' is-on' : ''}`} aria-pressed={asList} aria-label="List" title="List" onClick={() => setAsList(true)}><ListGlyph /></button>
+        </div>
+      </div>}
       <label className="fp-find">
         <SearchIcon />
         <input ref={box} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search files" aria-label="Search files"
@@ -607,7 +689,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
           trash(keys, keys.length === 1 ? shownName(chosenFiles[0]) : `${keys.length} files`);
         }}>Move to the Trash</button>
       </div>
-    </div> : <div className="fp-tools">
+    </div> : (kinds.length > 1 || reviewing > 0 || review) && <div className="fp-tools">
       <div className="fp-kinds" role="group" aria-label="Show">
         {kinds.length > 1 && <>
           <button type="button" className={`fp-kind${kind === null && !review ? ' is-on' : ''}`} aria-pressed={kind === null && !review} onClick={() => { setKind(null); setReview(false); }}>All</button>
@@ -615,39 +697,15 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
         </>}
         {(reviewing > 0 || review) && <button type="button" className={`fp-kind${review ? ' is-on' : ''}`} aria-pressed={review} onClick={() => setReview(!review)}>Needs review</button>}
       </div>
-      <div className="fp-views">
-        {used.onMac > 0 && <TotalMenu where={where} onMac={used.onMac} older={used.older} sort={sort} onSort={setSort}
-          onOlder={() => {
-            const keys = below.filter((f) => (f.older ?? 0) > 0).map((f) => f.key);
-            trash(keys, 'the older versions', true);
-          }}
-          onChoose={() => setChosen(new Set())}
-          cloud={cloud} onCloud={(paid) => onSettings?.(paid ? 'files' : 'cloud')} />}
-        <div className="fp-switch" role="group" aria-label="Sort">
-          <button type="button" className={`fp-kind${sort === 'recent' ? ' is-on' : ''}`} aria-pressed={sort === 'recent'} onClick={() => setSort('recent')}>Recent</button>
-          <button type="button" className={`fp-kind${sort === 'name' ? ' is-on' : ''}`} aria-pressed={sort === 'name'} onClick={() => setSort('name')}>Name</button>
-          {sort === 'size' && <button type="button" className="fp-kind is-on" aria-pressed="true" onClick={() => setSort('recent')}>Size</button>}
-        </div>
-        <div className="fp-switch" role="group" aria-label="View">
-          <button type="button" className={`fp-kind fp-view-icon${asList ? '' : ' is-on'}`} aria-pressed={!asList} aria-label="Grid" title="Grid" onClick={() => setAsList(false)}><GridGlyph /></button>
-          <button type="button" className={`fp-kind fp-view-icon${asList ? ' is-on' : ''}`} aria-pressed={asList} aria-label="List" title="List" onClick={() => setAsList(true)}><ListGlyph /></button>
-        </div>
-      </div>
     </div>}
-    {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders">
+    {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders" onPointerMove={pointerMoved}>
       {projectCards.map((p) => <FolderCard key={p} folder={{ name: p }} count={filesBelow(all.files, folders, { project: p, folder: null }).length} onOpen={() => onProject(p)} />)}
       {cards.map((f) => <FolderCard key={f.id} folder={f} count={countIn(f.id)} onOpen={() => setFolderId(f.id)}
-        onDropFile={(key) => move(key, f.id)} onRename={(name) => { void act({ do: 'rename', id: f.id, name }); }} onRemove={() => removeFolder(f)} />)}
+        onDropFile={(key) => move(key, f.id)} onRename={(name) => rename(f.id, name)} onRemove={() => removeFolder(f)} />)}
       {naming?.what === 'folder' && project && <div className="fp-folder is-new"><div className="fp-folder-open"><FolderGlyph /><span className="fp-folder-words"><NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /></span></div></div>}
     </div>}
     {list && !shown.length && !scratch.length && !cards.length && !projectCards.length && !naming && <p className="fp-empty">{empty}</p>}
-    <div className={asList ? 'fp-lines' : 'fp-grid'}>
-      {(naming?.what === 'document' || naming?.what === 'table') && project && <div className={asList ? 'fp-line is-new' : 'fp-tile is-new'}>
-        <div className="fp-open-file">
-          <span className={`fp-face fp-face-${naming.what === 'table' ? 'table' : 'markdown'}${asList ? ' fp-thumb' : ''}`}>{asList ? <span className="fp-thumb-word">{naming.what === 'table' ? 'TABLE' : 'DOC'}</span> : naming.what === 'table' ? <TableGlyph /> : <DocGlyph />}</span>
-          <span className="fp-name"><NameBox placeholder={naming.what === 'table' ? 'Table name' : 'Document name'} onCancel={() => setNaming(null)} onDone={(name) => makeFile(naming.what === 'table' ? 'table' : 'document', name)} /></span>
-        </div>
-      </div>}
+    <div className={asList ? 'fp-lines' : 'fp-grid'} onPointerMove={pointerMoved}>
       {draw.shown.map(tile)}
     </div>
     {scratch.length > 0 && draw.shown.length === shown.length && <div className="fp-scratch-row">
@@ -655,14 +713,14 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={scratchOpen ? 'M4 10l4-4 4 4' : 'M6 4l4 4-4 4'} /></svg>
         {scratchLine(scratch.length)}
       </button>
-      {scratch[0].project && <MoveMenu file={scratch[0]} name={scratchLine(scratch.length)} keys={scratch.map((f) => f.key)} folders={folders} act={(p) => { void act(p); }}
-        onNewFolder={(name) => { void act({ do: 'make', project: scratch[0].project ?? '', name }).then((r) => { if (r.ok && r.folder) for (const f of scratch) move(f.key, r.folder); }); }} />}
+      {scratch[0].project && <MoveMenu file={scratch[0]} name={scratchLine(scratch.length)} keys={scratch.map((f) => f.key)} folders={folders} onMove={moveAll}
+        onNewFolder={(name) => { void act({ do: 'make', project: scratch[0].project ?? '', name }).then((r) => { if (r.ok && r.folder) moveAll(scratch.map((f) => f.key), r.folder); }); }} />}
     </div>}
     {draw.scratch.length > 0 && <div className={`${asList ? 'fp-lines' : 'fp-grid'} fp-grid-scratch`}>
       {draw.scratch.map(tile)}
     </div>}
     {drawn < total && <div ref={foot} aria-hidden="true" />}
-    {openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); readAgain(); }} onNotice={onNotice}
+    {openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); readAgain(); }} onNotice={onNotice} onRename={renameFile}
       onPlace={(p) => { setOpenKey(null); onPlace(p); }} />}
   </div>;
 }

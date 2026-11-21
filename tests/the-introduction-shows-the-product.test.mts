@@ -294,7 +294,7 @@ describe('the walk teaches the goal', () => {
     // the same three declarations the inbox card and the opened task wear.
     const glass = css.slice(css.indexOf(':root[data-skin] .fr-piece {'));
     expect(glass.slice(0, 320)).toMatch(/background: var\(--skin-pane\)/);
-    expect(glass.slice(0, 320)).toMatch(/backdrop-filter: var\(--skin-glass\)/);
+    expect(glass.slice(0, 320)).toMatch(/backdrop-filter: blur\(var\(--skin-blur\)\)/);
     // AND THE PLAIN THEMES KEEP THEIR OPAQUE GROUND. There is no picture behind
     // them, so transparency there is the app's own grey through the app's own
     // grey.

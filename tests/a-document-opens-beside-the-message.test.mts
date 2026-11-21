@@ -73,7 +73,13 @@ describe('the breadcrumb says which file, not where the disk keeps it', () => {
     // called. The rule is the deeper one, so the leading word is the nearest
     // named place rather than always the product.
     expect(crumbParts('/Users/you/Zero/accounts/00000000/astral/designs/w-74b0b5cd87/pane-card/the-card-you-picked.html', roots))
-      .toEqual(['designs', 'w-74b0b5cd87', 'pane-card', 'the-card-you-picked.html']);
+      .toEqual(['designs', 'pane-card', 'the-card-you-picked.html']);
+  });
+
+  // w-f702d60afe: a walk-through read "designs › w-ec780094ea › …" and could not tell what the id was.
+  it('leaves out a thread folder\'s id, which means nothing on screen', () => {
+    expect(crumbParts('/Users/you/Zero/accounts/00000000/astral/designs/w-74b0b5cd87/table.csv', roots)).toEqual(['designs', 'table.csv']);
+    expect(crumbParts('/some/where/w-74b0b5cd87/table.csv', [])).toEqual(['some', 'where', 'table.csv']);
   });
 
   it('keeps the last three segments when nothing matches, never the whole disk', () => {

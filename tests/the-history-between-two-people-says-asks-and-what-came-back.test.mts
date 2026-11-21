@@ -32,3 +32,19 @@ describe('an ask in the history', () => {
     expect(lines(task({}))).toEqual(['Gave Theo a task']);
   });
 });
+
+// The regression look: Sam took a thread back from Theo and their chat still
+// ended on "Handed Theo a thread".
+describe('a take-back', () => {
+  it('is a line in the history, from whoever took it back', async () => {
+    const { pairTimeline } = await import('../renderer/src/team/pair-timeline.ts');
+    const { sentWords, threadLink } = await import('../shared/thread-link.mts');
+    const { GIVEN_TASK } = await import('../shared/team-rules.mts');
+    const body = sentWords('Add a key', threadLink('sam', 'w-1')!, '');
+    const t = { id: 't1', title: 'Add a key', body, people: ['sam', 'theo'], assignee: 'theo', createdBy: 'sam', createdAt: 1, labels: [GIVEN_TASK], status: 'done', wrote: { status: { ts: 5, by: 'sam' } } };
+    const out = pairTimeline({ me: 'sam', other: 'theo', rooms: [], messages: [], directItems: [t], talk: [], titleOf: () => '' } as never);
+    expect(out.find((e: { key: string }) => e.key === 'took:t1')).toMatchObject({ by: 'sam', text: 'Took it back', at: 5 });
+    const done = pairTimeline({ me: 'sam', other: 'theo', rooms: [], messages: [], directItems: [{ ...t, wrote: { status: { ts: 5, by: 'theo' } } }], talk: [], titleOf: () => '' } as never);
+    expect(done.find((e: { key: string }) => e.key === 'took:t1')).toBeUndefined();
+  });
+});

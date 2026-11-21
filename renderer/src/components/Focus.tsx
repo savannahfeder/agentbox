@@ -36,7 +36,8 @@ import {
   allModels, joinNames, moreCount, recentModels, replyBoxAsk, replyWaitsUntil, type Harness, type ModelPick,
 } from '../threads/composer-rules';
 import { createPortal } from 'react-dom';
-import ReactMarkdown from 'react-markdown';
+import type { Options as MarkdownOptions } from 'react-markdown';
+import { MessageMarkdown } from './MessageMarkdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
@@ -101,8 +102,9 @@ import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveD
 import { ReplyLater } from './ReplyLater';
 import { effortSaid, modelShown, pickOnItsWay, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
-import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, threadToOpen } from '../team/chat-threads';
-import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
+import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, paneForThread, threadToOpen } from '../team/chat-threads';
+import { heldByAPerson, isGivenTask, nameIsAPersons, taskGiver, whatWaits } from '../../../shared/team-rules.mts';
+import { handedFrom as handedFromLink } from '../../../shared/thread-link.mts';
 import { FormatBar } from '../team/FormatBar';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
 import { VoiceNote } from '../team/VoiceNote';
@@ -138,7 +140,7 @@ import { rowTitle, showsWhenItComesBack } from '../list-rules';
 import { useKeepInWindow } from '../keep-in-window';
 import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
-import { TeamRouteStrip, TeamSaid, teamHeld } from '../team/TeamFocus';
+import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import { HandedLine } from '../team/HandedBy';
 import { askAboutStep } from '../team/AsksLine';
 import {
@@ -751,7 +753,9 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, asked = false, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, asked = false, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
+  /** `supervisor.outOfUsage`, for the reply box's model chip. */
+  outOfUsage?: Record<string, { tool: string; until: number }>;
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
   queue?: { spot: Spot; onStep: (dir: 1 | -1) => void } | null;
   /** Drawn on the one-at-a-time page outside Needs you too: every thread with an agent. */
@@ -781,7 +785,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  when pressed is worse than no word. */
   onHandToAgent?: (item: WorkItem, message?: AgentTurn) => void;
   /** Who this thread can be handed on to, for its menu. */
-  giveTo?: readonly { id: string; name: string; detail?: string }[];
+  giveTo?: readonly { id: string; name: string; detail?: string; asked?: boolean }[];
   onGive?: (to: { id: string; name: string }, note: string) => void;
   /** Help or a review from a person, keeping the thread yours. */
   onAsk?: (to: { id: string; name: string }, kind: 'help' | 'review', note: string, step: string | null) => void;
@@ -1032,6 +1036,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const direct = teamCtx?.products.get(item.product)?.team?.direct === true;
   // A task given to a person is drawn as talk between the two of them, under its own name.
   const givenTask = isGivenTask(item, teamCtx?.products.get(item.product));
+  // Handed to you and taken back by whoever handed it: it is theirs, not yours to reopen.
+  const takenBack = givenTask && item.status === 'done' && !!item.wrote?.status?.by && item.wrote.status.by === taskGiver(item) && item.wrote.status.by !== teamCtx?.me && !!handedFromLink(item.body, taskGiver(item));
   // A conversation with a person has nothing running to stop.
   const stoppable = stoppableIn && !direct;
   // Who a conversation is with, from where you sit, for its title and reply box.
@@ -1056,19 +1062,24 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const audience = teamCtx ? workAudience(item, teamCtx.products.get(item.product), teamCtx.me, (id) => firstName(teamCtx.byId.get(id) ?? null)) : null;
   const handedName = handedTo(item);
   const handedTask = handedName ? taskHandedFrom(items ?? [], item.id, teamCtx?.me ?? null) : null;
+  // While they have it a reply here would reopen it for you too: the box makes way for taking it back.
+  const outWithThem = !!handedTask && handedTask.status !== 'done';
   const summarised = !agent && !made && !direct;
   // Read before the first paint, so the thread's width is right from the start.
+  // Only a chat's thread panel reads it, so the sidebar sliding open does not
+  // draw every other conversation again on each frame.
   const paneRef = useRef<HTMLDivElement>(null);
   const [paneWidth, setPaneWidth] = useState(Infinity);
   useLayoutEffect(() => {
     const pane = paneRef.current;
-    if (!pane) return undefined;
-    setPaneWidth(pane.clientWidth);
+    if (!pane || !direct) return undefined;
+    const measure = () => setPaneWidth(paneForThread(pane.clientWidth));
+    measure();
     if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(() => setPaneWidth(pane.clientWidth));
+    const ro = new ResizeObserver(measure);
     ro.observe(pane);
     return () => ro.disconnect();
-  }, []);
+  }, [direct]);
   // A CHAT'S THREAD, OPEN IN THE PANEL BESIDE IT (w-920461cbe6): which one, by
   // its message's uid, and how wide the panel was last dragged. A thread is not
   // carried from one conversation to the next, and a document open beside the
@@ -1549,7 +1560,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   }, [productDir, repoDir, item.id, item.result, item.note, item.body, item.answer, direct, product]);
 
   const mdPlugins = useMemo(
-    () => [remarkGfm, remarkTicketReferences, [remarkArtifactPaths, { dir: productDir ?? null, anyFull: direct, folder: taskFolder(repoDir, item.id) }], remarkMediaUnderSentences] as NonNullable<Parameters<typeof ReactMarkdown>[0]['remarkPlugins']>,
+    () => [remarkGfm, remarkTicketReferences, [remarkArtifactPaths, { dir: productDir ?? null, anyFull: direct, folder: taskFolder(repoDir, item.id) }], remarkMediaUnderSentences] as NonNullable<MarkdownOptions['remarkPlugins']>,
     [productDir, direct, repoDir, item.id],
   );
 
@@ -1677,7 +1688,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const needs = needsIn(text);
     const body = (
       <MessagePlace.Provider value={place}>
-        <ReactMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{needs.length ? needsAsBlocks(text) : text}</ReactMarkdown>
+        <MessageMarkdown remarkPlugins={mdPlugins} components={mdComponents} urlTransform={artifactUrlTransform}>{needs.length ? needsAsBlocks(text) : text}</MessageMarkdown>
       </MessagePlace.Provider>
     );
     if (!needs.length) return body;
@@ -1973,9 +1984,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       terminal={direct || onPhone() ? null : terminalOpen ? 'open' : 'closed'}
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
-      onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
+      // An ask is answered by handing it back, so it offers no second way to end it.
+      onCloseTask={canFinish && givenTask && !item.ask ? onCloseTask ?? null : null}
       onStopRepeating={repeat ? repeat.onEnd : null}
-      onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
+      // A handed-on thread's row is Take it back, which ends their task too (App's onReopen).
+      onReopen={!canFinish && !agent && !takenBack ? (handedName ? onReopen : onReopenDone) ?? null : null}
       handedTo={handedName ? { name: handedName, initials: handedInitials(handedName), onOpen: handedTask ? () => onOpenItem(handedTask) : null } : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
       onLater={canFinish ? onSnooze ?? null : null}
@@ -1993,7 +2006,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       giveTo={giveTo}
       onGive={onGive}
       onAsk={onAsk}
-      shipped={shippedMark}
+      shipped={handedName ? null : shippedMark}
       onShipped={onShipped}
       waitChoices={waitChoices}
       waitsNow={!!waitNow}
@@ -2133,7 +2146,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     {/* THE CORNER: THE THREAD'S MENU, and nothing else. The Summary button
         that stood beside it (w-e731ca9376) moved onto the summary itself on
         w-a3482b8c2c: the rail opens it, the icon beside its title closes it. */}
-    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{asksCorner}{threadMenu}</span>, cornerHeaderTarget)}
+    {cornerHeaderTarget && createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && !givenTask && (direct || summarised) && <ConversationAside item={item} />}{asksCorner}{threadMenu}</span>, cornerHeaderTarget)}
     {artifact && (
       <ThreadArtifacts item={item} open={artifact} withAgent={!direct && !heldByPerson && !item.agent}
         onClose={() => setArtifact(null)} onNotice={onNotice}
@@ -2296,7 +2309,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             and which two versions this is between (w-86452550e5). */}
         <HandedLine item={item} />
         <ContinuedFrom labels={item.labels} />
-        {givenTask && <div className="focus-meta by-lead"><TeamSaid item={item} /></div>}
+        {/* A task handed to you says only where it came from; its name heads the conversation. */}
         {givenTask && <HandedFrom item={item} />}
         {made
           ? <div className="outcome">{md(item.body ?? '')}</div>
@@ -2572,10 +2585,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
           <span className="focus-when">Opens the app it is running in</span></>
         )}
-        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>Send back to agent</button>}
+        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}><ActMark d="M9.5 7 5 11.5 9.5 16M5.5 11.5H15a4 4 0 0 1 0 8h-2" />Send back to agent</button>}
         {/* Where the agent stopped is the step a teammate is asked about. */}
         {!agent && item.status === 'blocked' && onAsk && !asked && giveTo.some((p) => !p.id.startsWith('mate:')) && (
-          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}>Ask a teammate</button>
+          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}><ActMark d="M5 5.5h14v10H10l-4 3.5v-3.5H5zM10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4M12 14.2v.1" />Ask for help or a review</button>
         )}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
@@ -2615,7 +2628,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           </div>
         )}
         {!sentUp && aboveDock}
-        <div className="dock-card">
+        {outWithThem ? <div className="dock-handed"><span>{handedName!.split(/\s+/)[0]} has this now.</span>{onReopen && <button type="button" className="ts-done" onClick={onReopen}>Take it back</button>}</div> : <div className="dock-card">
           {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back.
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
@@ -2668,7 +2681,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
+            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} outOfUsage={outOfUsage} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -2698,7 +2711,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && !answered && <ChoicesShow count={options.length} onShow={foldChoices} />}
             </button>
           )}
-        </div>
+        </div>}
       </div>
     </div>
     {!direct && <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} onOpenChange={setTerminalOpen}/>}
@@ -2776,6 +2789,12 @@ function SlashMenu({ rows, at, onPick, onHover }: {
   );
 }
 
+const ModeMark = () => (
+  <svg className="mode-mark" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true">
+    <path d="M8 1.8 2.9 3.7v3.9c0 3.1 2.1 5.4 5.1 6.6 3-1.2 5.1-3.5 5.1-6.6V3.7z" />
+  </svg>
+);
+
 /**
  * THE MODE, AS A WORD IN THE REPLY SENTENCE.
  *
@@ -2845,15 +2864,16 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false, f
         {/* TITLE CASE, with "Mode" after it capitalised too: "In Auto Mode."
             Settled on w-86dd93ab0d. */}
         {chip
-          ? <span className="tc-chip-label">{titleCase(now?.label ?? value)}</span>
+          ? <><ModeMark /><span className="tc-chip-label">{titleCase(now?.label ?? value)}</span></>
           : titleCase(now?.label ?? value)}
       </button>
     </span>
   );
 }
 
-function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null }: {
+function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null, outOfUsage }: {
   item: WorkItem;
+  outOfUsage?: Record<string, { tool: string; until: number }>;
   /** The pick of a reply still on its way here, until the row carries it. */
   onItsWay?: ReplyPick | null;
   /** The agent whose message this answers, named in place of its owner. */
@@ -3729,6 +3749,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
             )}
             <ReplyModel
               chip
+              out={talkTo?.length ? null : outOfUsage?.[engineShown]}
               label={engineModelLabel(engineShown, model, modelOpts)}
               level={levelSaid}
               pick={pick}
@@ -3837,3 +3858,8 @@ function chipsOverflow(chips: HTMLElement): boolean {
 }
 
 const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
+/** The 15px line mark on a button in a stopped thread's action row. */
+function ActMark({ d }: { d: string }) {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
+}

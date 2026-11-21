@@ -18,7 +18,7 @@ import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/mem
 import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mts';
 import { isGivenTask } from '../shared/team-rules.mts';
-import { TeammateCard } from '../renderer/src/threads/Summary.tsx';
+import { TeammateSummary } from '../renderer/src/threads/Summary.tsx';
 import { machineryPath } from '../main/store/home.mts';
 import { changePath } from '../main/code-change.mts';
 globalThis.React = React;
@@ -91,18 +91,18 @@ describe('the task a hand-over makes', () => {
 
 describe('a teammate\'s thread page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-  it('shows the list under the thread\'s name, before the conversation', () => {
-    const at = page.indexOf('<section className="tp-tried"');
-    expect(at).toBeGreaterThan(page.indexOf('<header className="tp-top">'));
-    expect(at).toBeLessThan(page.indexOf('<Thread events={events}'));
-    expect(page).toContain("const tried = card.visible ? doneSteps(card.progress) : [];");
+  // 2026-11-21 (w-8a8eac7620): the list is part of the summary at the top, which About became.
+  it('shows the list in the summary under the thread\'s name, before the conversation', () => {
+    const at = page.indexOf('<TeammateSummary card={card} owner={owner} files={files} />');
+    expect(at).toBeGreaterThan(page.indexOf('<h2 className="one-title">{title}</h2>'));
+    expect(at).toBeLessThan(page.indexOf('<Thread events={before}'));
   });
-  it('does not show it twice when About is open', () => {
+  it('shows it once, with what the thread is about', () => {
     const card = { personId: 'theo', threadId: 'w', visible: true, title: 'T', project: null, state: 'working', priority: null, problem: 'Retries charge twice.', progress: 'Tried a lock', solution: null, blockedBy: [], blocks: [], people: null, updatedAt: 1 };
-    const withDone = renderToStaticMarkup(React.createElement(TeammateCard, { card: card as never, person: null }));
-    const without = renderToStaticMarkup(React.createElement(TeammateCard, { card: card as never, person: null, done: false }));
-    expect(withDone).toContain('Tried a lock');
-    expect(without).not.toContain('Tried a lock');
-    expect(without).toContain('Retries charge twice.');
+    const html = renderToStaticMarkup(React.createElement(TeammateSummary, { card: card as never, owner: 'Theo' }));
+    expect(html.match(/Tried a lock/g)).toHaveLength(1);
+    expect(html).toContain('What Theo&#x27;s agent already tried');
+    expect(html).toContain('Retries charge twice.');
+    expect(page).not.toMatch(/tp-tried|TeammateCard/);
   });
 });
