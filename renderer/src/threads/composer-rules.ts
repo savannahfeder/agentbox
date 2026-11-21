@@ -787,7 +787,10 @@ export function taskHandOff({ from, brief, message, nameOf, handFrom, offered = 
   }
   // The thread is called what the task is called; who asked is its first words.
   const name = String(brief.title ?? '').trim();
-  const asked = from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`;
+  // A hand-over carries the giver's agent's edits as a .change file; the agent starts from them rather than over.
+  const change = brief.files.find((f) => /\.change$/i.test(f.name));
+  const start = change ? `Start from the edits in ${change.name}, attached: they are ${from ? `${from}'s` : 'the'} agent's work so far, not yet on this computer.\n\n` : '';
+  const asked = from ? `${from} asked:\n\n${brief.body}\n\n${start}` : `${brief.body}\n\n${start}`;
   return { to: 'agent', body: name && from ? `${name}\n\n${asked}` : asked, ...(name && from ? { named: name } : {}), attachments, ...from_, ...where };
 }
 

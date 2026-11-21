@@ -15,7 +15,7 @@ import { resolveCodexBin } from './codex-bin.mts';
 import { defaultStoreRoot } from './store/home.mts';
 import { machineSlots } from './machine.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
-import { runningAsADemo } from '../shared/demo-world.mts';
+import { DEMO_ACCOUNT, runningAsADemo } from '../shared/demo-world.mts';
 import { replaceFileSync } from './replace-file.mts';
 
 const CONFIG_NAME = 'zero.config.json';
@@ -188,7 +188,7 @@ export const DEFAULTS: ConfigDefaults = {
  * `home` is the machine's home folder and exists so a test can be run against
  *  a laid-out one rather than against whoever is logged in. Nothing in the app
  *  passes it. */
-export function loadConfig(appDir: string, { home = os.homedir() }: { home?: string } = {}): Config {
+export function loadConfig(appDir: string, { home = os.homedir(), env = process.env }: { home?: string; env?: NodeJS.ProcessEnv } = {}): Config {
   const file = path.join(appDir, CONFIG_NAME);
   let overrides: Record<string, unknown> = {};
   // WHETHER THIS MAC HAS EVER RUN AGENTBOX BEFORE. There is exactly one honest
@@ -240,10 +240,12 @@ export function loadConfig(appDir: string, { home = os.homedir() }: { home?: str
   // only be written by hand, so a new person with both engines never got
   // Codex at all. A Mac with no config file has no old rows, so its first
   // launch is that moment. An install with a config is left as it was.
-  const firstLaunch = fresh && !config.engineChoice ? new Date().toISOString() : null;
+  // A demo's seeded threads are a day old and name their engine, so its moment is earlier.
+  const firstLaunch = fresh && !config.engineChoice ? new Date(Date.now() - (runningAsADemo(env) ? 30 * 86_400_000 : 0)).toISOString() : null;
   if (firstLaunch) config.engineChoice = firstLaunch;
   if (typeof config.accountId !== 'string' || !config.accountId) {
-    config.accountId = crypto.randomUUID();
+    // A demo copy's store was seeded under this id before it opened (main/demo.mts).
+    config.accountId = runningAsADemo(env) ? DEMO_ACCOUNT : crypto.randomUUID();
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `${JSON.stringify({ ...overrides, accountId: config.accountId, ...(firstLaunch ? { engineChoice: firstLaunch } : {}) }, null, 2)}\n`);

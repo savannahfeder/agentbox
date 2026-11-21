@@ -104,7 +104,7 @@ import { openInBrowser } from './open-in-browser.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
 import type { SettingsConfig } from './settings.mts';
-import type { createTeamService } from './team/index.mts';
+import type { createTeamService, PictureIn } from './team/index.mts';
 import type { UpdateTerminals } from './agent-updates.mts';
 import type { AttachmentFile } from './save-attachments.mts';
 import type { PostInput } from './teammates.mts';
@@ -232,7 +232,10 @@ interface FilesPlace {
   makeFolder(ask: { project?: string; name?: string; parent: string | null }): Promise<{ id?: string }>;
   renameFolder(ask: { id: string; name?: string }): Promise<{ id?: string }>;
   moveFile(ask: { key: string; folder: string | null }): Promise<{ id?: string }>;
-  newDocument(ask: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string }>;
+  renameFile(ask: { key: string; name: string }): Promise<{ id?: string }>;
+  removeFolder(ask: { id: string }): Promise<{ ids: string[] }>;
+  restoreFolders(ask: { ids: string[] }): Promise<{ back: number }>;
+  newDocument(ask: { project: string; name?: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string; title: string }>;
   addFiles(ask: { project: string; folder: string | null; paths: string[] }): Promise<{ added: number; refused: string[]; keys: string[] }>;
   open(key: string): Promise<unknown>;
   edit(key: string, text?: string): Promise<{ ok: boolean } & Record<string, unknown>>;
@@ -241,7 +244,7 @@ interface FilesPlace {
   lineFor(ask: { product: string; id: string; room?: string | null }): Promise<unknown>;
   mark(key: string, mark: unknown): Promise<{ ok: boolean; wrote?: { product: string; id: string } } & Record<string, unknown>>;
   pictureNamed(src: unknown): Promise<string | null>;
-  newDocument(ask: { project: string; name: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string }>;
+  newDocument(ask: { project: string; name?: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string; title: string }>;
   addFiles(ask: { project: string; paths?: string[]; folder?: string | null; by?: string | null }): Promise<{ added: number; refused: string[]; keys: string[] }>;
   trash(ask: { keys: readonly string[]; older?: boolean }): Promise<{ ok: boolean; moved: number; bytes: number; error?: string; undo?: string }>;
   untrash(token: string): Promise<{ ok: boolean; back?: number; error?: string }>;
@@ -1162,6 +1165,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:team-accept-invite', teamCall(({ teamId }: { teamId: string }) => team!.acceptInvite(teamId)));
   ipcMain.handle('zero:team-invite', teamCall(({ email }: { email: string }) => team!.invite(email)));
   ipcMain.handle('zero:team-rename', teamCall(({ name }: { name: string }) => team!.renameTeam(name)));
+  ipcMain.handle('zero:team-update-me', teamCall(({ name, photo }: { name?: unknown; photo?: PictureIn | null }) => team!.updateMe({ name, photo })));
+  ipcMain.handle('zero:team-logo', teamCall(({ photo }: { photo: PictureIn | null }) => team!.setTeamLogo(photo ?? null)));
   ipcMain.handle('zero:team-remove-member', teamCall(({ personId, handTo, mates }: { personId: string; handTo?: unknown; mates?: unknown }) => team!.removeMember(personId, { handTo: typeof handTo === 'string' ? handTo : null, mates: Array.isArray(mates) ? mates : [] })));
   ipcMain.handle('zero:team-leave', teamCall(() => team!.leaveTeam()));
   ipcMain.handle('zero:team-cancel-invite', teamCall(({ email }: { email: string }) => team!.cancelInvite(email)));
@@ -1194,6 +1199,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     supervisor.setThreadPins({ [id]: null });
     return made;
   }));
+  ipcMain.handle('zero:team-ask', teamCall(({ product, id, to, kind, note, step }: { product: string; id: string; to: string; kind: string; note?: string; step?: string }) => team!.askTeammate({ product, id, to, kind, note, step })));
+  ipcMain.handle('zero:team-hand-back', teamCall(({ product, id, verdict, words }: { product: string; id: string; verdict?: string; words?: string }) => team!.handBack({ product, id, verdict, words })));
   ipcMain.handle('zero:team-task-brief', (_e, { product, id }: { product: string; id: string }) => {
     if (!team) throw new Error('This build has no team cloud set up.');
     return team.taskBrief(product, id);
@@ -1506,10 +1513,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
 
   // AN INBOX TO STAND IN FRONT OF A ROOM WITH.
   //
-  // The same second Agentbox in a throwaway home as the row above, with three
-  // invented products and a day of invented work seeded into it first, so it
-  // opens on a populated inbox rather than on the welcome screen. It reads none
-  // of her folders and it deletes nothing (main/demo.mts).
+  // A second Agentbox in a throwaway home, with an invented team and its
+  // morning seeded into it first, so it opens on a full inbox rather than on
+  // the welcome screen. It reads none of her folders and it deletes nothing
+  // (main/demo.mts).
   ipcMain.handle('zero:open-demo', () => openDemo({ packaged: app.isPackaged }));
 
   // "Run this later", the durable half of what snooze used to pretend to be.
@@ -2674,7 +2681,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       const { execFile } = await import('node:child_process');
       return new Promise<boolean>((resolve) => {
         const into = /\.(mp4|mov|m4v|webm|mkv)$/i.test(src) ? ['-ss', '1'] : [];
-        execFile('ffmpeg', ['-y', '-loglevel', 'error', ...into, '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', to], { timeout: 30_000 },
+        execFile('ffmpeg', ['-y', '-loglevel', 'error', ...into, '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', to], { timeout: 30_000, windowsHide: true },
           (err) => resolve(!err && fsWatch.existsSync(to)));
       });
     },
@@ -2713,23 +2720,26 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:files-place', async () => {
     try { return await filesPlaceNow().list(); } catch { return { files: [], projects: [], folders: [] }; }
   });
-  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; key?: unknown; folder?: string | null } = {}) => {
+  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; ids?: unknown; key?: unknown; folder?: string | null } = {}) => {
     try {
       const place = filesPlaceNow();
       const out = what === 'make' ? await place.makeFolder({ project: p.project, name: p.name, parent: p.parent ?? null })
         : what === 'rename' ? await place.renameFolder({ id: String(p.id ?? ''), name: p.name })
           : what === 'move' ? await place.moveFile({ key: String(p.key ?? ''), folder: p.folder ?? null })
-            : null;
+            : what === 'name' ? await place.renameFile({ key: String(p.key ?? ''), name: String(p.name ?? '') })
+              : what === 'remove' ? await place.removeFolder({ id: String(p.id ?? '') })
+                : what === 'restore' ? await place.restoreFolders({ ids: Array.isArray(p.ids) ? p.ids.map(String) : [] })
+                  : null;
       if (!out) return { ok: false, error: 'that cannot be done here' };
       push();
-      return { ok: true, folder: out.id ?? null };
+      return { ok: true, folder: 'id' in out ? out.id ?? null : null, ...('ids' in out ? { ids: out.ids } : {}) };
     } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
   ipcMain.handle('zero:files-place-new', async (_e, { project, name, kind, folder }: { project?: unknown; name?: unknown; kind?: unknown; folder?: unknown } = {}) => {
     try {
       const out = await filesPlaceNow().newDocument({ project: String(project ?? ''), name: String(name ?? ''), kind: kind === 'table' ? 'table' : 'document', folder: typeof folder === 'string' ? folder : null });
       push();
-      return { ok: true, key: out.key };
+      return { ok: true, key: out.key, title: out.title };
     } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
   ipcMain.handle('zero:files-place-upload', async (_e, { project, folder }: { project?: unknown; folder?: unknown } = {}) => {

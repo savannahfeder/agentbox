@@ -151,8 +151,9 @@ describe('the right side is the dots', () => {
     // One thing at a time (w-65bcefb857) puts the line saying where an answer
     // went, and its place and arrows, beside the dots, in that mode only.
     // The faces sit with them so the header is one row (2026-11-02); Add
-    // people is a row in the menu since w-c25aae4035.
-    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && \(direct \|\| summarised\) && <ConversationAside item=\{item\} \/>\})?\{threadMenu\}<\/span>/);
+    // people is a row in the menu since w-c25aae4035, and whoever you asked
+    // onto the thread sits beside them (w-f702d60afe).
+    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && !givenTask && \(direct \|\| summarised\) && <ConversationAside item=\{item\} \/>\})?(\{asksCorner\})?\{threadMenu\}<\/span>/);
     expect(focus).not.toMatch(/doneButton|terminalHeaderTarget|done-mark/);
   });
 
@@ -212,7 +213,7 @@ describe('the right side is the dots', () => {
     const css = prose(read('renderer/src/threads/summary.css'));
     // --tag-radius: the button is the Summary button's square, and both of
     // them are tags, which are square in every theme.
-    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--tag-radius\)/);
+    expect(css).toMatch(/\.ts-more \{[^}]*width: 32px; height: 32px;[^}]*border-radius: var\(--tag-radius\)/);
     expect(css).not.toMatch(/border-radius: (1[0-9]|[2-9][0-9])px|50%\s*;[^}]*ts-more/);
   });
 });

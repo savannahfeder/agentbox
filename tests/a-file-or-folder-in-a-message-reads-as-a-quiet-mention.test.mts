@@ -147,9 +147,10 @@ describe('the stylesheet', () => {
     }
   });
 
-  it('moves in 120ms and back out in 200ms, never snapping', () => {
-    expect(css).toMatch(/\.mention\s*\{[^}]*transition:[^}]*200ms/);
-    expect(css).toMatch(/\.mention:hover[^{]*\{[^}]*transition-duration:\s*120ms/);
+  // The 120ms in and 200ms out she picked here (2026-10-11) was later
+  // overruled: hover answers at once everywhere (tests/hover-and-press-feedback-is-instant).
+  it('answers the pointer at once', () => {
+    expect(css).not.toMatch(/transition/);
   });
 
   it('draws neither a mention nor a folder\'s name in the accent orange', () => {

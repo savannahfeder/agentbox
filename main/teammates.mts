@@ -13,6 +13,7 @@ import { reachTick } from './teammate-reach.mts';
 import { filesFoldersBrief } from '../shared/file-folders.mts';
 import { audienceWords } from '../shared/teammate-reach.mts';
 import { isShippedNote } from '../shared/shipped-note.mts';
+import { offerFace } from '../shared/teammate-face.mts';
 import { ruleLabel, periodKey } from '../shared/repeats.mts';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newTeammateId, newMemoryId, readPlaybooks,
@@ -38,6 +39,8 @@ export interface Teammate {
   id: string;
   name: string;
   letter?: string | null;
+  /** The face picked for it; absent, its face follows its id (shared/teammate-face.mts). */
+  face?: string | null;
   role?: string | null;
   job?: string | null;
   goal?: string | null;
@@ -194,7 +197,7 @@ interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', due: 'bring its duty to its thread', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
 
 // When each project last shipped, from the note the ship queue leaves.
 function shippedByProduct(items?: TeamItem[] | null) {
@@ -327,7 +330,7 @@ export class Teammates {
   update(id: string, patch: Record<string, unknown> = {}, now = Date.now()) {
     const t = this.get(id, now);
     if (!t) throw new Error('No such teammate.');
-    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary', 'readsMessages', 'openToTeam', 'voice', 'voiceText'];
+    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary', 'readsMessages', 'openToTeam', 'voice', 'voiceText', 'face'];
     const clean: Record<string, unknown> = {};
     for (const k of allowed) if (k in patch) clean[k] = patch[k];
     if ('name' in clean) {
@@ -618,6 +621,9 @@ export class Teammates {
           // An answer is made from a message, and a message always carries its words.
           await deliver?.(a.product, a.item, a.text as string);
           if (a.priority) workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { priority: a.priority }, { source: 'founder', now });
+        } else if (a.type === 'due') {
+          if (!tell) throw new Error('nothing here can wake a thread');
+          await tell(a.product, a.item, { text: a.text, from: { teammate: t.id, name: t.name }, hold: false, hop: 0 });
         } else if (a.type === 'tell') {
           if (!tell) throw new Error('nothing here can hand work to a thread');
           await tell(a.product, a.item, { text: a.text, from: a.from, hold: a.hold, hop: a.hop });
@@ -639,6 +645,7 @@ export class Teammates {
         done.push(a);
       } catch (err) {
         if (a.msg) failed.add(a.msg);
+        if (a.type === 'due') failed.add(`${a.teammate}#${a.duty}@${a.key}`);
         if (a.trigger?.msg) failed.add(a.trigger.msg);
         if (a.trigger?.key) failed.add(a.trigger.kind === 'duty' ? `${a.teammate}#${a.trigger.duty}@${a.trigger.key}` : `${a.teammate}@${a.trigger.key}`);
         this.noteTrouble(`${t?.name ?? 'A teammate'} could not ${TROUBLE_VERB[a.type] ?? 'carry on'}: ${(err as Error).message}`, now);
@@ -699,6 +706,8 @@ export class Teammates {
       const gains = offer.gains?.length ? ` ${offer.gains.map((g) => (/[.!?…]$/.test(g) ? g : `${g}.`)).join(' ')}` : '';
       const text = `${offer.role}. Take on work like this thread from now on, and learn how I like it done.${offer.why ? ` ${offer.why}` : ''}${gains}`;
       made = this.describe({ text, product: item.product, threads }, now).teammate?.id ?? null;
+      // The face the card showed is the one it keeps.
+      if (made) writeTeammate(this.dir(), made, { face: offerFace(item.id) }, now);
     } else {
       writeChat(this.dir(), { kind: 'act', from: YOU, verb: 'declined-role', ref: offer.role.toLowerCase(), text: offer.role }, now);
     }

@@ -12,8 +12,10 @@
 // track included, by a rule in pages.css that looks for a filled cell; one
 // filled cell brings it back. The markup is read here for which cells are
 // filled, and the stylesheet for the rule that acts on it. A card and a
-// teammate's task row follow the rows' rules: no kind in the project place,
-// no priority mark at Medium.
+// teammate's task row put no kind in the project place, and a card no
+// priority mark at Medium. Since 2026-11-21 a row says Medium
+// (a-thread-at-medium-says-medium-in-the-priority-column), so only a list
+// with no level anywhere, such as messages nobody gave one, loses Priority.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import React from 'react';
@@ -45,6 +47,12 @@ const task = (over = {}) => ({
   labels: ['given-task'], assignee: ME, people: [ME, SOFIA], createdBy: SOFIA, priority: 5,
   createdAt: NOW - MIN, updatedAt: NOW - MIN, talk: { chat: [{ by: SOFIA, ts: NOW - MIN, text: 'Review the launch film cut' }] }, wrote: {}, ...over,
 });
+// A message nobody gave a level: the one row whose Priority cell is empty.
+const message = (id, over = {}) => ({
+  id, product: withSofia.slug, status: 'open', kind: 'directive', title: 'Is the cut ready?', body: 'Is the cut ready?',
+  labels: [], people: [ME, SOFIA], createdBy: SOFIA, priority: 5, createdAt: NOW - MIN, updatedAt: NOW - MIN,
+  wrote: { body: { ts: NOW - MIN, by: SOFIA } }, ...over,
+});
 
 const list = (items) => renderToStaticMarkup(
   React.createElement(TeamContext.Provider, { value: team },
@@ -63,15 +71,15 @@ const headed = (html, col) => new RegExp(`<div class="th-col-${col}">${COL[col]}
 const drawn = (html, col) => headed(html, col) && (filled(html, col) || !hides(col));
 
 describe('a list column with no value in any row', () => {
-  it('the reported case: every priority blank draws no Priority header', () => {
-    const html = list([thread('w-1'), thread('w-2'), thread('w-3', { priority: null })]);
+  it('a list where no row has a level draws no Priority header', () => {
+    const html = list([message('w-1'), message('w-2')]);
     expect(filled(html, 'prio')).toBe(false);
     expect(drawn(html, 'prio')).toBe(false);
   });
 
-  it('one row at High brings the column back', () => {
-    const html = list([thread('w-1'), thread('w-2', { priority: 7 }), thread('w-3')]);
-    expect(drawn(html, 'prio')).toBe(true);
+  it('one thread brings the column back, at Medium as at High', () => {
+    expect(drawn(list([message('w-1'), thread('w-2'), message('w-3')]), 'prio')).toBe(true);
+    expect(drawn(list([message('w-1'), thread('w-2', { priority: 7 })]), 'prio')).toBe(true);
   });
 
   it('Low or Urgent alone brings it back too', () => {
@@ -111,7 +119,7 @@ describe('the columns that stay still line up', () => {
   });
 });
 
-describe('a board card follows the rows', () => {
+describe('a board card puts no kind for a project and no bars at Medium', () => {
   const display = { view: 'board', sort: 'priority', priorities: [], projects: [], updated: 'any' };
   const given = task({ id: 'w-g', product: withDev.slug, assignee: DEV, people: [ME, DEV], createdBy: ME, talk: { chat: [{ by: ME, ts: NOW - MIN, text: 'Fix it' }] } });
   const board = (items) => renderToStaticMarkup(React.createElement(TeamContext.Provider, { value: team },

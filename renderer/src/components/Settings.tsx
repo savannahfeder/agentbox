@@ -1753,7 +1753,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
+export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, teamShares = true, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
   /** Opens the Feedback card with `start` already written. */
@@ -1801,6 +1801,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   /** Team management, handed in by whoever has the team's state. Absent on a
    *  build with no team cloud, and then there is no Team row either. */
   teamPane?: ReactNode;
+  /** False while the team has no Pro, when nobody on it can read your threads. */
+  teamShares?: boolean;
   /** WHO SEES A PROJECT'S THREADS (w-b989839656), handed in the same way:
    *  the button beside a project's name, and the Projects list's column.
    *  Absent with nobody signed in, and then neither is drawn. */
@@ -2315,7 +2317,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
         )}
 
         {pane === 'team' && teamPane && (
-          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone can open and read your threads and their files unless you mark one private.">
+          <Page title="Team" lede={`Your name and photo, the team's name and logo, and who is on it.${teamShares ? ' Everyone can open and read your threads and their files unless you mark one private.' : ''}`}>
             {teamPane}
           </Page>
         )}
@@ -2385,7 +2387,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             <Group id="corner-tag" label="Agent Tray">
               <Row
                 label="Show the Agent Tray"
-                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere; it keeps that corner on every screen, and sizes itself to the screen it is on. Make it bigger or smaller with Size, at the foot of the list that opens when you point at it. Right-click it to hide it a while or turn it off."
+                desc="A small tag over your other apps when an agent needs you."
               >
                 <Switch label="Show the Agent Tray" on={w.cornerTag !== false} onChange={(v) => setWorkspace('cornerTag', v)} />
               </Row>
@@ -2541,7 +2543,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               {w.leftovers && (
                 <Row
                   label="Stop programs agents leave behind"
-                  desc={`Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on this computer are never stopped.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
+                  desc={`Dev servers and test runs an agent started stop when you close its task or memory runs short. Your own apps never do.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
                 >
                   <Switch label="Stop programs agents leave behind" on={w.leftovers.on} onChange={(v) => setWorkspace('cleanupLeftovers', v)} />
                 </Row>
@@ -2590,7 +2592,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               {/* The moment after the row above: a chat that has stopped. */}
               <Row
                 label="Bring in new chats"
-                desc="A new Claude Code or Codex chat in one of your projects comes in after ten quiet minutes. Waiting ones go to Needs you, finished ones to Done."
+                desc="A Claude Code or Codex chat in one of your projects comes in after ten quiet minutes."
               >
                 <Switch label="Bring in new chats" on={w.importNew === true} onChange={(v) => setWorkspace('importNew', v)} />
               </Row>
@@ -2722,7 +2724,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             <Group label="How it runs">
               <Row
                 label="Let agents start the tasks they file here"
-                desc="A task an agent writes on this project gets a session straight away. Without this it waits in your inbox for your yes. Questions and reviews always wait for you either way."
+                desc="A task an agent writes here starts at once instead of waiting for your yes. Questions and reviews still wait."
               >
                 <Switch label="Let agents start the tasks they file here" on={current.autonomous} onChange={(v) => setProject(current.slug, 'autonomous', v)} />
               </Row>
@@ -2797,7 +2799,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             <Group label="Archive">
               <Row
                 label="Archive this project"
-                desc={`It leaves your inbox, the sidebar and Projects, and no new agents start on it${current.running ? '; the ones running now finish' : ''}. Its files stay where they are, and you can bring it back from Projects.`}
+                desc={`It leaves your inbox and sidebar${current.running ? ', and the agents running now finish' : ''}. Its files stay, and Projects can bring it back.`}
               >
                 <button type="button" className="set-ghost" onClick={() => write(api.archiveProject({ product: current.slug, archived: true }))}>Archive</button>
               </Row>
@@ -2967,7 +2969,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
               )}
             </>
           )}
-          {toggle('Stop programs agents leave behind', 'cleanupLeftovers', !!w.leftovers?.on, `Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on this computer are never stopped.${two ? ' Codex agents’ programs are not found yet.' : ''}`)}
+          {toggle('Stop programs agents leave behind', 'cleanupLeftovers', !!w.leftovers?.on, `Dev servers and test runs an agent started stop when you close its task or memory runs short. Your own apps never do.${two ? ' Codex agents’ programs are not found yet.' : ''}`)}
           <ReadRow label="Something felt slow" reading={slow}
             desc={w.agentsNudge ? `${NAME} is running ${w.agentsNudge} fewer than this computer suggests.` : `${NAME} runs one fewer from now on, and remembers that it did.`}>
             {!!w.agentsNudge && <button type="button" className="set-ghost" onClick={() => onWorkspace('agentsFeltSlow', 'reset')}>Undo</button>}
@@ -2996,7 +2998,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
       <Page title={p.name}>
         <Group id="how-it-runs" label="How it runs">
           <ReadRow label="Let agents start the tasks they file here" reading={auto}
-            desc="A task an agent writes on this project gets a session straight away. Without this it waits in your inbox for your yes. Questions and reviews always wait for you either way.">
+            desc="A task an agent writes here starts at once instead of waiting for your yes. Questions and reviews still wait.">
             <Switch label="Let agents start the tasks they file here" on={!!auto.value} onChange={(v) => onProject(p.slug, 'autonomous', v)} />
           </ReadRow>
           {(accounts.length > 1 || account.value !== 'any') && (

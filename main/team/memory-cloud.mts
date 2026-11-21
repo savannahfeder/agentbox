@@ -44,13 +44,13 @@ export interface MemoryPerson {
   status: { text: string; until: number | null } | null;
   connections?: string[];
 }
-export interface MemoryTeam { id: string; name: string; createdBy: string | null; made?: number }
+export interface MemoryTeam { id: string; name: string; createdBy: string | null; made?: number; logoUrl?: string | null }
 export interface MemoryMember { teamId: string; personId: string; role: string }
 export interface MemoryInvite { teamId: string; email: string; invitedBy: string }
 export interface MemoryProject { id: string; teamId: string; name: string; visibility: string; createdBy: string; direct: boolean }
 export interface MemoryLine { seq: number; projectId: string; uid: string; byPerson: string; body: LedgerLine; createdAt: number }
 export interface MemoryFile { projectId: string; name: string; byPerson: string; data: string }
-export interface MemoryFolder { id: string; teamId: string; project: string; name: string; parent: string | null; people: string[] | null; by: string; at: number }
+export interface MemoryFolder { id: string; teamId: string; project: string; name: string; parent: string | null; people: string[] | null; by: string; gone: boolean; at: number }
 export interface MemoryFilePlace { owner: string; threadId: string; project: string; family: string; folder: string | null; by: string; at: number }
 export interface MemoryFileVersion { teamId: string; file: string; n: number; hash: string; name: string | null; by: string | null; at: number }
 export interface MemoryThreadWork { owner: string; threadId: string; teamId: string; hash: string; work: unknown; updatedAt: number }
@@ -118,6 +118,8 @@ export interface MemoryCloud extends MemoryRoomsFields {
   fileLinks: Map<string, MemoryFileLink>;
   fileLinkComments: MemoryFileLinkComment[];
   linkPieces?: Map<string, { owner: string; bytes: Buffer }>;
+  /** The public `pictures` bucket: name -> bytes (20261120000000_a_person_and_a_team_wear_a_picture.sql). */
+  pictures?: Map<string, Buffer>;
   /** token -> the people its owner added (20261112120000_a_link_says_who_can_open_it_and_what_they_can_do.sql). */
   fileLinkPeople?: Map<string, { email: string; can: LinkCan; at: number }[]>;
   reads: Map<string, MemorySeen>;
@@ -128,6 +130,12 @@ export interface MemoryCloud extends MemoryRoomsFields {
   events: EventEmitter;
   unconfirmed?: Set<string>;
   refuseShares?: string;
+  /** Set, a team invites, takes people on and shares only while it is in `paying`, as
+   *  20261121130000_team_features_need_pro.sql has it. Unset, every team pays, as before. */
+  freeTeams?: boolean;
+  paying?: Set<string>;
+  /** Emails whose next team pays from the moment it is made. */
+  payingOwners?: Set<string>;
   phoneCommands?: MemoryPhoneCommand[];
   phoneProjects?: Map<string, MemoryPhoneProject>;
   phoneThreads?: Map<string, MemoryPhoneThread>;
@@ -205,6 +213,9 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     people: cloud.projectPeople.filter((pp) => pp.projectId === p.id).map((pp) => pp.personId),
   });
   const refuse: (what: string) => never = (what) => { throw new Error(`not allowed: ${what}`); };
+  const pays = (teamId: string) => !cloud.freeTeams || !!cloud.paying?.has(teamId);
+  // The database's own words (20261121130000_team_features_need_pro.sql).
+  const needsPro = (teamId: string, words: string) => { if (!pays(teamId)) throw new Error(words); };
   // What this person may do with a link, as file_link_can_of decides it.
   type LinkPersonRow = { email: string; can: LinkCan; at: number };
   const peopleOf = (token: string): LinkPersonRow[] => (cloud.fileLinkPeople ??= new Map<string, LinkPersonRow[]>()).get(token) ?? [];
@@ -263,12 +274,16 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         .map((inv) => ({ teamId: inv.teamId, teamName: cloud.teams.get(inv.teamId)?.name ?? '', invitedBy: inv.invitedBy ?? null, invitedByName: cloud.people.get(inv.invitedBy)?.name ?? null }));
     },
 
+    // Only a cloud that keeps teams on Free asks, as a database without the table cannot answer.
+    ...(cloud.freeTeams ? { async teamPays() { return myTeams().some(pays); } } : {}),
+
     // One team, on a yes, and the invite is used up.
     async acceptInvite(teamId: string) {
       const email = confirmedEmail();
       if (!email) refuse('join a team without a confirmed email');
       const at = cloud.invites.findIndex((inv) => inv.teamId === teamId && inv.email.toLowerCase() === email);
       if (at < 0) refuse('join a team that did not invite you');
+      needsPro(teamId, 'This team needs Pro to take anyone new. Ask its owner to start it.');
       cloud.invites.splice(at, 1);
       if (!cloud.members.some((m) => m.teamId === teamId && m.personId === personId)) cloud.members.push({ teamId, personId, role: 'member' });
       cloud.events.emit('rooms', { kind: 'membership' });
@@ -283,11 +298,41 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       return (await this.myTeams())[0] ?? null;
     },
 
+    // The same rules as 20261001000500_security.sql and 20261120000000.
+    async setProfile({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
+      const me = cloud.people.get(personId);
+      if (!me) refuse('change a profile without signing in');
+      if (name !== undefined) me.name = name;
+      if (avatarUrl !== undefined) me.avatarUrl = avatarUrl;
+      cloud.events.emit('people', {});
+    },
+
+    async putPicture(name: string, bytes: Buffer) {
+      const m = /^(people|teams)\/([0-9a-f-]{36})\/[0-9a-f]{32}\.(png|jpg)$/.exec(name);
+      if (!m) refuse('a picture by that name');
+      if (m[1] === 'people' ? m[2] !== personId : !owns(m[2])) refuse(`add a picture to ${m[1]}/${m[2]}`);
+      const kept = (cloud.pictures ??= new Map());
+      if (!kept.has(name)) kept.set(name, bytes);
+      return `https://memory.test/storage/v1/object/public/pictures/${name}`;
+    },
+
+    async setTeamLogo(teamId: string, logoUrl: string | null) {
+      if (!owns(teamId)) refuse('change the logo of a team you do not own');
+      if (logoUrl !== null && !/^https:\/\//.test(logoUrl)) refuse('a logo that is not a link');
+      cloud.teams.get(teamId)!.logoUrl = logoUrl;
+    },
+
+    async teamInfo(teamId: string) {
+      const t = myTeams().includes(teamId) ? cloud.teams.get(teamId) : undefined;
+      return t ? { id: t.id, name: t.name, logoUrl: t.logoUrl ?? null } : null;
+    },
+
     async createTeam(name: string) {
       const id = crypto.randomUUID();
       cloud.teamsMade += 1;
       cloud.teams.set(id, { id, name, createdBy: personId, made: cloud.teamsMade });
       cloud.members.push({ teamId: id, personId, role: 'owner' });
+      if (cloud.payingOwners?.has(String(cloud.people.get(personId)?.email).toLowerCase())) cloud.paying?.add(id);
       return { id, name };
     },
 
@@ -354,6 +399,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
 
     async invite(teamId: string, email: unknown) {
       if (!myTeams().includes(teamId)) refuse('invite to a team you are not on');
+      needsPro(teamId, 'Inviting teammates needs Pro. Start it in Settings, Team.');
       const clean = String(email).trim();
       if (!cloud.invites.some((i) => i.teamId === teamId && i.email.toLowerCase() === clean.toLowerCase())) {
         cloud.invites.push({ teamId, email: clean, invitedBy: personId });
@@ -454,6 +500,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     async putThreadWork(teamId: string, { threadId, hash, work }: { threadId: string; hash: string; work: unknown }) {
       if (!myTeams().includes(teamId)) refuse('share into a team you are not on');
       if (!cloud.cards.has(`${personId}:${threadId}`)) refuse('share the work of a thread with no card');
+      needsPro(teamId, 'Sharing threads needs Pro.');
       if (new TextEncoder().encode(JSON.stringify(work)).length > MAX_WORK_BYTES) refuse('a thread that big');
       cloud.threadWork.set(`${personId}:${threadId}`, { owner: personId, threadId, teamId, hash, work: structuredClone(work), updatedAt: cloud.now() });
       cloud.events.emit('work', {});
@@ -674,14 +721,14 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     // FOLDERS (20261102000000_a_teams_folders.sql). A folder says who reads it; a
     // file's place hangs on a card, so it reaches only those who may read the
     // file, and goes when the card does.
-    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; at: number }) {
+    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, gone, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; gone?: boolean; at: number }) {
       if (!myTeams().includes(teamId)) refuse('make a folder on a team you are not on');
       const clean = String(name ?? '').trim();
       if (!clean || clean.length > MAX_FOLDER_NAME) refuse('a folder with no name, or that long a name');
       if (people && (!people.length || !people.includes(personId))) refuse('share a folder with nobody, or leave yourself out');
       const was = cloud.fileFolders.find((f) => f.id === id);
       if (was && !canReadFolder(was)) refuse('change a folder you cannot read');
-      const row = { id, teamId, project: String(project), name: clean, parent: parent ?? null, people: people ?? null, by: was?.by ?? personId, at };
+      const row = { id, teamId, project: String(project), name: clean, parent: parent ?? null, people: people ?? null, by: was?.by ?? personId, gone: gone ?? was?.gone ?? false, at };
       if (was) Object.assign(was, row); else cloud.fileFolders.push(row);
       cloud.events.emit('work', {});
     },

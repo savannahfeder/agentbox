@@ -729,7 +729,9 @@ export function readSettings({ config, supervisor, store, onTeam }: SettingsDeps
       // Read here rather than kept, because Claude Code refreshes its own
       // profile as it runs and this page is opened by hand a few times a day.
       // `null` when the file cannot be read, and then no screen says anything.
-      plan: plan.known ? { label: plan.label, max: plan.max } : null,
+      // A refusal outranks the file, which goes on naming the plan after it ends.
+      plan: trouble?.cause === 'subscription-ended' ? { label: 'Subscription ended', max: false }
+        : plan.known ? { label: plan.label, max: plan.max } : null,
     };
   });
 

@@ -53,8 +53,12 @@ const began = Date.now();
 let shipEndsBy = began + 18 * 60_000;
 
 const say = (msg) => console.log(`ship: ${msg}`);
-const git = (...args) => gitOrThrow(args, { cwd: root });
-const gitSoft = (...args) => runGit(args, { cwd: root });
+// A repository nested in the task folder is a worker's to write, settings and
+// all, and git runs those when it looks inside one. `dirty` still sees a
+// nested repository's commit move; only reading its files is skipped.
+const OWN_SETTINGS_ONLY = ['-c', 'core.fsmonitor=false', '-c', 'diff.ignoreSubmodules=dirty'];
+const git = (...args) => gitOrThrow([...OWN_SETTINGS_ONLY, ...args], { cwd: root });
+const gitSoft = (...args) => runGit([...OWN_SETTINGS_ONLY, ...args], { cwd: root });
 // process.exit drops whatever a pipe has not yet taken, and the ship queue
 // reads this script through one: the end of the hook's output, where the
 // failing test is named, was what got dropped. Exits once both have drained.

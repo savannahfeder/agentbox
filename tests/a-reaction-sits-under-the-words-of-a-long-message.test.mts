@@ -12,7 +12,9 @@
 // fold, which is why only the default width showed it.
 //
 // So every part of a message under the face's row is told its column, and the
-// test reads the stylesheet for each part a message can draw.
+// test reads the stylesheet for each part a message can draw. Since 2026-11-20
+// (w-f702d60afe) the face sits on the name's row and everything under it takes
+// the whole width.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -29,13 +31,17 @@ const column = (cls) => rules
   .filter(Boolean)
   .pop();
 
+const under = rules.find((r) => r.sel === '.chat-msg > :not(.chat-gutter, .msg-head)')?.body.match(/grid-column:\s*([^;]+)/)?.[1]?.trim();
+
 describe('the columns of a chat message', () => {
-  it('puts the reaction chips in the words column', () => {
-    expect(column('chat-chips')).toBe('2');
+  it('puts everything under the name, the reaction chips too, across the whole width', () => {
+    expect(under).toBe('1 / -1');
+    for (const part of ['chat-chips', 'msg-body', 'chat-more']) expect(column(part), part).toBeUndefined();
+    expect(column('chat-thread-line')).toBe('1 / -1');
   });
 
-  it('still puts the name, the words, the fold and the thread line there', () => {
-    for (const part of ['msg-head', 'msg-body', 'chat-more', 'chat-thread-line']) expect(column(part), part).toBe('2');
+  it('puts the name beside the face', () => {
+    expect(column('msg-head')).toBe('2');
   });
 
   // THE CASE THAT MUST NOT MOVE: the face keeps the first column.

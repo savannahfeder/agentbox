@@ -686,7 +686,8 @@ describe('the wiring from the reply box is present in the source', () => {
     expect(focus).toContain('const canSetMode = !item.agent;');
     expect(focus).toContain('const claudeCode = (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;');
     // The slash menu: no query means no rows means no menu.
-    expect(focus).toContain('const query = !item.agent ? slashQuery(text) : null;');
+    expect(focus).toContain('const toAgent = !item.agent && !talkTo?.length;');
+    expect(focus).toContain('const query = toAgent ? slashQuery(text) : null;');
     // And Claude Code's own Shift+Tab.
     expect(focus).toContain("e.key === 'Tab' && e.shiftKey && canSetMode");
     // And there is no longer a chip to guard at all.

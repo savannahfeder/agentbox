@@ -6,7 +6,9 @@
 // is how "attachments do not open in threads and DM" reached us. Soon at
 // first, then less often, about twenty minutes in all; pressing the picture
 // looks again at once after that.
-const WAITS = [5_000, 10_000, 20_000, 40_000, 80_000, 160_000, 300_000, 300_000, 300_000];
+// A cloud run's documents come back every 10 s, so the first two minutes are
+// looked at often enough that a picture shows within seconds of landing.
+const WAITS = [...Array(15).fill(2_000), ...Array(18).fill(5_000), 20_000, 40_000, 80_000, 160_000, 300_000, 300_000, 300_000];
 
 /** How long to wait before look number `tries + 1`, or null to stop. */
 export function lookAgainAfter(tries: number): number | null {

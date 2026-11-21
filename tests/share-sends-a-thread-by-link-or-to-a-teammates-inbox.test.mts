@@ -17,7 +17,7 @@ import { threadLink, threadOfLink, sendFirst, seenWord, matchPeople, openTo, sen
 import { whereALinkGoes } from '../renderer/src/link-click.ts';
 import { threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
 import { ShareList, SendSheet, CopiedSheet, SeeList } from '../renderer/src/threads/SharePanel.tsx';
-import { emailsIn, StartTeam } from '../renderer/src/team/StartTeam.tsx';
+import { StartTeam } from '../renderer/src/team/StartTeam.tsx';
 globalThis.React = React;
 
 const THEO = { id: 'p-theo', name: 'Theo Park', email: 'theo@lumen.test' };
@@ -68,11 +68,10 @@ describe('Share…', () => {
   const list = (o = {}) => text(renderToStaticMarkup(React.createElement(ShareList, {
     link: true, first: THEO, others: true, seen: 'Lumen', onCopy() {}, onSendFirst() {}, onSendOther() {}, onSee() {}, ...o,
   })));
-  it('says Copy link, Send to the teammate named, Send to someone…, and who can open it, in that order', () => {
+  it('says Copy link, Send a link…, and who can open it, in that order', () => {
     const t = list();
-    expect(t.indexOf('Copy link')).toBeLessThan(t.indexOf('Send to Theo'));
-    expect(t.indexOf('Send to Theo')).toBeLessThan(t.indexOf('Send to someone…'));
-    expect(t.indexOf('Send to someone…')).toBeLessThan(t.indexOf('Who can open it'));
+    expect(t.indexOf('Copy link')).toBeLessThan(t.indexOf('Send a link…'));
+    expect(t.indexOf('Send a link…')).toBeLessThan(t.indexOf('Who can open it'));
     expect(t).toContain('Lumen');
   });
   it('offers nobody to send to on a team of one, and no link where there is none', () => {
@@ -109,9 +108,10 @@ describe('Send to someone', () => {
   });
   it('draws To, a note, Copy link and Send to inbox', () => {
     const t = text(renderToStaticMarkup(React.createElement(SendSheet, { people: [THEO], start: ['p-theo'], link: true, onCopy() {}, onSend() {} })));
-    expect(t).toMatch(/^To Th\w* Theo/);
+    expect(t).toMatch(/^To TP Theo/);
     expect(t).toContain('Copy link');
-    expect(t).toContain('Send to inbox');
+    // It lands in the chat with them, so it says so (w-f702d60afe, 2026-11-21).
+    expect(t).toContain('Send in chat');
   });
   it('opens a private or chosen thread to whoever it goes to, and leaves a Team thread Team', () => {
     expect(openTo('team', [], ['p-theo'])).toEqual({ visibility: 'team', visibleTo: ['p-theo'] });
@@ -132,20 +132,16 @@ describe('after Copy link', () => {
     expect(t).toContain('Link copied');
     expect(t).toContain('app.agentbox.ac/t/p-maya/w-1');
     expect(t).not.toContain('https://');
-    expect(t).toContain('Or put it in an inbox');
+    expect(t).toContain('Or send it in chat');
     expect(firstName(THEO)).toBe('Theo');
   });
 });
 
 describe('the Team page before there is a team', () => {
-  it('is your face, two open seats and Start a team', () => {
+  // A team is Pro's since 2026-11-21 (tests/a-free-team-is-offered-pro-where-it-would-invite).
+  it('is your face, two open seats and Pro’s free week', () => {
     const t = text(renderToStaticMarkup(React.createElement(StartTeam, { me: { id: 'p-maya', name: 'Maya Chen' } })));
     expect(t).toContain('Bring your team in');
-    expect(t).toContain('Start a team');
-  });
-  it('takes emails typed with commas or spaces, each once, and keeps the half-typed one', () => {
-    expect(emailsIn('theo@lumen.test, jun@lumen.test, mi')).toEqual({ emails: ['theo@lumen.test', 'jun@lumen.test'], rest: 'mi' });
-    expect(emailsIn('Theo@Lumen.test ', ['theo@lumen.test'])).toEqual({ emails: ['theo@lumen.test'], rest: '' });
-    expect(emailsIn('not-an-email ')).toEqual({ emails: [], rest: '' });
+    expect(t).toContain('Try Pro free for 7 days');
   });
 });

@@ -69,6 +69,7 @@ import { carryLocalFiles, copyTree, folderChildDeadline, onlyTrackedContent, tra
 import { givePrivateFolder } from './private-folder.mts';
 import type { ExecFailure } from './worktree-include.mts';
 import { HOOK_FREE } from './hook-free-git.mts';
+import { alive } from './process-alive.mts';
 
 /** The answer of a git call that does not throw. */
 export interface GitResult {
@@ -171,6 +172,7 @@ const git = (cwd: string, args: string[]): string => execFileSync('git', [
   ...args,
 ], {
   cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: folderChildDeadline(), killSignal: 'SIGKILL',
+  windowsHide: true,
 }).trim();
 
 /**
@@ -272,7 +274,7 @@ const keptOutOfBackups = new Set<string>();
 export function keepOutOfBackups(dir: string, {
   platform = process.platform,
   // Not waited on: nothing needs its answer, and a task folder is often made on the window's thread.
-  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000 }, () => { /* best effort */ }); },
+  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000, windowsHide: true }, () => { /* best effort */ }); },
 }: { platform?: string; run?: (cmd: string, args: string[]) => unknown } = {}): boolean {
   if (platform !== 'darwin' || keptOutOfBackups.has(dir)) return false;
   keptOutOfBackups.add(dir);
@@ -396,6 +398,7 @@ function sizeOfFirstCommit(root: string): number {
   const listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024,
     timeout: folderChildDeadline(), killSignal: 'SIGKILL',
+    windowsHide: true,
   });
   let total = 0;
   for (const file of listed.split('\0')) {
@@ -465,12 +468,6 @@ const lockReason = (pid: number) => `agentbox pid=${pid}`;
 const pidInReason = (reason: string | null | undefined) => {
   const found = /agentbox pid=(\d+)/.exec(reason ?? '');
   return found ? Number(found[1]) : null;
-};
-// Signal 0 asks the kernel whether a pid exists without touching it. EPERM
-// means it exists and belongs to somebody else, which still counts as alive.
-const alive = (pid: number | null) => {
-  if (!pid) return false;
-  try { process.kill(pid, 0); return true; } catch (error) { return (error as ExecFailure)?.code === 'EPERM'; }
 };
 
 /** Every worktree git knows about, as records rather than as text. */
@@ -1110,9 +1107,13 @@ function removeWorktree(root: string, folder: string): GitResult {
 
 function submodulesHoldNothingOfTheirOwn(folder: string): boolean {
   try {
+    // Before git looks inside any of them, since looking runs their settings.
+    const own = repositoriesOfItsOwn(folder);
+    if (!own || own.length) return false;
+    const home = projectGitFolder(folder);
+    if (!home || !everySubmoduleKeepsItsRepositoryOutside(folder, home)) return false;
     const status = tryGit(folder, ['status', '--porcelain', '--ignore-submodules=none']);
     if (!status.ok || status.out !== '') return false;
-    if (!everySubmoduleKeepsItsRepositoryOutside(folder)) return false;
     const gitDir = tryGit(folder, ['rev-parse', '--absolute-git-dir']);
     if (!gitDir.ok) return false;
     return repositoriesUnder(path.join(gitDir.out, 'modules')).every((repo) => {
@@ -1128,7 +1129,7 @@ function submodulesHoldNothingOfTheirOwn(folder: string): boolean {
  * deletes it with the files. Asked of every level, since a submodule can hold
  * its own.
  */
-function everySubmoduleKeepsItsRepositoryOutside(at: string): boolean {
+function everySubmoduleKeepsItsRepositoryOutside(at: string, home: string): boolean {
   const staged = tryGit(at, ['ls-files', '-s']);
   if (!staged.ok) return false;
   for (const line of staged.out.split('\n')) {
@@ -1136,9 +1137,45 @@ function everySubmoduleKeepsItsRepositoryOutside(at: string): boolean {
     const inner = path.join(at, line.slice(line.indexOf('\t') + 1));
     const dotGit = path.join(inner, '.git');
     if (!fs.existsSync(dotGit)) continue;
-    if (fs.lstatSync(dotGit).isDirectory() || !everySubmoduleKeepsItsRepositoryOutside(inner)) return false;
+    if (!keptInTheProjectsGit(dotGit, home) || !everySubmoduleKeepsItsRepositoryOutside(inner, home)) return false;
   }
   return true;
+}
+
+/** The project's own git folder, which no worker can write, resolved. */
+function projectGitFolder(folder: string): string | null {
+  const common = tryGit(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  try { return common.ok ? fs.realpathSync(common.out) : null; } catch { return null; }
+}
+
+/** A `.git` that is a file naming a repository inside the project's own git folder. */
+function keptInTheProjectsGit(dotGit: string, home: string): boolean {
+  try {
+    if (!fs.lstatSync(dotGit).isFile()) return false;
+    const named = /^gitdir: (.+)$/m.exec(fs.readFileSync(dotGit, 'utf8'));
+    if (!named) return false;
+    return fs.realpathSync(path.resolve(path.dirname(dotGit), named[1].trim())).startsWith(home + path.sep);
+  } catch { return false; }
+}
+
+/**
+ * Repositories in the folder, tracked or not, whose git a worker could have
+ * written: a Codex sandbox protects only the folder's top-level `.git`, and git
+ * runs a repository's settings whenever it looks inside one. Paths relative to
+ * the folder; null when git could not say.
+ */
+function repositoriesOfItsOwn(folder: string): string[] | null {
+  const home = projectGitFolder(folder);
+  const staged = tryGit(folder, ['ls-files', '-s', '-z']);
+  const loose = tryGit(folder, ['ls-files', '-o', '--exclude-standard', '-z']);
+  if (!home || !staged.ok || !loose.ok) return null;
+  const gitlinks = staged.out.split('\0').filter((l) => l.startsWith('160000 ')).map((l) => l.slice(l.indexOf('\t') + 1));
+  // An untracked repository is listed as its folder, with a trailing slash.
+  const nested = loose.out.split('\0').filter((p) => p.endsWith('/')).map((p) => p.slice(0, -1));
+  return [...gitlinks, ...nested].filter((rel) => {
+    const dotGit = path.join(folder, rel, '.git');
+    return fs.existsSync(dotGit) && !keptInTheProjectsGit(dotGit, home);
+  });
 }
 
 /** Every repository in a `modules` directory, nested ones included. Throws on one it cannot read. */
@@ -1231,8 +1268,11 @@ export function parkTaskFolder(dir: string, id: unknown, { pid = process.pid, pa
     // index there is exactly the old behaviour, and the old behaviour is better
     // than stranding the folder.
     const as = asTheApp(folder);
+    // `add` looks inside a repository it stages, and staging one makes every later status look too.
+    const own = repositoriesOfItsOwn(folder);
+    if (!own) return { parked: false, reason: 'refused', path: folder, detail: 'git could not list what is in the folder' };
     tryGit(folder, [...as, 'commit', '--no-verify', '--allow-empty', '-q', '-m', PARKED_INDEX]);
-    const staged = tryGit(folder, ['add', '-A']);
+    const staged = tryGit(folder, ['add', '-A', '--', '.', ...own.map((rel) => `:(exclude,literal)${rel}`)]);
     // `--no-verify`, because a repository's own commit hooks are written for a
     // person finishing a piece of work, and this is the app tidying up after
     // one. A hook that refuses here would strand the folder it is protecting.

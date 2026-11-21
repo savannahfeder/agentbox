@@ -70,6 +70,10 @@ function Post({ p, face, at, since, all, onOpen, onPerson }: {
         <p className="su-list-l">Working on</p>
         <ul className="su-done">{p.working.map((l) => <li key={l.key}><button type="button" className="su-link" onClick={() => onOpen(l)}>{titleOf(l)}</button></li>)}</ul>
       </>}
+      {open && (p.helped?.length ?? 0) > 2 && <>
+        <p className="su-list-l">Helped on</p>
+        <ul className="su-done">{p.helped!.map((l) => <li key={l.key}><button type="button" className="su-link" onClick={() => onOpen(l)}>{titleOf(l)}</button></li>)}</ul>
+      </>}
     </div>
   </article>;
 }
@@ -136,7 +140,7 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
         <button type="button" className="su-ar" aria-label="The week before" onClick={() => moveWeek(-1)}>{I.back()}</button>
         {week.map((d) => <button type="button" role="tab" key={d.day} disabled={d.ahead} aria-selected={d.day === day && !searching}
           className={`su-day${d.day === day && !searching ? ' on' : ''}`} onClick={() => { setQ(''); setPicked(d.day); }}>{d.label}</button>)}
-        <button type="button" className="su-ar" aria-label="The week after" disabled={nextWeekAhead} onClick={() => moveWeek(1)}>{I.chev()}</button>
+        <button type="button" className="su-ar" aria-label="The week after" disabled={nextWeekAhead} onClick={() => moveWeek(1)}>{I.forward()}</button>
         <label className="su-search">{I.search()}<input value={q} placeholder="Search standups" aria-label="Search standups" onChange={(e) => setQ(e.target.value)} /></label>
       </div>
       {days.map((d, i) => {
@@ -147,15 +151,19 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
         if ((searching || i > 0) && !posts.length) return null;
         return <section key={d} className="su-dayfeed" aria-label={dayTitle(d)}>
           {(i > 0 || searching) && <div className="su-sep">{dayTitle(d)} {dateOf(d)}</div>}
-          {posts.length === 0 && <p className="su-empty">Nothing moved.</p>}
-          {posts.map((p) => <Post key={`${d}/${p.key}`} p={p} face={faces.get(p.key)} at={d === midnight(now) ? clockOf(s.at) : null} since={since} all={searching}
-            onOpen={onOpen} onPerson={onPerson} />)}
-          {i === 0 && !searching && (() => {
-            const quiet = team.filter((t) => (t.kind === 'person' || s.mates) && !posts.some((p) => p.key === t.key))
-              .map((t) => (t.kind === 'person' ? t.name.split(/\s+/)[0] : t.name));
-            if (!quiet.length) return null;
+          {(() => {
+            const quiet = i === 0 && !searching
+              ? team.filter((t) => (t.kind === 'person' || s.mates) && !posts.some((p) => p.key === t.key))
+                .map((t) => (t.kind === 'person' ? t.name.split(/\s+/)[0] : t.name))
+              : [];
             const names = quiet.length === 1 ? quiet[0] : `${quiet.slice(0, -1).join(', ')} and ${quiet[quiet.length - 1]}`;
-            return <p className="su-quiet">Nothing from {names} since {dayTitle(previousStandupDay(d, s))}’s standup.</p>;
+            // With no posts, the quiet line is the whole day, at the column's edge rather than under a face.
+            return <>
+              {posts.length === 0 && !quiet.length && <p className="su-empty">Nothing moved.</p>}
+              {posts.map((p) => <Post key={`${d}/${p.key}`} p={p} face={faces.get(p.key)} at={d === midnight(now) ? clockOf(s.at) : null} since={since} all={searching}
+                onOpen={onOpen} onPerson={onPerson} />)}
+              {quiet.length > 0 && <p className={`su-quiet${posts.length ? '' : ' alone'}`}>Nothing from {names} since {dayTitle(previousStandupDay(d, s))}’s standup.</p>}
+            </>;
           })()}
         </section>;
       })}

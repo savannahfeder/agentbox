@@ -79,6 +79,8 @@ export interface StandupNeed { line: TodayLine; on: string | null }
 export interface StandupPost {
   key: string; name: string; kind: TodayPerson['kind'];
   shipped: TodayLine[]; finished: TodayLine[];
+  /** Teammates' threads they helped on or reviewed and handed back. */
+  helped?: TodayLine[];
   /** Everything done since the standup before, newest first. */
   done: TodayLine[];
   working: TodayLine[];
@@ -99,21 +101,25 @@ function postOf(p: TodayPerson, live: boolean): StandupPost {
     key: p.key, name: p.name, kind: p.kind,
     shipped: [...p.shipped].sort(byNewest).map(titled),
     finished: [...p.finished, ...p.decided].sort(byNewest).map(titled),
+    helped: [...(p.helped ?? [])].sort(byNewest).map(titled),
     done: g.done.map(titled),
     // A thread whose agent answered and now waits on its owner is still theirs to finish.
     working: [...g.working, ...(p.waiting ?? [])].sort(byNewest).map(titled),
     // What is stuck is only known as of now, so only today's post says it.
     // A teammate's post also says what they handed you; your own Needs you is the inbox's to say.
-    needs: live ? [
+    // Two rows under one name (a thread and the ask about it) are said once.
+    needs: live ? onceEach([
       ...g.blocked.map((l) => ({ line: titled(l), on: l.on ?? null })),
       ...(p.kind === 'me' ? [] : p.waitingOnYou.map((l) => ({ line: titled(l), on: 'you' }))),
-    ] : [],
+    ]) : [],
     privateDone: p.privateDone,
     privateWorking: p.privateWorking ?? 0,
   };
 }
 
-const says = (p: StandupPost) => p.done.length + p.working.length + p.needs.length + p.privateDone + (p.privateWorking ?? 0) > 0;
+const onceEach = (needs: StandupNeed[]): StandupNeed[] => needs.filter((n, i) => needs.findIndex((m) => titleOf(m.line) === titleOf(n.line) && m.on === n.on) === i);
+
+const says = (p: StandupPost) => p.done.length + p.working.length + p.needs.length + (p.helped?.length ?? 0) + p.privateDone + (p.privateWorking ?? 0) > 0;
 
 /** A post per teammate. With AI teammates off, each AI teammate's work joins yours. */
 export function postsOf(people: readonly TodayPerson[], { mates, live = true }: { mates: boolean; live?: boolean }): StandupPost[] {
@@ -154,6 +160,7 @@ export function sentenceOf(p: StandupPost, { all = false }: { all?: boolean } = 
   };
   say('Shipped', named(p.shipped, 'done', all));
   say('Finished', named(p.finished, 'done', all));
+  say('Helped on', named(p.helped ?? [], 'done', all));
   if (!p.shipped.length && !p.finished.length && p.privateDone) out.push(`Finished ${p.privateDone} private ${p.privateDone === 1 ? 'thread' : 'threads'}.`);
   const hidden = p.privateWorking ?? 0;
   say('Working on', named(p.working, 'working', all, hidden ? `${hidden} private ${hidden === 1 ? 'thread' : 'threads'}` : ''));

@@ -16,7 +16,7 @@ export interface RunOptions {
 export function run(cmd: string, args: string[], { cwd, env = process.env, input = null, encoding = 'utf8' }: RunOptions = {}) {
   return new Promise<string | Buffer>((resolve, reject) => {
     let child: ChildProcessByStdio<Writable, Readable, Readable>;
-    try { child = spawn(cmd, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'] }); } catch (err) { reject(err); return; }
+    try { child = spawn(cmd, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }); } catch (err) { reject(err); return; }
     const out: Buffer[] = [];
     const err: Buffer[] = [];
     child.stdout.on('data', (d) => out.push(d));

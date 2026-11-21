@@ -313,7 +313,8 @@ const A_TEAMMATE_MAY_SET = ['problem', 'progress', 'solution', 'blockedBy', 'blo
 //
 // AND THE NAME THE APP GAVE THE ROW, so a task is called one thing on both
 // computers. Only its maker's computer writes one (main/row-label.mts).
-const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'note', 'result', 'people', 'status', 'react', 'inReplyTo', 'edit', 'due', 'artifact', 'voice', 'forAgent', 'fromNotes', 'typed', 'label'];
+// AND HOW AN ASK WAS ANSWERED (`verdict`), which only says how the hand-back is drawn.
+const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'note', 'result', 'people', 'status', 'react', 'inReplyTo', 'edit', 'due', 'artifact', 'voice', 'forAgent', 'fromNotes', 'typed', 'label', 'verdict'];
 // AND THE LEVEL THE SENDER PICKED, ON THE OPENING LINE ALONE (w-7ba439c883).
 // A message now carries how urgent its sender thought it was, and that number
 // decides where it sits in the inbox it lands in, so it has to survive the
@@ -350,6 +351,9 @@ export function whatATeammateMaySet(line: PulledLine | null | undefined, { direc
     kept.labels = [GIVEN_TASK];
     // Whether the team may read the task's card, which its holder publishes.
     for (const field of TASK_AUDIENCE) if (field in line.patch) kept[field] = (line.patch as Record<string, unknown>)[field];
+    // What the task asks for on its giver's thread. Its holder's copy only draws
+    // it; the giver's copy believes an ask only on a line it wrote itself.
+    if ('ask' in line.patch) kept.ask = (line.patch as Record<string, unknown>).ask;
   }
   else if (direct && opensARow(line.patch) && isWorkThread(line.patch)) kept.labels = [WORK_THREAD];
   const patch = pickFields(kept);

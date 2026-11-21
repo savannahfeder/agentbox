@@ -32,6 +32,7 @@ import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { catchUpDue } from '../../../shared/agent-import.mts';
 import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
@@ -365,7 +366,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
         <RowCells status={running?.live ? running : laterCell(null)}
           lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
-          priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
+          priority={shownPriority(rule)} updatedAt={rule.updatedAt ?? rule.createdAt}
           when={nextRunWords(rule)} now={Date.now()} />
       </div>
     );
@@ -436,7 +437,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
               return (
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
-                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
+                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} who={{ face: <Face person={team?.byId.get(c.personId) ?? null} />, name: team?.byId.get(c.personId)?.name ?? undefined }} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );

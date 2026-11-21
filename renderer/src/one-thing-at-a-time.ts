@@ -41,11 +41,12 @@ export function appWrote(outcome: ItemOutcome | null, wrote?: Record<string, { s
 }
 
 /** The newest answer: the one lifted to the foot, or else the last thing said that was not yours. */
-export function newestAnswer(events: AgentEvent[], outcome: ItemOutcome | null): { at: number; text: string } | null {
+export function newestAnswer(events: AgentEvent[], outcome: ItemOutcome | null): { at: number; text: string; fromId?: string } | null {
   if (outcome) return { at: outcome.at, text: outcome.text };
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
-    if (said(e) && e.who !== 'you' && e.text?.trim()) return { at: e.at, text: e.text };
+    // A person you asked to help signs what they wrote (team/AsksLine.tsx).
+    if (said(e) && e.who !== 'you' && e.text?.trim()) return { at: e.at, text: e.text, ...(e.fromId ? { fromId: e.fromId } : {}) };
   }
   return null;
 }
@@ -91,10 +92,20 @@ export const broughtIn = (item: { labels?: string[] }): boolean =>
  * above what was said or picked and the agent's work since. -1 when the answer
  * is still the newest word, or there is none.
  */
-export function standsAt(events: AgentEvent[], newest: { at: number } | null): number {
+export function standsAt(events: AgentEvent[], newest: { at: number; fromId?: string } | null): number {
   if (!newest) return -1;
   const answered = events.some((e) => e.at > newest.at && (said(e) ? e.who === 'you' : !!e.yours));
-  return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : -1;
+  return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : helperAnswered(events, newest);
+}
+
+/** A teammate's words are the newest answer: start at the agent's message they answer, so its question and choices stay in view. */
+export function helperAnswered(events: AgentEvent[], newest: { at: number; fromId?: string } | null): number {
+  if (!newest?.fromId) return -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (said(e) && e.who !== 'you' && !e.fromId && e.at < newest.at && e.text?.trim()) return i;
+  }
+  return -1;
 }
 
 /**

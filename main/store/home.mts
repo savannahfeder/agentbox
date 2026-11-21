@@ -287,6 +287,59 @@ export function carryMisplacedMachinery(fromHome: string | null | undefined, sto
 }
 
 /**
+ * Carries records filed under a project's old path to the path it has now,
+ * for a store that was copied or moved (a new machine, a renamed user, a
+ * restored backup). Machinery directories are named after the project's full
+ * path, so without this every project at the new path opens with no threads.
+ *
+ * A directory moves only when its `.origin` names a folder outside `storeRoot`
+ * whose path from `accounts/` on is a project here. A `.jsonl` log the new path
+ * already has keeps its lines after the old ones, which happened first.
+ * Returns the project folders whose records were carried.
+ */
+export function carryMovedStoreMachinery(storeRoot: string, home = appHome()): string[] {
+  const inside = path.resolve(storeRoot) + path.sep;
+  let names: string[] = [];
+  try { names = fs.readdirSync(path.join(home, 'projects')); } catch { return []; }
+  const carried: string[] = [];
+  for (const name of names) {
+    const dir = path.join(home, 'projects', name);
+    const origin = readOrigin(dir);
+    if (!origin || path.resolve(origin).startsWith(inside)) continue;
+    const parts = path.resolve(origin).split(path.sep);
+    const at = parts.lastIndexOf('accounts');
+    if (at < 0) continue;
+    const now = path.join(storeRoot, ...parts.slice(at));
+    if (!fs.existsSync(path.join(now, 'project.json'))) continue;
+    const target = ensureMachineryDir(now, home);
+    if (path.resolve(target) === path.resolve(dir)) continue;
+    let entries: string[] = [];
+    try { entries = fs.readdirSync(dir).filter((rel) => rel !== ORIGIN); } catch { continue; }
+    if (!entries.length) continue;
+    for (const rel of entries) {
+      const from = path.join(dir, rel);
+      const to = path.join(target, rel);
+      if (rel.endsWith('.jsonl') && fs.existsSync(to)) {
+        try {
+          fs.writeFileSync(`${to}.joining`, Buffer.concat([fs.readFileSync(from), fs.readFileSync(to)]));
+          fs.renameSync(`${to}.joining`, to);
+          fs.rmSync(from, { force: true });
+        } catch (err) { console.warn(`${nameSlug}: could not join ${from} onto ${to}: ${(err as Error).message}`); }
+      } else {
+        foldStray(from, to, rel);
+      }
+    }
+    let left: string[] = [];
+    try { left = fs.readdirSync(dir); } catch { /* gone already */ }
+    if (left.length === 1 && left[0] === ORIGIN) {
+      try { fs.rmSync(path.join(dir, ORIGIN)); fs.rmdirSync(dir); } catch { /* best effort */ }
+    }
+    carried.push(now);
+  }
+  return carried;
+}
+
+/**
  * Deletes every record of ours for one project. Its caller is the practice
  * project, which must not outlive its tutorial; deleting only its folder would
  * leave the ledger and traces behind.

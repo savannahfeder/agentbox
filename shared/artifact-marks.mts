@@ -357,7 +357,8 @@ export function placeWords(note: { place?: NotePlace | null; pin?: number | stri
 
 // `<sha12>-name`, how a shared thread names its copy, and `<time>-<random>-name`,
 // how a saved attachment is named: main/team/thread-share.mts, main/save-attachments.mts.
-const COPY_PREFIX = /^[0-9a-f]{12}-/;
+// One or more: a teammate's copy of a file sent to a thread carries a prefix of its own in front.
+const COPY_PREFIX = /^(?:[0-9a-f]{12}-)+/;
 const SAVED_PREFIX = /^([a-z0-9]{8})-[a-z0-9]{1,6}-/;
 // The stamp is Date.now() in base 36, so it must read as a moment the app could
 // have saved at: "payments-auth-" and "bookings-empty-" fit the shape and are words.
@@ -662,7 +663,7 @@ export function versionForPath(families: readonly FileFamily[] | null | undefine
 const EXT = 'png|jpe?g|gif|webp|svg|mp4|mov|m4v|webm|pdf|md|markdown|pptx';
 const PATHISH = String.raw`(?:\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:${EXT})`;
 const NAMED = new RegExp(
-  String.raw`\]\(<?((?:\.?\/)?[^()\s>:]+\.(?:${EXT}))>?\)`
+  String.raw`\]\(<?((?:\.?\/|[A-Za-z]:\/)?[^()\s>:]+\.(?:${EXT}))>?\)`
   + '|`(' + PATHISH + ')`'
   + String.raw`|(?<![\w./:@~(\[-])(${PATHISH})(?![\w/-])`,
   'gi',
@@ -893,7 +894,7 @@ export function approvalSince(family: Pick<FileFamily, 'versions'> | null | unde
  * comments still open on it. A version in `offered` (offeredTogether) is a
  * choice still on the table, so a newer one beside it is not asked about.
  */
-export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: ReadonlyArray<Pick<FileNote, 'file' | 'resolved'>> | null | undefined, offered: ReadonlySet<string> | null = null): { text: string; newest: FileVersion | null } | null {
+export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: ReadonlyArray<Pick<FileNote, 'file' | 'resolved'>> | null | undefined, offered: ReadonlySet<string> | null = null): { text: string; newest: FileVersion | null; yes: string } | null {
   const versions = family?.versions ?? [];
   const here = versions[index];
   if (!here) return null;
@@ -903,7 +904,9 @@ export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefin
   const said = [`Approve v${here.n}?`];
   if (newest) said.push(`v${newest.n} is newer.`);
   if (open) said.push(open > 1 ? `${open} comments are still open.` : '1 comment is still open.');
-  return { text: said.join(' '), newest };
+  const left = `${open} ${open === 1 ? 'comment' : 'comments'} open`;
+  const yes = !open ? `Approve v${here.n}, not v${newest!.n}` : newest ? `Approve v${here.n} with ${left}` : `Approve with ${left}`;
+  return { text: said.join(' '), newest, yes };
 }
 
 /** The newest edited copy of the file at `path`, or `path` when nobody has edited it. */

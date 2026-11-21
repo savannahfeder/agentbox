@@ -84,8 +84,9 @@ describe('in the app', () => {
     expect(hook).not.toContain('GroupBar');
   });
   it('a direct message lights Groups, and its trail says it came from there when opened over a group', () => {
-    // With a team on too: every chat is on the Chats page, which lights its row (w-2b3e1a85e5).
-    expect(app).toMatch(/onGroupsPage=\{roomShown \|\| directOpen\}/);
+    // With a team on too: every chat is on the Chats page, which lights its row (w-2b3e1a85e5),
+    // save one pressed in Needs you, which is in the inbox (w-1d47bc5339).
+    expect(app).toMatch(/onGroupsPage=\{roomOnTeam \|\| directOpen \|\| chatsPlaceShown \|\| cardFromPlace\}/);
     expect(app).toContain("directOpen && roomsUi.openId ? 'Groups'");
   });
 });

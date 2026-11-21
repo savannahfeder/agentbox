@@ -25,7 +25,7 @@ import { zoomDeltaFor } from './zoom-keys.mts';
 import { copySelection } from './copy-selection.mts';
 import { screenDetailFor } from './screen-detail.mts';
 import { Store } from './store.mts';
-import { storeRootEnv } from './store/home.mts';
+import { carryMovedStoreMachinery, storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
 import { gitHubPushSignIn } from './github-push-sign-in.mts';
@@ -52,6 +52,7 @@ import { phoneWaitsOf } from '../shared/phone-snapshot.mts';
 import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
+import { runningAsADemo } from '../shared/demo-world.mts';
 import { newUserTitle, newUserWindow } from './new-user-window.mts';
 import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
 import { tintWindowButtons, windowFrame } from './window-buttons.mts';
@@ -377,6 +378,7 @@ async function createWindow() {
   // Written under every name this app has had, because a store server or a
   // script from before a rename is still out there reading the old one.
   Object.assign(process.env, storeRootEnv(config.storeRoot));
+  carryMovedStoreMachinery(config.storeRoot);
   // What a reply may do is kept in her own folder, not that home, which every
   // worker is granted (main/answer-modes.mts).
   keepAnswerModesIn({ userDir, storeRoot: config.storeRoot });
@@ -541,6 +543,7 @@ async function createWindow() {
     wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
+    tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {
@@ -840,7 +843,7 @@ async function createWindow() {
   retitle = () => {
     if (!window || window.isDestroyed()) return;
     const me = team?.state().me;
-    const title = newUserTitle({ fresh: runningAsAFreshUser(), name: NAME, account: team?.state().signedIn ? me?.email || me?.name : null });
+    const title = runningAsADemo() ? `${NAME} (demo)` : newUserTitle({ fresh: runningAsAFreshUser(), name: NAME, account: team?.state().signedIn ? me?.email || me?.name : null });
     if (title && window.getTitle() !== title) window.setTitle(title);
   };
   retitle();
