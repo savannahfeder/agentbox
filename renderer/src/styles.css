@@ -4094,7 +4094,7 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.palette-item.selected { background: var(--wash); box-shadow: inset 2px 0 0 var(--accent); }
+.palette-item.selected { background: var(--wash); }
 /* Nothing matched. It sits on the first row's own line — same padding, same
    size — so the eye does not move to read it, and it is faint because it is a
    statement, not something to press..
@@ -4114,7 +4114,7 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
   text-overflow: ellipsis;
   text-align: right;
 }
-.palette-key {
+.palette-key, .palette-k .palette-esc {
   min-width: 22px;
   height: 20px;
   display: inline-grid;
@@ -4138,29 +4138,20 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .cloud-off-ask-acts .cloud-off-ask-go { color: var(--text); border-color: var(--line-strong); }
 
 /* ⌘K in the website's look (w-391bc4efbe): magnifier and Esc on the input, a
-   mark per row, the keys in a footer. Scoped to `.palette-k` because the Later
+   line icon per row. Scoped to `.palette-k` because the Later
    box and Find a group reuse the rows above, and the selected row stays the
    shared one. */
 .palette-k .palette-query { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 16px 0 18px; border-bottom: 1px solid var(--line); }
 .palette-k .palette-query svg { width: 18px; height: 18px; flex: none; color: var(--text-faint); }
 .palette-k .palette-input { flex: 1; min-width: 0; width: auto; border: none; padding: 0; font-size: 17px; caret-color: var(--accent); }
 .palette-k .palette-input::placeholder { color: var(--agent-ink); }
-.palette-k .palette-esc {
-  flex: none; padding: 4px 6px; cursor: pointer; background: none;
-  border: 1px solid var(--line); border-radius: var(--radius);
-  font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint);
-}
+.palette-k .palette-esc { flex: none; cursor: pointer; line-height: 1; }
 .palette-k .palette-esc:hover { color: var(--text); }
 .palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }
 .palette-k .palette-item.selected { color: var(--text); }
-.palette-k .palette-glyph { flex: none; width: 18px; text-align: center; font: 400 13px/1 var(--mono); color: var(--agent-ink); }
-.palette-k .palette-item.selected .palette-glyph { color: var(--accent); }
+.palette-k .palette-glyph { flex: none; width: 18px; height: 18px; display: grid; place-items: center; color: var(--text-faint); }
+.palette-k .palette-item.selected .palette-glyph { color: var(--text); }
 .palette-k .palette-hint, .palette-k .palette-key { margin-left: auto; }
-.palette-k .palette-foot {
-  display: flex; gap: 18px; padding: 10px 18px; border-top: 1px solid var(--line);
-  font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
-}
-.palette-k .palette-foot b { font-weight: 500; color: var(--text-faint); }
 .palette-k .palette-section {
   padding: 14px 18px 6px; font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
 }
@@ -4171,7 +4162,6 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
    and where under them in the faint ink. A thread: its title, then the line it
    was found by. Two lines, so the row is taller. */
 .palette-k :is(.palette-found, .palette-two) { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
-.palette-k :is(.palette-found, .palette-two) .palette-glyph { padding-top: 3px; }
 .palette-k :is(.palette-found, .palette-two) .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .palette-k :is(.palette-found, .palette-two) .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
