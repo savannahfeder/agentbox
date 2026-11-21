@@ -304,7 +304,10 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
             )}
             {askWords && (
               <div className="tp-ask">
-                <div className="one-by"><Face person={person} /><span>{owner}</span><em>{askWords}</em></div>
+                {/* The ask is theirs and signed; once you have answered, the line says what you did. */}
+                {helping || reviewing
+                  ? <div className="one-by"><Face person={person} /><span>{owner}</span><em>{askWords}</em></div>
+                  : <div className="one-by"><Face person={me} me /><em>{askWords}</em></div>}
                 {helping && askNote && <p className="tp-ask-note">{askNote}</p>}
                 {reviewing && review.note && <p className="tp-ask-note">{review.note}</p>}
               </div>

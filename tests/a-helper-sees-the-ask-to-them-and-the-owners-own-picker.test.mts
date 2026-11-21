@@ -52,6 +52,8 @@ describe('the helper\'s page', () => {
   it('heads the page with the ask to them, then that it went', () => {
     expect(page).toContain('helping ? `asked you to help with this step`');
     expect(page).toContain('<div className="one-by"><Face person={person} /><span>{owner}</span><em>{askWords}</em></div>');
+    // Once answered it is your line, not the owner's: it read "Lena Sent back to Lena" (2026-11-21).
+    expect(page).toContain('{helping || reviewing\n                  ? <div className="one-by"><Face person={person} /><span>{owner}</span><em>{askWords}</em></div>\n                  : <div className="one-by"><Face person={me} me /><em>{askWords}</em></div>}');
     expect(page).toContain("`Sent to ${owner}'s agent`");
   });
 });
