@@ -1,4 +1,5 @@
 import { previewFocus } from './preview-focus';
+import { picturesNamedIn, warmPictures } from './components/FittedImg';
 import { PhoneStatus } from './components/PhoneStatus';
 import { sidebarFolded, useSidebarShrinks } from './sidebar-shrinks';
 import { GlassBand } from './components/GlassBand';
@@ -3232,6 +3233,14 @@ export default function App() {
     return needsByWho(heldBox.rows, (i) => whoIsWaiting(i, who), needsFolded, fromPeopleAbove);
   }, [needsGroup, teamMode, view, search, withOthers, team?.me, heldBox.rows, directSlugs, needsFolded, fromPeopleAbove]);
   const list = search !== null ? (hits ?? []).map((h) => h.item) : stacked ? stacked.rows : needsStacked ? needsStacked.rows : boardOrder ?? heldBox.rows;
+  const underCursor = focused ? null : list[selected];
+  useEffect(() => {
+    const shots = picturesNamedIn(underCursor?.result);
+    if (!shots.length) return;
+    const leaving = new AbortController();
+    const timer = setTimeout(() => warmPictures(shots, leaving.signal), 150);
+    return () => { clearTimeout(timer); leaving.abort(); };
+  }, [underCursor?.id, underCursor?.result]);
 
   // THE PLACE FOLLOWS ITS THREAD when the list changes under a cursor nobody
   // moved (./cursor-follows). Worked out here, in the render, so the board
@@ -6423,6 +6432,7 @@ export default function App() {
         // Escape in an open dropdown closes the dropdown, not the page.
         if (modal || inInput || target?.tagName === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
         // A document open over its chat goes first, as its close button says.
+        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); return; }
         if (e.key === 'Escape' && openDoc) { e.preventDefault(); closeArtifact(); return; }
         if (e.key === 'Escape') { e.preventDefault(); teammatesUi.back(); }
         if (e.key === 'g' || e.key === 'G') { const box = document.querySelector<HTMLInputElement>('.cx-search input'); if (box) { e.preventDefault(); box.focus(); } }
@@ -6430,11 +6440,13 @@ export default function App() {
       }
       if (connectionsShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         if (modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); return; }
         if (e.key === 'Escape') { e.preventDefault(); setConnectionsPage(null); }
         return;
       }
       if (filesShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         if (modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); return; }
         if (e.key === 'Escape') { e.preventDefault(); setFilesPage(null); }
         else if (e.key === '/') { e.preventDefault(); document.querySelector<HTMLInputElement>('.fp-find input')?.focus(); }
         return;

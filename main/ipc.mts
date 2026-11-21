@@ -2674,7 +2674,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       const { execFile } = await import('node:child_process');
       return new Promise<boolean>((resolve) => {
         const into = /\.(mp4|mov|m4v|webm|mkv)$/i.test(src) ? ['-ss', '1'] : [];
-        execFile('ffmpeg', ['-y', '-loglevel', 'error', ...into, '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', to], { timeout: 30_000 },
+        execFile('ffmpeg', ['-y', '-loglevel', 'error', ...into, '-i', src, '-frames:v', '1', '-vf', 'scale=640:-2', '-q:v', '4', to], { timeout: 30_000, windowsHide: true },
           (err) => resolve(!err && fsWatch.existsSync(to)));
       });
     },
