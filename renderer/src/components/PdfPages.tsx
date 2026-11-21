@@ -72,12 +72,11 @@ export function Page({ pdf, n, width, aspect, onCanvas, onSpot, over }: {
   }, []);
   useEffect(() => {
     const el = canvas.current;
-    if (!el) return undefined;
-    if (!toKeep && !toDraw) {
-      if (drawnAt.current) { el.width = 0; el.height = 0; drawnAt.current = 0; }
-      return undefined;
-    }
-    if (!toDraw || !shape || width <= 0 || drawnAt.current === width) return undefined;
+    if (el && !toDraw && !toKeep && el.width) { el.width = 0; el.height = 0; drawnAt.current = 0; }
+  }, [toDraw, toKeep]);
+  useEffect(() => {
+    const el = canvas.current;
+    if (!el || !toDraw || width <= 0 || drawnAt.current === width) return undefined;
     let live = true;
     let job: { cancel: () => void } | null = null;
     const drawNow = () => {
@@ -85,19 +84,23 @@ export function Page({ pdf, n, width, aspect, onCanvas, onSpot, over }: {
         if (!live) return;
         const shown = page.getViewport({ scale: width / page.getViewport({ scale: 1 }).width });
         const dpr = window.devicePixelRatio || 1;
-        // Drawn aside and copied in whole, so a page being drawn again keeps its old drawing meanwhile.
-        const aside = document.createElement('canvas');
-        aside.width = Math.round(shown.width * dpr);
-        aside.height = Math.round(shown.height * dpr);
-        const ctx = aside.getContext('2d');
+        // A first drawing goes straight onto the page. One drawn again is drawn aside and
+        // copied in whole, so the page keeps its old drawing meanwhile.
+        const again = drawnAt.current > 0;
+        const onto = again ? document.createElement('canvas') : el;
+        onto.width = Math.round(shown.width * dpr);
+        onto.height = Math.round(shown.height * dpr);
+        const ctx = onto.getContext('2d');
         if (!ctx) return;
-        const task = page.render({ canvasContext: ctx, canvas: aside, viewport: shown, transform: [dpr, 0, 0, dpr, 0, 0] });
+        const task = page.render({ canvasContext: ctx, canvas: onto, viewport: shown, transform: [dpr, 0, 0, dpr, 0, 0] });
         job = task;
         task.promise.then(() => {
           if (!live) return;
-          el.width = aside.width;
-          el.height = aside.height;
-          el.getContext('2d')?.drawImage(aside, 0, 0);
+          if (again) {
+            el.width = onto.width;
+            el.height = onto.height;
+            el.getContext('2d')?.drawImage(onto, 0, 0);
+          }
           drawnAt.current = width;
         }, () => { /* a cancelled draw; the next one takes over */ });
       });
@@ -105,7 +108,7 @@ export function Page({ pdf, n, width, aspect, onCanvas, onSpot, over }: {
     const later = drawnAt.current ? window.setTimeout(drawNow, REDRAW_AFTER_MS) : null;
     if (!later) drawNow();
     return () => { live = false; if (later) window.clearTimeout(later); job?.cancel(); };
-  }, [pdf, n, width, toDraw, toKeep, shape]);
+  }, [pdf, n, width, toDraw]);
   const tall = shape ? shape.h / shape.w : aspect ? 1 / aspect : 0;
   const size = tall && width > 0 ? { width, height: width * tall } : undefined;
   return <div className={`pdf-page${onSpot ? ' can-pin' : ''}`} ref={box} data-page={n}
@@ -153,10 +156,10 @@ export function PdfPages({ load, name, onPage, onShape, goTo, fit = false, word 
       if (!live) { void opened.destroy(); return; }
       task = opened;
       const doc = (await opened.promise) as Pdf;
-      if (live) setPdf(doc);
       const first = await doc.getPage(1);
       const shape = first.getViewport({ scale: 1 });
-      if (live) { setAspect(shape.width / shape.height); onShape?.(shape.width > shape.height); }
+      // Together, so the pages are laid out at their size from the first time they are drawn.
+      if (live) { setPdf(doc); setAspect(shape.width / shape.height); onShape?.(shape.width > shape.height); }
     }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; void task?.destroy(); };
   }, [load]);
