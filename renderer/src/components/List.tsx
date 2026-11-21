@@ -32,6 +32,7 @@ import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { catchUpDue } from '../../../shared/agent-import.mts';
 import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
@@ -365,7 +366,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
         <RowCells status={running?.live ? running : laterCell(null)}
           lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
-          priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
+          priority={shownPriority(rule)} updatedAt={rule.updatedAt ?? rule.createdAt}
           when={nextRunWords(rule)} now={Date.now()} />
       </div>
     );

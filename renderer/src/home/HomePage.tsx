@@ -4,18 +4,20 @@ import { updatedWords } from '../threads/page-rules';
 import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
 import { MateFace } from '../teammates/MateFace';
+import { AgentFace } from '../components/AgentFace';
+import { initialsOf } from '../team/rooms/room-rules';
 import './home.css';
 import { enterIsTheButtons } from '../focused-button';
 
-/** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox; an invitation has no time. */
-export type NeedsRow = { key: string; letter: string; face?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
+/** `from` is the teammate who asked, when one did; priority is null at Medium, as on the Inbox's board; an invitation has no time. `agent` is an agent's thread. */
+export type NeedsRow = { key: string; letter: string; face?: string; photo?: string; agent?: boolean; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
 export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; photo?: string; line: string; state: TeamRowState; week: number[]; total: number };
 export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
 
 const ICONS: Record<DoorKey, JSX.Element> = {
-  inbox: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9" /></svg>,
-  progress: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5" /><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none" /></svg>,
-  team: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5" /><circle cx="6" cy="10" r="2" /><circle cx="18" cy="10" r="2" /><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" /><path d="M3 18c0-2 1.3-3.5 3-3.5M21 18c0-2-1.3-3.5-3-3.5" /></svg>,
+  inbox: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9" /></svg>,
+  progress: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5" /><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none" /></svg>,
+  team: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5" /><circle cx="6" cy="10" r="2" /><circle cx="18" cy="10" r="2" /><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" /><path d="M3 18c0-2 1.3-3.5 3-3.5M21 18c0-2-1.3-3.5-3-3.5" /></svg>,
 };
 
 function Bars({ week }: { week: number[] }) {
@@ -69,6 +71,9 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
     rows.current?.querySelector('.hm-row.on')?.scrollIntoView({ block: 'nearest' });
   }, [pick]);
 
+  // Up to three rows a card is as tall as its rows; past that it stops at its full height and scrolls.
+  const tallest = Math.max(needs.length, team ? team.length : progress.length, 1);
+
   return <div className="hm-page">
     <div className="hm-col">
       <h1 className="hm-hello">{hello}</h1>
@@ -80,7 +85,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
         ))}
       </nav>
       <div className="hm-start" ref={slot} />
-      <div className="hm-two">
+      <div className={`hm-two${tallest <= 3 ? ' fits' : ''}`}>
         <section className="hm-card hm-glass" aria-label="Needs you">
           <header className="hm-head">
             <span className="t">Needs you{needsCount > 0 && <em>{needsCount}</em>}</span>
@@ -90,7 +95,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
             {needs.length === 0 && <p className="hm-empty">Nothing needs you.</p>}
             {needs.map((r, i) => (
               <button type="button" key={r.key} className={`hm-row${i === pick ? ' on' : ''}${r.unread ? ' unread' : ''}`} onClick={() => onOpen(r.key)} onMouseEnter={() => setPick(i)}>
-                {r.face ? <MateFace seed={r.face} className="hm-face" /> : <span className="hm-face">{r.letter}</span>}
+                {r.face ? <MateFace seed={r.face} className="hm-face" /> : r.agent ? <span className="hm-face hm-agent"><AgentFace /></span> : <span className="hm-face">{r.photo ? <img className="hm-photo" src={r.photo} alt="" referrerPolicy="no-referrer" /> : r.letter}</span>}
                 <span className="hm-text"><b>{r.title}</b>
                   <span className="hm-tags">
                     {r.priority && <span className={`hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`} title={priorityLabelOf(r.priority)} aria-label={priorityLabelOf(r.priority)}><PriorityMark id={r.priority} /></span>}
@@ -116,9 +121,9 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
                   {m.face
                     ? <MateFace seed={m.face} className={`hm-face${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`} />
                     : <span className={`hm-face${m.ai ? ' ai' : ''}${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`}>
-                      {m.photo ? <img className="hm-photo" src={m.photo} alt="" referrerPolicy="no-referrer" /> : m.letter}</span>}
+                      {m.photo ? <img className="hm-photo" src={m.photo} alt="" referrerPolicy="no-referrer" /> : m.ai ? m.letter : initialsOf(m.name)}</span>}
                   <span className="hm-text"><b>{m.name}</b><small>{m.line}</small></span>
-                  <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>
+                  {m.total > 0 && <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>}
                 </button>
               ))}
             </div>
@@ -133,7 +138,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
               {progress.length === 0 && <p className="hm-empty">No agent is working right now.</p>}
               {progress.map((r) => (
                 <button type="button" key={r.key} className="hm-row" onClick={() => onOpen(r.key)}>
-                  <span className="hm-face live">{r.letter}</span>
+                  <span className="hm-face hm-agent live"><AgentFace /></span>
                   <span className="hm-text"><b>{r.title}</b><small>{r.line}</small></span>
                   <time>{updatedWords(r.at, now)}</time>
                 </button>

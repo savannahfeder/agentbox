@@ -257,6 +257,8 @@ const FILES_HELD = 40;
 const FILE_CHARS_HELD = 64_000_000;
 const HEARTBEAT_MS = 5 * 60_000;
 const SETTLE_MS = 400;
+/** How long a sync pass trusts the live connection before it reads the chats again; a socket can drop without a word. */
+export const ROOMS_RECHECK_MS = 60_000;
 
 // Pins, mutes, rooms marked unread, the first-room pin and each group's Mark
 // done are this Mac's, kept per person.
@@ -340,6 +342,7 @@ export function createRooms({
   let again = false;
   let gen = 0; // bumped by every change made here, see refresh
   let settle: ReturnType<typeof setTimeout> | null = null;
+  let readAt = 0; // when the chats were last read whole from the cloud
 
   const meId = () => me()?.id ?? null;
 
@@ -513,6 +516,7 @@ export function createRooms({
       decisions = marked;
       fileMarks = onFiles;
       reads = new Map(readRows.map((r): [string, number] => [r.roomId, r.readAt]));
+      readAt = now();
       mentioned = mentionRows;
       saidByMe = myRows;
       autoPin(rooms);
@@ -677,6 +681,8 @@ export function createRooms({
     if (!want && started) return stop();
     if (!want) return;
     if (!setUp) { await setUpOnce(started!); if (setUp) await refresh(); }
+    // Live messages are only heard while the socket is up, so the pass reads them again now and then.
+    if (setUp && now() - readAt >= ROOMS_RECHECK_MS) await refresh();
     await syncName().catch((err) => log(`rooms: name: ${err.message}`));
     await syncStatus().catch((err) => log(`rooms: status: ${err.message}`));
     await publish().catch((err) => log(`rooms: presence: ${err.message}`));

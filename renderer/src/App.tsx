@@ -70,8 +70,8 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
-import { SEE_SAID, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
+import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy, newestAskPerThread, sentAwayByMe } from '../../shared/thread-asks.mts';
+import { ASK_PERSON_EVENT, HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
 import { ImportAgents } from './components/ImportAgents';
@@ -154,7 +154,7 @@ import { personChatShows, personPressOpens } from './team/one-conversation';
 import { pairLine, pairTimeline, THREAD_KINDS, type PairEntry, type PairOpens } from './team/pair-timeline';
 import { AlongHistory, type ChatAlong } from './team/rooms/RoomChat';
 import { listedIn, pairRooms } from '../../shared/pair-room.mts';
-import { isPresenceCard, roomMateCards, roomMatesById, threadOnLine } from './team/rooms/room-rules';
+import { initialsOf, isPresenceCard, roomMateCards, roomMatesById, threadOnLine } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
 import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
@@ -231,8 +231,9 @@ import { isNew } from '../../shared/notify-rules.mts';
 import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mts';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { StartTeam } from './team/StartTeam';
+import { sharingNeedsPro } from './team/multiplayer-words';
 import { inboxBadge } from './needs-count';
-import { givenStage as givenStageOf, namedCards } from './team/company';
+import { givenStage as givenStageOf, namedCards, taskWords } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { TeamBilling } from './team/TeamBilling';
@@ -243,7 +244,7 @@ import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, stoppedIds, type Fleet } from './fleet';
 import { factsFor } from './status-word';
 import { isCarrying } from './threads/row-drag';
-import { TeammateThread } from './threads/TeammateThread';
+import { TEAMMATE_REPLY, TeammateThread } from './threads/TeammateThread';
 import { SharedFileCards, SharedFileRows } from './threads/SharedFileRows';
 import { FollowCards, FollowRows } from './threads/FollowRows';
 import { FollowContext, follow, followNews, isFollowing, markTold, readFollows, unfollow, writeFollows, type Follow } from './team/following';
@@ -268,7 +269,7 @@ import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
 import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
-import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
+import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, taskHandedFrom, handedTo as handedToPage, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
 import { usePointerHold, useHeldOrder } from './threads/steady-rows';
@@ -521,7 +522,8 @@ export default function App() {
   const [pointedHint, setPointedHint] = useState<{ id: string; el: HTMLElement } | null>(null);
   const [shownHint, setShownHint] = useState<{ id: string; el: HTMLElement } | null>(null);
   const hints = useRef<HintScheduler<{ id: string; el: HTMLElement }> | null>(null);
-  if (!hints.current) hints.current = hintScheduler(setShownHint);
+  // A plate due after its button opened a menu never shows: the menu is what it would cover.
+  if (!hints.current) hints.current = hintScheduler((h) => setShownHint(h && h.el.getAttribute('aria-expanded') === 'true' ? null : h));
   useEffect(() => { hints.current?.point(pointedHint); }, [pointedHint]);
   useEffect(() => () => hints.current?.stop(), []);
   // THE SWITCH OVER ALL OF IT. Off means the row keeps
@@ -678,18 +680,30 @@ export default function App() {
   // for the icon inside it.
   useEffect(() => {
     if (!hintsOn) return undefined;
+    // What was just pressed says nothing until the pointer reaches something else: a hint under a tab you clicked tells you what you just did.
+    let pressed: HTMLElement | null = null;
+    const onPress = (e: PointerEvent) => {
+      pressed = (e.target as HTMLElement | null)?.closest?.('[data-hint]') as HTMLElement | null;
+      setPointedHint(null);
+      hints.current?.stop();
+    };
     const onMove = (e: MouseEvent) => {
       const el = (e.target as HTMLElement | null)?.closest?.('[data-hint]') as HTMLElement | null;
+      if (pressed && el === pressed) return;
+      pressed = null;
       const id = el?.dataset.hint;
-      if (!el || !id || !HINTS[id]) { setPointedHint((was) => (was ? null : was)); return; }
+      // A button whose menu is open says nothing: the hint would sit on the menu's first row.
+      if (!el || !id || !HINTS[id] || el.getAttribute('aria-expanded') === 'true') { setPointedHint((was) => (was ? null : was)); return; }
       setPointedHint((was) => (was && was.el === el ? was : { id, el }));
     };
     const onOut = (e: MouseEvent) => { if (!e.relatedTarget) setPointedHint(null); };
     document.addEventListener('mousemove', onMove, true);
     document.addEventListener('mouseout', onOut, true);
+    document.addEventListener('pointerdown', onPress, true);
     return () => {
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('mouseout', onOut, true);
+      document.removeEventListener('pointerdown', onPress, true);
     };
   }, [hintsOn]);
   // A PLATE MUST NEVER OUTLIVE THE THING IT IS ABOUT, and this is three guards
@@ -722,9 +736,10 @@ export default function App() {
     // re-rendered away by an agent finishing, with no key pressed and nothing
     // scrolled, so the last guard watches the document rather than the input.
     const watch = new MutationObserver(() => {
-      if (!shownHint.el.isConnected) drop();
+      if (!shownHint.el.isConnected || shownHint.el.getAttribute('aria-expanded') === 'true') drop();
     });
     watch.observe(document.body, { childList: true, subtree: true });
+    watch.observe(shownHint.el, { attributes: true, attributeFilter: ['aria-expanded'] });
     return () => {
       window.removeEventListener('scroll', drop, true);
       window.removeEventListener('resize', drop);
@@ -2291,7 +2306,8 @@ export default function App() {
     asking: [...askingIds],
     whyNotCloud: snap?.supervisor.whyNotCloud,
     signInBar: !!planWords,
-  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds, planWords]);
+    engines: snap?.engines,
+  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds, planWords, snap?.engines]);
   const savedCloudKeyList = snap?.cloud?.setUp ? snap.cloud.keys : null;
   const savedCloudKeys = useMemo(() => (savedCloudKeyList ?? []).map((k) => k.name), [savedCloudKeyList]);
   const cloudIds = useMemo(() => new Set(runningRows.filter((r) => r.where === 'cloud').map((r) => r.itemId)), [runningRows]);
@@ -2314,6 +2330,12 @@ export default function App() {
     const thread = a ? byId.get(a.thread) : null;
     return a && askIsOpen(r) && !(thread && heldForHer(thread)) ? [a.thread] : [];
   })), [items, team?.me, byId]);
+  // Threads you handed over that the other person still has: in progress, not done.
+  const handedOut = useMemo(() => new Set(items.flatMap((r) => {
+    if (!handedToPage(r)) return [];
+    const task = taskHandedFrom(items, r.id, team?.me ?? null);
+    return task && task.status !== 'done' ? [r.id] : [];
+  })), [items, team?.me]);
 
   // A comment that asks you by name is news to you (fileNewsFor).
   const myName = team?.byId.get(team.me ?? '')?.name ?? null;
@@ -2556,8 +2578,9 @@ export default function App() {
   const progress = useMemo(() => [
     ...items.filter((i) => {
       if (scope && i.product !== scope) return false;
-      if (askIGave(i, team?.me ?? null)) return false;
+      if (sentAwayByMe(i, team?.me ?? null)) return false;
       if (askedOut.has(i.id) && i.status !== 'done') return true;
+      if (handedOut.has(i.id)) return true;
       const deferredUntil = dueAt(i);
       if (hiddenAt(i) > now && !liveIds.has(i.id)) return false;
       // The grace window: the write waits for Z, the signal must not, because a
@@ -2591,7 +2614,7 @@ export default function App() {
     // threads/page-rules.ts): a queued row is told by its Status cell, and
     // what you just sent is on top.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, scope, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut]);
+  [items, agentList, agentMode, scope, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut, handedOut]);
 
   // AND THE TAB COUNTS EACH THREAD ONCE: the list, less what Needs you holds,
   // the way `tabState` below has it for the board and `done` for the archive.
@@ -2639,9 +2662,9 @@ export default function App() {
   // In progress until it does (w-bc976fd247).
   const done = useMemo(() => {
     const needsYou = new Set(inbox.map((i) => i.id));
-    return items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !askIGave(i, team?.me ?? null))
+    return newestAskPerThread(items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !sentAwayByMe(i, team?.me ?? null) && !handedOut.has(i.id)), items)
       .sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [items, scope, inbox, liveIds, shippingIds, team?.me]);
+  }, [items, scope, inbox, liveIds, shippingIds, team?.me, handedOut]);
 
   // Scheduled is the future inbox: everything waiting for its moment, soonest
   // first. The view only exists while something is in it. It holds two things
@@ -3091,9 +3114,22 @@ export default function App() {
       const w = linkWaiting.current;
       if (w?.personId !== personId || w.threadId !== threadId) return;
       linkWaiting.current = null;
-      showToast(`${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
+      showToast(sharingNeedsPro(team?.state) ?? `${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
     }, 1500));
   }, [weekCards, openTeammateCard, team, items]);
+
+  // AN ASK OPENS ON THE THREAD IT IS ABOUT. The person asked was put on a task
+  // page whose reply box went to the asker, with the thread a button away;
+  // the thread page carries the same hand-back. Where this computer has no card
+  // for the thread yet, the task page stays as it was.
+  useEffect(() => {
+    const f = focused;
+    if (!f?.ask || !team?.me || f.assignee !== team.me || !askIsOpen(f)) return;
+    const card = weekCards.find((c) => c.personId === f.ask!.owner && c.threadId === f.ask!.thread);
+    if (!card) return;
+    setFocused(null);
+    openTeammateCard(card);
+  }, [focused?.product, focused?.id, weekCards.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const w = linkWaiting.current;
     if (!w) return;
@@ -3207,7 +3243,7 @@ export default function App() {
   // The columns themselves are kept too, for the left and right arrows
   // (`boardSideways`), and they come in the order you dragged them to.
   // An ask you sent is said by your thread's own card (as in the lists).
-  const boardItemsHere = useMemo(() => items.filter((i) => !askIGave(i, team?.me ?? null)), [items, team?.me]);
+  const boardItemsHere = useMemo(() => items.filter((i) => !sentAwayByMe(i, team?.me ?? null)), [items, team?.me]);
   const boardArgs = useMemo(
     () => ({ items: evBoard ? boardItems(boardItemsHere, evBoard, teammateIdOf) : boardItemsHere, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
       picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: runningIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),
@@ -4481,6 +4517,7 @@ export default function App() {
       if (one) openChatsPlace(`person:${one.people[0]}`); else roomsUi.pickGroup(key);
     },
     onTeam: homeLayout === 'chats' ? () => openChatsPlace('team') : undefined,
+    onTasks: homeLayout === 'chats' ? () => openChatsPlace('tasks') : undefined,
     persons: homeLayout === 'chats' && team ? (team.state.people ?? []).filter((p) => p.id !== team.me).map((p) => ({ id: p.id, name: p.name, url: p.avatarUrl ?? null, waits: false })) : undefined,
     onPerson: (id) => openChatsPlace(`person:${id}`),
   } : null;
@@ -6798,7 +6835,8 @@ export default function App() {
       // A TEAMMATE'S CARD IS A SCREEN, LIKE AN OPEN THREAD (w-fb16bcaeba). It
       // had no keys of its own, so J, K and E all ran against the list hidden
       // behind it. J and K walk on, Escape goes back to the page, N and Z mean
-      // what they mean everywhere, and nothing else reaches the list.
+      // what they mean everywhere, R opens its reply box as on a thread of your
+      // own, and nothing else reaches the list.
       if (openCard && teamShown) {
         if (e.key === 'Escape') { e.preventDefault(); if (putAwayTheNewest(openDoc ? docOpenedAt.current : -Infinity)) return; if (openDoc) closeArtifact(); else { setOpenCard(null); setTeamOpen(false); } }
         else if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
@@ -6808,6 +6846,7 @@ export default function App() {
         }
         else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
+        else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); window.dispatchEvent(new Event(TEAMMATE_REPLY)); }
         return;
       }
       // On the page J and K move the keyboard and open nothing: onto a
@@ -7534,7 +7573,7 @@ export default function App() {
     : s.at === 'files' ? 'Files'
     : s.at === 'connections' ? 'Connections'
     : s.at === 'settings' ? 'Settings'
-    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : members.find((m) => m.key === s.place)?.name ?? 'Team')
+    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : s.place === 'tasks' ? 'Tasks' : members.find((m) => m.key === s.place)?.name ?? 'Team')
     : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
     : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
     : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
@@ -7685,23 +7724,32 @@ export default function App() {
     const people = team ? byWorkHere(giveRows(item, { me: team.me, people: team.state.people ?? [], product: team.products.get(item.product) }), weekCards, team.products.get(item.product)?.name ?? item.productName, now) : [];
     if (!people.length) return [];
     const mates = teammatesUi.list.filter((t) => !t.paused && t.status !== 'draft' && item.routed?.to !== `mate:${t.id}`);
-    return [...people, ...mates.map((t) => ({ id: `mate:${t.id}`, name: t.name }))];
+    const asked = new Set(asksOnThread(items, team?.me ?? null, item.id).filter((a) => a.open).map((a) => a.to));
+    return [...people.map((p) => (asked.has(p.id) ? { ...p, asked: true } : p)), ...mates.map((t) => ({ id: `mate:${t.id}`, name: t.name }))];
   };
   const giveThread = async (item: WorkItem, to: GiveTo, note = '') => {
     if (to.id.startsWith('mate:')) {
-      await api.routeThread({ product: item.product, id: item.id, to: to.id }).then(() => showToast(`Given to ${to.name}`), (err) => showToast(String(err?.message ?? err)));
+      await api.routeThread({ product: item.product, id: item.id, to: to.id }).then(() => showToast(handedToWhom(to.name)), (err) => showToast(String(err?.message ?? err)));
       return;
     }
     showToast(sendingTo(to.name.split(/\s+/)[0] || to.name));
     const out = await api.teamHandOn({ product: item.product, id: item.id, to: to.id, ...(note.trim() ? { note: note.trim() } : {}) });
-    showToast(out.ok ? handedToWhom(to.name) : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
+    // A thread handed over is no longer yours to be helped with: anyone still asked onto it is let go.
+    const asked = out.ok && team ? asksOnThread(items, team.me, item.id).filter((a) => a.open) : [];
+    for (const a of asked) await api.answer({ product: (a.row as WorkItem).product, id: a.row.id, status: 'done' }).catch(() => {});
+    const letGo = [...new Set(asked.filter((a) => a.to !== to.id).map((a) => firstName(team?.byId.get(a.to) ?? null) || 'Your teammate'))];
+    showToast(out.ok ? `${handedToWhom(to.name)}${letGo.length ? `. ${letGo.join(' and ')} no longer ${letGo.length === 1 ? 'has' : 'have'} the ask` : ''}` : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
     if (out.ok) await refresh();
   };
   // Help or a review keeps the thread yours; the task they get leads back to it.
   const askOnThread = async (item: WorkItem, to: GiveTo, kind: 'help' | 'review', note: string, step: string | null) => {
     const first = to.name.split(/\s+/)[0] || to.name;
+    // Their task leads back to this thread, which they could not open.
+    const paused = sharingNeedsPro(team?.state);
+    if (paused && !to.id.startsWith('mate:')) { showToast(paused); return; }
     const out = await api.teamAsk({ product: item.product, id: item.id, to: to.id, kind, ...(note ? { note } : {}), ...(step ? { step } : {}) });
-    showToast(out.ok ? (kind === 'help' ? `Asked ${first} to help. It stays yours.` : `Asked ${first} to review it.`) : out.error ?? 'That did not work.');
+    // It leaves Needs you for In progress, so the toast says where it went and when it comes back.
+    showToast(out.ok ? `Asked ${first} to ${kind === 'help' ? 'help' : 'review it'}. It waits in In progress until ${first} hands it back.` : out.error ?? 'That did not work.');
     if (out.ok) await refresh();
   };
   const handAskBack = async (task: WorkItem, verdict: 'done' | 'yes' | 'changes', words: string) => {
@@ -7710,6 +7758,29 @@ export default function App() {
     showToast(out.ok ? `Handed back to ${first}.` : out.error ?? 'That did not work.');
     if (out.ok) await refresh();
     return !!out.ok;
+  };
+  // A message to someone about a thread starts by naming it (round two of the team test). By name,
+  // not link: the box shows a link as raw markdown, and the thread may be theirs.
+  const messageAbout = (personId: string, title: string | null | undefined) => {
+    if (!snap) return;
+    const convo = conversationWith(personId, { products: snap.products, items, me: team?.me ?? null });
+    const about = title ? `About “${title}”: ` : '';
+    if (convo) {
+      if (about && !readDraft(convo).trim()) { saveDraft(convo, about); window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(convo) })); }
+      openConversation(convo);
+    } else { setComposeInitial({ to: personId, ...(about ? { body: about } : {}) }); setModal('compose'); }
+  };
+  // A thread you handed over comes back: their task ends, and your thread opens again.
+  const takeHandOverBack = async (item: WorkItem) => {
+    const task = taskHandedFrom(items, item.id, team?.me ?? null);
+    const who = firstName(team?.byId.get(task?.assignee ?? '') ?? null) || handedToPage(item) || 'them';
+    try {
+      if (task && task.status !== 'done') await api.answer({ product: task.product, id: task.id, status: 'done' });
+      // Back to you, waiting in Needs you: a reopen would start its agent again.
+      await api.answer({ product: item.product, id: item.id, status: 'blocked' });
+    } catch (err) { showToast(`Not taken back: ${(err as Error).message}`); return; }
+    showToast(`Taken back from ${who}. It is in your Needs you.`);
+    await refresh();
   };
   const takeAskBack = async (task: WorkItem) => {
     try { await api.answer({ product: task.product, id: task.id, status: 'done' }); } catch (err) { showToast(`Not taken back: ${(err as Error).message}`); return; }
@@ -7745,6 +7816,12 @@ export default function App() {
         return;
       }
       case 'give': void giveThread(item, { id: d.to, name: d.name }); return;
+      case 'take-back': void takeHandOverBack(item); return;
+      case 'ask':
+        if (!focused || keyOf(focused) !== keyOf(item)) { setFocused(item); markSeen(item); }
+        // Next tick: the menu is on the thread's page, which may only just be opening.
+        setTimeout(() => window.dispatchEvent(new CustomEvent(ASK_PERSON_EVENT, { detail: { kind: d.kind, to: { id: d.to, name: d.name } } })), 60);
+        return;
       case 'shipped': void markShipped(item, d.on); return;
       case 'wait': void waitOn(item, d.on); return;
       case 'decide': {
@@ -7773,6 +7850,9 @@ export default function App() {
       const item = items.find((i) => i.product === target.product && i.id === target.id);
       const link = threadLink(team?.me, target.id);
       if (!item || !link || !to.length) return;
+      // A link nobody could open is not sent.
+      const paused = sharingNeedsPro(team?.state);
+      if (paused) { showToast(paused); return; }
       const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
       showToast(sendingTo(names));
       const seen = seenNow(item, team?.products.get(item.product), team?.state.since ?? null);
@@ -7957,8 +8037,11 @@ export default function App() {
       const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : mate?.name ?? null;
       // A conversation's record is named for nobody; the row's sender says who it is with.
       const project = directSlugs.has(i.product) ? '' : i.productName;
-      const asks = from && i.ask && i.assignee === team?.me ? (i.ask.kind === 'help' ? ' asks for help' : ' asks for a review') : '';
-      return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: from ? `${from}${asks}` : null, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+      // A closed ask says how it ended ("Sam took it back"), not what it asked.
+      const ended = from && i.ask && i.status === 'done' && team ? taskWords(i, team.products.get(i.product), team.me, (id) => firstName(team.byId.get(id) ?? null), true)?.word ?? null : null;
+      const asks = from && i.ask && i.assignee === team?.me && !ended ? (i.ask.kind === 'help' ? ' asks for help' : ' asks for a review') : '';
+      const photo = sent && !sent.agent ? team?.byId.get(sent.from)?.avatarUrl : null;
+      return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), ...(!from && !mate ? { agent: true } : {}), ...(photo ? { photo } : {}), letter: sent ? initialsOf(team?.byId.get(sent.from)?.name || from || '?') : from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: ended ?? (from ? `${from}${asks}` : null), priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
     },
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : busiestFirst(members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
@@ -8029,9 +8112,9 @@ export default function App() {
   // A teammate's waiting thread waits on them, not on you, so it never wears the accent.
   const CARD_WORD: Record<string, [string, PlaceRow['tone']]> = { running: ['Working', 'work'], waiting: ['Waiting', 'hold'], scheduled: ['Later', 'later'], done: ['Done', 'done'] };
   const placeMember = evOn && evPlace ? members.find((m) => m.key === evPlace) ?? null
-    : chatsPlaceShown && chatsPlace !== 'team' ? members.find((m) => m.key === chatsPlace) ?? null : null;
-  // Where Chats' list marks the open page: the team, an AI teammate, or the person's one-to-one chat.
-  const chatsListKey = !chatsPlaceShown || !chatsPlace ? null : chatsPlace === 'team' ? 'team'
+    : chatsPlaceShown && chatsPlace !== 'team' && chatsPlace !== 'tasks' ? members.find((m) => m.key === chatsPlace) ?? null : null;
+  // Where Chats' list marks the open page: the team, its tasks, an AI teammate, or the person's one-to-one chat.
+  const chatsListKey = !chatsPlaceShown || !chatsPlace ? null : chatsPlace === 'team' || chatsPlace === 'tasks' ? chatsPlace
     : chatsPlace.startsWith('mate:') ? `teammate:${chatsPlace.slice('mate:'.length)}`
       : chatsPlace;
   const backTo = 'Needs you';
@@ -8271,7 +8354,7 @@ export default function App() {
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inboxCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
-        onHome={homeOn ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen}
+        onHome={homeOn ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen || chatsPlaceShown || cardFromPlace}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
         groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
@@ -8503,23 +8586,16 @@ export default function App() {
                   headerTarget={focused ? null : teamHeader} cornerTarget={focused ? null : teamCorner}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
+                  handedToYou={taskHandedFrom(items, openCard.threadId, openCard.personId) as WorkItem | null}
+                  onOpenTask={(t) => { setOpenCard(null); setTeamOpen(false); setFocused(t); markSeen(t); }}
                   onHandBack={(verdict, words) => {
                     const task = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;
                     return task ? handAskBack(task, verdict, words) : Promise.resolve(false);
                   }}
-                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
+                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : chatsPlace === 'tasks' ? 'Tasks' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
-                  onMessage={() => {
-                    const convo = conversationWith(openCard.personId, { products: snap.products, items, me: team?.me ?? null });
-                    // The message starts by naming the thread it is about (round two of the team test).
-                    // By name, not link: the box shows a link as raw markdown, and the thread is theirs.
-                    const about = openCard.title ? `About “${openCard.title}”: ` : '';
-                    if (convo) {
-                      if (about && !readDraft(convo).trim()) { saveDraft(convo, about); window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(convo) })); }
-                      openConversation(convo);
-                    } else { setComposeInitial({ to: openCard.personId, ...(about ? { body: about } : {}) }); setModal('compose'); }
-                  }} />
+                  onMessage={() => messageAbout(openCard.personId, openCard.title)} />
               </div>
             ) : (
               <TeamPage team={snap?.team} />
@@ -8544,7 +8620,7 @@ export default function App() {
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
                   onOpen={homeOpenRow} onMember={(key) => openChatsPlace(key)} onTeam={() => openChatsPlace('team')} />
-              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{standupPage(homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : placeEl}</ChatsFrame>
+              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{standupPage(homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : chatsPlace === 'tasks' ? <div className="team-page">{tasksPage('Tasks')}</div> : placeEl}</ChatsFrame>
               : connectionsShown ? (
                 <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} cloudKeys={savedCloudKeyList} />
               ) : filesShown ? (
@@ -8614,7 +8690,7 @@ export default function App() {
                   onGive={(to, note) => { void giveThread(focused, to, note); }}
                   onAsk={team ? (to, kind, note, step) => { void askOnThread(focused, to, kind, note, step); } : undefined}
                   asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
-                  asksCorner={team && !focused.ask ? <AsksChip item={focused} items={items} now={now} onTakeBack={(task) => { void takeAskBack(task); }} /> : null}
+                  asksCorner={team && !focused.ask ? <AsksChip item={focused} items={items} now={now} onTakeBack={(task) => { void takeAskBack(task); }} onMessage={(personId) => messageAbout(personId, rowTitle(focused))} /> : null}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}
                   waitChoices={waitsFor(focused)}
@@ -8767,7 +8843,7 @@ export default function App() {
                   // ways a task ends, and the card beside the bar names exactly
                   // two. Both are back the moment the walk ends.
                   onSnooze={walking ? undefined : () => openSnooze(focused)}
-                  onReopen={() => sendBack(focused)}
+                  onReopen={() => (handedToPage(focused) ? takeHandOverBack(focused) : sendBack(focused))}
                   onReopenDone={() => reopenDone(focused)}
                   onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
                   onPriority={(value) => { void retag([focused], value); }}
@@ -9301,6 +9377,15 @@ export default function App() {
           // The same row the hint and the keys are on, so ⌘K opened over a
           // row cannot mean a different task than E pressed over it.
           // A phone draws no pointed row, so only the open thread.
+          // A teammate's thread has no row of its own: its commands answer the ask on it.
+          if (!focused && openCard && teamShown) {
+            const ask = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;
+            const owner = firstName(team?.byId.get(openCard.personId) ?? null) || 'them';
+            return threadCommands({ answers: askAnswers(ask?.ask?.kind, owner) }).map((c) => ({
+              id: c.id, label: c.label, keywords: c.keywords,
+              run: () => { setModal(null); if (c.does.act === 'hand-back') window.dispatchEvent(new CustomEvent(HAND_BACK_EVENT, { detail: c.does.verdict })); },
+            }));
+          }
           const target = focused ?? (onPhone() ? null : pointed);
           if (!target) return [];
           const options = itemOptions(target);
@@ -9317,7 +9402,7 @@ export default function App() {
               || (target.status === 'open' && target.kind !== 'question' && !filedByThePerson(target)))
               ? [{ id: 'approve',
                   label: target.kind === 'question' ? 'Approve recommended'
-                    : target.kind === 'review' ? 'Approve (proceed as proposed)' : 'Approve (run it)',
+                    : target.kind === 'review' ? 'Approve as proposed' : 'Approve and run',
                   run: () => { setModal(null); resolve(target); } }]
               : []),
             // RUN NOW, by the same rule as the three-dot menu (run-now.ts).
@@ -9385,6 +9470,8 @@ export default function App() {
                   : page && peopleToAdd({ item: target, me: team?.me ?? null, company: team?.state.people ?? [] }).length > 0 && 'thread',
                 routes: teamRouteChoices(target, team),
                 give: giveToFor(target),
+                ask: giveToFor(target).filter((p) => !p.id.startsWith('mate:') && !p.asked && !target.ask),
+                takeBack: !!handedToPage(target),
                 shipped: shippedFor(target),
                 waits: waitsFor(target),
                 waitsNow: setByPerson(target),
@@ -9558,6 +9645,7 @@ export default function App() {
              has no team in it, and this keeps the team's code in the team's
              files. No team cloud, no pane and no Team row. */
           teamPane={snap?.team?.configured ? <TeamPage team={snap?.team} inviteFocus={inviteFocus} /> : undefined}
+          teamShares={snap?.team?.pro !== false}
           roomsPane={roomsUi.settingsPane}
           // WHO SEES A PROJECT'S THREADS (w-b989839656): the button beside a
           // project's name and the Projects list's column, only while someone

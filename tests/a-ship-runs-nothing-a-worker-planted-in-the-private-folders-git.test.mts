@@ -12,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pushPrivateFolder } from '../scripts/lib/private-folder.mjs';
+import { plantedIn } from '../scripts/lib/private-folder-check.mjs';
 
 const made: string[] = [];
 afterEach(() => { for (const d of made.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
@@ -101,6 +102,19 @@ describe('a ship and a private folder a worker could write', () => {
     put(path.join(inner, 'x.md'), 'changed\n');
     expect(ship(w).pushed).toBe(false);
     expect(fs.existsSync(w.marker)).toBe(false);
+  });
+
+  // A Mac's and a Windows disk open `.GIT` when git asks for `.git`, so a nested
+  // repository under any spelling of the name is still one (security review, 2026-11-21).
+  it('sees a nested repository whatever case its .git is spelt in', () => {
+    for (const name of ['.GIT', '.Git', 'GIT~1', '.git.']) {
+      const w = world();
+      fs.mkdirSync(path.join(w.at, 'inner', name), { recursive: true });
+      expect(plantedIn(w.at, path.join(w.app, '.claude/skills')), name).toMatch(/repository of its own at inner/);
+    }
+    const w = world();
+    fs.mkdirSync(path.join(w.at, 'inner', 'git'), { recursive: true });
+    expect(plantedIn(w.at, path.join(w.app, '.claude/skills'))).toBeNull();
   });
 
   it('follows no .git file a worker pointed somewhere else', () => {

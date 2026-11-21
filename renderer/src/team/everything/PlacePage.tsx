@@ -8,6 +8,7 @@ import { MemberFace, MemberWord } from './TeamStrip';
 import type { Member } from './members';
 
 const BACK = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>;
+const PLUS = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>;
 
 /** One button over a place's chat: a list or the job, shown in the chat's place, or a page it goes to. */
 export type PlacePart = { key: string; label: string; count?: number; ask?: boolean; body?: ReactNode; onOpen?: () => void };
@@ -214,9 +215,9 @@ export function SendBox({ placeholder, note, onSend, empty }: {
   </div>;
 }
 
-/** A button on a place's header. */
+/** A button on a place's header; the one that is not quiet is its main action and carries a plus. */
 export function PlaceAction({ children, onClick, quiet = false, title }: { children: ReactNode; onClick: () => void; quiet?: boolean; title?: string }) {
-  return <button type="button" className={`pl-btn${quiet ? ' quiet' : ''}`} onClick={onClick} title={title}>{children}</button>;
+  return <button type="button" className={`pl-btn pl-act${quiet ? ' quiet' : ''}`} onClick={onClick} title={title}>{!quiet && PLUS}{children}</button>;
 }
 
 /** Their AI teammates as a button over the chat: a face and a name each, which open its own place. */
