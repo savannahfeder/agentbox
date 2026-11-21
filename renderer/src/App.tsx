@@ -262,6 +262,7 @@ import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../
 import type { ArtifactOpen } from './components/ArtifactView';
 import { fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
 import { commentsToHand, type HandedComment } from './threads/comments-to-hand';
+import { notesOnThread } from './threads/thread-notes';
 import { teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
@@ -806,17 +807,18 @@ export default function App() {
   // `files`: only the comments on these, when a file's own notes asked.
   const handToAgent = useCallback((item: WorkItem, message?: AgentTurn, files?: string[]) => {
     const seen = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer);
-    const notes = item.artifacts?.notes ?? [];
+    // The comments the notes panel shows, other copies of the same files included.
+    const comments = notesOnThread(item);
     // A task's files sit in the record it rides in, which a new thread cannot
     // read, so they go on the card and the links come out of the words.
     if (isTaskRow(item)) {
       const from = item.createdBy ? seen?.byId.get(item.createdBy)?.name : null;
-      void api.teamTaskBrief({ product: item.product, id: item.id })
-        .then((b) => {
+      void Promise.all([api.teamTaskBrief({ product: item.product, id: item.id }), comments])
+        .then(([b, notes]) => {
           const { attachments, ...start } = taskHandOff({ from, brief: b, message: message ?? null, nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
             handFrom: { product: item.product, id: item.id, message: message?.uid ?? 'first' }, offered: snap?.products ?? [], cards: snap?.team?.cards ?? [] });
-          const comments = commentsToHand(notes, { me: seen?.me ?? null, files: files ?? null });
-          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(comments.length ? { comments } : {}) });
+          const handed = commentsToHand(notes, { me: seen?.me ?? null, files: files ?? null });
+          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(handed.length ? { comments: handed } : {}) });
           setModal('compose');
         })
         .catch((err) => showToast(String(err?.message ?? err)));
@@ -831,11 +833,13 @@ export default function App() {
     });
     // The files a message carries are the ones whose comments go with it.
     const linked = files ?? start.attachments.map((a) => a.srcPath.slice((dir?.length ?? 0) + 1));
-    const comments = linked.length ? commentsToHand(notes, { me: seen?.me ?? null, files: linked }) : [];
     // From a file's notes there is no message to carry, so the thread is named for the file.
     const named = !message && files?.length ? { body: `Changes from the comments on ${[...new Set(files.map((f) => shownName(f)))].join(', ')}\n\n` } : {};
-    setComposeInitial({ ...start, ...named, ...(comments.length ? { comments } : {}) });
-    setModal('compose');
+    void comments.then((notes) => {
+      const handed = linked.length ? commentsToHand(notes, { me: seen?.me ?? null, files: linked }) : [];
+      setComposeInitial({ ...start, ...named, ...(handed.length ? { comments: handed } : {}) });
+      setModal('compose');
+    });
   }, [snap?.team, snap?.products]);
   useEffect(() => {
     const ask = (e: Event) => {

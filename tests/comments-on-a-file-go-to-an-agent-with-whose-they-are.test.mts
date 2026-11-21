@@ -100,6 +100,11 @@ describe('every way to an agent carries them', () => {
   const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
   it('the hand-over opens the card with the thread\'s comments', () => {
     expect(app.match(/commentsToHand\(notes, /g)?.length).toBe(2);
+    // Round two: a hand-over left out comments made on another copy of the same
+    // file, which the notes panel showed. Both read the same list now.
+    expect(app).toContain('const comments = notesOnThread(item);');
+    const notes = fs.readFileSync(new URL('../renderer/src/threads/thread-notes.ts', import.meta.url), 'utf8');
+    expect(notes).toMatch(/withElsewhere\(own, await api\.fileElsewhere/);
     expect(app).toContain("'zero:hand-comments'");
   });
   // Round one of the testers (2026-11-21): reviewing a teammate's thread, three
@@ -109,6 +114,10 @@ describe('every way to an agent carries them', () => {
     expect(page).toMatch(/onHandToAgent=\{onContinue \? \(files\) => \{[^}]*commentsToHand\(marks\.notes, \{ me: team\?\.me \?\? null, files \}\)/);
     expect(page).toMatch(/onContinue\(commentsToHand\(marks\.notes, \{ me: team\?\.me \?\? null \}\)\)/);
     expect(app).toMatch(/continueTeammateThread = useCallback\(\(card: ThreadCard, comments: HandedComment\[\] = \[\]\)/);
+  });
+  it("a file's notes hand over its newest version by path, so the card can attach it", () => {
+    const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
+    expect(view).toContain('onHandToAgent!([family!.versions.at(-1)!.path])');
   });
   it('the card shows them and sends the ticked ones', () => {
     expect(card).toContain('<HandedComments');

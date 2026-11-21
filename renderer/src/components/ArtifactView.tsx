@@ -114,7 +114,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   write: (mark: ArtifactMark) => Promise<{ ok: boolean; error?: string }>;
   /** Only on a thread with an agent, on the owner's own computer. */
   withAgent?: boolean;
-  /** Where no agent hears these notes: starts one with them, the file's versions named. */
+  /** Where no agent hears these notes: starts one with them and the file's newest version, by its path. */
   onHandToAgent?: (files: string[]) => void;
   /** Posts edited words as the next version of a document. Null when it went, else why not. */
   onNewVersion?: (name: string, text: string, path: string, id: string, since?: string | null) => Promise<string | null>;
@@ -887,7 +887,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
               {canSendAll && sendBeside && <button type="button" className="av-btn av-unsent-send" title={unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
-              {handable && <button type="button" className="av-btn" onClick={() => onHandToAgent!(family!.versions.map((v) => v.id))}><NoteGlyph name="agent" />Hand to an agent</button>}
+              {handable && <button type="button" className="av-btn" onClick={() => onHandToAgent!([family!.versions.at(-1)!.path])}><NoteGlyph name="agent" />Hand to an agent</button>}
               {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>
           )}
