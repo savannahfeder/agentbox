@@ -3367,7 +3367,7 @@ body {
 .attach-x {
   position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; padding: 0; display: grid; place-items: center;
   border: 1px solid var(--line-strong); border-radius: 50%; background: var(--pop); color: var(--text-dim); cursor: pointer;
-  opacity: 0; transition: opacity .12s;
+  opacity: 0;
 }
 .attach-x svg { width: 10px; height: 10px; }
 .attach-x:hover { color: var(--text); border-color: var(--text-faint); }
