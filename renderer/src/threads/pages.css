@@ -179,6 +179,14 @@
    fallback, so its track and its gap go and the rest close up. */
 .th-grid { --th-state: 176px; --th-proj: 150px; --th-prio: 112px; display: grid; grid-template-columns: minmax(0, 1fr) var(--th-state,) var(--th-proj,) var(--th-person,) var(--th-prio,) 96px; column-gap: 16px; align-items: center; width: 100%; min-height: 20px; }
 .th-table .row { min-height: 0; }
+/* A thread row far off screen is skipped until it comes near, so the sidebar
+   sliding open, which narrows every row on every frame, lays out and paints
+   only the rows in view. A row is 54px tall, which holds its place meanwhile.
+   Not in the phone layout (phone.css), which has no sliding sidebar and rows
+   of more than one height. */
+@media (min-width: 701px) and (min-height: 521px) {
+  .th-table .row[data-item-id] { content-visibility: auto; contain-intrinsic-size: auto 54px; }
+}
 .th-grid > div { line-height: 20px; }
 .th-grid.with-person { --th-proj: 140px; --th-person: 130px; }
 /* A column no row of the table fills is not drawn, header included. */
@@ -720,3 +728,9 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
    thread's empty foot (one more flex gap) adds to the 24px above it. */
 .tp-col .thread:has(+ .appendix) > .thread-block:nth-last-child(2) > .msg.turn-end { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
 .tp-col .thread:has(+ .appendix) > :last-child:empty { display: none; }
+/* A teammate's thread opened from the Inbox is drawn as a thread of your own (TeammateThread.tsx). */
+.tm-team-pane.th-pane:has(> .tp-thread) { display: flex; flex-direction: column; overflow: hidden; }
+.tp-thread > .tp-side { position: absolute; top: 28px; right: 32px; width: 300px; max-height: calc(100% - 56px); overflow: auto; z-index: 2; }
+.tp-thread .tp-files { margin: 12px 0 0; }
+.tp-dock-form { margin: 0; }
+.tp-dock-form .compose-clauses { margin-right: auto; }

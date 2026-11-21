@@ -38,6 +38,7 @@ function row(parts: Part[], room: number) {
 const HOME_ON_A_TEAM: Part[] = [
   { name: 'to', width: 98, drop: dropRank('to') },
   { name: 'model', width: 72, drop: dropRank('model') },
+  { name: 'out-when', width: 70, drop: dropRank('out-when') },
   { name: 'project', width: 96 },
   { name: 'priority', width: 128, drop: dropRank('priority') },
   { name: 'private', width: 88 },

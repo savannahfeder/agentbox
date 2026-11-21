@@ -300,7 +300,11 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
   useLayoutEffect(() => {
     const el = card.current;
     if (!el) return;
-    const read = () => setEdge({ x: el.offsetLeft, y: el.offsetTop, h: el.offsetHeight, r: getComputedStyle(el).borderTopLeftRadius || '0px' });
+    // Only a moved edge draws the pane again; the card's width changes every frame the sidebar slides.
+    const read = () => {
+      const next = { x: el.offsetLeft, y: el.offsetTop, h: el.offsetHeight, r: getComputedStyle(el).borderTopLeftRadius || '0px' };
+      setEdge((was) => (was.x === next.x && was.y === next.y && was.h === next.h && was.r === next.r ? was : next));
+    };
     read();
     const watch = new ResizeObserver(read);
     watch.observe(el);

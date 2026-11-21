@@ -45,7 +45,8 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
   const first = firstName(owner) || 'Your teammate';
   const change = onOpenChange ? askChange(task) : null;
   const back = async () => {
-    if (!giving || busy) return;
+    // The same rule as its button: changes asked for say what they are, whichever way it is sent.
+    if (!giving || busy || (giving === 'changes' && !words.trim())) return;
     setBusy(true);
     const ok = await onHandBack(giving, words.trim());
     setBusy(false);

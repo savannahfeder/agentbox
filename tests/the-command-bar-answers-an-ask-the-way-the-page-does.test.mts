@@ -31,7 +31,7 @@ describe('on a help ask', () => {
 describe('on a review', () => {
   const rows = threadCommands({ answers: askAnswers('review', 'Sam') });
   it('offers the two answers the page has', () => {
-    expect(rows.map((r) => r.label)).toEqual(['Looks good', 'Send changes to Sam']);
+    expect(rows.map((r) => r.label)).toEqual(['Looks good', 'Needs changes']);
     expect(rows.map((r) => r.does)).toEqual([{ act: 'hand-back', verdict: 'yes' }, { act: 'hand-back', verdict: 'changes' }]);
   });
   it('finds each by its own words, and "changes" never finds Looks good', () => {
@@ -64,8 +64,9 @@ describe('the page', () => {
   });
   it('hands back from the bar through the same hand-back as its buttons', () => {
     const src = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-    expect(src).toContain('window.addEventListener(HAND_BACK_EVENT, hear)');
-    expect(src).toMatch(/if \(verdict === 'changes' && !draft\.trim\(\)\) \{[^\n]*\}\n\s*void handBack\(verdict\);/);
+    expect(src).toContain('window.addEventListener(HAND_BACK_EVENT, press)');
+    // Changes need words, which only the ask's own box takes, so the bar says where to write them.
+    expect(src).toMatch(/if \(verdict === 'changes'\) \{ onNotice\([^)]*\); return; \}\n\s*void handBack\(verdict, ''\);/);
     expect(HAND_BACK_EVENT).toBe('zero:hand-back');
   });
 });

@@ -114,6 +114,7 @@ const BY_ID: Record<string, IconName> = {
   'import-agents': 'download',
   tutorial: 'help',
   'first-run': 'refresh',
+  demo: 'spark',
   // What acts on the thread.
   'remote-control': 'swap',
   'open-terminal': 'terminal',

@@ -232,7 +232,10 @@ interface FilesPlace {
   makeFolder(ask: { project?: string; name?: string; parent: string | null }): Promise<{ id?: string }>;
   renameFolder(ask: { id: string; name?: string }): Promise<{ id?: string }>;
   moveFile(ask: { key: string; folder: string | null }): Promise<{ id?: string }>;
-  newDocument(ask: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string }>;
+  renameFile(ask: { key: string; name: string }): Promise<{ id?: string }>;
+  removeFolder(ask: { id: string }): Promise<{ ids: string[] }>;
+  restoreFolders(ask: { ids: string[] }): Promise<{ back: number }>;
+  newDocument(ask: { project: string; name?: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string; title: string }>;
   addFiles(ask: { project: string; folder: string | null; paths: string[] }): Promise<{ added: number; refused: string[]; keys: string[] }>;
   open(key: string): Promise<unknown>;
   edit(key: string, text?: string): Promise<{ ok: boolean } & Record<string, unknown>>;
@@ -241,7 +244,7 @@ interface FilesPlace {
   lineFor(ask: { product: string; id: string; room?: string | null }): Promise<unknown>;
   mark(key: string, mark: unknown): Promise<{ ok: boolean; wrote?: { product: string; id: string } } & Record<string, unknown>>;
   pictureNamed(src: unknown): Promise<string | null>;
-  newDocument(ask: { project: string; name: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string }>;
+  newDocument(ask: { project: string; name?: string; kind?: 'document' | 'table'; folder?: string | null; by?: string | null }): Promise<{ key: string; title: string }>;
   addFiles(ask: { project: string; paths?: string[]; folder?: string | null; by?: string | null }): Promise<{ added: number; refused: string[]; keys: string[] }>;
   trash(ask: { keys: readonly string[]; older?: boolean }): Promise<{ ok: boolean; moved: number; bytes: number; error?: string; undo?: string }>;
   untrash(token: string): Promise<{ ok: boolean; back?: number; error?: string }>;
@@ -1510,10 +1513,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
 
   // AN INBOX TO STAND IN FRONT OF A ROOM WITH.
   //
-  // The same second Agentbox in a throwaway home as the row above, with three
-  // invented products and a day of invented work seeded into it first, so it
-  // opens on a populated inbox rather than on the welcome screen. It reads none
-  // of her folders and it deletes nothing (main/demo.mts).
+  // A second Agentbox in a throwaway home, with an invented team and its
+  // morning seeded into it first, so it opens on a full inbox rather than on
+  // the welcome screen. It reads none of her folders and it deletes nothing
+  // (main/demo.mts).
   ipcMain.handle('zero:open-demo', () => openDemo({ packaged: app.isPackaged }));
 
   // "Run this later", the durable half of what snooze used to pretend to be.
@@ -2717,23 +2720,26 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:files-place', async () => {
     try { return await filesPlaceNow().list(); } catch { return { files: [], projects: [], folders: [] }; }
   });
-  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; key?: unknown; folder?: string | null } = {}) => {
+  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; ids?: unknown; key?: unknown; folder?: string | null } = {}) => {
     try {
       const place = filesPlaceNow();
       const out = what === 'make' ? await place.makeFolder({ project: p.project, name: p.name, parent: p.parent ?? null })
         : what === 'rename' ? await place.renameFolder({ id: String(p.id ?? ''), name: p.name })
           : what === 'move' ? await place.moveFile({ key: String(p.key ?? ''), folder: p.folder ?? null })
-            : null;
+            : what === 'name' ? await place.renameFile({ key: String(p.key ?? ''), name: String(p.name ?? '') })
+              : what === 'remove' ? await place.removeFolder({ id: String(p.id ?? '') })
+                : what === 'restore' ? await place.restoreFolders({ ids: Array.isArray(p.ids) ? p.ids.map(String) : [] })
+                  : null;
       if (!out) return { ok: false, error: 'that cannot be done here' };
       push();
-      return { ok: true, folder: out.id ?? null };
+      return { ok: true, folder: 'id' in out ? out.id ?? null : null, ...('ids' in out ? { ids: out.ids } : {}) };
     } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
   ipcMain.handle('zero:files-place-new', async (_e, { project, name, kind, folder }: { project?: unknown; name?: unknown; kind?: unknown; folder?: unknown } = {}) => {
     try {
       const out = await filesPlaceNow().newDocument({ project: String(project ?? ''), name: String(name ?? ''), kind: kind === 'table' ? 'table' : 'document', folder: typeof folder === 'string' ? folder : null });
       push();
-      return { ok: true, key: out.key };
+      return { ok: true, key: out.key, title: out.title };
     } catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
   });
   ipcMain.handle('zero:files-place-upload', async (_e, { project, folder }: { project?: unknown; folder?: unknown } = {}) => {

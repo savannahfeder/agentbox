@@ -314,6 +314,8 @@ export interface PlacedFile {
   key: string;
   project: string | null;
   name: string;
+  /** The name a person gave it in Files; `name` stays its name on disk. */
+  title?: string;
   kind: FileKind | null;
   /** Made in Files and nothing written in it yet. */
   blank?: boolean;
@@ -342,6 +344,8 @@ export interface PlacedFile {
   older?: number;
   /** What this file's own Move to the Trash would move. */
   movable?: number;
+  /** Whether it has one, which an empty document does at 0 bytes. */
+  trashable?: boolean;
   /** The newest version is kept in the cloud and off this computer. */
   cloud?: boolean;
   /** A small picture of it while it is in the cloud. */
@@ -364,7 +368,10 @@ export interface FileFolder { id: string; project: string; name: string; parent:
 export type FileFolderAct =
   | { do: 'make'; project: string; name: string; parent?: string | null }
   | { do: 'rename'; id: string; name: string }
-  | { do: 'move'; key: string; folder: string | null };
+  | { do: 'move'; key: string; folder: string | null }
+  | { do: 'name'; key: string; name: string }
+  | { do: 'remove'; id: string }
+  | { do: 'restore'; ids: string[] };
 
 export interface FilesUploaded { ok: boolean; error?: string; added?: number; refused?: string[]; keys?: string[] }
 export interface FilesPlaceList { files: PlacedFile[]; projects: string[]; folders?: FileFolder[]; mine?: string[] }
@@ -399,6 +406,9 @@ export interface FilesPlaceView {
   key: string;
   project: string | null;
   name: string;
+  title?: string;
+  /** The project folder it lives in, for a file no thread was sent. */
+  product?: string;
   /** Its newest version is on its way back from the cloud. */
   coming?: boolean;
   sentIn: FileSentIn[];
@@ -590,6 +600,8 @@ export interface RoomCard {
   status: string | null;
   workingOn: string | null;
   workingPrivate: boolean;
+  /** The thread `workingOn` names, when you can open it: a teammate's shared card, or your own. */
+  workingThread?: string | null;
 }
 
 export interface RoomActivity {
@@ -986,6 +998,8 @@ export interface SupervisorStatus {
   // Rows nothing can start because every login of their tool is out of usage,
   // id -> the tool's name and when it resets (0 when no login said).
   atLimit?: Record<string, { tool: string; until: number }>;
+  // Engine -> its tool's name and reset, for each tool whose work account is out of usage now.
+  outOfUsage?: Record<string, { tool: string; until: number }>;
   // Queued rows the last pass could not start, id -> why and the tool's name.
   cannotStart?: Record<string, { why: string; tool: string }>;
   // Rows the app's ship queue still owes a ship (main/ship-queue.mts). Waiting
@@ -1840,7 +1854,7 @@ declare global {
       filesPlaceOpen?(p: { key: string }): Promise<FilesPlaceView | null>;
       filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
       filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
-      filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }>;
+      filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null; ids?: string[] }>;
       filesPlaceNew?(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }>;
       filesPlaceUpload?(p: { project: string; folder: string | null }): Promise<FilesUploaded>;
       filesPlaceTrash?(p: { keys: string[]; older?: boolean }): Promise<FilesTrashed>;

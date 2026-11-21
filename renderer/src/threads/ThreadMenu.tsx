@@ -429,6 +429,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
     const keys = (e: KeyboardEvent) => {
       // The ask sheet's note is kept for its person, so Escape can close.
       if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(true); return; }
+      // A note being written keeps every key: Tab to its button, arrows through its lines, ⌘↵ to send.
+      if (document.activeElement?.tagName === 'TEXTAREA' && wrap.current?.contains(document.activeElement)) return;
       const items = [...(wrap.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
         e.preventDefault();

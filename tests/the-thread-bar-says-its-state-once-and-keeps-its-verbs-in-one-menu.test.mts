@@ -153,7 +153,7 @@ describe('the right side is the dots', () => {
     // The faces sit with them so the header is one row (2026-11-02); Add
     // people is a row in the menu since w-c25aae4035, and whoever you asked
     // onto the thread sits beside them (w-f702d60afe).
-    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && \(direct \|\| summarised\) && <ConversationAside item=\{item\} \/>\})?(\{asksCorner\})?\{threadMenu\}<\/span>/);
+    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && !givenTask && \(direct \|\| summarised\) && <ConversationAside item=\{item\} \/>\})?(\{asksCorner\})?\{threadMenu\}<\/span>/);
     expect(focus).not.toMatch(/doneButton|terminalHeaderTarget|done-mark/);
   });
 

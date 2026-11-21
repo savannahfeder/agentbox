@@ -266,7 +266,8 @@
   --skin-pane-line: transparent;
   /* The corner marks, which only Ember Grid draws (workspace-navigation.css). */
   --skin-tick: transparent;
-  --skin-blur: 0px;
+  /* No blur, and not blur(0px), which Chromium still draws (skins.ts applyTune). */
+  --skin-blur: initial;
   /* The opaque writing surface. With no skin on there is no photograph to
      average, so it falls back to the card the app already had. */
   --skin-solid: var(--bg-raised);
@@ -575,7 +576,8 @@
   --skin-pane-line: transparent;
   /* The corner marks, which only Ember Grid draws (workspace-navigation.css). */
   --skin-tick: transparent;
-  --skin-blur: 0px;
+  /* No blur, and not blur(0px), which Chromium still draws (skins.ts applyTune). */
+  --skin-blur: initial;
   /* The opaque writing surface. With no skin on there is no photograph to
      average, so it falls back to the card the app already had. */
   --skin-solid: var(--bg-raised);
@@ -744,6 +746,9 @@
   --doc-page-held: #282625;
   --code-ground: #22201f;
   --work-fill: rgba(40, 38, 37, 0.9);
+  /* A fill this opaque hides any blur behind it, and the blur redrew every code
+     block on each frame of a scroll. */
+  --work-blur: none;
   --accent: #ee6018;
   --select-bar: #ee6018;
   --underline: rgba(238, 96, 24, 0.6);

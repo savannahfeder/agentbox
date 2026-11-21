@@ -2,7 +2,7 @@ import { useLayoutEffect, type RefObject } from 'react';
 
 /** What Home's box hides when its controls do not fit on one line, least needed
  *  first. The project, who sees it, and Send are never hidden. */
-export const DROP_ORDER = ['priority', 'send-keys', 'model', 'to', 'attach'] as const;
+export const DROP_ORDER = ['priority', 'send-keys', 'out-when', 'model', 'to', 'attach'] as const;
 export type Droppable = typeof DROP_ORDER[number];
 export const dropRank = (name: Droppable) => DROP_ORDER.indexOf(name) + 1;
 

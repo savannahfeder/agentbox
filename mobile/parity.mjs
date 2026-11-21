@@ -60,6 +60,7 @@ export const PARITY = {
   'palette:import-agents': { desktopOnly: 'it reads Claude Code and Codex chats off the computer\'s disk' },
   'palette:tutorial': { desktopOnly: 'the tutorial runs on the computer only' },
   'palette:first-run': { desktopOnly: 'it sets up the computer' },
+  'palette:demo': { desktopOnly: 'it opens a second copy of the app on the computer' },
   'palette:keyhints': { desktopOnly: KEYS },
   'palette:rank-*': { phone: P, find: 'Rank ${p.name} first' },
   'palette:group-*': { phone: P, find: 'group-${g.id}' },

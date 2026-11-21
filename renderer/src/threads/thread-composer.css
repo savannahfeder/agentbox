@@ -99,6 +99,10 @@
 }
 .tc-note button:hover, .tc-note button:focus-visible { text-decoration-color: currentColor; outline: none; }
 
+/* The model chip's agent is out of usage: a gauge and when it comes back (../components/OutUntil.tsx). */
+.tc-out { display: inline-flex; align-items: center; gap: 5px; color: var(--text-faint); }
+.tc-out svg { width: 13px; height: 13px; flex: none; }
+
 /* -------------------------------- the bar -------------------------------- */
 .tc-bar { display: flex; align-items: center; gap: 6px; padding: 12px 14px 12px 18px; border-top: 1px solid var(--tc-hair); position: relative; }
 .tc-chip {
@@ -341,8 +345,7 @@
 .tc-inline .tc-bar { flex-wrap: wrap; border-top: 0; padding: 14px 0 0; }
 /* One line always: fit-row.ts hides the least needed parts until it fits. */
 .tc-inline .tc-bar.tc-fit { flex-wrap: nowrap; }
-.tc-inline .tc-bar.tc-fit [data-dropped] { display: none; }
-.tc-inline .tc-subject { flex: 0 1 260px; height: 28px; padding: 0 10px; border: 1px solid var(--tc-hair); font-size: 13px; }
+.tc-inline .tc-bar.tc-fit [data-dropped] { display: none; }.tc-inline .tc-subject { flex: 0 1 260px; height: 28px; padding: 0 10px; border: 1px solid var(--tc-hair); font-size: 13px; }
 .tc-inline .tc-subject:focus { border-color: var(--text-faint); }
 .tc-inline .tc-note, .tc-inline .attach-row { padding: 12px 0 0; }
 .tc-inline .tc-word-text { text-decoration: none; }

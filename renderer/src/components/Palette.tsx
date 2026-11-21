@@ -31,6 +31,8 @@ export interface Command {
   oldNames?: readonly string[];
   /** A word the query must name before the row is offered (../palette-rows). */
   onlyWith?: string;
+  /** Not in the list until something is typed (../palette-rows). */
+  unlisted?: boolean;
   keyHint?: string;
   run: () => void;
   /** A line, file, comment or decision found inside something: drawn as its words with who and where under. */
@@ -40,7 +42,7 @@ export interface Command {
 /** What was found inside things, a labelled group of rows each (renderer/src/found-inside.ts). */
 export interface InsideSection { key: string; label: string; rows: Command[] }
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -130,6 +132,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
    *  it and no import card after it. */
   onTutorial: () => void;
   onImportAgents: () => void;
+  /** A second copy on an invented team, for a call (main/demo.mts). */
+  onDemo?: () => void;
   onClose: () => void;
   /** The cloud, when this Mac is set up for it; null hides its rows. */
   cloud?: CloudStatus | null;
@@ -141,6 +145,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   /** Drawn for a phone: full screen, threads first, no keys. */
   phone?: boolean;
 }) {
+  const projects = useMemo(() => products.filter((p) => !p.team?.direct), [products]);
   const commands: Command[] = useMemo(() => [
     // First, and labelled "project" because that is the word people type. Row
     // one by a product decision (tests/her-word-is-project).
@@ -171,10 +176,11 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // user meets it here as a project they never made, with nothing on the row
     // to say so. Its hint says what it is until it is ranked, after which
     // where it stands is the more useful thing to say.
-    ...products.map((p, i) => ({
+    // A conversation with a teammate is kept as a record too, and is not a project.
+    ...projects.map((p, i) => ({
       id: `rank-${p.slug}`,
       label: `Rank ${p.name} first`,
-      hint: order.includes(p.slug) ? `now #${i + 1} of ${products.length}`
+      hint: order.includes(p.slug) ? `now #${i + 1} of ${projects.length}`
         : p.personal ? 'made for you'
         : 'not ranked yet',
       run: () => onRankFirst(p.slug),
@@ -385,6 +391,17 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'onboarding first run new user welcome intro setup start over from scratch install fresh',
       run: onFirstRun,
     },
+    // Offered only once "demo" is typed, so it is not in everybody's list
+    // (tests/a-demo-copy-opens-from-command-k).
+    ...(onDemo ? [{
+      id: 'demo',
+      label: 'Open a demo copy',
+      hint: 'an invented team · yours keeps running',
+      keywords: 'demo demonstration present presentation onboarding call customer screen share sample example',
+      onlyWith: 'demo',
+      unlisted: true,
+      run: onDemo,
+    }] : []),
     {
       id: 'keyhints',
       label: keyHints ? 'Turn off keyboard shortcut hints' : 'Turn on keyboard shortcut hints',
@@ -393,7 +410,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, cloud, onCloudMode]);
+  ], [itemCommands, batch, projects, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, cloud, onCloudMode]);
   return open ? <PaletteBox commands={commands} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 
@@ -415,7 +432,7 @@ export function threadRows(query: string, findThreads?: (q: string) => Command[]
 
 // The box itself, mounted fresh each time ⌘K opens, so it starts empty and focused.
 /** Commands about the Mac or its keyboard, which a phone has neither of. */
-export const NOT_ON_A_PHONE = ['keyhints', 'shortcuts', 'stale', 'update', 'update-check', 'update-move', 'first-run', 'tutorial', 'import-agents', 'open-terminal', 'remote-control', 'flip-view'];
+export const NOT_ON_A_PHONE = ['keyhints', 'shortcuts', 'stale', 'update', 'update-check', 'update-move', 'first-run', 'tutorial', 'demo', 'import-agents', 'open-terminal', 'remote-control', 'flip-view'];
 
 /** The rows in the order drawn, and the label over the row each section starts
  *  at. A phone searches threads more than it runs commands, so they go first. */
@@ -484,7 +501,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
   const offered = useMemo(() => (phone ? commands.filter((c) => !NOT_ON_A_PHONE.includes(c.id)) : commands), [commands, phone]);
   const matched = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return offered;
+    if (!q) return offered.filter((c) => !c.unlisted);
     // Ranked as well as filtered, so "rem" puts Remind Me above Remote Control
     // (../palette-rows).
     return rankMatches(q, offered.filter((c) => matchesQuery(q, c)));

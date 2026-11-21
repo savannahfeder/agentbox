@@ -28,7 +28,7 @@ interface AskRow {
   verdict?: Verdict | null;
   answer?: string | null;
   product?: string;
-  wrote?: { ask?: { by?: string; ts?: number } | null; status?: { by?: string; ts?: number } | null } | null;
+  wrote?: { ask?: { by?: string; ts?: number } | null; status?: { by?: string; ts?: number } | null; verdict?: { ts?: number } | null; answer?: { by?: string; ts?: number } | null } | null;
 }
 
 export function askOf(row: AskRow | null | undefined): Ask | null {
@@ -58,6 +58,32 @@ export function helpAskOpen(rows: readonly AskRow[], me: string | null, thread: 
   }) ?? null;
 }
 
+/**
+ * The help ask that covers words this helper wrote at `at`: asked before them
+ * and not handed back until after. Judged by when the words were written, not
+ * when this computer read them, so a late sync neither drops them nor sends
+ * older remarks to the agent.
+ */
+export function helpAskCovering(rows: readonly AskRow[], me: string | null, thread: string, helper: string, at: number): AskRow | null {
+  return rows.find((r) => {
+    const a = askIGave(r, me);
+    if (!a || a.kind !== 'help' || a.thread !== thread || r.assignee !== helper) return false;
+    const opened = r.wrote?.ask?.ts ?? r.createdAt ?? 0;
+    if (at < opened) return false;
+    if (isOpen(r)) return true;
+    const closed = r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? r.updatedAt ?? 0;
+    return at <= closed;
+  }) ?? null;
+}
+
+/** What the helper said as they handed back: the task's answer only when they wrote it with the hand-back. */
+export function handBackSaid(r: AskRow): string {
+  const said = r.wrote?.answer;
+  const back = r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? 0;
+  if (!said || (said.by && said.by !== r.assignee) || (said.ts ?? 0) < back) return '';
+  return String(r.answer ?? '').trim();
+}
+
 export interface AskShown { row: AskRow; ask: Ask; to: string; open: boolean; verdict: Verdict | null; words: string; at: number; backAt: number | null }
 
 /** Every ask on one of your threads, newest first, for the line above its reply box. */
@@ -69,7 +95,7 @@ export function asksOnThread(rows: readonly AskRow[], me: string | null, thread:
     const open = isOpen(r);
     out.push({
       row: r, ask: a, to: r.assignee, open, verdict: open ? null : (r.verdict ?? 'done'),
-      words: open ? '' : String(r.answer ?? '').trim(),
+      words: open ? '' : handBackSaid(r),
       at: r.createdAt ?? 0, backAt: open ? null : (r.wrote?.status?.ts ?? r.updatedAt ?? null),
     });
   }

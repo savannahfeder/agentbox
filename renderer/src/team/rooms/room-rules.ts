@@ -34,6 +34,16 @@ export function activityCards(card: RoomCard, cards: readonly ThreadCard[]): Thr
   }));
 }
 
+type Line = Pick<RoomCard, 'id' | 'me' | 'workingThread'>;
+
+/** The thread a person's "working on" line opens: your own, or a teammate's shared card by its id. */
+export function threadOnLine(person: Line, cards: readonly Pick<ThreadCard, 'personId' | 'threadId' | 'visible'>[]): { personId: string; threadId: string } | null {
+  const id = person.workingThread;
+  if (!id) return null;
+  if (person.me) return { personId: person.id, threadId: id };
+  return cards.some((c) => c.personId === person.id && c.threadId === id && c.visible) ? { personId: person.id, threadId: id } : null;
+}
+
 /** Everyone on my rooms' walls but me, as people the board can name and draw. */
 export function roomMatesById(rooms: readonly Pick<Room, 'wall'>[]): Map<string, Person> {
   const out = new Map<string, Person>();
@@ -167,6 +177,17 @@ export function weekRank(wall: readonly RoomCard[], id: string): number {
   const mine = wall.find((c) => c.id === id)?.hoursWeek ?? 0;
   return 1 + wall.filter((c) => c.hoursWeek > mine).length;
 }
+
+/** A profile's ranks: the week's only in a group of three or more, and neither for someone with no hours to rank. */
+export function profileRanks(room: Pick<Room, 'members' | 'wall'>, card: Pick<RoomCard, 'id' | 'hoursWeek' | 'hoursTotal'>, allTime: number | undefined): { week: number | null; allTime: number | null } {
+  return {
+    week: room.members > 2 && card.hoursWeek > 0 ? weekRank(room.wall, card.id) : null,
+    allTime: allTime != null && card.hoursTotal > 0 ? allTime : null,
+  };
+}
+
+/** A teammate's name opens their own page, which has their threads; you and anyone else open the profile. */
+export const personOpens = (c: Pick<RoomCard, 'me' | 'teammate'>): 'page' | 'profile' => (c.teammate && !c.me ? 'page' : 'profile');
 
 export function agentsWords(n: number | null): string {
   if (n == null || n <= 0) return 'Not running';

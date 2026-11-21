@@ -108,7 +108,9 @@
   appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   color: var(--text-dim); font: inherit; font-size: 12px;
 }
-.chat-act + .chat-act { border-left: 1px solid var(--line); }
+/* The divider is its own straight line: a border on a rounded button curved at both ends. */
+.chat-act { position: relative; }
+.chat-act + .chat-act::before, .chat-quick + .chat-act::before { content: ''; position: absolute; left: -0.5px; top: 0; bottom: 0; width: 1px; background: var(--line); }
 .chat-act:hover { background: var(--wash); color: var(--text); }
 .chat-act:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
 .chat-act svg { width: 14px; height: 14px; flex: none; }
@@ -121,7 +123,6 @@
 }
 .chat-quick:hover { background: var(--wash); }
 .chat-quick:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
-.chat-quick + .chat-act { border-left: 1px solid var(--line); }
 .chat-act-more svg { width: 14px; height: 14px; }
 
 /* THE MORE MENU, placed against the window like the whole emoji list. */

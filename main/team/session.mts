@@ -14,6 +14,8 @@ import { CLOUD_ADDRESS, PHONE_SITE } from '../../shared/cloud-address.mts';
 import { runningAsAFreshUser } from '../../shared/fresh-user-home.mts';
 import { supabaseBackend } from './supabase-backend.mts';
 import { standinSession } from './standin-backend.mts';
+import { demoTeamSession } from '../demo-team.mts';
+import { runningAsADemo } from '../../shared/demo-world.mts';
 import { signInWithGoogle, cancelGoogleSignIn, listenForTheConfirmationLink } from './sign-in.mts';
 import { plainAuthError } from './auth-words.mts';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -27,6 +29,7 @@ export interface CloudConfig {
   phoneSite?: string;
   signInReturn?: string;
   standin?: boolean;
+  demo?: boolean;
   /** The live-file relay's ws:// or wss:// address (main/team/live-room.mts). */
   live?: string;
   contact?: string;
@@ -114,7 +117,12 @@ function withPhoneSite(c: CloudConfig | null): CloudConfig | null {
   return ours(c.url) ? { ...c, phoneSite: PHONE_SITE } : c;
 }
 
+/** A demo copy's team: its own, in memory (main/demo-team.mts). */
+export const DEMO_CLOUD: CloudConfig = { url: 'demo:', anonKey: 'demo', demo: true };
+
 function cloudConfigFound(appDir: string, { packaged = isPackagedElectron(), home = os.homedir(), env = process.env }: CloudConfigLookup = {}): CloudConfig | null {
+  // Before any file: a demo on a screen share never signs in as a real person.
+  if (runningAsADemo(env)) return DEMO_CLOUD;
   if (packaged) return bakedTeam(appDir);
   if (runningAsAFreshUser(env) && !env.AGENTBOX_TEAM_CONFIG) return null;
   const tries = runningAsAFreshUser(env) ? [env.AGENTBOX_TEAM_CONFIG] : [
@@ -180,6 +188,7 @@ export const withDeadline = (ms = DATABASE_DEADLINE_MS) => (url: Parameters<type
 export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decrypt = null, openExternal, packaged = isPackagedElectron(), testLogin = process.env.AGENTBOX_TEAM_TEST_LOGIN }: SupabaseSessionOptions): TeamSession {
   const configured = !!cloudConfig;
   if (packaged) testLogin = null;
+  if (cloudConfig?.demo) return demoTeamSession();
   if (cloudConfig?.standin && !packaged) return standinSession({ cloudConfig, testLogin });
   let client: SupabaseClient | null = null;
 

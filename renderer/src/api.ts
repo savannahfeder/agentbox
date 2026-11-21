@@ -125,6 +125,17 @@ const mockFixtures = params.get('fixtures') === 'mock';
 // script already photographs and is the rule it records. The four
 // machines and the whole argument are in ./fixtures, beside the data.
 const engineFixtures = fixtureEngineWorld(params.get('engines'));
+// &codexout: Codex's week spent until Sunday 6:10pm, over ?fixtures=empty or the full world.
+function codexOut(snap: Snapshot): Snapshot {
+  if (!params.has('codexout')) return snap;
+  const sunday = new Date();
+  sunday.setDate(sunday.getDate() + ((7 - sunday.getDay()) % 7 || 7));
+  sunday.setHours(18, 10, 0, 0);
+  const until = sunday.getTime();
+  snap.supervisor.outOfUsage = { codex: { tool: 'Codex', until } };
+  snap.usageByEngine = [{ engine: 'codex', at: Date.now(), limits: [{ span: 'week', qualifier: null, name: 'This week', percent: 100, resetsText: null, resetsOn: null, resetsAt: until, zone: null }] }];
+  return snap;
+}
 // Twenty-two names, because the point of this world is a sidebar with more in it
 // than fits. The duplicates and the "(2)" suffixes are the shape that matters,
 // not the words: near-copies of one product are what make a crowded sidebar
@@ -454,7 +465,7 @@ export const api = {
       // builds its own object; layering it here is what lets
       // ?fixtures=empty&engines=codex photograph the corner naming an agent on
       // the idle page. A world of `null` hands the snapshot straight back.
-      return fixtureSecondEngine(empty, engineFixtures);
+      return codexOut(fixtureSecondEngine(empty, engineFixtures));
     }
     if (mockFixtures) return fixtureSecondEngine(structuredClone(fixtureMock), engineFixtures);
     if (crowdedFixtures) {
@@ -643,7 +654,7 @@ export const api = {
         base.usage = { engine: 'codex', limits, at: now - 6 * 3_600_000 };
         base.usageByEngine = [base.usage];
       }
-      return fixtureSecondEngine(base, engineFixtures);
+      return codexOut(fixtureSecondEngine(base, engineFixtures));
     }
     // A document's holder thread is the app's, so no list of threads draws it.
     const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
@@ -1088,7 +1099,7 @@ export const api = {
   async filesPlace(): Promise<FilesPlaceList> {
     return (await window.zero?.filesPlace?.().catch(() => null)) ?? { files: [], projects: [], folders: [] };
   },
-  async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }> {
+  async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null; ids?: string[] }> {
     if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
     return window.zero.filesPlaceFolder(p);
   },
