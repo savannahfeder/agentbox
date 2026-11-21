@@ -294,6 +294,9 @@ export function createThreadShare({
   const missed = new Map<string, number>();
   const waitingFile = `${root}.marks-waiting.json`;
   let waiting: ThreadFileMark[] | null = null;
+  // The notes you opened, kept here too: the cloud forgets them when the owner unshares and shares again.
+  const seenFile = `${root}.marks-seen.json`;
+  let seenHere: ThreadFileMark[] | null = null;
   let logged = '';
   const quietly = async <T, F = null>(what: string, fn: () => Promise<T>, fallback: F = null as F): Promise<T | F> => {
     try { return await fn(); } catch (err) {
@@ -481,6 +484,21 @@ export function createThreadShare({
     if (!Array.isArray(waiting)) waiting = [];
     return waiting;
   }
+  function seenMarks(): ThreadFileMark[] {
+    if (seenHere) return seenHere;
+    try { seenHere = JSON.parse(fs.readFileSync(seenFile, 'utf8')); } catch { seenHere = []; }
+    if (!Array.isArray(seenHere)) seenHere = [];
+    return seenHere;
+  }
+  function keepSeen(row: ThreadFileMark) {
+    seenHere = [...seenMarks(), row].slice(-2000);
+    try {
+      fs.mkdirSync(path.dirname(seenFile), { recursive: true });
+      const tmp = `${seenFile}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(seenHere));
+      fs.renameSync(tmp, seenFile);
+    } catch (err) { log(`team threads: could not keep what you opened: ${(err as Error).message}`); }
+  }
   function saveWaiting() {
     fs.mkdirSync(path.dirname(waitingFile), { recursive: true });
     const tmp = `${waitingFile}.${process.pid}.tmp`;
@@ -518,7 +536,7 @@ export function createThreadShare({
     const out = new Map<string, SharedLine>();
     for (const l of local?.marks ?? []) out.set(l.uid ?? `${l.ts}-${out.size}`, l);
     const here = (m: ThreadFileMark) => m.owner === owner && m.threadId === threadId;
-    for (const m of [...fileMarks.filter(here), ...(waiting ?? waitingMarks()).filter(here)]) {
+    for (const m of [...fileMarks.filter(here), ...(waiting ?? waitingMarks()).filter(here), ...seenMarks().filter(here)]) {
       const line = asLine(m);
       if (line && line.patch.artifact.do !== 'edit' && !out.has(line.uid)) out.set(line.uid, line);
     }
@@ -756,6 +774,7 @@ export function createThreadShare({
       const row: ThreadFileMark = { id, owner, threadId, by: me, mark: clean, at: now() };
       waiting = [...waitingMarks(), row];
       saveWaiting();
+      if ((clean as { do?: string }).do === 'seen') keepSeen(row);
       await sendWaiting(null);
       fileMarks = await quietly('reading notes on files', () => backend.fileMarks!(), fileMarks);
       return true;

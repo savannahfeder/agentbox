@@ -52,6 +52,7 @@ import { phoneWaitsOf } from '../shared/phone-snapshot.mts';
 import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
+import { runningAsADemo } from '../shared/demo-world.mts';
 import { newUserTitle, newUserWindow } from './new-user-window.mts';
 import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
 import { tintWindowButtons, windowFrame } from './window-buttons.mts';
@@ -842,7 +843,7 @@ async function createWindow() {
   retitle = () => {
     if (!window || window.isDestroyed()) return;
     const me = team?.state().me;
-    const title = newUserTitle({ fresh: runningAsAFreshUser(), name: NAME, account: team?.state().signedIn ? me?.email || me?.name : null });
+    const title = runningAsADemo() ? `${NAME} (demo)` : newUserTitle({ fresh: runningAsAFreshUser(), name: NAME, account: team?.state().signedIn ? me?.email || me?.name : null });
     if (title && window.getTitle() !== title) window.setTitle(title);
   };
   retitle();

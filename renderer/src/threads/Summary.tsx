@@ -201,7 +201,9 @@ export function TeammateSummary({ card, owner, files = [] }: {
   if (!card.visible) return null;
   const about = card.problem && card.problem !== card.title ? card.problem : null;
   const tried = doneSteps(card.progress);
-  if (!about && !tried.length && !files.length && !card.blocks.length) return null;
+  // A card published by an older copy can come without its links.
+  const blocks = card.blocks ?? [];
+  if (!about && !tried.length && !files.length && !blocks.length) return null;
   return (
     <section className="ts-ticket tp-summary" aria-label="Summary">
       {about && <p className="ts-tk-lead">{about}</p>}
@@ -218,9 +220,9 @@ export function TeammateSummary({ card, owner, files = [] }: {
           </li>)}
         </ul>
       </div>}
-      {card.blocks.length > 0 && <div className="ts-tk-part">
+      {blocks.length > 0 && <div className="ts-tk-part">
         <span className="ts-h">Blocks</span>
-        <p>{card.blocks.map((l, i) => { const who = linkPerson(l.id, team?.byId); return <span key={l.id} className={l.title || who ? '' : 'dim'}>{i > 0 && ', '}{l.title ?? who ?? UNSEEN_THREAD}</span>; })}</p>
+        <p>{blocks.map((l, i) => { const who = linkPerson(l.id, team?.byId); return <span key={l.id} className={l.title || who ? '' : 'dim'}>{i > 0 && ', '}{l.title ?? who ?? UNSEEN_THREAD}</span>; })}</p>
       </div>}
     </section>
   );

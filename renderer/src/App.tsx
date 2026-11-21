@@ -106,7 +106,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
-import { filedByThePerson, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
+import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
@@ -2308,10 +2308,12 @@ export default function App() {
   const waitingOn = useCallback((i: WorkItem) => waitsThatCanEnd(i, byId), [byId]);
   // Your threads someone you asked for help or a review has right now: out of Needs you, notes and
   // comments included, until they hand it back (shared/thread-asks.mts).
+  // One that has come back and waits on you is yours again, though someone else you asked still has it.
   const askedOut = useMemo(() => new Set(items.flatMap((r) => {
     const a = askIGave(r, team?.me ?? null);
-    return a && askIsOpen(r) ? [a.thread] : [];
-  })), [items, team?.me]);
+    const thread = a ? byId.get(a.thread) : null;
+    return a && askIsOpen(r) && !(thread && heldForHer(thread)) ? [a.thread] : [];
+  })), [items, team?.me, byId]);
 
   // A comment that asks you by name is news to you (fileNewsFor).
   const myName = team?.byId.get(team.me ?? '')?.name ?? null;
@@ -4313,6 +4315,14 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
+  // A second copy on an invented team, for a call where this inbox should stay
+  // off the shared screen (main/demo.mts). The toast says which window is which.
+  const openDemoCopy = useCallback(async () => {
+    setModal(null);
+    const out = await api.openDemo();
+    if (!out.ok) { showToast(out.error ?? 'It could not be opened.'); return; }
+    showToast(`Opening a demo copy in a new window. Yours keeps running.${out.notes?.length ? ` ${out.notes[0]}` : ''}`);
+  }, [showToast]);
   // A CHAT'S OWN ASKS (team/chat-events.ts): mark this conversation unread, and say a short note.
   useEffect(() => {
     const mark = (e: Event) => {
@@ -8479,7 +8489,7 @@ export default function App() {
                 {/* A TEAMMATE'S THREAD, the whole window. Back goes to Threads
                     with the same people picked, or to the room whose board it
                     was opened from. */}
-                <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
+                <TeammateThread key={`${openCard.personId}/${openCard.threadId}`} card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
                   headerTarget={focused ? null : teamHeader} cornerTarget={focused ? null : teamCorner}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
@@ -8716,6 +8726,7 @@ export default function App() {
                   codexModels={codexModels}
                   codexModelDefault={codexModelDefault}
                   engines={snap.engines?.choices}
+                  outOfUsage={snap.supervisor.outOfUsage}
                   items={items}
                   onReplySend={(text, priority, repeat, sent, mode, pick, sendAt) => {
                     // THE REPLY GOES WHERE THE ROW ACTUALLY LIVES. On an agent
@@ -8998,6 +9009,7 @@ export default function App() {
           items={items}
           engines={snap.engines?.choices}
           workspaceEngine={snap.engines?.workspace}
+          outOfUsage={snap.supervisor.outOfUsage}
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
@@ -9176,6 +9188,7 @@ export default function App() {
         onFirstRun={walkAgain}
         onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}
+        onDemo={openDemoCopy}
         products={rankedProducts}
         typed={paletteTyped}
         supervisorPaused={snap.supervisor.paused}

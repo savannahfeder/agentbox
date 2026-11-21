@@ -5,7 +5,7 @@
 // owner's own Thread, drawn from the lines their copy published.
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import ReactMarkdown from 'react-markdown';
+import { MessageMarkdown } from '../components/MessageMarkdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
@@ -43,6 +43,7 @@ import { parseOptions, stripOptionsSection } from '../format';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
 const COPY = /^attachments\//;
+const THREAD_PLUGINS = [remarkGfm];
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
@@ -79,7 +80,12 @@ export function CommentBox({ owner, helping, draft, setDraft, sending, onSend, o
 }) {
   const field = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => { applyDockHeight(field.current); });
-  useEffect(() => { if (open) field.current?.focus(); }, [open]);
+  // Focused when you open it, not when the page opens with it open (asked to help), where 1-9 pick an option.
+  const drawn = useRef(false);
+  useEffect(() => {
+    if (open && drawn.current) field.current?.focus();
+    drawn.current = true;
+  }, [open]);
   const box = helping ? `Write to ${owner}'s agent` : `Reply to ${owner}`;
   if (!open) {
     const said = foldedReply(draft);
@@ -194,7 +200,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
       },
       img: ({ src, alt }: { src?: string; alt?: string }) => <ArtifactImg key={src} src={src} alt={alt} roots={roots} onOpen={open} />,
     };
-    return (text: string) => <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={artifactUrlTransform}>{text}</ReactMarkdown>;
+    return (text: string) => <MessageMarkdown remarkPlugins={THREAD_PLUGINS} components={components} urlTransform={artifactUrlTransform}>{text}</MessageMarkdown>;
   }, [product, dir]);
 
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
@@ -295,13 +301,28 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   useEffect(() => { setEarlierOpen(false); }, [personId, threadId]);
   const earlierCount = before.filter((e: AgentEvent) => !e.kind).length;
   // Asked to help, the step's options are the owner's picker on your reply box; a pick sends it with what you typed.
-  const options = helping && newest ? parseOptions(newest.text) : [];
+  // Once anyone has spoken after them, or you picked one, they are answered, as on a thread of your own.
+  const [pickedFor, setPickedFor] = useState<number | null>(null);
+  const answered = !newest || pickedFor === newest.at || said.some((e) => e.at > newest.at && e.who !== 'it');
+  const options = helping && newest && !answered ? parseOptions(newest.text) : [];
   const pick = (n: number) => {
     const o = options.find((x) => x.n === n);
-    if (!o) return;
+    if (!o || !newest) return;
+    setPickedFor(newest.at);
     const choice = o.text.replace(/\s*\(recommended\)\s*$/i, '');
     void send(draft.trim() ? `${choice}\n\n${draft.trim()}` : choice);
   };
+  // 1-9 pick, as the numbers on the rows say, unless a box has the keys.
+  useEffect(() => {
+    if (!options.length) return undefined;
+    const keys = (e: globalThis.KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (e.metaKey || e.ctrlKey || e.altKey || el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable) return;
+      if (/^[1-9]$/.test(e.key) && options.some((o) => o.n === Number(e.key))) { e.preventDefault(); pick(Number(e.key)); }
+    };
+    window.addEventListener('keydown', keys);
+    return () => window.removeEventListener('keydown', keys);
+  });
   const title = card.title || `${owner}'s thread`;
 
   return (

@@ -25,6 +25,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CommentBox, TeammateCorner, TeammateThread } from '../renderer/src/threads/TeammateThread.tsx';
 import { ThreadMenuList, threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
+import { TeammateSummary } from '../renderer/src/threads/Summary.tsx';
 import { endWasInView } from '../renderer/src/threads/teammate-thread.ts';
 import { TeamContext } from '../renderer/src/team/people.tsx';
 import { FollowContext } from '../renderer/src/team/following.ts';
@@ -109,6 +110,12 @@ describe('the summary at the top', () => {
   });
   it('says nothing for a thread its owner keeps private', () => {
     expect(page({ visible: false })).not.toContain('tp-summary');
+  });
+  // The merge's browser test opened a card with no `blocks`, and the summary's
+  // `card.blocks.length` threw, taking the whole page with it.
+  it('still draws a card an older copy published without its links', () => {
+    const { blocks: _b, blockedBy: _w, ...old } = card;
+    expect(renderToStaticMarkup(React.createElement(TeammateSummary, { card: old as never, owner: 'Maya' }))).toContain('It was the Mac sleeping.');
   });
 });
 

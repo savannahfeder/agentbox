@@ -25,9 +25,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  HOMES as DEMO_HOMES, clearDemoHomes, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
+  HOMES as DEMO_HOMES, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
 } from '../main/demo.mts';
-import { DEMO_ENV, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, runningAsADemo } from '../shared/demo-world.mts';
+import { DEMO_ENV, DEMO_GROUP_POSTS, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, demoMessages, runningAsADemo } from '../shared/demo-world.mts';
 import { HOMES as FRESH_HOMES } from '../shared/fresh-user-home.mts';
 import { readInstallId } from '../shared/install-id.mts';
 import { readWorkItems } from '../main/store/work-items.mts';
@@ -65,12 +65,11 @@ describe('where a demo lives', () => {
     }
   });
 
-  it('clears only its own folder', () => {
-    aHome();
-    expect(fs.existsSync(DEMO_HOMES)).toBe(true);
-    expect(clearDemoHomes()).toEqual({ ok: true });
-    expect(fs.existsSync(DEMO_HOMES)).toBe(false);
-    made.length = 0;
+  // A demo copy may be open on a call while the suite runs on the same
+  // computer. Clearing the whole folder here wiped an open demo's store and
+  // left its inbox empty (2026-11-21), so nothing clears it any more.
+  it('offers nothing that deletes every demo home, so a test run cannot empty an open demo', async () => {
+    expect('clearDemoHomes' in (await import('../main/demo.mts'))).toBe(false);
   });
 });
 
@@ -158,9 +157,9 @@ describe('the store a demo opens on', () => {
     try {
       const all = [];
       for (const p of out.products) all.push(...readWorkItems(p.dir));
-      expect(all.length).toBeGreaterThanOrEqual(9);
+      expect(all.length).toBeGreaterThanOrEqual(6);
       // Every screen worth demoing has a row that lands on it.
-      expect(all.some((i) => i.status === 'open' && /## Options/.test(i.body ?? ''))).toBe(true);
+      expect(all.some((i) => i.status === 'open' && /## Options/.test(i.result ?? ''))).toBe(true);
       expect(all.some((i) => i.status === 'blocked')).toBe(true);
       expect(all.some((i) => i.status === 'done' && (i.result ?? '').length > 40)).toBe(true);
       // And one row the user wrote, which an agent may not overwrite.
@@ -240,18 +239,42 @@ describe('what a demo never shows', () => {
 
 describe('how the demo rows are written', () => {
   const rows = Object.values(demoLedgerLines(Date.now())).flat();
-  // AGENT BODIES ONLY. The user's own row is their sentence, written the way
-  // somebody types a sentence, and a rule about how we open a card does not
-  // apply to what the user wrote.
-  const bodies = rows.filter((l) => l.source === 'agent').map((l) => l.patch?.body).filter(Boolean);
+  // THE AGENTS' ANSWERS ON THREADS STILL WAITING ON YOU. The user's own words
+  // are a sentence somebody typed, and a finished thread's answer is a report.
+  const finished = new Set(rows.filter((l) => l.patch?.status === 'done').map((l) => l.id));
+  const bodies = rows.filter((l) => l.source === 'agent' && !finished.has(l.id)).map((l) => l.patch?.result).filter(Boolean);
 
-  it('opens every body with the ask in bold on the first line', () => {
-    expect(bodies.length).toBeGreaterThan(0);
+  it('opens every answer waiting on you with the ask in bold, under fifteen words', () => {
+    expect(bodies.length).toBeGreaterThanOrEqual(4);
     for (const body of bodies) {
       const first = body.split('\n')[0];
       expect(first.startsWith('**')).toBe(true);
       expect(first.endsWith('**')).toBe(true);
+      expect(first.replace(/\*/g, '').split(/\s+/).length).toBeLessThan(15);
     }
+  });
+
+  it('names and summarises every thread itself, so the copy never asks a model to', () => {
+    // main/row-label.mts names any row without a label on a timer.
+    const ids = new Set(rows.map((l) => l.id));
+    for (const id of ids) {
+      const mine = rows.filter((l) => l.id === id);
+      expect(mine.some((l) => String(l.patch?.label ?? '').trim())).toBe(true);
+      const summary = mine.find((l) => l.patch?.problem);
+      expect(String(summary?.patch.problem).split(/\s+/).length).toBeLessThanOrEqual(45);
+      const done = String(summary?.patch.progress).split('\n');
+      expect(done.length).toBeLessThanOrEqual(6);
+      for (const step of done) expect(step.split(/\s+/).length).toBeLessThanOrEqual(15);
+    }
+  });
+
+  it('joins no two sentences with a colon, the same standing rule as the em dash', () => {
+    const said = [
+      ...rows.flatMap((l) => ['title', 'body', 'result', 'problem', 'progress', 'label'].map((k) => l.patch?.[k])),
+      ...demoMessages().flatMap((m) => [m.title, m.body]),
+      ...DEMO_GROUP_POSTS.map((p) => p.body),
+    ].filter((s): s is string => typeof s === 'string');
+    for (const text of said) expect(text).not.toMatch(/[a-z]: [a-z]/i);
   });
 
   it('writes no em dash anywhere, because a screenshot of this is our writing', () => {
@@ -264,9 +287,10 @@ describe('how the demo rows are written', () => {
     // The list under the reply box is drawn from the body's `## Options`
     // section. A demo whose questions have none demonstrates the app with its
     // best feature switched off.
-    const asks = rows.filter((l) => l.patch?.body && /^\*\*(Say|Merge|Post|Pick)/.test(l.patch.body));
-    expect(asks.length).toBeGreaterThanOrEqual(4);
-    for (const ask of asks) expect(ask.patch.body).toMatch(/\n## Options\n/);
+    // An ask that offers a choice ("Ship it, or hold it") draws one.
+    const asks = rows.filter((l) => l.source === 'agent' && /^\*\*[^*\n]*, or /.test(String(l.patch?.result ?? '')));
+    expect(asks.length).toBeGreaterThanOrEqual(2);
+    for (const ask of asks) expect(ask.patch.result).toMatch(/\n## Options\n/);
   });
 });
 
@@ -284,7 +308,7 @@ describe('opening one', () => {
     // ROWS, NOT LEDGER LINES. The toast reads this number out loud, and one row
     // is two or three appended lines, so counting lines said twenty for nine.
     expect(out.rows).toBe(new Set(Object.values(demoLedgerLines(Date.now())).flat().map((l) => l.id)).size);
-    expect(out.rows).toBeGreaterThanOrEqual(9);
+    expect(out.rows).toBeGreaterThanOrEqual(6);
     expect(spawned).toHaveLength(1);
     expect(spawned[0].opts.detached).toBe(true);
     expect(spawned[0].opts.env.HOME).toBe(out.home);
