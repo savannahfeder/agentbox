@@ -11,14 +11,17 @@ import { familyOfName } from './artifact-marks.mts';
 const LOG = 'file-folders.jsonl';
 export const FOLDER_NAME_MOST = 120;
 
-export interface FolderOp { op: 'folder'; id: string; project: string; name: string; parent?: string | null; by?: string | null; at: number }
+export interface FolderOp { op: 'folder'; id: string; project: string; name: string; parent?: string | null; gone?: boolean; by?: string | null; at: number }
 export interface PlaceOp { op: 'place'; key: string; project?: string | null; family?: string; folder: string | null; by?: string | null; at: number }
 export type FolderLogOp = FolderOp | PlaceOp;
 
 export interface FileFolder { id: string; project: string; name: string; parent: string | null; at: number }
+/** A folder removed, kept so putting it back keeps its id, and so its files return to it. */
+export type GoneFolder = FileFolder & { gone: true };
 
 export interface FolderShelf {
   folders: FileFolder[];
+  gone: GoneFolder[];
   canon: (id: string) => string;
   places: Map<string, PlaceOp>;
   placeOf(key: string): string | null;
@@ -52,31 +55,36 @@ export function writeFolderLog<T extends FolderLogOp>(dir: string, op: T): T {
  * "Launch" apart have one folder: the older id, which every place of either follows.
  */
 export function foldFolders(ops: readonly FolderLogOp[]): FolderShelf {
-  const rows = new Map<string, FileFolder & { first: number }>();
+  const rows = new Map<string, FileFolder & { first: number; gone: boolean }>();
   const places = new Map<string, PlaceOp>();
   for (const op of ops) {
     if (op.op === 'folder') {
       const was = rows.get(op.id);
-      if (!was || was.at <= op.at) rows.set(op.id, { id: op.id, project: op.project, name: op.name, parent: op.parent ?? null, at: op.at, first: Math.min(was?.first ?? op.at, op.at) });
+      if (!was || was.at <= op.at) rows.set(op.id, { id: op.id, project: op.project, name: op.name, parent: op.parent ?? null, at: op.at, gone: op.gone === true, first: Math.min(was?.first ?? op.at, op.at) });
     } else if (op.op === 'place') {
       const was = places.get(op.key);
       if (!was || was.at <= op.at) places.set(op.key, op);
     }
   }
+  // A folder under a removed one goes with it, and a removed name is free to use again.
+  const goneIds = new Set([...rows.values()].filter((f) => f.gone).map((f) => f.id));
+  for (const f of rows.values()) if (f.parent && goneIds.has(f.parent)) goneIds.add(f.id);
   const alias = new Map<string | null, string>();
   const seen = new Map<string, string>();
-  for (const f of [...rows.values()].sort((a, b) => a.first - b.first || a.id.localeCompare(b.id))) {
+  for (const f of [...rows.values()].filter((r) => !goneIds.has(r.id)).sort((a, b) => a.first - b.first || a.id.localeCompare(b.id))) {
     const parent = alias.get(f.parent) ?? f.parent;
     const k = `${projectKey(f.project)}\0${parent ?? ''}\0${nameKey(f.name)}`;
     if (seen.has(k)) alias.set(f.id, seen.get(k)!);
     else seen.set(k, f.id);
   }
   const canon = (id: string): string => alias.get(id) ?? id;
-  const folders = [...rows.values()].filter((f) => !alias.has(f.id))
-    .map(({ first: _first, ...f }): FileFolder => ({ ...f, parent: f.parent ? canon(f.parent) : null }));
+  const folders = [...rows.values()].filter((f) => !alias.has(f.id) && !goneIds.has(f.id))
+    .map(({ first: _first, gone: _gone, ...f }): FileFolder => ({ ...f, parent: f.parent ? canon(f.parent) : null }));
+  const gone = [...rows.values()].filter((f) => f.gone).map(({ first: _first, ...f }): GoneFolder => ({ ...f, gone: true }));
   const shown = new Set(folders.map((f) => f.id));
   return {
     folders,
+    gone,
     canon,
     places,
     /** The folder a file sits in, or null: a folder this person cannot read is no place. */
