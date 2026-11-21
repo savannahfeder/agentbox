@@ -87,6 +87,22 @@ describe('the rewrite', () => {
     for (let i = 0; i < CATCH_UP_TRIES; i++) await sup.catchUpTheImports([imported()], i * 3_600_000);
     expect(writes).toEqual([['route', { labels: [THREAD_LABEL, 'thread:abc'] }]]);
   });
+  // See tests/an-imported-chat-is-rewritten-the-way-every-thread-reads: the
+  // model guessed the project from the person's own settings.
+  it('asks the model with the project named and what was typed in the terminal', async () => {
+    const sup = bare();
+    const root = dirs[dirs.length - 1];
+    const asked = path.join(root, 'asked.txt');
+    const fake = path.join(root, 'fake-claude');
+    fs.writeFileSync(fake, `#!/bin/sh\nprintf '%s' "$2" > '${asked}'\necho '${JSON.stringify(card)}'\n`, { mode: 0o755 });
+    sup.store = { listProducts: () => [{ slug: 'p', name: 'Shop' }], catchUpItem: () => {}, routeItem: () => {} };
+    sup._askSmall = async (ask) => ask({ claudeBin: fake, engine: 'claude', timeoutMs: 20_000 });
+    await sup.catchUpTheImports([imported({ saidOutside: 'Mock the clock.' })]);
+    const prompt = fs.readFileSync(asked, 'utf8');
+    expect(prompt).toContain('--- the project ---\nShop\n');
+    expect(prompt).toContain('Mock the clock.');
+  });
+
   it('waits for a chat that has no answer to rewrite', async () => {
     const { sup, writes } = watching(card);
     await sup.catchUpTheImports([imported({ result: '' })]);

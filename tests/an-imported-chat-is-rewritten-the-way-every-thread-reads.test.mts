@@ -37,6 +37,34 @@ describe('what the model is asked', () => {
   });
 });
 
+// Measured 2026-11-21 on a real chat carried on in its terminal: opened with
+// "Look at this folder, then ask me one short question about what to build
+// here first", answered "A list of products" in the terminal. The rewrite of
+// the agent's next answer saw only the opening and that answer, asked the
+// question again, and named "dd-landing", a folder from the person's own Claude
+// Code settings, as the project. It now gets the project and what was said last.
+describe('a chat carried on where it started', () => {
+  const carried = {
+    body: 'Look at this folder, then ask me one short question about what to build here first.',
+    saidOutside: 'A list of products. Then a three-bullet plan for that page.',
+    result: 'The wait is running in the background. I will send the plan when it finishes.',
+    project: 'Shop',
+  };
+  it('names the project the chat is in', () => {
+    expect(catchUpPrompt(carried)).toContain('--- the project ---\nShop\n');
+  });
+  it('carries what the person said last, between the opening and the answer', () => {
+    const p = catchUpPrompt(carried);
+    expect(p.indexOf('A list of products')).toBeGreaterThan(p.indexOf('Look at this folder'));
+    expect(p.indexOf('A list of products')).toBeLessThan(p.indexOf('The wait is running'));
+  });
+  it('a chat that was only brought in reads as it did, with no empty parts', () => {
+    const p = catchUpPrompt(chat);
+    expect(p).not.toContain('--- the project ---');
+    expect(p).not.toContain('then said');
+  });
+});
+
 describe('what comes back', () => {
   it('reads a clean reply', () => {
     expect(cleanCatchUp(reply)?.title).toBe('Notes store fixes');

@@ -5144,7 +5144,8 @@ export class Supervisor {
     return Promise.all(due.map((next) => {
       this._catchingUp.add(key(next));
       const labels = (next.labels ?? []).filter((l) => l !== CATCH_UP_LABEL);
-      return this._askSmall((opts) => catchUpRow(next, opts) as Promise<CatchUpCard | ''>, { product: next.product })
+      const project = this.store.listProducts?.().find((p) => p.slug === next.product)?.name ?? null;
+      return this._askSmall((opts) => catchUpRow({ ...next, project }, opts) as Promise<CatchUpCard | ''>, { product: next.product })
         .then((card) => {
           if (!card) {
             const misses = (this._catchUpMisses.get(key(next))?.count ?? 0) + 1;

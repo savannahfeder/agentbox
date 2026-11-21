@@ -28,6 +28,7 @@ import { transcriptSearch } from '../main/transcript-search.mts';
 import { HELD_IN, carriedOnIn, heldOutside } from '../shared/carried-on-outside.mts';
 import { belongsInInbox, belongsInProgress, stillAsksYou } from '../renderer/src/list-rules.ts';
 import { threadEvents } from '../renderer/src/thread-history.ts';
+import { offerIsLive } from '../renderer/src/format.ts';
 import { liveLine } from '../renderer/src/live-line.ts';
 import { threadSnapshot } from '../shared/phone-snapshot.mts';
 
@@ -124,6 +125,16 @@ describe('a Claude Code chat brought in, answered in the terminal', () => {
       'Mocked. It passes now.',
     ]);
     expect(events[2].who).toBe('you');
+  });
+
+  // Measured 2026-11-21 on a real chat: answered in the terminal, its thread
+  // still offered the three options you had answered, and a press would have
+  // sent a second reply to an agent already at work on the first.
+  it('stops offering the options you answered there, until the next answer offers its own', () => {
+    const offered = { result: '**Which one?**\n\n## Options\n1. Mock the clock\n2. Retry once', wrote: { result: { ts: 100 } } };
+    expect(offerIsLive(offered)).toBe(true);
+    expect(offerIsLive({ ...offered, wrote: { result: { ts: 100 }, saidOutside: { ts: 150 } } })).toBe(false);
+    expect(offerIsLive({ ...offered, wrote: { result: { ts: 200 }, saidOutside: { ts: 150 } } })).toBe(true);
   });
 
   it('does not take words an agent wrote on the row for yours', () => {
@@ -331,6 +342,39 @@ describe('reading where a chat stands', () => {
     const turn = readChatTurn(file);
     expect(turn.heardAt).toBe(T0 + 200_000);
     expect(turn.ended).toBe(false);
+  });
+
+  // Measured 2026-11-21 on a real Claude Code 2.1.330 chat: one question and
+  // its answer were 421 KB, the question 420 KB from the end, past the 256 KB
+  // read, because each request also writes its attachments and request records.
+  // What was typed in the terminal never reached the thread.
+  const records = (ms, kb) => Array.from({ length: kb / 32 }, () => ({ type: 'api-request-blob', timestamp: at(ms), blob: 'x'.repeat(32 * 1024) }));
+
+  it('finds what you typed behind a turn of request records longer than the tail', () => {
+    write(says(T0 + 100_000, 'Earlier.'), typed(T0 + 200_000, 'Mock the clock.'), ...records(T0 + 201_000, 320), runs(T0 + 210_000), ran(T0 + 220_000), ...records(T0 + 221_000, 96), says(T0 + 230_000, 'Mocked.'));
+    expect(fs.statSync(file).size).toBeGreaterThan(400 * 1024);
+    expect(readChatTurn(file)).toEqual({ heard: 'Mock the clock.', heardAt: T0 + 200_000, said: 'Mocked.', saidAt: T0 + 230_000, ended: true });
+  });
+
+  it('reads no further back than it must when the tail already holds what you typed', () => {
+    write(typed(T0 + 100_000, 'Older words.'), ...records(T0 + 101_000, 320), typed(T0 + 200_000, 'Mock the clock.'), says(T0 + 230_000, 'Mocked.'));
+    expect(readChatTurn(file).heard).toBe('Mock the clock.');
+  });
+
+  it('gives up past a few megabytes with nothing typed, and still reads the answer', () => {
+    write(typed(T0 + 100_000, 'Long ago.'), ...records(T0 + 101_000, 8 * 1024 + 64), says(T0 + 230_000, 'Mocked.'));
+    const turn = readChatTurn(file);
+    expect(turn).toMatchObject({ heard: '', heardAt: 0, said: 'Mocked.', ended: true });
+  });
+
+  // Measured 2026-11-21 on a real Claude Code 2.1.330 chat: a background
+  // command finished, Claude Code wrote its own <task-notification> as a user
+  // row, and the thread showed that XML under You as if typed in the terminal.
+  it("does not take Claude Code's own notice of a finished background command for something you typed", () => {
+    const notice = { type: 'user', timestamp: at(T0 + 240_000), origin: { kind: 'task-notification', producer: 'session-task' }, promptSource: 'system', message: { role: 'user', content: '<task-notification>\n<task-id>b4</task-id>\n<status>completed</status>\n</task-notification>' } };
+    const bare = { ...notice, origin: undefined, promptSource: undefined, timestamp: at(T0 + 250_000) };
+    write({ ...typed(T0 + 200_000, 'Mock the clock.'), origin: { kind: 'human' }, promptSource: 'typed' }, says(T0 + 230_000, 'Started it in the background.'), notice, bare, says(T0 + 260_000, 'Mocked.'));
+    expect(readChatTurn(file)).toMatchObject({ heard: 'Mock the clock.', heardAt: T0 + 200_000, said: 'Started it in the background.\n\nMocked.' });
   });
 
   it('decides each case, and only a newer finished answer is news', () => {

@@ -229,7 +229,7 @@ export function isSubagentPath(file: unknown) {
 const NOT_TYPED = [
   /^<command-name>/, /^<command-message>/, /^<command-args>/, /^<local-command/,
   /^<system-reminder>/, /^<user-memory/, /^Caveat: The messages below/,
-  /^This session is being continued from/, /^\[Request interrupted/,
+  /^This session is being continued from/, /^\[Request interrupted/, /^<task-notification>/,
 ];
 
 /** The row's name, from the first line a person typed. Terminal transcripts
@@ -330,6 +330,9 @@ export function readTranscriptHead(file: string, bytes = HEAD_BYTES, most = FIRS
  *  command's wrapper. Only these end the agent's reply. */
 function typedTurn(row: TranscriptRow | null | undefined) {
   if (row?.type !== 'user' || row.toolUseResult || row.isMeta || row.isCompactSummary) return false;
+  // Claude Code 2.1.330 marks who wrote a turn; a background command's notice is `task-notification`.
+  const kind = (row as { origin?: { kind?: unknown } }).origin?.kind;
+  if (typeof kind === 'string' && kind !== 'human') return false;
   return threadTitle(messageText(row)) !== '';
 }
 
@@ -382,43 +385,54 @@ export function readTranscriptTail(file: string, bytes = TAIL_BYTES): Transcript
  *  since, and `ended` whether that reply's turn is over. */
 export interface ChatTurn { heard: string; heardAt: number; said: string; saidAt: number; ended: boolean }
 
+// Claude Code 2.1.330 writes each request's attachments and records into the
+// transcript, so what you typed can sit further back than the tail.
+const TYPED_BACK_MOST = FIRST_TURN_BYTES;
+
 export function readChatTurn(file: string, bytes = TAIL_BYTES): ChatTurn | null {
   let fd: number | null = null;
   try {
     fd = fs.openSync(file, 'r');
     const size = fs.fstatSync(fd).size;
-    const from = Math.max(0, size - bytes);
-    const buf = Buffer.alloc(size - from);
-    const n = fs.readSync(fd, buf, 0, buf.length, from);
-    const lines = buf.slice(0, n).toString('utf8').split('\n');
-    if (from > 0) lines.shift();
-    const turn: ChatTurn = { heard: '', heardAt: 0, said: '', saidAt: 0, ended: false };
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      let row: TranscriptRow & { isSidechain?: boolean; message?: { content?: unknown; stop_reason?: unknown } };
-      try { row = JSON.parse(line); } catch { continue; }
-      if (row.isSidechain || (row.type !== 'user' && row.type !== 'assistant')) continue;
-      const at = Date.parse(String(row.timestamp ?? '')) || 0;
-      if (typedTurn(row)) {
-        Object.assign(turn, { heard: messageText(row).trim().slice(0, FIRST_CHARS), heardAt: at, said: '', saidAt: 0, ended: false });
-        continue;
-      }
-      // A tool's result: the agent carries on from it.
-      if (row.type === 'user') { turn.ended = false; continue; }
-      // Claude Code refusing the turn, a usage limit: the agent has stopped.
-      if (row.isApiErrorMessage) { turn.ended = true; continue; }
-      const text = messageText(row).trim();
-      if (text) Object.assign(turn, { said: turn.said ? `${turn.said}\n\n${text}` : text, saidAt: at });
-      const blocks = Array.isArray(row.message?.content) ? row.message.content as { type?: unknown }[] : [];
-      turn.ended = row.message?.stop_reason === 'end_turn' && !blocks.some((b) => b?.type === 'tool_use');
+    for (let want = Math.min(bytes, TYPED_BACK_MOST); ; want = Math.min(want * 4, TYPED_BACK_MOST)) {
+      const turn = turnIn(fd, size, want);
+      if (turn.heardAt || want >= size || want >= TYPED_BACK_MOST) return turn;
     }
-    turn.said = turn.said.slice(-SAID_CHARS);
-    return turn;
   } catch {
     return null;
   } finally {
     if (fd !== null) { try { fs.closeSync(fd); } catch { /* nothing to do */ } }
   }
+}
+
+function turnIn(fd: number, size: number, bytes: number): ChatTurn {
+  const from = Math.max(0, size - bytes);
+  const buf = Buffer.alloc(size - from);
+  const n = fs.readSync(fd, buf, 0, buf.length, from);
+  const lines = buf.slice(0, n).toString('utf8').split('\n');
+  if (from > 0) lines.shift();
+  const turn: ChatTurn = { heard: '', heardAt: 0, said: '', saidAt: 0, ended: false };
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let row: TranscriptRow & { isSidechain?: boolean; message?: { content?: unknown; stop_reason?: unknown } };
+    try { row = JSON.parse(line); } catch { continue; }
+    if (row.isSidechain || (row.type !== 'user' && row.type !== 'assistant')) continue;
+    const at = Date.parse(String(row.timestamp ?? '')) || 0;
+    if (typedTurn(row)) {
+      Object.assign(turn, { heard: messageText(row).trim().slice(0, FIRST_CHARS), heardAt: at, said: '', saidAt: 0, ended: false });
+      continue;
+    }
+    // A tool's result: the agent carries on from it.
+    if (row.type === 'user') { turn.ended = false; continue; }
+    // Claude Code refusing the turn, a usage limit: the agent has stopped.
+    if (row.isApiErrorMessage) { turn.ended = true; continue; }
+    const text = messageText(row).trim();
+    if (text) Object.assign(turn, { said: turn.said ? `${turn.said}\n\n${text}` : text, saidAt: at });
+    const blocks = Array.isArray(row.message?.content) ? row.message.content as { type?: unknown }[] : [];
+    turn.ended = row.message?.stop_reason === 'end_turn' && !blocks.some((b) => b?.type === 'tool_use');
+  }
+  turn.said = turn.said.slice(-SAID_CHARS);
+  return turn;
 }
 
 /** What a finished read knows about how a chat ended, for its row and the

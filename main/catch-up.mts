@@ -12,7 +12,10 @@ export const CATCH_UP_TIMEOUT_MS = 150_000;
 
 const cut = (s: unknown, n: number) => String(s ?? '').replace(/\r/g, '').trim().slice(0, n);
 
-export interface CatchUpItem { body?: string | null; title?: string | null; result?: string | null }
+/** `saidOutside` is what the person last typed where the chat started
+ *  (main/chat-follow.mts). Without it and the project, the model guessed the
+ *  folder from the person's own Claude Code settings. */
+export interface CatchUpItem { body?: string | null; title?: string | null; result?: string | null; saidOutside?: string | null; project?: string | null }
 
 export interface CatchUpCard { title: string; context: string; ask: string; said: string; options: string[] }
 
@@ -32,8 +35,10 @@ export function catchUpPrompt(item: CatchUpItem | null | undefined) {
     '  "options": ["three options: the next steps the person could pick, the one the agent would recommend first, each under 12 words"]',
     '}',
     '',
+    ...(cut(item?.project, 120) ? ['--- the project ---', cut(item?.project, 120)] : []),
     '--- the person opened with ---',
     cut(item?.body || item?.title, 1500),
+    ...(cut(item?.saidOutside, 1500) ? ['--- the person then said ---', cut(item?.saidOutside, 1500)] : []),
     '--- the agent last said ---',
     cut(item?.result, 5000) || '(nothing)',
     '---',
