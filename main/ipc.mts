@@ -72,10 +72,9 @@ import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mts';
 import { routedPatch, PICKED_WHY } from '../shared/auto-route.mts';
 import * as agents from './agents.mts';
 import { findAgentFolders, readAgentFiles, readFolderAgents } from './agent-files.mts';
-import { readCodexThreadsOffThread } from './codex-threads.mts';
+import { readChatEndsOffThread, readClaudeThreadsOffThread, readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { readImportableThreads, readSearchableThreads } from './importable-threads.mts';
-import { readChatEnds } from './agent-sessions.mts';
 import { markImported } from '../shared/agent-import.mts';
 import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mts';
 import { checkProjectFolder, chooserStartsIn, folderFromChooser } from '../shared/project-folder-check.mts';
@@ -1777,7 +1776,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // EVERY FOLDER EITHER TOOL KEEPS SESSIONS IN (main/agent-homes.mts), not only
   // ~/.claude and ~/.codex, which is where the import used to look and nothing
   // else (w-e46f2e9cea).
-  const readAllThreads = () => readImportableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread });
+  const readAllThreads = () => readImportableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread, readClaude: readClaudeThreadsOffThread });
   ipcMain.handle('zero:agent-threads', async () => {
     const threads = await readAllThreads();
     lastThreads = threads;
@@ -1813,7 +1812,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     if (again) searchable = null;
     if (!searchable) {
       let got: { threads: ImportableThreads; reached: number } = { threads: [], reached: 0 };
-      try { got = await readSearchableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread }); } catch { got = { threads: [], reached: 0 }; }
+      try { got = await readSearchableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread, readClaude: readClaudeThreadsOffThread }); } catch { got = { threads: [], reached: 0 }; }
       searchable = got;
     }
     const byId = new Map(lastThreads.map((t) => [String(t?.id ?? ''), t]));
@@ -1841,9 +1840,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     // the case a test or a fresh window can reach and a person cannot.
     if (!lastThreads.length) lastThreads = await readAllThreads();
     // Two kinds, two rows.
-    const chosen = readChatEnds(lastThreads.filter((t) => want.has(String(t?.id ?? ''))));
     let out: { ids: string[]; added: number; already: number; done: number } = { ids: [], added: 0, already: 0, done: 0 };
     try {
+      const chosen = await readChatEndsOffThread(lastThreads.filter((t) => want.has(String(t?.id ?? ''))));
       // Each store method takes its own kind off the list and leaves the other.
       // Setup's last screen sorts what it brings in: finished chats go to Done.
       const how = { land: land === 'sorted' ? 'sorted' : 'inbox' };
