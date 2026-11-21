@@ -276,7 +276,7 @@ import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
 import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
-import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
+import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -4344,9 +4344,12 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Counts toasts, so each new one is a new element and its clock starts over.
   const toastShown = useRef(0);
+  // What O opens once the toast has gone (opensTheLastToast).
+  const lastToast = useRef<LastToast | null>(null);
   const showToast = useCallback((text: string, goes?: ToastGoes) => {
     toastShown.current += 1;
     setToast({ text, goes });
+    if (goes && !goes.warns) lastToast.current = { goes, at: Date.now() };
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
@@ -4422,16 +4425,17 @@ export default function App() {
   };
   // The Team page says more about a team.
   const openInvite = () => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); };
+  // A chat pressed in Needs you opens in the inbox, as a thread does.
   const answerLead = (l: LeadRow) => {
     if (l.invite) void joinInvite(l.invite);
-    else if (l.mention) roomsUi.openMention(l.mention);
+    else if (l.mention) roomsUi.openMention(l.mention, 'inbox');
   };
   const leadRowsDrawn = (rows: LeadRow[]) => rows.map((l) => (l.invite
     ? <InviteRows key={l.key} rows={[l.invite]} onJoin={(r) => void joinInvite(r)} onOpen={openInvite} selected={keyLeadPicked?.key ?? null} />
-    : <MentionRows key={l.key} mentions={[l.mention!]} faces={roomsUi.faces} now={now} onOpen={roomsUi.openMention} selected={keyLeadPicked?.key ?? null} />));
+    : <MentionRows key={l.key} mentions={[l.mention!]} faces={roomsUi.faces} now={now} onOpen={(m) => roomsUi.openMention(m, 'inbox')} selected={keyLeadPicked?.key ?? null} />));
   const leadCardsDrawn = (rows: LeadRow[]) => rows.map((l) => (l.invite
     ? <InviteCards key={l.key} rows={[l.invite]} onJoin={(r) => void joinInvite(r)} onOpen={openInvite} selected={keyLeadPicked?.key ?? null} />
-    : <MentionCards key={l.key} mentions={[l.mention!]} onOpen={roomsUi.openMention} selected={keyLeadPicked?.key ?? null} />));
+    : <MentionCards key={l.key} mentions={[l.mention!]} onOpen={(m) => roomsUi.openMention(m, 'inbox')} selected={keyLeadPicked?.key ?? null} />));
   // The board's Needs you column starts with what the list's does, in the list's order.
   const boardLead = fromPeopleAbove ? { count: fromPeopleAbove, cards: <>
     <SharedFileCards news={sharedFileNews} cards={cards} team={team} onOpen={(n, card) => { openTeammateCard(card, { file: n.file, note: n.id }); }} />
@@ -4439,6 +4443,8 @@ export default function App() {
     {leadCardsDrawn(allLeads)}
   </> } : undefined;
   const roomShown = !!roomsUi.openId && !settingsOpen && !teamShown && !focused && !focusedRepeat && search === null;
+  // One opened from Needs you is in the inbox instead.
+  const roomOnTeam = roomShown && !roomsUi.inInbox;
   const teammateModels = useMemo(() => ({ engine: snap?.engines?.workspace ?? null, codex: codexModels, codexDefault: codexModelDefault ?? null }), [snap?.engines?.workspace, codexModels, codexModelDefault]);
   const teammatesUi = useTeammates({
     items, view: snap?.teammates, asking: (snap?.approvals ?? []).map((a) => a.item), running: snap?.supervisor?.running ?? NO_RUNNING, queued: snap?.supervisor?.queued, products: snap?.products ?? [], engines: snap?.engines?.choices ?? [],
@@ -4518,21 +4524,20 @@ export default function App() {
     persons: homeLayout === 'chats' && team ? (team.state.people ?? []).filter((p) => p.id !== team.me).map((p) => ({ id: p.id, name: p.name, url: p.avatarUrl ?? null, waits: false })) : undefined,
     onPerson: (id) => openChatsPlace(`person:${id}`),
   } : null;
-  // Command K's chats: a group or chat by name or people, an AI teammate.
-  const findChats = useCallback((q: string) => {
-    const found = chatsFound({ groups: roomsUi.live ? roomsUi.groups : [], teammates: teammatesUi.live ? teammatesUi.list : [], query: q });
-    const persons = (chatsValue?.persons ?? []).filter((p) => p.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q.toLowerCase())));
-    return [
-      ...persons.map((p) => ({
-        id: `chat-person-${p.id}`, label: p.name, hint: 'Their page in Team',
-        run: () => { setModal(null); openChatsPlace(`person:${p.id}`); },
-      })),
-      ...found.filter((f) => !persons.some((p) => p.name === f.label)).map((f) => ({
-        id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
-        run: () => { setModal(null); if (f.kind === 'teammate') teammatesUi.go(f.key); else roomsUi.pickGroup(f.key); },
-      })),
-    ];
-  }, [roomsUi, teammatesUi, chatsValue]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Command K's people and groups. Each id is `chat-` before the id of the
+  // command row for the same group or teammate, which the palette then leaves
+  // out (paletteOrder).
+  const findChats = useCallback((q: string) => chatsFound({
+    groups: roomsUi.live ? roomsUi.groups : [], teammates: teammatesUi.live ? teammatesUi.list : [], persons: chatsValue?.persons ?? [], query: q,
+  }).map((f) => ({
+    id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
+    run: () => {
+      setModal(null);
+      if (f.kind === 'person') openChatsPlace(`person:${f.key}`);
+      else if (f.kind === 'teammate') teammatesUi.go(f.key);
+      else roomsUi.pickGroup(f.key);
+    },
+  })), [roomsUi, teammatesUi, chatsValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // LINES, FILES, COMMENTS AND DECISIONS (./found-inside). Threads, conversations
   // and teammates' shared threads are searched in main; groups and decisions are
@@ -4773,7 +4778,7 @@ export default function App() {
     if (!held) return false;
     setStoppedWarned(true);
     rememberWarned(localStorage);
-    showToast(held.say, held.goes);
+    showToast(held.say, { ...held.goes, warns: true });
     return true;
   }, [stoppedWarned, run, showToast]);
 
@@ -6274,6 +6279,7 @@ export default function App() {
       pendingRef.current = null;
       clearTimeout(pending.timer);
       advanceRef.current = null;
+      lastToast.current = null;
       letRowGo(pending.item.id);
       // the draft has to be back on disk before the item is focused, because it
       // is the draft's presence that opens the reply dock (the effect below).
@@ -6343,6 +6349,7 @@ export default function App() {
       if (outcome.open) { setFocused(outcome.open); markSeen(outcome.open); }
       return { failed: outcome.refused };
     }
+    lastToast.current = null;
     leaveUndoMarks(last.undid, from, Date.now());
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
@@ -6487,7 +6494,7 @@ export default function App() {
         setModal((m) => (m === 'palette' ? null : 'palette'));
         return;
       }
-      const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now());
+      const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now(), lastToast.current);
       // A ROOM OWNS THE KEYBOARD WHILE IT IS OPEN, as Settings does: the list
       // behind it is not on the screen. Escape goes back to the threads and
       // Tab walks on along the tabs. N goes on to the room's branch below the
@@ -6651,8 +6658,8 @@ export default function App() {
       // after submitting a task, click 'Open it' in the toast." Z takes back
       // what the toast announced; O goes into it. Here, above the split, because
       // it means the same thing on the list and inside a task (answering one
-      // moves you on, and O brings you back to it). Only while a toast with
-      // somewhere to go is up: the cap drawn on it is the only promise of it.
+      // moves you on, and O brings you back to it). Anything on screen that
+      // offers O comes first, then the last toast's thread.
       const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);
       if (goesTo) { e.preventDefault(); openToastRow(goesTo); return; }
       if (oWaitsForTheSend(e.key, toast, sentAt.current, Date.now())) {
@@ -6661,6 +6668,8 @@ export default function App() {
         return;
       }
       if ((e.key === 'o' || e.key === 'O') && urgentShownRow) { e.preventDefault(); openUrgentReady(); return; }
+      const lastGoesTo = opensTheLastToast(e.key, lastToast.current, Date.now(), focused ? { product: focused.product, id: focused.id } : null);
+      if (lastGoesTo) { e.preventDefault(); openToastRow(lastGoesTo); return; }
       // AN OPEN REPEATING TASK IS A SCREEN, AND EVERY KEY STOPS HERE.
       //
       // There was no branch for it at all, so with a rule on screen the whole
@@ -7038,6 +7047,7 @@ export default function App() {
     if (chatsPlace) place.chats = chatsPlace;
     // 'groups' is what Groups says when it has no group to open, not a group.
     if (roomsUi.openId && roomsUi.openId !== 'groups') place.room = roomsUi.openId;
+    if (roomsUi.openId && roomsUi.openId !== 'groups' && roomsUi.inInbox) place.roomInInbox = true;
     if (teammatesUi.open) place.teammate = teammatesUi.open;
     if (todayOn) place.today = true;
     if (tasksOn) place.tasks = true;
@@ -7048,7 +7058,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloaded, restored, view, focused?.id, focused?.product, focusedRepeat?.id,
     openDoc?.src, openDoc?.product, settingsOpen, settingsAt, search, current?.id,
-    homeOpen, filesPage?.project, !!filesPage, !!connectionsPage, teamOpen, chatsPlace, roomsUi.openId, teammatesUi.open, todayOn, tasksOn]);
+    homeOpen, filesPage?.project, !!filesPage, !!connectionsPage, teamOpen, chatsPlace, roomsUi.openId, roomsUi.inInbox, teammatesUi.open, todayOn, tasksOn]);
 
   // READING IT BACK, once, on a page that is coming back and never on a fresh
   // launch. Opening Agentbox in the morning still opens on the inbox: that is
@@ -7080,7 +7090,7 @@ export default function App() {
     // First, because opening either clears the thread, Team and search that
     // the lines below may put back.
     if (place.teammate) teammatesUi.go(place.teammate);
-    if (place.room) roomsUi.open(place.room);
+    if (place.room) roomsUi.open(place.room, place.roomInInbox ? 'inbox' : null);
     setView(place.view);
     // A note from before Home was kept: any tab but the inbox was off Home.
     if (homeOn) setHomeOpen(place.home ?? place.view === 'inbox');
@@ -7531,6 +7541,7 @@ export default function App() {
     files: filesShown ? { project: filesPage?.project ?? null } : null,
     connections: connectionsShown,
     group: groupHere,
+    groupInInbox: roomShown && roomsUi.inInbox,
     teammate: teammatesShown ? teammatesUi.open : null,
     teamPlace: chatsPlaceShown ? chatsPlace : null,
     unrecorded: search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || !!focusedRepeat || todayOn || tasksOn,
@@ -7550,7 +7561,7 @@ export default function App() {
       else if (s.at === 'files') openFiles(s.project);
       else if (s.at === 'connections') openConnectionsPage(null);
       else if (s.at === 'team') openChatsPlace(s.place);
-      else if (s.at === 'group') { openView(view); roomsUi.open(s.id); }
+      else if (s.at === 'group') { openView(view); roomsUi.open(s.id, s.inbox ? 'inbox' : null); }
       else if (s.at === 'teammate') teammatesUi.go(s.id);
       else if (s.at === 'card') {
         const card = cardOf(s);
@@ -7940,7 +7951,7 @@ export default function App() {
   const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
   // The Inbox button is only on an inbox thread: anywhere else the sidebar's
   // own Inbox is as close, and on the inbox it would lead to itself.
-  const onInboxThread = !!focused && !settingsOpen && !inChats;
+  const onInboxThread = (!!focused && !settingsOpen && !inChats) || (roomShown && roomsUi.inInbox);
   // A teammate's thread opened from the Inbox is an inbox thread too.
   const onTeammateThread = teamShown && !!openCard && !cardFromPlace;
   const backForward = backForwardOn
@@ -8069,7 +8080,7 @@ export default function App() {
       item: openItem,
       card: (card) => openTeammateCard(card),
       // A click on an invitation opens it, as its Inbox row does; joining is its own button there.
-      lead: (l) => { if (l.mention) roomsUi.openMention(l.mention); else openInvite(); },
+      lead: (l) => { if (l.mention) roomsUi.openMention(l.mention, 'inbox'); else openInvite(); },
       file: (n, card) => openTeammateCard(card, { file: n.file, note: n.id }),
       follow: (n, card) => { changeFollows((was) => markTold(was, n)); openTeammateCard(card); },
     });
@@ -8281,7 +8292,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${teamShown && openCard && snap?.team?.signedIn && snap.team.team ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${((queueSpot || onePage) && focused) || (teamShown && openCard && snap?.team?.signedIn && snap.team.team) ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}${skyOnPlace ? ' sky-shown sky-place' : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${roomShown && roomsUi.inInbox ? ' workspace-task' : ''}${teamShown && openCard && snap?.team?.signedIn && snap.team.team ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${((queueSpot || onePage) && focused) || (teamShown && openCard && snap?.team?.signedIn && snap.team.team) ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}${skyOnPlace ? ' sky-shown sky-place' : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put
@@ -8342,9 +8353,9 @@ export default function App() {
         onAccount={() => { setTeamOpen(false); setOpenCard(null); closeSearch(); setFocused(null); setInviteFocus(false); setSettingsPane('team'); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
         onSignOut={() => { void api.teamSignOut().then(() => refresh()); }}
         onTeam={() => { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setOpenCard(null); setTeamOpen(true); }} onSettings={() => { setTeamOpen(false); setSettingsPane(null); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }} inboxCount={inboxCount} scheduledCount={scheduledCount} view={view} collapsed={sideFolded} onSearch={openSearch} onCompose={() => setModal('compose')} onView={openView}
-        onHome={homeOn ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomShown || directOpen || chatsPlaceShown || cardFromPlace}
+        onHome={homeOn ? goHome : undefined} homePage={homeShown} onTeammatesPage={teammatesShown} onFiles={() => openFiles(null)} filesPage={filesShown} tasksPage={tasksShown} onConnections={() => openConnectionsPage(null)} connectionsPage={connectionsShown} rail={narrowSidebar} onHover={setRailOpen} onGroupsPage={roomOnTeam || directOpen || chatsPlaceShown || cardFromPlace}
         /* Without Groups the one row under Threads is Chats, and only while there are teammates. */
-        groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
+        groups={roomsUi.live ? roomsUi.sidebarGroups(roomOnTeam || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />
       {/* THE REACH (w-5dcff78971). The corner is transparent and it is the
           only part of our own document lying over the file, so a pointer
           brought up there wakes the marks that a pointer moving across the

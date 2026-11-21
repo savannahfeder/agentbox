@@ -19,7 +19,8 @@ describe('the app', () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     // A second review: Standup and a person's page still lit Inbox, because the app told the sidebar only about rooms.
-    expect(app).toContain('onGroupsPage={roomShown || directOpen || chatsPlaceShown || cardFromPlace}');
+    // A chat opened from Needs you is in the inbox, not on the Team page (w-1d47bc5339).
+    expect(app).toContain('onGroupsPage={roomOnTeam || directOpen || chatsPlaceShown || cardFromPlace}');
   });
 });
 

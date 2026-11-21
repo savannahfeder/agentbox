@@ -96,9 +96,11 @@ describe('a card opens its chat', () => {
     expect(app).toMatch(/const chat = person \? personChats\.get\(person\) : undefined;\s*const talk = person && !\(roomsUi\.live && chat\) \? directWith\(person\) : null;/);
   });
 
+  // The same page drawn in the inbox (tests/a-chat-opened-from-needs-you-stays-in-the-inbox).
   it('leaves the group\'s list and, for the team or one person, its people to the cards', () => {
-    expect(rooms).toContain('page = <GroupPage key={open.id} inline={inline}');
-    expect(rooms).toContain('people={inline && (open.teamId || open.members <= 2) ? null : <PeoplePanel');
+    expect(rooms).toContain('const bare = inline || inInbox;');
+    expect(rooms).toContain('page = <GroupPage key={open.id} inline={bare}');
+    expect(rooms).toContain('people={bare && (open.teamId || open.members <= 2) ? null : <PeoplePanel');
   });
 
 });

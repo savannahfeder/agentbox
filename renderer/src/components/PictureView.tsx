@@ -8,6 +8,7 @@ import { CrossIcon } from './CrossIcon';
 import { focusTheReplyBox } from '../focus-at-end';
 import { pressedInThePalette } from '../palette-rows';
 import { opening, seenAt } from '../picture';
+import { fetchableFileUrl } from '../phone-files';
 
 export type { Picture };
 
@@ -51,7 +52,8 @@ function decoded(url: string): Promise<Ready> {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.decoding = 'async';
-  img.src = url;
+  // An Image() is in no page, so the browser app's rewriting of the desktop's picture address never reaches it.
+  img.src = fetchableFileUrl(url);
   let timer: number | undefined;
   const late = new Promise<never>((_, no) => { timer = window.setTimeout(() => no(new Error('slow')), PICTURE_WAIT_MS); });
   return Promise.race([img.decode(), late])

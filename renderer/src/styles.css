@@ -3341,6 +3341,40 @@ body {
 }
 .attach-remove:hover { color: var(--text); border-color: var(--text-faint); }
 
+/* A chat's box draws what is attached as tiles of one height (AttachRow's
+   `tiles`), each with its own ×, so pressing a file never takes it out. */
+.attach-tiles { gap: 8px; max-height: 192px; overflow-y: auto; }
+.dock-card .attach-tiles { padding: 4px 16px 12px; }
+.attach-tile { position: relative; flex: none; height: 56px; max-width: 100%; box-sizing: border-box; }
+.attach-tiles .attach-picture img { width: 56px; height: 56px; object-fit: cover; box-sizing: border-box; display: block; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); }
+.attach-tiles .attach-file {
+  display: flex; align-items: center; gap: 10px; width: 232px; padding: 0 30px 0 10px; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--artifact-corner-small); background: var(--wash);
+}
+.attach-tiles .attach-kind {
+  flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--artifact-corner-small);
+  background: var(--wash-strong); font: 9.5px var(--mono); letter-spacing: .04em; color: var(--text-dim);
+}
+.attach-tiles .attach-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.attach-tiles .attach-name { display: flex; min-width: 0; white-space: pre; font-size: 13px; line-height: 17px; color: var(--text); }
+.attach-tiles .attach-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.attach-tiles .attach-tail { flex: none; }
+.attach-tiles .attach-meta { font-size: 12px; line-height: 16px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.attach-tiles .attach-too-big { border-color: var(--text-faint); }
+.attach-tiles .attach-too-big .attach-meta { color: var(--text-dim); }
+.attach-tiles .attach-coming .attach-bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--text-faint); transition: width 0.2s linear; }
+.attach-tiles .attach-voice .voice-note { height: 56px; padding-right: 32px; border-radius: var(--artifact-corner-small); }
+.attach-x {
+  position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; padding: 0; display: grid; place-items: center;
+  border: 1px solid var(--line-strong); border-radius: 50%; background: var(--pop); color: var(--text-dim); cursor: pointer;
+  opacity: 0;
+}
+.attach-x svg { width: 10px; height: 10px; }
+.attach-x:hover { color: var(--text); border-color: var(--text-faint); }
+.attach-x:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 1px; }
+.attach-tile:hover > .attach-x, .attach-tile:focus-within > .attach-x { opacity: 1; }
+@media (hover: none) { .attach-tiles .attach-x { opacity: 1; } }
+
 /* The 0 is transparent-panel bookkeeping, not the corner exception retired
    on 2026-08-16: this panel has no background and no shadow, so there is no
    edge here for a radius to cut. */
