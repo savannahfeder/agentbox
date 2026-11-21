@@ -338,8 +338,9 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, share: !!share, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
   const canGive = giveTo.length > 0 && !!onGive && !!onFinish;
+  // With both, the Share button beside Done is the one door, so the menu does not repeat it.
+  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, share: !!share && !canGive, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: canGive && !share, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [givingTo, setGivingTo] = useState<{ id: string; name: string } | null>(null);

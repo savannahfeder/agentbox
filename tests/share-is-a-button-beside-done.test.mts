@@ -28,3 +28,11 @@ describe('the Share button', () => {
     expect(menu).toMatch(/share: PeopleMark/);
   });
 });
+
+// A regression look: the menu's first row repeated the Share button.
+describe('the menu beside it', () => {
+  it("leaves out the share row while the button is there", () => {
+    expect(menu).toContain('share: !!share && !canGive,');
+    expect(menu).toContain('give: canGive && !share,');
+  });
+});

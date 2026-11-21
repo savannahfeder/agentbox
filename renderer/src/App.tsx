@@ -2326,6 +2326,12 @@ export default function App() {
     const a = askIGave(r, team?.me ?? null);
     return a && askIsOpen(r) ? [a.thread] : [];
   })), [items, team?.me]);
+  // Threads you handed over that the other person still has: in progress, not done.
+  const handedOut = useMemo(() => new Set(items.flatMap((r) => {
+    if (!handedToPage(r)) return [];
+    const task = taskHandedFrom(items, r.id, team?.me ?? null);
+    return task && task.status !== 'done' ? [r.id] : [];
+  })), [items, team?.me]);
 
   // A comment that asks you by name is news to you (fileNewsFor).
   const myName = team?.byId.get(team.me ?? '')?.name ?? null;
@@ -2570,6 +2576,7 @@ export default function App() {
       if (scope && i.product !== scope) return false;
       if (sentAwayByMe(i, team?.me ?? null)) return false;
       if (askedOut.has(i.id) && i.status !== 'done') return true;
+      if (handedOut.has(i.id)) return true;
       const deferredUntil = dueAt(i);
       if (hiddenAt(i) > now && !liveIds.has(i.id)) return false;
       // The grace window: the write waits for Z, the signal must not, because a
@@ -2603,7 +2610,7 @@ export default function App() {
     // threads/page-rules.ts): a queued row is told by its Status cell, and
     // what you just sent is on top.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, scope, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut]);
+  [items, agentList, agentMode, scope, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut, handedOut]);
 
   // AND THE TAB COUNTS EACH THREAD ONCE: the list, less what Needs you holds,
   // the way `tabState` below has it for the board and `done` for the archive.
@@ -2651,9 +2658,9 @@ export default function App() {
   // In progress until it does (w-bc976fd247).
   const done = useMemo(() => {
     const needsYou = new Set(inbox.map((i) => i.id));
-    return newestAskPerThread(items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !sentAwayByMe(i, team?.me ?? null)))
+    return newestAskPerThread(items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !sentAwayByMe(i, team?.me ?? null) && !handedOut.has(i.id)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [items, scope, inbox, liveIds, shippingIds, team?.me]);
+  }, [items, scope, inbox, liveIds, shippingIds, team?.me, handedOut]);
 
   // Scheduled is the future inbox: everything waiting for its moment, soonest
   // first. The view only exists while something is in it. It holds two things

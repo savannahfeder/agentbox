@@ -33,7 +33,7 @@ describe('the lists', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   it('keep it off In progress, Done and the board', () => {
     expect(app).toContain('      if (sentAwayByMe(i, team?.me ?? null)) return false;');
-    expect(app).toContain("i.status === 'done' && !sentAwayByMe(i, team?.me ?? null))");
+    expect(app).toContain("i.status === 'done' && !sentAwayByMe(i, team?.me ?? null)");
     expect(app).toContain('const boardItemsHere = useMemo(() => items.filter((i) => !sentAwayByMe(i, team?.me ?? null)), [items, team?.me]);');
   });
 });
@@ -83,7 +83,7 @@ describe('the wiring a live check caught', () => {
 describe('the giver\'s Done row', () => {
   it('says who has it, not Done', () => {
     const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
-    expect(pages).toContain('(handedOnName ? `Handed to ${handedOnName.split(/\\s+/)[0]}` : null)');
+    expect(pages).toContain(': `Handed to ${handedOnName.split(/\\s+/)[0]}`;');
   });
 });
 
@@ -93,5 +93,23 @@ describe('the side that held it', () => {
     expect(team).toContain("handedFrom(item.body, taskGiver(item)) && closer === taskGiver(item) ? `${closer === team.me ? 'you' : name} took this back`");
     const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
     expect(focus).toContain('onReopen={!canFinish && !agent && !takenBack ?');
+  });
+});
+
+// A regression look: with the task off the lists, Sam's In progress said
+// "Nothing is running" while Theo had four of his threads, and Done read as
+// finished. The thread itself now stays in In progress while Theo's task is
+// open, and says how it stands.
+describe('the giver\'s thread while it is out', () => {
+  const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+  it('is in In progress, not Done, while their task is open', () => {
+    expect(app).toContain("return task && task.status !== 'done' ? [r.id] : [];");
+    expect(app).toContain('      if (handedOut.has(i.id)) return true;');
+    expect(app).toContain("!sentAwayByMe(i, team?.me ?? null) && !handedOut.has(i.id)))");
+  });
+  it('says With Theo, then Theo finished it', () => {
+    expect(pages).toContain('`With ${handedOnName.split(/\\s+/)[0]}`');
+    expect(pages).toContain('`${handedOnName.split(/\\s+/)[0]} finished it`');
   });
 });
