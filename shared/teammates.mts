@@ -732,6 +732,15 @@ export function dutyUnread(teammateId: string, dutyId: string, items: readonly R
   return false;
 }
 
+// A duty's job is still open while its first-job run or an earlier run of the
+// same duty is running, queued, or asking you something. One that only
+// delivered a result is finished; the next slot is new work.
+export function jobStillOpen(teammateId: string, dutyId: string, items: readonly RunItem[], chat: ChatLike): boolean {
+  const firstId = runIdFor(`${teammateId}#first`);
+  return runsOf(teammateId, items).some((i) => (i.id === firstId || dutyOf(i) === dutyId) && i.status !== 'done'
+    && (isActiveRun(i) || isQueued(i) || (waitingOnYou(i) && asksYouStill(i, teammateId, chat))));
+}
+
 export function isQueued(item: { status?: string; start?: string } | null | undefined): boolean {
   return item?.status === 'open' && item?.start === 'later';
 }
@@ -1151,6 +1160,11 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         const slot = dutySlot(d, now);
         if (!slot || slot <= served) continue;
         key = slot;
+      }
+      // The job's own thread is still open, so a new one would only duplicate it.
+      if (jobStillOpen(t.id, d.id, items, chat)) {
+        actions.push({ type: 'dutyServed', teammate: t.id, duty: d.id, key });
+        continue;
       }
       const id = newRun(t, { kind: 'duty', duty: d.id, what: d.what, ...(d.tell ? { tell: d.tell } : {}), key }, `${t.id}#${d.id}@${key}`);
       if (id) actions.push({ type: 'dutyServed', teammate: t.id, duty: d.id, key });
