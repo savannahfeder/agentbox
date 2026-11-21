@@ -13,6 +13,7 @@ import { reachTick } from './teammate-reach.mts';
 import { filesFoldersBrief } from '../shared/file-folders.mts';
 import { audienceWords } from '../shared/teammate-reach.mts';
 import { isShippedNote } from '../shared/shipped-note.mts';
+import { offerFace } from '../shared/teammate-face.mts';
 import { ruleLabel, periodKey } from '../shared/repeats.mts';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newTeammateId, newMemoryId, readPlaybooks,
@@ -38,6 +39,8 @@ export interface Teammate {
   id: string;
   name: string;
   letter?: string | null;
+  /** The face picked for it; absent, its face follows its id (shared/teammate-face.mts). */
+  face?: string | null;
   role?: string | null;
   job?: string | null;
   goal?: string | null;
@@ -327,7 +330,7 @@ export class Teammates {
   update(id: string, patch: Record<string, unknown> = {}, now = Date.now()) {
     const t = this.get(id, now);
     if (!t) throw new Error('No such teammate.');
-    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary', 'readsMessages', 'openToTeam', 'voice', 'voiceText'];
+    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary', 'readsMessages', 'openToTeam', 'voice', 'voiceText', 'face'];
     const clean: Record<string, unknown> = {};
     for (const k of allowed) if (k in patch) clean[k] = patch[k];
     if ('name' in clean) {
@@ -699,6 +702,8 @@ export class Teammates {
       const gains = offer.gains?.length ? ` ${offer.gains.map((g) => (/[.!?…]$/.test(g) ? g : `${g}.`)).join(' ')}` : '';
       const text = `${offer.role}. Take on work like this thread from now on, and learn how I like it done.${offer.why ? ` ${offer.why}` : ''}${gains}`;
       made = this.describe({ text, product: item.product, threads }, now).teammate?.id ?? null;
+      // The face the card showed is the one it keeps.
+      if (made) writeTeammate(this.dir(), made, { face: offerFace(item.id) }, now);
     } else {
       writeChat(this.dir(), { kind: 'act', from: YOU, verb: 'declined-role', ref: offer.role.toLowerCase(), text: offer.role }, now);
     }

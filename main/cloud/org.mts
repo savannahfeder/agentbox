@@ -32,7 +32,7 @@ export function orgFromOutput(text: unknown) {
 export async function readCloudOrg(rec: { id: string }, { transport, storage }: { transport: CloudTransport; storage: CloudStorage }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-org-'));
   try {
-    const git = (...a: string[]) => execFileSync('git', a, { cwd: dir, stdio: 'pipe' });
+    const git = (...a: string[]) => execFileSync('git', a, { cwd: dir, stdio: 'pipe', windowsHide: true });
     git('init', '-q', '-b', 'main', '.');
     git('-c', `user.name=${Name}`, '-c', `user.email=${nameSlug}@localhost`, 'commit', '-q', '--allow-empty', '-m', 'org check');
     git('checkout', '-q', '-b', 'agentbox/org-check');

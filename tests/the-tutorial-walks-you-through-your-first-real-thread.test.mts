@@ -448,7 +448,9 @@ describe('the folder chip before a choice', () => {
   // And then: "I thought it was actually a folder ... that can run code. It's just for personal tasks."
   it('says in the menu what a project with no folder is for', async () => {
     const box = await read();
-    expect(box).toContain('{!p.repoPath && <span className="tc-row-note">For personal tasks</span>}');
+    expect(box).toContain('!p.repoPath && <span className="tc-row-note">For personal tasks</span>}');
+    // A project a teammate shared has no folder here either, and says it is the team's.
+    expect(box).toContain('{p.team?.projectId ? <span className="tc-row-note">Shared with your team</span> : ');
   });
 });
 

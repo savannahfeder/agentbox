@@ -20,7 +20,7 @@ export function startGhLogin({ gh = 'gh', spawn = nodeSpawn as Spawn, env = proc
     let said = '';
     let child;
     try {
-      child = spawn(gh, ['auth', 'login', '--web', '--hostname', 'github.com', '--git-protocol', 'https'], { env: { ...env, GH_PROMPT_DISABLED: '1' }, stdio: ['pipe', 'pipe', 'pipe'] });
+      child = spawn(gh, ['auth', 'login', '--web', '--hostname', 'github.com', '--git-protocol', 'https'], { env: { ...env, GH_PROMPT_DISABLED: '1' }, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     } catch { reject(new Error(NO_GH)); return; }
     const timer = setTimeout(() => child.kill(), LOGIN_MS);
     let settled = false;
@@ -45,7 +45,7 @@ export function startGhLogin({ gh = 'gh', spawn = nodeSpawn as Spawn, env = proc
 export function ghToken({ gh = 'gh', spawn = nodeSpawn as Spawn, env = process.env }: { gh?: string; spawn?: Spawn; env?: NodeJS.ProcessEnv } = {}): Promise<string | null> {
   return new Promise((resolve) => {
     let child;
-    try { child = spawn(gh, ['auth', 'token', '--hostname', 'github.com'], { env, stdio: ['ignore', 'pipe', 'ignore'] }); } catch { resolve(null); return; }
+    try { child = spawn(gh, ['auth', 'token', '--hostname', 'github.com'], { env, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }); } catch { resolve(null); return; }
     let out = '';
     const timer = setTimeout(() => child.kill(), SETUP_MS);
     child.stdout.on('data', (b: Buffer) => { out += b; });
@@ -58,7 +58,7 @@ export function ghToken({ gh = 'gh', spawn = nodeSpawn as Spawn, env = process.e
 export function setUpGit({ gh = 'gh', spawn = nodeSpawn as Spawn, env = process.env }: { gh?: string; spawn?: Spawn; env?: NodeJS.ProcessEnv } = {}): Promise<boolean> {
   return new Promise((resolve) => {
     let child;
-    try { child = spawn(gh, ['auth', 'setup-git', '--hostname', 'github.com'], { env, stdio: 'ignore' }); } catch { resolve(false); return; }
+    try { child = spawn(gh, ['auth', 'setup-git', '--hostname', 'github.com'], { env, stdio: 'ignore', windowsHide: true }); } catch { resolve(false); return; }
     const timer = setTimeout(() => child.kill(), SETUP_MS);
     child.on('error', () => { clearTimeout(timer); resolve(false); });
     child.on('close', (code: number | null) => { clearTimeout(timer); resolve(code === 0); });

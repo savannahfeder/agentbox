@@ -82,7 +82,8 @@ describe('the window', () => {
   it("on a teammate's copy it counts the notes their thread has, and opens the review", () => {
     expect(app).toContain('const teammateNotesBeside = !fullScreenDoc && !!openDoc?.readOnly && !!openCard && openDoc.notes != null && takesNotesSidebar(openDoc.src);');
     expect(app).toMatch(/\{teammateNotesBeside && <NotesToggle open=\{false\} waiting=\{openDoc\.notes \?\? 0\} onToggle=\{openNotesFull\} \/>\}/);
-    expect(teammate).toContain('onOpenDoc(product, src, notesOnFile(work?.lines ?? [], notesHere.current, src))');
+    // Through refs since w-f702d60afe, so a sync does not draw the thread's links again.
+    expect(teammate).toContain('calls.current.onOpenDoc(product, src, notesOnFile(linesHere.current, notesHere.current, src))');
     expect(teammate).toContain('onBeside={(path) => { setBig(null); beside(path); }}');
   });
 });

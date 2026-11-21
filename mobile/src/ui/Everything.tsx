@@ -25,7 +25,7 @@ const CARDS_EVERY_MS = 30_000;
 
 /** A person's initials, an AI teammate's dashed letter, a chat's faces. */
 function MemberFace({ m, s }: { m: Member; s: number }) {
-  if (m.kind === 'mate') return <TeammateMark t={{ letter: m.letter ?? '', name: m.name }} size={s} />;
+  if (m.kind === 'mate') return <TeammateMark t={{ letter: m.letter ?? '', name: m.name, face: m.face ?? null }} size={s} />;
   if (m.kind === 'chat') {
     const faces = m.faces ?? [];
     if (!faces.length) return <View style={{ width: s, height: s, borderRadius: s * 0.28, borderWidth: 1, borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}><T style={{ fontFamily: font.mono, fontSize: Math.round(s * 0.3), color: color.dim }}>#</T></View>;

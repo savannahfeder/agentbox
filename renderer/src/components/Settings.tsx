@@ -2315,7 +2315,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
         )}
 
         {pane === 'team' && teamPane && (
-          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone can open and read your threads and their files unless you mark one private.">
+          <Page title="Team" lede="Your name and photo, the team's name and logo, and who is on it. Everyone can open and read your threads and their files unless you mark one private.">
             {teamPane}
           </Page>
         )}

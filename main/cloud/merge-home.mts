@@ -46,7 +46,7 @@ const NO_PROMPT = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
 // a hooks path that resolves into it runs the agent's code: none run by default.
 function git(cwd: string, args: string[], { timeout = GIT_MS, env = process.env, hooks = HOOK_FREE }: { timeout?: number; env?: NodeJS.ProcessEnv; hooks?: readonly string[] } = {}): Promise<GitResult> {
   return new Promise((resolve) => {
-    execFile('git', [...hooks, ...args], { cwd, encoding: 'utf8', timeout, env, maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile('git', [...hooks, ...args], { cwd, encoding: 'utf8', timeout, env, maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (error, stdout, stderr) => {
       resolve(error
         ? { ok: false, out: `${stdout ?? ''}${stderr ?? ''}`.trim() || String(error.message) }
         : { ok: true, out: String(stdout).trim() });

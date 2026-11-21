@@ -205,7 +205,7 @@ export async function taskCommand(sup: TaskCommandSupervisor, productSlug: strin
    result=[...providerCommands(engine).map(c=>`/${c.name}${c.argumentHint?' '+c.argumentHint:''} · ${c.description}`), ...(harness.capabilities.nativeCommands?names.map((n: string)=>`/${n} · Native ${harness.label} command`):[])].join('\n')+`\n\n${missing} Unavailable commands keep your draft and never run as a prompt.`;
   } else if(op.name==='diff') {
    if(op.args)throw new Error('Run /diff on its own.');
-   const opts={cwd,timeout:15000,maxBuffer:2*1024*1024};
+   const opts={cwd,timeout:15000,maxBuffer:2*1024*1024,windowsHide:true};
    const unstaged=await exec('git',['--no-pager','diff','--no-ext-diff','--no-textconv'],opts);
    const staged=await exec('git',['--no-pager','diff','--cached','--no-ext-diff','--no-textconv'],opts);
    const untracked=await exec('git',['ls-files','--others','--exclude-standard'],opts);

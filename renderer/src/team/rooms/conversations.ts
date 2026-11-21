@@ -9,7 +9,7 @@ import { isTaskRow, isWorkThread, nameIsAPersons } from '../../../../shared/team
 import { voiceName } from '../../../../shared/agent-voice.mts';
 
 const nameOf = (p: Person | undefined) => (p?.name ? shortName(p.name) : 'Someone');
-const shortName = (name: string) => { const w = name.trim().split(/\s+/); return w.length > 1 ? `${w[0]} ${w[w.length - 1][0]}.` : w[0] ?? ''; };
+export const shortName = (name: string) => { const w = name.trim().split(/\s+/); return w.length > 1 ? `${w[0]} ${w[w.length - 1][0]}.` : w[0] ?? ''; };
 
 /** A direct record is its newest row: older records may hold one row per message. */
 export function directConversations({ items, products, me, people, waiting, marked = new Set() }: {

@@ -34,8 +34,25 @@ export function taskWords(item: WorkItem, product: Product | undefined | null, m
   if (wroteBack) return { word: `${name} wrote back`, unread: true, other, at };
   const blocked = blockedWords(item, { items: lookup.items ?? [], cards: lookup.cards ?? [], me, nameOf });
   if (blocked) return { word: blocked.word, unread: false, other, at, held: true, title: blocked.title };
-  if (holding) return { word: inMyInbox(item, product, me) ? `From ${name}` : 'You have this', unread: false, other, at };
-  return { word: `With ${name}`, unread: false, other, at };
+  // An ask says what it asks, so a review reads as one in the list (round four of the team test).
+  const asks = item.ask?.kind;
+  // Handed back stays handed back, whatever a thank-you since did to the status (shared/thread-asks.mts).
+  if (asks && item.verdict) return { word: holding ? 'You handed it back' : `${name} handed it back`, unread: false, other, at };
+  if (holding) return { word: inMyInbox(item, product, me) ? (asks ? `${name} asks for ${asks === 'help' ? 'help' : 'a review'}` : `From ${name}`) : 'You have this', unread: false, other, at };
+  return { word: asks ? `${name} is ${asks === 'help' ? 'helping' : 'reviewing'}` : `With ${name}`, unread: false, other, at };
+}
+
+/** Where a task you gave stands for the person holding it, in Tasks you gave: an ask says which, and what came back. */
+export function givenStage(i: WorkItem, seen: number): string {
+  const kind = i.ask?.kind === 'review' ? 'Review' : i.ask?.kind === 'help' ? 'Help' : null;
+  const holder = i.assignee ?? '';
+  // A reply in one of the task's own threads counts too (round four: it said Seen after Dana replied).
+  const replied = !!holder && (lastSpeaker(i) === holder || (i.talk?.chat ?? []).some((c) => c.by === holder));
+  const stage = i.ask && i.verdict ? (i.verdict === 'yes' ? 'Looks good' : i.verdict === 'changes' ? 'Needs changes' : 'Handed back')
+    : i.status === 'done' ? 'Done'
+      : replied ? 'Replied'
+        : seen >= (i.createdAt ?? 0) ? 'Seen' : 'Not opened';
+  return kind ? `${kind} · ${stage}` : stage;
 }
 
 /** A task's card carries no words. If it is between you and them this Mac has its

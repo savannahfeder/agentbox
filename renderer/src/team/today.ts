@@ -66,6 +66,8 @@ export interface TodayPerson {
   waiting?: TodayLine[];
   /** Every open task they hold, whatever the range. */
   tasks: TodayLine[];
+  /** Asks for help or a review on someone's thread they handed back: the thread stays its owner's to finish. */
+  helped?: TodayLine[];
   /** Private threads they finished: counted, never named. */
   privateDone: number;
   /** Private threads an agent is on for them in the range: counted, never named. */
@@ -132,7 +134,7 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
   const byKey = new Map<string, TodayPerson>();
   const order: string[] = [];
   const add = (key: string, name: string, kind: TodayPerson['kind']) => {
-    byKey.set(key, { key, name, kind, finished: [], shipped: [], decided: [], blocked: [], waitingOnYou: [], working: [], waiting: [], tasks: [], privateDone: 0 });
+    byKey.set(key, { key, name, kind, finished: [], shipped: [], decided: [], blocked: [], waitingOnYou: [], working: [], waiting: [], tasks: [], helped: [], privateDone: 0 });
     order.push(key);
   };
   add('me', 'You', 'me');
@@ -194,6 +196,22 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
     if (direct.has(i.product) && !task) continue;
     if (runBy(i) !== me) continue;
     // A task someone gave you is theirs to say finished; open, it is one of yours.
+    // An ask handed back is help on a thread its owner still finishes, said by the helper, whatever a thank-you
+    // did to the task's status since; taken back, it is nobody's news (shared/thread-asks.mts).
+    const back = task && i.ask && i.verdict ? i.wrote?.verdict ?? i.wrote?.status : null;
+    if (back) {
+      const helper = keyOfPerson(back.by === i.assignee ? i.assignee : null);
+      const list = helper && inRange(back.ts) ? byKey.get(helper)?.helped : null;
+      if (list) {
+        // Help and then a review on one thread name it once, by the newer.
+        const same = list.findIndex((l) => l.item?.ask?.thread === i.ask!.thread && l.item?.ask?.product === i.ask!.product);
+        const line = { key: `${i.product}/${i.id}`, title: '', at: back.ts, item: i };
+        if (same < 0) list.push(line);
+        else if (list[same].at < back.ts) list[same] = line;
+      }
+      continue;
+    }
+    if (task && i.ask && i.status === 'done') continue;
     if (task && i.createdBy && i.createdBy !== me) {
       if (i.status !== 'done' && !inNeeds.has(`${i.product}/${i.id}`)) byKey.get('me')!.tasks.push(taskLine(i, { key: `${i.product}/${i.id}`, title: '', at: i.updatedAt, item: i }));
       continue;
@@ -295,12 +313,12 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
   // Titles only for the lines a section draws: a week on a big store finishes thousands.
   for (const p of all) {
     p.tasks.sort(byDue);
-    for (const list of [p.finished, p.shipped, p.decided, p.blocked, p.waitingOnYou, p.working, p.waiting!, p.tasks]) {
+    for (const list of [p.finished, p.shipped, p.decided, p.blocked, p.waitingOnYou, p.working, p.waiting!, p.tasks, p.helped ?? []]) {
       if (list !== p.tasks) list.sort(newest);
       for (const l of list.slice(0, SHOWN)) if (!l.title && l.item) l.title = shownTitle(l.item);
     }
   }
-  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.privateDone + (p.privateWorking ?? 0) > 0;
+  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + (p.helped?.length ?? 0) + p.privateDone + (p.privateWorking ?? 0) > 0;
   return {
     people: all.filter(says),
     quiet: all.filter((p) => p.kind !== 'me' && !says(p)).map(quietName),

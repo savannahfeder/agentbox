@@ -31,7 +31,7 @@ const KEYCHAIN_MS = 2 * 60_000;
 const NO_ITEM = 44;
 
 const defaultRun: Runner = (cmd, args, { timeoutMs }) => new Promise((resolve, reject) => {
-  const child = execFile(cmd, args, { encoding: 'utf8', timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024 }, (err, stdout) => {
+  const child = execFile(cmd, args, { encoding: 'utf8', timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024, windowsHide: true }, (err, stdout) => {
     if (err) reject(err); else resolve(stdout);
   });
   child.stdin?.end();

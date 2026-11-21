@@ -15,7 +15,8 @@ import './doc-reading.css';
 import { TeammateMark } from '../teammates/TeammatesRail';
 import { clock, dayHeading } from '../thread-history';
 import { shownName } from '../../../shared/artifact-marks.mts';
-import type { Teammate } from '../types';
+import type { Person, Teammate } from '../types';
+import { Face, firstName } from '../team/people';
 
 /** What this page reads in place rather than as a tile: a page an agent made, a note, or a table. */
 export const readsInPlace = (path: string) => /\.(html?|md|markdown|csv|tsv)$/i.test(path);
@@ -86,15 +87,25 @@ export function QueueSummary({ title, context, earlier, steps = false, open, onT
 
 const sameLine = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
 
-export function QueueAnswer({ text, md, name = '', by = null }: {
+export function QueueAnswer({ text, md, name = '', by = null, person = null }: {
   text: string;
   md: (text: string) => ReactNode;
   name?: string;
   /** The teammate that wrote it, which signs it. */
   by?: { t: Pick<Teammate, 'letter' | 'name'>; at: number } | null;
+  /** A person you asked to help, whose words these are. */
+  person?: { p: Person; at: number } | null;
 }) {
   const { headline, rest } = splitHeadline(text);
-  const shown = headline && !sameLine(headline, name) ? headline : null;
+  const shown = !person && headline && !sameLine(headline, name) ? headline : null;
+  if (person) {
+    return (
+      <div className="outcome one-answer">
+        <div className="one-by"><Face person={person.p} size={22} /><span>{firstName(person.p)}</span><em>{`${dayHeading(person.at)} ${clock(person.at)}`}</em></div>
+        <div className="msg-body typed">{text}</div>
+      </div>
+    );
+  }
   return (
     <div className="outcome one-answer">
       {by && <div className="one-by"><TeammateMark t={by.t} size="hd" /><span>{by.t.name}</span><em>{`${dayHeading(by.at)} ${clock(by.at)}`}</em></div>}
