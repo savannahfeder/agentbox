@@ -42,6 +42,13 @@ describe('the helper\'s page', () => {
     expect(page).toContain('stripOptionsSection(');
     expect(page).toMatch(/\/\^\[1-9\]\$\/\.test\(e\.key\)/);
   });
+  // 2026-11-21: drawn under the answer, apart from the reply box, they read as
+  // a separate card rather than the choices the box answers.
+  it('sits on the reply box, as the options do on a thread of your own', () => {
+    expect(page).toMatch(/<div className="focus-dock-inner">[\s\S]{0,200}<div className="one-choices">\s*<OptionsOffer/);
+    expect(page.indexOf('<OptionsOffer')).toBeLessThan(page.indexOf('<div className="dock-card">'));
+    expect(page.indexOf('<OptionsOffer')).toBeGreaterThan(page.indexOf('<div className="focus-dock">'));
+  });
   it('heads the page with the ask to them, then that it went', () => {
     expect(page).toContain('helping ? `asked you to help with this step`');
     expect(page).toContain('<div className="one-by"><Face person={person} /><span>{owner}</span><em>{askWords}</em></div>');

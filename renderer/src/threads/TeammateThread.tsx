@@ -314,15 +314,17 @@ export function TeammateThread({ card, person, syncedAt, openAt, step = null, on
                 <QueueAnswer text={options.length ? stripOptionsSection(newest.text) : newest.text} md={md} name={title} />
               </div>
             )}
-            {/* Out of the form, whose button styles would square its rows. */}
-            {options.length > 0 && !reviewing && <OptionsOffer bare ask="" askAll="" options={options} peekOption={null} askPeek={false}
-              selectedOption={picked} selRef={pickRef} onPick={pickOption}
-              onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />}
           </div>
         </div>
       </div>
       <div className="focus-dock">
         <div className="focus-dock-inner">
+          {/* On the reply box, as on a thread of your own; out of the form, whose button styles would square its rows. */}
+          {options.length > 0 && !reviewing && <div className="one-choices">
+            <OptionsOffer bare ask="" askAll="" options={options} peekOption={null} askPeek={false}
+              selectedOption={picked} selRef={pickRef} onPick={pickOption}
+              onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />
+          </div>}
           <div className="dock-card">
             {reviewing ? (
               <SendBack owner={owner} note={review.note} notes={myOpenNotes} face={<Face person={me} me />} onSend={sendBack} />

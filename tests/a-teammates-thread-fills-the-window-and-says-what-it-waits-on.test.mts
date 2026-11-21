@@ -78,7 +78,7 @@ describe('the page uses the window', () => {
     expect(page).toContain('<div className="focus-pane tp-thread">');
     expect(page).toContain('createPortal(<ThreadCrumb from={backLabel} name={title} onBack={onBack} />, headerTarget)');
     expect(page).toContain('<QueueSummary title={title}');
-    expect(page).toMatch(/<div className="focus-dock">\s*<div className="focus-dock-inner">\s*<div className="dock-card">/);
+    expect(page).toMatch(/<div className="focus-dock">\s*<div className="focus-dock-inner">[\s\S]*?<div className="dock-card">/);
     expect(page).not.toContain('tp-side');
   });
   it('no longer caps the whole page at 760px', () => {
