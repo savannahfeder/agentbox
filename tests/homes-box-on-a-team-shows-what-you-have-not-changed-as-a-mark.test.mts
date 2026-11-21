@@ -156,6 +156,15 @@ describe('the styles', () => {
     expect(word).not.toMatch(/display: none/);
   });
 
+  // Measured in the demo team: the level's menu opened rightward from a mark at
+  // the row's right end, widened the row past its box, and the row then hid
+  // that very mark, menu and all (fit-row.ts reads the row's scroll width).
+  it('opens a mark\'s menu leftward from its right edge, so an open menu never widens the row', () => {
+    const open = rule('.tc-quiet .tc-bar > .tc-gap ~ .tc-anchor > .tc-menu');
+    expect(open).toMatch(/left: auto/);
+    expect(open).toMatch(/right: 0/);
+  });
+
   it('rounds the toggle and clips its lit half to the corners, in the pop-up as on Home', () => {
     const seg = rule('.tc-seg');
     expect(seg).toMatch(/border: 1px solid var\(--line\)/);

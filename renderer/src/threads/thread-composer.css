@@ -434,6 +434,9 @@
 .tc-quiet .tc-chip.tc-at-rest:hover, .tc-quiet .tc-chip.tc-at-rest.open, .tc-quiet .tc-chip.tc-at-rest:focus-visible { background: var(--wash); border-color: transparent; }
 .tc-quiet .tc-chip.tc-at-rest svg { color: var(--text-faint); }
 .tc-quiet .tc-chip.tc-at-rest:hover svg, .tc-quiet .tc-chip.tc-at-rest.open svg { color: var(--text); }
+/* A mark's menu opens leftward from its right edge: opening rightward from the
+   row's end widened the row, and fit-row.ts then hid the mark with its menu. */
+.tc-quiet .tc-bar > .tc-gap ~ .tc-anchor > .tc-menu { left: auto; right: 0; }
 /* The subject is typed into its own mark, which opens as a chip while it is typed in. */
 .tc-quiet .tc-subject-chip.tc-at-rest:focus-within { width: auto; padding: 0 10px; border-color: var(--line-strong); background: rgba(255, 255, 255, 0.03); }
 .tc-quiet .tc-subject-chip.tc-at-rest:focus-within .tc-chip-text { position: static; width: auto; height: 26px; clip-path: none; }
