@@ -669,18 +669,17 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
 
 /* Every row: a face, the title, then who it is from in grey (w-585619d660).
-   The face hangs in the row's left margin, where the select box shows on a
-   point, so every title still starts on the line "Needs you" starts on. The
+   The face starts on the line "Needs you" and the Thread heading start on,
+   which leaves the margin to its left for the unread dot and the select box.
+   The slot is there on every row, empty or not, so the titles line up. The
    name is an inline block so the row's underline stops at the title. */
-.th-slot { position: absolute; left: calc(var(--text-x) - 26px); top: 20px; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; }
-.th-slot:empty { display: none; }
+.th-slot { display: inline-flex; vertical-align: top; align-items: center; justify-content: center; width: 18px; height: 20px; margin-right: 10px; flex: none; }
 .th-slot .tm-av, .th-slot .tq, .th-slot .agent-face { width: 18px; height: 18px; line-height: 16px; font-size: 8.5px; }
-.row:has(.mark:hover) .th-slot, .row.checked .th-slot { visibility: hidden; }
-/* Unread moves from the margin onto the face's corner. */
-.th-table .row.unread:has(.th-slot:not(:empty))::before { left: calc(var(--text-x) - 12px); top: 17px; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); z-index: 1; }
+/* EXPLORATION: unread as a dot on the face's corner instead of in the margin. */
+[data-unread="badge"] .th-table .row.unread::before { display: none; }
+[data-unread="badge"] .th-slot { position: relative; }
+[data-unread="badge"] .row.unread .th-slot::after { content: ''; position: absolute; top: 0; right: -2px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
 .th-who-name { display: inline-block; vertical-align: top; margin-left: 12px; color: var(--text-dim); white-space: nowrap; }
 .th-cell-title.with-aside > .th-who-name { flex: none; }
 /* An AI teammate's letter on its own soft colour until it has a drawn face, so it never reads as an agent. */
 .th-mate .tq { border: 0; background: var(--mate-tint); color: #2b2a33; font-weight: 600; }
-/* EXPLORATION: the Thread heading on the faces' edge instead of the titles'. */
-[data-head="faces"] .th-head .th-grid > :first-child { margin-left: calc(var(--gutter) - var(--text-x)); }
