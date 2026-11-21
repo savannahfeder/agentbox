@@ -4303,6 +4303,14 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
+  // A second copy on an invented team, for a call where this inbox should stay
+  // off the shared screen (main/demo.mts). The toast says which window is which.
+  const openDemoCopy = useCallback(async () => {
+    setModal(null);
+    const out = await api.openDemo();
+    if (!out.ok) { showToast(out.error ?? 'It could not be opened.'); return; }
+    showToast(`Opening a demo copy in a new window. Yours keeps running.${out.notes?.length ? ` ${out.notes[0]}` : ''}`);
+  }, [showToast]);
   // A CHAT'S OWN ASKS (team/chat-events.ts): mark this conversation unread, and say a short note.
   useEffect(() => {
     const mark = (e: Event) => {
@@ -9162,6 +9170,7 @@ export default function App() {
         onFirstRun={walkAgain}
         onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}
+        onDemo={openDemoCopy}
         products={rankedProducts}
         typed={paletteTyped}
         supervisorPaused={snap.supervisor.paused}

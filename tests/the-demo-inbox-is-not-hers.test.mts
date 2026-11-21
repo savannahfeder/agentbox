@@ -158,7 +158,7 @@ describe('the store a demo opens on', () => {
     try {
       const all = [];
       for (const p of out.products) all.push(...readWorkItems(p.dir));
-      expect(all.length).toBeGreaterThanOrEqual(9);
+      expect(all.length).toBeGreaterThanOrEqual(6);
       // Every screen worth demoing has a row that lands on it.
       expect(all.some((i) => i.status === 'open' && /## Options/.test(i.body ?? ''))).toBe(true);
       expect(all.some((i) => i.status === 'blocked')).toBe(true);
@@ -264,8 +264,9 @@ describe('how the demo rows are written', () => {
     // The list under the reply box is drawn from the body's `## Options`
     // section. A demo whose questions have none demonstrates the app with its
     // best feature switched off.
-    const asks = rows.filter((l) => l.patch?.body && /^\*\*(Say|Merge|Post|Pick)/.test(l.patch.body));
-    expect(asks.length).toBeGreaterThanOrEqual(4);
+    // An ask that offers a choice ("Ship it, or hold it") draws one.
+    const asks = rows.filter((l) => l.source === 'agent' && /^\*\*[^*\n]*, or /.test(String(l.patch?.body ?? '')));
+    expect(asks.length).toBeGreaterThanOrEqual(2);
     for (const ask of asks) expect(ask.patch.body).toMatch(/\n## Options\n/);
   });
 });
@@ -284,7 +285,7 @@ describe('opening one', () => {
     // ROWS, NOT LEDGER LINES. The toast reads this number out loud, and one row
     // is two or three appended lines, so counting lines said twenty for nine.
     expect(out.rows).toBe(new Set(Object.values(demoLedgerLines(Date.now())).flat().map((l) => l.id)).size);
-    expect(out.rows).toBeGreaterThanOrEqual(9);
+    expect(out.rows).toBeGreaterThanOrEqual(6);
     expect(spawned).toHaveLength(1);
     expect(spawned[0].opts.detached).toBe(true);
     expect(spawned[0].opts.env.HOME).toBe(out.home);

@@ -1512,10 +1512,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
 
   // AN INBOX TO STAND IN FRONT OF A ROOM WITH.
   //
-  // The same second Agentbox in a throwaway home as the row above, with three
-  // invented products and a day of invented work seeded into it first, so it
-  // opens on a populated inbox rather than on the welcome screen. It reads none
-  // of her folders and it deletes nothing (main/demo.mts).
+  // A second Agentbox in a throwaway home, with an invented team and its
+  // morning seeded into it first, so it opens on a full inbox rather than on
+  // the welcome screen. It reads none of her folders and it deletes nothing
+  // (main/demo.mts).
   ipcMain.handle('zero:open-demo', () => openDemo({ packaged: app.isPackaged }));
 
   // "Run this later", the durable half of what snooze used to pretend to be.

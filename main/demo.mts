@@ -11,11 +11,11 @@
 // it wrong.
 //
 // WHAT IS DIFFERENT IS WHAT IS IN THE STORE. A new user opens on an empty one,
-// which is correct for testing a first run and useless for a demo: an inbox
-// with nothing in it demonstrates nothing. So this seeds three invented
-// products and a day of invented work first (shared/demo-world.mts), and
-// because the store then has projects in it, the welcome walk does not run
-// (`firstRunNeeded` counts projects) and the copy opens straight on the inbox.
+// which demonstrates nothing. So this seeds an invented team's shared projects
+// and their morning first (shared/demo-world.mts), and because the store then
+// has projects in it, the welcome walk does not run and the copy opens on the
+// inbox. The copy signs in to that team inside itself (main/demo-team.mts),
+// never to the real team cloud.
 //
 // AND HER ~/.claude IS NOT LINKED THROUGH, which is the one place this is
 // deliberately stricter than the new-user row. That folder holds the Claude
@@ -32,7 +32,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { DEMO_ACCOUNT, DEMO_DOCS, DEMO_ENV, DEMO_PRODUCTS, demoLedgerLines } from '../shared/demo-world.mts';
+import { DEMO_ACCOUNT, DEMO_DOCS, DEMO_ENV, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, demoLedgerLines } from '../shared/demo-world.mts';
+import { writeSeededAt } from './demo-team.mts';
 import { prepareHome } from '../shared/fresh-user-home.mts';
 import { relaunchCommand } from './fresh-user.mts';
 import { defaultStoreRoot, encodeProjectPath, storeRootEnv } from './store/home.mts';
@@ -138,12 +139,14 @@ export function seedDemoStore(home: string, { now = Date.now() }: { now?: number
       name: product.name,
       createdAt: new Date(now - 21 * 86_400_000).toISOString(),
       oneLiner: product.oneLiner,
+      // Shared with the invented team the copy signs in to (main/demo-team.mts).
+      team: { projectId: product.projectId, teamId: DEMO_TEAM.id, visibility: 'team', people: [], sharedBy: DEMO_ME.id },
     }, null, 2)}\n`);
 
     // The documents, and the catalog that makes them visible. A file on disk
     // with no entry in index.json is a file the pane does not know about
     // (main/store/project.mts), so both halves or neither.
-    const docs = DEMO_DOCS[product.slug as keyof typeof DEMO_DOCS] ?? [];
+    const docs = DEMO_DOCS[product.slug] ?? [];
     for (const doc of docs) {
       const file = path.join(dir, doc.path);
       fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -177,6 +180,7 @@ export function seedDemoStore(home: string, { now = Date.now() }: { now?: number
     const ids = new Set((ledgers[product.slug] ?? []).map((line) => line.id));
     written.push({ slug: product.slug, dir, machinery, rows: ids.size });
   }
+  writeSeededAt(home, now);
 
   return { accountRoot, appHome, products: written };
 }
