@@ -69,7 +69,7 @@
 .cn-tile-go {
   position: absolute; right: 16px; top: 50%; transform: translateY(-50%); height: 28px; padding: 0 11px; display: flex; align-items: center;
   background: inherit; border: 1px solid var(--line-strong); border-radius: var(--radius);
-  font-size: 12.5px; color: var(--text); opacity: 0; transition: opacity .12s ease; pointer-events: none;
+  font-size: 12.5px; color: var(--text); opacity: 0; pointer-events: none;
 }
 .cn-tile:hover .cn-tile-go, .cn-tile:focus-visible .cn-tile-go { opacity: 1; }
 

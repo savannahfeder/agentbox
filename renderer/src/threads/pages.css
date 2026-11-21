@@ -29,7 +29,7 @@
 
 /* The ×. Hidden until you point at the card, and still reachable by Tab,
    which shows it too. */
-.workspace-navigation .sb-update-close { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0; justify-content: center; color: var(--text-dim); background: none; opacity: 0; transition: opacity 120ms ease; }
+.workspace-navigation .sb-update-close { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0; justify-content: center; color: var(--text-dim); background: none; opacity: 0; }
 .workspace-navigation .sb-update-close svg { width: 13px; height: 13px; }
 .sb-update-card:hover .sb-update-close, .sb-update-card:focus-within .sb-update-close { opacity: 1; }
 .workspace-navigation .sb-update-close:hover { color: var(--text); }
@@ -228,7 +228,7 @@
    row. It takes the time's place rather than adding a column, the time comes
    back when the pointer leaves, and a row with nothing to share keeps its
    time. Square, quiet, and the one thing on the row that does not open it. */
-.th-row-act { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .08s ease; }
+.th-row-act { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; opacity: 0; pointer-events: none; }
 .th-table .row:hover .th-row-act, .th-row-act:focus-visible { opacity: 1; pointer-events: auto; }
 .th-table .row:hover .has-act .th-when, .has-act:focus-within .th-when { visibility: hidden; }
 .th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
@@ -298,8 +298,6 @@ body[data-dragging], body[data-dragging] * { cursor: grabbing !important; user-s
 .th-card.drag-preview { background: linear-gradient(rgba(255,255,255,.035), rgba(255,255,255,.035)), var(--skin-solid, var(--surface)); border-color: var(--line-strong); }
 /* Nothing that answers a hover comes up while a row is carried or settling:
    not the key plate, not Share. */
-/* Share is faded rather than removed, so when the settle ends it comes back
-   on its own short fade instead of snapping in. */
 body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-table[data-sorting] .th-row-act { opacity: 0 !important; pointer-events: none !important; }
 .th-table[data-sorting] .row:not([data-lifted]) .has-act .th-when { visibility: visible !important; }
@@ -363,7 +361,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* The handle: six dots at the heading's right end, out of sight until the
    pointer is over the column, faint there, and full only on the heading you
    would grab. Never drawn mid-drag, when it would only be noise. */
-.th-col-grip { margin-left: auto; flex: none; color: var(--text-faint); opacity: 0; transition: opacity .12s ease; }
+.th-col-grip { margin-left: auto; flex: none; color: var(--text-faint); opacity: 0; }
 .th-col:hover .th-col-grip { opacity: .7; }
 .th-col-h:hover .th-col-grip { opacity: 1; color: var(--text-dim); }
 .th-board.dragging .th-col-grip { opacity: 0; }

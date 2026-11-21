@@ -8,7 +8,7 @@
 .su-r { margin-left: auto; display: flex; align-items: center; gap: 10px; align-self: center; }
 .su-tog { display: inline-flex; align-items: center; gap: 9px; height: 28px; padding: 0 6px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
 .su-tog:hover { color: var(--text-dim); }
-.su-tog i { position: relative; width: 28px; height: 16px; border-radius: 8px; background: var(--line-strong); transition: background .15s; }
+.su-tog i { position: relative; width: 28px; height: 16px; border-radius: 8px; background: var(--line-strong); }
 .su-tog i::after { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); transition: left .15s; }
 .su-tog[aria-checked="true"] i { background: var(--text-dim); }
 .su-tog[aria-checked="true"] i::after { left: 14px; }
