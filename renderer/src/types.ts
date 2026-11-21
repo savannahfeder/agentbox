@@ -307,6 +307,8 @@ export interface PlacedFile {
   key: string;
   project: string | null;
   name: string;
+  /** The name a person gave it in Files; `name` stays its name on disk. */
+  title?: string;
   kind: FileKind | null;
   /** Made in Files and nothing written in it yet. */
   blank?: boolean;
@@ -357,7 +359,8 @@ export interface FileFolder { id: string; project: string; name: string; parent:
 export type FileFolderAct =
   | { do: 'make'; project: string; name: string; parent?: string | null }
   | { do: 'rename'; id: string; name: string }
-  | { do: 'move'; key: string; folder: string | null };
+  | { do: 'move'; key: string; folder: string | null }
+  | { do: 'name'; key: string; name: string };
 
 export interface FilesUploaded { ok: boolean; error?: string; added?: number; refused?: string[]; keys?: string[] }
 export interface FilesPlaceList { files: PlacedFile[]; projects: string[]; folders?: FileFolder[]; mine?: string[] }
@@ -392,6 +395,7 @@ export interface FilesPlaceView {
   key: string;
   project: string | null;
   name: string;
+  title?: string;
   /** Its newest version is on its way back from the cloud. */
   coming?: boolean;
   sentIn: FileSentIn[];

@@ -64,9 +64,30 @@ const keyIsOn = (target: EventTarget | null): 'box' | 'control' | 'nothing' => {
 };
 const newId = () => `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false }: {
+/** The file's name in the top bar, which a click turns into a box to rename it in. */
+function NameInTop({ shown, onRename }: { shown: string; onRename: (name: string) => void }) {
+  const [name, setName] = useState<string | null>(null);
+  if (name === null) return <button type="button" className="av-name av-name-edit" title="Rename" onClick={() => setName(shown)}>{shown}</button>;
+  const done = () => { const n = name.replace(/\s+/g, ' ').trim(); setName(null); if (n && n !== shown) onRename(n); };
+  return <input className="av-name av-name-box" autoFocus value={name} aria-label="Name" maxLength={120} data-own-escape
+    size={Math.max(8, Math.min(60, name.length + 1))}
+    onFocus={(e) => e.currentTarget.select()}
+    onChange={(e) => setName(e.target.value)}
+    onBlur={done}
+    onKeyDown={(e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); done(); }
+      if (e.key === 'Escape') { e.preventDefault(); setName(null); }
+    }} />;
+}
+
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
+  /** The name a person gave the file in Files, shown over its name on disk. */
+  title?: string;
+  /** Only in Files, where a file has a name of its own to change. */
+  onRename?: (name: string) => void;
   /** Each path's number on its file's version line, which every surface counts by. */
   numbers?: Record<string, number>;
   /** What to say of a version with no bytes on this computer, by who made it. */
@@ -790,7 +811,10 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     <div className="artifact-view" data-find-layer role="dialog" aria-label={version?.name ?? 'File'}>
       <header className="av-top">
         <button type="button" className="doc-mark av-back" aria-label="Back" title="Back to the thread (esc)" onClick={leave}><ArtifactControlGlyph><path d="M16 10H4m5-5-5 5 5 5" /></ArtifactControlGlyph></button>
-        <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
+        {(() => {
+          const shown = title || familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '');
+          return onRename && shown ? <NameInTop key={shown} shown={shown} onRename={onRename} /> : <span className="av-name">{shown}</span>;
+        })()}
         {family && version && family.versions.length > 1 && (
           <span className="av-versions">
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>

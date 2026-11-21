@@ -142,10 +142,10 @@ function NameBox({ placeholder, start = '', onDone, onCancel }: { placeholder: s
 // The menu's most height and a little: under this it opens upward, or the window cuts it off.
 const MENU_ROOM = 300;
 
-/** A file's menu, or a group's: where it can go in its project. */
-function MoveMenu({ file, name, keys, folders, act, onNewFolder, onTrash }: {
+/** A file's menu, or a group's: its name, and where it can go in its project. */
+function MoveMenu({ file, name, keys, folders, act, onNewFolder, onTrash, onRename }: {
   file: PlacedFile; name?: string; keys?: string[]; folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (name: string) => void;
-  onTrash?: () => void;
+  onTrash?: () => void; onRename?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [naming, setNaming] = useState(false);
@@ -165,8 +165,12 @@ function MoveMenu({ file, name, keys, folders, act, onNewFolder, onTrash }: {
   </button>;
   const found = foldersMatching(here, query);
   return <div className={`fp-more-box${open ? ' is-open' : ''}`} ref={box}>
-    <button type="button" className="fp-more" aria-label={`Move ${name ?? file.name}`} aria-haspopup="menu" aria-expanded={open} onClick={(e) => { setUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < MENU_ROOM); setOpen(!open); }}><MoreGlyph /></button>
+    <button type="button" className="fp-more" aria-label={`${onRename ? 'More for' : 'Move'} ${name ?? shownName(file)}`} aria-haspopup="menu" aria-expanded={open} onClick={(e) => { setUp(window.innerHeight - e.currentTarget.getBoundingClientRect().bottom < MENU_ROOM); setOpen(!open); }}><MoreGlyph /></button>
     {open && <div className={`fp-menu${up ? ' is-up' : ''}`} role="menu">
+      {onRename && !naming && <>
+        <button type="button" role="menuitem" className="fp-menu-item" onClick={() => { setOpen(false); setQuery(''); onRename(); }}>Rename</button>
+        <div className="fp-menu-gap" role="separator" />
+      </>}
       <div className="fp-menu-head">Move to</div>
       {here.length > 3 && <input className="fp-menu-find" autoFocus value={query} placeholder="Find a folder" aria-label="Find a folder" onChange={(e) => setQuery(e.target.value)} onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && found.length === 1) move(found[0].id); }} />}
@@ -303,24 +307,30 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, 
   const name = shownName(file);
   const whose = !file.opened && file.by && file.by !== me ? nameOf(file.by) : null;
   const choosing = chosen !== null || unmovable;
+  const [renaming, setRenaming] = useState(false);
   const [faceRef, near] = useNear<HTMLSpanElement>();
-  return <div className={`${list ? 'fp-line' : 'fp-tile'}${file.cloud ? ' is-in-cloud' : ''}${chosen ? ' is-chosen' : ''}${unmovable ? ' is-unmovable' : ''}`} draggable={!!file.project && !choosing} onDragStart={(e) => { e.dataTransfer.setData(DRAGGED, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
+  const shownAs = renaming
+    ? <span className="fp-name"><NameBox placeholder="Name" start={name} onCancel={() => setRenaming(false)} onDone={(n) => { setRenaming(false); void act({ do: 'name', key: file.key, name: n }); }} /></span>
+    : <span className="fp-name">{name}</span>;
+  const inside = list
+    ? <>
+      <span ref={faceRef} className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? near && <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
+      {shownAs}
+      <span className="fp-line-marks">{marks}</span>
+      <span className="fp-meta-words">{said}</span>
+    </>
+    : <>
+      <span ref={faceRef} className={`fp-face fp-face-${file.kind ?? 'file'}`}>{near && <Face file={file} whose={whose} />}</span>
+      {shownAs}
+      <span className="fp-meta"><span className="fp-meta-words">{said}</span>{marks}</span>
+    </>;
+  return <div className={`${list ? 'fp-line' : 'fp-tile'}${file.cloud ? ' is-in-cloud' : ''}${chosen ? ' is-chosen' : ''}${unmovable ? ' is-unmovable' : ''}`} draggable={!!file.project && !choosing && !renaming} onDragStart={(e) => { e.dataTransfer.setData(DRAGGED, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
     {chosen !== null && <span className="fp-check" aria-hidden="true">{chosen && <CheckGlyph />}</span>}
-    <button type="button" className="fp-open-file" onClick={onOpen} aria-label={choosing ? `${chosen ? 'Unchoose' : 'Choose'} ${file.name}` : `Open ${file.name}`} aria-pressed={choosing ? !!chosen : undefined} title={name === file.name ? undefined : file.name}>
-      {list
-        ? <>
-          <span ref={faceRef} className={`fp-face fp-thumb fp-face-${file.kind ?? 'file'}`}>{file.kind === 'image' || file.kind === 'film' ? near && <Face file={file} whose={whose} /> : <span className="fp-thumb-word">{file.kind === 'markdown' ? 'DOC' : file.kind === 'pdf' ? 'PDF' : file.kind === 'deck' ? 'DECK' : file.kind === 'page' ? 'PAGE' : file.kind === 'code' ? 'CODE' : file.kind === 'table' ? 'TABLE' : 'FILE'}</span>}</span>
-          <span className="fp-name">{name}</span>
-          <span className="fp-line-marks">{marks}</span>
-          <span className="fp-meta-words">{said}</span>
-        </>
-        : <>
-          <span ref={faceRef} className={`fp-face fp-face-${file.kind ?? 'file'}`}>{near && <Face file={file} whose={whose} />}</span>
-          <span className="fp-name">{name}</span>
-          <span className="fp-meta"><span className="fp-meta-words">{said}</span>{marks}</span>
-        </>}
-    </button>
-    {file.project && !choosing && <MoveMenu file={file} folders={folders} act={act} onNewFolder={(n) => onNewFolder(file, n)} onTrash={file.movable ? () => onTrash(file) : undefined} />}
+    {/* A box to type in cannot sit inside a button. */}
+    {renaming
+      ? <div className="fp-open-file">{inside}</div>
+      : <button type="button" className="fp-open-file" onClick={onOpen} aria-label={choosing ? `${chosen ? 'Unchoose' : 'Choose'} ${name}` : `Open ${name}`} aria-pressed={choosing ? !!chosen : undefined} title={name === file.name ? undefined : file.name}>{inside}</button>}
+    {file.project && !choosing && !renaming && <MoveMenu file={file} folders={folders} act={act} onNewFolder={(n) => onNewFolder(file, n)} onTrash={file.movable ? () => onTrash(file) : undefined} onRename={() => setRenaming(true)} />}
   </div>;
 }
 
@@ -406,6 +416,13 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
     onClose={onClose}
     below={below}
     typing={typing}
+    title={view?.title}
+    onRename={view?.project ? (name) => {
+      void api.filesPlaceFolder({ do: 'name', key: fileKey, name }).then((r) => {
+        if (!r.ok) onNotice(r.error || 'That name did not save.');
+        else void api.filesPlaceOpen({ key: fileKey }).then((v) => { if (v) setView(v); });
+      });
+    } : undefined}
   />;
 }
 
@@ -475,10 +492,9 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   useEffect(() => { setFolderId(null); setNaming((n) => (n && n.project === project ? n : null)); }, [project]);
   const mine = all.mine ?? [];
   const isMine = (p: string | null) => !!p && mine.some((m) => m.toLowerCase() === p.toLowerCase());
-  const makeFile = (kind: 'document' | 'table', name: string) => {
+  const makeFile = (kind: 'document' | 'table', into: string, inFolder: string | null) => {
     setNaming(null);
-    if (!project) return;
-    void api.filesPlaceNew({ project, name, kind, folder }).then((r) => {
+    void api.filesPlaceNew({ project: into, name: '', kind, folder: inFolder }).then((r) => {
       if (r.ok && r.key) { setMadeKey(r.key); setOpenKey(r.key); readAgain(); } else onNotice(r.error || `That ${kind} could not be made.`);
     });
   };
@@ -545,8 +561,10 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
       : project ? `No files in ${project} yet.` : 'Nothing in Files yet.';
   const pick = (what: Making, p: string) => {
     if (p !== project) onProject(p);
-    if (what === 'upload') upload(p, p === project ? folder : null);
-    else setNaming({ what, project: p });
+    const inFolder = p === project ? folder : null;
+    if (what === 'upload') upload(p, inFolder);
+    else if (what === 'folder') setNaming({ what, project: p });
+    else makeFile(what, p, inFolder);
   };
   const headSlot = useSlot('fp-head-slot');
 
@@ -615,12 +633,6 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
     </div>}
     {list && !shown.length && !scratch.length && !cards.length && !projectCards.length && !naming && <p className="fp-empty">{empty}</p>}
     <div className={asList ? 'fp-lines' : 'fp-grid'}>
-      {(naming?.what === 'document' || naming?.what === 'table') && project && <div className={asList ? 'fp-line is-new' : 'fp-tile is-new'}>
-        <div className="fp-open-file">
-          <span className={`fp-face fp-face-${naming.what === 'table' ? 'table' : 'markdown'}${asList ? ' fp-thumb' : ''}`}>{asList ? <span className="fp-thumb-word">{naming.what === 'table' ? 'TABLE' : 'DOC'}</span> : naming.what === 'table' ? <TableGlyph /> : <DocGlyph />}</span>
-          <span className="fp-name"><NameBox placeholder={naming.what === 'table' ? 'Table name' : 'Document name'} onCancel={() => setNaming(null)} onDone={(name) => makeFile(naming.what === 'table' ? 'table' : 'document', name)} /></span>
-        </div>
-      </div>}
       {draw.shown.map(tile)}
     </div>
     {scratch.length > 0 && draw.shown.length === shown.length && <div className="fp-scratch-row">
