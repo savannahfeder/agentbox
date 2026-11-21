@@ -175,7 +175,7 @@ describe('what waits on the person when it opens', () => {
 
   it('includes a thread that belongs with a teammate, by name', () => {
     const lines = Object.values(demoLedgerLines()).flat();
-    expect(lines.some((l) => DEMO_TEAMMATES.some((p) => String(l.patch.result ?? '').startsWith(`**Hand this to ${p.name.split(' ')[0]}.`)))).toBe(true);
+    expect(lines.some((l) => DEMO_TEAMMATES.some((p) => String(l.patch.result ?? '').includes(`\n1. Hand it to ${p.name.split(' ')[0]} (recommended)`)))).toBe(true);
   });
 });
 
