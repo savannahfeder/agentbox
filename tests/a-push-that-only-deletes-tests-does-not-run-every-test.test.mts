@@ -63,7 +63,7 @@ describe('the pre-push hook', () => {
     commit();
     const { said, asked } = push();
     expect(said).not.toMatch(/running the whole suite/);
-    expect(asked).not.toMatch(/^run /);
+    expect(asked).toMatch(/^run --passWithNoTests tests\/a-list-of-checks\.test\.mts /);
   });
 
   it('still runs the tests that name the deleted test file', () => {

@@ -209,6 +209,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     }
   }
 
+  // What Stripe charges the team a seat, a code taken off, as its webhook last read it.
+  const seatDollarsOf = (bill) => (Number.isFinite(bill.seatCents) ? bill.seatCents / 100 : teamPlan.dollarsPerSeat);
+
   // A trial's subscription can reach past_due never having been charged;
   // a record from before `paid` was kept is taken as paid.
   const seatsOf = (bill) => {
@@ -255,7 +258,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     await seatsFollowMembers(team.id, bill, seats, members.length);
     const tm = {
       id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
-      seconds: teamAllot(trial),
+      seconds: teamAllot(trial), dollarsPerSeat: seatDollarsOf(bill),
     };
     if (!people) return tm;
     const recs = await Promise.all(members.map(async (m) => [m, m === person ? null : await recOf(m).catch(() => fresh())]));
@@ -430,7 +433,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       ...(stripe && !rec.stripe?.subscription ? { trialOffer: { days: PLAN_TRIAL.days, hours: PLAN_TRIAL.hours } } : {}),
       // Hours and agents are this person's own; `people` is every member's, this one's included.
       ...(tm ? { team: {
-        trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: null, running: teamRunning(tm, rec),
+        trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: null, running: teamRunning(tm, rec), dollarsPerSeat: tm.dollarsPerSeat,
         hours: tm.seconds / 3600, usedSeconds: Math.min(tm.seconds, Math.round(teamUsedOf(rec, tm.id, tm.trial, t))),
         ...(tm.people ? { people: tm.people.map(({ id, rec: r }) => {
           const of = r ?? rec;
@@ -958,7 +961,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     return {
       ...empty, periodStart, periodEnd,
       nextAt: pays ? periodEnd : null,
-      nextAmount: pays ? (Math.floor(Number(item?.quantity)) || bill.seats || 0) * teamPlan.dollarsPerSeat : null,
+      nextAmount: pays ? Math.round((Math.floor(Number(item?.quantity)) || bill.seats || 0) * seatDollarsOf(bill) * 100) / 100 : null,
       endsAt: ending ? (at(sub?.cancel_at) ?? periodEnd) : null,
       card: card ? { brand: String(card.brand || '').replace(/^./, (c) => c.toUpperCase()), last4: String(card.last4 || '') } : null,
       email: typeof customer?.email === 'string' ? customer.email : null,
@@ -976,6 +979,10 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const pays = PAYING.has(sub.status);
     const item = sub.items?.data?.[0];
     if (pays && planOfLookupKey(item?.price?.lookup_key) !== 'team') { log(`subscription ${sub.id} is on a price no team plan sells`); return { received: true }; }
+    // A Stripe that will not say what a seat costs leaves the price last known.
+    const seatCents = pays && stripe.seatCents
+      ? await stripe.seatCents(sub).catch((err) => { log(`could not read what team ${team} pays a seat: ${err?.message || err}`); return null; })
+      : null;
     const bill = await updateTeam(team, (bill) => {
       // An old subscription ending leaves alone a newer one that pays.
       if (!pays && bill.stripe?.subscription && bill.stripe.subscription !== sub.id && PAYING.has(bill.stripe.status)) return null;
@@ -984,6 +991,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       const paid = sub.status === 'active' || !!was && (was.paid === true || was.status === 'active' || (was.paid === undefined && was.status === 'past_due'));
       bill.plan = pays ? 'team' : 'none';
       bill.seats = Math.max(0, Math.floor(Number(item?.quantity)) || 0);
+      if (!pays) delete bill.seatCents;
+      else if (Number.isFinite(seatCents)) bill.seatCents = seatCents;
       const trialEnd = Number(sub.trial_end) > 0 ? Number(sub.trial_end) * 1000 : null;
       bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, ...(trialEnd ? { trialEnd } : {}), at: now() };
       bill.rev = (Number(bill.rev) || 0) + 1;

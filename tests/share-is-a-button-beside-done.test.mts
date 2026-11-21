@@ -7,12 +7,13 @@
 // panel that asks, hands over and shares.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import { threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
 
 const menu = fs.readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
 
 describe('the Share button', () => {
   it('is drawn only where the thread can be shared and given, before Done', () => {
-    const at = menu.indexOf('{share && canGive && <button type="button" className="ts-done ts-share"');
+    const at = menu.indexOf('{share && shareButton && <button type="button" className="ts-done ts-share"');
     expect(at).toBeGreaterThan(-1);
     expect(at).toBeLessThan(menu.indexOf('data-hint="done"'));
   });
@@ -32,7 +33,9 @@ describe('the Share button', () => {
 // A regression look: the menu's first row repeated the Share button.
 describe('the menu beside it', () => {
   it("leaves out the share row while the button is there", () => {
-    expect(menu).toContain('share: !!share && !canGive,');
-    expect(menu).toContain('give: canGive && !share,');
+    expect(menu).toContain('share: !!share, shareButton, shareSays,');
+    const ids = threadMenuRows({ change: false, terminal: null, finish: true, share: true, shareButton: true, give: true }).map((r) => r.id);
+    expect(ids).not.toContain('share');
+    expect(ids).not.toContain('give');
   });
 });

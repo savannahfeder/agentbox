@@ -17,6 +17,36 @@ export function sendFirst<P extends SharePerson>(people: readonly P[], last: str
   return people.find((p) => p.id === last) ?? people[0] ?? null;
 }
 
+/** What the Share button wears: who can open the thread, or Share while only you can. */
+export interface ShareFace<P extends SharePerson = SharePerson> {
+  mark: 'share' | 'team' | 'people';
+  words: string;
+  /** The faces drawn, at most three; someone who has left the team is counted but has none. */
+  people: P[];
+}
+
+export function shareFace<P extends SharePerson>({ seen, chosen = [], people, me = null, teamName = null }: {
+  seen: SeenBy;
+  chosen?: readonly string[];
+  /** The team, to find each chosen person's name and face. */
+  people: readonly P[];
+  me?: string | null;
+  teamName?: string | null;
+}): ShareFace<P> {
+  if (seen === 'team') {
+    const name = String(teamName ?? '').trim();
+    return { mark: 'team', words: name ? `Everyone at ${name}` : 'Your team', people: [] };
+  }
+  // A private thread keeps the names it had, and none of them can open it.
+  const ids = seen === 'people' ? [...new Set(chosen)].filter((id) => id && id !== me) : [];
+  if (!ids.length) return { mark: 'share', words: 'Share', people: [] };
+  const known = ids.map((id) => people.find((p) => p.id === id)).filter((p): p is P => !!p);
+  const words = ids.length === 1 ? (known[0] ? String(known[0].name || firstName(known[0])) : '1 person')
+    : ids.length === 2 && known.length === 2 ? `${firstName(known[0])} and ${firstName(known[1])}`
+      : `${ids.length} people`;
+  return { mark: 'people', words, people: known.slice(0, 3) };
+}
+
 /** What the Who can open it row says it is now. */
 export function seenWord(seen: SeenBy, teamName: string | null | undefined, chosen = 0): string {
   if (seen === 'private') return 'Only you';
