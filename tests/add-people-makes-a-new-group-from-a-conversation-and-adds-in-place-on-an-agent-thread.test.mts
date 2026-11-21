@@ -78,12 +78,15 @@ describe('on an agent thread', () => {
   it('does nothing until a person is picked', () => {
     expect(whatAddPeopleDoes({ product: agentProject, item: {}, me: 'me', company })).toBeNull();
   });
-  it('offers everyone not already chosen', () => {
-    expect(peopleToAdd({ item: { visibility: 'people', visibleTo: ['a'] }, me: 'me', company }).map((p) => p.id)).toEqual(['b', 'c']);
+  it('offers everyone not already chosen, on a teammate\'s thread', () => {
+    expect(peopleToAdd({ item: { createdBy: 'a', visibility: 'people', visibleTo: ['a'] }, me: 'me', company }).map((p) => p.id)).toEqual(['b', 'c']);
   });
   it('offers nothing when everyone is chosen, or nobody is signed in', () => {
-    expect(peopleToAdd({ item: { visibleTo: ['a', 'b', 'c'] }, me: 'me', company })).toEqual([]);
-    expect(peopleToAdd({ item: {}, me: null, company })).toEqual([]);
+    expect(peopleToAdd({ item: { createdBy: 'a', visibleTo: ['a', 'b', 'c'] }, me: 'me', company })).toEqual([]);
+    expect(peopleToAdd({ item: { createdBy: 'a' }, me: null, company })).toEqual([]);
+  });
+  it('offers nobody on a thread of your own, where Share is the door', () => {
+    expect(peopleToAdd({ item: { createdBy: 'me', visibleTo: [] }, me: 'me', company })).toEqual([]);
   });
   it('private or chosen becomes chosen, with the new person', () => {
     expect(addPeopleToAgentThread({ visibility: 'private', visibleTo: [] }, 'a')).toEqual({ visibility: 'people', visibleTo: ['a'] });
