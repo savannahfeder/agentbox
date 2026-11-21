@@ -337,14 +337,22 @@ function FolderCard({ folder, count, onOpen, onDropFile, onRename, onRemove }: {
         <FolderGlyph />
         <span className="fp-folder-words"><span className="fp-folder-name">{folder.name}</span><span className="fp-folder-count">{words}</span></span>
       </button>}
-    {(onRename || onRemove) && !renaming && <div className="fp-folder-acts">
-      {onRename && <button type="button" className="fp-rename" aria-label={`Rename ${folder.name}`} title="Rename" onClick={() => setRenaming(true)}><PenGlyph /></button>}
-      {onRemove && <button type="button" className="fp-rename" aria-label={`Delete ${folder.name}`} title="Delete folder" onClick={onRemove}><BinGlyph /></button>}
-    </div>}
+    {(onRename || onRemove) && !renaming && <FolderMenu name={folder.name} onRename={onRename ? () => setRenaming(true) : undefined} onRemove={onRemove} />}
   </div>;
 }
 
-const BinGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2.8 4.3h10.4M6.3 4.3V3h3.4v1.3M4.2 4.3l.6 8.4c0 .5.4.8.9.8h4.6c.5 0 .9-.3.9-.8l.6-8.4" /></svg>;
+function FolderMenu({ name, onRename, onRemove }: { name: string; onRename?: () => void; onRemove?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useClosesOutside(open, () => setOpen(false));
+  const pick = (fn: () => void) => () => { setOpen(false); fn(); };
+  return <div className={`fp-more-box fp-folder-more${open ? ' is-open' : ''}`} ref={box}>
+    <button type="button" className="fp-more" aria-label={`More for ${name}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><MoreGlyph /></button>
+    {open && <div className="fp-menu fp-folder-menu" role="menu">
+      {onRename && <button type="button" role="menuitem" className="fp-menu-item" onClick={pick(onRename)}>Rename</button>}
+      {onRemove && <button type="button" role="menuitem" className="fp-menu-item" onClick={pick(onRemove)}>Delete folder</button>}
+    </div>}
+  </div>;
+}
 
 const FolderGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M2 4.6c0-.6.5-1.1 1.1-1.1h2.7c.3 0 .6.1.8.3l1 1h5.3c.6 0 1.1.5 1.1 1.1v6c0 .6-.5 1.1-1.1 1.1H3.1c-.6 0-1.1-.5-1.1-1.1z" strokeLinejoin="round" /></svg>;
 const TableGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1" /><path d="M2.5 6.4h11M2.5 9.7h11M6.2 6.4V13" /></svg>;
@@ -352,7 +360,6 @@ const UploadGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" w
 const PlusGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>;
 const DocGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3 M6 8.5h4 M6 10.8h4" strokeLinejoin="round" strokeLinecap="round" /></svg>;
 const MoreGlyph = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2" /><circle cx="8" cy="8" r="1.2" /><circle cx="12.5" cy="8" r="1.2" /></svg>;
-const PenGlyph = () => <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M3 13l.7-2.8 7-7a1.2 1.2 0 0 1 1.7 0l.4.4a1.2 1.2 0 0 1 0 1.7l-7 7z" strokeLinejoin="round" /></svg>;
 const GridGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2.5" y="2.5" width="4.4" height="4.4" rx="1.1" /><rect x="9.1" y="2.5" width="4.4" height="4.4" rx="1.1" /><rect x="2.5" y="9.1" width="4.4" height="4.4" rx="1.1" /><rect x="9.1" y="9.1" width="4.4" height="4.4" rx="1.1" /></svg>;
 const ListGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h10" strokeLinecap="round" /></svg>;
 
