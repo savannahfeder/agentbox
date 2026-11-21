@@ -1245,10 +1245,13 @@ export function ThreadComposer({
   const fields: { label: string; node: ReactNode }[] = [
     ...(toShown ? [{ label: 'To', node: (
       <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person ? dropRank('to') : undefined}>
-        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'}
+        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'} title={inline && !mate && !person && !onAuto ? 'To: Agent' : undefined}
           onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
           {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : onAuto ? <AutoFace /> : <AgentFace />}
-          <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>
+          {/* On the page's narrow box the agent is its face alone, so the bar keeps room for the level. */}
+          {inline && !mate && !person && !onAuto
+            ? <span className="tc-word-text tc-face-only">Agent</span>
+            : <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>}
         </button>
         {extra.map((p) => (
           <span key={p.id} className="tc-also">

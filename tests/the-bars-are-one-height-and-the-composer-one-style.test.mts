@@ -77,3 +77,19 @@ describe('Search in the sidebar', () => {
     expect(nav).not.toMatch(/\.workspace-find button::after/);
   });
 });
+
+// The marks made the chips wider, and on Home's 760px box the row then hid the
+// level chip (Agent decides) to keep Send on its line. Measured in the built
+// app: 628px of 722 went to the rest, leaving 94 for a 127px chip. The agent
+// is its face alone there, and the gaps are 6px, so the level stays.
+describe("Home's box with the marks", () => {
+  it('shows the agent as its face alone, with the word kept for screen readers', async () => {
+    const fs = await import('node:fs');
+    const src = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
+    const css = fs.readFileSync(new URL('../renderer/src/threads/thread-composer.css', import.meta.url), 'utf8');
+    expect(src).toContain('<span className="tc-word-text tc-face-only">Agent</span>');
+    expect(src).toContain("title={inline && !mate && !person && !onAuto ? 'To: Agent' : undefined}");
+    expect(css).toMatch(/\.tc-chip \.tc-face-only \{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset\(50%\)/);
+    expect(css).toMatch(/^\.tc-bar \{ display: flex; align-items: center; gap: 6px;/m);
+  });
+});

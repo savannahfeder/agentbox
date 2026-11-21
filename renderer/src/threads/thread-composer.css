@@ -100,7 +100,7 @@
 .tc-note button:hover, .tc-note button:focus-visible { text-decoration-color: currentColor; outline: none; }
 
 /* -------------------------------- the bar -------------------------------- */
-.tc-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px 12px 18px; border-top: 1px solid var(--tc-hair); position: relative; }
+.tc-bar { display: flex; align-items: center; gap: 6px; padding: 12px 14px 12px 18px; border-top: 1px solid var(--tc-hair); position: relative; }
 .tc-chip {
   display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px;
   border: 1px solid var(--line); border-radius: var(--tag-radius); background: rgba(255, 255, 255, 0.03);
@@ -404,3 +404,7 @@
 .dock-send-arrow { display: none; }
 .dock-send-pair .dock-send kbd { font: 11px var(--mono); color: inherit; opacity: 0.75; background: none; border: 0; padding: 0; margin: 0; line-height: 1; }
 .reply-later { position: relative; display: inline-flex; }
+
+/* The agent's face stands for the word on the page's box; the word stays for screen readers. */
+.tc-chip .tc-face-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.tc-chip:has(> .tc-face-only) { padding: 0 7px; }
