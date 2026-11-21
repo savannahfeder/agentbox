@@ -81,7 +81,7 @@ export function accountsOnce({ here, cloud = [], readings = [], current = null, 
     const localError = h ? readings.find((r) => r.profile === h.profile)?.error ?? null : null;
     return {
       key: h?.profile ?? `cloud:${c!.key}`,
-      name: h?.email ?? (c ? accountLabel(c, cloud) : h?.signedIn ? accountName({ engine, index: here.indexOf(h), total: here.length }) : 'Not signed in'),
+      name: h?.email ?? (c ? accountLabel(c, cloud) : h?.signedIn && engine === 'claude' ? accountName({ engine, index: here.indexOf(h), total: here.length }) : 'Not signed in'),
       plan: (h?.signedIn ? h.plan : null) ?? c?.plan ?? null,
       here: h,
       cloud: c,

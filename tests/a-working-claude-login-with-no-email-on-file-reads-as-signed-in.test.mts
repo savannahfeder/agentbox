@@ -13,6 +13,10 @@
 // from that check, which the app already asks at launch, and only for the
 // default login. A credentials file proves nothing, whatever it holds. A run
 // that was told "Not logged in" wins over everything, the email included.
+//
+// The words were approved for Claude only. Review found the first version also
+// renamed a Codex login with an account id or plan but no email, on the desktop
+// and the phone; the last block holds Codex to the words it had before.
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
@@ -24,7 +28,7 @@ import { readSettings } from '../main/settings.mts';
 import { forgetDiscovery } from '../main/account-discovery.mts';
 import { phoneSettingsOf } from '../shared/phone-settings.mts';
 import { USAGE_UNREADABLE } from '../shared/usage.mts';
-import { accountsOnce } from '../renderer/src/accounts-once';
+import { accountsOnce, codexAccountsOnce } from '../renderer/src/accounts-once';
 import { PlaceTiles, WebAccounts, accountTile, agentStory } from '../renderer/src/components/Settings';
 
 type Layout = {
@@ -194,5 +198,30 @@ describe('the copy for the phone and the web app', () => {
     expect(html).toContain('Claude account');
     expect(html).not.toContain('Not signed in');
     expect(html).not.toContain('Finish signing in to use it');
+  });
+});
+
+describe('a Codex login signed in with no email keeps the words it had', () => {
+  const codexRow = { profile: 'default', email: null, plan: 'Plus', chosen: true, signedIn: true };
+  const here = () => agentStory({ codex: { found: true, accounts: [codexRow] } } as never, [], 'codex').accounts;
+
+  it('on the desktop tile', () => {
+    const [one] = codexAccountsOnce({ here: here() });
+    expect(one.name).toBe('Not signed in');
+    const html = renderToStaticMarkup(React.createElement(PlaceTiles, { accounts: [accountTile(one, { many: false, now: Date.now(), onUse: vi.fn(), engine: 'codex' })] }));
+    expect(html).not.toContain('Codex account');
+  });
+
+  it('beside an empty usage read', () => {
+    const [one] = codexAccountsOnce({ here: here() });
+    const tile = accountTile({ ...one, usageError: USAGE_UNREADABLE }, { many: false, now: Date.now(), onUse: vi.fn(), engine: 'codex' });
+    expect(tile.usageError).toBe(USAGE_UNREADABLE);
+  });
+
+  it('on the phone and the web app', () => {
+    const list = [{ id: 'default', email: null, name: null, plan: 'Plus', chosen: true, signedIn: true }];
+    const html = renderToStaticMarkup(React.createElement(WebAccounts, { engine: 'codex', list, reading: { value: null } as never, refusedAsk: null, onUse: vi.fn() }));
+    expect(html).toContain('Not signed in');
+    expect(html).not.toContain('Codex account');
   });
 });

@@ -558,9 +558,10 @@ export function cloudPlaceAccounts(cloud: CloudStatus, engine: 'claude' | 'codex
  *  place the account works. The cloud cannot borrow this computer's login, so
  *  an account missing there, or whose sign-in there stopped, offers the sign-in.
  */
-export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, onCloudSignIn }: {
+export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, onCloudSignIn, engine = 'claude' }: {
   many: boolean; now: number; onUse: (profile: string) => void;
   cloud?: boolean;
+  engine?: 'claude' | 'codex';
   onCloudSignIn?: (key: string | null, email: string | null) => void;
 }): PlaceAccount {
   const h = a.here;
@@ -589,8 +590,8 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
     // now, so the tile with it is the account and the others offer the switch.
     // The supervisor names one Codex login as the one that runs even before it is signed in.
     inUse: !!h?.chosen && !signingIn,
-    // An empty usage read says nothing about the plan of a login that is signed in with no trouble.
-    limits: a.limits, checkedAt: a.checkedAt, usageError: a.usageError === USAGE_UNREADABLE && h?.signedIn && !h.trouble ? null : a.usageError,
+    // An empty usage read says nothing about the plan of a Claude login that is signed in with no trouble.
+    limits: a.limits, checkedAt: a.checkedAt, usageError: engine === 'claude' && a.usageError === USAGE_UNREADABLE && h?.signedIn && !h.trouble ? null : a.usageError,
     use: h?.signedIn && !h.chosen && many ? { word: 'Switch', onUse: () => onUse(h.profile) } : null,
     trouble,
     cmd: trouble && h?.dir ? `CLAUDE_CONFIG_DIR=${h.dir} claude` : null,
@@ -2052,7 +2053,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
       : accountsOnce({ here: agent.accounts, cloud: cloudLogins, readings: accountReadings, current: agent.reading });
     const tiles = accounts.map((a) => {
       const tile = accountTile(a, {
-        many: agent.accounts.length > 1, now,
+        many: agent.accounts.length > 1, now, engine,
         onUse: (profile) => {
           void (async () => {
             const saved = await api.setWorkspaceSetting({ key: 'activeAccount', value: { engine, profile } });
@@ -2861,7 +2862,7 @@ export function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engi
       {list.map((a, i) => {
         const live = picked && chosen(a) && a.signedIn !== false;
         return (
-          <ReadRow key={a.id} label={a.email ?? a.name ?? (a.signedIn === false ? 'Not signed in' : accountName({ engine, index: i, total: list.length }))} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
+          <ReadRow key={a.id} label={a.email ?? a.name ?? (a.signedIn === false || engine !== 'claude' ? 'Not signed in' : accountName({ engine, index: i, total: list.length }))} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
             {live ? <span className="set-in-use">In use</span>
               : list.length > 1 && a.signedIn !== false && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
           </ReadRow>
