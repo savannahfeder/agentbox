@@ -426,12 +426,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
       close(false);
     };
     const keys = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault(); e.stopImmediatePropagation();
-        // Like a click outside: a typed note keeps the panel, and Cancel is the way out.
-        if ([...(wrap.current?.querySelectorAll('textarea') ?? [])].some((t) => t.value.trim())) return;
-        close(true); return;
-      }
+      // The ask sheet's note is kept for its person, so Escape can close.
+      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(true); return; }
       const items = [...(wrap.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
         e.preventDefault();
