@@ -23,7 +23,7 @@ import { memorySession } from '../main/team/session.mts';
 import { TeamPage } from '../renderer/src/team/TeamPage.tsx';
 import { readTeam } from '../renderer/src/phone-team.ts';
 import { proButton, PRO_PITCH } from '../renderer/src/setup-split.ts';
-import { PRO_FOR_INVITES } from '../renderer/src/team/multiplayer-words.ts';
+import { PRO_FOR_INVITES, sharingNeedsPro } from '../renderer/src/team/multiplayer-words.ts';
 
 type Answer = (() => Promise<boolean>) | null;
 
@@ -137,6 +137,32 @@ describe('Settings › Team', () => {
     await maya.service.syncNow();
     expect(page(maya.service.state())).toContain('Their email');
     expect(page({ ...maya.service.state(), pro: null })).toContain('Their email');
+  });
+});
+
+// Power test, 2026-11-21: once Lumen stopped paying, Theo's "Send to Dana" still
+// said Sent, Dana's click on the link said "Theo hasn't shared that thread with
+// you", and Settings › Team still said everyone could read his threads.
+describe('a team that stops paying says so where a thread would go or come', () => {
+  const people = [{ id: 'ana', name: 'Ana Ruiz', role: 'owner' }, { id: 'theo', name: 'Theo Okafor', role: 'member' }];
+  it('tells the owner where to start Pro, and anyone else whom to ask', () => {
+    expect(sharingNeedsPro({ pro: false, people, me: { id: 'ana' } })).toBe('Sharing threads comes with Pro. Start it in Settings, Team.');
+    expect(sharingNeedsPro({ pro: false, people, me: { id: 'theo' } })).toBe('Sharing threads comes with Pro. Ask Ana to start it.');
+  });
+  it('says nothing while the team pays, or when the cloud could not say', () => {
+    expect(sharingNeedsPro({ pro: true, people, me: { id: 'theo' } })).toBeNull();
+    expect(sharingNeedsPro({ pro: null, people, me: { id: 'theo' } })).toBeNull();
+    expect(sharingNeedsPro(null)).toBeNull();
+  });
+  it('sends no link nobody could open, and says why a teammate’s link does not open', () => {
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    expect(app).toMatch(/const paused = sharingNeedsPro\(team\?\.state\);\s*if \(paused\) \{ showToast\(paused\); return; \}\s*const names = /);
+    expect(app).toMatch(/showToast\(sharingNeedsPro\(team\?\.state\) \?\? `\$\{firstName\(team\?\.byId\.get\(personId\)/);
+  });
+  it('drops the promise that everyone can read your threads from Settings › Team', () => {
+    const settings = fs.readFileSync(new URL('../renderer/src/components/Settings.tsx', import.meta.url), 'utf8');
+    expect(settings).toMatch(/\$\{teamShares \? ' Everyone can open and read your threads/);
+    expect(fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8')).toContain('teamShares={snap?.team?.pro !== false}');
   });
 });
 

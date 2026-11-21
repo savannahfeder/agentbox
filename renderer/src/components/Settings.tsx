@@ -1753,7 +1753,7 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
+export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, teamShares = true, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
   /** Opens the Feedback card with `start` already written. */
@@ -1801,6 +1801,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   /** Team management, handed in by whoever has the team's state. Absent on a
    *  build with no team cloud, and then there is no Team row either. */
   teamPane?: ReactNode;
+  /** False while the team has no Pro, when nobody on it can read your threads. */
+  teamShares?: boolean;
   /** WHO SEES A PROJECT'S THREADS (w-b989839656), handed in the same way:
    *  the button beside a project's name, and the Projects list's column.
    *  Absent with nobody signed in, and then neither is drawn. */
@@ -2315,7 +2317,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
         )}
 
         {pane === 'team' && teamPane && (
-          <Page title="Team" lede="Your name and photo, the team's name and logo, and who is on it. Everyone can open and read your threads and their files unless you mark one private.">
+          <Page title="Team" lede={`Your name and photo, the team's name and logo, and who is on it.${teamShares ? ' Everyone can open and read your threads and their files unless you mark one private.' : ''}`}>
             {teamPane}
           </Page>
         )}

@@ -231,6 +231,7 @@ import { isNew } from '../../shared/notify-rules.mts';
 import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mts';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { StartTeam } from './team/StartTeam';
+import { sharingNeedsPro } from './team/multiplayer-words';
 import { inboxBadge } from './needs-count';
 import { givenStage as givenStageOf, namedCards } from './team/company';
 import { FaceHover } from './team/status';
@@ -3089,7 +3090,7 @@ export default function App() {
       const w = linkWaiting.current;
       if (w?.personId !== personId || w.threadId !== threadId) return;
       linkWaiting.current = null;
-      showToast(`${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
+      showToast(sharingNeedsPro(team?.state) ?? `${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
     }, 1500));
   }, [weekCards, openTeammateCard, team, items]);
   useEffect(() => {
@@ -7748,6 +7749,9 @@ export default function App() {
       const item = items.find((i) => i.product === target.product && i.id === target.id);
       const link = threadLink(team?.me, target.id);
       if (!item || !link || !to.length) return;
+      // A link nobody could open is not sent.
+      const paused = sharingNeedsPro(team?.state);
+      if (paused) { showToast(paused); return; }
       const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
       showToast(sendingTo(names));
       const seen = seenNow(item, team?.products.get(item.product), team?.state.since ?? null);
@@ -9521,6 +9525,7 @@ export default function App() {
              has no team in it, and this keeps the team's code in the team's
              files. No team cloud, no pane and no Team row. */
           teamPane={snap?.team?.configured ? <TeamPage team={snap?.team} inviteFocus={inviteFocus} /> : undefined}
+          teamShares={snap?.team?.pro !== false}
           roomsPane={roomsUi.settingsPane}
           // WHO SEES A PROJECT'S THREADS (w-b989839656): the button beside a
           // project's name and the Projects list's column, only while someone
