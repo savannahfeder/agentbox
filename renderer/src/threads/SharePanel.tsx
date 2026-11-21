@@ -4,6 +4,7 @@ import { useContext, useState } from 'react';
 import { Face, TeamContext } from '../team/people';
 import type { Person } from '../types';
 import { firstName, matchPeople, type SeenBy } from './share-rules';
+import { sendKeyFor } from '../reply-keys';
 import './share.css';
 import '../team/asks.css';
 
@@ -29,14 +30,14 @@ export function PanelBack({ label, onBack }: { label: string; onBack: () => void
   </>;
 }
 
-/** Hand it to someone or ask them in first, then the link: copy it, send it to an inbox, and who can open it. */
-export function ShareList({ link, first, others, seen, onCopy, onSendFirst, onSendOther, onSee, onAsk, onHand, onBack }: {
+/** Ask someone in or hand it over first, then the link: copy it, send it to an inbox, and who can open it.
+ *  A one-click send to the last person was taken out: it was the panel's most clickable row and only sent a link. */
+export function ShareList({ link, others, seen, onCopy, onSendOther, onSee, onAsk, onHand, onBack }: {
   link: boolean;
-  first: Person | null;
+  /** Someone on the team to send a link to. */
   others: boolean;
   seen: string;
   onCopy: () => void;
-  onSendFirst: () => void;
   onSendOther: () => void;
   onSee: () => void;
   /** Help or a review; absent where the thread cannot be asked about. */
@@ -58,12 +59,8 @@ export function ShareList({ link, first, others, seen, onCopy, onSendFirst, onSe
       {link && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onCopy}>
         <span className="ico"><LinkMark /></span><span className="ts-more-label">Copy link</span>
       </button>}
-      {first && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSendFirst}>
-        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send a link to {firstName(first)}</span>
-        <Face person={first} size={18} />
-      </button>}
       {others && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSendOther}>
-        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send a link to someone…</span>
+        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send a link…</span>
       </button>}
       <span className="sh-sep" aria-hidden="true" />
       <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSee}>
@@ -147,15 +144,17 @@ export function SendSheet({ people, start, link, onCopy, onSend, onBack }: {
 
 export type GiveMode = 'help' | 'review' | 'give';
 
-const MODES: { id: GiveMode; label: string; detail: (first: string) => string; ask: string; go: (first: string) => string }[] = [
-  { id: 'help', label: 'Help', detail: (f) => `${f} can write to your agent, then hands it back to you.`, ask: 'What do you need help with?', go: (f) => `Ask ${f} to help` },
-  { id: 'review', label: 'Review', detail: (f) => `${f} reads it and tells you it looks good or what to change.`, ask: 'What should they look at?', go: (f) => `Ask ${f} to review` },
-  { id: 'give', label: 'Hand over', detail: (f) => `It becomes ${f}’s thread from now on.`, ask: 'Add a note', go: (f) => `Hand it to ${f}` },
+const MODES: { id: GiveMode; label: string; detail: (first: string) => string; ask: (first: string) => string; go: (first: string) => string }[] = [
+  { id: 'help', label: 'Help', detail: (f) => `${f} can write to your agent, then hands it back to you.`, ask: () => 'What do you need help with?', go: (f) => `Ask ${f} to help` },
+  { id: 'review', label: 'Review', detail: (f) => `${f} reads it and tells you it looks good or what to change.`, ask: (f) => `What should ${f} look at?`, go: (f) => `Ask ${f} to review` },
+  { id: 'give', label: 'Hand over', detail: (f) => `${f} gets it as a task, with its conversation and files. It closes for you.`, ask: () => 'Add a note', go: (f) => `Hand over to ${f}` },
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
-export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack }: {
+export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack, only }: {
   onBack?: () => void;
+  /** Came in through Ask (help or a review only) or through Hand over (no choice to make). */
+  only?: 'ask' | 'give';
   to: { id: string; name: string };
   onGive: (note: string) => void;
   /** Help or a review keeps the thread yours; without it only handing over is offered. */
@@ -165,7 +164,8 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
   start?: GiveMode;
 }) {
   const [note, setNote] = useState('');
-  const [mode, setMode] = useState<GiveMode>(onAsk ? start : 'give');
+  const [mode, setMode] = useState<GiveMode>(onAsk && only !== 'give' ? (only === 'ask' && start === 'give' ? 'help' : start) : 'give');
+  const choices = MODES.filter((x) => (only === 'ask' ? x.id !== 'give' : true));
   const team = useContext(TeamContext);
   const first = to.name.split(/\s+/)[0] || to.name;
   const m = MODES.find((x) => x.id === mode)!;
@@ -174,18 +174,19 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
     <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Bring in ${first}`}>
       {onBack && <PanelBack label="Back" onBack={onBack} />}
       <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
-      {onAsk && <div className="sh-modes">
+      {onAsk && only !== 'give' && <div className="sh-modes">
         <div className="sh-switch" role="radiogroup" aria-label="What you want from them">
-          {MODES.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => setMode(x.id)}>{x.label}</button>)}
+          {choices.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => setMode(x.id)}>{x.label}</button>)}
         </div>
         <p className="sh-mode-says">{m.detail(first)}</p>
       </div>}
+      {(!onAsk || only === 'give') && <p className="sh-mode-says sh-mode-alone">{m.detail(first)}</p>}
       {step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>}
-      <textarea className="sh-note" autoFocus placeholder={m.ask} value={note} aria-label={m.ask} rows={2}
+      <textarea className="sh-note" autoFocus placeholder={m.ask(first)} value={note} aria-label={m.ask(first)} rows={2}
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); } }} />
       <div className="sh-foot">
-        <button type="button" className="th-new sh-go" onClick={go}>{m.go(first)}</button>
+        <button type="button" className="th-new sh-go" onClick={go}>{m.go(first)}<kbd>{sendKeyFor(false)}</kbd></button>
       </div>
     </div>
   );

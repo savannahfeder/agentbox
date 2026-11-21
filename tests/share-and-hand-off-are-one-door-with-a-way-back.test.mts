@@ -18,13 +18,13 @@ globalThis.React = React;
 const text = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const THEO = { id: 'theo', name: 'Theo Okafor', email: 't@x', avatarUrl: null };
 const list = (o = {}) => text(renderToStaticMarkup(React.createElement(ShareList, {
-  link: true, first: THEO, others: true, seen: 'Lumen', onCopy() {}, onSendFirst() {}, onSendOther() {}, onSee() {}, onAsk() {}, onHand() {}, onBack() {}, ...o,
+  link: true, others: true, seen: 'Lumen', onCopy() {}, onSendFirst() {}, onSendOther() {}, onSee() {}, onAsk() {}, onHand() {}, onBack() {}, ...o,
 } as never)));
 
 describe('the thread menu', () => {
   it('has one row for sharing and handing off where both can be done', () => {
     const rows = threadMenuRows({ change: false, terminal: null, finish: true, share: true, give: true });
-    expect(rows.filter((r) => r.id === 'share' || r.id === 'give').map((r) => r.label)).toEqual(['Share or hand off…']);
+    expect(rows.filter((r) => r.id === 'share' || r.id === 'give').map((r) => r.label)).toEqual(['Ask, hand over or share…']);
   });
   it('keeps Share… alone where it cannot be handed off, and Ask or hand off… where it cannot be shared', () => {
     expect(threadMenuRows({ change: false, terminal: null, finish: true, share: true }).map((r) => r.label)).toContain('Share…');
@@ -38,9 +38,10 @@ describe('the panel it opens', () => {
     expect(t.indexOf('Ask for help or a review…')).toBeLessThan(t.indexOf('Hand it over…'));
     expect(t.indexOf('Hand it over…')).toBeLessThan(t.indexOf('Copy link'));
   });
-  it('says a send is a link, so it does not read as handing it over', () => {
-    expect(list()).toContain('Send a link to Theo');
-    expect(list()).not.toMatch(/Send to Theo/);
+  it('says a send is a link, and has no one-click send that reads like handing it over', () => {
+    // A review found "Send a link to Theo" was the panel's most clickable row and only sent a link.
+    expect(list()).toContain('Send a link…');
+    expect(list()).not.toMatch(/Send (a link )?to Theo/);
   });
   it('offers no hand-off rows where it cannot be handed off', () => {
     const t = list({ onAsk: undefined, onHand: undefined });
@@ -60,7 +61,30 @@ describe('every panel under it', () => {
     expect(menu).toContain("onBack={() => setSharing(null)} />;");
     expect(menu).toContain("<SeeList seen={share.seen} teamName={share.teamName} onBack={() => setSharing('list')}");
     expect(menu).toContain("onBack={() => setSharing('see')} />");
-    expect(menu).toContain("start={giveStart} onBack={() => setGivingTo(null)}");
+    expect(menu).toMatch(/start=\{giveStart\} only=\{[^}]*\} onBack=\{\(\) => setGivingTo\(null\)\}/);
     expect(menu).toContain("if (givingFromShare) { setGivingFromShare(false); setSharing('list'); }");
+    // Opened from the button under a message, Back closes it: the menu was never open.
+    expect(menu).toContain('if (step) { close(false); return; }');
+  });
+});
+
+describe('the sheet after picking a person', () => {
+  it('offers only Help or Review when you came to ask, and no choice when you came to hand it over', async () => {
+    const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');
+    const sheet = (o: Record<string, unknown>) => text(renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, onAsk() {}, ...o } as never)));
+    const ask = sheet({ only: 'ask' });
+    expect(ask).toContain('Help');
+    expect(ask).toContain('Review');
+    expect(ask).not.toContain('Hand over');
+    const give = sheet({ only: 'give', start: 'give' });
+    expect(give).not.toContain('Review');
+    expect(give).toContain('Hand over to Theo');
+    expect(give).toContain('Theo gets it as a task, with its conversation and files. It closes for you.');
+  });
+  it('names the person in the review prompt and shows the send key on the button', async () => {
+    const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');
+    const html = renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, onAsk() {}, start: 'review' } as never));
+    expect(html).toContain('What should Theo look at?');
+    expect(html).toMatch(/Ask Theo to review<kbd>/);
   });
 });

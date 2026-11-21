@@ -46,7 +46,7 @@ import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
 import { ChooseList, CopiedSheet, GiveSheet, PanelBack, SeeList, SendSheet, ShareList } from './SharePanel';
-import { sendFirst, type SeenBy } from './share-rules';
+import type { SeenBy } from './share-rules';
 
 export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
 
@@ -121,7 +121,7 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, share
 }): ThreadMenuRow[] {
   const rows: ThreadMenuRow[] = [];
   // One door for both: someone looking to hand it off goes to Share first (founder, 2026-11-21).
-  if (share) rows.push({ id: 'share', label: give ? 'Share or hand off…' : 'Share…', key: null });
+  if (share) rows.push({ id: 'share', label: give ? 'Ask, hand over or share…' : 'Share…', key: null });
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
@@ -533,10 +533,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
         </div>
       )}
       {open && share && sharing === 'list' && (() => {
-        const first = sendFirst(share.people, share.last);
-        return <ShareList link={!!share.link} first={first} others={share.people.length > (first ? 1 : 0)} seen={share.seenWord}
+        return <ShareList link={!!share.link} others={share.people.length > 0} seen={share.seenWord}
           onCopy={copyLink}
-          onSendFirst={() => { close(false); if (first) onSendTo?.([first.id], ''); }}
           onSendOther={() => { setSendTo([]); setSharing('send'); }}
           onSee={() => setSharing('see')}
           onAsk={canGive && onAsk ? () => { setSharing(null); setGiveStart('help'); setGivingFromShare(true); setGiving(true); } : undefined}
@@ -551,14 +549,14 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
         onPick={(to) => { if (to === 'people') { setSharing('choose'); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
       {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} onBack={() => setSharing('see')} />}
       {open && !waiting && !adding && !leveling && !sharing && (giving && givingTo
-        ? <GiveSheet to={givingTo} step={step} start={giveStart} onBack={() => setGivingTo(null)} onGive={(note) => { close(false); onGive?.(givingTo, note); }}
+        ? <GiveSheet to={givingTo} step={step} start={giveStart} only={givingFromShare ? (giveStart === 'give' ? 'give' : 'ask') : step ? 'ask' : undefined} onBack={() => setGivingTo(null)} onGive={(note) => { close(false); onGive?.(givingTo, note); }}
           onAsk={onAsk ? (kind, note) => { const s = step; close(false); onAsk(givingTo, kind, note, s); } : undefined} />
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">
-          <PanelBack label="Back" onBack={() => { setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />
+          <PanelBack label="Back" onBack={() => { if (step) { close(false); return; } setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />
           <p className="ts-menu-say">{(givingFromShare ? (giveStart === 'give' ? 'Who takes it over?' : 'Who do you want to ask?') : onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
             + (giveTo.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
-          {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
+          {giveTo.filter((p) => !(givingFromShare && giveStart === 'help' && p.id.startsWith('mate:'))).map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
             <span className="ico">{p.id.startsWith('mate:') ? <GiveMark /> : <Face name={p.name} size={18} />}</span>
             <span className="ts-more-label">{p.name}</span>
             {p.detail && <kbd>{p.detail}</kbd>}
