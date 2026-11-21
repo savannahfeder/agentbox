@@ -131,7 +131,7 @@ export interface MemoryCloud extends MemoryRoomsFields {
   unconfirmed?: Set<string>;
   refuseShares?: string;
   /** Set, a team invites, takes people on and shares only while it is in `paying`, as
-   *  20261121120000_team_features_need_pro.sql has it. Unset, every team pays, as before. */
+   *  20261121130000_team_features_need_pro.sql has it. Unset, every team pays, as before. */
   freeTeams?: boolean;
   paying?: Set<string>;
   /** Emails whose next team pays from the moment it is made. */
@@ -214,7 +214,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
   });
   const refuse: (what: string) => never = (what) => { throw new Error(`not allowed: ${what}`); };
   const pays = (teamId: string) => !cloud.freeTeams || !!cloud.paying?.has(teamId);
-  // The database's own words (20261121120000_team_features_need_pro.sql).
+  // The database's own words (20261121130000_team_features_need_pro.sql).
   const needsPro = (teamId: string, words: string) => { if (!pays(teamId)) throw new Error(words); };
   // What this person may do with a link, as file_link_can_of decides it.
   type LinkPersonRow = { email: string; can: LinkCan; at: number };

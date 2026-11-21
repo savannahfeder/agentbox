@@ -22,6 +22,10 @@ export function whereAFileOpens(src: string | null | undefined): 'beside' | 'ful
 export function artifactFraction(fraction: number, width: number): number {
   return Math.max(560 / width, Math.min(1 - 400 / width, fraction));
 }
+/** The body width to keep: a new one only when it moves where a file opens, or with a file open, whose split it sets. */
+export function keptWidth(was: number, width: number, fileOpen: boolean): number {
+  return fileOpen || artifactPlacement('beside', was) !== artifactPlacement('beside', width) ? width : was;
+}
 export function isLocalPreview(src: string): boolean {
   try {
     const url = new URL(src);

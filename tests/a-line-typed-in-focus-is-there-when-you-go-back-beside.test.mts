@@ -24,6 +24,7 @@ const DISK = `
     openArtifact: async () => ({ ok: true, opened: '/docs/week-1-plan.md' }),
     readDoc: async () => ({ ok: true, text: file.text, mtime: file.mtime }),
     writeDoc: async ({ text }) => { await new Promise(r => setTimeout(r, 50)); file.text = text; file.mtime += 1; return { ok: true, mtime: file.mtime }; },
+    onChanged: () => () => {},
   };`;
 
 beforeAll(async () => {

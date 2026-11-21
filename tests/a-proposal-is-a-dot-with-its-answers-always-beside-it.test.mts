@@ -145,7 +145,7 @@ describe('the three answers', () => {
 // the proposal you were not pointing at looked broken: "Why is this proposal
 // not showing the options... it should always show those options even if
 // you're not hovering over it."
-describe('the answers are always on every proposal, and nothing snaps', () => {
+describe('the answers are always on every proposal', () => {
   it('never hides them or holds them back from a press', () => {
     expect(css).not.toMatch(/\.made-acts \{[^}]*opacity: 0/);
     expect(css).not.toMatch(/\.made-acts \{[^}]*pointer-events: none/);
@@ -158,13 +158,10 @@ describe('the answers are always on every proposal, and nothing snaps', () => {
     expect(rule('.made-title')).toMatch(/text-overflow: ellipsis/);
   });
 
-  it('fades every colour the cursor changes', () => {
-    const t = css.match(/\.made-row, \.made-open, \.made-title, \.made-state, \.made-acts button \{[^}]*\}/)?.[0] ?? '';
-    for (const prop of ['background-color', 'color']) expect(t).toMatch(new RegExp(`${prop} \\.\\d+s`));
-  });
-
-  it('stands still for someone who has asked for less motion', () => {
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[^}]*transition: none/);
+  // The fade asked for here (2026-10-14) was later overruled: hover answers at
+  // once everywhere (tests/hover-and-press-feedback-is-instant).
+  it('changes every colour the cursor changes at once', () => {
+    expect(css).not.toMatch(/transition/);
   });
 });
 

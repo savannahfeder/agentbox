@@ -30,16 +30,24 @@ export function DocOutline({ scroller, page }: { scroller: HTMLElement | null; p
 
   useEffect(() => {
     if (!scroller || !page || !outlineShows(entries)) return undefined;
-    const spy = () => {
+    // Where each heading sits in the scrolled page, so a scroll reads no layout.
+    let tops: number[] = [];
+    const measure = () => {
       const els = headingsIn(page);
-      const top = scroller.getBoundingClientRect().top;
-      const atFoot = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
-      setOn(atFoot && scroller.scrollTop > 0 ? entries.length - 1
-        : sectionAt(entries.map((e) => (els[e.at]?.getBoundingClientRect().top ?? Infinity) - top), READING_LINE));
+      const origin = scroller.getBoundingClientRect().top - scroller.scrollTop;
+      tops = entries.map((e) => (els[e.at]?.getBoundingClientRect().top ?? Infinity) - origin);
     };
+    const spy = () => {
+      const at = scroller.scrollTop;
+      const atFoot = at + scroller.clientHeight >= scroller.scrollHeight - 4;
+      setOn(atFoot && at > 0 ? entries.length - 1 : sectionAt(tops.map((t) => t - at), READING_LINE));
+    };
+    const resized = new ResizeObserver(() => { measure(); spy(); });
+    resized.observe(page);
+    measure();
     spy();
     scroller.addEventListener('scroll', spy, { passive: true });
-    return () => scroller.removeEventListener('scroll', spy);
+    return () => { resized.disconnect(); scroller.removeEventListener('scroll', spy); };
   }, [scroller, page, entries]);
 
   if (!outlineShows(entries)) return null;

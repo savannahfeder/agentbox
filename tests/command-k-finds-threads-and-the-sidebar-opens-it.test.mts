@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WorkspaceNavigation } from '../renderer/src/components/WorkspaceNavigation';
 import { threadRows, THREADS_SHOWN } from '../renderer/src/components/Palette';
-import { glyphFor } from '../renderer/src/palette-glyphs';
+import { iconFor } from '../renderer/src/palette-glyphs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
@@ -69,8 +69,9 @@ describe('⌘K finds threads', () => {
   });
 
   it('marks a thread and See all apart from the commands', () => {
-    expect(glyphFor({ id: 'thread-p-1', label: 'Pricing page' })).toBe('›');
-    expect(glyphFor({ id: 'all-threads', label: 'See all 6 threads' })).toBe('/');
+    expect(iconFor({ id: 'thread-p-1', label: 'Pricing page' })).toBe('thread');
+    expect(iconFor({ id: 'all-threads', label: 'See all 6 threads' })).toBe('search');
+    expect(iconFor({ id: 'new-thread', label: 'New thread' })).not.toBe('thread');
   });
 
   it('is handed the list search and a way to open it with words typed', () => {

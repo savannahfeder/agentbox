@@ -15,7 +15,7 @@ import { emptyDatabase } from './an-empty-test-database.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrationsDir = path.join(root, 'cloud/supabase/migrations');
-const GATE = '20261121120000_team_features_need_pro.sql';
+const GATE = '20261121130000_team_features_need_pro.sql';
 const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
 const read = (list: string[]) => list.map((f) => fs.readFileSync(path.join(migrationsDir, f), 'utf8')).join('\n');
 

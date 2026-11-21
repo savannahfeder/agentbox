@@ -12,11 +12,14 @@ import { HINTS } from '../renderer/src/hint-plate.ts';
 const menu = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/threads/ThreadMenu.tsx'), 'utf8');
 
 describe('Close task', () => {
-  it('wears a plate', () => {
-    expect(menu).toContain('<button type="button" className="ts-done ts-close-task" data-hint="close-task" data-hint-align="right" onClick={onCloseTask}>');
+  // w-f702d60afe, 2026-11-21: two buttons side by side still read as one thing
+  // said twice, so the top bar keeps Done and Close task lives in the menu,
+  // where its row says who it closes it for.
+  it('is not a second button beside Done', () => {
+    expect(menu).not.toContain('ts-close-task');
   });
-  it('that says it closes the task for both of you', () => {
-    expect(HINTS['close-task']).toEqual([{ key: '', what: 'Close the task for both of you' }]);
+  it('is a menu row that says it is for both of you', () => {
+    expect(menu).toContain("if (closeTask) rows.push({ id: 'close-task', label: 'Close task', key: null, detail: 'For both of you' });");
   });
   it('while Done still says it is the E key', () => {
     expect(HINTS.done).toEqual([{ key: 'E', what: 'Mark done' }]);

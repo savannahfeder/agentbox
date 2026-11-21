@@ -2,7 +2,7 @@
 // (cloud/supabase/migrations/20261119000000_multiplayer_is_invite_only.sql).
 export const NOT_LET_IN = 'Multiplayer is invite-only for now';
 
-// Where inviting would be, for a team without Pro (20261121120000_team_features_need_pro.sql).
+// Where inviting would be, for a team without Pro (20261121130000_team_features_need_pro.sql).
 export const PRO_FOR_INVITES = 'Inviting people comes with Pro.';
 const ownerName = (owner: string | null | undefined) => owner?.trim().split(/\s+/)[0] || 'your team’s owner';
 export const askOwnerForPro = (owner: string | null | undefined) => `${PRO_FOR_INVITES} Ask ${ownerName(owner)} to start it.`;

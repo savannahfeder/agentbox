@@ -10,13 +10,20 @@ import './asks.css';
 
 type Verdict = 'done' | 'yes' | 'changes';
 
+/** The thread bar's mark for a code change (ThreadMenu's CodeMark). */
+const CodeMark = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m8.5 7-5 5 5 5" /><path d="m15.5 7 5 5-5 5" /></svg>
+);
+
 /** The code change an ask carries (main/team/index.mts askTeammate), as a path in the task's project. */
 export function askChange(task: Pick<WorkItem, 'body'>): string | null {
   return /\]\((attachments\/[^)\s]+\.change)\)/.exec(String(task.body ?? ''))?.[1] ?? null;
 }
 
-export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, under = false }: {
+export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, under = false, answeredBelow = false }: {
   task: WorkItem;
+  /** The page's own box below answers it, so the bar keeps only its links. */
+  answeredBelow?: boolean;
   /** Only the answer, under the message that asked, which already names the thread and the change. */
   under?: boolean;
   owner: Person | null;
@@ -38,7 +45,8 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
   const first = firstName(owner) || 'Your teammate';
   const change = onOpenChange ? askChange(task) : null;
   const back = async () => {
-    if (!giving || busy) return;
+    // The same rule as its button: changes asked for say what they are, whichever way it is sent.
+    if (!giving || busy || (giving === 'changes' && !words.trim())) return;
     setBusy(true);
     const ok = await onHandBack(giving, words.trim());
     setBusy(false);
@@ -61,15 +69,16 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
             onChange={(e) => setWords(e.target.value)}
             onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void back(); } }} />
           <div className="ask-bar-acts">
-            <button type="button" disabled={busy || (giving === 'changes' && !words.trim())} onClick={() => { void back(); }}>Hand back to {first}</button>
-            <button type="button" className="quiet" onClick={() => { setGiving(null); setWords(''); }}>Not yet</button>
+            {/* Named by what it sends: "Looks good" alone left people thinking it had gone. */}
+            <button type="button" disabled={busy || (giving === 'changes' && !words.trim())} onClick={() => { void back(); }}>{giving === 'yes' ? `Send “Looks good” to ${first}` : giving === 'changes' ? `Send changes to ${first}` : `Hand back to ${first}`}</button>
+            <button type="button" className="quiet" onClick={() => { setGiving(null); setWords(''); }}>Cancel</button>
           </div>
         </div>
-      ) : (
+      ) : (onOpenThread || (change && !under) || !answeredBelow) && (
         <div className="ask-bar-acts">
           {onOpenThread && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
-          {change && !under && <button type="button" onClick={() => onOpenChange?.(change)}>View the change</button>}
-          {ask.kind === 'review'
+          {change && !under && <button type="button" className="ask-bar-change" onClick={() => onOpenChange?.(change)}><CodeMark />View the change</button>}
+          {answeredBelow ? null : ask.kind === 'review'
             ? <>
               <button type="button" onClick={() => setGiving('yes')}>Looks good</button>
               <button type="button" onClick={() => setGiving('changes')}>Needs changes</button>

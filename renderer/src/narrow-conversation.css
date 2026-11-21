@@ -34,12 +34,12 @@
 
 /* Under 460 the priority keeps its bars and Stop its square; both keep their
    names for the pointer and screen readers. The model's level goes to its
-   menu. When the chips still do not fit, the mode chip goes (Focus.tsx
+   menu, and the mode and model chips drop their marks so both words fit. When the chips still do not fit, the mode chip goes (Focus.tsx
    chipsOverflow), and only then does the model's name end in an ellipsis:
    a chip is never sliced by its own border. */
 @container reply (max-width: 460px) {
   .dock-chips { flex-wrap: nowrap; }
-  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word, .dock-chips .tc-chip-level { display: none; }
+  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word, .dock-chips .tc-chip-level, .dock-chips .mode-mark, .dock-chips .model-pick .engine-logo, .dock-chips .tc-out-when { display: none; }
   .dock-chips > * { flex: none; }
   .dock-chips > .model-pick { flex: 0 1 auto; min-width: 44px; }
   .dock-chips .model-pick .tc-chip { min-width: 0; max-width: 100%; }

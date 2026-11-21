@@ -1,5 +1,5 @@
 // For a test database whose rule under test is not paying: every team, made
-// before or after, pays for Pro (20261121120000_team_features_need_pro.sql),
+// before or after, pays for Pro (20261121130000_team_features_need_pro.sql),
 // as `multiplayer_people '*'` lets every team past the invite-only list.
 // tests/team-features-need-pro-or-a-card-trial covers paying itself.
 export const EVERY_TEAM_PAYS = `

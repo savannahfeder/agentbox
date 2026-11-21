@@ -217,7 +217,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   };
 
   // WHETHER A TEAM PAYS, WHERE THE DATABASE'S INVITE AND SHARE GATES READ IT
-  // (20261121120000_team_features_need_pro.sql). The bill's `rev` moves with
+  // (20261121130000_team_features_need_pro.sql). The bill's `rev` moves with
   // each Stripe event; a bill the database is behind on is written again on
   // the next read, so a refused write is not lost.
   const mirrorTried = new Map();

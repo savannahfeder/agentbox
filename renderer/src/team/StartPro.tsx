@@ -1,5 +1,5 @@
 // Pro's button where inviting would be: a team without Pro neither invites nor
-// shares (20261121120000_team_features_need_pro.sql). It starts the setup's
+// shares (20261121130000_team_features_need_pro.sql). It starts the setup's
 // Pro, Stripe's checkout in the browser, and the invite box takes its place
 // once the team pays.
 import { useEffect, useState } from 'react';
