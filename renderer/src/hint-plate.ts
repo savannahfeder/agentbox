@@ -126,7 +126,6 @@ export const HINTS: Record<string, HintLine[]> = {
   // thread's dots. It prints only its word, so E goes here, in
   // the row plate's own wording.
   done: [{ key: 'E', what: 'Mark done' }],
-  'close-task': [{ key: '', what: 'Close the task for both of you' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
   // The Inbox button left of the back arrow, drawn only on a thread.
   inbox: [{ key: 'esc', what: 'Inbox' }],

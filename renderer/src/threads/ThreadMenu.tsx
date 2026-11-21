@@ -486,7 +486,6 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
       {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {handedTo && !done && <button type="button" className="ts-done ts-handed" disabled={!handedTo.onOpen} onClick={handedTo.onOpen ?? undefined}><span className="ts-handed-face" aria-hidden="true">{handedTo.initials}</span><span>{handedTo.name}</span></button>}
       {onReopen && !handedTo && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
-      {onCloseTask && <button type="button" className="ts-done ts-close-task" data-hint="close-task" data-hint-align="right" onClick={onCloseTask}><span>Close task</span></button>}
       {done && (
         <button
           type="button"
