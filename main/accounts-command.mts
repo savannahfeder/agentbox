@@ -14,6 +14,7 @@ import { readPlan } from './claude-plan.mts';
 import { codexAccount } from './codex-account.mts';
 import { codexHome } from './codex-models.mts';
 import { accountRecheckFile, askForAccountRecheck } from './account-recheck.mts';
+import { Name } from '../shared/product-name.mjs';
 
 export interface AccountsConfig {
   storeRoot: string;
@@ -124,9 +125,9 @@ export function describeLogins(rows: LoginRow[], { home = os.homedir() }: { home
         : r.engineSays?.signedIn === false ? 'signed out'
         : `no answer${r.engineSays?.said ? ` (${r.engineSays.said.split('\n')[0].slice(0, 80)})` : ''}`;
       const plan = r.plan && r.engineSays?.signedIn !== false ? `, ${r.plan}` : '';
-      const app = !r.key ? 'Agentbox does not list it'
-        : r.appHolds ? `Agentbox thinks: ${WORDS[r.appHolds.cause] ?? r.appHolds.cause}`
-        : 'Agentbox thinks: fine';
+      const app = !r.key ? `${Name} does not list it`
+        : r.appHolds ? `${Name} thinks: ${WORDS[r.appHolds.cause] ?? r.appHolds.cause}`
+        : `${Name} thinks: fine`;
       out.push(`  ${short(r.folder)}`);
       out.push(`    ${engine === 'claude' ? 'Claude Code' : 'Codex'} says: ${says}${plan}`);
       out.push(`    ${app}${disagrees(r) ? '   <- they disagree' : ''}`);
@@ -134,7 +135,7 @@ export function describeLogins(rows: LoginRow[], { home = os.homedir() }: { home
     out.push('');
   }
   const stale = rows.filter((r) => r.appHolds);
-  if (stale.length) out.push('To make Agentbox forget what it thinks about every login: npm run accounts -- --reset');
+  if (stale.length) out.push(`To make ${Name} forget what it thinks about every login: npm run accounts -- --reset`);
   return out.join('\n').trimEnd();
 }
 
