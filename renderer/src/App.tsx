@@ -70,7 +70,7 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
+import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy, sentAwayByMe } from '../../shared/thread-asks.mts';
 import { ASK_PERSON_EVENT, HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -2568,7 +2568,7 @@ export default function App() {
   const progress = useMemo(() => [
     ...items.filter((i) => {
       if (scope && i.product !== scope) return false;
-      if (askIGave(i, team?.me ?? null)) return false;
+      if (sentAwayByMe(i, team?.me ?? null)) return false;
       if (askedOut.has(i.id) && i.status !== 'done') return true;
       const deferredUntil = dueAt(i);
       if (hiddenAt(i) > now && !liveIds.has(i.id)) return false;
@@ -2651,7 +2651,7 @@ export default function App() {
   // In progress until it does (w-bc976fd247).
   const done = useMemo(() => {
     const needsYou = new Set(inbox.map((i) => i.id));
-    return items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !askIGave(i, team?.me ?? null))
+    return items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !sentAwayByMe(i, team?.me ?? null))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [items, scope, inbox, liveIds, shippingIds, team?.me]);
 
@@ -3232,7 +3232,7 @@ export default function App() {
   // The columns themselves are kept too, for the left and right arrows
   // (`boardSideways`), and they come in the order you dragged them to.
   // An ask you sent is said by your thread's own card (as in the lists).
-  const boardItemsHere = useMemo(() => items.filter((i) => !askIGave(i, team?.me ?? null)), [items, team?.me]);
+  const boardItemsHere = useMemo(() => items.filter((i) => !sentAwayByMe(i, team?.me ?? null)), [items, team?.me]);
   const boardArgs = useMemo(
     () => ({ items: evBoard ? boardItems(boardItemsHere, evBoard, teammateIdOf) : boardItemsHere, products: snap?.products ?? [], display: inboxDisplay, now, stateOf: stateOfMine, cards,
       picked: evBoard ? evBoard.picked : team ? picked : undefined, me: team?.me ?? null, since: team?.state.since ?? null, live: runningIds, projectOrder, waitingIsInProgress: !!evBoard && !evBoard.mate && !evBoard.mineOnly && evBoard.picked.length > 1 }),

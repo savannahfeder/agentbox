@@ -9,7 +9,8 @@
 // Handing back is closing the task with words and a verdict. The thread stays
 // the owner's throughout: their computer runs it, and it comes back to their
 // Needs you saying what was said.
-import { isTaskRow } from './team-rules.mts';
+import { isTaskRow, taskGiver } from './team-rules.mts';
+import { handedFrom } from './thread-link.mts';
 import type { AskPatch, Verdict } from './work-items.mts';
 
 export type AskKind = AskPatch['kind'];
@@ -81,6 +82,17 @@ export function askOnMe(rows: readonly AskRow[], me: string | null, owner: strin
     const a = askOf(r);
     return !!a && a.owner === owner && a.thread === thread && r.assignee === me && isOpen(r);
   }) ?? null;
+}
+
+/**
+ * A task you sent out about one of your own threads: an ask, or the thread
+ * handed over for good. Your thread is the row for it, so the task stays off
+ * your In progress, Done and board; a reply on it still reaches Needs you.
+ */
+export function sentAwayByMe(row: (AskRow & { body?: string | null }) | null | undefined, me: string | null): boolean {
+  if (!row || !me) return false;
+  if (askIGave(row, me)) return true;
+  return isTaskRow(row as Parameters<typeof isTaskRow>[0]) && taskGiver(row as Parameters<typeof taskGiver>[0]) === me && !!handedFrom(row.body, me);
 }
 
 /** Asks you gave that were handed back and not yet carried onto the thread. */
