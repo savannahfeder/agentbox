@@ -15,7 +15,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { testsThatRead } from './lib/tests-that-read.mjs';
+import { testsTheChangeReaches } from './lib/tests-the-push-runs.mjs';
 
 const root = (() => {
   try { return execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim(); } catch {
@@ -40,9 +40,21 @@ if (!files.length) {
   process.exit(0);
 }
 
-const readers = testsThatRead(files, root).filter((f) => !files.includes(f));
-console.log(`test:changed: ${files.length} changed file(s)${readers.length ? ` and ${readers.length} test(s) that read one as text` : ''}.`);
-const run = spawnSync('npx', ['vitest', 'related', '--run', '--passWithNoTests', ...files, ...readers], {
+// Not `vitest related`: it opens every test file at once, and on a machine
+// whose open-file limit is 1,024 that dies before a test runs.
+let tests;
+try {
+  tests = await testsTheChangeReaches(files, root);
+} catch (err) {
+  console.error(`test:changed: could not work out which tests reach this change, so nothing ran.\n${err?.stack ?? err}`);
+  process.exit(1);
+}
+if (!tests.length) {
+  console.log(`test:changed: no test reaches the ${files.length} changed file(s).`);
+  process.exit(0);
+}
+console.log(`test:changed: ${tests.length} test file(s) reach the ${files.length} changed file(s).`);
+const run = spawnSync('npx', ['vitest', 'run', '--passWithNoTests', ...tests], {
   cwd: root,
   stdio: 'inherit',
   env: { ...process.env, VITEST_MAX_FORKS: process.env.VITEST_MAX_FORKS ?? '2', VITEST_MIN_FORKS: process.env.VITEST_MIN_FORKS ?? '1' },

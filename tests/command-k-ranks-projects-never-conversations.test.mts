@@ -12,7 +12,7 @@ const noop = () => {};
 const team = (direct: boolean) => ({ projectId: 'p', teamId: 't', visibility: direct ? 'people' : 'team', people: [], sharedBy: null, ...(direct ? { direct: true } : {}) });
 const drawn = (typed: string) => renderToStaticMarkup(createElement(Palette, {
   products: [
-    { slug: 'ferry', name: 'Ferry', team: team(false) },
+    { slug: 'shuttle', name: 'Shuttle', team: team(false) },
     { slug: 'mine', name: 'Mine' },
     { slug: 'direct-1', name: 'Direct', team: team(true) },
     { slug: 'direct-2', name: 'Direct', team: team(true) },
@@ -26,7 +26,7 @@ const drawn = (typed: string) => renderToStaticMarkup(createElement(Palette, {
 describe('⌘K ranks projects', () => {
   it('offers every project, shared or not', () => {
     const html = drawn('rank');
-    expect(html).toContain('Rank Ferry first');
+    expect(html).toContain('Rank Shuttle first');
     expect(html).toContain('Rank Mine first');
   });
 

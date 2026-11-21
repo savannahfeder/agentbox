@@ -189,9 +189,10 @@ describe('every way a stopped row could leave the inbox goes past the nudge', ()
     // showToast's second argument is what turns the pill into a button with
     // "Open it" on its end (App.tsx, `.toast-goes`). The sentence without it
     // would be advice with no way in. `rememberWarned` beside it is what makes
-    // the next press land.
+    // the next press land. `warns` keeps O from opening it once the pill has
+    // gone (o-still-opens-what-you-sent-after-its-note-has-gone).
     expect(app).toMatch(
-      /const nudgeOnStopped[\s\S]{0,500}?holdForStoppedAgent\([\s\S]{0,400}?rememberWarned\(localStorage\)[\s\S]{0,200}?showToast\(held\.say, held\.goes\)/,
+      /const nudgeOnStopped[\s\S]{0,500}?holdForStoppedAgent\([\s\S]{0,400}?rememberWarned\(localStorage\)[\s\S]{0,200}?showToast\(held\.say, \{ \.\.\.held\.goes, warns: true \}\)/,
     );
   });
 });
