@@ -15,7 +15,7 @@ describe("the box on a teammate's thread", () => {
   it('starts from the draft kept for this teammate and thread', () => {
     expect(page).toMatch(/const draftAt = useMemo\(\(\) => \(\{ product: `teammate:\$\{personId\}`, id: threadId \}\), \[personId, threadId\]\);/);
     expect(page).toMatch(/const \[draft, setDraftHere\] = useState\(\(\) => readDraft\(draftAt\)\);/);
-    expect(page).toMatch(/useEffect\(\(\) => \{ setWork\(null\); setDraftHere\(readDraft\(draftAt\)\); \}, \[draftAt\]\);/);
+    expect(page).toMatch(/useEffect\(\(\) => \{ setWork\(null\); setDraftHere\(readDraft\(draftAt\)\);[^\n]*\}, \[draftAt\]\);/);
   });
   it('keeps every change, and lets go of it once sent', () => {
     expect(page).toMatch(/const setDraft = \(text: string\) => \{ setDraftHere\(text\); saveDraft\(draftAt, text\); \};/);

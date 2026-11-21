@@ -18,7 +18,8 @@ const MADE = Date.UTC(2026, 10, 17, 9);
 const ENDS = MADE + TEAM.trialDays * DAY;
 const inTrial = (endsAt: number) => ({ signedIn: true, plan: 'team' as const, team: { trial: true, endsAt, seats: 0 } });
 
-async function checkoutTrialDays(at: number): Promise<number> {
+// What the page reads from the cloud at `at`, and the free days the checkout then gives Stripe.
+async function checkoutTrialDays(at: number, { freeUntil = null as number | null, hadSubscription = false } = {}): Promise<{ checkout: number; page: number }> {
   let form: Record<string, string> = {};
   const fetchImpl = async (url: string, init: { method: string; body?: string }) => {
     const u = new URL(url);
@@ -27,12 +28,14 @@ async function checkoutTrialDays(at: number): Promise<number> {
     if (u.pathname === '/v1/checkout/sessions') { form = Object.fromEntries(new URLSearchParams(init.body)); return json(200, { id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1' }); }
     return json(404, { error: { message: 'not faked' } });
   };
-  const team = { id: 'team-1', createdAt: MADE, members: [A], owners: [A] };
+  const team = { id: 'team-1', createdAt: MADE, freeUntil, members: [A], owners: [A] };
+  const objects = memoryObjects();
+  if (hadSubscription) await objects.put('ledger/teams/team-1.json', JSON.stringify({ plan: 'none', seats: 0, stripe: { customer: 'cus_1', subscription: 'sub_old', status: 'canceled', paid: true } }));
   const gw = createGateway({
     agentcore: { async invoke() { return { ok: true }; }, async stop() {} },
     links: { get: async (k: string) => k, put: async (k: string) => k, head: async (k: string) => k },
     removeObject: async () => {},
-    objects: memoryObjects(),
+    objects,
     whoIs: async (t: string) => (t === 'session-a' ? { id: A } : null),
     teams: async (p: string) => (team.members.includes(p) ? team : null),
     stripe: stripeClient({ key: 'sk_test_x', webhookSecret: 'whsec_x', fetchImpl }),
@@ -40,9 +43,10 @@ async function checkoutTrialDays(at: number): Promise<number> {
     plans: PLANS,
   });
   const key = (await gw.handle({ method: 'POST', path: '/v1/devices', headers: { authorization: 'Bearer session-a' }, body: JSON.stringify({ acceptedTerms: TERMS_VERSION }) })).body.key;
+  const me = (await gw.handle({ method: 'GET', path: '/v1/me', headers: { authorization: `Bearer ${key}` }, body: '' })).body;
   await gw.handle({ method: 'POST', path: '/v1/checkout', headers: { authorization: `Bearer ${key}`, host: 'gw.example.on.aws' }, body: JSON.stringify({ plan: 'team' }) });
   const end = form['subscription_data[trial_end]'];
-  return end ? (Number(end) * 1000 - at) / DAY : 0;
+  return { checkout: end ? (Number(end) * 1000 - at) / DAY : 0, page: proFreeDays(true, me, at) };
 }
 
 describe('the free days a team has left', () => {
@@ -60,10 +64,18 @@ describe('the free days a team has left', () => {
   it('are all 7 for a team made today', () => {
     expect(teamFreeDays(ENDS, MADE + 60_000)).toBe(TEAM.trialDays);
   });
-  it('are what the team checkout gives Stripe, at every point in the week', async () => {
-    for (const at of [MADE + 60_000, MADE + 2.5 * DAY, ENDS - 3 * DAY, ENDS - 2 * DAY - 60_000, ENDS - 2 * DAY, ENDS - DAY, ENDS + DAY]) {
-      expect(await checkoutTrialDays(at)).toBe(proFreeDays(true, inTrial(ENDS), at));
-    }
+  // Since 2026-11-21 the week runs from the checkout, once a team (w-61142123a4).
+  it('are what the team checkout gives Stripe, whenever the team was made, with days given by hand or without', async () => {
+    const cases: Array<[number, Parameters<typeof checkoutTrialDays>[1], number]> = [
+      [MADE + 60_000, {}, 7],
+      [ENDS + 30 * DAY, {}, 7],
+      [MADE + DAY, { freeUntil: MADE + 3 * DAY }, 7],
+      [MADE + DAY, { freeUntil: MADE + 11.5 * DAY }, 11],
+      [MADE + DAY, { hadSubscription: true }, 0],
+      [MADE + DAY, { hadSubscription: true, freeUntil: MADE + 4 * DAY }, 3],
+      [MADE + DAY, { hadSubscription: true, freeUntil: MADE + 3 * DAY }, 0],
+    ];
+    for (const [at, opts, days] of cases) expect(await checkoutTrialDays(at, opts)).toEqual({ checkout: days, page: days });
   });
 });
 

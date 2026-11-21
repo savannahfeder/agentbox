@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { emptyDatabase } from './an-empty-test-database.mts';
+import { EVERY_TEAM_PAYS } from './every-team-pays.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrationsDir = path.join(root, 'cloud/supabase/migrations');
@@ -70,6 +71,7 @@ beforeAll(async () => {
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(`insert into public.multiplayer_people (email) values ('*')`);
+  await db.exec(EVERY_TEAM_PAYS);
   await db.exec(GRANTS);
   await signUp(MAYA, 'maya@northwind.test', 'Maya');
   await signUp(THEO, 'theo@northwind.test', 'Theo');

@@ -20,7 +20,8 @@
 // What this holds: a group takes no note; a group's warning is inside its card;
 // the card is 10px round; the account-in-use row is square, inset clear of the
 // card's corners, and wears the app's selection bar; a switch that is on is the
-// accent; buttons, the stepper and the dropdown are the composer's chip.
+// text ink, as everywhere else (the accent is only ever a small dot); buttons,
+// the stepper and the dropdown are the composer's chip.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -84,8 +85,9 @@ describe('the corners', () => {
 });
 
 describe('the controls are the new-task card\'s', () => {
-  it('turns a switch on in the accent', () => {
-    expect(rule('.set-sw.on')).toContain('background: var(--accent);');
+  it('turns a switch on in the text ink, not the accent', () => {
+    expect(rule('.set-sw.on')).toContain('background: var(--text);');
+    expect(rule('.set-sw.on')).not.toContain('--accent');
   });
 
   it('draws a button as the composer\'s chip', () => {

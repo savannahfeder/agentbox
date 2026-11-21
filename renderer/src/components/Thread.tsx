@@ -563,7 +563,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     {headFacts(e, when(e.at))}
                     <MessageKind e={e} />
                     {askAbout && e.who !== 'you' && !helperOf(e) && !voiceOf(e) && e.text && (
-                      <button type="button" className="msg-ask" onClick={() => askAboutStep(e.text ?? '')}>Ask a teammate</button>
+                      <button type="button" className="msg-ask" onClick={() => askAboutStep(e.text ?? '')}>Ask about this</button>
                     )}
                   </div>
                 )}

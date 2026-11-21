@@ -2,13 +2,12 @@
 // and keywords (../palette-rows), so a row is found only by words it contains.
 
 import { cloudCommands, type CloudMode, type CloudStatus } from '../cloud-menu';
-import { chord } from '../this-keyboard';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, View } from '../types';
 import { commandKeys } from '../palette-keys';
 import { keptPick, namesIt, pointerMoved, titleFirst } from '../palette-pick';
 import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
-import { glyphFor } from '../palette-glyphs';
+import { ICONS, iconFor } from '../palette-glyphs';
 import { markedWords } from '../found-inside';
 import { ago } from '../format';
 import { type Look } from '../skins';
@@ -150,17 +149,17 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   const commands: Command[] = useMemo(() => [
     // First, and labelled "project" because that is the word people type. Row
     // one by a product decision (tests/her-word-is-project).
-    { id: 'new-project', label: 'New project…', hint: 'name it, and it is yours', run: onNewProject },
+    { id: 'new-project', label: 'New project…', run: onNewProject },
     // AND THEN THE THREAD, which was not here at all: typing "new" offered New
     // project, Check for updates, Set up again and Open as a new user, and no
     // way to start a thread. "It is the thing I do most" (power-test-1, issue
     // 22).
-    { id: 'new-thread', label: 'New thread', hint: 'ask an agent for something', keywords: 'task compose write message ask start', keyHint: 'N', run: onNewThread },
+    { id: 'new-thread', label: 'New thread', hint: 'ask an agent', keywords: 'task compose write message ask start', keyHint: 'N', run: onNewThread },
     // Actions on the selected item next, so every chord can be searched for.
     ...itemCommands,
     // One Filter row rather than a row per project, which filled the list. It
     // opens the corner's filter menu with the keyboard in it.
-    { id: 'filter', label: 'Filter…', hint: 'Project, priority or agent', run: onOpenFilter },
+    { id: 'filter', label: 'Filter…', hint: 'project, priority or agent', run: onOpenFilter },
     ...(filtering ? [{ id: 'clear-filter', label: 'Clear filter', run: onClearFilter }] : []),
     ...(onEndTutorial ? [{ id: 'end-tutorial', label: 'End the tutorial', keywords: 'skip stop hide tips', run: onEndTutorial }] : []),
     // Per project, only "rank first" is offered. The whole order is set on the
@@ -168,7 +167,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ...(onOpenProjects ? [{
       id: 'projects-page',
       label: 'Projects…',
-      hint: 'which goes first, names and rules',
+      hint: 'order, names and rules',
       keywords: 'priority order rank reorder sort first top priorities rename project settings',
       run: onOpenProjects,
     }] : []),
@@ -182,7 +181,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       id: `rank-${p.slug}`,
       label: `Rank ${p.name} first`,
       hint: order.includes(p.slug) ? `now #${i + 1} of ${projects.length}`
-        : p.personal ? 'made for you, so a thread always has somewhere to go'
+        : p.personal ? 'made for you'
         : 'not ranked yet',
       run: () => onRankFirst(p.slug),
     })),
@@ -205,7 +204,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ...(roomsOn && onGroups ? [{
       id: 'view-groups',
       label: 'Go to Groups',
-      hint: 'the people you work with, and what they are on',
+      hint: 'people you work with',
       keywords: 'rooms room groups group chat channel messages message dm dms direct teammates team people together',
       oldNames: ['rooms'],
       run: onGroups,
@@ -228,16 +227,16 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: `files file documents docs pictures images films videos decks slides pdfs designs shared ${l.title}`, run: l.run,
     })),
     ...(onConnections ? [{
-      id: 'view-connections', label: 'Go to Connections', hint: 'the tools your agents can reach',
+      id: 'view-connections', label: 'Go to Connections', hint: 'tools your agents reach',
       keywords: 'connections connect tools linear integrations sign in apps', run: onConnections,
     }] : []),
     ...(teammates && onTeammates ? [
       { id: 'view-teammates', label: 'Go to Teammates', hint: 'the team chat', keywords: 'teammates team chat agents standing jobs', run: () => onTeammates('team') },
-      { id: 'new-teammate', label: 'New teammate', hint: 'it asks you what to take on', keywords: 'teammate agent hire add make create start describe', run: () => onTeammates('new') },
+      { id: 'new-teammate', label: 'New teammate', hint: 'asks what to do', keywords: 'teammate agent hire add make create start describe', run: () => onTeammates('new') },
       ...teammates.map((t) => ({ id: `teammate-${t.id}`, label: t.name, hint: t.role ?? 'teammate', keywords: `teammate ${t.name} ${t.role ?? ''}`, run: () => onTeammates(t.id) })),
       ...(onPauseTeammate ? teammates.map((t) => ({
         id: `teammate-pause-${t.id}`, label: `${t.paused ? 'Resume' : 'Pause'} ${t.name}`,
-        hint: t.paused ? 'it wakes for its schedule and the team again' : 'it wakes only when you write to it',
+        hint: t.paused ? 'wakes on schedule again' : 'wakes when you write',
         keywords: `teammate pause resume stop hold ${t.name}`, run: () => onPauseTeammate(t.id, !t.paused),
       })) : []),
     ] : []),
@@ -265,7 +264,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ...(updateReady ? [{
       id: 'update',
       label: `Restart to update ${NAME}`,
-      hint: `version ${updateReady} has downloaded · restarting puts you back where you were`,
+      hint: `version ${updateReady} is ready`,
       keywords: 'update upgrade new version restart',
       run: () => onInstallUpdate?.(),
     }] : []),
@@ -275,7 +274,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ...(moveToApplications ? [{
       id: 'update-move',
       label: MOVE_SAY.button,
-      hint: `${NAME} cannot update itself from where it is now`,
+      hint: 'cannot update from here',
       keywords: 'update upgrade move applications folder disk image read-only stuck',
       run: () => onMoveToApplications?.(),
     }] : []),
@@ -284,14 +283,14 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ...(updateReady ? [] : [{
       id: 'update-check',
       label: CHECK_SAY.check,
-      hint: `look now instead of waiting for ${NAME} to look on its own`,
+      hint: 'look for one now',
       keywords: 'update upgrade new version release newest restart',
       run: () => onCheckUpdate?.(),
     }]),
     ...(staleFiles.length ? [{
       id: 'stale',
       label: `Restart ${NAME} to pick up main-process changes`,
-      hint: `${staleFiles.length} file${staleFiles.length === 1 ? '' : 's'} changed since this one started · ${chord('⌘R')} will not pick them up`,
+      hint: `${staleFiles.length} file${staleFiles.length === 1 ? '' : 's'} changed`,
       run: () => {},
     }] : []),
     {
@@ -305,7 +304,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ...(batch ? [] : [{
       id: 'resume-stopped',
       label: 'Resume interrupted agents',
-      hint: 'respawn work stranded by a usage limit or crash',
+      hint: 'after limits or crashes',
       run: onResume,
     }]),
     // Rules every session is briefed with. The label is the same in the
@@ -325,7 +324,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     ...(onUsage ? [{
       id: 'usage',
       label: 'Usage and limits',
-      hint: 'what is left of your week',
+      hint: 'what is left',
       keywords: 'usage limit limits left remaining quota tokens cost spend plan subscription accounts',
       run: onUsage,
     }] : []),
@@ -336,7 +335,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     {
       id: 'settings',
       label: 'Settings…',
-      hint: 'the workspace, and every project',
+      hint: 'workspace and every project',
       keywords: 'settings preferences options usage limits accounts account sign in theme appearance look phone cloud permissions agents rooms groups alpha codex claude',
       run: onSettings,
     },
@@ -366,7 +365,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     {
       id: 'import-agents',
       label: 'Import chats and agents',
-      hint: 'from Claude Code or Codex · recent or by name',
+      hint: 'Claude Code or Codex',
       keywords: 'import agents claude code codex conversations threads sessions subagents existing mine bring across add my recent older chat find search by name title past old',
       run: onImportAgents,
     },
@@ -378,7 +377,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     {
       id: 'tutorial',
       label: 'Take the tutorial',
-      hint: 'a pretend project · nothing is kept',
+      hint: 'nothing is kept',
       keywords: 'tutorial practice practise walkthrough walk tour again show me around teach learn training how does this work sandbox lesson',
       run: onTutorial,
     },
@@ -388,7 +387,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     {
       id: 'first-run',
       label: `Set ${NAME} up again`,
-      hint: 'from the welcome screen · makes a project',
+      hint: 'makes a project',
       keywords: 'onboarding first run new user welcome intro setup start over from scratch install fresh',
       run: onFirstRun,
     },
@@ -406,7 +405,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     {
       id: 'keyhints',
       label: keyHints ? 'Turn off keyboard shortcut hints' : 'Turn on keyboard shortcut hints',
-      hint: 'the keys a row and the tabs offer, drawn when you point at them',
+      hint: 'shown when you point',
+      keywords: 'keys keyboard shortcut hints',
       run: () => onSetKeyHints(!keyHints),
     },
 
@@ -474,6 +474,14 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
     if (matched.length) labels.set(threads.length, 'Commands');
   }
   return { rows: [...threads, ...matched], labels };
+}
+
+function RowIcon({ row }: { row: Command }) {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      {ICONS[iconFor(row)].map((d) => <path key={d} d={d} />)}
+    </svg>
+  );
 }
 
 // The box itself, mounted fresh each time ⌘K opens, so it starts empty and focused.
@@ -582,7 +590,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
                 if (moved && i !== selected) pick(i);
               }}
             >
-              <span className="palette-glyph" aria-hidden="true">{glyphFor(c)}</span>
+              <span className="palette-glyph" aria-hidden="true"><RowIcon row={c} /></span>
               {c.found
                 ? <span className="palette-text">
                   <span className="palette-label">
@@ -600,7 +608,6 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
             </div>
           </Fragment>))}
         </div>
-        {!phone && <div className="palette-foot" aria-hidden="true"><span><b>↑ ↓</b> move</span><span><b>↵</b> select</span></div>}
       </div>
     </div>
   );

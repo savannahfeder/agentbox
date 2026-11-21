@@ -105,8 +105,8 @@ describe('the thread view wears the crumb', () => {
     expect(app).toMatch(/crumbFrom=\{/);
     expect(app).toMatch(/INBOX_TABS\.find/);
   });
-  it('draws the bar thin while the crumb is in it, and in the app\'s mono capitals', () => {
-    expect(css).toMatch(/\.workspace-layout\.workspace-task:has\(\.thread-crumb\) > \.topbar \{[^}]*height: 56px/);
+  it('draws the bar at the Inbox bar\'s height while the crumb is in it, and in the app\'s mono capitals', () => {
+    expect(css).toMatch(/\.workspace-layout\.workspace-task:has\(\.thread-crumb\) > \.topbar \{[^}]*height: 64px/);
     const crumb = css.match(/\.workspace-task-header > \.thread-crumb \{([^}]*)\}/)[1];
     expect(crumb).toMatch(/text-transform: uppercase/);
     expect(crumb).toMatch(/var\(--mono\)/);

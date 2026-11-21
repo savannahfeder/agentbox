@@ -11,6 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { emptyDatabase } from './an-empty-test-database.mts';
+import { EVERY_TEAM_PAYS } from './every-team-pays.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrationsDir = path.join(root, 'cloud/supabase/migrations');
@@ -55,6 +56,7 @@ beforeAll(async () => {
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(`insert into public.multiplayer_people (email) values ('*')`);
+  await db.exec(EVERY_TEAM_PAYS);
   await db.exec(GRANTS);
   for (const [id, email, name] of [[MAYA, 'maya@lumen.test', 'Maya Chen'], [DEV, 'dev@lumen.test', 'Dev Rao'], [JORDAN, 'jordan@lumen.test', 'Jordan Lee'], [STRANGER, 'kai@else.test', 'Kai']]) {
     await db.query('insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ($1, $2, now(), $3)', [id, email, { full_name: name }]);

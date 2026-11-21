@@ -44,9 +44,16 @@ beforeEach(async () => {
   supervisors = [];
 });
 
-afterEach(() => {
+afterEach(async () => {
   for (const sup of supervisors) sup.stop();
-  fs.rmSync(tmp, { recursive: true, force: true });
+  // A git call the supervisor started can still be writing into repo/.git. A
+  // file landing between rmSync's sweep and its rmdir is ENOTEMPTY, and
+  // maxRetries retries only the rmdir, so retry the whole removal.
+  const end = Date.now() + 5000;
+  for (;;) {
+    try { fs.rmSync(tmp, { recursive: true, force: true }); break; } catch { if (Date.now() > end) break; }
+    await new Promise((r) => setTimeout(r, 50));
+  }
 });
 
 const fakeRelay = () => {

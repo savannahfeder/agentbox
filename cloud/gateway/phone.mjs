@@ -167,13 +167,26 @@ export function supabaseRest({ url, serviceKey, fetchImpl = fetch, timeoutMs = D
       await call('POST', 'cloud_plans?on_conflict=person', { body: { person, ...row }, prefer: 'resolution=ignore-duplicates,return=minimal' });
     },
     takeGive: (person, give) => call('PATCH', `cloud_plans?person=eq.${q(person)}&give=eq.${q(give)}`, { body: { give: null } }),
-    // The team someone is on (the app has one a person), when it was made, and who is on it.
+    // WHETHER A TEAM PAYS (team_plans), where the invite and share gates read
+    // it. Forwards only, as writePlan; `free_until` is the owner's and never written here.
+    async writeTeamPlan(team, { pays, status, trialEndsAt, rev, at }) {
+      const row = { pays: !!pays, status: status ?? null, trial_ends_at: trialEndsAt ? iso(trialEndsAt) : null, rev, at: iso(at) };
+      const moved = await call('PATCH', `team_plans?team_id=eq.${q(team)}&rev=lt.${rev}`, { body: row, prefer: 'return=representation' });
+      if (Array.isArray(moved) && moved.length) return;
+      await call('POST', 'team_plans?on_conflict=team_id', { body: { team_id: team, ...row }, prefer: 'resolution=ignore-duplicates,return=minimal' });
+    },
+    // The team someone is on (the app has one a person), when it was made, who is on it, and its free days given by hand.
     async teamOf(person) {
       const mine = await call('GET', `team_members?select=team_id,teams(created_at)&person_id=eq.${q(person)}&order=joined_at.asc&limit=1`);
       const row = mine?.[0];
       if (!row?.team_id) return null;
-      const all = await call('GET', `team_members?select=person_id,role&team_id=eq.${q(row.team_id)}&limit=500`);
-      return { id: row.team_id, createdAt: Date.parse(row.teams?.created_at), members: (all ?? []).map((r) => r.person_id), owners: (all ?? []).filter((r) => r.role === 'owner').map((r) => r.person_id) };
+      const [all, plan] = await Promise.all([
+        call('GET', `team_members?select=person_id,role&team_id=eq.${q(row.team_id)}&limit=500`),
+        // A database without the table gives no free days, and the team is read as before.
+        call('GET', `team_plans?select=free_until&team_id=eq.${q(row.team_id)}&limit=1`).catch(() => null),
+      ]);
+      const freeUntil = Date.parse(plan?.[0]?.free_until ?? '') || null;
+      return { id: row.team_id, createdAt: Date.parse(row.teams?.created_at), freeUntil, members: (all ?? []).map((r) => r.person_id), owners: (all ?? []).filter((r) => r.role === 'owner').map((r) => r.person_id) };
     },
   };
 }
