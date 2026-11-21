@@ -138,17 +138,33 @@ export function sentLine(p: {
   // and it is not scheduled either.
   if (p.held) return `Added to Later in ${p.to} · Z to undo`;
   if (p.limit && !p.when) {
-    const now = p.now ?? Date.now();
-    const at = p.limit.until > now
-      ? new Date(p.limit.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase()
-      : null;
-    const day = at ? resetDay(p.limit.until, now) : null;
+    const at = backAt(p.limit.until, p.now ?? Date.now());
     // Short, because the card holds about thirty characters on this line and
     // the reason is the half that must survive; its title names the task.
-    return `${at ? `${p.limit.tool} is out until ${at}${day ? ` ${day}` : ''}` : `${p.limit.tool} is out of usage`} · Z to undo`;
+    return `${at ? `${p.limit.tool} is out until ${at}` : `${p.limit.tool} is out of usage`} · Z to undo`;
   }
   const where = p.when ? `Scheduled in ${p.to}` : `Started in ${p.to}`;
   return `${p.when ? `${where} · ${p.when}` : where} · Z to undo`;
+}
+
+/** "6:10pm", or "6:10pm Sun" when the reset is not today; null once it has passed or when nobody said. */
+function backAt(until: number, now: number): string | null {
+  if (!(until > now)) return null;
+  const at = new Date(until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
+  const day = resetDay(until, now);
+  return day ? `${at} ${day}` : at;
+}
+
+/**
+ * The same fact before Send, under the words, while the picked agent's account
+ * is out of usage (`supervisor.outOfUsage`). Null when it has room.
+ */
+export function outOfUsageNote(out: { tool: string; until: number } | null | undefined, now = Date.now()): string | null {
+  if (!out) return null;
+  const at = backAt(out.until, now);
+  // A reset that has passed is a reading not yet taken again, not a limit.
+  if (!at && out.until) return null;
+  return at ? `${out.tool} is out of usage until ${at}, so this starts then.` : `${out.tool} is out of usage, so this starts when it resets.`;
 }
 
 /**
