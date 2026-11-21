@@ -61,6 +61,7 @@ import { ideasFor, type Idea } from '../first-run';
 import { readRule, repeatsLine } from '../format';
 import { fitMenu } from '../keep-in-window';
 import { ModelMenu } from './ModelMenu';
+import { OutUntil } from '../components/OutUntil';
 import { dropRank, useFitRow } from './fit-row';
 import { useThreadMentions } from '../components/ThreadMentions';
 import {
@@ -396,9 +397,8 @@ export function ThreadComposer({
   // Recent rows say which agent runs them, where there are two.
   const engineTags = agentChoices(engineRows).length > 0;
   // Said before Send, so nobody files a task expecting an agent that cannot start.
-  const outNote = person || mate ? null : outOfUsageNote(outOfUsage?.[pick.engine]);
-  const other: Harness = pick.engine === 'codex' ? 'claude' : 'codex';
-  const otherHasRoom = engineRows.some((e) => e.id === other) && !outOfUsage?.[other];
+  const outHere = person || mate ? null : outOfUsage?.[pick.engine] ?? null;
+  const outNote = outOfUsageNote(outHere);
   const recent = useMemo(
     () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered }),
     [items, codexModels, codexDefault, codexOffered, claudeOffered],
@@ -1293,8 +1293,9 @@ export function ThreadComposer({
     ...(rows.includes('model') ? [{ label: 'Model', node: (
       <span className="tc-anchor" ref={anchor('model')} data-drop={inline ? dropRank('model') : undefined}>
         <button type="button" data-trigger className={trigger('model')} aria-haspopup="listbox" aria-expanded={open === 'model'}
-          onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
+          title={outNote ?? undefined} onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
           <span className="tc-word-text">{labelOf(pick)}</span>
+          <OutUntil out={outHere} drop={inline ? dropRank('out-when') : undefined} />
         </button>
         {open === 'model' && modelMenu}
       </span>
@@ -1433,11 +1434,6 @@ export function ThreadComposer({
         {!inline && ideaRows}
 
         {refusal && <div className="tc-note">{refusal}</div>}
-        {outNote && !refusal && (
-          <div className="tc-note tc-out-of-usage">
-            {outNote}{otherHasRoom && <> <button type="button" onClick={() => pickModel({ engine: other, model: readLastModel(undefined, other, codexDefault) ?? defaultModelFor(other, codexDefault) })}>Use {engineLabel(other)}</button></>}
-          </div>
-        )}
         {toCode && !person && <div className="tc-note">Going to {toCode.name}, where the code is. <button type="button" onClick={() => setProductSlug(pointedAt!.slug)}>Keep {pointedAt!.name}</button></div>}
         {dropped > 0 && (
           <div className="tc-note">

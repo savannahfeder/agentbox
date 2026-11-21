@@ -37,7 +37,7 @@
    a chip is never sliced by its own border. */
 @container reply (max-width: 460px) {
   .dock-chips { flex-wrap: nowrap; }
-  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word, .dock-chips .tc-chip-level { display: none; }
+  .dock-chips .tc-chip-word, .dock-bar .dock-stop-word, .dock-chips .tc-chip-level, .dock-chips .tc-out-when { display: none; }
   .dock-chips > * { flex: none; }
   .dock-chips > .model-pick { flex: 0 1 auto; min-width: 44px; }
   .dock-chips .model-pick .tc-chip { min-width: 0; max-width: 100%; }

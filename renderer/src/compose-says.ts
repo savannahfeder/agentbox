@@ -167,6 +167,16 @@ export function outOfUsageNote(out: { tool: string; until: number } | null | und
   return at ? `${out.tool} is out of usage until ${at}, so this starts then.` : `${out.tool} is out of usage, so this starts when it resets.`;
 }
 
+/** The model chip's own words for the same fact: "Sun 6:10pm", "6:10pm", or "Out" when nobody said. */
+export function outOfUsageWhen(out: { tool: string; until: number } | null | undefined, now = Date.now()): string | null {
+  if (!out) return null;
+  if (!out.until) return 'Out';
+  if (out.until <= now) return null;
+  const at = new Date(out.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(/\s/g, '').toLowerCase();
+  const day = resetDay(out.until, now);
+  return day ? `${day} ${at}` : at;
+}
+
 /**
  * What the toast says between Send and the computer's answer (w-461fbd8d2d).
  *

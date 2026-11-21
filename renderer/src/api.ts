@@ -125,7 +125,7 @@ const mockFixtures = params.get('fixtures') === 'mock';
 // script already photographs and is the rule it records. The four
 // machines and the whole argument are in ./fixtures, beside the data.
 const engineFixtures = fixtureEngineWorld(params.get('engines'));
-// &codexout: Codex's week spent until Sunday 6:10pm, over ?fixtures=empty.
+// &codexout: Codex's week spent until Sunday 6:10pm, over ?fixtures=empty or the full world.
 function codexOut(snap: Snapshot): Snapshot {
   if (!params.has('codexout')) return snap;
   const sunday = new Date();
@@ -654,7 +654,7 @@ export const api = {
         base.usage = { engine: 'codex', limits, at: now - 6 * 3_600_000 };
         base.usageByEngine = [base.usage];
       }
-      return fixtureSecondEngine(base, engineFixtures);
+      return codexOut(fixtureSecondEngine(base, engineFixtures));
     }
     // A document's holder thread is the app's, so no list of threads draws it.
     const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
