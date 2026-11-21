@@ -459,7 +459,7 @@
 .tc-give { display: inline-flex; height: 28px; position: relative; flex: none; }
 .tc-give > button {
   display: inline-flex; align-items: center; gap: 6px; height: 28px; box-sizing: border-box;
-  border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.03); color: var(--text); cursor: pointer;
+  border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: rgba(255, 255, 255, 0.03); color: var(--text); cursor: pointer;
   font: inherit; font-size: 13.5px; font-weight: 500; padding: 0 12px;
 }
 .tc-give > .tc-give-main { border-radius: var(--tag-radius) 0 0 var(--tag-radius); }
@@ -477,6 +477,8 @@
 .tc-lay-rows .tc-field + .tc-field { border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .tc-lay-rows .tc-field .tc-subject { flex: 1; height: auto; padding: 0; border: 0; font-size: 14px; }
 .tc-lay-rows .tc-field .tc-seg { height: 28px; }
+/* The values are words you click, dotted as on the pop-up. */
+.tc-lay-rows .tc-word-text { text-decoration: underline dotted var(--line-strong); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 :root[data-theme="light"] .tc-lay-rows .tc-head, :root[data-theme="light"] .tc-lay-rows .tc-field + .tc-field { border-color: rgba(30, 22, 36, 0.08); }
 
 /* 5. KIND TABS: Task or Message first, then who it is to in the bar. */

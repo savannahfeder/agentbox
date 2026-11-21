@@ -88,8 +88,8 @@ import { closesOnPress } from '../press';
 
 /** PROPOSAL ROUND (w-83da0ab961): the Home layouts drawn for a pick, read from
  *  localStorage `tc-home-layout`. Unset is today's box; this goes once one is chosen. */
-export type HomeLayout = 'top' | 'quiet' | 'give' | 'rows' | 'tabs' | 'tidy';
-const HOME_LAYOUTS: readonly HomeLayout[] = ['top', 'quiet', 'give', 'rows', 'tabs', 'tidy'];
+export type HomeLayout = 'top' | 'quiet' | 'give' | 'rows' | 'tabs';
+const HOME_LAYOUTS: readonly HomeLayout[] = ['top', 'quiet', 'give', 'rows', 'tabs'];
 function readHomeLayout(): HomeLayout | null {
   try { const v = localStorage.getItem('tc-home-layout'); return HOME_LAYOUTS.includes(v as HomeLayout) ? v as HomeLayout : null; } catch { return null; }
 }
@@ -788,7 +788,8 @@ export function ThreadComposer({
   // A picked suggestion that keeps a schedule sends as that repeating task, while its words are unchanged.
   const [idea, setIdea] = useState<Idea | null>(null);
   const ideaRule = idea?.repeat && text.trim() === idea.text ? (({ short: _s, label: _l, ...rule }) => rule)(idea.repeat) : null;
-  const send = (asTask?: boolean) => (person ? sendMessage(asTask) : sendTask(when ? whenToSend(when) : ideaRule ? { repeat: ideaRule } : {}));
+  const send = () => (person ? sendMessage() : sendTask(when ? whenToSend(when) : ideaRule ? { repeat: ideaRule } : {}));
+  const sendAsTask = () => sendMessage(true);
   const ideaList = useRef<HTMLDivElement>(null);
   const takeIdea = (i: Idea) => {
     setIdea(i);
@@ -910,7 +911,7 @@ export function ThreadComposer({
     agents: toFound.agent,
     mates: matesHere && (toFound.mates.length > 0 || toFound.someoneNew),
     adding,
-  });
+  }).filter((s) => !(lay === 'tabs' && msgTab) || s === 'people'); // the tabs layout's Message tab lists people only
   const firstFound = (): (() => void) | null => {
     if (found[0]) return () => chooseTo(found[0].id);
     if (adding) return null;
@@ -964,13 +965,11 @@ export function ThreadComposer({
         ))}
         {!found.length && !invitedFound.length && sections.length === 1 && <span className="tc-none">Nobody on the team matches that.</span>}
       </Fragment>);
-  // A message goes to people, so the tabs layout's Message tab lists nobody else.
-  const toRows = lay === 'tabs' && msgTab ? sections.filter((s) => s === 'people') : sections;
   const toMenu = (
     <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
-      {toRows.map((s, i) => (
+      {sections.map((s, i) => (
         <Fragment key={s}>
-          {i > 0 && (s === 'mates' || toRows[i - 1] === 'people') && <span className="tc-sep" />}
+          {i > 0 && (s === 'mates' || sections[i - 1] === 'people') && <span className="tc-sep" />}
           {toSection(s)}
         </Fragment>
       ))}
@@ -1272,7 +1271,7 @@ export function ThreadComposer({
   const fields: { label: string; node: ReactNode }[] = [
     ...(toShown ? [{ label: 'To', node: (
       <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person && lay !== 'top' && lay !== 'rows' ? dropRank('to') : undefined}>
-        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'} title={faceOnly ? 'To: Agent' : undefined}
+        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'} title={inline && !mate && !person && !onAuto ? 'To: Agent' : undefined}
           onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
           {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : onAuto ? <AutoFace /> : <AgentFace />}
           {/* On the page's narrow box the agent is its face alone, so the bar keeps room for the level. */}
@@ -1286,7 +1285,8 @@ export function ThreadComposer({
             <button type="button" aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`} onClick={() => setAlso((was) => was.filter((x) => x !== p.id))}>×</button>
           </span>
         ))}
-        {person && others.length > group.length && (
+        {/* A task goes to one person, so the new layouts offer no second one for it. */}
+        {person && others.length > group.length && !(lay && lay !== 'give' && sendAs === 'task' && !extra.length) && (
           <button type="button" className="tc-add" aria-label="Add someone" title="Add someone"
             onClick={() => { setAdding(true); setQuery(''); if (open !== 'to') toggle('to'); }}>+</button>
         )}
@@ -1315,7 +1315,7 @@ export function ThreadComposer({
           {lay && lay !== 'rows' && <CalendarIcon />}
           {/* A day nobody set is drawn in the faint ink a placeholder
               uses: it is an answer, but a quiet one. */}
-          <span className={`tc-word-text tc-chip-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
+          <span className={`tc-chip-text tc-word-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
         </button>
         {open === 'dueOn' && dueOnMenu}
       </span>
@@ -1325,7 +1325,7 @@ export function ThreadComposer({
         <button type="button" data-trigger className={`${trigger('blockedBy')}${blockedBy ? '' : ' tc-at-rest'}`} aria-haspopup="listbox" aria-expanded={open === 'blockedBy'}
           title={lay ? 'Blocked By' : undefined} onClick={() => toggle('blockedBy')} onKeyDown={triggerKeys('blockedBy')}>
           {lay && lay !== 'rows' && <WaitIcon />}
-          <span className={`tc-word-text tc-chip-text${blockedBy ? '' : ' tc-unset'}`}>{blockLabel}</span>
+          <span className={`tc-chip-text tc-word-text${blockedBy ? '' : ' tc-unset'}`}>{blockLabel}</span>
         </button>
         {open === 'blockedBy' && blockedByMenu}
       </span>
@@ -1487,7 +1487,7 @@ export function ThreadComposer({
   );
   const giveButton = (
     <span className="tc-give" ref={anchor('give')}>
-      <button type="button" className="tc-give-main" disabled={!canSend || extra.length > 0} onClick={() => void send(true)}
+      <button type="button" className="tc-give-main" disabled={!canSend || extra.length > 0} onClick={() => void sendAsTask()}
         title={extra.length ? 'A task goes to one person' : `Give ${person ? firstName(person) : 'them'} this as a task`}>
         Send as a task
       </button>
@@ -1690,7 +1690,9 @@ export function ThreadComposer({
         {error && <div className="tc-note tc-error" role="alert">{error}</div>}
         {!talk.on && talk.problem && <div className="tc-note">{talk.problem}</div>}
 
-        {lay ? layoutBar : person ? (
+        {lay && layoutBar}
+        {!lay && <>
+        {person ? (
           <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
             {taskToMany && <span className="tc-why">A task goes to one person.</span>}
@@ -1797,6 +1799,7 @@ export function ThreadComposer({
             </span>
           </div>
         )}
+        </>}
         {inline && ideaRows}
       </div>
   );
