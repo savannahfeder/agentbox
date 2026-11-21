@@ -61,7 +61,7 @@ describe('the box on a phone', () => {
   it('leaves the desktop box as it was', () => {
     expect(desk).not.toContain('palette-on-phone');
     expect(desk).toContain('palette-esc');
-    expect(desk).toContain('palette-foot');
+    expect(desk).not.toContain('palette-foot');
   });
 });
 

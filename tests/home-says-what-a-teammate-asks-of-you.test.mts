@@ -12,7 +12,8 @@ const home = app.slice(app.indexOf('const homeNeeds: NeedsRow[]'), app.indexOf('
 
 describe("Home's card for an ask", () => {
   it('says what is asked after who asks', () => {
-    expect(home).toMatch(/const asks = from && i\.ask && i\.assignee === team\?\.me \? \(i\.ask\.kind === 'help' \? ' asks for help' : ' asks for a review'\) : '';/);
-    expect(home).toMatch(/from: from \? `\$\{from\}\$\{asks\}` : null/);
+    expect(home).toMatch(/const asks = from && i\.ask && i\.assignee === team\?\.me && !ended \? \(i\.ask\.kind === 'help' \? ' asks for help' : ' asks for a review'\) : '';/);
+    // A closed ask says how it ended instead (tests/an-ask-is-sent-once-and-ends-in-words-that-say-how).
+    expect(home).toMatch(/from: ended \?\? \(from \? `\$\{from\}\$\{asks\}` : null\)/);
   });
 });

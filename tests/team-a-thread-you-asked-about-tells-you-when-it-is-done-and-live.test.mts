@@ -79,7 +79,7 @@ describe('where it is wired', () => {
   it('commenting on a thread follows it, and so does the menu row', () => {
     const menu = readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
     expect(thread).toMatch(/following\?\.follow\(card\)/);
-    expect(thread).toMatch(/onFollow=\{following && card\.state !== 'done' \? \(\) => \(followed \? following\.unfollow\(card\) : following\.follow\(card\)\) : null\}/);
+    expect(thread).toMatch(/onFollow=\{following && card\.state !== 'done' && !ask \? \(\) => \(followed \? following\.unfollow\(card\) : following\.follow\(card\)\) : null\}/);
     expect(menu).toContain("label: 'Tell me when it is done'");
   });
   it('the news is a row in Needs you and counts there', () => {

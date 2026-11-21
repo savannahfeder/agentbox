@@ -14,6 +14,7 @@ import { agentOnTask, agentOnTaskWord } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { askWord } from '../../../shared/thread-asks.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
 export function teamHeld(item: WorkItem, team: TeamView | null): boolean {
@@ -37,6 +38,8 @@ export function TeamSaid({ item }: { item: WorkItem }) {
     ? ask ? (closer === item.assignee
       ? `${mine ? 'you' : name} ${item.verdict === 'changes' ? 'asked for changes' : item.verdict === 'yes' ? 'said it looks good' : 'handed this back'}`
       : `${mine ? name : 'you'} took this back`)
+      // A thread handed over and closed by whoever handed it: they took it back.
+      : handedFrom(item.body, taskGiver(item)) && closer === taskGiver(item) ? `${closer === team.me ? 'you' : name} took this back`
       : `${closer === team.me ? 'you' : firstName(team.byId.get(closer ?? '') ?? team.byId.get(other ?? ''))} marked this done`
     : ask ? (mine ? `${name} asked you` : `asked ${name}`)
     : mine ? `${name} gave you this` : `with ${name}`;
@@ -130,7 +133,7 @@ export function teamRouteChoices(item: WorkItem, team: TeamView | null): { route
   if (!team || !teamHeld(item, team) || item.assignee !== team.me) return [];
   // A task someone gave you stays yours and writing back does not return it, so
   // the one choice is who does the work.
-  if (isGivenTask(item, team.products.get(item.product))) return item.status === 'done' ? [] : [{ route: 'agent', label: 'Give it to an agent' }];
+  if (isGivenTask(item, team.products.get(item.product))) return item.status === 'done' ? [] : [{ route: 'agent', label: 'Carry on with an agent' }];
   // A message is talk, not a task (approved 2026-10-01): work comes out of it
   // only by @-mentioning an agent in the reply box, which works in the project
   // its mention names. There is no line under the conversation offering to

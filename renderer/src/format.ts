@@ -88,11 +88,20 @@ const isOptionsHeading = (line: string) => /^#{1,4}\s/.test(line) && /option/i.t
 
 // Agents do not always write the heading (a Codex run ended on a bare list,
 // w-40d7d7cf71). Without it, a numbered list counts as an offer only when it
-// closes the message, runs 1, 2, 3..., and marks one choice recommended, so a
-// list of steps stays prose.
+// closes the message, runs 1, 2, 3..., and either marks one choice recommended
+// or follows a paragraph that asks a question, so a list of steps stays prose.
 const ITEM = /^ {0,3}(\d+)[.)]\s+(.*)$/;
 const LEADING_MARK = /^(?:\*\*|__)?\[?recommended(?:\]|\s*[:\p{Pd}]|\*\*|__)\s*(?:\*\*|__)?\s*[:\p{Pd}]?\s*/iu;
 const TRAILING_MARK = /\s*(?:\p{Pd}\s*)?(?:\*\*|__)?[([]recommended\b[^)\]]*[)\]](?:\*\*|__)?\s*$|\s*\p{Pd}\s*(?:\*\*|__)?recommended(?:\*\*|__)?\s*$/iu;
+
+const QUESTION = /\?(?:\*\*|__|\*|_)?(?=\s|$)/;
+
+function asksRightBefore(lines: string[], start: number): boolean {
+  let i = start - 1;
+  while (i >= 0 && !lines[i].trim()) i--;
+  for (; i >= 0 && lines[i].trim(); i--) if (QUESTION.test(lines[i])) return true;
+  return false;
+}
 
 function headlessOptions(lines: string[]): { start: number; end: number; options: ParsedOption[] } | null {
   let last = -1;
@@ -115,7 +124,8 @@ function headlessOptions(lines: string[]): { start: number; end: number; options
     const words = marked ? `${bare.replace(TRAILING_MARK, '')} (recommended)` : text;
     options.push({ n: Number(m[1]), text: words, recommended: marked });
   }
-  if (options.length < 2 || options.some((o, i) => o.n !== i + 1) || !options.some((o) => o.recommended)) return null;
+  if (options.length < 2 || options.some((o, i) => o.n !== i + 1)) return null;
+  if (!options.some((o) => o.recommended) && !asksRightBefore(lines, start)) return null;
   while (end > start && !lines[end - 1].trim()) end--;
   return { start, end, options };
 }

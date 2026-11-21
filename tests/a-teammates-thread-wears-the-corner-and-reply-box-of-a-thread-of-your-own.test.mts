@@ -75,7 +75,7 @@ describe("a teammate's thread's corner", () => {
     const all = buttons(corner());
     expect(all).toHaveLength(2);
     expect(all[0]).toMatch(/^<button type="button" class="ts-done ts-msgbtn">/);
-    expect(all[0].replace(/<[^>]+>/g, '')).toBe('MaMessage Maya');
+    expect(all[0].replace(/<[^>]+>/g, '')).toBe('MCMessage Maya');
     expect(all[1]).toMatch(/class="ts-more" aria-label="More actions"/);
   });
   it('puts Follow and Continue in the menu in their full words, Follow ticked while it is on', () => {

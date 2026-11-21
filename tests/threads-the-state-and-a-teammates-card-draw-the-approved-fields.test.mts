@@ -72,7 +72,7 @@ describe('a teammate’s card', () => {
   });
   it('offers a square button with their face and the words Message and their first name', () => {
     const html = draw(React.createElement(MessagePerson, { person: maya, onMessage: () => {} }));
-    expect(text(html)).toBe('Ma Message Maya');
+    expect(text(html)).toBe('MC Message Maya');
     expect(html).toContain('ts-msgbtn');
   });
 });

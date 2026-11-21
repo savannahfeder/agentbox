@@ -29,7 +29,7 @@
 
 /* The ×. Hidden until you point at the card, and still reachable by Tab,
    which shows it too. */
-.workspace-navigation .sb-update-close { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0; justify-content: center; color: var(--text-dim); background: none; opacity: 0; transition: opacity 120ms ease; }
+.workspace-navigation .sb-update-close { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; padding: 0; justify-content: center; color: var(--text-dim); background: none; opacity: 0; }
 .workspace-navigation .sb-update-close svg { width: 13px; height: 13px; }
 .sb-update-card:hover .sb-update-close, .sb-update-card:focus-within .sb-update-close { opacity: 1; }
 .workspace-navigation .sb-update-close:hover { color: var(--text); }
@@ -76,6 +76,8 @@
 .th-disp { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text-dim); position: relative; padding: 0; cursor: pointer; }
 .th-disp.open { background: var(--wash-strong); color: var(--text); }
 .th-disp > i { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+/* A worded button's dot gets its own corner rather than touching the word's last letter. */
+.th-cloud.named:has(> i) { padding-right: 20px; }
 .th-pop { position: absolute; top: 40px; right: 0; z-index: 80; width: 470px; padding: 8px 0; display: flex; flex-direction: column; background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: 0 18px 50px rgba(0,0,0,.5); text-align: left; cursor: default; }
 :root[data-theme="light"] .th-pop { background: var(--surface); }
 .th-pop .line { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 10px; padding: 7px 16px; }
@@ -236,7 +238,7 @@
    row. It takes the time's place rather than adding a column, the time comes
    back when the pointer leaves, and a row with nothing to share keeps its
    time. Square, quiet, and the one thing on the row that does not open it. */
-.th-row-act { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity .08s ease; }
+.th-row-act { position: absolute; right: -9px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; opacity: 0; pointer-events: none; }
 .th-table .row:hover .th-row-act, .th-row-act:focus-visible { opacity: 1; pointer-events: auto; }
 .th-table .row:hover .has-act .th-when, .has-act:focus-within .th-when { visibility: hidden; }
 .th-row-act:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
@@ -306,14 +308,14 @@ body[data-dragging], body[data-dragging] * { cursor: grabbing !important; user-s
 .th-card.drag-preview { background: linear-gradient(rgba(255,255,255,.035), rgba(255,255,255,.035)), var(--skin-solid, var(--surface)); border-color: var(--line-strong); }
 /* Nothing that answers a hover comes up while a row is carried or settling:
    not the key plate, not Share. */
-/* Share is faded rather than removed, so when the settle ends it comes back
-   on its own short fade instead of snapping in. */
 body:has([data-sorting]) .hint-plate { display: none !important; }
+/* A tab just clicked (Pages.tsx, quietOnceClicked) shows no hint while the pointer stays on it. */
+body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
 .th-table[data-sorting] .th-row-act { opacity: 0 !important; pointer-events: none !important; }
 .th-table[data-sorting] .row:not([data-lifted]) .has-act .th-when { visibility: visible !important; }
 .th-cell-person { font-size: 13px; line-height: 20px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
 .th-cell-person .tm-av { margin-right: 9px; flex: none; }
-.th-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 32px 24px 12vh; color: var(--text-faint); font-size: 14px; line-height: 21px; }
+.th-empty { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; padding: 32px 24px 12vh; color: var(--text-faint); font-size: 14px; line-height: 21px; text-wrap: balance; }
 .th-empty > span { max-width: 420px; }
 .th-empty > .live-mark { margin-right: 12px; }
 
@@ -368,10 +370,11 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-col-h.movable { cursor: grab; user-select: none; touch-action: none; }
 .th-col-h.movable:hover { color: var(--text); }
 .th-board.dragging, .th-board.dragging * { cursor: grabbing !important; user-select: none; }
-/* The handle: six dots at the heading's right end, out of sight until the
+/* The handle: six dots just after its own label, out of sight until the
    pointer is over the column, faint there, and full only on the heading you
-   would grab. Never drawn mid-drag, when it would only be noise. */
-.th-col-grip { margin-left: auto; flex: none; color: var(--text-faint); opacity: 0; transition: opacity .12s ease; }
+   would grab. Never drawn mid-drag, when it would only be noise. At the
+   heading's far end it sat against the next column's label and read as its. */
+.th-col-grip { margin-left: 10px; flex: none; color: var(--text-faint); opacity: 0; }
 .th-col:hover .th-col-grip { opacity: .7; }
 .th-col-h:hover .th-col-grip { opacity: 1; color: var(--text-dim); }
 .th-board.dragging .th-col-grip { opacity: 0; }
@@ -426,7 +429,6 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-card .m .s:not(:has(~ .th-prio-mark, ~ .p))::after { content: none; }
 .th-card .m .s .th-st, .th-card .m .s .th-st-cloud { margin-right: 7px; }
 .th-card .m .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 8px; margin-left: auto; flex: none; }
-.th-col-empty { font-size: 13px; color: var(--text-faint); padding: 4px 2px; }
 .tm-team-pane.th-pane { height: 100%; overflow: auto; }
 .th-prio-mark { display: inline-flex; margin-right: 8px; }
 .th-pop .opts .th-prio-mark { margin-right: 0; }
@@ -675,4 +677,3 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-mate .tq { border: 0; background: var(--mate-tint); color: #2b2a33; font-weight: 600; }
 /* A box, not a run of text, so the face centres on the title rather than sitting on a baseline. */
 .th-mate { display: inline-flex; }
-

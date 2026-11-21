@@ -45,8 +45,11 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
-import { ChooseList, CopiedSheet, GiveSheet, SeeList, SendSheet, ShareList } from './SharePanel';
-import { sendFirst, type SeenBy } from './share-rules';
+import { ChooseList, CopiedSheet, GiveSheet, PanelBack, SeeList, SendSheet, ShareList } from './SharePanel';
+import type { SeenBy } from './share-rules';
+
+/** ⌘K asking a person: the thread's menu opens its sheet for them. */
+export const ASK_PERSON_EVENT = 'zero:ask-person';
 
 export type ThreadMenuRowId = 'follow' | 'continue' | 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
 
@@ -130,7 +133,8 @@ export function threadMenuRows({ change, terminal, finish, follow = null, carryO
   const rows: ThreadMenuRow[] = [];
   if (follow) rows.push({ id: 'follow', label: 'Tell me when it is done', key: null, on: follow === 'on' });
   if (carryOn) rows.push({ id: 'continue', label: 'Continue it yourself', key: null });
-  if (share) rows.push({ id: 'share', label: 'Share…', key: null });
+  // One door for both: someone looking to hand it off goes to Share first (founder, 2026-11-21).
+  if (share) rows.push({ id: 'share', label: give ? 'Ask, hand over or share…' : 'Share…', key: null });
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
@@ -140,12 +144,13 @@ export function threadMenuRows({ change, terminal, finish, follow = null, carryO
   if (rename) rows.push({ id: 'rename', label: 'Rename', key: null });
   if (move) rows.push({ id: 'move', label: 'Move to another project', key: null });
   if (pin) rows.push({ id: 'pin', label: pin === 'pinned' ? 'Unpin thread' : 'Pin thread', key: null });
-  if (give) rows.push({ id: 'give', label: 'Ask or hand off…', key: null });
+  if (give && !share) rows.push({ id: 'give', label: 'Ask or hand over…', key: null });
   if (wait) rows.push({ id: 'wait', label: wait === 'blocked' ? 'Blocked by…' : 'Waits on…', key: null });
   if (shipped) rows.push({ id: 'shipped', label: shipped === 'marked' ? 'Not shipped after all' : 'Mark as shipped', key: null });
   if (stopRepeat) rows.push({ id: 'stop-repeat', label: 'Stop repeating', key: null });
   if (closeTask) rows.push({ id: 'close-task', label: 'Close task', key: null, detail: 'For both of you' });
-  if (reopen) rows.push({ id: 'reopen', label: 'Reopen', key: null });
+  // Only a handed-on thread has this row; taking it back ends their copy too.
+  if (reopen) rows.push({ id: 'reopen', label: 'Take it back', key: null });
   if (finish) rows.push({ id: 'done', label: 'Mark done', key: 'E' });
   return rows;
 }
@@ -221,6 +226,10 @@ function PeopleMark() {
   return <svg {...mark}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.5 2.7-5.5 6-5.5 1.4 0 2.7.4 3.7 1" /><path d="M18 13v7m-3.5-3.5h7" /></svg>;
 }
 /** An arrow turning back. */
+/** A ring with a check: the task is closed for both people, which Done alone is not. */
+function CloseTaskMark() {
+  return <svg {...mark}><circle cx="12" cy="12" r="9" /><path d="m8 12.3 2.8 2.8L16 9.6" /></svg>;
+}
 function ReopenMark() {
   return <svg {...mark}><path d="M4 10h11a5 5 0 0 1 0 10h-4" /><path d="m8 6-4 4 4 4" /></svg>;
 }
@@ -233,7 +242,7 @@ function ContinueMark() {
   return <svg {...mark}><path d="M6 4.5v7a3.5 3.5 0 0 0 3.5 3.5H19" /><path d="m15 11 4 4-4 4" /></svg>;
 }
 const TICK = <svg className="ts-more-tick" {...mark}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { follow: FollowMark, continue: ContinueMark, reopen: ReopenMark, share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': DoneMark, done: DoneMark };
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { follow: FollowMark, continue: ContinueMark, reopen: ReopenMark, share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': CloseTaskMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -257,7 +266,7 @@ export function ThreadMenuList({ rows, change, onPick }: {
           <button key={row.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => onPick(row.id)}>
             <span className="ico"><Mark /></span>
             <span className="ts-more-label">{row.label}</span>
-            {row.id === 'code' ? change : row.key ? <kbd>{chord(row.key)}</kbd> : row.detail ? <kbd>{row.detail}</kbd> : row.on && TICK}
+            {row.id === 'code' ? change : row.key ? <kbd>{chord(row.key)}</kbd> : row.detail ? <span className="ts-more-detail">{row.detail}</span> : row.on && TICK}
           </button>
         );
       })}
@@ -305,7 +314,7 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
   /** Null stops waiting. */
   onWait?: (id: string | null) => void;
   /** Who it can be handed on to; the row is only there when somebody is. */
-  giveTo?: readonly { id: string; name: string; detail?: string }[];
+  giveTo?: readonly { id: string; name: string; detail?: string; asked?: boolean }[];
   /** `note`: what the giver wants from a person; empty for an AI teammate. */
   onGive?: (to: { id: string; name: string }, note: string) => void;
   /** Help or a review from a person, keeping the thread; `step` is the message picked, if one was. */
@@ -353,27 +362,39 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
   /** True keeps it on this Mac (moving it here if it is in the cloud). */
   onPlace?: (keep: PlaceAct) => void;
 }) {
-  const { done, menu: rows } = splitDone(threadMenuRows({ follow: following === null || !onFollow ? null : following ? 'on' : 'off', carryOn: !!onContinue, change: !!change && !codeButton, share: !!share, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: giveTo.length > 0 && !!onGive && !!onFinish, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
+  const canGive = giveTo.length > 0 && !!onGive && !!onFinish;
+  // With both, the Share button beside Done is the one door, so the menu does not repeat it.
+  const { done, menu: rows } = splitDone(threadMenuRows({ follow: following === null || !onFollow ? null : following ? 'on' : 'off', carryOn: !!onContinue, change: !!change && !codeButton, share: !!share && !canGive, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: canGive && !share, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [givingTo, setGivingTo] = useState<{ id: string; name: string } | null>(null);
+  const [giveStart, setGiveStart] = useState<'help' | 'review' | 'give'>('help');
+  const [givingFromShare, setGivingFromShare] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [leveling, setLeveling] = useState(false);
   const [sharing, setSharing] = useState<null | 'list' | 'send' | 'copied' | 'see' | 'choose'>(null);
   const [sendTo, setSendTo] = useState<string[]>([]);
   const [step, setStep] = useState<string | null>(null);
+  const [shareDirect, setShareDirect] = useState(false);
+  // One note per person, kept until it is sent.
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const asking = (givingFromShare && giveStart !== 'give') || !!step;
+  const listed = giveTo.filter((p) => !(asking && p.id.startsWith('mate:')));
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const close = useCallback((refocus: boolean) => {
     setOpen(false);
     setGiving(false);
     setGivingTo(null);
+    setGiveStart('help');
+    setGivingFromShare(false);
     setStep(null);
     setWaiting(false);
     setAdding(false);
     setLeveling(false);
     setSharing(null);
+    setShareDirect(false);
     if (refocus) button.current?.focus();
   }, []);
 
@@ -395,6 +416,17 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
     window.addEventListener('zero:ask-step', askAbout);
     return () => window.removeEventListener('zero:ask-step', askAbout);
   }, [!!onAsk, giveTo.length]);
+  // ⌘K's Ask Theo for a review or for help (ASK_PERSON_EVENT) opens the same sheet the menu's row does, Theo picked.
+  useEffect(() => {
+    if (!onAsk) return undefined;
+    const askPerson = (e: Event) => {
+      const d = (e as CustomEvent<{ kind: 'help' | 'review' | 'give'; to: { id: string; name: string } }>).detail;
+      if (!d) return;
+      setSharing(null); setStep(null); setGiveStart(d.kind); setGivingFromShare(true); setGiving(true); setGivingTo(d.to); setOpen(true);
+    };
+    window.addEventListener(ASK_PERSON_EVENT, askPerson);
+    return () => window.removeEventListener(ASK_PERSON_EVENT, askPerson);
+  }, [!!onAsk]);
   // ⌘K's Share with chosen people… opens the same list Share → Chosen people does.
   useEffect(() => {
     if (!share) return undefined;
@@ -412,8 +444,14 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
   // window, which reads Enter as "send the picked option".
   useEffect(() => {
     if (!open) return undefined;
-    const away = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) close(false); };
+    // A note half-written in a sheet stays: people click into the thread to re-read the step mid-note.
+    const away = (e: PointerEvent) => {
+      if (wrap.current?.contains(e.target as Node)) return;
+      if ([...(wrap.current?.querySelectorAll('textarea') ?? [])].some((t) => t.value.trim())) return;
+      close(false);
+    };
     const keys = (e: KeyboardEvent) => {
+      // The ask sheet's note is kept for its person, so Escape can close.
       if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(true); return; }
       // A note being written keeps every key: Tab to its button, arrows through its lines, ⌘↵ to send.
       if (document.activeElement?.tagName === 'TEXTAREA' && wrap.current?.contains(document.activeElement)) return;
@@ -431,7 +469,7 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
         return;
       }
       // Typing in the menu's own box is typing.
-      if (document.activeElement?.tagName === 'INPUT' && wrap.current?.contains(document.activeElement)) return;
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && wrap.current?.contains(document.activeElement)) return;
       if ((e.key === 'Enter' || e.key === ' ') && wrap.current?.contains(document.activeElement)) { e.stopImmediatePropagation(); return; }
       if (e.key === 'Tab') close(false);
     };
@@ -445,7 +483,8 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
 
   // The first row takes the focus as the menu opens, so the arrows work at once.
   useEffect(() => {
-    if (open) wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    // Back is not the thing anyone came for, so the first real row takes it.
+    if (open) wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(.sh-back)')?.focus();
   }, [open, giving, waiting, adding, leveling, sharing]);
 
   // Enter, Space or the down arrow on the dots opens the menu. Handled here and
@@ -494,7 +533,10 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
       {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {handedTo && !done && <button type="button" className="ts-done ts-handed" disabled={!handedTo.onOpen} onClick={handedTo.onOpen ?? undefined}><span className="ts-handed-face" aria-hidden="true">{handedTo.initials}</span><span>{handedTo.name}</span></button>}
       {onReopen && !handedTo && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
-      {onCloseTask && <button type="button" className="ts-done ts-close-task" data-hint="close-task" data-hint-align="right" onClick={onCloseTask}><span>Close task</span></button>}
+      {share && canGive && <button type="button" className="ts-done ts-share" aria-haspopup="menu" aria-expanded={open && !!sharing}
+        onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); setShareDirect(true); }}>
+        <PeopleMark /><span>Share</span>
+      </button>}
       {done && (
         <button
           type="button"
@@ -517,7 +559,7 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
         data-hint-align="right"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { if (open) close(false); else setOpen(true); }}
         onKeyDown={openFromKeys}
       >
         <Dots />
@@ -554,31 +596,36 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
         </div>
       )}
       {open && share && sharing === 'list' && (() => {
-        const first = sendFirst(share.people, share.last);
-        return <ShareList link={!!share.link} first={first} others={share.people.length > (first ? 1 : 0)} seen={share.seenWord}
+        return <ShareList link={!!share.link} others={share.people.length > 0} seen={share.seenWord}
           onCopy={copyLink}
-          onSendFirst={() => { close(false); if (first) onSendTo?.([first.id], ''); }}
           onSendOther={() => { setSendTo([]); setSharing('send'); }}
-          onSee={() => setSharing('see')} />;
+          onSee={() => setSharing('see')}
+          onAsk={canGive && onAsk ? (kind) => { setSharing(null); setGiveStart(kind); setGivingFromShare(true); setGiving(true); } : undefined}
+          onHand={canGive ? () => { setSharing(null); setGiveStart('give'); setGivingFromShare(true); setGiving(true); } : undefined}
+          // Opened by the Share button there is no menu behind it to go back to.
+          onBack={shareDirect ? undefined : () => setSharing(null)} />;
       })()}
-      {open && share && sharing === 'send' && <SendSheet people={share.people} start={sendTo} link={!!share.link} onCopy={copyLink}
+      {open && share && sharing === 'send' && <SendSheet people={share.people} start={sendTo} link={!!share.link} onCopy={copyLink} onBack={() => setSharing('list')}
         onSend={(to, note) => { close(false); onSendTo?.(to, note); }} />}
-      {open && share && sharing === 'copied' && share.link && <CopiedSheet link={share.link} people={share.people}
+      {open && share && sharing === 'copied' && share.link && <CopiedSheet link={share.link} people={share.people} onBack={() => setSharing('list')}
         onSend={(id) => { close(false); onSendTo?.([id], ''); }} />}
-      {open && share && sharing === 'see' && <SeeList seen={share.seen} teamName={share.teamName}
+      {open && share && sharing === 'see' && <SeeList seen={share.seen} teamName={share.teamName} onBack={() => setSharing('list')}
         onPick={(to) => { if (to === 'people') { setSharing('choose'); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
-      {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} />}
+      {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} onBack={() => setSharing('see')} />}
       {open && !waiting && !adding && !leveling && !sharing && (giving && givingTo
-        ? <GiveSheet to={givingTo} step={step} onGive={(note) => { close(false); onGive?.(givingTo, note); }}
-          onAsk={onAsk ? (kind, note) => { const s = step; close(false); onAsk(givingTo, kind, note, s); } : undefined} />
+        ? <GiveSheet to={givingTo} step={step} start={giveStart} only={givingFromShare ? giveStart : step ? 'ask' : undefined} onBack={() => setGivingTo(null)} onCancel={() => close(true)}
+          note={notes[givingTo.id] ?? ''} onNote={(n) => setNotes((was) => ({ ...was, [givingTo.id]: n }))}
+          onGive={(note) => { setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onGive?.(givingTo, note); }}
+          onAsk={onAsk ? (kind, note) => { const s = step; setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onAsk(givingTo, kind, note, s); } : undefined} />
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">
-          <p className="ts-menu-say">{(onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
-            + (giveTo.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
-          {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
-            <span className="ico"><GiveMark /></span>
+          <PanelBack label={step ? 'Close' : 'Back'} onBack={() => { if (step) { close(false); return; } setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />
+          <p className="ts-menu-say">{(givingFromShare ? (giveStart === 'give' ? 'Who takes it over?' : giveStart === 'review' ? 'Who should review it?' : 'Who do you want to ask?') : step ? 'Who do you want to ask?' : onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
+            + (listed.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
+          {listed.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" disabled={asking && p.asked} onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
+            <span className="ico">{p.id.startsWith('mate:') ? <GiveMark /> : <Face name={p.name} size={18} />}</span>
             <span className="ts-more-label">{p.name}</span>
-            {p.detail && <kbd>{p.detail}</kbd>}
+            {asking && p.asked ? <span className="ts-more-detail">Already asked</span> : p.detail && <span className="ts-more-detail">{p.detail}</span>}
           </button>)}
         </div>
         : <ThreadMenuList rows={rows} change={change} onPick={pick} />)}

@@ -46,17 +46,18 @@ export function runningAsADemo(env: NodeJS.ProcessEnv | Record<string, string | 
 // makes when it starts agree on who is who.
 const id = (n: string) => `00000000-0000-4000-8000-${n.padStart(12, '0')}`;
 
-export interface DemoPerson { id: string; name: string; email: string; job: string }
+/** `face`: a photo in shared/demo-faces, of nobody: each was made by an image model. */
+export interface DemoPerson { id: string; name: string; email: string; job: string; face: string }
 
 export const DEMO_TEAM = { id: id('f001'), name: 'Ferry' };
 
 /** The person the demo copy is signed in as. */
-export const DEMO_ME: DemoPerson = { id: id('a1'), name: 'Jamie Park', email: 'jamie@ferry.test', job: 'CTO' };
+export const DEMO_ME: DemoPerson = { id: id('a1'), name: 'Jamie Park', email: 'jamie@ferry.test', job: 'CTO', face: 'jamie.jpg' };
 
 export const DEMO_TEAMMATES: DemoPerson[] = [
-  { id: id('b2'), name: 'Priya Raman', email: 'priya@ferry.test', job: 'Design' },
-  { id: id('c3'), name: 'Theo Brandt', email: 'theo@ferry.test', job: 'Sync engine' },
-  { id: id('d4'), name: 'Lena Ortiz', email: 'lena@ferry.test', job: 'Growth' },
+  { id: id('b2'), name: 'Priya Raman', email: 'priya@ferry.test', job: 'Design', face: 'priya.jpg' },
+  { id: id('c3'), name: 'Theo Brandt', email: 'theo@ferry.test', job: 'Sync engine', face: 'theo.jpg' },
+  { id: id('d4'), name: 'Lena Ortiz', email: 'lena@ferry.test', job: 'Growth', face: 'lena.jpg' },
 ];
 const [PRIYA, THEO, LENA] = DEMO_TEAMMATES;
 
@@ -333,6 +334,36 @@ export function demoMessages(now: number = Date.now()): DemoMessage[] {
   ];
 }
 
+/* ------------------------- the chat with each teammate ------------------------- */
+
+// A teammate's page opens on your chat with them (a group of the two of you),
+// which was empty. One short exchange each, answered by you.
+export interface DemoChat { with: DemoPerson; said: { by: 'them' | 'me'; hoursAgo: number; text: string }[] }
+
+export const DEMO_CHATS: DemoChat[] = [
+  {
+    with: THEO,
+    said: [
+      { by: 'them', hoursAgo: 26, text: 'I start rewriting the sync engine tomorrow. Anything big that touches it, send my way first.' },
+      { by: 'me', hoursAgo: 25.6, text: 'Will do. The OneDrive work will hit it, so that one comes to you.' },
+    ],
+  },
+  {
+    with: LENA,
+    said: [
+      { by: 'them', hoursAgo: 22, text: 'The comparison page is live and linked from pricing.' },
+      { by: 'me', hoursAgo: 21.7, text: 'Read it. Clear, and fair to both of them.' },
+    ],
+  },
+  {
+    with: PRIYA,
+    said: [
+      { by: 'them', hoursAgo: 18, text: 'The pricing page works in dark mode now. Checked on a phone and a laptop.' },
+      { by: 'me', hoursAgo: 17.8, text: 'Looks great, thank you.' },
+    ],
+  },
+];
+
 /* ------------------------------ the team's group ------------------------------ */
 
 // What the team said in its group this morning, oldest first, beside the Team
@@ -381,14 +412,18 @@ export function demoCards(now: number = Date.now()): DemoCard[] {
   return [
     { by: THEO, threadId: 'w-c3a1e09d42', project: 'Ferry', title: 'Sync engine rewrite for large moves', state: 'running', updatedAt: now - 12 * MIN, progress: 'Batches of 5,000 files instead of one queue\n60,000 file test finished in 41 minutes\nShared drives next' },
     { by: THEO, threadId: 'w-c3b27f8e15', project: 'Ferry', title: 'Retries on a slow connection', state: 'done', updatedAt: done - 19 * HR, shippedAt: done - 19 * HR, progress: 'Retries three times, then says which file' },
-    { by: THEO, threadId: 'w-c3c84a1f06', project: 'Ferry', title: 'Permissions on shared drives', state: 'done', updatedAt: done - 15 * HR, progress: 'Owners, editors and viewers carry across' },
+    { by: THEO, threadId: 'w-c3c84a1f06', project: 'Ferry', title: 'Permissions on shared drives', state: 'done', updatedAt: done - 15 * HR, shippedAt: done - 15 * HR, progress: 'Owners, editors and viewers carry across' },
+    { by: THEO, threadId: 'w-c3d51b7e29', project: 'Ferry', title: 'Faster listing of a Dropbox', state: 'done', updatedAt: done - 8 * HR, shippedAt: done - 8 * HR, progress: 'A 100,000 file Dropbox lists in 40 seconds, not 6 minutes' },
     { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Ferry', title: 'Sign-up screens', state: 'done', updatedAt: done - 40 * MIN, progress: 'Drawn in light and dark\nWords sent to Jamie for a yes' },
     { by: PRIYA, threadId: 'w-b2d91e6c50', project: 'Ferry', title: 'Empty states for the move list', state: 'running', updatedAt: now - 25 * MIN, progress: 'Four states drawn, two to go' },
     { by: PRIYA, threadId: 'w-b2e3f7a915', project: 'Website', title: 'Pricing page in dark mode', state: 'done', updatedAt: done - 17 * HR, shippedAt: done - 17 * HR, progress: 'Checked on a phone and a laptop' },
+    { by: PRIYA, threadId: 'w-b2f60c4d18', project: 'Ferry', title: 'Error messages in plain words', state: 'done', updatedAt: done - 11 * HR, shippedAt: done - 11 * HR, progress: 'All 23 rewritten, each says what to do next' },
+    { by: PRIYA, threadId: 'w-b2a78e3f51', project: 'Ferry', title: 'A progress bar for every move', state: 'done', updatedAt: done - 4 * HR, shippedAt: done - 4 * HR, progress: 'Shows files moved and time left' },
     { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email for the trial users', state: 'done', updatedAt: done - 1.3 * HR, progress: 'For all 4,000 trial users\nSent to Jamie to read' },
     { by: LENA, threadId: 'w-d4b37e0c84', project: 'Website', title: 'Welcome emails for new teams', state: 'running', updatedAt: now - 6 * MIN, progress: 'Three of the five emails written' },
     { by: LENA, threadId: 'w-d4f05c1b98', project: 'Website', title: 'Comparison page', state: 'done', updatedAt: done - 21 * HR, shippedAt: done - 21 * HR, progress: 'Live, linked from pricing' },
-    { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'A note to trial teams that never started a move', state: 'done', updatedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
+    { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'A note to trial teams that never started a move', state: 'done', updatedAt: done - 3 * HR, shippedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
+    { by: LENA, threadId: 'w-d4c19a6b02', project: 'Website', title: 'Story of the first team to move', state: 'done', updatedAt: done - 7 * HR, shippedAt: done - 7 * HR, progress: '14 people, 18,000 files, done by lunch' },
   ];
 }
 

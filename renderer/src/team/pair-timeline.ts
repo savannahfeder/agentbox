@@ -22,6 +22,7 @@ export interface PairTask {
   /** Help or a review asked on a thread (shared/thread-asks.mts), and what came back. */
   ask?: { kind?: string } | null;
   verdict?: string | null;
+  status?: string;
   wrote?: Readonly<Record<string, { ts: number; by?: string } | undefined>>;
 }
 
@@ -91,6 +92,11 @@ export function pairTimeline({ me, other, rooms, messages, directItems, talk, ti
     if (back?.by && pair.has(back.by)) {
       const word = t.verdict === 'yes' ? 'Said it looks good' : t.verdict === 'changes' ? 'Asked for changes' : 'Handed it back';
       out.push({ key: `back:${t.id}`, at: back.ts ?? 0, kind: 'back', by: back.by, to: otherOf(back.by), text: word, where: { label: title, open } });
+    }
+    // Closed with no answer by whoever sent it: they took it back.
+    const close = t.status === 'done' && !t.verdict ? t.wrote?.status : null;
+    if ((asked || handoff) && close?.by === giver) {
+      out.push({ key: `took:${t.id}`, at: close.ts ?? 0, kind: 'back', by: giver, to: otherOf(giver), text: 'Took it back', where: { label: title, open } });
     }
     const brief = said(t.body ?? '');
     let briefSeen = false;
