@@ -260,6 +260,13 @@ export class MemoryGate {
     r.peakMb = Math.max(r.peakMb ?? 0, mb);
   }
 
+  /** The peak so far was not this command's alone: start again from `mb`. */
+  restartPeak(id: unknown, mb: number) {
+    const r = this.running.get(String(id));
+    if (!r || !Number.isFinite(mb)) return;
+    r.peakMb = mb;
+  }
+
   /**
    * This running command's memory reading is shared with others on the same
    * agent process (`group`), so it is not its own figure. Nothing clears it.

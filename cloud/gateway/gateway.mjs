@@ -829,9 +829,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       // Paid before Stripe's webhook has landed.
       if (last?.status === 'complete' && last.customer) return toBilling(last.customer);
     }
-    const freeDays = teamDaysFree(team, bill, now());
-    const trialEnd = freeDays ? now() + freeDays * DAY_MS : null;
-    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${WEB_APP}/paid?plan=team`, cancelUrl: `${WEB_APP}/paid?cancelled=1` });
+    const trialDays = teamDaysFree(team, bill, now()) || null;
+    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialDays, successUrl: `${WEB_APP}/paid?plan=team`, cancelUrl: `${WEB_APP}/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
     return { url: made.url, where: 'checkout' };
   }
@@ -872,8 +871,8 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const was = await settle(rec.checkout, rec.checkout?.plan === plan);
     if (was) return was;
     // The free week is for someone who never had a subscription.
-    const trialEnd = rec.stripe?.subscription ? null : now() + PLAN_TRIAL.days * DAY_MS;
-    const made = await stripe.checkout({ person, plan, customer: rec.stripe?.customer, trialEnd, successUrl: `${WEB_APP}/paid?plan=${plan}`, cancelUrl: `${WEB_APP}/paid?cancelled=1` });
+    const trialDays = rec.stripe?.subscription ? null : PLAN_TRIAL.days;
+    const made = await stripe.checkout({ person, plan, customer: rec.stripe?.customer, trialDays, successUrl: `${WEB_APP}/paid?plan=${plan}`, cancelUrl: `${WEB_APP}/paid?cancelled=1` });
     // Another press may have opened one while this one was being made.
     let raced = null;
     await update(person, (r) => {
