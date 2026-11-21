@@ -9,7 +9,7 @@
 // Both remember what they did in a file beside the team state, so a restart
 // neither says it twice nor drops it.
 import fs from 'node:fs';
-import { askIGave, handedBackAsks, handedBackWords, helpAskOpen } from '../../shared/thread-asks.mts';
+import { askIGave, handedBackAsks, handedBackWords, helpAskCovering } from '../../shared/thread-asks.mts';
 import type { Verdict } from '../../shared/work-items.mts';
 import type { PhoneItem } from '../phone-inbox.mts';
 import type { ThreadComment } from './thread-share.mts';
@@ -56,7 +56,7 @@ export function createAsks({ file, me, products, readRows, nameOf, tell, putAway
       if (k.relayed.includes(c.id)) return true;
       if (!tell) return false;
       const rows = taskRows().map((t) => t.row);
-      if (!helpAskOpen(rows as never[], me(), c.threadId, c.by)) return false;
+      if (!helpAskCovering(rows as never[], me(), c.threadId, c.by, c.at)) return false;
       k.relayed.push(c.id);
       save();
       void Promise.resolve(tell(thread.product.slug, c.threadId, { text: c.text, from: { teammate: c.by, name: nameOf(c.by) } }))

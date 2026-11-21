@@ -27,7 +27,7 @@ interface AskRow {
   verdict?: Verdict | null;
   answer?: string | null;
   product?: string;
-  wrote?: { ask?: { by?: string; ts?: number } | null; status?: { by?: string; ts?: number } | null } | null;
+  wrote?: { ask?: { by?: string; ts?: number } | null; status?: { by?: string; ts?: number } | null; verdict?: { ts?: number } | null } | null;
 }
 
 export function askOf(row: AskRow | null | undefined): Ask | null {
@@ -54,6 +54,24 @@ export function helpAskOpen(rows: readonly AskRow[], me: string | null, thread: 
   return rows.find((r) => {
     const a = askIGave(r, me);
     return !!a && a.kind === 'help' && a.thread === thread && r.assignee === helper && isOpen(r);
+  }) ?? null;
+}
+
+/**
+ * The help ask that covers words this helper wrote at `at`: asked before them
+ * and not handed back until after. Judged by when the words were written, not
+ * when this computer read them, so a late sync neither drops them nor sends
+ * older remarks to the agent.
+ */
+export function helpAskCovering(rows: readonly AskRow[], me: string | null, thread: string, helper: string, at: number): AskRow | null {
+  return rows.find((r) => {
+    const a = askIGave(r, me);
+    if (!a || a.kind !== 'help' || a.thread !== thread || r.assignee !== helper) return false;
+    const opened = r.wrote?.ask?.ts ?? r.createdAt ?? 0;
+    if (at < opened) return false;
+    if (isOpen(r)) return true;
+    const closed = r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? r.updatedAt ?? 0;
+    return at <= closed;
   }) ?? null;
 }
 
