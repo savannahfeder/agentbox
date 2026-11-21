@@ -443,10 +443,10 @@ export function emptyTabWords(view: View | string, starting = false, waiting = 0
     return `Nothing is running. ${waiting === 1 ? 'One thread waits' : `${waiting} threads wait`} in Needs you.`;
   }
   // A finished thread waits in Needs you until its owner closes it, which a
-  // persona read as the app losing it.
+  // persona read as the app losing it. One short line, like In progress's.
   return {
-    snoozed: 'Nothing is waiting for later. "Add it to Later" on a new thread writes one down without starting it.',
-    done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
+    snoozed: 'Nothing is waiting for later.',
+    done: 'Nothing done yet. Finished threads wait in Needs you.',
   }[view as string] ?? 'Nothing here.';
 }
 
@@ -1011,15 +1011,13 @@ export function handedTo(item: { status?: string; answer?: string | null }): str
   return handedOn(item) ? String(item.answer).split('\n')[0].slice('Given to '.length).replace(/\.$/, '') : null;
 }
 
-export function handedInitials(name: string): string {
-  const words = name.split(/\s+/).filter(Boolean);
-  return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)).toUpperCase();
-}
+export { initialsOf as handedInitials } from '../team/rooms/room-rules';
 
 /** The task a thread became when it was handed on: its link leads back here, from the one who gave it. */
 export function taskHandedFrom<T extends TeamRow & { id: string; body?: string | null }>(items: readonly T[], threadId: string, me: string | null = null): T | null {
   return items.find((t) => {
-    if (!isTaskRow(t)) return false;
+    // An ask links back to the thread too, and is not a hand-over.
+    if (!isTaskRow(t) || (t as { ask?: unknown }).ask) return false;
     const giver = taskGiver(t);
     return (!me || giver === me) && handedFrom(t.body, giver)?.id === threadId;
   }) ?? null;

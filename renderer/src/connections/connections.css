@@ -1,5 +1,5 @@
-/* 44px is where the page title's text starts. */
-.cn-page { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 44px 48px; }
+/* 44px is where the page title's text starts; 28px is where the header's buttons end. */
+.cn-page { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 28px 48px 44px; }
 .cn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .cn-head { display: flex; align-items: center; gap: 8px; }
 .cn-head .cn-find { width: 200px; }
@@ -46,6 +46,8 @@
   text-align: left; font: inherit; color: inherit; cursor: default;
 }
 .cn-tile:hover, .cn-tile:focus-visible { box-shadow: var(--shadow-card); outline: none; }
+.cn-tile-off { opacity: .5; box-shadow: none; }
+.cn-tile-off:hover, .cn-tile-off:focus-visible { opacity: .7; box-shadow: none; }
 :root[data-theme="dark"] .cn-tile,
 :root[data-skin]:where(:not([data-theme="light"])) .cn-tile { background: var(--bg-raised); border-color: var(--line); }
 
@@ -69,7 +71,7 @@
 .cn-tile-go {
   position: absolute; right: 16px; top: 50%; transform: translateY(-50%); height: 28px; padding: 0 11px; display: flex; align-items: center;
   background: inherit; border: 1px solid var(--line-strong); border-radius: var(--radius);
-  font-size: 12.5px; color: var(--text); opacity: 0; transition: opacity .12s ease; pointer-events: none;
+  font-size: 12.5px; color: var(--text); opacity: 0; pointer-events: none;
 }
 .cn-tile:hover .cn-tile-go, .cn-tile:focus-visible .cn-tile-go { opacity: 1; }
 

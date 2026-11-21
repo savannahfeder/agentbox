@@ -36,8 +36,7 @@ const hintOf = (html, label) => (rows(html).find(([l]) => l === label) ?? [])[1]
 
 describe('the row for the project nobody made', () => {
   it('says what it is for while it has no place in the order', () => {
-    expect(hintOf(palette({}), 'Rank My Workspace first'))
-      .toBe('made for you, so a thread always has somewhere to go');
+    expect(hintOf(palette({}), 'Rank My Workspace first')).toBe('made for you');
   });
 
   // The case that must NOT match: a project they made themselves says nothing
