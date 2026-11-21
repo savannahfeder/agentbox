@@ -14,10 +14,11 @@ import { SAYS_UNDO } from '../toast-parts';
 import type { LedgerLine } from '../thread-history';
 import type { DragEvent } from 'react';
 import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
-import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
+import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, inOrderOf, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
 import './files-place.css';
 
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
+const HOLD_STILL_MS = 1500;
 const NO_FOLDERS: FileFolder[] = [];
 
 const readers = new Set<() => void>();
@@ -516,7 +517,21 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const found = looking ? filesShown(below, { query, kind, folders }).filter((f) => !review || needsReview(f)) : here;
   // A search finds a check picture like any file; otherwise they wait under one line.
   const { files: unsorted, scratch } = query ? { files: found, scratch: [] } : apartScratch(found);
-  const shown = sortFiles(unsorted, sort);
+  // A file arriving while the pointer is on its way to a tile moved that tile, and the
+  // click opened another file. The order holds until the pointer has been still a moment.
+  const movedAt = useRef(0);
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, setSettled] = useState(0);
+  const held = useRef<{ tiles: string[]; projects: string[] }>({ tiles: [], projects: [] });
+  useEffect(() => () => { if (settle.current) clearTimeout(settle.current); }, []);
+  const holding = Date.now() - movedAt.current < HOLD_STILL_MS;
+  const pointerMoved = () => {
+    movedAt.current = Date.now();
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(() => setSettled((n) => n + 1), HOLD_STILL_MS);
+  };
+  const sorted = sortFiles(unsorted, sort);
+  const shown = holding ? inOrderOf(sorted, held.current.tiles, (f) => f.key) : sorted;
   const [scratchOpen, setScratchOpen] = useState(false);
   const [drawn, setDrawn] = useState(TILES_AT_ONCE);
   useEffect(() => { setDrawn(TILES_AT_ONCE); }, [project, folder, query, kind, review, sort]);
@@ -538,7 +553,8 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const countIn = (id: string) => filesBelow(all.files, folders, { project, folder: id }).length;
   const crumbs = crumbsTo(folders, place);
   const cards = looking ? [] : foldersInPlace(folders, place);
-  const projectCards = looking || project ? [] : all.projects;
+  const projectCards = looking || project ? [] : holding ? inOrderOf(all.projects, held.current.projects, (p) => p) : all.projects;
+  held.current = { tiles: shown.map((f) => f.key), projects: projectCards };
   // Folders go one level deep.
   const canNest = !folders.find((f) => f.id === folder)?.parent;
   const choose = (f: PlacedFile) => setChosen((was) => {
@@ -625,14 +641,14 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
         </div>
       </div>
     </div>}
-    {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders">
+    {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders" onPointerMove={pointerMoved}>
       {projectCards.map((p) => <FolderCard key={p} folder={{ name: p }} count={filesBelow(all.files, folders, { project: p, folder: null }).length} onOpen={() => onProject(p)} />)}
       {cards.map((f) => <FolderCard key={f.id} folder={f} count={countIn(f.id)} onOpen={() => setFolderId(f.id)}
         onDropFile={(key) => move(key, f.id)} onRename={(name) => { void act({ do: 'rename', id: f.id, name }); }} />)}
       {naming?.what === 'folder' && project && <div className="fp-folder is-new"><div className="fp-folder-open"><FolderGlyph /><span className="fp-folder-words"><NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /></span></div></div>}
     </div>}
     {list && !shown.length && !scratch.length && !cards.length && !projectCards.length && !naming && <p className="fp-empty">{empty}</p>}
-    <div className={asList ? 'fp-lines' : 'fp-grid'}>
+    <div className={asList ? 'fp-lines' : 'fp-grid'} onPointerMove={pointerMoved}>
       {draw.shown.map(tile)}
     </div>
     {scratch.length > 0 && draw.shown.length === shown.length && <div className="fp-scratch-row">

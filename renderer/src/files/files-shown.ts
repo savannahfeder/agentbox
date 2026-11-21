@@ -177,3 +177,10 @@ export function drawnOf<T>(shown: T[], scratch: T[], drawn: number): { shown: T[
 }
 
 export const moreTiles = (drawn: number, total: number) => (drawn >= total ? drawn : Math.min(drawn + TILES_AT_ONCE, total));
+
+/** `items` in the order `before` had them, anything new after the rest in its own order. */
+export function inOrderOf<T>(items: T[], before: readonly string[], keyOf: (t: T) => string): T[] {
+  const at = new Map(before.map((k, i) => [k, i]));
+  const rank = (t: T) => at.get(keyOf(t)) ?? before.length;
+  return [...items].sort((a, b) => rank(a) - rank(b));
+}
