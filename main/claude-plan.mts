@@ -157,7 +157,13 @@ function readPlanNow(at: string): ClaudePlan {
   if (account.billingType === 'none') {
     return { known: true, ended: true, max: false, label: 'Subscription ended', tier, from, file: at };
   }
-  return { known: true, ended: false, max: isMaxTier(tier), label: planLabel(tier), tier, from, file: at };
+  return { known: true, ended: false, max: isMaxTier(tier), label: shownName(account.planDisplayName) ?? planLabel(tier), tier, from, file: at };
+}
+
+// Claude Code's own name for the plan, which it shows as `Claude ${name}`; it
+// keeps up with a rename ("Ultra") that the tier string does not.
+function shownName(name: unknown): string | null {
+  return typeof name === 'string' && /^[\p{L}\p{N}][\p{L}\p{N} +-]{0,39}$/u.test(name.trim()) ? name.trim() : null;
 }
 
 /**

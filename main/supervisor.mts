@@ -187,6 +187,9 @@ import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-pri
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
 import { NAME, Name, envName, nameSlug, isOurSlug } from '../shared/product-name.mjs';
 import { signInFiles, signInStamp, claudeKeychainService, KeychainStamps } from './sign-in-files.mts';
+import { askEngine } from './ask-the-engine.mts';
+import type { EngineAnswer } from './ask-the-engine.mts';
+import { takeAccountRecheck } from './account-recheck.mts';
 import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
@@ -550,6 +553,8 @@ export interface ProfileTrouble {
   stamp?: number;
   resetsAt?: number;
   plan?: string;
+  /** The engine's first answer about a signed-out login, which a sign-in changes. */
+  engineSaid?: string;
 }
 
 /** Fresh-work runs that ended with the row where it started, and what was said about them. */
@@ -1046,6 +1051,9 @@ const BACKOFF_CAP_MS = 30 * 60_000;
 // fallback for a login that lands somewhere it cannot see. A try on a login
 // that is still out costs a two-second run and is charged to nobody.
 const SIGNED_OUT_REST_MS = 5 * 60_000;
+// How often a login held as signed out is asked about with its engine's status
+// command. Each ask starts the engine's program, a few hundred MB for a second.
+const LOGIN_ASK_EVERY_MS = 2 * 60_000;
 // HOW LONG A LOGIN THAT IS OUT OF USAGE SITS OUT WHEN THE LIMIT PRINTED NO
 // RESET HOUR. One that printed one is waited out to it exactly, below. Five
 // minutes for the same reason as a signed-out login: a try that is still
@@ -1370,6 +1378,8 @@ export class Supervisor {
   declare _profileTrouble: Record<string, ProfileTrouble>;
   declare _profileCooldown: Record<string, number>;
   declare _keychainStamps: KeychainStamps | undefined;
+  declare _loginAsks: Record<string, { at: number; busy: boolean }> | undefined;
+  _askEngine: (engine: string, options: { bin: string; folder?: string | null }) => Promise<EngineAnswer> = askEngine;
   declare _profileStrikes: Record<string, number> | undefined;
   declare _movedWhy: Record<string, MovedWhy>;
   declare _accountChosenAt: number | undefined;
@@ -2074,16 +2084,97 @@ export class Supervisor {
       trouble.stamp = stamp;
       if (this._profileCooldown) this._profileCooldown[key] = 0;
       if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
-      // A thread held for dying on this login gets its next try now. Only one
-      // with a try left, so a sign-in never adds to the 30m/2h/8h ladder.
-      const now = Date.now();
-      for (const held of Object.values(this._heldStarts ?? {})) {
-        if (held?.account === key && !held.trying && held.next != null && held.next > now) held.next = now;
-      }
+      this._giveHeldThreadsATry((held) => held.account === key);
       lifted = true;
     }
     if (lifted) this._saveState();
     return lifted;
+  }
+
+  /**
+   * A signed-out mark goes when the engine's own status command says the login
+   * changed and is signed in. The first answer after the mark is kept as the
+   * baseline, so an answer that never moves (signed in by its own account while
+   * its runs are refused) buys no tries; one change buys one.
+   */
+  _askAboutSignedOutLogins(now = Date.now()): Promise<unknown> {
+    const asks: Promise<unknown>[] = [];
+    for (const [key, trouble] of Object.entries(this._profileTrouble ?? {})) {
+      if (trouble?.cause !== 'signed-out') continue;
+      const login = this._loginToAsk(key);
+      if (!login) continue;
+      const last = (this._loginAsks ??= {})[key];
+      if (last && (last.busy || now - last.at < LOGIN_ASK_EVERY_MS)) continue;
+      const ask = { at: now, busy: true };
+      this._loginAsks[key] = ask;
+      asks.push(this._askEngine(login.engine, { bin: login.bin, folder: login.folder })
+        .then((answer) => this._heardFromLogin(key, answer))
+        .catch((e) => console.warn('zero: could not ask about a signed-out login:', (e as Error).message))
+        .finally(() => { ask.busy = false; }));
+    }
+    return Promise.all(asks);
+  }
+
+  _loginToAsk(key: string): { engine: string; bin: string; folder: string | null } | null {
+    if (key.startsWith('codex:')) {
+      const bin = this.config.codexBin;
+      return bin ? { engine: 'codex', bin, folder: this._codexProfileHome(key.slice('codex:'.length)) } : null;
+    }
+    if (key.includes(':')) return null;
+    const bin = this.config.claudeBin;
+    return bin ? { engine: 'claude', bin, folder: key === 'default' ? null : key } : null;
+  }
+
+  _heardFromLogin(key: string, answer: EngineAnswer) {
+    const trouble = this._profileTrouble?.[key];
+    if (trouble?.cause !== 'signed-out' || !answer?.print) return false;
+    if (!trouble.engineSaid) {
+      trouble.engineSaid = answer.print;
+      this._saveState();
+      return false;
+    }
+    if (answer.signedIn !== true || answer.print === trouble.engineSaid) return false;
+    this._clearProfileTrouble(key);
+    if (!key.startsWith('codex:')) this._spawnCooldownUntil = 0;
+    this._giveHeldThreadsATry((held) => held.account === key);
+    this._saveState();
+    this.onChange?.();
+    this.wake?.();
+    return true;
+  }
+
+  // Only a thread with a try left, so this never adds to the 30m/2h/8h ladder.
+  _giveHeldThreadsATry(which: (held: HeldStart) => boolean = () => true) {
+    const now = Date.now();
+    for (const held of Object.values(this._heldStarts ?? {})) {
+      if (held && which(held) && !held.trying && held.next != null && held.next > now) held.next = now;
+    }
+  }
+
+  /**
+   * `npm run accounts -- --reset` leaves a request in the store; the next tick
+   * forgets everything held against this computer's logins, and the next run on
+   * each is the proof. It works the same whether or not the app was running.
+   */
+  _takeAccountRecheck() {
+    if (!takeAccountRecheck(this.config.storeRoot)) return false;
+    for (const key of Object.keys(this._profileTrouble ?? {})) {
+      if (!key.startsWith('cloud:')) this._clearProfileTrouble(key);
+    }
+    for (const key of Object.keys(this._profileCooldown ?? {})) {
+      if (!key.startsWith('cloud:')) this._profileCooldown[key] = 0;
+    }
+    this._loginAsks = {};
+    this._profilesKept = undefined;
+    this._fastExits = 0;
+    this._spawnCooldownUntil = 0;
+    this._fleetTroubleSince = 0;
+    this._lastFastExit = null;
+    this._giveHeldThreadsATry();
+    this._saveState();
+    this.onChange?.();
+    this.wake?.();
+    return true;
   }
 
   /**
@@ -6206,6 +6297,7 @@ export class Supervisor {
       const stamp = this._signInMoment(profile);
       if (stamp != null) this._profileTrouble[profile].stamp = Math.max(stamp, had?.stamp ?? 0);
       else if (had?.stamp != null) this._profileTrouble[profile].stamp = had.stamp;
+      if (had?.cause === 'signed-out' && had.engineSaid) this._profileTrouble[profile].engineSaid = had.engineSaid;
     }
     // When the limit says it resets, so `_forgetResetLimits` can let it go then.
     if (cause === 'at-limit') {
@@ -9380,12 +9472,15 @@ export class Supervisor {
 
   async _tick() {
     this._listenForSignInReturns();
+    // Ahead of the pause, so the reset works on an app that is holding everything.
+    try { this._takeAccountRecheck(); } catch (e) { console.warn('zero: could not recheck the accounts:', (e as Error).message); }
     if (this.paused) { this._noteWaitingRows('paused'); return; }
     this._refreshMemoryReading();
     if (this.firstRunHolding()) { this._noteWaitingRows('setup'); return; }
     // Has a login landed since an account was found signed out? Ahead of the
     // brake below, which would otherwise hold the fleet past the sign-in.
     try { this._noticeSignIns(); } catch (e) { console.warn('zero: could not look for a sign-in:', (e as Error).message); }
+    try { void this._askAboutSignedOutLogins(); } catch (e) { console.warn('zero: could not ask about a signed-out login:', (e as Error).message); }
     try { this._noticeLimitTryLived(); } catch (e) { console.warn('zero: could not check a capped login\'s try:', (e as Error).message); }
     try { this._forgetResetLimits(); } catch (e) { console.warn('zero: could not let a reset limit go:', (e as Error).message); }
     try { this._forgetLimitsOfAnOldPlan(); } catch (e) { console.warn('zero: could not read a login for a new plan:', (e as Error).message); }
