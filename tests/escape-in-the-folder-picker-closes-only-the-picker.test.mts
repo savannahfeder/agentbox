@@ -3,19 +3,10 @@
 // A round-five tester ran "Set Agentbox up again", opened Choose a folder and
 // pressed Escape to shut the picker: the whole setup closed and the inbox came
 // back. The app's window listener leaves a re-run setup on Escape, and it runs
-// before the picker's own handler. It stands aside while a picker is open.
+// before the picker's own handler. That window listener went with the old walk
+// (2026-11-21); what is left is the picker hearing Escape itself.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-
-const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-
-describe('Escape on a setup started again', () => {
-  it('leaves the setup only when no folder picker is open', () => {
-    const line = app.split('\n').find((l) => l.includes('leaveSetupAgain(); return;') && l.includes("'Escape'"));
-    expect(line).toBeDefined();
-    expect(line).toMatch(/!document\.querySelector\('\.fp-card'\)/);
-  });
-});
 
 describe('the folder picker', () => {
   it('hears Escape wherever focus is, not only inside its card', () => {

@@ -182,33 +182,6 @@ describe('a Mac with Codex and no Claude Code', () => {
   });
 });
 
-// THE LAST CARD OF THE WALK SHUT THE INBOX ON EVERY MAC WITHOUT CLAUDE CODE,
-// Codex or not, so a Codex-only Mac never reached its inbox at all.
-describe('the inbox opens with either one', () => {
-  const here = { found: true, certain: true };
-  const gone = { found: false, certain: true };
-  const unsure = { found: false, certain: false };
-
-  it('opens with only Codex, and with only Claude Code', async () => {
-    const { noCodingAgent } = await import('../renderer/src/onboarding.ts');
-    expect(noCodingAgent(gone, here)).toBe(false);
-    expect(noCodingAgent(here, gone)).toBe(false);
-  });
-
-  it('shuts only when it is sure neither is here', async () => {
-    const { noCodingAgent } = await import('../renderer/src/onboarding.ts');
-    expect(noCodingAgent(gone, gone)).toBe(true);
-    expect(noCodingAgent(gone, unsure)).toBe(false);
-    expect(noCodingAgent(unsure, gone)).toBe(false);
-  });
-
-  it('names both on the card, never Claude Code alone', async () => {
-    const { COPY } = await import('../renderer/src/onboarding.ts');
-    expect(COPY.gateHead).toContain('Claude Code or Codex');
-    expect(COPY.missing).toContain('Claude Code or Codex');
-  });
-});
-
 describe('every other Mac is where it was', () => {
   it('runs Claude Code when Claude Code is found, Codex or not', () => {
     const { sup } = build({ claudeFound: true });

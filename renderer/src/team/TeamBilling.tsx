@@ -38,11 +38,12 @@ export function teamBillingView(team: Team, people: Person[], meId: string | nul
   }).sort((a, b) => Number(b.you) - Number(a.you));
   const days = team.endsAt ? Math.max(1, Math.ceil((team.endsAt - now) / DAY)) : 0;
   const count = team.trial ? team.members : team.seats || team.members;
-  const price = `$${n(TEAM.dollarsPerSeat * count)} a month`;
+  const perSeat = team.dollarsPerSeat ?? TEAM.dollarsPerSeat;
+  const price = `$${n(Math.round(perSeat * count * 100) / 100)} a month`;
   return {
     days, ends: day(team.endsAt), started: day(team.endsAt ? team.endsAt - TEAM.trialDays * DAY : null),
     spentPercent: team.trial ? Math.round(((TEAM.trialDays - days) / TEAM.trialDays) * 100) : 100,
-    seatsLine: seats(count), price,
+    seatsLine: seats(count), price, seatPrice: `$${n(perSeat)} a month`,
     mine: `${hours(left(team.usedSeconds))} of ${n(team.hours)}`,
     rows,
   };
@@ -85,7 +86,7 @@ export function TeamBilling({ team, people, meId, billing, now = Date.now(), pay
         <div className="tb-compare-small">Any number at once</div>
       </Card>
       {team.trial ? (
-        <Card name={`From ${v.ends}, each person`} big={`$${TEAM.dollarsPerSeat} a month`}>
+        <Card name={`From ${v.ends}, each person`} big={v.seatPrice}>
           <div className="tb-compare-small">{n(TEAM.hoursPerSeat)} cloud hours a month</div>
           <div className="tb-compare-small">{team.owner ? `You pay ${v.price} for ${team.members}` : "Paid by your team's owner"}</div>
         </Card>
@@ -95,7 +96,7 @@ export function TeamBilling({ team, people, meId, billing, now = Date.now(), pay
           <div className="tb-compare-small">{last ? `Last ${day(last.at)}, $${n(last.amount)} · ${last.status === 'paid' ? 'Paid' : last.status === 'failed' ? 'Failed' : 'Due'}` : 'No invoices yet'}</div>
         </Card>
       ) : (
-        <Card name="Your seat" big={`$${TEAM.dollarsPerSeat} a month`}>
+        <Card name="Your seat" big={v.seatPrice}>
           <div className="tb-compare-small">{n(TEAM.hoursPerSeat)} cloud hours a month</div>
           <div className="tb-compare-small">Paid by your team's owner</div>
         </Card>

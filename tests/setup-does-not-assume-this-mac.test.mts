@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { firstRunNeeded, forcedStep } from '../renderer/src/onboarding.ts';
+import { firstRunNeeded } from '../renderer/src/onboarding.ts';
 import { workSubject } from '../shared/work-lines.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -148,7 +148,7 @@ describe('the path under a running agent', () => {
   });
 });
 
-describe('whether the walk runs at all on this Mac', () => {
+describe('whether the first run runs at all on this Mac', () => {
   it('runs on a store with nothing in it, which is the only honest new install', () => {
     expect(firstRunNeeded({ products: 0, done: false })).toBe(true);
   });
@@ -160,49 +160,5 @@ describe('whether the walk runs at all on this Mac', () => {
 
   it('does not run again for somebody who finished it and then deleted everything', () => {
     expect(firstRunNeeded({ products: 0, done: true })).toBe(false);
-  });
-
-  it('runs when it is asked for, whatever the machine looks like', () => {
-    // ⌘K "Walk through onboarding again", and `?firstrun=1`. This is the row
-    // she asked for on 08-23 so a downloaded app can be seen as a new user
-    // without throwing the install away.
-    expect(firstRunNeeded({ products: 9, done: true, forced: true })).toBe(true);
-  });
-});
-
-describe('opening the walk at a named step', () => {
-  it('opens at the beginning on 1', () => {
-    expect(forcedStep('1')).toBe('welcome');
-  });
-
-  it('opens at a step this version really has', () => {
-    for (const step of ['welcome', 'folder', 'name',
-      // The introduction, in front of the app since 2026-08-23. Only the
-      // hand-off is left of it since 2026-10-05 (w-9f6975906c).
-      'hand',
-      'make', 'task', 'working', 'open', 'answer',
-      'clear', 'unblock', 'command', 'done', 'landed']) {
-      expect(forcedStep(step)).toBe(step);
-    }
-  });
-
-  it('refuses a step this version has deleted, rather than opening the welcome', () => {
-    // `agents` and `zero` were both beats of this walk within the last week. A
-    // typo or a stale bookmark that silently means "the welcome" is how a shot
-    // of the wrong screen gets filed as the right one.
-    expect(forcedStep('agents')).toBe(null);
-    expect(forcedStep('zero')).toBe(null);
-    // `inbox` used to be on this list and it is a real step now: it is the
-    // first slab of the introduction. `practice` is the near-miss that replaces
-    // it, because the practice project is the thing somebody would guess a step
-    // was called and the step is `hand`.
-    expect(forcedStep('practice')).toBe(null);
-    // And the three slabs, `inbox` among them, are gone again since 2026-10-05
-    // (w-9f6975906c), so a bookmark to one of them opens nothing.
-    expect(forcedStep('inbox')).toBe(null);
-    expect(forcedStep('away')).toBe(null);
-    expect(forcedStep('goal')).toBe(null);
-    expect(forcedStep('')).toBe(null);
-    expect(forcedStep(null)).toBe(null);
   });
 });
