@@ -13,7 +13,7 @@ const NOW = new Date(2026, 10, 12, 15, 0).getTime();
 const at = (h: number) => new Date(2026, 10, 12, h, 0).getTime();
 const row = (o: Record<string, unknown>) => ({ status: 'done', labels: [], visibility: 'team', createdAt: at(8), updatedAt: at(12), wrote: { status: { ts: at(12) } }, ...o });
 const given = row({ id: 'g', title: 'Post-signup primary action', answer: 'Given to Maya Chen.' });
-const done = row({ id: 'd', title: 'Refund copy', answer: 'Looks good, ship it.' });
+const done = row({ id: 'd', title: 'Refund copy', result: 'The refund copy is in.', answer: 'Looks good, ship it.' });
 
 describe('what counts as handed on', () => {
   it('a closed thread whose answer is the hand-on note', () => {
@@ -32,7 +32,7 @@ describe('a handed-on thread', () => {
   // Its card stays: the person it went to opens the whole conversation through it.
   it('still goes up to the team, saying who it was given to', () => {
     const cards = cardsFor({ products: [{ slug: 'p', name: 'Product' }] as never, readItems: () => [given, done] as never, since: 0, me: 'p-ana', now: NOW });
-    expect(cards.map((c) => [c.title, c.solution])).toEqual([['Post-signup primary action', 'Given to Maya Chen.'], ['Refund copy', null]]);
+    expect(cards.map((c) => [c.title, c.solution])).toEqual([['Post-signup primary action', 'Given to Maya Chen.'], ['Refund copy', 'The refund copy is in.']]);
   });
   it('is not something its owner finished, on a teammate\'s screen', () => {
     const [card] = cardsFor({ products: [{ slug: 'p', name: 'Product' }] as never, readItems: () => [given] as never, since: 0, me: 'p-ana', now: NOW });
