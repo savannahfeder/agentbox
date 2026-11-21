@@ -301,7 +301,8 @@ describe('the wiring', () => {
   // Round two: Priya messaged Dana from Dana's thread and had to spell out which thread she meant.
   it('a message started from a teammate\'s thread starts by naming that thread', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toContain("const about = openCard.title ? `About “${openCard.title}”: ` : '';");
+    expect(app).toContain("const about = title ? `About “${title}”: ` : '';");
+    expect(app).toContain('onMessage={() => messageAbout(openCard.personId, openCard.title)} />');
     expect(app).toContain('if (about && !readDraft(convo).trim()) { saveDraft(convo, about);');
   });
   // Rounds three and four: Home said a teammate had nothing running while their profile showed two in progress.

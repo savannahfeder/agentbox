@@ -55,3 +55,6 @@
 .ask-bar-back { display: flex; flex-direction: column; gap: 8px; }
 .ask-bar-back textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 12px; font: inherit; font-size: 14px; line-height: 20px; color: var(--text); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 10px; outline: none; resize: vertical; }
 .ask-bar-done { margin: 0; font-size: 14px; color: var(--text-dim); }
+/* The time on the left, the two buttons together on the right. */
+.asks-pop-foot { justify-content: flex-start; gap: 8px; }
+.asks-pop-foot .asks-when { margin-right: auto; }

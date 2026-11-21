@@ -7717,6 +7717,17 @@ export default function App() {
     if (out.ok) await refresh();
     return !!out.ok;
   };
+  // A message to someone about a thread starts by naming it (round two of the team test). By name,
+  // not link: the box shows a link as raw markdown, and the thread may be theirs.
+  const messageAbout = (personId: string, title: string | null | undefined) => {
+    if (!snap) return;
+    const convo = conversationWith(personId, { products: snap.products, items, me: team?.me ?? null });
+    const about = title ? `About “${title}”: ` : '';
+    if (convo) {
+      if (about && !readDraft(convo).trim()) { saveDraft(convo, about); window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(convo) })); }
+      openConversation(convo);
+    } else { setComposeInitial({ to: personId, ...(about ? { body: about } : {}) }); setModal('compose'); }
+  };
   const takeAskBack = async (task: WorkItem) => {
     try { await api.answer({ product: task.product, id: task.id, status: 'done' }); } catch (err) { showToast(`Not taken back: ${(err as Error).message}`); return; }
     showToast('Taken back. It is only yours again.');
@@ -8507,16 +8518,7 @@ export default function App() {
                   backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
-                  onMessage={() => {
-                    const convo = conversationWith(openCard.personId, { products: snap.products, items, me: team?.me ?? null });
-                    // The message starts by naming the thread it is about (round two of the team test).
-                    // By name, not link: the box shows a link as raw markdown, and the thread is theirs.
-                    const about = openCard.title ? `About “${openCard.title}”: ` : '';
-                    if (convo) {
-                      if (about && !readDraft(convo).trim()) { saveDraft(convo, about); window.dispatchEvent(new CustomEvent('zero:reply-restored', { detail: draftKey(convo) })); }
-                      openConversation(convo);
-                    } else { setComposeInitial({ to: openCard.personId, ...(about ? { body: about } : {}) }); setModal('compose'); }
-                  }} />
+                  onMessage={() => messageAbout(openCard.personId, openCard.title)} />
               </div>
             ) : (
               <TeamPage team={snap?.team} />
@@ -8611,7 +8613,7 @@ export default function App() {
                   onGive={(to, note) => { void giveThread(focused, to, note); }}
                   onAsk={team ? (to, kind, note, step) => { void askOnThread(focused, to, kind, note, step); } : undefined}
                   asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
-                  asksCorner={team && !focused.ask ? <AsksChip item={focused} items={items} now={now} onTakeBack={(task) => { void takeAskBack(task); }} /> : null}
+                  asksCorner={team && !focused.ask ? <AsksChip item={focused} items={items} now={now} onTakeBack={(task) => { void takeAskBack(task); }} onMessage={(personId) => messageAbout(personId, rowTitle(focused))} /> : null}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}
                   waitChoices={waitsFor(focused)}
