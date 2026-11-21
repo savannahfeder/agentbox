@@ -17,7 +17,7 @@ import { threadLink, threadOfLink, sendFirst, seenWord, matchPeople, openTo, sen
 import { whereALinkGoes } from '../renderer/src/link-click.ts';
 import { threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
 import { ShareList, SendSheet, CopiedSheet, SeeList } from '../renderer/src/threads/SharePanel.tsx';
-import { emailsIn, StartTeam } from '../renderer/src/team/StartTeam.tsx';
+import { StartTeam } from '../renderer/src/team/StartTeam.tsx';
 globalThis.React = React;
 
 const THEO = { id: 'p-theo', name: 'Theo Park', email: 'theo@lumen.test' };
@@ -138,14 +138,10 @@ describe('after Copy link', () => {
 });
 
 describe('the Team page before there is a team', () => {
-  it('is your face, two open seats and Start a team', () => {
+  // A team is Pro's since 2026-11-21 (tests/a-free-team-is-offered-pro-where-it-would-invite).
+  it('is your face, two open seats and Pro’s free week', () => {
     const t = text(renderToStaticMarkup(React.createElement(StartTeam, { me: { id: 'p-maya', name: 'Maya Chen' } })));
     expect(t).toContain('Bring your team in');
-    expect(t).toContain('Start a team');
-  });
-  it('takes emails typed with commas or spaces, each once, and keeps the half-typed one', () => {
-    expect(emailsIn('theo@lumen.test, jun@lumen.test, mi')).toEqual({ emails: ['theo@lumen.test', 'jun@lumen.test'], rest: 'mi' });
-    expect(emailsIn('Theo@Lumen.test ', ['theo@lumen.test'])).toEqual({ emails: ['theo@lumen.test'], rest: '' });
-    expect(emailsIn('not-an-email ')).toEqual({ emails: [], rest: '' });
+    expect(t).toContain('Try Pro free for 7 days');
   });
 });

@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { emptyDatabase } from './an-empty-test-database.mts';
+import { EVERY_TEAM_PAYS } from './every-team-pays.mts';
 
 const migrationsDir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const migration = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
@@ -89,6 +90,7 @@ beforeAll(async () => {
   await db.exec(SUPABASE_STAND_IN);
   await db.exec(migration);
   await db.exec(`insert into public.multiplayer_people (email) values ('*')`);
+  await db.exec(EVERY_TEAM_PAYS);
   await db.exec(GRANTS);
   for (const [id, email, name] of [
     [OWNER, 'owner@rooms.test', 'Olive Owner'],
