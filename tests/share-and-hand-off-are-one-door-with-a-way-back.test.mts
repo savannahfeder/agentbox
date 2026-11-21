@@ -60,7 +60,8 @@ describe('every panel under it', () => {
   });
   it('goes back to the panel it opened from', () => {
     const menu = fs.readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
-    expect(menu).toContain("onBack={() => setSharing(null)} />;");
+    // Opened by the Share button, the list has no Back: no menu sits behind it.
+    expect(menu).toContain("onBack={shareDirect ? undefined : () => setSharing(null)} />;");
     expect(menu).toContain("<SeeList seen={share.seen} teamName={share.teamName} onBack={() => setSharing('list')}");
     expect(menu).toContain("onBack={() => setSharing('see')} />");
     expect(menu).toMatch(/start=\{giveStart\} only=\{[^}]*\} onBack=\{\(\) => setGivingTo\(null\)\}/);
