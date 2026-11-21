@@ -80,7 +80,9 @@ describe("the thread menu's drawings", () => {
   };
   const same: [string, string][] = [
     ['rename', 'RenameMark'], ['move-site', 'MoveMark'], ['pin', 'PinMark'], ['snooze', 'LaterMark'],
-    ['give-theo', 'GiveMark'], ['done', 'DoneMark'], ['close-task', 'DoneMark'], ['code', 'CodeMark'],
+    // Close task is left out: it has its own ring and tick so it does not read
+    // as Mark done (every-chip-in-the-reply-box-has-a-mark).
+    ['give-theo', 'GiveMark'], ['done', 'DoneMark'], ['close-task', 'CloseTaskMark'], ['code', 'CodeMark'],
     ['run-now', 'RunMark'], ['wait-stop', 'WaitMark'], ['shipped', 'ShippedMark'],
     ['end-repeat', 'StopRepeatMark'], ['reopen', 'ReopenMark'], ['add-people', 'PeopleMark'],
   ];

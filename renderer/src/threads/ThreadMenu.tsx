@@ -212,10 +212,14 @@ function PeopleMark() {
   return <svg {...mark}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.5 2.7-5.5 6-5.5 1.4 0 2.7.4 3.7 1" /><path d="M18 13v7m-3.5-3.5h7" /></svg>;
 }
 /** An arrow turning back. */
+/** A ring with a check: the task is closed for both people, which Done alone is not. */
+function CloseTaskMark() {
+  return <svg {...mark}><circle cx="12" cy="12" r="9" /><path d="m8 12.3 2.8 2.8L16 9.6" /></svg>;
+}
 function ReopenMark() {
   return <svg {...mark}><path d="M4 10h11a5 5 0 0 1 0 10h-4" /><path d="m8 6-4 4 4 4" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { reopen: ReopenMark, share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': DoneMark, done: DoneMark };
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { reopen: ReopenMark, share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': CloseTaskMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {

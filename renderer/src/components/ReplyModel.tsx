@@ -8,6 +8,7 @@
 // the task up, and nothing about a run already going.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { EngineLogo } from './EngineLogos';
 import { fitMenu } from '../keep-in-window';
 import { modelDrawerKey } from '../model-drawer-keys';
 import { ModelMenu } from '../threads/ModelMenu';
@@ -132,7 +133,7 @@ export function ReplyModel({
           }
         }}
       >{chip
-        ? <span className="tc-chip-label">{label}{level && <span className="tc-chip-level"> · {level}</span>}</span>
+        ? <><EngineLogo engine={pick.engine} size={14} /><span className="tc-chip-label">{label}{level && <span className="tc-chip-level"> · {level}</span>}</span></>
         : <>{label}{level && ` · ${level}`}</>}</button>
     </span>
   );

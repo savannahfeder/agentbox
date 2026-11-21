@@ -2777,6 +2777,12 @@ function SlashMenu({ rows, at, onPick, onHover }: {
   );
 }
 
+const ModeMark = () => (
+  <svg className="mode-mark" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true">
+    <path d="M8 1.8 2.9 3.7v3.9c0 3.1 2.1 5.4 5.1 6.6 3-1.2 5.1-3.5 5.1-6.6V3.7z" />
+  </svg>
+);
+
 /**
  * THE MODE, AS A WORD IN THE REPLY SENTENCE.
  *
@@ -2846,7 +2852,7 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false, f
         {/* TITLE CASE, with "Mode" after it capitalised too: "In Auto Mode."
             Settled on w-86dd93ab0d. */}
         {chip
-          ? <span className="tc-chip-label">{titleCase(now?.label ?? value)}</span>
+          ? <><ModeMark /><span className="tc-chip-label">{titleCase(now?.label ?? value)}</span></>
           : titleCase(now?.label ?? value)}
       </button>
     </span>
