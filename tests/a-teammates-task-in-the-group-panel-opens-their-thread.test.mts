@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import React, { createElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PeoplePanel } from '../renderer/src/team/rooms/GroupPage.tsx';
+import { Face } from '../renderer/src/team/people.tsx';
 import { threadOnLine } from '../renderer/src/team/rooms/room-rules.ts';
 import type { RoomCard, ThreadCard } from '../renderer/src/types.ts';
 globalThis.React = React;
@@ -61,6 +62,8 @@ function all(node: ReactNode, out: ReactElement<Record<string, unknown>>[] = [])
   if (Array.isArray(node)) { for (const n of node) all(n, out); return out; }
   if (!isValidElement(node)) return out;
   const el = node as ReactElement<Record<string, unknown>>;
+  // A face reads the team (useContext), which only works inside a render; it holds no button.
+  if (el.type === Face) return out;
   if (typeof el.type === 'function') return all((el.type as (p: unknown) => ReactNode)(el.props), out);
   out.push(el);
   all(el.props.children as ReactNode, out);

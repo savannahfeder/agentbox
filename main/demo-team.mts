@@ -16,7 +16,7 @@ import path from 'node:path';
 import type { TeamBackend, TeamSession } from './team/index.mts';
 import type { MemoryCloud } from './team/memory-cloud.mts';
 import {
-  DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
+  type DemoPerson, yesterdayAt, DEMO_CHATS, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
 } from '../shared/demo-world.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED } from '../shared/team-look.mts';
 
@@ -36,11 +36,19 @@ export function readSeededAt(home: string): number {
   } catch { return Date.now(); }
 }
 
+/** A person's photo, inside the address itself, so it draws with no network. */
+export function faceOf(p: DemoPerson): string | null {
+  try {
+    const bytes = fs.readFileSync(new URL(`../shared/demo-faces/${p.face}`, import.meta.url));
+    return `data:image/jpeg;base64,${bytes.toString('base64')}`;
+  } catch { return null; }
+}
+
 /** The team, its people, its shared projects and everything the teammates said. */
 export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
   const { createMemoryCloud, memoryBackend, signUpMemory } = await import('./team/memory-cloud.mts');
   const cloud = createMemoryCloud();
-  for (const p of [DEMO_ME, ...DEMO_TEAMMATES]) signUpMemory(cloud, { id: p.id, email: p.email, name: p.name });
+  for (const p of [DEMO_ME, ...DEMO_TEAMMATES]) signUpMemory(cloud, { id: p.id, email: p.email, name: p.name, avatarUrl: faceOf(p) });
   cloud.teamsMade = 1;
   cloud.teams.set(DEMO_TEAM.id, { id: DEMO_TEAM.id, name: DEMO_TEAM.name, createdBy: DEMO_ME.id, made: 1 });
   cloud.members.push({ teamId: DEMO_TEAM.id, personId: DEMO_ME.id, role: 'owner' });
@@ -48,7 +56,7 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
 
   const me = memoryBackend(cloud, DEMO_ME.id);
   for (const p of DEMO_PRODUCTS) await me.shareProject({ id: p.projectId, teamId: DEMO_TEAM.id, name: p.name });
-  for (const p of DEMO_TEAMMATES) await memoryBackend(cloud, p.id).saveRoomProfile({ display_name: p.name, headline: p.job });
+  for (const p of [DEMO_ME, ...DEMO_TEAMMATES]) await memoryBackend(cloud, p.id).saveRoomProfile({ display_name: p.name, headline: p.job, avatar_url: faceOf(p) });
 
   // The cloud stamps each line with its own clock, which the inbox shows as
   // the line's time, so the clock is set to when each was said.
@@ -69,6 +77,17 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
     ]);
     // Sorted already, as the copy's own agent would have sorted it.
     await me.pushLines(m.projectId, [line(DEMO_ME.id, m.at + 2, 'agent', { priority: m.priority }, m.id)]);
+  }
+
+  // A chat with one teammate is a group of the two of you, named for the
+  // other person, as the app makes one (main/team/rooms.mts `create`).
+  for (const c of DEMO_CHATS) {
+    clock = yesterdayAt(now, c.said[0].at);
+    const room = await memoryBackend(cloud, c.with.id).createRoom({ name: DEMO_ME.name, kind: 'group', people: [DEMO_ME.id] }) as string;
+    for (const s of c.said) {
+      clock = yesterdayAt(now, s.at);
+      await memoryBackend(cloud, s.by === 'me' ? DEMO_ME.id : c.with.id).sendRoomMessage(room, { body: s.text });
+    }
   }
 
   for (const person of DEMO_TEAMMATES) {

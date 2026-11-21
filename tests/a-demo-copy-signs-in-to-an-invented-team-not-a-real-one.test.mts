@@ -13,7 +13,7 @@ import path from 'node:path';
 import { DEMO_CLOUD, loadCloudConfig, supabaseSession } from '../main/team/session.mts';
 import { readSeededAt, seedDemoTeam, writeSeededAt } from '../main/demo-team.mts';
 import {
-  DEMO_ENV, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoLedgerLines, demoMessages, lastWorkingMorning,
+  DEMO_CHATS, yesterdayAt, DEMO_ENV, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoLedgerLines, demoMessages, lastWorkingMorning,
 } from '../shared/demo-world.mts';
 import { TEAM_LOOK } from '../shared/team-look.mts';
 
@@ -102,6 +102,28 @@ describe('the team a demo copy is signed in to', () => {
     expect(look).not.toMatch(/^- \w+:\s*$/m);
   });
 
+  // "Give the teammates real pictures. Make sure they've shipped more" (2026-11-21).
+  it('gives every person a photo, not two letters', async () => {
+    const people = await (await signedIn()).teamPeople(DEMO_TEAM.id) as { name: string; avatarUrl: string | null }[];
+    expect(people).toHaveLength(4);
+    for (const p of people) expect(p.avatarUrl, p.name).toMatch(/^data:image\/jpeg;base64,\/9j\//);
+  });
+
+  it('has a chat of two with each teammate, so their page never opens on an empty one', async () => {
+    const b = await signedIn();
+    const rooms = await b.myRooms() as { id: string; kind: string; members: number }[];
+    for (const p of DEMO_TEAMMATES) {
+      let found = false;
+      for (const r of rooms.filter((x) => x.kind === 'group' && x.members === 2)) {
+        if ((await b.roomPeople(r.id) as string[]).includes(p.id)) {
+          found = true;
+          expect((await b.roomMessages(r.id) as unknown[]).length, p.name).toBeGreaterThan(0);
+        }
+      }
+      expect(found, p.name).toBe(true);
+    }
+  });
+
   it('shows what each teammate is on', async () => {
     const cards = await (await signedIn()).listCards() as { personId: string; state: string }[];
     for (const p of DEMO_TEAMMATES) expect(cards.some((c) => c.personId === p.id)).toBe(true);
@@ -145,6 +167,28 @@ describe('finished work lands inside the standup that opens', () => {
     const friday = new Date(2026, 10, 20, 8, 30).getTime();
     expect(lastWorkingMorning(at(2026, 11, 21, 7))).toBe(friday);
     expect(lastWorkingMorning(at(2026, 11, 22, 20))).toBe(friday);
+  });
+
+  it('and every teammate has shipped at least three things in it, on a weekday or a weekend', () => {
+    for (const now of [at(2026, 11, 18, 15), at(2026, 11, 21, 7)]) {
+      const morning = lastWorkingMorning(now);
+      for (const p of DEMO_TEAMMATES) {
+        const shipped = demoCards(now).filter((c) => c.by.id === p.id && c.shippedAt && c.shippedAt < morning && c.shippedAt > morning - 24 * 3_600_000);
+        expect(shipped.length, p.name).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('and every chat line was said in working hours the day before, whenever the demo opens', () => {
+    // A Priya message stamped 12:08am was counted back from a demo opened at 18:00.
+    for (const now of [at(2026, 11, 18, 9), at(2026, 11, 18, 18), at(2026, 11, 21, 23)]) {
+      for (const c of DEMO_CHATS) for (const s of c.said) {
+        const when = new Date(yesterdayAt(now, s.at));
+        expect(when.getHours()).toBeGreaterThanOrEqual(9);
+        expect(when.getHours()).toBeLessThan(18);
+        expect(when.getTime()).toBeLessThan(now);
+      }
+    }
   });
 
   it('so every finished card on a Saturday falls between Thursday 9:00 and Friday 9:00', () => {

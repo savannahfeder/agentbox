@@ -87,7 +87,7 @@ describe.skipIf(!browserAvailable)('the ask sheet', () => {
     const p = await page();
     await p.evaluate(() => window.mountMenu());
     await p.click('button[aria-label="More actions"]');
-    await p.click('text=Ask or hand off…');
+    await p.click('text=Ask or hand over…');
     await p.click('text=Maya Lin');
     const note = p.locator('textarea.sh-note');
     await note.fill('line one\nline two');

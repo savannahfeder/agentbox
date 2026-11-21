@@ -33,6 +33,7 @@ export const I = {
   bell: () => svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5h4"/>', 15, 1.4),
   out: () => svg('<path d="M14 5h5v14h-5"/><path d="M10 8l-4 4 4 4M6 12h9"/>', 15, 1.4),
   back: () => svg('<path d="M15 6l-6 6 6 6"/>', 16, 1.6),
+  forward: () => svg('<path d="M9 6l6 6-6 6"/>', 16, 1.6),
   expand: () => svg('<path d="M14 5h5v5M10 19H5v-5M19 5l-6 6M5 19l6-6"/>', 15, 1.5),
   search: () => svg('<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>', 15, 1.5),
   eyeOff: (size = 15) => svg(EYE_OFF, size, 1.5),

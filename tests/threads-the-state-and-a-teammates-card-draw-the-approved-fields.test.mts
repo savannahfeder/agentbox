@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ThreadStateMark, TeammateCard, MessagePerson } from '../renderer/src/threads/Summary.tsx';
+import { ThreadStateMark, TeammateSummary, MessagePerson } from '../renderer/src/threads/Summary.tsx';
 globalThis.React = React;
 
 const NOW = Date.now();
@@ -59,17 +59,20 @@ describe('a teammate’s card', () => {
   // the lead and then the Done trail; Problem and Solution are gone.
   // CHANGED 2026-10-30: the card is the column beside the conversation, and the
   // state ("Waiting on Maya") heads the page (TeammateStanding) instead.
-  it('is exactly the summary’s fields: context first, then done, the links, then the properties', () => {
-    const words = text(draw(React.createElement(TeammateCard, { card, person: maya })));
-    expect(words).toBe('About Acme’s contract ends on the 14th. Done Terms are drafted at 8% over last year. Blocked by Sign in with Google Blocks A thread you cannot see Owner Ma Maya Chen Priority High Project Northwind Who sees it The team');
+  // CHANGED 2026-11-21 (w-8a8eac7620): the card became the summary at the top
+  // of the page, always there. Whose it is and its project are the line above
+  // it, what it waits on is the state's line, and Priority and Who sees it went
+  // with the card beside the conversation.
+  it('is exactly the summary’s fields: context first, then what was tried, then what it holds up', () => {
+    const words = text(draw(React.createElement(TeammateSummary, { card, owner: 'Maya' })));
+    expect(words).toBe('Acme’s contract ends on the 14th. What Maya&#x27;s agent already tried Terms are drafted at 8% over last year. Blocks A thread you cannot see');
   });
-  it('shows nothing of a private thread but that it is private, whose it is and its state', () => {
-    const words = text(draw(React.createElement(TeammateCard, { card: { ...card, visible: false, title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [] }, person: maya })));
-    expect(words).toBe('Private thread Ma Maya Chen Waiting');
+  it('shows nothing of a private thread', () => {
+    expect(draw(React.createElement(TeammateSummary, { card: { ...card, visible: false, title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [] }, owner: 'Maya' }))).toBe('');
   });
   it('offers a square button with their face and the words Message and their first name', () => {
     const html = draw(React.createElement(MessagePerson, { person: maya, onMessage: () => {} }));
-    expect(text(html)).toBe('Ma Message Maya');
+    expect(text(html)).toBe('MC Message Maya');
     expect(html).toContain('ts-msgbtn');
   });
 });
