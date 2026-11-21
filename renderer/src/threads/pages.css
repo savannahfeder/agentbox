@@ -675,10 +675,6 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
    name is an inline block so the row's underline stops at the title. */
 .th-slot { display: inline-flex; vertical-align: top; align-items: center; justify-content: center; width: 18px; height: 20px; margin-right: 10px; flex: none; }
 .th-slot .tm-av, .th-slot .tq, .th-slot .agent-face { width: 18px; height: 18px; line-height: 16px; font-size: 8.5px; }
-/* EXPLORATION: unread as a dot on the face's corner instead of in the margin. */
-[data-unread="badge"] .th-table .row.unread::before { display: none; }
-[data-unread="badge"] .th-slot { position: relative; }
-[data-unread="badge"] .row.unread .th-slot::after { content: ''; position: absolute; top: 0; right: -2px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
 .th-who-name { display: inline-block; vertical-align: top; margin-left: 12px; color: var(--text-dim); white-space: nowrap; }
 .th-cell-title.with-aside > .th-who-name { flex: none; }
 /* An AI teammate's letter on its own soft colour until it has a drawn face, so it never reads as an agent. */
