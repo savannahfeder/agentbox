@@ -13,7 +13,7 @@ import path from 'node:path';
 import { DEMO_CLOUD, loadCloudConfig, supabaseSession } from '../main/team/session.mts';
 import { readSeededAt, seedDemoTeam, writeSeededAt } from '../main/demo-team.mts';
 import {
-  DEMO_ENV, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoLedgerLines, demoMessages, lastWorkingMorning,
+  DEMO_CHATS, LENA_THREAD, SUBJECT_TASK, yesterdayAt, DEMO_ENV, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoLedgerLines, demoMessages, lastWorkingMorning,
 } from '../shared/demo-world.mts';
 import { TEAM_LOOK } from '../shared/team-look.mts';
 
@@ -124,6 +124,29 @@ describe('the team a demo copy is signed in to', () => {
     }
   });
 
+  // The call script's beats (2026-11-21): Tasks, late and blocked first, and an
+  // agent @-mentioned in a chat beside people.
+  it('gives the Tasks page one late task, one blocked on you and more ahead', async () => {
+    const now = Date.now();
+    const cards = (await (await signedIn()).listCards() as { task?: { dueAt: number }; blockedBy: { id: string }[] }[]).filter((c) => c.task);
+    expect(cards.some((c) => c.task!.dueAt < now)).toBe(true);
+    expect(cards.some((c) => c.blockedBy.some((b) => b.id === `person:${DEMO_ME.id}`))).toBe(true);
+    expect(cards.filter((c) => c.task!.dueAt > now && !c.blockedBy.length).length).toBeGreaterThan(0);
+  });
+
+  it('brings an agent into Lena\'s thread the way the reply box does, answered and finished', async () => {
+    const lena = demoMessages().find((m) => m.id === LENA_THREAD.id)!;
+    const lines = await (await signedIn()).pullLines(lena.projectId) as { line: { by?: string; patch: Record<string, unknown> } }[];
+    const ask = lines.find((l) => String(l.line.patch.answer ?? '').includes('agentbox-agent:'));
+    expect(String(ask?.line.patch.answer)).toContain(`[@Claude Code in Website](agentbox-agent:claude?project=website&task=${SUBJECT_TASK})`);
+    // Lena has the last word, so the thread still waits on you.
+    expect(lines.at(-1)?.line.patch.assignee).toBe(DEMO_ME.id);
+    const task = demoLedgerLines().website.filter((l) => l.id === SUBJECT_TASK);
+    expect(task.some((l) => (l.patch.labels as string[] | undefined)?.includes(`asked-in:${LENA_THREAD.slug}/${LENA_THREAD.id}`))).toBe(true);
+    expect(task.some((l) => String(l.patch.result ?? '').length > 40)).toBe(true);
+    expect(task.some((l) => l.patch.status === 'done')).toBe(true);
+  });
+
   it('shows what each teammate is on', async () => {
     const cards = await (await signedIn()).listCards() as { personId: string; state: string }[];
     for (const p of DEMO_TEAMMATES) expect(cards.some((c) => c.personId === p.id)).toBe(true);
@@ -175,6 +198,18 @@ describe('finished work lands inside the standup that opens', () => {
       for (const p of DEMO_TEAMMATES) {
         const shipped = demoCards(now).filter((c) => c.by.id === p.id && c.shippedAt && c.shippedAt < morning && c.shippedAt > morning - 24 * 3_600_000);
         expect(shipped.length, p.name).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('and every chat line was said in working hours the day before, whenever the demo opens', () => {
+    // A Priya message stamped 12:08am was counted back from a demo opened at 18:00.
+    for (const now of [at(2026, 11, 18, 9), at(2026, 11, 18, 18), at(2026, 11, 21, 23)]) {
+      for (const c of DEMO_CHATS) for (const s of c.said) {
+        const when = new Date(yesterdayAt(now, s.at));
+        expect(when.getHours()).toBeGreaterThanOrEqual(9);
+        expect(when.getHours()).toBeLessThan(18);
+        expect(when.getTime()).toBeLessThan(now);
       }
     }
   });

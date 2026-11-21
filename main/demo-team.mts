@@ -16,7 +16,7 @@ import path from 'node:path';
 import type { TeamBackend, TeamSession } from './team/index.mts';
 import type { MemoryCloud } from './team/memory-cloud.mts';
 import {
-  type DemoPerson, DEMO_CHATS, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
+  type DemoPerson, endOfDayIn, yesterdayAt, DEMO_CHATS, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
 } from '../shared/demo-world.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED } from '../shared/team-look.mts';
 
@@ -73,19 +73,24 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
     await them.pushLines(m.projectId, [
       // A task's mark rides the line that opens it, or the pull drops it (shared/team-rules.mts).
       line(m.from.id, m.at, 'system', { title: m.title, kind: 'directive', priority: 0, status: 'open', ...(m.given ? { labels: ['given-task'] } : m.subject ? { labels: ['work-thread'] } : {}) }, m.id),
-      line(m.from.id, m.at + 1, 'founder', { title: m.title, body: withFile(m), assignee: DEMO_ME.id, people }, m.id),
+      line(m.from.id, m.at + 1, 'founder', { title: m.title, body: withFile(m), assignee: DEMO_ME.id, people, ...(m.due ? { due: m.due } : {}) }, m.id),
     ]);
     // Sorted already, as the copy's own agent would have sorted it.
     await me.pushLines(m.projectId, [line(DEMO_ME.id, m.at + 2, 'agent', { priority: m.priority }, m.id)]);
+    for (const r of m.replies ?? []) {
+      clock = r.at;
+      const [by, to] = r.by === 'me' ? [DEMO_ME.id, m.from.id] : [m.from.id, DEMO_ME.id];
+      await memoryBackend(cloud, by).pushLines(m.projectId, [line(by, r.at, 'founder', { answer: r.text, assignee: to }, m.id)]);
+    }
   }
 
   // A chat with one teammate is a group of the two of you, named for the
   // other person, as the app makes one (main/team/rooms.mts `create`).
   for (const c of DEMO_CHATS) {
-    clock = now - c.said[0].hoursAgo * HR;
+    clock = yesterdayAt(now, c.said[0].at);
     const room = await memoryBackend(cloud, c.with.id).createRoom({ name: DEMO_ME.name, kind: 'group', people: [DEMO_ME.id] }) as string;
     for (const s of c.said) {
-      clock = now - s.hoursAgo * HR;
+      clock = yesterdayAt(now, s.at);
       await memoryBackend(cloud, s.by === 'me' ? DEMO_ME.id : c.with.id).sendRoomMessage(room, { body: s.text });
     }
   }
@@ -93,8 +98,10 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
   for (const person of DEMO_TEAMMATES) {
     const cards = demoCards(now).filter((c) => c.by.id === person.id).map((c) => ({
       threadId: c.threadId, visible: true, title: c.title, project: c.project, people: null, state: c.state,
-      priority: null, problem: null, progress: c.progress ?? null, solution: null, blockedBy: [], blocks: [],
+      priority: null, problem: null, progress: c.progress ?? null, solution: null, blocks: [],
+      blockedBy: c.blockedOn ? [{ id: `person:${c.blockedOn.id}`, title: null }] : [],
       updatedAt: c.updatedAt, ...(c.shippedAt ? { shippedAt: c.shippedAt } : {}),
+      ...(c.task ? { task: { from: c.task.from.id, dueAt: endOfDayIn(now, c.task.dueInDays), clock: false } } : {}),
     }));
     await memoryBackend(cloud, person.id).putCards(DEMO_TEAM.id, cards);
   }

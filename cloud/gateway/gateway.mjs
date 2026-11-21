@@ -209,19 +209,47 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     }
   }
 
+  // A trial's subscription can reach past_due never having been charged;
+  // a record from before `paid` was kept is taken as paid.
+  const seatsOf = (bill) => {
+    const neverPaid = bill.stripe?.status === 'past_due' && bill.stripe.paid === false;
+    return bill.plan === 'team' && PAYING.has(bill.stripe?.status) && !neverPaid ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
+  };
+
+  // WHETHER A TEAM PAYS, WHERE THE DATABASE'S INVITE AND SHARE GATES READ IT
+  // (20261121130000_team_features_need_pro.sql). The bill's `rev` moves with
+  // each Stripe event; a bill the database is behind on is written again on
+  // the next read, so a refused write is not lost.
+  const mirrorTried = new Map();
+  // A read retries at most once in ten minutes; Stripe's event always writes.
+  async function mirrorTeam(id, bill, { event = false } = {}) {
+    const rev = Number(bill.rev) || 0;
+    if (!db?.writeTeamPlan || !bill.stripe || bill.wrote === rev) return;
+    const t = now();
+    if (!event && t - (mirrorTried.get(id) ?? -Infinity) < SEATS_ASK_GAP_MS) return;
+    mirrorTried.set(id, t);
+    try {
+      await db.writeTeamPlan(id, { pays: seatsOf(bill) > 0, status: bill.stripe?.status ?? null, trialEndsAt: bill.stripe?.trialEnd ?? null, rev, at: now() });
+      await updateTeam(id, (b) => { if ((Number(b.rev) || 0) === rev) b.wrote = rev; });
+    } catch (err) {
+      log(`the database has not taken whether team ${id} pays: ${err?.message || err}`);
+    }
+  }
+
   async function teamNow(person, t, { people = false } = {}) {
     if (!teams) return null;
     const team = await teams(person);
     if (!team?.id || !Array.isArray(team.members)) return null;
     const bill = (await readJson(teamKey(team.id))) || {};
-    // A trial's subscription can reach past_due never having been charged;
-    // a record from before `paid` was kept is taken as paid.
-    const neverPaid = bill.stripe?.status === 'past_due' && bill.stripe.paid === false;
-    const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) && !neverPaid ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
-    const endsAt = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
-    // A card taken in the trial is not yet a charge: its seats wait for `active`,
-    // and a late charge after the free days keeps the trial rather than nothing.
-    const trial = seats ? bill.stripe.status === 'trialing' : t < endsAt;
+    const seats = seatsOf(bill);
+    // NO FREE WEEK WITHOUT A CARD (the founder, 2026-11-21): the trial is
+    // Stripe's, or free days the owner gave by hand (team_plans.free_until).
+    const given = Number(team.freeUntil) || 0;
+    const cardTrial = !!seats && bill.stripe.status === 'trialing';
+    const trial = seats ? cardTrial : t < given;
+    // A card trial from before Stripe's end was kept ended a week after the team was made.
+    const endsAt = cardTrial ? Number(bill.stripe.trialEnd) || Number(team.createdAt) + teamPlan.trialDays * DAY_MS : given;
+    await mirrorTeam(team.id, bill);
     if (!seats && !trial) return null;
     const members = team.members.filter((m) => PERSON.test(m));
     await seatsFollowMembers(team.id, bill, seats, members.length);
@@ -764,6 +792,26 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     throw new Error('the team\'s ledger kept changing under this write');
   }
 
+  // The free days a team's checkout gives: a week for a team that never had a
+  // subscription, or the days given by hand if they run longer. The card is
+  // taken now and charged when they end.
+  const teamDaysFree = (team, bill, t) => {
+    const week = bill.stripe?.subscription ? 0 : t + teamPlan.trialDays * DAY_MS;
+    return teamFreeDays(Math.max(Number(team.freeUntil) || 0, week), t);
+  };
+
+  /** What the plan page promises: the free days Pro would start with for this person's team, or null off a team. */
+  async function freeDaysOfTeam(person, t) {
+    try {
+      const team = teams ? await teams(person) : null;
+      if (!team?.id) return null;
+      return teamDaysFree(team, (await readJson(teamKey(team.id))) || {}, t);
+    } catch (err) {
+      log(`could not read ${person}'s team for its free days: ${err?.message || err}`);
+      return null;
+    }
+  }
+
   // THE TEAM'S SEATS, bought by its owner, one a member.
   async function teamCheckout(person) {
     const team = teams ? await teams(person) : null;
@@ -778,8 +826,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       // Paid before Stripe's webhook has landed.
       if (last?.status === 'complete' && last.customer) return toBilling(last.customer);
     }
-    // Paid for inside the team's free days, the card is charged when they end.
-    const freeDays = teamFreeDays(Number(team.createdAt) + teamPlan.trialDays * DAY_MS, now());
+    const freeDays = teamDaysFree(team, bill, now());
     const trialEnd = freeDays ? now() + freeDays * DAY_MS : null;
     const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${WEB_APP}/paid?plan=team`, cancelUrl: `${WEB_APP}/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
@@ -929,17 +976,21 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const pays = PAYING.has(sub.status);
     const item = sub.items?.data?.[0];
     if (pays && planOfLookupKey(item?.price?.lookup_key) !== 'team') { log(`subscription ${sub.id} is on a price no team plan sells`); return { received: true }; }
-    await updateTeam(team, (bill) => {
+    const bill = await updateTeam(team, (bill) => {
       // An old subscription ending leaves alone a newer one that pays.
-      if (!pays && bill.stripe?.subscription && bill.stripe.subscription !== sub.id && PAYING.has(bill.stripe.status)) return;
+      if (!pays && bill.stripe?.subscription && bill.stripe.subscription !== sub.id && PAYING.has(bill.stripe.status)) return null;
       // A past_due recorded before `paid` was kept is a renewal's retry.
       const was = bill.stripe?.subscription === sub.id ? bill.stripe : null;
       const paid = sub.status === 'active' || !!was && (was.paid === true || was.status === 'active' || (was.paid === undefined && was.status === 'past_due'));
       bill.plan = pays ? 'team' : 'none';
       bill.seats = Math.max(0, Math.floor(Number(item?.quantity)) || 0);
-      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, at: now() };
+      const trialEnd = Number(sub.trial_end) > 0 ? Number(sub.trial_end) * 1000 : null;
+      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, ...(trialEnd ? { trialEnd } : {}), at: now() };
+      bill.rev = (Number(bill.rev) || 0) + 1;
       if (pays) delete bill.checkout;
+      return { ...bill };
     });
+    if (bill) await mirrorTeam(team, bill, { event: true });
     log(`team ${team} is on ${pays ? `${Math.floor(Number(item?.quantity)) || 0} seats` : 'no plan'} (Stripe ${sub.status})`);
     return { received: true };
   }
@@ -972,8 +1023,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         return { status: 200, body: { ok: true, terms: termsVersion } };
       }
       if (route === 'GET /v1/me') {
-        const tm = await teamOrNone(person, now(), { people: true });
-        return { status: 200, body: await update(person, (rec, ctx) => { settle(rec, ctx, now()); return summary(rec, now(), tm); }) };
+        const [tm, teamFreeDays] = await Promise.all([teamOrNone(person, now(), { people: true }), freeDaysOfTeam(person, now())]);
+        const body = await update(person, (rec, ctx) => { settle(rec, ctx, now()); return summary(rec, now(), tm); });
+        return { status: 200, body: teamFreeDays === null ? body : { ...body, teamFreeDays } };
       }
       if (route === 'POST /v1/invoke') return { status: 200, body: await invoke(person, data) };
       if (route === 'POST /v1/stop') return { status: 200, body: await stop(person, data) };

@@ -40,7 +40,9 @@ describe('the line that says the ask ended', () => {
     const html = page(null, { handedToYou: task, onOpenTask() {} });
     expect(html).toContain('Sam handed this thread to you.');
     expect(html).toMatch(/<button[^>]*>Open your task<\/button>/);
-    expect(html.indexOf('Sam handed this thread to you.')).toBeLessThan(html.indexOf('<form class="tp-dock-form"'));
+    // The box, folded to its pill until you press R or click it (w-8a8eac7620).
+    expect(html.indexOf('class="dock-card tp-compose')).toBeGreaterThan(-1);
+    expect(html.indexOf('Sam handed this thread to you.')).toBeLessThan(html.indexOf('class="dock-card tp-compose'));
   });
   it('is not drawn while the ask is open or when nothing happened', () => {
     expect(page(askOf('review'))).not.toContain('took the ask back');
