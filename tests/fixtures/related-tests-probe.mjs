@@ -36,5 +36,5 @@ if (how === 'vitest') {
   const { testsTheGraphReaches } = await import('../../scripts/lib/tests-the-graph-reaches.mjs');
   for (const changed of queries) results.push(await testsTheGraphReaches(changed, root));
 }
-process.stdout.write(`${JSON.stringify({ results, peak, atPeak })}\n`);
-process.exit(0);
+// On macOS a pipe write is async: exiting before it drains cuts the JSON at 8 KB.
+process.stdout.write(`${JSON.stringify({ results, peak, atPeak })}\n`, () => process.exit(0));
