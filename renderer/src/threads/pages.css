@@ -435,7 +435,7 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
 .tp-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 32px 0; }
 .tp-acts { display: flex; align-items: center; gap: 10px; }
 .tp-about.on { color: var(--text); border-color: var(--text-faint); }
-.tp-top { margin: 0 0 28px; }
+.tp-top { margin: 0 0 24px; }
 .tp-whose { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--text-dim); }
 .tp-whose .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }
 .tp-files { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; }
@@ -453,8 +453,8 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
   padding: 29px 32px 0 max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
 }
 .tp-grid.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
-.tp-col :is(.msg-body, .appendix) { font-size: var(--tp-type); }
-.tp-col :is(.msg-body, .appendix) :not(pre) > code { font-size: .87em; background: var(--work-chip); padding: 1px 5px; border-radius: var(--radius); }
+.tp-col :is(.msg-body, .appendix) { font-size: var(--tp-type); line-height: 1.6; }
+.tp-col :is(.msg-body, .appendix) :not(pre) > code { font-family: var(--mono); font-size: .8125em; background: var(--work-chip); padding: 1px 5px; border-radius: var(--radius); }
 .tp-side { position: sticky; top: 0; }
 .tp-side .ts-ticket { max-width: none; margin: 0; padding: 20px 22px 18px; border-radius: 10px; }
 .tp-side .ts-tk-part { padding: 0 0 18px; margin: 0 0 18px; border-bottom: 1px solid var(--line); }
@@ -703,8 +703,20 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
 .th-mate { display: inline-flex; }
 
 /* What the owner's agent already did, under the thread's name: the first thing someone picking it up reads. */
-.tp-tried { margin: 4px 0 28px; }
-.tp-tried h2 { margin: 0 0 10px; font-size: 13px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
+.tp-tried { margin: 24px 0 28px; }
+.tp-tried h2 { margin: 0 0 8px; font-size: 13px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
 .tp-tried .ts-trail { font-size: 14px; line-height: 21px; color: var(--text); }
 .tp-tried .ts-step::before { top: 8px; }
 .tp-tried .ts-step:not(:last-child)::after { top: 15px; }
+
+/* Read as the owner's own thread reads; after `.th-work .msg-body p` so these win. */
+.tp-col :is(.msg-body, .appendix) p { margin: 8px 0; }
+.tp-col :is(.msg-body, .appendix) :is(ul, ol) { margin: 8px 0 8px 22px; }
+.tp-col .msg-body > :first-child { margin-top: 0; }
+.tp-col .msg-body > :last-child { margin-bottom: 0; }
+.tp-col .appendix-foot { margin-top: 24px; }
+.tp-col .appendix-label { margin-bottom: 8px; font-size: 13px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
+/* The Result is the agent's turn, so neither the frame closing the turn before it nor the
+   thread's empty foot (one more flex gap) adds to the 24px above it. */
+.tp-col .thread:has(+ .appendix) > .thread-block:nth-last-child(2) > .msg.turn-end { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+.tp-col .thread:has(+ .appendix) > :last-child:empty { display: none; }

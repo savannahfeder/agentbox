@@ -45,12 +45,14 @@
 .ask-bar-head { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-dim); }
 .ask-bar-head b { font-weight: 500; color: var(--text); }
 .ask-bar-when { font-size: 13px; color: var(--text-faint); }
-.ask-bar-note { margin: 0; font-size: var(--tp-type, 15px); line-height: 1.55; color: var(--text); white-space: pre-wrap; }
+.ask-bar-note { margin: 0; font-size: var(--tp-type, 15px); line-height: 1.6; color: var(--text); white-space: pre-wrap; }
 .ask-bar-step { margin: 0; padding: 6px 12px; font-size: 14px; line-height: 21px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; white-space: pre-wrap; }
 .ask-bar-acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
 .ask-bar-acts button { padding: 7px 14px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
 .ask-bar-acts button:hover:not(:disabled) { color: var(--text); border-color: var(--text-faint); }
 .ask-bar-acts button.quiet { color: var(--text-faint); }
+.ask-bar-acts .ask-bar-change { display: inline-flex; align-items: center; gap: 8px; }
+.ask-bar-change svg { flex: none; }
 .ask-bar-acts button:disabled { opacity: .5; cursor: default; }
 .ask-bar-back { display: flex; flex-direction: column; gap: 8px; }
 .ask-bar-back textarea { width: 100%; box-sizing: border-box; min-height: 64px; padding: 10px 12px; font: inherit; font-size: 14px; line-height: 20px; color: var(--text); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 10px; outline: none; resize: vertical; }

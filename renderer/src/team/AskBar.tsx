@@ -10,6 +10,11 @@ import './asks.css';
 
 type Verdict = 'done' | 'yes' | 'changes';
 
+/** The thread bar's mark for a code change (ThreadMenu's CodeMark). */
+const CodeMark = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m8.5 7-5 5 5 5" /><path d="m15.5 7 5 5-5 5" /></svg>
+);
+
 /** The code change an ask carries (main/team/index.mts askTeammate), as a path in the task's project. */
 export function askChange(task: Pick<WorkItem, 'body'>): string | null {
   return /\]\((attachments\/[^)\s]+\.change)\)/.exec(String(task.body ?? ''))?.[1] ?? null;
@@ -71,7 +76,7 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
       ) : (onOpenThread || (change && !under) || !answeredBelow) && (
         <div className="ask-bar-acts">
           {onOpenThread && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
-          {change && !under && <button type="button" onClick={() => onOpenChange?.(change)}>View the change</button>}
+          {change && !under && <button type="button" className="ask-bar-change" onClick={() => onOpenChange?.(change)}><CodeMark />View the change</button>}
           {answeredBelow ? null : ask.kind === 'review'
             ? <>
               <button type="button" onClick={() => setGiving('yes')}>Looks good</button>
