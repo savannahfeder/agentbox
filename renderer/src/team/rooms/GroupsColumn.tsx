@@ -7,6 +7,7 @@ import { I } from './icons';
 import { updatedWords } from '../../threads/page-rules';
 import { groupTag } from './room-rules';
 import { ChatsColumn, ChatsContext } from '../../teammates/ChatsColumn';
+import { closesOnPress } from '../../press';
 
 /** Groups whose name matches, the name's start first, then a word's start, then anywhere in it.
  *  Names only: what was said last matches nearly every group. */
@@ -66,7 +67,7 @@ export function GroupFinder({ rows, current = null, now, onOpen, onClose }: { ro
   const shown = findGroups(rows, q);
   const at = chosen ?? (q.trim() ? 0 : Math.max(0, shown.findIndex((g) => g.key !== current)));
   const pick = shown[Math.min(at, shown.length - 1)];
-  return <div className="modal-backdrop palette-backdrop" onClick={onClose}>
+  return <div className="modal-backdrop palette-backdrop" {...closesOnPress(onClose)}>
     <div className="modal palette gc-finder" role="dialog" aria-label="Find a group" onClick={(e) => e.stopPropagation()}>
       <input ref={box} className="palette-input" value={q} placeholder="Find a group…" aria-label="Find a group"
         onChange={(e) => { setQ(e.target.value); setAt(null); }}

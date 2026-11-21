@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyClosesFinish, keyEndsFinish, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyClosesFinish, keyEndsFinish, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, urgentCountsNow, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -243,10 +243,16 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
   const point = useRef(onPoint);
   point.current = onPoint;
   const walked = useRef(false);
+  // The urgent tip has gone but its lesson is not written yet (urgentCountsNow).
+  const urgentGone = useRef(false);
+  const pressedAt = useRef(0);
   useEffect(() => {
-    const note = (e: KeyboardEvent) => { if (/^(ArrowUp|ArrowDown|j|k)$/.test(e.key)) walked.current = true; };
+    const note = (e: KeyboardEvent) => { pressedAt.current = Date.now(); if (/^(ArrowUp|ArrowDown|j|k)$/.test(e.key)) walked.current = true; };
+    const pointer = () => { pressedAt.current = Date.now(); };
+    const POINTER = ['pointerdown', 'pointerup'] as const;
     window.addEventListener('keydown', note, true);
-    return () => window.removeEventListener('keydown', note, true);
+    for (const p of POINTER) window.addEventListener(p, pointer, true);
+    return () => { window.removeEventListener('keydown', note, true); for (const p of POINTER) window.removeEventListener(p, pointer, true); };
   }, []);
 
   // THE END OF THE TUTORIAL: one burst of confetti, the way the old walk ended,
@@ -277,7 +283,14 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
     if (!live || !tour) { if (shown.current) { shown.current = null; setStep(null); } return undefined; }
     const read = () => {
       const screen = readScreen(view, thread, covered, palette, answering, practiceId);
-      const rawStep = tourStep(tour, screen);
+      if (!tour.urgent || tour.done.includes('urgent')) urgentGone.current = false;
+      // Written once the press that ended the tip has done its own work, so nothing redraws under it.
+      else if (urgentGone.current && Date.now() - pressedAt.current >= SETTLE_MS && urgentCountsNow(tour, screen)) {
+        onChange(finishLesson(readTour(localStorage) ?? tour, 'urgent'));
+        return;
+      }
+      const told = tourStep(tour, screen);
+      const rawStep = told === 'urgent' && urgentGone.current ? null : told;
       // Told to go and explore, nobody is then asked to come back and watch.
       const wanted = rawStep === 'working' && tried ? null : rawStep;
       // Already closed, by its agent: nothing is left for the close tip to point at.
@@ -382,12 +395,16 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
   }, [step, tour, thread, onChange]);
 
   // The urgent tip goes after a while, or on the next key or click once it has been read.
+  // That press still reaches the app; the lesson is written by the reading above.
   useEffect(() => {
     if (step !== 'urgent' || !tour) return undefined;
     const since = Date.now();
-    const done = () => onChange(finishLesson(tour, 'urgent'));
+    const done = () => { urgentGone.current = true; };
     const t = setTimeout(done, URGENT_MS);
-    const any = () => { if (Date.now() - since >= SEEN_MS) setTimeout(done, 0); };
+    const any = (e: Event) => {
+      if (e instanceof KeyboardEvent && !keyEndsFinish(e.key)) return;
+      if (Date.now() - since >= SEEN_MS) done();
+    };
     window.addEventListener('keydown', any, true);
     window.addEventListener('pointerdown', any, true);
     return () => { clearTimeout(t); window.removeEventListener('keydown', any, true); window.removeEventListener('pointerdown', any, true); };

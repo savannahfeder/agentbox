@@ -19,7 +19,7 @@ export function FollowRows({ news, team, now, onOpen }: { news: FollowNews[]; te
       onClick={() => onOpen(n, n.card)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(n, n.card); }}>
       <span className="mark" aria-hidden="true" />
       <RowCells status={cell(n.kind === 'shipped' ? 'Shipped' : 'Done')}
-        title={<span className="th-msg"><Face person={who} /><span className="th-msg-text">{words}</span></span>}
+        who={{ face: <Face person={who} /> }} title={words}
         where={cardPlace(n.card)} priority={null} updatedAt={n.at} now={now} />
     </div>;
   })}</>;

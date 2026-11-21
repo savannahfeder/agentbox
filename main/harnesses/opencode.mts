@@ -126,6 +126,7 @@ export const openCodeHarness = {
         ZERO_PRODUCT: item.product, ZERO_ITEM: item.id,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
     });
 
     const worker: OpenCodeWorker & { server?: ChildProcess } = createOpenCodeWorker({

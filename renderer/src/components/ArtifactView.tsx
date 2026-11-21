@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import {
   addressedTo, agentOfVersion, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
 } from '../../../shared/artifact-marks.mts';
+import { labelSaidFor } from '../../../shared/file-label.mts';
 import { AgentFace } from './AgentFace';
 import type { FileVersion } from '../../../shared/artifact-marks.mts';
 import { api } from '../api';
@@ -19,6 +20,7 @@ import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, 
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
+import { paletteIsOpen, pressedInThePalette } from '../palette-rows';
 import { ArtifactStage, StageLink, StageProject, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
 import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding, type MovedDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
@@ -187,6 +189,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // Read by the placing effect above, which runs first, so it says what was true before a version arrived.
   useEffect(() => { newestInHand.current = !!family && !!at && at.vi === family.versions.length - 1; });
   const kind = version ? viewKind(version.path) : null;
+  const label = useMemo(() => (version ? labelSaidFor(lines, [version.path, ...(version.also ?? [])]) : null), [lines, version]);
   const agentHere = family && version ? agentOfVersion(family.versions, version.id) : null;
   const [savingNotes, setSavingNotes] = useState<FileNote[]>([]);
   const [settling, setSettling] = useState<Record<string, boolean>>({});
@@ -637,7 +640,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // on its way up, so the thread behind stays still.
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || document.querySelector('[data-own-escape]')) return;
+      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || paletteIsOpen(document) || document.querySelector('[data-own-escape]')) return;
       e.stopImmediatePropagation();
       e.preventDefault();
       if (link) setLink(null);
@@ -648,6 +651,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       else leave();
     };
     const rest = (e: KeyboardEvent) => {
+      if (pressedInThePalette(e.target)) return;
       const at = e.target as HTMLElement | null;
       const typing = at?.tagName === 'TEXTAREA' || !!at?.isContentEditable;
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !typing && !e.defaultPrevented && unsent.ids.length) {
@@ -789,6 +793,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       <header className="av-top">
         <button type="button" className="doc-mark av-back" aria-label="Back" title="Back to the thread (esc)" onClick={leave}><ArtifactControlGlyph><path d="M16 10H4m5-5-5 5 5 5" /></ArtifactControlGlyph></button>
         <span className="av-name">{familyName(family, editing?.base ?? version) || ((editing?.base ?? version)?.name ?? '')}</span>
+        {label && !editing && <span className="av-label" title={label}>{label}</span>}
         {family && version && family.versions.length > 1 && (
           <span className="av-versions">
             <button type="button" className="av-chev" disabled={at!.vi === 0} onClick={() => stepVersion(-1)} aria-label="Older version">‹</button>

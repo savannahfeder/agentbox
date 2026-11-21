@@ -172,6 +172,7 @@ const git = (cwd: string, args: string[]): string => execFileSync('git', [
   ...args,
 ], {
   cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: folderChildDeadline(), killSignal: 'SIGKILL',
+  windowsHide: true,
 }).trim();
 
 /**
@@ -273,7 +274,7 @@ const keptOutOfBackups = new Set<string>();
 export function keepOutOfBackups(dir: string, {
   platform = process.platform,
   // Not waited on: nothing needs its answer, and a task folder is often made on the window's thread.
-  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000 }, () => { /* best effort */ }); },
+  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000, windowsHide: true }, () => { /* best effort */ }); },
 }: { platform?: string; run?: (cmd: string, args: string[]) => unknown } = {}): boolean {
   if (platform !== 'darwin' || keptOutOfBackups.has(dir)) return false;
   keptOutOfBackups.add(dir);
@@ -397,6 +398,7 @@ function sizeOfFirstCommit(root: string): number {
   const listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024,
     timeout: folderChildDeadline(), killSignal: 'SIGKILL',
+    windowsHide: true,
   });
   let total = 0;
   for (const file of listed.split('\0')) {

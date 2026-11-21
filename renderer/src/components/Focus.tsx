@@ -81,7 +81,7 @@ import { connectedReply, lateReply, needsIn, needId, keysOf, type Need } from '.
 import type { KeySource } from '../../../shared/cloud-key-sources.mts';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
 import { referencedFiles, isImagePath } from '../referenced-files';
-import { pictureRoots } from '../message-folders';
+import { pictureRoots, taskFolder } from '../message-folders';
 import { changePathFor } from '../code-artifact';
 import { fileCount, figuresFrom, figuresLabel, signed, type ChangeFigures } from '../change-figures';
 import { embeddedDocuments, isBookkeeping, messageDocuments } from '../message-artifacts';
@@ -95,7 +95,7 @@ import { fileNewsFor, shownName, type ThreadLine } from '../../../shared/artifac
 import { whereAFileOpens } from '../artifact-layout';
 import { carryLine, type CarryState } from '../../../shared/carried-files.mts';
 import { watchScrollGutter } from '../scroll-gutter';
-import { CODE_PATH, artifactUrlTransform, isMediaPath, productPath, remarkArtifactPaths } from '../remark-artifact-paths';
+import { CODE_PATH, artifactUrlTransform, isMediaPath, remarkArtifactPaths, shortPath } from '../remark-artifact-paths';
 import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, readDraftWhen, saveDraftWhen, type SentDraft } from '../drafts';
 import { ReplyLater } from './ReplyLater';
@@ -1512,10 +1512,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         if (!className && ticketReference(value)) return <code>{children}</code>;
         const source = !className && sourceReference(value);
         if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(value)}</ArtifactLink>;
-        // Written out in full into this product's folder counts as the short
-        // path it names, the same rule a full path in a sentence follows.
+        // Written out in full into this product's folder, or the thread's own,
+        // counts as the short path it names, as a full path in a sentence does.
         const shown = value.trim();
-        const path = (!className && productDir && productPath(shown, productDir)) || shown;
+        const path = (!className && shortPath(shown, productDir, taskFolder(repoDir, item.id))) || shown;
         if (!className && (PATH_RE.test(path) || (conversing && path.startsWith('/') && PATH_RE.test(path.slice(1))))) {
           if (/\.(png|jpe?g|gif|webp)$/i.test(path)) {
             return <ArtifactImg key={path} src={path} alt={shown} roots={roots} onOpen={openHref} find={find} />;
@@ -1549,8 +1549,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   }, [productDir, repoDir, item.id, item.result, item.note, item.body, item.answer, direct, product]);
 
   const mdPlugins = useMemo(
-    () => [remarkGfm, remarkTicketReferences, [remarkArtifactPaths, { dir: productDir ?? null, anyFull: direct }], remarkMediaUnderSentences] as NonNullable<Parameters<typeof ReactMarkdown>[0]['remarkPlugins']>,
-    [productDir, direct],
+    () => [remarkGfm, remarkTicketReferences, [remarkArtifactPaths, { dir: productDir ?? null, anyFull: direct, folder: taskFolder(repoDir, item.id) }], remarkMediaUnderSentences] as NonNullable<Parameters<typeof ReactMarkdown>[0]['remarkPlugins']>,
+    [productDir, direct, repoDir, item.id],
   );
 
   // WHAT A CLOUD RUN ASKED FOR is a card in its message (NeedCard.tsx). A saved

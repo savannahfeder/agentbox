@@ -227,8 +227,12 @@ export function effectiveProfiles(
  *  THE NEWEST READING WINS, because that is the only honest answer when two
  *  folders of one subscription disagree: each entry is what was true when a
  *  run last died there, and nothing clears a folder nothing spawns on.
- *  Codex keys are never considered — an account's key carries its engine. */
-export function troubleForProfile<T extends { at?: number | null; since?: number | null }>(
+ *  Codex keys are never considered — an account's key carries its engine.
+ *
+ *  A SIGNED-OUT IS NEVER BORROWED. Each folder holds its own login, so a /login
+ *  in this folder is not undone by another folder of the same account that
+ *  was signed out a week ago. */
+export function troubleForProfile<T extends { at?: number | null; since?: number | null; cause?: string | null }>(
   troubles: Record<string, T | null | undefined> | null | undefined,
   profile: string,
   { home = os.homedir() }: { home?: string } = {},
@@ -242,7 +246,7 @@ export function troubleForProfile<T extends { at?: number | null; since?: number
   const when = (t: T | null) => t?.at ?? t?.since ?? 0;
   let best = own;
   for (const [key, t] of Object.entries(troubles ?? {})) {
-    if (!t || key === profile || key.startsWith('codex:')) continue;
+    if (!t || key === profile || key.startsWith('codex:') || t.cause === 'signed-out') continue;
     if (idOf(key)?.accountUuid !== mine) continue;
     if (when(t) > when(best)) best = t;
   }

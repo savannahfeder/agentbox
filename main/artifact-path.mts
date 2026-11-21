@@ -342,7 +342,7 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
 // cloud may never have had one. Until its branch is merged, the file there is
 // newer than the checkout's copy of the same name. A copy is read out for viewing.
 const readFromGit = promisify(execFile);
-const gitOut = async (repoPath: string, args: string[]): Promise<Buffer> => (await readFromGit('git', ['-C', repoPath, ...args], { encoding: 'buffer', timeout: 5_000, maxBuffer: 64 * 1024 * 1024 })).stdout;
+const gitOut = async (repoPath: string, args: string[]): Promise<Buffer> => (await readFromGit('git', ['-C', repoPath, ...args], { encoding: 'buffer', timeout: 5_000, maxBuffer: 64 * 1024 * 1024, windowsHide: true })).stdout;
 // One git call per repository per look, however many threads ask.
 function unmergedTips(repoPath: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<Map<string, string>> {
     const branches = `refs/heads/${path.posix.dirname(taskBranch('w-0'))}/`;

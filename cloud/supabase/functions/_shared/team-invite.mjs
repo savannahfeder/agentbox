@@ -4,6 +4,8 @@
 
 /** Where someone who has never had Agentbox gets it. */
 export const DOWNLOAD = 'https://agentbox.ac';
+/** The button's page: it opens Agentbox for someone who has it, and gets it for someone who does not. */
+export const JOIN_PAGE = 'https://app.agentbox.ac/invited';
 
 const addressIn = (from) => /<([^<>\s]+)>/.exec(String(from))?.[1] ?? String(from).trim();
 // A name is somebody else's text going into a subject line.
@@ -58,13 +60,13 @@ export function inviteEmail({ email, team, inviter }, { from }) {
     '',
     'If you were not expecting this, you can ignore it.',
   ].join('\n');
-  // The invitation is kept against the address, so the button has no token to carry: it goes where
-  // Agentbox is downloaded, and signing in with this address is what finds the invitation.
+  // The invitation is kept against the address, so the button has no token to carry: signing in
+  // with this address is what finds the invitation.
   const html = [
     `<div style="padding:24px 12px"><div style="max-width:560px;margin:0 auto;padding:44px;background:${PAPER};border:1px solid #e4e0d8;border-radius:16px">`,
     `<table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="padding:3px 5px 0 0;vertical-align:middle">${MARK}</td><td style="vertical-align:middle;font:500 15px/1 ${FONT};color:${INK}">Agentbox</td></tr></table>`,
     `<h1 style="margin:40px 0 0;font:500 34px/1.15 ${FONT};letter-spacing:-0.02em;color:${INK}">${escapeHtml(line)}</h1>`,
-    `<p style="margin:30px 0 0"><a href="${DOWNLOAD}" style="display:inline-block;padding:13px 20px;border-radius:10px;background:${INK};color:${PAPER};text-decoration:none;font:500 16px/1.2 ${FONT}">${escapeHtml(join)}</a></p>`,
+    `<p style="margin:30px 0 0"><a href="${JOIN_PAGE}" style="display:inline-block;padding:13px 20px;border-radius:10px;background:${INK};color:${PAPER};text-decoration:none;font:500 16px/1.2 ${FONT}">${escapeHtml(join)}</a></p>`,
     `<p style="margin:28px 0 0;font:13px/1.6 ${FONT};color:#8a857c">${escapeHtml(`Sign in with ${to} and the invitation is waiting.`)}<br>Not expecting this? Ignore it.</p>`,
     '</div></div>',
   ].join('');

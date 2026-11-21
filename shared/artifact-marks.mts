@@ -663,7 +663,7 @@ export function versionForPath(families: readonly FileFamily[] | null | undefine
 const EXT = 'png|jpe?g|gif|webp|svg|mp4|mov|m4v|webm|pdf|md|markdown|pptx';
 const PATHISH = String.raw`(?:\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:${EXT})`;
 const NAMED = new RegExp(
-  String.raw`\]\(<?((?:\.?\/)?[^()\s>:]+\.(?:${EXT}))>?\)`
+  String.raw`\]\(<?((?:\.?\/|[A-Za-z]:\/)?[^()\s>:]+\.(?:${EXT}))>?\)`
   + '|`(' + PATHISH + ')`'
   + String.raw`|(?<![\w./:@~(\[-])(${PATHISH})(?![\w/-])`,
   'gi',

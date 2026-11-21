@@ -76,7 +76,7 @@ export function copyTree(from: string, to: string, platform: NodeJS.Platform = p
   const args = platform === 'darwin'
     ? ['-c', '-R', from, to]
     : ['-a', '--reflink=auto', from, to];
-  execFileSync('cp', args, { stdio: ['ignore', 'ignore', 'pipe'], ...ended() });
+  execFileSync('cp', args, { stdio: ['ignore', 'ignore', 'pipe'], ...ended(), windowsHide: true });
 }
 
 /**
@@ -93,6 +93,7 @@ const MANAGED = '.claude/worktrees';
 
 const git = (cwd: string, args: string[], input?: string): string => execFileSync('git', args, {
   cwd, input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...ended(),
+  windowsHide: true,
 });
 
 const patternsIn = (text: string) => text.split('\n')
@@ -246,7 +247,7 @@ function nearestReal(abs: string): string | null {
  */
 export function linksUnder(at: string, platform: NodeJS.Platform = process.platform): string[] {
   if (platform !== 'win32') {
-    return execFileSync('find', [at, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...ended() })
+    return execFileSync('find', [at, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...ended(), windowsHide: true })
       .split('\0').filter(Boolean);
   }
   const top = fs.lstatSync(at);

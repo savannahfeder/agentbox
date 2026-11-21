@@ -1,5 +1,5 @@
 import { useLayoutEffect } from 'react';
-import { drawSky, type SkyArt } from './sky';
+import { paintSky, type SkyArt } from './sky';
 
 /**
  * The sky, laid over the main card (`.workspace-layout::before`) and under
@@ -31,7 +31,7 @@ export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?:
       if (key === last) return;
       last = key;
       Object.assign(wrap.style, { left: `${L}px`, top: `${T}px`, width: `${w}px`, height: `${h}px` });
-      drawSky(canvas, art, { from, span, dpr: Math.min(2, window.devicePixelRatio || 1) });
+      paintSky(canvas, art, { from, span, dpr: Math.min(2, window.devicePixelRatio || 1) });
     };
     const later = () => { if (!frame) frame = requestAnimationFrame(paint); };
     paint();

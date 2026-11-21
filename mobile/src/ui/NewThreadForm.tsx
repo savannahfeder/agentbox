@@ -197,6 +197,8 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
   const { draft, box, talk, product, projectName, model, setSheet, agents, offered, engine, codex, mate, onAuto, toWord } = form;
   // A teammate keeps its own model and project; someone new needs only the project it works in.
   const toMate = !!mate && mate !== 'new';
+  // A kept draft opens with the cursor after its words, then the cursor is the person's again.
+  const [caret, setCaret] = useState<{ start: number; end: number } | undefined>(() => ({ start: draft.text.length, end: draft.text.length }));
   return (
     <>
       <Field label="To">
@@ -229,7 +231,8 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
       )}
       {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
       <TextInput ref={box} multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
-        onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onFocus={onFocus} onBlur={onBlur}
+        onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onBlur={onBlur}
+        selection={caret} onFocus={() => { setTimeout(() => setCaret(undefined), 0); onFocus?.(); }}
         style={[{ flex: inline ? undefined : 1, minHeight: inline ? 120 : 160, padding: 16, fontFamily: font.regular, fontSize: 16, lineHeight: 24.8, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
     </>
   );

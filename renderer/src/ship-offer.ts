@@ -216,7 +216,9 @@ export function shipOfferLive(item: Finished, { change, running }: { change: boo
   // AND IT IS THE NEWEST WORD ON THE ROW, which is the one test that covers
   // all of: it has shipped (the queue writes its note after), its ship failed
   // (the same), and you have already answered it (a run is on its way).
-  if (at(item, 'result') < at(item, 'note') || at(item, 'result') < at(item, 'answer')) return false;
+  // A pick taken back with Z leaves '(withdrawn)', which answers nothing.
+  const answered = item.answer !== '(withdrawn)' && at(item, 'result') < at(item, 'answer');
+  if (at(item, 'result') < at(item, 'note') || answered) return false;
   if (NOTHING_LEFT.test(item.result ?? '')) return false;
   // The app's own word that the run stopped: the work is half done, and the
   // next run picks up from those loose edits.

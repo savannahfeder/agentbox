@@ -212,6 +212,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   blankCheck: 'zero:blank-check',
   // The appearance the desktop window's glass is drawn in; a tab has no glass.
   glassTone: 'zero:glass-tone',
+  windowButtons: 'zero:window-buttons',
   track: 'zero:track',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
