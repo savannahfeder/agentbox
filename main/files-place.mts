@@ -1143,7 +1143,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const made = MADE[kind as MadeKind] as (typeof MADE)[MadeKind] | undefined;
       if (!made) throw new Error('New makes a document or a table');
       const { home, into } = whereNew(project, folder);
-      const stem = title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
+      const typed = title.toLowerCase().endsWith(made.ext) ? title.slice(0, -made.ext.length) : title;
+      const stem = typed.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
       const file = freeName(home, stem, made.ext);
       fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
       fs.writeFileSync(path.join(home.dir, 'documents', file), made.seed, { flag: 'wx' });

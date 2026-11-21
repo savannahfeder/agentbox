@@ -51,6 +51,20 @@ describe('a new, empty document', () => {
   });
 });
 
+// Two power testers typed "ideas.md" and got ideas-md.md.
+describe('a new document named with its own ending', () => {
+  it('keeps the name as typed', async () => {
+    await place.newDocument({ project: 'Company', name: 'ideas.md' });
+    await place.newDocument({ project: 'Company', name: 'Leads.CSV', kind: 'table' });
+    expect((await listed()).map((f) => f.name).sort()).toEqual(['ideas.md', 'leads.csv']);
+  });
+
+  it('but not an ending of another kind', async () => {
+    await place.newDocument({ project: 'Company', name: 'notes.csv' });
+    expect((await listed()).map((f) => f.name)).toEqual(['notes-csv.md']);
+  });
+});
+
 it('a file whose only copy is in a code folder cannot be moved to the Trash', async () => {
   const repo = path.join(storeRoot, 'repo');
   fs.mkdirSync(repo, { recursive: true });
