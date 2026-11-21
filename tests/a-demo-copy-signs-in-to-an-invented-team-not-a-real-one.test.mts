@@ -140,7 +140,7 @@ describe('the team a demo copy is signed in to', () => {
     const ask = lines.find((l) => String(l.line.patch.answer ?? '').includes('agentbox-agent:'));
     expect(String(ask?.line.patch.answer)).toContain(`[@Claude Code in Website](agentbox-agent:claude?project=website&task=${SUBJECT_TASK})`);
     // Lena has the last word, so the thread still waits on you.
-    expect(lines.at(-1)?.line.patch.assignee).toBe(DEMO_ME.id);
+    expect(lines.filter((l) => 'answer' in l.line.patch).at(-1)?.line.patch.assignee).toBe(DEMO_ME.id);
     const task = demoLedgerLines().website.filter((l) => l.id === SUBJECT_TASK);
     expect(task.some((l) => (l.patch.labels as string[] | undefined)?.includes(`asked-in:${LENA_THREAD.slug}/${LENA_THREAD.id}`))).toBe(true);
     expect(task.some((l) => String(l.patch.result ?? '').length > 40)).toBe(true);
