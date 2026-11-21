@@ -12,7 +12,8 @@ export type Stop =
   | { at: 'settings'; pane: string | null }
   /** The Team page: 'team' is the Standup, `mate:<id>` and `person:<id>` a member's page. */
   | { at: 'team'; place: string }
-  | { at: 'group'; id: string }
+  /** `inbox`: opened from Needs you, and drawn in the inbox rather than as the Team page. */
+  | { at: 'group'; id: string; inbox?: true }
   | { at: 'teammate'; id: string }
   /** A teammate's thread, which is a card from their Mac rather than one of your rows. */
   | { at: 'card'; person: string; thread: string };
@@ -28,7 +29,7 @@ export function sameStop(a: Stop, b: Stop): boolean {
   if (a.at === 'thread' && b.at === 'thread') return a.product === b.product && a.id === b.id;
   if (a.at === 'files' && b.at === 'files') return a.project === b.project;
   if (a.at === 'team' && b.at === 'team') return a.place === b.place;
-  if (a.at === 'group' && b.at === 'group') return a.id === b.id;
+  if (a.at === 'group' && b.at === 'group') return a.id === b.id && !!a.inbox === !!b.inbox;
   if (a.at === 'teammate' && b.at === 'teammate') return a.id === b.id;
   if (a.at === 'card' && b.at === 'card') return a.person === b.person && a.thread === b.thread;
   // Settings is one place: its pages are where you are inside it.
@@ -44,6 +45,7 @@ export type Screen = {
   files: { project: string | null } | null;
   connections: boolean;
   group: string | null;
+  groupInInbox?: boolean;
   teammate: string | null;
   teamPlace: string | null;
   /** A page the trail does not know. */
@@ -58,7 +60,7 @@ export function stopOnScreen(s: Screen): Stop | null {
   if (s.home) return { at: 'home' };
   if (s.files) return { at: 'files', project: s.files.project };
   if (s.connections) return { at: 'connections' };
-  if (s.group) return { at: 'group', id: s.group };
+  if (s.group) return s.groupInInbox ? { at: 'group', id: s.group, inbox: true } : { at: 'group', id: s.group };
   if (s.teammate) return { at: 'teammate', id: s.teammate };
   if (s.teamPlace) return { at: 'team', place: s.teamPlace };
   if (s.unrecorded) return null;
