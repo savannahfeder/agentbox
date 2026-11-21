@@ -49,7 +49,8 @@ export function taskWords(item: WorkItem, product: Product | undefined | null, m
 
 /** How a finished ask ended, or null for a plain task: the verdict, or that the asker took it back. */
 function askDoneWord(item: WorkItem, holding: boolean, name: string, closer: string): string | null {
-  if (!item.ask) return null;
+  // A thread handed over and closed by whoever handed it: they took it back.
+  if (!item.ask) return handedFrom(item.body, taskGiver(item)) && item.wrote?.status?.by === taskGiver(item) ? `${closer} took it back` : null;
   const v = item.verdict;
   if (v) {
     if (holding) return 'You handed it back';

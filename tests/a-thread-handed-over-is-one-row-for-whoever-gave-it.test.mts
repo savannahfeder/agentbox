@@ -37,3 +37,24 @@ describe('the lists', () => {
     expect(app).toContain('const boardItemsHere = useMemo(() => items.filter((i) => !sentAwayByMe(i, team?.me ?? null)), [items, team?.me]);');
   });
 });
+
+// The same review: the only way back was Reopen, which left Theo holding the task.
+describe('taking a handed-over thread back', () => {
+  const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  it('is the menu row, and ends their task before reopening yours', async () => {
+    const { threadMenuRows } = await import('../renderer/src/threads/ThreadMenu.tsx');
+    expect(threadMenuRows({ change: false, terminal: null, finish: false, reopen: true }).map((r) => r.label)).toContain('Take it back');
+    expect(app).toContain('onReopen={() => (handedToPage(focused) ? takeHandOverBack(focused) : sendBack(focused))}');
+    const fn = app.slice(app.indexOf('const takeHandOverBack'), app.indexOf('const takeAskBack'));
+    expect(fn.indexOf("status: 'done'")).toBeLessThan(fn.indexOf('window.zero?.reopen?.('));
+  });
+  it('reads "Sam took it back" for whoever held it', async () => {
+    const { taskWords } = await import('../renderer/src/team/company.ts');
+    const nameOf = (id: string) => ({ sam: 'Sam', theo: 'Theo' })[id] ?? '';
+    const product = { slug: 'dm', team: { direct: true, projectId: 'd1', people: ['sam', 'theo'] } };
+    const closed = task({ status: 'done', wrote: { status: { by: 'sam', ts: 9 } } });
+    expect(taskWords(closed as never, product as never, 'theo', nameOf, true)?.word).toBe('Sam took it back');
+    const finished = task({ status: 'done', wrote: { status: { by: 'theo', ts: 9 } } });
+    expect(taskWords(finished as never, product as never, 'sam', nameOf, true)?.word).toBe('Theo marked it done');
+  });
+});

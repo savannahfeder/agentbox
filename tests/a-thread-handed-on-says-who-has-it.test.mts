@@ -82,8 +82,8 @@ describe('the bar of a handed-on thread', () => {
 });
 
 describe('the menu of a handed-on thread', () => {
-  it('holds Reopen', () => {
-    expect(threadMenuRows({ change: false, terminal: null, finish: false, reopen: true }).map((r) => r.label)).toContain('Reopen');
+  it('holds Take it back (w-f702d60afe: Reopen left the other person holding it)', () => {
+    expect(threadMenuRows({ change: false, terminal: null, finish: false, reopen: true }).map((r) => r.label)).toContain('Take it back');
   });
 
   it('holds no Reopen otherwise', () => {

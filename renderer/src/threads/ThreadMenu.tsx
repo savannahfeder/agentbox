@@ -139,7 +139,8 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, share
   if (shipped) rows.push({ id: 'shipped', label: shipped === 'marked' ? 'Not shipped after all' : 'Mark as shipped', key: null });
   if (stopRepeat) rows.push({ id: 'stop-repeat', label: 'Stop repeating', key: null });
   if (closeTask) rows.push({ id: 'close-task', label: 'Close task', key: null, detail: 'For both of you' });
-  if (reopen) rows.push({ id: 'reopen', label: 'Reopen', key: null });
+  // Only a handed-on thread has this row; taking it back ends their copy too.
+  if (reopen) rows.push({ id: 'reopen', label: 'Take it back', key: null });
   if (finish) rows.push({ id: 'done', label: 'Mark done', key: 'E' });
   return rows;
 }

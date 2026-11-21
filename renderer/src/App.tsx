@@ -268,7 +268,7 @@ import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
 import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
-import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, taskHandedFrom, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
+import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, taskHandedFrom, handedTo as handedToPage, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
 import { usePointerHold, useHeldOrder } from './threads/steady-rows';
@@ -7730,6 +7730,17 @@ export default function App() {
       openConversation(convo);
     } else { setComposeInitial({ to: personId, ...(about ? { body: about } : {}) }); setModal('compose'); }
   };
+  // A thread you handed over comes back: their task ends, and your thread opens again.
+  const takeHandOverBack = async (item: WorkItem) => {
+    const task = taskHandedFrom(items, item.id, team?.me ?? null);
+    const who = firstName(team?.byId.get(task?.assignee ?? '') ?? null) || handedToPage(item) || 'them';
+    try {
+      if (task && task.status !== 'done') await api.answer({ product: task.product, id: task.id, status: 'done' });
+      await window.zero?.reopen?.({ product: item.product, id: item.id });
+    } catch (err) { showToast(`Not taken back: ${(err as Error).message}`); return; }
+    showToast(`Taken back from ${who}. It is yours again.`);
+    await refresh();
+  };
   const takeAskBack = async (task: WorkItem) => {
     try { await api.answer({ product: task.product, id: task.id, status: 'done' }); } catch (err) { showToast(`Not taken back: ${(err as Error).message}`); return; }
     showToast('Taken back. It is only yours again.');
@@ -8776,7 +8787,7 @@ export default function App() {
                   // ways a task ends, and the card beside the bar names exactly
                   // two. Both are back the moment the walk ends.
                   onSnooze={walking ? undefined : () => openSnooze(focused)}
-                  onReopen={() => sendBack(focused)}
+                  onReopen={() => (handedToPage(focused) ? takeHandOverBack(focused) : sendBack(focused))}
                   onReopenDone={() => reopenDone(focused)}
                   onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
                   onPriority={(value) => { void retag([focused], value); }}
