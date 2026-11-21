@@ -130,7 +130,7 @@ export function teamRouteChoices(item: WorkItem, team: TeamView | null): { route
   if (!team || !teamHeld(item, team) || item.assignee !== team.me) return [];
   // A task someone gave you stays yours and writing back does not return it, so
   // the one choice is who does the work.
-  if (isGivenTask(item, team.products.get(item.product))) return item.status === 'done' ? [] : [{ route: 'agent', label: 'Give it to an agent' }];
+  if (isGivenTask(item, team.products.get(item.product))) return item.status === 'done' ? [] : [{ route: 'agent', label: 'Carry on with an agent' }];
   // A message is talk, not a task (approved 2026-10-01): work comes out of it
   // only by @-mentioning an agent in the reply box, which works in the project
   // its mention names. There is no line under the conversation offering to

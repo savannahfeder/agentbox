@@ -305,7 +305,7 @@ describe('giving it to an agent', () => {
   it('is offered to the person who holds it, and only that', async () => {
     await give();
     await dev.service.syncNow();
-    expect(teamRouteChoices(dev.row('Book Dr. Ames'), view(dev))).toEqual([{ route: 'agent', label: 'Give it to an agent' }]);
+    expect(teamRouteChoices(dev.row('Book Dr. Ames'), view(dev))).toEqual([{ route: 'agent', label: 'Carry on with an agent' }]);
     expect(teamRouteChoices(maya.row('Book Dr. Ames'), view(maya))).toEqual([]);
   });
 
