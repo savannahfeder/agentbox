@@ -13,7 +13,7 @@ import path from 'node:path';
 import { DEMO_CLOUD, loadCloudConfig, supabaseSession } from '../main/team/session.mts';
 import { readSeededAt, seedDemoTeam, writeSeededAt } from '../main/demo-team.mts';
 import {
-  DEMO_ENV, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoLedgerLines, demoMessages, lastWorkingMorning,
+  DEMO_CHATS, yesterdayAt, DEMO_ENV, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoLedgerLines, demoMessages, lastWorkingMorning,
 } from '../shared/demo-world.mts';
 import { TEAM_LOOK } from '../shared/team-look.mts';
 
@@ -175,6 +175,18 @@ describe('finished work lands inside the standup that opens', () => {
       for (const p of DEMO_TEAMMATES) {
         const shipped = demoCards(now).filter((c) => c.by.id === p.id && c.shippedAt && c.shippedAt < morning && c.shippedAt > morning - 24 * 3_600_000);
         expect(shipped.length, p.name).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('and every chat line was said in working hours the day before, whenever the demo opens', () => {
+    // A Priya message stamped 12:08am was counted back from a demo opened at 18:00.
+    for (const now of [at(2026, 11, 18, 9), at(2026, 11, 18, 18), at(2026, 11, 21, 23)]) {
+      for (const c of DEMO_CHATS) for (const s of c.said) {
+        const when = new Date(yesterdayAt(now, s.at));
+        expect(when.getHours()).toBeGreaterThanOrEqual(9);
+        expect(when.getHours()).toBeLessThan(18);
+        expect(when.getTime()).toBeLessThan(now);
       }
     }
   });
