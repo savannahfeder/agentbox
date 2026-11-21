@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CommentBox, TeammateCorner, TeammateThread } from '../renderer/src/threads/TeammateThread.tsx';
+import { endWasInView } from '../renderer/src/threads/teammate-thread.ts';
 import { TeamContext } from '../renderer/src/team/people.tsx';
 import { FollowContext } from '../renderer/src/team/following.ts';
 globalThis.React = React;
@@ -163,6 +164,17 @@ describe("the box at the foot of a teammate's thread", () => {
     expect(left(rule(pages, '.tp-dock'))).toBe(left(rule(pages, '.tp-grid')));
     expect(rule(pages, '.tp-dock.tp-with-about').match(/padding-left: ([^;]*);/)?.[1]).toBe(rule(pages, '.tp-grid.tp-with-about').match(/padding-left: ([^;]*);/)?.[1]);
     expect(page()).toMatch(/<div class="tp-scroll">[\s\S]*<\/div><div class="tp-dock"><div class="dock-card tp-compose"><button type="button" class="dock-pill">/);
+  });
+  // Opened under the last message on the stage, the 150px card covered it.
+  it('keeps the end of the conversation in view as it opens, when you were reading the end', () => {
+    // 2000px of words in an 800px window, the box 106px taller: the window is 694px now.
+    const atEnd = { scrollHeight: 2000, clientHeight: 694, scrollTop: 1200 };
+    expect(endWasInView(atEnd, 106)).toBe(true);
+    expect(endWasInView({ ...atEnd, scrollTop: 1193 }, 106)).toBe(true);
+    expect(endWasInView({ ...atEnd, scrollTop: 1192 }, 106)).toBe(false);
+    expect(endWasInView({ ...atEnd, scrollTop: 0 }, 106)).toBe(false);
+    expect(endWasInView(atEnd, -106)).toBe(false);
+    expect(source).toMatch(/if \(endWasInView\(scroll, by\)\) scroll\.scrollTop = scroll\.scrollHeight;/);
   });
   it('opens on R, which the page\'s own keys pass on', () => {
     expect(app).toMatch(/if \(openCard && teamShown\) \{[\s\S]*?else if \(e\.key === 'r' \|\| e\.key === 'R'\) \{ e\.preventDefault\(\); window\.dispatchEvent\(new Event\(TEAMMATE_REPLY\)\); \}/);

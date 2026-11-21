@@ -41,6 +41,15 @@ export function teammateThreadsFound(cards: ThreadCard[], me: string | null | un
   });
 }
 
+/**
+ * Whether the conversation's end was in view before the box under it grew by
+ * `by` px. The scroll is already that much shorter when this is asked, so the
+ * end counts as in view if it was within 8px of the old bottom.
+ */
+export function endWasInView(scroll: { scrollHeight: number; scrollTop: number; clientHeight: number }, by: number): boolean {
+  return by > 0 && scroll.scrollHeight - scroll.scrollTop - (scroll.clientHeight + by) < 8;
+}
+
 /** Under the "Waiting on Dev" at the top of a teammate's thread: what that means, in one line. */
 export function standingLine(state: ThreadCard['state'], owner: string, waits: string | null): string | null {
   if (state === 'running') return `${owner}'s agent is working on it.`;

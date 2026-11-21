@@ -30,7 +30,7 @@ import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Pers
 import { AskBar } from '../team/AskBar';
 import { DoneTrail, MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
 import { doneSteps } from '../../../shared/thread-cards.mts';
-import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
+import { earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
 import { agoWords } from './summary-rules';
@@ -255,8 +255,23 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const numbered = useMemo(() => lineAsThread(line), [line]);
   const viewLines = useMemo(() => (numbered.lines.length ? [...(work?.lines ?? []), ...numbered.lines as LedgerLine[]] : work?.lines ?? []), [work?.lines, numbered]);
   const [big, setBig] = useState<ArtifactOpen | null>(null);
-  // Asked onto it, you land where the ask and the box to write in are, once per thread.
+  // Read to its end, the end stays in view while the box under it opens and grows.
   const scrollEl = useRef<HTMLDivElement>(null);
+  const dockEl = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scroll = scrollEl.current;
+    const dock = dockEl.current;
+    if (!scroll || !dock || typeof ResizeObserver === 'undefined') return undefined;
+    let was = dock.offsetHeight;
+    const grew = new ResizeObserver(() => {
+      const by = dock.offsetHeight - was;
+      was = dock.offsetHeight;
+      if (endWasInView(scroll, by)) scroll.scrollTop = scroll.scrollHeight;
+    });
+    grew.observe(dock);
+    return () => grew.disconnect();
+  }, []);
+  // Asked onto it, you land where the ask and the box to write in are, once per thread.
   const landed = useRef<string | null>(null);
   useEffect(() => {
     if (!ask || !work || landed.current === threadId) return;
@@ -368,7 +383,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           </aside>}
         </div>
       </div>
-      <div className={`tp-dock${about ? ' tp-with-about' : ''}`}>
+      <div className={`tp-dock${about ? ' tp-with-about' : ''}`} ref={dockEl}>
         {/* Asked to help, the box to write to the agent stays open. */}
         <CommentBox owner={owner} helping={helping} draft={draft} setDraft={setDraft} sending={sending} onSend={() => void send()}
           open={boxOpen || helping} onOpen={() => setBoxOpen(true)} onFold={() => setBoxOpen(false)} />
