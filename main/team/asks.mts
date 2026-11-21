@@ -10,6 +10,7 @@
 // neither says it twice nor drops it.
 import fs from 'node:fs';
 import { askIGave, handedBackAsks, handedBackWords, helpAskCovering } from '../../shared/thread-asks.mts';
+import { handedOn } from '../../shared/thread-cards.mts';
 import type { Verdict } from '../../shared/work-items.mts';
 import type { PhoneItem } from '../phone-inbox.mts';
 import type { ThreadComment } from './thread-share.mts';
@@ -54,7 +55,8 @@ export function createAsks({ file, me, products, readRows, nameOf, tell, putAway
     relay(c: ThreadComment, thread: { item: PhoneItem; product: AskProduct }): boolean {
       const k = read();
       if (k.relayed.includes(c.id)) return true;
-      if (!tell) return false;
+      // A thread you handed on is not yours to run on anyone's words.
+      if (!tell || handedOn(thread.item)) return false;
       const rows = taskRows().map((t) => t.row);
       if (!helpAskCovering(rows as never[], me(), c.threadId, c.by, c.at)) return false;
       k.relayed.push(c.id);
@@ -75,7 +77,14 @@ export function createAsks({ file, me, products, readRows, nameOf, tell, putAway
         const a = askIGave(r as never, me())!;
         const where = products().find((p) => p.slug === a.product);
         changed = true;
-        if (!where) { k.back.push(r.id); continue; }
+        // Gone, or handed on since: the hand-back belongs to nobody here, and would reopen a thread you gave away.
+        const thread = where ? readRows(where.dir).find((t) => t.id === a.thread) : null;
+        if (!where || (thread && handedOn(thread))) {
+          k.back.push(r.id);
+          const slug = all.find((t) => t.row.id === r.id)?.slug;
+          if (slug) putAway(slug, r.id);
+          continue;
+        }
         const helper = String((r as { assignee?: string }).assignee);
         const name = nameOf(helper);
         const mine = me();

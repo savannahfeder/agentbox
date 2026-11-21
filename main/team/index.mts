@@ -1397,6 +1397,12 @@ export function createTeamService({
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...change.files, ...files],
       });
+      // The asks on it end with it: what they say back would come to a thread you no longer hold.
+      for (const r of store.listItems()) {
+        const a = askOf(r as never);
+        if (!a || a.owner !== state.me.id || a.thread !== id || !askIsOpen(r as never)) continue;
+        try { store.answerItem(r.product, r.id, { answer: `${giver} handed this thread to ${person.name || 'a teammate'}.`, status: 'done' }); } catch (err) { log(`asks: ${(err as Error).message}`); }
+      }
       // As your own words: a note would be drawn as the agent's checkpoint.
       const said = String(note ?? '').trim();
       store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}.${said ? `\n\n${said}` : ''}`, status: 'done' });
