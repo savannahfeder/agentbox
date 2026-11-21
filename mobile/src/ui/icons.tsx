@@ -42,10 +42,6 @@ export const More = ({ size = 18, tint = color.dim }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={tint}><Circle cx={5} cy={12} r={1.5} /><Circle cx={12} cy={12} r={1.5} /><Circle cx={19} cy={12} r={1.5} /></Svg>
 );
 
-export const Panel = ({ size = 17, tint = color.dim }: P) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.5}><Rect x={3.75} y={4.75} width={16.5} height={14.5} rx={1} /><Path d="M14.5 5v14" /></Svg>
-);
-
 export const Cross = ({ size = 18, tint = color.dim }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round"><Path d="M6 6l12 12M18 6 6 18" /></Svg>
 );

@@ -11,7 +11,7 @@ import fs from 'node:fs';
 
 const page = fs.readFileSync('mobile/src/app/thread/[product]/[id].tsx', 'utf8');
 const parts = fs.readFileSync('mobile/src/ui/parts.tsx', 'utf8');
-const composer = page.slice(page.indexOf('function Dock('), page.indexOf('function Summary('));
+const composer = page.slice(page.indexOf('function Dock('), page.indexOf('export default function ThreadScreen('));
 
 describe("the reply box's choices", () => {
   it('are each a ChoiceButton that names what it changes', () => {
