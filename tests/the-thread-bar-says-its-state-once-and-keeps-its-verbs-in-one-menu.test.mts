@@ -213,7 +213,7 @@ describe('the right side is the dots', () => {
     const css = prose(read('renderer/src/threads/summary.css'));
     // --tag-radius: the button is the Summary button's square, and both of
     // them are tags, which are square in every theme.
-    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--tag-radius\)/);
+    expect(css).toMatch(/\.ts-more \{[^}]*width: 32px; height: 32px;[^}]*border-radius: var\(--tag-radius\)/);
     expect(css).not.toMatch(/border-radius: (1[0-9]|[2-9][0-9])px|50%\s*;[^}]*ts-more/);
   });
 });

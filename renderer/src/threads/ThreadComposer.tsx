@@ -43,6 +43,7 @@ import { TeamContext, Face, firstName } from '../team/people';
 import { whereAMessageGoes } from '../team/one-conversation';
 import { AgentFace } from '../components/AgentFace';
 import { AutoFace } from '../components/AutoFace';
+import { EngineLogo } from '../components/EngineLogos';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
@@ -1246,7 +1247,7 @@ export function ThreadComposer({
       <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person ? dropRank('to') : undefined}>
         <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'}
           onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
-          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : inline ? null : onAuto ? <AutoFace /> : <AgentFace />}
+          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : onAuto ? <AutoFace /> : <AgentFace />}
           <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>
         </button>
         {extra.map((p) => (
@@ -1293,6 +1294,7 @@ export function ThreadComposer({
       <span className="tc-anchor" ref={anchor('model')} data-drop={inline ? dropRank('model') : undefined}>
         <button type="button" data-trigger className={trigger('model')} aria-haspopup="listbox" aria-expanded={open === 'model'}
           onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
+          <EngineLogo engine={pick.engine} size={14} />
           <span className="tc-word-text">{labelOf(pick)}</span>
         </button>
         {open === 'model' && modelMenu}
