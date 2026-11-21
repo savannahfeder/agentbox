@@ -314,6 +314,8 @@ export interface PlacedFile {
   key: string;
   project: string | null;
   name: string;
+  /** The name a person gave it in Files; `name` stays its name on disk. */
+  title?: string;
   kind: FileKind | null;
   /** Made in Files and nothing written in it yet. */
   blank?: boolean;
@@ -367,6 +369,7 @@ export type FileFolderAct =
   | { do: 'make'; project: string; name: string; parent?: string | null }
   | { do: 'rename'; id: string; name: string }
   | { do: 'move'; key: string; folder: string | null }
+  | { do: 'name'; key: string; name: string }
   | { do: 'remove'; id: string }
   | { do: 'restore'; ids: string[] };
 
@@ -403,6 +406,9 @@ export interface FilesPlaceView {
   key: string;
   project: string | null;
   name: string;
+  title?: string;
+  /** The project folder it lives in, for a file no thread was sent. */
+  product?: string;
   /** Its newest version is on its way back from the cloud. */
   coming?: boolean;
   sentIn: FileSentIn[];
@@ -992,6 +998,8 @@ export interface SupervisorStatus {
   // Rows nothing can start because every login of their tool is out of usage,
   // id -> the tool's name and when it resets (0 when no login said).
   atLimit?: Record<string, { tool: string; until: number }>;
+  // Engine -> its tool's name and reset, for each tool whose work account is out of usage now.
+  outOfUsage?: Record<string, { tool: string; until: number }>;
   // Queued rows the last pass could not start, id -> why and the tool's name.
   cannotStart?: Record<string, { why: string; tool: string }>;
   // Rows the app's ship queue still owes a ship (main/ship-queue.mts). Waiting

@@ -12,6 +12,12 @@ export function renameUndo(folders: readonly FileFolder[], id: string, name: str
   return { label: `Renamed ${was.name} back`, undoes: `rename “${clean(name)}” back to “${was.name}”`, back: { do: 'rename', id, name: was.name } };
 }
 
+export function fileRenameUndo(file: Pick<PlacedFile, 'key' | 'name' | 'sentIn' | 'title'>, name: string): Back<FileFolderAct> | null {
+  const was = shownName(file);
+  if (clean(name) === was) return null;
+  return { label: `Renamed ${was} back`, undoes: `rename “${clean(name)}” back to “${was}”`, back: { do: 'name', key: file.key, name: was } };
+}
+
 /** Taken before the move, while `files` still says where each one was. */
 export function moveUndo(files: readonly PlacedFile[], keys: readonly string[], to: string | null, folders: readonly FileFolder[]): Back<FileFolderAct[]> | null {
   const moved = keys.map((k) => files.find((f) => f.key === k)).filter((f): f is PlacedFile => !!f && (f.folder ?? null) !== to);
