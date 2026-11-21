@@ -69,6 +69,7 @@ import { carryLocalFiles, copyTree, folderChildDeadline, onlyTrackedContent, tra
 import { givePrivateFolder } from './private-folder.mts';
 import type { ExecFailure } from './worktree-include.mts';
 import { HOOK_FREE } from './hook-free-git.mts';
+import { alive } from './process-alive.mts';
 
 /** The answer of a git call that does not throw. */
 export interface GitResult {
@@ -171,6 +172,7 @@ const git = (cwd: string, args: string[]): string => execFileSync('git', [
   ...args,
 ], {
   cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: folderChildDeadline(), killSignal: 'SIGKILL',
+  windowsHide: true,
 }).trim();
 
 /**
@@ -272,7 +274,7 @@ const keptOutOfBackups = new Set<string>();
 export function keepOutOfBackups(dir: string, {
   platform = process.platform,
   // Not waited on: nothing needs its answer, and a task folder is often made on the window's thread.
-  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000 }, () => { /* best effort */ }); },
+  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000, windowsHide: true }, () => { /* best effort */ }); },
 }: { platform?: string; run?: (cmd: string, args: string[]) => unknown } = {}): boolean {
   if (platform !== 'darwin' || keptOutOfBackups.has(dir)) return false;
   keptOutOfBackups.add(dir);
@@ -396,6 +398,7 @@ function sizeOfFirstCommit(root: string): number {
   const listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024,
     timeout: folderChildDeadline(), killSignal: 'SIGKILL',
+    windowsHide: true,
   });
   let total = 0;
   for (const file of listed.split('\0')) {
@@ -465,12 +468,6 @@ const lockReason = (pid: number) => `agentbox pid=${pid}`;
 const pidInReason = (reason: string | null | undefined) => {
   const found = /agentbox pid=(\d+)/.exec(reason ?? '');
   return found ? Number(found[1]) : null;
-};
-// Signal 0 asks the kernel whether a pid exists without touching it. EPERM
-// means it exists and belongs to somebody else, which still counts as alive.
-const alive = (pid: number | null) => {
-  if (!pid) return false;
-  try { process.kill(pid, 0); return true; } catch (error) { return (error as ExecFailure)?.code === 'EPERM'; }
 };
 
 /** Every worktree git knows about, as records rather than as text. */

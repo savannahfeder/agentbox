@@ -15,9 +15,12 @@ const LOCAL_MS = 20_000;
 const CHECKED_PUSH_MS = 10 * 60_000;
 
 export function pushPrivateFolder(dir, { message, env = process.env, trusted = dir } = {}) {
-  const rel = named(dir);
+  // The task's own private.json is the worker's to write, so the name is the app folder's.
+  const rel = named(trusted);
   const at = rel && path.join(dir, rel);
   if (!at || !fs.existsSync(path.join(at, '.git'))) return { pushed: false };
+  // A linked folder on the way would compare the app folder's checkout with itself.
+  if (fs.realpathSync(at) !== path.join(fs.realpathSync(dir), rel)) return { pushed: false, why: `${rel} was left as it is, because it leads outside the task folder` };
   const planted = plantedIn(at, path.join(trusted, rel));
   if (planted) return { pushed: false, why: `${rel} was left as it is, because ${planted}` };
   // The gate, not the public hooks the ship names in the environment, which

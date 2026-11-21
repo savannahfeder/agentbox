@@ -15,6 +15,7 @@ import { type Look } from '../skins';
 import { type ThemeChoice } from '../theme';
 import { NAME } from '../../../shared/product-name.mjs';
 import { CHECK_SAY, MOVE_SAY } from '../update-row';
+import { closesOnPress } from '../press';
 
 export interface Command {
   id: string;
@@ -525,7 +526,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
   }, [selected]);
 
   return (
-    <div className={`modal-backdrop palette-backdrop${phone ? ' palette-on-phone' : ''}`} onClick={onClose}>
+    <div className={`modal-backdrop palette-backdrop${phone ? ' palette-on-phone' : ''}`} {...closesOnPress(onClose)}>
       <div className={`modal palette palette-k${phone ? ' palette-phone' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="palette-query">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.6" /><path d="M10.4 10.4L14 14" /></svg>

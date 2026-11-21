@@ -14,6 +14,8 @@ export function messageKind(e: Pick<AgentTurn, 'says' | 'fileMark'> | null | und
   }
   if (e.fileMark?.kind === 'edited') return { word: `Edited ${e.fileMark.shown ?? e.fileMark.file}`, file: true };
   if (e.says === 'comment') return { word: 'Comment', why: 'did not start the agent' };
+  // Yours, on a thread you were asked to help on: its owner's computer passes it to their agent.
+  if (e.says === 'to-agent') return { word: 'To the agent' };
   if (e.says === 'progress') return { word: 'Checkpoint', why: 'progress so far' };
   return null;
 }

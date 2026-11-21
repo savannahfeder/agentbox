@@ -164,7 +164,7 @@ const PS_DEADLINE_MS = 30_000;
 
 function ps(args: string[]): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    execFile('/bin/ps', args, { timeout: PS_DEADLINE_MS, maxBuffer: 256 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile('/bin/ps', args, { timeout: PS_DEADLINE_MS, maxBuffer: 256 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       if (!err) { resolve(stdout); return; }
       const { killed, code } = err as { killed?: boolean; code?: unknown };
       const said = String(stderr ?? '').trim().split('\n')[0];
@@ -256,8 +256,16 @@ export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null 
   return out;
 }
 
-/** Every process, tagged with its task where it can be: `ps` on a Mac (about 100 ms), /proc on Linux. */
+/**
+ * Whether this computer can tie a program to its task at all. Windows lets no
+ * process read another's environment, and the tag is only ever read from
+ * there, so on Windows nothing is attributed and nothing is stopped.
+ */
+export const seesTaskTags = (platform: string = process.platform) => platform !== 'win32';
+
+/** Every process, tagged with its task where it can be: `ps` on a Mac (about 100 ms), /proc on Linux, none on Windows. */
 export async function listProcesses(platform: string = process.platform): Promise<ProcessRecord[]> {
+  if (!seesTaskTags(platform)) return [];
   if (platform !== 'darwin') return readLinuxProcesses();
   const [base, argv, full] = await Promise.all([
     ps(['-axo', 'pid=,ppid=,rss=,time=,lstart=,comm=']),
@@ -268,7 +276,7 @@ export async function listProcesses(platform: string = process.platform): Promis
   const renamed = procs.filter((p) => !p.exe.startsWith('/')).map((p) => p.pid);
   if (renamed.length) {
     const out = await new Promise<string>((resolve) => {
-      execFile('/usr/sbin/lsof', ['-a', '-p', renamed.join(','), '-d', 'txt', '-Fpn'], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024 },
+      execFile('/usr/sbin/lsof', ['-a', '-p', renamed.join(','), '-d', 'txt', '-Fpn'], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
         (_err, stdout) => resolve(stdout ?? ''));
     });
     applyExecutables(procs, out);

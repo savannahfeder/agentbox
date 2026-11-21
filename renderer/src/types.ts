@@ -137,6 +137,10 @@ export interface WorkItem {
   waitEnded?: { said: string; at: number };
   /** Where it went when someone left the team (main/team/departures.mts). */
   handedOver?: { said: string; at: number };
+  /** A task asking for help or a review on someone's thread (shared/thread-asks.mts). */
+  ask?: { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string };
+  /** How that ask was handed back. */
+  verdict?: 'done' | 'yes' | 'changes';
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -1140,12 +1144,14 @@ export interface AgentTurn {
   /** An agent teammate that handed this thread work: drawn as an agent's
    *  message under that teammate's name, never as yours. */
   from?: string;
+  /** Whose words those were, by id: a person you asked to help draws with their face. */
+  fromId?: string;
   /** The agent that wrote this message on its owner's behalf (`by`). */
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
   fileMark?: FileMarkLink;
   /** A teammate's comment, or an agent's checkpoint (thread-history.ts). */
-  says?: 'comment' | 'progress';
+  says?: 'comment' | 'progress' | 'to-agent';
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
@@ -1761,6 +1767,7 @@ declare global {
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       draftCopy?: { read(): string | null; write(text: string): void };
       glassTone?(p: { tone: 'light' | 'dark' | 'system' }): Promise<unknown>;
+      windowButtons?(p: { dark: boolean }): Promise<unknown>;
       blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
@@ -1853,6 +1860,8 @@ declare global {
       teamGiveTask(p: { to: string; title?: string; body: string; priority?: number; due?: string; files?: TeamMessageFile[]; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; blockedBy?: string[] }): Promise<TeamCallResult>;
       teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult>;
       teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult>;
+      teamAsk(p: { product: string; id: string; to: string; kind: 'help' | 'review'; note?: string; step?: string }): Promise<TeamCallResult>;
+      teamHandBack(p: { product: string; id: string; verdict?: 'done' | 'yes' | 'changes'; words?: string }): Promise<TeamCallResult>;
       teamTaskBrief(p: { product: string; id: string }): Promise<{ title: string; body: string; files: { name: string; srcPath: string }[] }>;
       rooms?(p: { op: string; args?: unknown[] }): Promise<RoomsResult>;
       teammates?(p: { op: string; args?: unknown }): Promise<TeammatesResult>;

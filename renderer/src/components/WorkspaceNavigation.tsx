@@ -11,6 +11,7 @@ import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
 import { chord } from '../this-keyboard';
 import { pointerMoved } from '../sidebar-shrinks';
+import { actsOnPress } from '../press';
 
 // The search glass drawn at the sidebar's stroke, like Feedback's plane.
 function SearchGlyph() {
@@ -175,10 +176,10 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
         rather than among them, and its keys are text rather than caps. */}
     {onPalette && <div className="workspace-find"><button type="button" aria-label="Search" title={`Search · ${chord('⌘K')}`} onClick={onPalette}><SearchGlyph /><span>Search</span><small className="workspace-keys" aria-hidden="true">{chord('⌘K')}</small></button></div>}
     <nav className="workspace-tabs" aria-label="Inbox">
-      {onHome && <button data-tab="home" className={`workspace-tab${homePage ? ' active' : ''}`} aria-label="Home" aria-current={homePage ? 'page' : undefined} title={collapsed ? 'Home' : undefined} onClick={onHome}>
+      {onHome && <button data-tab="home" className={`workspace-tab${homePage ? ' active' : ''}`} aria-label="Home" aria-current={homePage ? 'page' : undefined} title={collapsed ? 'Home' : undefined} {...actsOnPress(onHome)}>
         <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 10.4 12 5l7 5.4v8.6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M10 20v-4.6a2 2 0 0 1 4 0V20"/></svg><span>Home</span>
       </button>}
-      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} onClick={() => onView('inbox')}>{onHome ? <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg> : <SidebarIcon view="inbox" />}<span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
+      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} {...actsOnPress(() => onView('inbox'))}>{onHome ? <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg> : <SidebarIcon view="inbox" />}<span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
       {/* THERE IS NO TEAM TAB (w-05ff3d1438, 2026-10-01). The Team page and
           the Inbox were one question on two pages, so they are one page: the
           faces at the end of the Inbox's tab bar pick whose threads are on
@@ -186,15 +187,15 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     </nav>
     {groups}
     {(onConnections || onFiles || onTasks) && <nav className="workspace-tabs workspace-places" aria-label="Places">
-      {onTasks && <button data-tab="team" className={`workspace-tab${tasksPage ? ' active' : ''}`} aria-label="Team" aria-current={tasksPage ? 'page' : undefined} title={collapsed ? 'Team' : undefined} onClick={onTasks}>
+      {onTasks && <button data-tab="team" className={`workspace-tab${tasksPage ? ' active' : ''}`} aria-label="Team" aria-current={tasksPage ? 'page' : undefined} title={collapsed ? 'Team' : undefined} {...actsOnPress(onTasks)}>
         <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5"/><circle cx="6" cy="10" r="2"/><circle cx="18" cy="10" r="2"/><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5"/><path d="M3 18c0-2 1.3-3.5 3-3.5 .8 0 1.5.3 2 .8M21 18c0-2-1.3-3.5-3-3.5-.8 0-1.5.3-2 .8"/></svg>
         <span>Team</span>
       </button>}
-      {onConnections && <button data-tab="connections" className={`workspace-tab${connectionsPage ? ' active' : ''}`} aria-label="Connections" aria-current={connectionsPage ? 'page' : undefined} title={collapsed ? 'Connections' : undefined} onClick={onConnections}>
+      {onConnections && <button data-tab="connections" className={`workspace-tab${connectionsPage ? ' active' : ''}`} aria-label="Connections" aria-current={connectionsPage ? 'page' : undefined} title={collapsed ? 'Connections' : undefined} {...actsOnPress(onConnections)}>
         <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10.5a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 0 0 5.66 5.66l1-1"/></svg>
         <span>Connections</span>
       </button>}
-      {onFiles && <button data-tab="files" className={`workspace-tab${filesPage ? ' active' : ''}`} aria-label="Files" aria-current={filesPage ? 'page' : undefined} title={collapsed ? 'Files' : undefined} onClick={onFiles}>
+      {onFiles && <button data-tab="files" className={`workspace-tab${filesPage ? ' active' : ''}`} aria-label="Files" aria-current={filesPage ? 'page' : undefined} title={collapsed ? 'Files' : undefined} {...actsOnPress(onFiles)}>
         <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4.5h6.5l4 4V19a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z"/><path d="M13.5 4.5v4h4"/></svg>
         <span>Files</span>
       </button>}

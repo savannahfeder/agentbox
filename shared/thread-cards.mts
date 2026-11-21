@@ -399,7 +399,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     const s = summaryOf(item);
     // The run that got nowhere is said by the wait; as a solution it read as finished.
     // A thread handed on says so, so a teammate's screen never reads its close as finished.
-    const solution = handedOn(item) ? item.answer : waitsOn && gotNowhere ? '' : s.solution;
+    // The first line names who has it; the giver's note under it is theirs to read, not the team board's.
+    const solution = handedOn(item) ? String(item.answer).split('\n')[0] : waitsOn && gotNowhere ? '' : s.solution;
     const shippedAt = shippedAtOf(item);
     cards.push({
       threadId: item.id, visible: true, title: shownTitle(item), project: product.name,

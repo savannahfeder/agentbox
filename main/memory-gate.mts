@@ -87,6 +87,9 @@ export function pressureFrom(
   return 'normal';
 }
 
+/** Windows has no unix socket for the hook to ask on, so there the check is off. */
+export const memoryGateWorksOn = (platform: NodeJS.Platform = process.platform): boolean => platform !== 'win32';
+
 /** One heavy slot per 8 GB, at least one; two on a machine it cannot read. */
 export function autoSlots(memBytes: unknown): number {
   const gb = Math.round((Number(memBytes) || 0) / 1024 ** 3);

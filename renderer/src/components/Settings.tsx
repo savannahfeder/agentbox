@@ -2938,7 +2938,8 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
     const auto = read('agentsAuto', w.agentsAuto);
     const count = read('sessionsAtOnce', w.sessionsAtOnce);
     const isAuto = auto.waiting ? !!auto.value : count.waiting ? false : !!auto.value;
-    const gate = read('memoryGate', w.memoryGate?.on);
+    const memory = w.memoryGate;
+    const gate = read('memoryGate', memory?.on);
     const slots = read('memoryGateSlots', w.memoryGate?.slots ?? null);
     const slow = read('agentsFeltSlow', null);
     const outside = read('outsideAgents', w.outsideAgents);
@@ -2951,16 +2952,20 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
             <Picker bare label="How many run at once" value={isAuto ? 'auto' : String(count.value)} options={options}
               onChange={(v) => (v === 'auto' ? onWorkspace('agentsAuto', true) : onWorkspace('sessionsAtOnce', Number(v)))} />
           </ReadRow>
-          <ReadRow label="Hold heavy work when memory is short" reading={gate}
-            desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
-            <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
-          </ReadRow>
-          {(gate.value as boolean) && !isAuto && (
-            <ReadRow label="Heavy commands at once" reading={slots}
-              desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}>
-              <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}
-                onChange={(v) => onWorkspace('memoryGateSlots', v === w.memoryGate.slotsAuto ? null : v)} />
-            </ReadRow>
+          {memory && (
+            <>
+              <ReadRow label="Hold heavy work when memory is short" reading={gate}
+                desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
+                <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
+              </ReadRow>
+              {(gate.value as boolean) && !isAuto && (
+                <ReadRow label="Heavy commands at once" reading={slots}
+                  desc={slots.value === null ? `Auto: ${memory.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${memory.slotsAuto} on this computer.`}>
+                  <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? memory.slotsAuto} min={1} max={memory.slotsMax ?? 8}
+                    onChange={(v) => onWorkspace('memoryGateSlots', v === memory.slotsAuto ? null : v)} />
+                </ReadRow>
+              )}
+            </>
           )}
           {toggle('Stop programs agents leave behind', 'cleanupLeftovers', !!w.leftovers?.on, `Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on this computer are never stopped.${two ? ' Codex agents’ programs are not found yet.' : ''}`)}
           <ReadRow label="Something felt slow" reading={slow}

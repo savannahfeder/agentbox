@@ -26,6 +26,7 @@ const { startFreezeRecorder } = await import('../main/freeze-recorder.mts');
 const { readHubAddress } = await import('../main/hub-address.mts');
 const { watchNewChatsFor } = await import('../main/new-chats-watch.mts');
 const { osOpenDialog } = await import('../main/os-folder-window.mts');
+const { browserLauncher } = await import('../main/open-in-browser.mts');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.dirname(here);
@@ -155,11 +156,9 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 }
 
 function open(url) {
-  const cmd = process.platform === 'darwin' ? 'open'
-    : process.platform === 'win32' ? 'start'
-    : 'xdg-open';
+  const { cmd, args } = browserLauncher(url);
   try {
-    spawn(cmd, [url], { detached: true, stdio: 'ignore', shell: process.platform === 'win32' }).unref();
+    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
   } catch {
     // A machine with no browser to open is a normal way to run this. The url is
     // already printed above, which is all anybody needs.

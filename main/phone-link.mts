@@ -156,7 +156,7 @@ export function tailscaleCli(bins = TAILSCALE_BINS): TailscaleCli | null {
   const bin = bins.find((b) => { try { fs.accessSync(b, fs.constants.X_OK); return true; } catch { return false; } });
   if (!bin) return null;
   const run = (args: string[]) => new Promise<string>((resolve, reject) => {
-    execFile(bin, args, { timeout: 20_000 }, (err, stdout, stderr) => (err ? reject(new Error(String(stderr || err.message).trim())) : resolve(String(stdout))));
+    execFile(bin, args, { timeout: 20_000, windowsHide: true }, (err, stdout, stderr) => (err ? reject(new Error(String(stderr || err.message).trim())) : resolve(String(stdout))));
   });
   return {
     /** This computer's name in the tailnet, if it can have a certificate. */

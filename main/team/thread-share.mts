@@ -124,6 +124,8 @@ export interface ThreadShareOptions {
   myName?: () => string | null;
   /** A teammate's name by their id, carried on their comment for the owner's agent. */
   nameOf?: (personId: string) => string | null | undefined;
+  /** True when a comment on your thread was taken as words to its agent, so it is not filed as a comment too. */
+  relay?: (comment: ThreadComment, thread: { item: PhoneItem; product: TeamProduct }) => boolean;
 }
 
 export interface ThreadShare {
@@ -279,7 +281,7 @@ function messageLines(lines: TeamHistoryLine[], me: string): OutLine[] {
 
 export function createThreadShare({
   backend, me, root, listCards, listThreads, historyOf, disk, accountRoot, storeRoot, listProducts = () => [],
-  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null, nameOf = () => null,
+  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null, nameOf = () => null, relay,
 }: ThreadShareOptions): ThreadShare {
   const built = new Map<string, Built>();
   // Your threads with a card, and who may read each: null is the whole team.
@@ -627,6 +629,7 @@ export function createThreadShare({
     for (const c of unsaid) {
       const thread = threads.get(c.threadId);
       if (!thread) continue;
+      if (relay?.(c, thread)) { delivered.add(c.id); added += 1; continue; }
       // The name is for the owner's agent, which has no team list to look it up in.
       const name = nameOf(c.by);
       added += disk.appendForeignLines(thread.product.dir, [{
@@ -678,7 +681,12 @@ export function createThreadShare({
       const ok = THREAD_ID.test(String(owner)) && THREAD_ID.test(String(threadId));
       const local = ok ? readLocal(owner, threadId) : null;
       const carried = new Set((local?.lines ?? []).map((l) => l.uid).filter(Boolean));
-      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`)).map((c): SharedLine => ({
+      // A helper's words the owner's copy passed to its agent come back as that agent's reply line.
+      const passedOn = new Set((local?.lines ?? []).flatMap((l) => {
+        const from = l.patch?.from as { teammate?: unknown } | undefined;
+        return typeof from?.teammate === 'string' && l.patch?.answer ? [`${from.teammate}\n${l.patch.answer}`] : [];
+      }));
+      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`) && !passedOn.has(`${c.by}\n${c.text}`)).map((c): SharedLine => ({
         id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
       }));
       return {

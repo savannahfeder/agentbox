@@ -1,6 +1,5 @@
-// What the ship and the change card check before running git in a task's
-// private checkout. Reads files only: the app's own process imports it
-// (main/git-change.mts), so nothing here may start a process.
+// What the ship checks before running git in a task's private checkout. Reads
+// files only.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -26,6 +25,10 @@ export function plantedIn(at, trusted) {
   if (kind(at) !== 'dir' || kind(own) !== 'dir' || kind(given) !== 'dir') return 'its .git is not a folder like the app folder\'s copy';
   for (const name of ['commondir', 'config.worktree', 'hooks']) {
     if (kind(path.join(own, name)) !== kind(path.join(given, name))) return `its .git/${name} is not the app folder's`;
+  }
+  for (const name of ['commondir', 'config.worktree']) {
+    const mine = read(path.join(own, name));
+    if (mine && !mine.equals(read(path.join(given, name)) ?? Buffer.alloc(0))) return `its .git/${name} is not the app folder's`;
   }
   if (kind(path.join(own, 'config')) !== 'file') return 'its git settings are not a plain file';
   const config = read(path.join(own, 'config'));

@@ -376,7 +376,7 @@ const isAutoNow = (s: SettingsState, w: Pick<NonNullable<SettingsState['settings
 /** What the computer measured, first, as the desktop's Running page leads with it (`Reading`). */
 function Measured() {
   const w = useSettings().settings!.workspace;
-  const f = runningFigures({ running: w.running, capacity: w.agentsTotal, gate: w.memoryGate });
+  const f = runningFigures({ running: w.running, capacity: w.agentsTotal, gate: w.memoryGate ?? undefined });
   if (!f) return null;
   const line = (text: string) => <T key={text} style={{ fontSize: 12.5, lineHeight: 18.75, color: color.dim, paddingVertical: 12, borderTopWidth: 1, borderTopColor: color.line }}>{text}</T>;
   return (
@@ -409,8 +409,9 @@ function Running() {
   const w = s.settings?.workspace;
   if (!w) return <Aside>{NOT_YET}</Aside>;
   const two = w.engines.length > 1;
-  const gate = s.reading('workspace', 'memoryGate', w.memoryGate.on);
-  const slots = s.reading('workspace', 'memoryGateSlots', w.memoryGate.slots);
+  const memory = w.memoryGate;
+  const gate = s.reading('workspace', 'memoryGate', memory?.on ?? false);
+  const slots = s.reading('workspace', 'memoryGateSlots', memory?.slots ?? null);
   const slow = s.reading('workspace', 'agentsFeltSlow', null);
   const outside = s.reading('workspace', 'outsideAgents', w.outsideAgents);
   const paused = s.reading('workspace', 'paused', !!w.paused);
@@ -421,14 +422,18 @@ function Running() {
       <Measured />
       <Group label="Agents">
         <AgentsAtOnce />
-        <Row label="Hold heavy work when memory is short" reading={gate}
-          desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}
-          control={<Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGate', value: v })} />} />
-        {gate.value && !isAutoNow(s, w) ? (
-          <Row label="Heavy commands at once" reading={slots}
-            desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on your computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on your computer.`}
-            control={<Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}
-              onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGateSlots', value: v === w.memoryGate.slotsAuto ? null : v })} />} />
+        {memory ? (
+          <>
+            <Row label="Hold heavy work when memory is short" reading={gate}
+              desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}
+              control={<Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGate', value: v })} />} />
+            {gate.value && !isAutoNow(s, w) ? (
+              <Row label="Heavy commands at once" reading={slots}
+                desc={slots.value === null ? `Auto: ${memory.slotsAuto} on your computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${memory.slotsAuto} on your computer.`}
+                control={<Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? memory.slotsAuto} min={1} max={memory.slotsMax ?? 8}
+                  onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGateSlots', value: v === memory.slotsAuto ? null : v })} />} />
+            ) : null}
+          </>
         ) : null}
         <SettingSwitch label="Stop programs agents leave behind" k="cleanupLeftovers" copy={w.leftovers.on}
           desc={`Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on your computer are never stopped.${two ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`} />

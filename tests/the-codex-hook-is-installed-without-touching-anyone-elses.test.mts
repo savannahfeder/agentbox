@@ -22,9 +22,13 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { syncCodexMemoryGate, hookIsOurs } from '../main/codex-memory-gate.mts';
+import { syncCodexMemoryGate as sync, hookIsOurs } from '../main/codex-memory-gate.mts';
 
 const SCRIPT = '/Applications/Agentbox.app/Contents/scripts/memory-gate-hook.sh';
+
+// What is written on a Mac or Linux. Windows writes nothing; see
+// tests/on-windows-no-codex-hook-is-written-into-anyones-codex-home.test.mts.
+const syncCodexMemoryGate = (how: Parameters<typeof sync>[0]) => sync({ platform: 'darwin', ...how });
 
 function home() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'codex-gate-test-'));
