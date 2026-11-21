@@ -8,18 +8,23 @@
 // - the corner was four outlined words with no mark, where your own thread's
 //   corner is boxes of a mark and a word (Done) beside the dots;
 // - under the title the face was 20px and the ring 12px, so "Maya's thread"
-//   began 28px in, "Waiting on Maya" 22px in and the trail's steps 18px in;
+//   began 28px in and "Waiting on Maya" 22px in;
 // - "Updated 12 hours ago" sat on the column's right edge, away from its line;
 // - the trail's line stopped 2px under one dot and 6px over the next, so it
 //   read as dashes;
-// - the comment box was a face, a two-line field and an outlined "Send to
-//   Maya" with no key, at the end of the scroll, where your own thread has the
-//   "Reply… R" pill under the conversation that opens into the reply card.
+// - the comment box was a face, a two-line field and an outlined button with
+//   no key, at the end of the scroll, where your own thread has the "Reply… R"
+//   pill under the conversation that opens into the reply card.
+// On the pictures of the fix: "everything, with the exception of 'Message
+// Maya,' to go in the three dots", and About "should just be a component at
+// the top, not on the side, and it also includes what Maya's agent already
+// tried. It's basically a summary component ... not going to be toggleable".
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CommentBox, TeammateCorner, TeammateThread } from '../renderer/src/threads/TeammateThread.tsx';
+import { ThreadMenuList, threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
 import { endWasInView } from '../renderer/src/threads/teammate-thread.ts';
 import { TeamContext } from '../renderer/src/team/people.tsx';
 import { FollowContext } from '../renderer/src/team/following.ts';
@@ -48,44 +53,62 @@ const card = {
   state: 'waiting', priority: 5, problem: 'It was the Mac sleeping.', progress: 'Found the entry\nTimed account discovery',
   solution: null, blockedBy: [], blocks: [], people: null, updatedAt: NOW - 12 * 3600_000,
 };
-const page = () => renderToStaticMarkup(React.createElement(TeamContext.Provider, { value: team as never },
+const page = (over = {}) => renderToStaticMarkup(React.createElement(TeamContext.Provider, { value: team as never },
   React.createElement(FollowContext.Provider, { value: { is: () => false, follow() {}, unfollow() {} } },
     React.createElement(TeammateThread, {
-      card: card as never, person: maya as never, now: NOW, syncedAt: null, backLabel: 'Inbox',
+      card: { ...card, ...over } as never, person: maya as never, now: NOW, syncedAt: null, backLabel: 'Inbox',
       onBack() {}, onMessage() {}, onContinue() {}, onOpenDoc() {}, onNotice() {},
     }))));
 const corner = (props = {}) => renderToStaticMarkup(React.createElement(TeammateCorner, {
-  owner: 'Maya', person: maya as never, followed: false, onFollow() {}, onContinue() {}, onMessage() {}, about: false, onAbout() {}, ...props,
+  person: maya as never, followed: false, onFollow() {}, onContinue() {}, onMessage() {}, ...props,
 }));
 const box = (props = {}) => renderToStaticMarkup(React.createElement(CommentBox, {
   owner: 'Maya', helping: false, draft: '', setDraft() {}, sending: false, onSend() {}, open: false, onOpen() {}, onFold() {}, ...props,
 }));
 const buttons = (html: string) => html.match(/<button[\s\S]*?<\/button>/g) ?? [];
+const rows = (follow: 'on' | 'off' | null, carryOn: boolean) => threadMenuRows({ change: false, terminal: null, finish: false, follow, carryOn });
 
 describe("a teammate's thread's corner", () => {
-  it('is the boxes your own thread\'s corner wears, each a mark and a word', () => {
-    const all = buttons(corner());
-    expect(all.map((b) => b.replace(/<[^>]+>/g, ''))).toEqual(['Follow', 'Continue', 'MaMessage Maya', 'About']);
-    for (const b of all) {
-      expect(b).toMatch(/^<button[^>]*class="ts-done[ "]/);
-      expect(b).toMatch(/<svg|class="tm-av/);
-    }
-  });
-  it('wears the corner\'s own row, the one the dots and Done sit in', () => {
+  it('keeps Message Maya in Done\'s box and the rest behind the ⋯, as a thread of your own does', () => {
     expect(corner()).toMatch(/^<span class="ts-top tp-acts">/);
+    const all = buttons(corner());
+    expect(all).toHaveLength(2);
+    expect(all[0]).toMatch(/^<button type="button" class="ts-done ts-msgbtn">/);
+    expect(all[0].replace(/<[^>]+>/g, '')).toBe('MaMessage Maya');
+    expect(all[1]).toMatch(/class="ts-more" aria-label="More actions"/);
   });
-  it('says a pressed Follow and About as pressed, the way the code button does', () => {
-    expect(corner({ followed: true })).toMatch(/aria-pressed="true"[^>]*>(<svg[\s\S]*?<\/svg>)Following</);
-    expect(corner({ about: true })).toMatch(/aria-pressed="true"[^>]*>(<svg[\s\S]*?<\/svg>)About</);
-    expect(summary).toMatch(/\.ts-done\[aria-pressed="true"\] \{[^}]*background: var\(--wash-strong\)/);
+  it('puts Follow and Continue in the menu in their full words, Follow ticked while it is on', () => {
+    expect(rows('off', true).map((r) => [r.id, r.label])).toEqual([['follow', 'Tell me when it is done'], ['continue', 'Continue it yourself']]);
+    const list = (r: ReturnType<typeof rows>) => renderToStaticMarkup(React.createElement(ThreadMenuList, { rows: r, onPick() {} }));
+    expect(list(rows('on', false))).toContain('ts-more-tick');
+    expect(list(rows('off', false))).not.toContain('ts-more-tick');
+    expect(rows(null, false)).toEqual([]);
   });
-  it('keeps the long words for whoever points at the short ones', () => {
-    expect(source).toContain("'Tell me when it is done'");
-    expect(source).toContain('`Start a thread of your own with ${owner}\'s conversation and files.`');
+  it('draws no ⋯ with nothing to put behind it', () => {
+    expect(buttons(corner({ onFollow: null, onContinue: null }))).toHaveLength(1);
   });
-  it('draws no outlined word without a mark any more', () => {
-    expect(page()).not.toContain('th-follow');
-    expect(pages).not.toMatch(/\.th-follow\b/);
+  it('has no About to switch on and off', () => {
+    expect(page()).not.toMatch(/>About</);
+    expect(source).not.toMatch(/setAbout|tp-side/);
+  });
+});
+
+describe('the summary at the top', () => {
+  const html = page();
+  const at = html.indexOf('<section class="ts-ticket tp-summary" aria-label="Summary">');
+  it('is there without asking, under the lines that say whose it is and where it stands', () => {
+    expect(at).toBeGreaterThan(html.indexOf('<p class="tp-standing">'));
+    expect(at).toBeLessThan(html.indexOf('<div class="focus-dock">'));
+  });
+  it('says what it is about and what the agent already tried', () => {
+    const part = html.slice(at, html.indexOf('</section>', at));
+    expect(part).toContain('<p class="ts-tk-lead">It was the Mac sleeping.</p>');
+    expect(part).toContain('What Maya&#x27;s agent already tried');
+    expect(part.replace(/<[^>]+>/g, ' ')).toMatch(/Found the entry\s+Timed account discovery/);
+    expect(part).not.toMatch(/>About</);
+  });
+  it('says nothing for a thread its owner keeps private', () => {
+    expect(page({ visible: false })).not.toContain('tp-summary');
   });
 });
 
@@ -100,13 +123,6 @@ describe('the lines under its name', () => {
     expect(slot).toMatch(/justify-content: center/);
     expect(rule(pages, '.tp-whose, .tp-standing')).toMatch(/gap: 0 8px/);
   });
-  it('set the steps the agent tried on that same slot: dots on its middle, words where the lines\' words start', () => {
-    const words = px(rule(pages, '.tp-mark'), 'width') + 8;
-    expect(px(rule(pages, '.tp-tried .ts-step'), 'padding-left')).toBe(words);
-    const dot = rule(pages, '.tp-tried .ts-step::before');
-    expect(px(dot, 'left') + 5 / 2).toBe(10);
-    expect(px(rule(pages, '.tp-tried .ts-step:not(:last-child)::after'), 'left') + 1 / 2).toBe(10);
-  });
   it('date the thread beside whose it is, not at the column\'s far edge', () => {
     expect(html).toMatch(/<p class="tp-whose">[\s\S]*?Maya&#x27;s thread in Agentbox testing[\s\S]*?Updated 12 hours ago<\/span><\/p>/);
     expect(pages).not.toMatch(/\.tp-ago \{[^}]*margin-left: auto/);
@@ -114,12 +130,11 @@ describe('the lines under its name', () => {
 });
 
 describe('the trail of what was done', () => {
-  // The dot's top and height, the line's top and bottom, and the gap to the next step, on each trail.
-  for (const [where, css, prefix] of [['the card beside the thread', summary, ''], ["the page's own list", pages, '.tp-tried ']] as const) {
-    it(`joins one dot to the next with the same gap at each end, on ${where}`, () => {
+  for (const [where, css, prefix] of [['its plain size', summary, ''], ['the summary at the top', pages, '.tp-summary ']] as const) {
+    it(`joins one dot to the next with the same gap at each end, at ${where}`, () => {
       const base = rule(summary, '.ts-step::before');
       const dot = { top: px(rule(css, `${prefix}.ts-step::before`) || base, 'top'), size: px(base, 'height') };
-      const line = rule(css, `${prefix}.ts-step:not(:last-child)::after`);
+      const line = rule(css, `${prefix}.ts-step:not(:last-child)::after`) || rule(summary, '.ts-step:not(:last-child)::after');
       const step = Number(rule(summary, '.ts-step').match(/margin: 0 0 ([\d.]+)px/)?.[1]);
       const above = px(line, 'top') - (dot.top + dot.size);
       const below = step + dot.top + px(line, 'bottom');
@@ -133,37 +148,31 @@ describe("the box at the foot of a teammate's thread", () => {
   it('rests as the reply box\'s pill, with R on it, the way your own thread\'s does', () => {
     const html = box();
     expect(html).toMatch(/^<div class="dock-card tp-compose"><button type="button" class="dock-pill">/);
-    expect(html).toContain('<span class="dock-pill-text">Comment to Maya…</span>');
+    expect(html).toContain('<span class="dock-pill-text">Reply to Maya…</span>');
     expect(html).toContain('<kbd>R</kbd>');
   });
   it('shows your unsent words on the pill rather than the invitation', () => {
     expect(box({ draft: 'Saw the same thing\n\non my Mac' })).toContain('<span class="dock-pill-text">Saw the same thing on my Mac</span>');
     expect(box({ draft: 'Saw it' })).toMatch(/class="dock-pill dock-pill-kept"/);
   });
-  it('opens into the reply card: its field, its bar and its Send with the key and the arrow', () => {
+  it('opens into the reply card: its field, who it goes to, and Send with the key and the arrow', () => {
     const html = box({ open: true });
-    expect(html).toMatch(/^<form class="dock-card tp-compose">/);
-    expect(html).toMatch(/<textarea class="dock-input"[^>]*placeholder="Comment to Maya"/);
-    expect(html).toContain('<div class="compose-sentence dock-bar"><span class="dock-send-pair solo"><button type="submit" class="dock-send"');
-    expect(html).toMatch(/>Send to Maya <kbd>↵<\/kbd><svg class="dock-send-arrow"/);
+    expect(html).toMatch(/^<form class="dock-card tp-compose tp-dock-form">/);
+    expect(html).toMatch(/<textarea class="dock-input"[^>]*placeholder="Reply to Maya"/);
+    expect(html).toContain('<span class="compose-clauses"><span class="dim">Goes to Maya.</span></span>');
+    expect(html).toMatch(/>Send <kbd>↵<\/kbd><svg class="dock-send-arrow"/);
   });
   it('says the agent, not the owner, when you were asked to help', () => {
     const html = box({ open: true, helping: true });
     expect(html).toMatch(/placeholder="Write to Maya&#x27;s agent"/);
-    expect(html).toMatch(/>Send to the agent <kbd>↵<\/kbd>/);
+    expect(html).toContain('Goes to Maya&#x27;s agent.');
     expect(box({ helping: true })).toContain('Write to Maya&#x27;s agent…');
   });
   it('grows the way the reply box does', () => {
     expect(source).toMatch(/applyDockHeight\(field\.current\)/);
   });
-  it('stays under the conversation, outside what scrolls, starting where its words start', () => {
-    expect(rule(pages, '.tp-page')).toMatch(/display: flex; flex-direction: column; height: 100%/);
-    expect(rule(pages, '.tp-scroll')).toMatch(/flex: 1; min-height: 0; overflow-y: auto/);
-    expect(rule(pages, '.tp-dock')).toMatch(/flex: none/);
-    const left = (body: string) => body.match(/padding: [^;]*? (max\([^;]*\));/)?.[1] ?? body.match(/padding-left: ([^;]*);/)?.[1];
-    expect(left(rule(pages, '.tp-dock'))).toBe(left(rule(pages, '.tp-grid')));
-    expect(rule(pages, '.tp-dock.tp-with-about').match(/padding-left: ([^;]*);/)?.[1]).toBe(rule(pages, '.tp-grid.tp-with-about').match(/padding-left: ([^;]*);/)?.[1]);
-    expect(page()).toMatch(/<div class="tp-scroll">[\s\S]*<\/div><div class="tp-dock"><div class="dock-card tp-compose"><button type="button" class="dock-pill">/);
+  it('stays under the conversation, in the dock your own thread keeps its box in', () => {
+    expect(page()).toMatch(/<div class="focus-scroll"[\s\S]*<\/div><div class="focus-dock"><div class="focus-dock-inner"><div class="dock-card tp-compose"><button type="button" class="dock-pill">/);
   });
   // Opened under the last message on the stage, the 150px card covered it.
   it('keeps the end of the conversation in view as it opens, when you were reading the end', () => {

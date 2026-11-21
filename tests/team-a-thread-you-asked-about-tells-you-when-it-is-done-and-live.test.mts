@@ -75,9 +75,12 @@ describe('what it tells you', () => {
 describe('where it is wired', () => {
   const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   const thread = readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-  it('commenting on a thread follows it, and so does the button', () => {
+  // The button is a row in the thread's ⋯ menu since w-8a8eac7620.
+  it('commenting on a thread follows it, and so does the menu row', () => {
+    const menu = readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
     expect(thread).toMatch(/following\?\.follow\(card\)/);
-    expect(thread).toContain('Tell me when it is done');
+    expect(thread).toMatch(/onFollow=\{following && card\.state !== 'done' \? \(\) => \(followed \? following\.unfollow\(card\) : following\.follow\(card\)\) : null\}/);
+    expect(menu).toContain("label: 'Tell me when it is done'");
   });
   it('the news is a row in Needs you and counts there', () => {
     expect(app).toContain('<FollowRows');

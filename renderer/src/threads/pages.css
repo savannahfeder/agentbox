@@ -177,6 +177,14 @@
    fallback, so its track and its gap go and the rest close up. */
 .th-grid { --th-state: 176px; --th-proj: 150px; --th-prio: 112px; display: grid; grid-template-columns: minmax(0, 1fr) var(--th-state,) var(--th-proj,) var(--th-person,) var(--th-prio,) 96px; column-gap: 16px; align-items: center; width: 100%; min-height: 20px; }
 .th-table .row { min-height: 0; }
+/* A thread row far off screen is skipped until it comes near, so the sidebar
+   sliding open, which narrows every row on every frame, lays out and paints
+   only the rows in view. A row is 54px tall, which holds its place meanwhile.
+   Not in the phone layout (phone.css), which has no sliding sidebar and rows
+   of more than one height. */
+@media (min-width: 701px) and (min-height: 521px) {
+  .th-table .row[data-item-id] { content-visibility: auto; contain-intrinsic-size: auto 54px; }
+}
 .th-grid > div { line-height: 20px; }
 .th-grid.with-person { --th-proj: 140px; --th-person: 130px; }
 /* A column no row of the table fills is not drawn, header included. */
@@ -424,19 +432,10 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-pop .opts .th-prio-mark { margin-right: 0; }
 
 /* ------------------------------------------------------------ a teammate's thread */
-/* Laid out as an opened thread of your own (one-thing-at-a-time.css, THE TASK
-   PAGE FILLS THE WINDOW): the same type, the same measure, starting a third of
-   the way into the spare room. The founder on the page it replaced: "it doesn't
-   match our design style ... the padding is really different". */
-/* Measured by its own width: a file opened beside it narrows the page, not the
-   window. The words scroll and the reply box stays under them, as on a thread
-   of your own (.focus-scroll and .focus-dock). */
-.tp-page { display: flex; flex-direction: column; height: 100%; container: tp / inline-size; }
-.tp-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+/* Drawn as a thread of your own (TeammateThread.tsx): the thread page's column,
+   type and reply box (.focus-pane, .focus-scroll, .focus-dock). */
+.tm-team-pane.th-pane:has(> .tp-thread) { display: flex; flex-direction: column; overflow: hidden; }
 .tp-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 32px 0; }
-.tp-top { margin: 0 0 28px; }
-/* The title as a thread of your own sets it (.one-sum .one-title). */
-.tp-top .th-card-title { margin: 0 0 12px; font-size: 27px; line-height: 1.25; font-weight: 500; letter-spacing: -.015em; color: var(--text); }
 /* Whose it is and where it stands, each led by the same 20px slot (the face,
    the state's ring), so both lines' words start 28px in. */
 .tp-whose, .tp-standing { display: flex; align-items: center; gap: 0 8px; margin: 0; font-size: 14px; line-height: 20px; color: var(--text-dim); }
@@ -449,42 +448,25 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-standing-line { margin-left: 8px; }
 .tp-ago { flex: none; color: var(--text-faint); }
 .tp-ago::before { content: "·"; margin-right: 8px; }
-.tp-files { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; }
+/* Its summary, always there under those lines: what it is about, then what its
+   agent already tried, its files and what it holds up, with no line between. */
+.tp-summary { max-width: none; margin: 16px 0 0; padding: 18px 22px 20px; }
+.tp-summary .ts-tk-lead { margin: 0; }
+.tp-summary .ts-tk-part { margin: 16px 0 0; }
+.tp-summary .ts-tk-lead + .ts-tk-part { margin-top: 18px; }
+.tp-summary .ts-h { margin: 0 0 8px; }
+.tp-summary .ts-tk-part > p { margin: 0; font-size: 14px; line-height: 21px; color: var(--text); }
+/* The trail at the thread's reading size, its line still 3px off each dot (summary.css). */
+.tp-summary .ts-trail { font-size: 14px; line-height: 21px; color: var(--text); }
+.tp-summary .ts-step::before { top: 8px; }
+.tp-summary .ts-step:not(:last-child)::after { top: 16px; bottom: -11px; }
+.tp-files { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
 .tp-files button { display: flex; align-items: center; gap: 9px; max-width: 320px; padding: 5px 10px 5px 5px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
 .tp-files button:hover { background: var(--wash); border-color: var(--line-strong); }
-.tp-grid, .tp-dock {
-  --tp-type: clamp(16px, calc(0.25cqi + 13px), 18px);
-  --tp-measure: min(calc(var(--tp-type) * 47.5), calc(100cqi - 96px));
-}
-.tp-grid {
-  display: grid; grid-template-columns: minmax(0, var(--tp-measure)); gap: 48px; align-items: start;
-  padding: 29px 32px 32px max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
-}
-.tp-grid.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
-/* The reply box sits in the conversation's column: both take their left edge from the page's width, not their own. */
-.tp-dock {
-  flex: none; display: grid; grid-template-columns: minmax(0, var(--tp-measure)); gap: 48px;
-  padding: 0 32px 24px max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
-}
-.tp-dock.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
-.tp-col :is(.msg-body, .appendix) { font-size: var(--tp-type); }
-.tp-side { position: sticky; top: 0; }
-.tp-side .ts-ticket { max-width: none; margin: 0; padding: 20px 22px 18px; border-radius: 10px; }
-.tp-side .ts-tk-part { padding: 0 0 18px; margin: 0 0 18px; border-bottom: 1px solid var(--line); }
-.tp-side .ts-tk-part > .ts-h { margin: 0 0 8px; }
-.tp-side .ts-tk-done { padding-top: 0; border-top: 0; }
-.tp-side .ts-tk-lead { margin: 0; font-size: 14px; line-height: 21px; }
-.tp-side .ts-tk-grid { grid-template-columns: 1fr; gap: 14px; padding-top: 0; border-top: 0; }
-.ts-tk-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.ts-tk-files button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px 7px 7px; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
-.ts-tk-files button:hover { background: var(--wash); border-color: var(--line-strong); }
 .ts-tk-ext { flex: none; width: 34px; padding: 5px 0; border-radius: 5px; background: var(--wash); font: 9.5px var(--mono); letter-spacing: .04em; text-transform: uppercase; text-align: center; color: var(--text-dim); }
 .ts-tk-fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ts-tk-notes { flex: none; font-size: 12px; color: var(--text-faint); }
-.ts-tk-props { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px 12px; margin: 0; font-size: 13px; }
-.ts-tk-props dt { color: var(--text-faint); }
-.ts-tk-props dd { display: flex; align-items: center; gap: 7px; margin: 0; min-width: 0; color: var(--text); }
-.ts-tk-props .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 7.5px; }
+.tp-dock-form .compose-clauses { margin-right: auto; }
 .th-back { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 6px; margin-left: -6px; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); font: inherit; font-size: 13.5px; cursor: pointer; }
 .th-back:hover { background: var(--wash); color: var(--text); }
 
@@ -561,16 +543,6 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* The numbers sit inside the column, as they do on an opened thread of your own. */
 .th-work .msg-body ul, .th-work .msg-body ol, .th-work .appendix ul, .th-work .appendix ol { margin: 0 0 10px 22px; padding: 0; }
 .th-work-note { margin: 0 0 18px; font-size: 13px; color: var(--text-dim); }
-@container tp (max-width: 980px) {
-  .tp-grid, .tp-grid.tp-with-about { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-left: 32px; }
-  .tp-dock, .tp-dock.tp-with-about { grid-template-columns: minmax(0, 1fr); padding-left: 32px; }
-  .tp-side { position: static; }
-}
-@container tp (max-width: 720px) {
-  .tp-bar { flex-wrap: wrap; }
-  .tp-acts { flex-wrap: wrap; }
-  .tp-acts > * { white-space: nowrap; }
-}
 /* Collapsed, the Inbox still says something is waiting: a dot where the
    number was (a persona lost the count when the sidebar was shut). */
 .workspace-collapsed .workspace-navigation .workspace-tab.has-count { position: relative; }
@@ -697,12 +669,3 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 /* A box, not a run of text, so the face centres on the title rather than sitting on a baseline. */
 .th-mate { display: inline-flex; }
 
-/* What the owner's agent already did, under the thread's name: the first thing someone picking it up reads. */
-.tp-tried { margin: 4px 0 28px; }
-.tp-tried h2 { margin: 0 0 10px; font-size: 13px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
-.tp-tried .ts-trail { font-size: 14px; line-height: 21px; color: var(--text); }
-/* On the slot the lines above lead with: the dots on its middle, the words where
-   theirs start, the line 3px off each dot as on the card (summary.css). */
-.tp-tried .ts-step { padding-left: 28px; }
-.tp-tried .ts-step::before { left: 7.5px; top: 8px; }
-.tp-tried .ts-step:not(:last-child)::after { left: 9.5px; top: 16px; bottom: -11px; }

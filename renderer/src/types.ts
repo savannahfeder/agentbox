@@ -342,6 +342,8 @@ export interface PlacedFile {
   older?: number;
   /** What this file's own Move to the Trash would move. */
   movable?: number;
+  /** Whether it has one, which an empty document does at 0 bytes. */
+  trashable?: boolean;
   /** The newest version is kept in the cloud and off this computer. */
   cloud?: boolean;
   /** A small picture of it while it is in the cloud. */
@@ -364,7 +366,9 @@ export interface FileFolder { id: string; project: string; name: string; parent:
 export type FileFolderAct =
   | { do: 'make'; project: string; name: string; parent?: string | null }
   | { do: 'rename'; id: string; name: string }
-  | { do: 'move'; key: string; folder: string | null };
+  | { do: 'move'; key: string; folder: string | null }
+  | { do: 'remove'; id: string }
+  | { do: 'restore'; ids: string[] };
 
 export interface FilesUploaded { ok: boolean; error?: string; added?: number; refused?: string[]; keys?: string[] }
 export interface FilesPlaceList { files: PlacedFile[]; projects: string[]; folders?: FileFolder[]; mine?: string[] }
@@ -590,6 +594,8 @@ export interface RoomCard {
   status: string | null;
   workingOn: string | null;
   workingPrivate: boolean;
+  /** The thread `workingOn` names, when you can open it: a teammate's shared card, or your own. */
+  workingThread?: string | null;
 }
 
 export interface RoomActivity {
@@ -1840,7 +1846,7 @@ declare global {
       filesPlaceOpen?(p: { key: string }): Promise<FilesPlaceView | null>;
       filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
       filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
-      filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }>;
+      filesPlaceFolder?(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null; ids?: string[] }>;
       filesPlaceNew?(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }>;
       filesPlaceUpload?(p: { project: string; folder: string | null }): Promise<FilesUploaded>;
       filesPlaceTrash?(p: { keys: string[]; older?: boolean }): Promise<FilesTrashed>;

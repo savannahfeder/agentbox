@@ -1,15 +1,12 @@
-// A THREAD'S STATE MARK, ITS NAME IN THE BAR, AND THE CARD A TEAMMATE READS.
+// A THREAD'S STATE MARK, ITS NAME IN THE BAR, AND THE SUMMARY A TEAMMATE READS.
 // The rules that decide words are in ./summary-rules.ts, and the bar's crumb in
 // ./crumb-rules.ts, where the tests read them.
 import { useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Person, RepeatRule, ThreadCard, WorkItem } from '../types';
 import { doneSteps, threadState } from '../../../shared/thread-cards.mts';
-import { PriorityIcon } from '../components/Priority';
-import { priorityIdOf, priorityLabelOf } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
 import { STATE_WORD, UNSEEN_THREAD, linkPerson, linkWords, stateGlyph, type StateGlyph } from './summary-rules';
 import { crumbName, renameTo } from './crumb-rules';
-import { chosenNames } from './summary-rules';
 import { inStep, RunningMark } from './Pages';
 import { FleetContext } from '../fleet';
 import { factsFor, statusCell, type StatusCell } from '../status-word';
@@ -68,7 +65,6 @@ export interface RepeatHandle {
   onEnd: () => void;
 }
 
-const NOT_WRITTEN = 'Not written yet';
 
 /** Each done step a dot, joined to the next by a thin line, oldest at the top (summary.css .ts-trail). */
 export function DoneTrail({ steps }: { steps: string[] }) {
@@ -189,72 +185,44 @@ export function TeammateStanding({ card, person }: { card: ThreadCard; person: P
 }
 
 /**
- * A teammate's thread, beside its conversation: what it is about and what is
- * done, the files it links to, what it waits on or holds up when anything
- * does, and its properties. Its state heads the page (TeammateStanding). A
- * private thread's card says only that it is private, because the Mac that
- * published it sent nothing else (shared/thread-cards.mts cardsFor).
+ * A teammate's thread's summary, always at the top of its page: a thread's two
+ * parts (w-54e9c7243f), what it is about and then what its agent already
+ * tried, with its files and what it holds up. Whose it is, its project and
+ * what it waits on are the lines above it. A private thread published nothing
+ * to summarise (shared/thread-cards.mts cardsFor).
  */
-export function TeammateCard({ card, person, files = [], done = true }: {
-  card: ThreadCard; person: Person | null; now?: number;
+export function TeammateSummary({ card, owner, files = [] }: {
+  card: ThreadCard;
+  /** Their first name, for "What Maya's agent already tried". */
+  owner: string;
   files?: { src: string; name: string; notes: number; open: () => void }[];
-  /** False where the page already shows the Done list. */
-  done?: boolean;
 }) {
   const team = useContext(TeamContext);
-  const name = person?.name || 'Someone';
-  if (!card.visible) {
-    return (
-      <article className="ts-ticket ts-ticket-private">
-        <p className="ts-tk-lead dim">Private thread</p>
-        <div className="ts-tk-foot"><Face person={person} /><b>{name}</b><span className="ts-tk-state"><Glyph kind={stateGlyph(card.state, false)} />{card.shippedAt ? 'Shipped' : STATE_WORD[card.state]}</span></div>
-      </article>
-    );
-  }
-  const pid = Number.isFinite(card.priority) ? priorityIdOf(card.priority) : null;
-  const titles = (links: ThreadCard['blockedBy']) => (
-    <p>{links.map((l, i) => { const who = linkPerson(l.id, team?.byId); return <span key={l.id} className={l.title || who ? '' : 'dim'}>{i > 0 && ', '}{l.title ?? who ?? UNSEEN_THREAD}</span>; })}</p>
-  );
+  if (!card.visible) return null;
+  const about = card.problem && card.problem !== card.title ? card.problem : null;
+  const tried = doneSteps(card.progress);
+  if (!about && !tried.length && !files.length && !card.blocks.length) return null;
   return (
-    <article className="ts-ticket">
-      {/* THE SAME TWO PARTS AS THE PANEL (w-54e9c7243f): Context as the lead,
-          then the Done trail when anything is done. */}
-      <section className="ts-tk-part">
-        <span className="ts-h">About</span>
-        <p className={`ts-tk-lead${card.problem ? '' : ' dim'}`}>{card.problem || NOT_WRITTEN}</p>
-      </section>
-      {done && doneSteps(card.progress).length > 0 && (
-        <section className="ts-tk-part ts-tk-done"><span className="ts-h">Done</span><DoneTrail steps={doneSteps(card.progress)} /></section>
-      )}
-      {files.length > 0 && (
-        <section className="ts-tk-part">
-          <span className="ts-h">Files</span>
-          <ul className="ts-tk-files">
-            {files.map((f) => (
-              <li key={f.src}>
-                <button type="button" onClick={f.open} title={`Open ${f.name}`}>
-                  <span className="ts-tk-ext" aria-hidden="true">{(f.name.includes('.') ? f.name.split('.').pop() ?? '' : 'file').slice(0, 4)}</span>
-                  <span className="ts-tk-fname">{f.name}</span>
-                  {f.notes > 0 && <span className="ts-tk-notes">{f.notes === 1 ? '1 note' : `${f.notes} notes`}</span>}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {(card.blockedBy.length > 0 || card.blocks.length > 0) && (
-        <div className="ts-tk-part ts-tk-grid ts-tk-next">
-          {card.blockedBy.length > 0 && <div><span className="ts-h">Blocked by</span>{titles(card.blockedBy)}</div>}
-          {card.blocks.length > 0 && <div><span className="ts-h">Blocks</span>{titles(card.blocks)}</div>}
-        </div>
-      )}
-      <dl className="ts-tk-props">
-        <dt>Owner</dt><dd><Face person={person} />{name}</dd>
-        {pid && <><dt>Priority</dt><dd><PriorityIcon id={pid} />{priorityLabelOf(pid)}</dd></>}
-        {card.project && <><dt>Project</dt><dd>{card.project}</dd></>}
-        <dt>Who sees it</dt><dd>{card.people?.length && team ? chosenNames(card.people, team.byId) : 'The team'}</dd>
-      </dl>
-    </article>
+    <section className="ts-ticket tp-summary" aria-label="Summary">
+      {about && <p className="ts-tk-lead">{about}</p>}
+      {tried.length > 0 && <div className="ts-tk-part"><span className="ts-h">What {owner}'s agent already tried</span><DoneTrail steps={tried} /></div>}
+      {files.length > 0 && <div className="ts-tk-part">
+        <span className="ts-h">Files</span>
+        <ul className="tp-files" aria-label="Files on this thread">
+          {files.map((f) => <li key={f.src}>
+            <button type="button" onClick={f.open} title={`Open ${f.name}`}>
+              <span className="ts-tk-ext" aria-hidden="true">{(f.name.includes('.') ? f.name.split('.').pop() ?? '' : 'file').slice(0, 4)}</span>
+              <span className="ts-tk-fname">{f.name}</span>
+              {f.notes > 0 && <span className="ts-tk-notes">{f.notes === 1 ? '1 note' : `${f.notes} notes`}</span>}
+            </button>
+          </li>)}
+        </ul>
+      </div>}
+      {card.blocks.length > 0 && <div className="ts-tk-part">
+        <span className="ts-h">Blocks</span>
+        <p>{card.blocks.map((l, i) => { const who = linkPerson(l.id, team?.byId); return <span key={l.id} className={l.title || who ? '' : 'dim'}>{i > 0 && ', '}{l.title ?? who ?? UNSEEN_THREAD}</span>; })}</p>
+      </div>}
+    </section>
   );
 }
 
