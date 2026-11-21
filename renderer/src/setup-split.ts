@@ -84,12 +84,14 @@ export const PRO_PITCH = {
   free: 'Stay on Free',
 };
 
-type PlanSeen = { team?: { trial: boolean; endsAt: number | null } | null } | null | undefined;
+type PlanSeen = { teamFreeDays?: number; team?: { trial: boolean; endsAt: number | null } | null } | null | undefined;
 
 /** The free days Pro starts with. A team is made when Pro starts, so without one they are all there;
- *  a team already made has what its checkout would give, and none unless the cloud says its trial is on. */
+ *  a team already made has what the cloud says its checkout would give. A cloud from before
+ *  2026-11-21 does not say, and its team had what was left of a trial counted from the day it was made. */
 export function proFreeDays(hasTeam: boolean, plan: PlanSeen, now = Date.now()): number {
   if (!hasTeam) return TEAM.trialDays;
+  if (typeof plan?.teamFreeDays === 'number') return plan.teamFreeDays;
   return plan?.team?.trial && plan.team.endsAt ? teamFreeDays(plan.team.endsAt, now) : 0;
 }
 
