@@ -37,15 +37,19 @@ type Layout = {
   otherFolder?: boolean;
 };
 
+const made: string[] = [];
+
 /** One home folder laid out as Claude Code leaves it, and the Claude row Settings reads off it. */
 function rowFor({ email = null, cli, credentials = null, signedOutRun = false, otherFolder = false }: Layout) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ab-no-email-'));
+  made.push(home);
   fs.mkdirSync(path.join(home, '.claude'));
   fs.writeFileSync(path.join(home, '.claude.json'), JSON.stringify(email ? { oauthAccount: { emailAddress: email, accountUuid: 'acct-1' } } : { numStartups: 3 }));
   const file = path.join(home, '.claude', '.credentials.json');
   if (credentials) fs.writeFileSync(file, credentials === 'corrupt' ? '{"claudeAi' : '{}');
   if (credentials === 'stale') fs.utimesSync(file, new Date('2025-01-01'), new Date('2025-01-01'));
   const other = fs.mkdtempSync(path.join(os.tmpdir(), 'ab-other-login-'));
+  made.push(other);
   forgetDiscovery();
   const store = { listItems: () => [], listProducts: () => [], isDue: () => true };
   const config = {
@@ -63,7 +67,10 @@ function rowFor({ email = null, cli, credentials = null, signedOutRun = false, o
 describe('the Claude row the computer reads', () => {
   // A worker on an added login runs these tests with this set; the app's own check would not speak for 'default' then.
   beforeEach(() => { vi.stubEnv('CLAUDE_CONFIG_DIR', ''); });
-  afterEach(() => { vi.unstubAllEnvs(); });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    for (const dir of made.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+  });
 
   it('the reported case: Claude Code says signed in and no email is on file', () => {
     const row = rowFor({ cli: true });
