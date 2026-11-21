@@ -692,7 +692,8 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   /** Who the thread is from: a person, an AI teammate, or you. */
   who?: Who;
 }) {
-  const id = rowPriorityId(priority);
+  // Every level, Medium included: a blank here read as a gap in the column.
+  const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
     {/* EVERY ROW READS THE SAME WAY (w-585619d660): a mark in one slot, the
         title, then who it is from in grey. The titles line up because the

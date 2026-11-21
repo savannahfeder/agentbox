@@ -7,7 +7,7 @@ import { MateFace } from '../teammates/MateFace';
 import './home.css';
 import { enterIsTheButtons } from '../focused-button';
 
-/** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox; an invitation has no time. */
+/** `from` is the teammate who asked, when one did; priority is null at Medium, as on the Inbox's board; an invitation has no time. */
 export type NeedsRow = { key: string; letter: string; face?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
 export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; photo?: string; line: string; state: TeamRowState; week: number[]; total: number };
 export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };

@@ -701,7 +701,11 @@ export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'
   return asksSomething(said);
 }
 
-/** The level a row names: none at Medium, which is what an unset thread runs at. */
+/**
+ * The level a small mark beside other words names, on a board card or a Home
+ * row: none at Medium, which is what an unset thread runs at. The table's
+ * Priority column names every level (RowCells).
+ */
 export function rowPriorityId(priority: number | null): PriorityId | null {
   if (priority === null) return null;
   const id = priorityIdOf(priority);
