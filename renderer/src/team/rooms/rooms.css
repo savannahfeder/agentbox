@@ -482,8 +482,8 @@
 .gr-page .rm-full .rm-cm .h { font-size: 15px; }
 .gr-page .rm-full .rm-cm .h em { font-family: inherit; font-size: 12px; }
 .gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 24px; }
-/* Slack's face: 36px, its top level with the top of the name's line. */
-.gr-page .rm-full.hang .rm-cm { padding-left: 48px; }
+/* A small face, its top level with the top of the name's line. */
+.gr-page .rm-full.hang .rm-cm { padding-left: 40px; }
 .gr-page .rm-full.hang .rm-cm .h { line-height: 20px; }
 .gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 14px; }
 .gr-page .rm-compose-input { font-size: 15px; line-height: 22px; }

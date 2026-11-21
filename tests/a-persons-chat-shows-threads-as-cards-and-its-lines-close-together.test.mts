@@ -11,7 +11,8 @@
 // - one sender's lines sat 31px apart, 16px text on a 25px line plus 6px, so
 //   each line read as its own paragraph;
 // - the faces were 32px and sat 2px under the name's line, so they hung low
-//   beside it (founder: "It doesn't really match Slack");
+//   beside it (founder: "It doesn't really match Slack"); at 36px she found
+//   them "still too large", so they are 28px with their top on the name's;
 // - the box was 79px tall at rest: the field, then a row of tools and a
 //   bordered Send holding a second box with "Enter" in it.
 import { describe, it, expect } from 'vitest';
@@ -59,7 +60,7 @@ describe('what you did together, before a first message', () => {
     expect(html).toContain('<span>You</span>');
     expect(html).toContain('<span>Theo O.</span>');
     expect(html).not.toContain('Sam O.');
-    expect(html).toMatch(/width:36px/);
+    expect(html).toMatch(/width:28px/);
   });
 });
 
@@ -76,11 +77,11 @@ describe('a person\'s or a group\'s chat', () => {
     expect(rule('.gr-page .rm-full .rm-cm .tx')).toMatch(/line-height: 24px/);
   });
 
-  it('draws Slack\'s face: 36px, its top level with the top of the name\'s line', () => {
+  it('draws a 28px face, its top level with the top of the name\'s line', () => {
     expect(rule('.gr-page .rm-full .rm-cm')).toMatch(/padding-top: 14px/);
     expect(rule('.gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child')).toMatch(/top: 14px/);
-    expect(rule('.gr-page .rm-full.hang .rm-cm')).toMatch(/padding-left: 48px/);
-    expect(fs.readFileSync(new URL('../renderer/src/team/rooms/RoomChat.tsx', import.meta.url), 'utf8')).toContain('size={hang ? 36 : 16}');
+    expect(rule('.gr-page .rm-full.hang .rm-cm')).toMatch(/padding-left: 40px/);
+    expect(fs.readFileSync(new URL('../renderer/src/team/rooms/RoomChat.tsx', import.meta.url), 'utf8')).toContain('size={hang ? 28 : 16}');
   });
 
   it('has a box one line high with its tools at the right of that line', () => {

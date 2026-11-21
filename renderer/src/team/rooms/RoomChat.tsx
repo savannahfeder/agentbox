@@ -232,7 +232,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
         const slot = slots[i];
         if (d.a) {
           const p = who(d.a.by);
-          return <AlongRow key={d.a.key} a={d.a} day={slot.day} head={slot.head} face={p} name={nameOf(d.a.by)} size={hang ? 36 : 16} />;
+          return <AlongRow key={d.a.key} a={d.a} day={slot.day} head={slot.head} face={p} name={nameOf(d.a.by)} size={hang ? 28 : 16} />;
         }
         const m = d.m;
         const where = root ? undefined : along?.on.get(m.id);
@@ -245,7 +245,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
           {m.id === newAt && <div className="rm-new" role="separator"><span>New</span></div>}
           <div className={`rm-cm${headed ? '' : ' cont'}${root && i === 0 ? ' root' : ''}`}>
             {headed && <div className="h">
-              <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 36 : 16} />
+              <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 28 : 16} />
               <span>{m.voice ? voiceName(m.voice, p?.name ?? '', { mine }) : nameOf(m.by)}</span><em>{clockOf(m.at)}</em>
               {m.editedAt && !m.deleted && <em className="rm-edited">edited</em>}
             </div>}
@@ -442,7 +442,7 @@ export function AlongHistory({ rows, who }: {
   return <div className="rm-full hang pl-history"><div className="rm-chat-list"><div className="rm-chat-msgs">
     {sorted.map((a, i) => {
       const p = who(a.by);
-      return <AlongRow key={a.key} a={a} day={slots[i].day} head={slots[i].head} face={p} name={p ? cardName({ me: !!p.me, name: p.name }) : 'Someone'} size={36} />;
+      return <AlongRow key={a.key} a={a} day={slots[i].day} head={slots[i].head} face={p} name={p ? cardName({ me: !!p.me, name: p.name }) : 'Someone'} size={28} />;
     })}
   </div></div></div>;
 }
