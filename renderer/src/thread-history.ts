@@ -26,6 +26,7 @@ import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../
 import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
+import { handBackReadBy } from '../../shared/thread-asks.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
@@ -462,7 +463,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
       const fromId = (patch!.from as { teammate?: unknown }).teammate;
-      events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from, ...(typeof fromId === 'string' ? { fromId } : {}) });
+      events.push({ at, who: 'agent', said: `${from} handed this over`, words: handBackReadBy(words(patch.answer)!, 'asker'), message: true, field: 'answer', from, ...(typeof fromId === 'string' ? { fromId } : {}) });
       continue;
     }
     if (has(patch, 'answer')) {

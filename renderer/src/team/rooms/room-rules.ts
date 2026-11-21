@@ -194,9 +194,12 @@ export function agentsWords(n: number | null): string {
   return `${n} ${n === 1 ? 'agent' : 'agents'} working`;
 }
 
+/** The two letters on a person's face: first and last word ("Sam Ortiz" SO),
+ *  the first two of a single word, the part before @ of an email. */
 export function initialsOf(name: string): string {
-  const s = String(name ?? '').replace(/[^\p{L}\p{N} ]/gu, '').trim();
-  return (s.slice(0, 2) || '?').toUpperCase();
+  const words = String(name ?? '').split('@')[0].replace(/[^\p{L}\p{N}\s]/gu, '').split(/\s+/).filter(Boolean);
+  const two = words.length > 1 ? [...words[0]][0] + [...words[words.length - 1]][0] : [...(words[0] ?? '')].slice(0, 2).join('');
+  return (two || '?').toUpperCase();
 }
 
 /** The name drawn on a card: "You" on my own. */
