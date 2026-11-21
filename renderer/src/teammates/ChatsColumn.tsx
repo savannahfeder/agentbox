@@ -62,14 +62,14 @@ export function ChatsColumn({ current }: { current: string | null }) {
     const open = !folded.has(id);
     return <div className="cx-sec" key={id}>
       <div className="cx-head">
-        <button type="button" className="cx-fold" aria-expanded={open} onClick={() => fold(id)}>{CHEVRON(open)}<span>{title}</span>{count > 0 && <em>{count}</em>}</button>
+        <button type="button" className="cx-fold" aria-expanded={open} onClick={() => fold(id)}>{CHEVRON(open)}<span>{title}</span>{count > 1 && <em>{count}</em>}</button>
         {plus}
       </div>
       {open && rows}
     </div>;
   };
   return <aside className="gc-list cx-list" aria-label="Chats">
-    <label className="cx-search">{I.search()}<input value={q} placeholder="Search" aria-label="Search your chats" onChange={(e) => setQ(e.target.value)} /><kbd>G</kbd></label>
+    <label className="cx-search">{I.search()}<input value={q} placeholder="Search" aria-label="Search your chats" title="Search your chats (G)" onChange={(e) => setQ(e.target.value)} /></label>
     {c.onTeam && <button type="button" className={`cx-row cx-team${current === 'team' ? ' on' : ''}`} aria-current={current === 'team' ? 'page' : undefined} onClick={c.onTeam}>
       <span className="cx-mark" aria-hidden="true">{I.standupNav()}</span><span className="cx-n">Standup</span>
     </button>}
@@ -81,7 +81,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
         </button>;
       })}
       {!c.teammates.length && <button type="button" className={`cx-row cx-add${current === 'new' ? ' on' : ''}`} onClick={c.onNew}><i className="tq tq-sm tq-hash" aria-hidden="true">+</i><span className="cx-n">New teammate</span></button>}
-    </>, <button type="button" className="cx-plus" aria-label="New teammate" title="New teammate" onClick={c.onNew}>{I.plus()}</button>)}
+    </>, c.teammates.length > 0 && <button type="button" className="cx-plus" aria-label="New teammate" title="New teammate" onClick={c.onNew}>{I.plus()}</button>)}
     {c.persons ? c.persons.length > 0 && section('people', 'People', c.persons.length, persons.map((p) => {
       const on = current === `person:${p.id}`;
       return <button type="button" key={p.id} className={`cx-row${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => c.onPerson?.(p.id)}>
@@ -94,7 +94,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
   function row(g: GroupChoice) {
     const on = current === g.key;
     return <button type="button" key={g.key} className={`cx-row${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => openGroup(g.key)}>
-      <GroupMark g={g} size={20} /><span className="cx-n">{g.name}</span>{g.unread && !on ? <i className="cx-need" aria-label="New messages" /> : groupTag(g) && <span className="cx-st">{groupTag(g)}</span>}
+      <GroupMark g={g} size={20} /><span className="cx-n">{g.name}</span>{g.unread && !on ? <i className="cx-need" aria-label="New messages" /> : !g.team && groupTag(g) && <span className="cx-st">{groupTag(g)}</span>}
     </button>;
   }
 }

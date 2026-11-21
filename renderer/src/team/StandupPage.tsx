@@ -140,7 +140,7 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
         <button type="button" className="su-ar" aria-label="The week before" onClick={() => moveWeek(-1)}>{I.back()}</button>
         {week.map((d) => <button type="button" role="tab" key={d.day} disabled={d.ahead} aria-selected={d.day === day && !searching}
           className={`su-day${d.day === day && !searching ? ' on' : ''}`} onClick={() => { setQ(''); setPicked(d.day); }}>{d.label}</button>)}
-        <button type="button" className="su-ar" aria-label="The week after" disabled={nextWeekAhead} onClick={() => moveWeek(1)}>{I.chev()}</button>
+        <button type="button" className="su-ar" aria-label="The week after" disabled={nextWeekAhead} onClick={() => moveWeek(1)}>{I.forward()}</button>
         <label className="su-search">{I.search()}<input value={q} placeholder="Search standups" aria-label="Search standups" onChange={(e) => setQ(e.target.value)} /></label>
       </div>
       {days.map((d, i) => {

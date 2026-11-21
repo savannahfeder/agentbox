@@ -31,7 +31,7 @@ export function PeoplePanel({ room, onPerson }: { room: Pick<Room, 'members' | '
   return <aside className="gr-side">
     <div className="gr-ph"><span className="gr-pt">{peopleHeading(room)}</span>{working > 0 && <span className="gr-pn">{working} working now</span>}</div>
     {cards.map((c) => <button type="button" key={c.id} className="gr-prow" title={`Open ${cardName(c)}'s page`} onClick={() => onPerson(c.id)}>
-      <Face name={c.name} url={c.avatarUrl} size={32} />
+      <Face name={c.name} url={c.avatarUrl} size={28} />
       <span className="gr-pw">
         <span className="gr-l1"><span className="rm-one">{cardName(c)}</span>
           {c.teammate && !c.me && !room.teamId && <span className="gr-mate">Your team</span>}</span>

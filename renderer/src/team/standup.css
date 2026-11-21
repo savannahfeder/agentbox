@@ -6,7 +6,7 @@
 .su-top h2 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
 .su-date { font-size: 14px; color: var(--text-faint); }
 .su-r { margin-left: auto; display: flex; align-items: center; gap: 10px; align-self: center; }
-.su-tog { display: inline-flex; align-items: center; gap: 9px; height: 28px; padding: 0 6px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
+.su-tog { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 6px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
 .su-tog:hover { color: var(--text-dim); }
 .su-tog i { position: relative; width: 28px; height: 16px; border-radius: 8px; background: var(--line-strong); }
 .su-tog i::after { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); transition: left .15s; }
@@ -28,14 +28,16 @@
 .su-btn { height: 30px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg-raised); font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
 
 .su-days { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
-.su-ar { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: none; color: var(--text-faint); cursor: pointer; }
+.su-ar { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: none; color: var(--text-faint); cursor: pointer; }
 .su-ar:hover:not(:disabled) { color: var(--text); background: var(--wash); }
 .su-ar:disabled { opacity: .35; cursor: default; }
+/* The arrow's point, not its button, lines up with the day's title. */
+.su-ar:first-child { margin-left: -11px; }
 .su-day { height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: 15px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
 .su-day:hover:not(:disabled) { color: var(--text); }
 .su-day.on { color: var(--text); border-color: var(--line-strong); background: var(--bg-selected); }
 .su-day:disabled { opacity: .45; cursor: default; }
-.su-search { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text-faint); }
+.su-search { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text-faint); }
 .su-search input { width: 150px; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text); outline: none; }
 .su-search input::placeholder { color: var(--text-faint); }
 
