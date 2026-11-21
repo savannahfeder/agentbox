@@ -15,6 +15,7 @@ import type { LedgerLine } from '../thread-history';
 import type { DragEvent } from 'react';
 import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
 import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
+import { moveUndo, renameUndo } from './files-undo';
 import './files-place.css';
 
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
@@ -143,8 +144,8 @@ function NameBox({ placeholder, start = '', onDone, onCancel }: { placeholder: s
 const MENU_ROOM = 300;
 
 /** A file's menu, or a group's: where it can go in its project. */
-function MoveMenu({ file, name, keys, folders, act, onNewFolder, onTrash }: {
-  file: PlacedFile; name?: string; keys?: string[]; folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (name: string) => void;
+function MoveMenu({ file, name, keys, folders, onMove, onNewFolder, onTrash }: {
+  file: PlacedFile; name?: string; keys?: string[]; folders: FileFolder[]; onMove: (keys: string[], folder: string | null) => void; onNewFolder: (name: string) => void;
   onTrash?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -159,7 +160,7 @@ function MoveMenu({ file, name, keys, folders, act, onNewFolder, onTrash }: {
   }, [open, naming]);
   const here = folders.filter((f) => f.project.toLowerCase() === (file.project ?? '').toLowerCase());
   const tops = here.filter((f) => !f.parent);
-  const move = (folder: string | null) => { setOpen(false); setQuery(''); for (const key of keys ?? [file.key]) act({ do: 'move', key, folder }); };
+  const move = (folder: string | null) => { setOpen(false); setQuery(''); onMove(keys ?? [file.key], folder); };
   const item = (f: FileFolder, sub: boolean) => <button type="button" key={f.id} role="menuitem" className={`fp-menu-item${sub ? ' is-sub' : ''}`} disabled={!keys && file.folder === f.id} onClick={() => move(f.id)}>
     <FolderGlyph />{f.name}
   </button>;
@@ -282,9 +283,9 @@ function useNear<T extends Element>() {
   return [ref, near] as const;
 }
 
-function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, onTrash, chosen = null, unmovable = false }: {
+function Tile({ file, list, now, me, nameOf, onOpen, folders, onMove, onNewFolder, onTrash, chosen = null, unmovable = false }: {
   file: PlacedFile; list: boolean; now: number; me: string | null; nameOf: (id: string) => string; onOpen: () => void;
-  folders: FileFolder[]; act: (p: FileFolderAct) => void; onNewFolder: (file: PlacedFile, name: string) => void;
+  folders: FileFolder[]; onMove: (keys: string[], folder: string | null) => void; onNewFolder: (file: PlacedFile, name: string) => void;
   onTrash: (file: PlacedFile) => void;
   /** While files are being chosen: whether this one is. */
   chosen?: boolean | null;
@@ -320,7 +321,7 @@ function Tile({ file, list, now, me, nameOf, onOpen, folders, act, onNewFolder, 
           <span className="fp-meta"><span className="fp-meta-words">{said}</span>{marks}</span>
         </>}
     </button>
-    {file.project && !choosing && <MoveMenu file={file} folders={folders} act={act} onNewFolder={(n) => onNewFolder(file, n)} onTrash={file.movable ? () => onTrash(file) : undefined} />}
+    {file.project && !choosing && <MoveMenu file={file} folders={folders} onMove={onMove} onNewFolder={(n) => onNewFolder(file, n)} onTrash={file.movable ? () => onTrash(file) : undefined} />}
   </div>;
 }
 
@@ -518,7 +519,29 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   }, [drawn, total]);
   const nameOf = (id: string) => firstName(team?.byId.get(id) ?? null) || 'A teammate';
   const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); else readAgain(); return r; });
-  const move = (key: string, to: string | null) => { void act({ do: 'move', key, folder: to }); };
+  const undoable = (u: { label: string; undoes: string }, back: FileFolderAct[]) => onUndoable?.({
+    label: u.label,
+    undoes: u.undoes,
+    run: async () => {
+      for (const p of back) {
+        const r = await api.filesPlaceFolder(p);
+        if (!r.ok) { readAgain(); return { refused: r.error || 'That could not be put back.' }; }
+      }
+      readAgain();
+    },
+  });
+  const moveAll = (keys: string[], to: string | null) => {
+    const before = all.files;
+    void Promise.all(keys.map((key) => act({ do: 'move', key, folder: to }))).then((rs) => {
+      const u = moveUndo(before, keys.filter((_, i) => rs[i].ok), to, folders);
+      if (u) undoable(u, u.back);
+    });
+  };
+  const move = (key: string, to: string | null) => moveAll([key], to);
+  const rename = (id: string, name: string) => {
+    const u = renameUndo(folders, id, name);
+    void act({ do: 'rename', id, name }).then((r) => { if (r.ok && u) undoable(u, [u.back]); });
+  };
   const countIn = (id: string) => filesBelow(all.files, folders, { project, folder: id }).length;
   const crumbs = crumbsTo(folders, place);
   const cards = looking ? [] : foldersInPlace(folders, place);
@@ -530,7 +553,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
     if (next.has(f.key)) next.delete(f.key); else next.add(f.key);
     return next;
   });
-  const tile = (f: PlacedFile) => <Tile key={f.key} file={f} list={asList} now={now} me={team?.me ?? null} nameOf={nameOf} folders={folders} act={(p) => { void act(p); }}
+  const tile = (f: PlacedFile) => <Tile key={f.key} file={f} list={asList} now={now} me={team?.me ?? null} nameOf={nameOf} folders={folders} onMove={moveAll}
     onOpen={() => (!chosen ? setOpenKey(f.key) : f.movable ? choose(f) : undefined)}
     chosen={chosen && f.movable ? chosen.has(f.key) : null}
     unmovable={!!chosen && !f.movable}
@@ -610,7 +633,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
     {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders">
       {projectCards.map((p) => <FolderCard key={p} folder={{ name: p }} count={filesBelow(all.files, folders, { project: p, folder: null }).length} onOpen={() => onProject(p)} />)}
       {cards.map((f) => <FolderCard key={f.id} folder={f} count={countIn(f.id)} onOpen={() => setFolderId(f.id)}
-        onDropFile={(key) => move(key, f.id)} onRename={(name) => { void act({ do: 'rename', id: f.id, name }); }} />)}
+        onDropFile={(key) => move(key, f.id)} onRename={(name) => rename(f.id, name)} />)}
       {naming?.what === 'folder' && project && <div className="fp-folder is-new"><div className="fp-folder-open"><FolderGlyph /><span className="fp-folder-words"><NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /></span></div></div>}
     </div>}
     {list && !shown.length && !scratch.length && !cards.length && !projectCards.length && !naming && <p className="fp-empty">{empty}</p>}
@@ -628,8 +651,8 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
         <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={scratchOpen ? 'M4 10l4-4 4 4' : 'M6 4l4 4-4 4'} /></svg>
         {scratchLine(scratch.length)}
       </button>
-      {scratch[0].project && <MoveMenu file={scratch[0]} name={scratchLine(scratch.length)} keys={scratch.map((f) => f.key)} folders={folders} act={(p) => { void act(p); }}
-        onNewFolder={(name) => { void act({ do: 'make', project: scratch[0].project ?? '', name }).then((r) => { if (r.ok && r.folder) for (const f of scratch) move(f.key, r.folder); }); }} />}
+      {scratch[0].project && <MoveMenu file={scratch[0]} name={scratchLine(scratch.length)} keys={scratch.map((f) => f.key)} folders={folders} onMove={moveAll}
+        onNewFolder={(name) => { void act({ do: 'make', project: scratch[0].project ?? '', name }).then((r) => { if (r.ok && r.folder) moveAll(scratch.map((f) => f.key), r.folder); }); }} />}
     </div>}
     {draw.scratch.length > 0 && <div className={`${asList ? 'fp-lines' : 'fp-grid'} fp-grid-scratch`}>
       {draw.scratch.map(tile)}
