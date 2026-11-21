@@ -133,21 +133,13 @@ export function stoppedWaiting(item: MaybeStopped): boolean {
  *  `rows` is one row for a single close and the ticked set for a batch, because
  *  a selection is the one route that takes a stopped agent out without ever
  *  pointing at it. The row named in `goes` is the first stopped one in the
- *  list, which is the one the pill offers to open.
- *
- *  `walking` vetoes everything. The walk refuses its own rows every time it is
- *  pressed, and a press inside the practice must not be the press that spends
- *  the one nudge somebody gets in the app they actually work in. It cannot
- *  happen today — the walk filters the list down to its own staged rows — but
- *  the veto is stated rather than assumed, because "not reachable" is a fact
- *  about this month's screens. */
+ *  list, which is the one the pill offers to open. */
 export function holdForStoppedAgent(p: {
   rows: readonly MaybeStopped[];
   key: StoppedKey;
   warned: boolean;
-  walking: boolean;
 }): { say: string; goes: { product: string; id: string } } | null {
-  if (p.warned || p.walking) return null;
+  if (p.warned) return null;
   const stopped = p.rows.find(stoppedWaiting);
   if (!stopped) return null;
   return { say: stoppedWarning(p.key, { pressAgain: p.key !== 'L' }), goes: { product: stopped.product, id: stopped.id } };

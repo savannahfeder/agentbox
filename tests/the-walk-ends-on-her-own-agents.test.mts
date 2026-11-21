@@ -1,4 +1,4 @@
-// THE LAST SCREEN OF THE FIRST RUN: her Claude Code agents.
+// HER CLAUDE CODE AGENTS, read off their files for the import card.
 //
 // names three different things on a Mac and only one of them has two scopes
 // that are literally all-projects and this-project, which is why the screen is
@@ -14,9 +14,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { agentTitle, firstFromBody, oneLine, parseAgentFile, readAgentFiles } from '../main/agent-files.mts';
 import { NAME } from '../shared/product-name.mjs';
-import {
-  anyAgents, COPY, BEAT, N_BEATS, forcedStep,
-} from '../renderer/src/onboarding.ts';
 
 // One of hers, ~/.claude/agents/leon-okafor-qa.md, first four lines.
 const REAL = `---
@@ -102,147 +99,12 @@ describe('both of her scopes, off a real folder tree', () => {
   });
 });
 
-describe('the screen', () => {
-  const found = {
-    user: [{ name: 'a', title: 'A', line: '', scope: 'all', path: '/h/a.md' }],
-    project: [{ name: 'b', title: 'B', line: '', scope: 'project', path: '/p/b.md' }],
-  };
-
-  /* * THE SWITCH THIS BLOCK USED TO TEST IS DELETED.
-
-     Six tests went with it, and each one is here as the rule it held so the
-     rule is not lost with the code:
-
-       draws a group per scope, every-project first
-       offers both sides of the switch even when one is empty
-         `agentGroups`. The card has a section per inbox the rows can land in.
-         On her own Mac on 08-26 that was eight, not two, and two of the eight
-         were folders no project pointed at, which the switch could not reach at
-         all. Both sides always drawn is a rule about a control that is gone.
-       opens on every-project, and on the project only when the home folder is
-       empty
-         `scopeAtOpen`. There are no sides to open on.
-       opens with everything she has ticked
-       opens on what she took last time when she walks it again
-         `chosenAtOpen`. The card opens with NOTHING ticked. She approved that
-         on 08-26 and it is what makes one project one press; a card that opens
-         with sixteen ticked is a card you have to untick fifteen times.
-       ticks and unticks, and what is saved reads in the order she saw it
-         `toggleAgent`, which ticked by NAME. The card ticks by PATH, because
-         two folders on one Mac can both hold a `code-reviewer`.
-
-     What replaced each of them is in tests/a-project-is-a-thing-you-can-tick
-     and tests/importing-agents-has-its-own-row, against the card that is now
-     drawn in both places.
-  */
-
-  // Nothing at all in these two folders is half of what decides whether the
-  // last card appears. The other half is whether any other folder on the Mac
-  // has agents in it, which the card can reach and this cannot see.
-  it('knows when there is nothing in her home folder or this project', () => {
-    expect(anyAgents(found)).toBe(true);
-    expect(anyAgents({ user: [], project: [] })).toBe(false);
-  });
-});
-
-describe('where it sits in the walk', () => {
-  // IT IS NOT A SCREEN ANY MORE, IT IS PART OF THE ENDING.It was the eighth of
-  // ten for a day, which put a full screen form between closing her first task
-  // and clearing the three examples, and the tenth for a few hours, which put
-  // a form between the walk and its own ending. Now the finish card asks it.
-  // It was the tenth and last dot until 2026-08-23, when five screens of
-  // introduction went in front of the app. It is still the last one, which is
-  // the half of this that is hers.
-  it('is on the finish card, which is the last dot', () => {
-    // Nineteen since 2026-10-01: who a thread is for, and the board, each became a beat of their own.
-    // Sixteen since 2026-10-05 (w-9f6975906c): the three introduction slabs went.
-    // Seventeen since 2026-10-06: the look around added two and To took one.
-    expect(N_BEATS).toBe(17);
-    expect(BEAT.done).toBe(N_BEATS);
-    expect(BEAT.landed).toBe(N_BEATS);
-    expect(BEAT.answer).toBe(10);
-    // There is no beat of its own left for it to sit on.
-    expect(BEAT.agents).toBeUndefined();
-  });
-
-  it('comes after the inbox is cleared and after ⌘K', () => {
-    expect(BEAT.clear).toBeLessThan(BEAT.done);
-    expect(BEAT.command).toBeLessThan(BEAT.done);
-    // And there is no beat between them any more. The card that said she was
-    // at inbox zero stood there until 2026-08-23, when she asked for it to go.
-    expect(BEAT.zero).toBeUndefined();
-  });
-
-  it('shares the card\'s one button, so nothing is asked after the confetti', () => {
-    // The screen had a Finish of its own and the celebration came after it,
-    // which is a celebration followed by one more form. One card, one button,
-    // and the button is her sentence.
-    expect(COPY.finishGo).toBe('Open my inbox');
-    expect(COPY.agentsFinish).toBe(undefined);
-  });
-
-  it('opens with ?firstrun=done, and the old step name is refused', () => {
-    expect(forcedStep('done')).toBe('done');
-    expect(forcedStep('agents')).toBe(null);
-    expect(forcedStep('nonsense')).toBe(null);
-  });
-
-  // Every word of the offer is one sentence, because the walk's other screens
-  // are and because a paragraph on a finality scene is not one.
-  it('says one thing per line', () => {
-    for (const k of ['agentsOffer', 'agentsRead', 'agentsNoneAll', 'agentsNoneHere',
-      'finishHead', 'finishLine']) {
-      expect(COPY[k].length).toBeLessThan(100);
-    }
-  });
-
-  // Two sentences became one, and the one that stayed is the one at the foot.
-  // The line that IS over the list now is not that sentence coming back: the
-  // headline it used to live under is deleted, so without it the list is a
-  // column of names on a celebration card with nothing saying what it is.
-  //
-  // AND ON 2026-08-24 THE LINE OVER THE LIST BECAME THE CARD'S OWN LINE. AND ON
-  // 2026-08-27 THE LIST MOVED TO THE CARD SHE APPROVED.So the walk's own
-  // `.fr-offer` block is gone and <ImportAgents> is what draws her agents here.
-  // The rule this test has always been about survives the move unchanged: ONE
-  // line over the list and ONE under it. Over is `agentsOffer`, drawn by the
-  // import card only when it is inside the walk and only on the door screen.
-  // Under is `agentsRead`, drawn once, on the choose screen.
-  it('keeps one line over the list and one under it, and no more', () => {
-    const tsx = fs.readFileSync(
-      path.join(import.meta.dirname, '..', 'renderer/src/components/Onboarding.tsx'), 'utf8');
+describe('the import card that draws them', () => {
+  // One line over its list, picked by `listLine`, and only when there is a list
+  // and it is not a search (w-db6f5e331e, w-e46f2e9cea, w-6418318cd5).
+  it('says one line over the list, and none over nothing', () => {
     const ia = fs.readFileSync(
       path.join(import.meta.dirname, '..', 'renderer/src/components/ImportAgents.tsx'), 'utf8');
-    // The walk's card draws its own headline and its own one line, and no list.
-    //
-    // THAT CARD IS THE GATE SINCE 2026-10-09 (w-ce8c1a9275) and it is the only
-    // one left: the branch above it returns the import card for every unblocked
-    // Mac, so the `fr-finish` panel this used to slice was only ever drawn when
-    // blocked. It wears the walk's question-screen classes now, `fr-page` and
-    // `fr-lede`, which is what the anchors below follow. The claim is unchanged.
-    const card = tsx.slice(tsx.indexOf('className="fr-page"'), tsx.indexOf('<AskList'));
-    expect(card.split('card.line').length - 1).toBe(1);
-    expect(card.includes('className="fr-offer"')).toBe(false);
-    expect(card.includes('COPY.agentsClause')).toBe(false);
-    // Her agents are on the import card, handed the one line to say over them.
-    expect(tsx).toMatch(/if \(!card\.blocked\) \{/);
-    expect(tsx).toMatch(/line: COPY\.agentsOffer,/);
-    // Drawn once, over the doors, never repeated on the choose screen where
-    // every section prints the real folder it was read out of, and NOT AT ALL
-    // when there are no agents on the Mac: a line reading "these are the
-    // agents already on this Mac" over nothing is the contradiction this
-    // whole file is about.
-    //
-    // CHANGED 2026-10-05 (w-db6f5e331e): the one-list card says one line over
-    // its list in the walk and in ⌘K alike, and only when there is a list.
-    //
-    // AND SINCE w-e46f2e9cea THE LINE IS PICKED BY `listLine`, which says "From
-    // the last 10 days" unless the card had to reach back for older sessions.
-    // AND NOT OVER A SEARCH (w-6418318cd5). The name field puts matches from
-    // months ago on the card; "From the last 10 days" over those is the same
-    // contradiction this file is about, pointing the other way.
-    // The third argument is w-6418318cd5: a chat kept out of a search is on
-    // this list too, so the line owns up to it rather than saying ten days.
     expect(ia).toContain('{read && some && !searching && <p className="ia-line">{listLine(threads ?? [], Date.now(), kept.length > 0)}</p>}');
     expect(ia.split('listLine(').length - 1).toBe(1);
     expect(ia).not.toContain('COPY.agentsRead');

@@ -39,23 +39,22 @@ const waiting = {
 
 describe('the lesson itself is untouched', () => {
   it('still fires once, on a thread whose agent is waiting', () => {
-    expect(holdForStoppedAgent({ rows: [waiting], key: 'L', warned: false, walking: false })?.say)
+    expect(holdForStoppedAgent({ rows: [waiting], key: 'L', warned: false })?.say)
       .toContain('leaves it stuck');
   });
 
   // The box is already open in front of you, so the way through is the box.
   it('drops "press again" on L, which is no longer true, and keeps it on E', () => {
-    expect(holdForStoppedAgent({ rows: [waiting], key: 'L', warned: false, walking: false }).say)
+    expect(holdForStoppedAgent({ rows: [waiting], key: 'L', warned: false }).say)
       .toBe(stoppedWarning('L', { pressAgain: false }));
     expect(stoppedWarning('L', { pressAgain: false })).not.toContain('Press again');
-    expect(holdForStoppedAgent({ rows: [waiting], key: 'E', warned: false, walking: false }).say)
+    expect(holdForStoppedAgent({ rows: [waiting], key: 'E', warned: false }).say)
       .toBe(stoppedWarning('E'));
     expect(stoppedWarning('E')).toContain('Press again to go ahead.');
   });
 
-  it('is still said once ever, and never during the walk', () => {
-    expect(holdForStoppedAgent({ rows: [waiting], key: 'L', warned: true, walking: false })).toBe(null);
-    expect(holdForStoppedAgent({ rows: [waiting], key: 'L', warned: false, walking: true })).toBe(null);
+  it('is still said once ever', () => {
+    expect(holdForStoppedAgent({ rows: [waiting], key: 'L', warned: true })).toBe(null);
   });
 
   it('still holds E, which opens no field', () => {
