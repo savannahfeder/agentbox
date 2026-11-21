@@ -110,6 +110,9 @@ export function sortFiles<T extends Pick<PlacedFile, 'name' | 'sentIn' | 'at' | 
 export const MACHINE = MAC ? 'Mac' : 'computer';
 
 /** A size as a person reads it: 625 MB, 2.1 MB, 4 KB, 4.8 GB. */
+/** The page's total says something only once it reaches a megabyte. */
+export const showsTotal = (bytes: number): boolean => bytes >= 1024 * 1024;
+
 export function sizeWords(bytes: number): string {
   const units = ['KB', 'MB', 'GB', 'TB'];
   let n = bytes / 1024;
