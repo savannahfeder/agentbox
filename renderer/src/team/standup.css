@@ -12,7 +12,7 @@
 .su-tog i::after { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); transition: left .15s; }
 .su-tog[aria-checked="true"] i { background: var(--text-dim); }
 .su-tog[aria-checked="true"] i::after { left: 14px; }
-.su-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--text-faint); cursor: pointer; }
+.su-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer; }
 .su-icon:hover, .su-icon.on { color: var(--text); border-color: var(--line-strong); }
 
 /* Settings open under the heading, in the page, never over it. */
@@ -23,12 +23,12 @@
 .su-chip { height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 14px; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
 .su-chip:hover { color: var(--text-dim); }
 .su-chip.on { color: var(--text); border-color: var(--line-strong); background: var(--bg-selected); }
-.su-select { height: 30px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--pop, var(--bg-raised)); font: inherit; font-size: 13px; color: var(--text); }
+.su-select { height: 30px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--pop, var(--bg-raised)); font: inherit; font-size: 13px; color: var(--text); }
 .su-tz { font-size: 13px; color: var(--text-faint); }
-.su-btn { height: 30px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg-raised); font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
+.su-btn { height: 30px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg-raised); font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
 
 .su-days { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
-.su-ar { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: none; color: var(--text-faint); cursor: pointer; }
+.su-ar { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer; }
 .su-ar:hover:not(:disabled) { color: var(--text); background: var(--wash); }
 .su-ar:disabled { opacity: .35; cursor: default; }
 /* The arrow's point, not its button, lines up with the day's title. */

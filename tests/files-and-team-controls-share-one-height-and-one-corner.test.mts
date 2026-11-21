@@ -23,5 +23,6 @@ describe('the Team controls', () => {
     expect(rule(css('team/everything/everything.css'), '.pl-btn')).toContain('border-radius: var(--radius)');
     expect(rule(css('team/standup.css'), '.su-day')).toContain('border-radius: var(--radius)');
     expect(rule(css('team/standup.css'), '.su-tog')).toContain('border-radius: var(--radius)');
+    for (const sel of ['.su-icon', '.su-select', '.su-btn', '.su-ar']) expect(rule(css('team/standup.css'), sel), sel).toContain('border-radius: var(--radius)');
   });
 });
