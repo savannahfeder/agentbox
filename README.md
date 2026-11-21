@@ -48,7 +48,9 @@ Every way runs Claude Code or Codex on the plan you already have. If your comput
 
 <br>
 
-1. Open PowerShell. If you do not have Git and Node 22.18 or newer, install them with winget, then close the PowerShell window and open a new one so it finds them.
+Building it needs Git and Node 22.18 or newer.
+
+1. Open PowerShell. If you do not have both yet, install them with winget, then close the PowerShell window and open a new one so it finds them.
 
    ```
    winget install --id Git.Git -e
@@ -115,7 +117,7 @@ On macOS, the system may ask to let Terminal find devices on your local network.
 
 <br>
 
-It needs only Node 22.18 or newer.
+It needs Node 22.18 or newer.
 
 ```
 npx agentbox-app
