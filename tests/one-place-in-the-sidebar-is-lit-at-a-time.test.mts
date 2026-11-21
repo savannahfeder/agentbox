@@ -14,6 +14,15 @@ const lit = (o: Record<string, unknown>) => {
   return [...html.matchAll(/aria-label="([^"]+)"[^>]*aria-current="page"/g)].map((m) => m[1]);
 };
 
+describe('the app', () => {
+  it('tells the sidebar a Team page is open, so Inbox does not light beside Team', async () => {
+    const fs = await import('node:fs');
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    // A second review: Standup and a person's page still lit Inbox, because the app told the sidebar only about rooms.
+    expect(app).toContain('onGroupsPage={roomShown || directOpen || chatsPlaceShown || cardFromPlace}');
+  });
+});
+
 describe('the sidebar', () => {
   it('lights only Team on the Team page', () => {
     expect(lit({ tasksPage: true })).toEqual(['Team']);
