@@ -135,13 +135,40 @@ describe('the trail of what was done', () => {
       const base = rule(summary, '.ts-step::before');
       const dot = { top: px(rule(css, `${prefix}.ts-step::before`) || base, 'top'), size: px(base, 'height') };
       const line = rule(css, `${prefix}.ts-step:not(:last-child)::after`) || rule(summary, '.ts-step:not(:last-child)::after');
-      const step = Number(rule(summary, '.ts-step').match(/margin: 0 0 ([\d.]+)px/)?.[1]);
+      const step = Number((rule(css, `${prefix}.ts-step`) || rule(summary, '.ts-step')).match(/margin: 0 0 ([\d.]+)px/)?.[1]);
       const above = px(line, 'top') - (dot.top + dot.size);
       const below = step + dot.top + px(line, 'bottom');
       expect(above).toBeGreaterThan(0);
       expect(below).toBe(above);
     });
   }
+  // Pinned on the light picture: "These little dots feel a little too indented". The page is
+  // markdown, and `.markdown ol` (22px in) and `.markdown li` (3px) outranked the trail's
+  // one-class rules, so the dots sat 25px in from the label over them.
+  it('starts the summary\'s dots on the edge its label starts on, whatever the page\'s lists do', () => {
+    expect(read('renderer/src/styles.css')).toMatch(/^\.markdown ul, \.markdown ol \{ margin: 8px 0 8px 22px; \}/m);
+    expect(rule(pages, '.tp-summary .ts-trail')).toMatch(/margin: 0; padding: 0;/);
+    expect(rule(pages, '.tp-summary .ts-step')).toMatch(/margin: 0 0 6px/);
+    expect(rule(pages, '.tp-summary .ts-step::before')).toMatch(/(^|;)\s*left: 0;/);
+    expect(px(rule(pages, '.tp-summary .ts-step:not(:last-child)::after'), 'left') + 0.5).toBe(2.5);
+    expect(rule(pages, '.tp-summary .tp-files')).toMatch(/margin: 0;/);
+  });
+});
+
+describe('what a teammate asked of you, on their thread', () => {
+  const asks = read('renderer/src/team/asks.css');
+  // Pinned on the asked-to-help picture: "visually really easy to miss. It's poorly
+  // spaced, and it feels like part of the message". It sat 8px under the answer, unframed.
+  it('stands apart from the answer above it, in the summary\'s card', () => {
+    const card = rule(asks, '.ask-bar:not(.ask-under)');
+    expect(Number(card.match(/margin: (\d+)px 0 0;/)?.[1])).toBeGreaterThanOrEqual(24);
+    expect(card).toMatch(/border: 1px solid var\(--line\); border-radius: var\(--radius\); background: var\(--wash\);/);
+    expect(card).toMatch(/padding: 18px 22px 20px;/);
+    expect(rule(pages, '.ts-ticket.tp-summary')).toMatch(/padding: 18px 22px 20px;/);
+  });
+  it('leaves the answer drawn under a task\'s own message as it was', () => {
+    expect(rule(asks, '.ask-bar.ask-under')).toBe(' margin: 0; ');
+  });
 });
 
 describe("the box at the foot of a teammate's thread", () => {

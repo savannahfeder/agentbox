@@ -456,13 +456,20 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-summary .ts-tk-lead + .ts-tk-part { margin-top: 18px; }
 .tp-summary .ts-h { margin: 0 0 8px; }
 .tp-summary .ts-tk-part > p { margin: 0; font-size: 14px; line-height: 21px; color: var(--text); }
-/* The trail at the thread's reading size, its line still 3px off each dot (summary.css). */
-.tp-summary .ts-trail { font-size: 14px; line-height: 21px; color: var(--text); }
-.tp-summary .ts-step::before { top: 8px; }
-.tp-summary .ts-step:not(:last-child)::after { top: 16px; bottom: -11px; }
+/* The trail at the thread's reading size, its dots on the edge its label starts
+   on and its line still 3px off each dot (summary.css). The page is markdown,
+   whose list rules (.markdown ol, .markdown li) would set it 22px in, so these
+   name the summary to come first. */
+.tp-summary .ts-trail { margin: 0; padding: 0; font-size: 14px; line-height: 21px; color: var(--text); }
+.tp-summary .ts-step { margin: 0 0 6px; padding-left: 16px; }
+.tp-summary .ts-step:last-child { margin-bottom: 0; }
+.tp-summary .ts-step::before { left: 0; top: 8px; }
+.tp-summary .ts-step:not(:last-child)::after { left: 2px; top: 16px; bottom: -11px; }
 .tp-files { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
 .tp-files button { display: flex; align-items: center; gap: 9px; max-width: 320px; padding: 5px 10px 5px 5px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
 .tp-files button:hover { background: var(--wash); border-color: var(--line-strong); }
+.tp-summary .tp-files { margin: 0; }
+.tp-summary .tp-files > li { margin: 0; }
 .ts-tk-ext { flex: none; width: 34px; padding: 5px 0; border-radius: 5px; background: var(--wash); font: 9.5px var(--mono); letter-spacing: .04em; text-transform: uppercase; text-align: center; color: var(--text-dim); }
 .ts-tk-fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ts-tk-notes { flex: none; font-size: 12px; color: var(--text-faint); }

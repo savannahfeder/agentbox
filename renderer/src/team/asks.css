@@ -38,6 +38,9 @@
 
 /* A helper on someone's thread: what was asked, as a message, and handing it back. */
 .ask-bar { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 0; }
+/* On their thread it is a card of its own, the summary's card (pages.css
+   .tp-summary), set apart from the answer above it. */
+.ask-bar:not(.ask-under) { margin: 28px 0 0; padding: 18px 22px 20px; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash); }
 /* After the result block, which ends without a message's own space below it. */
 .appendix + .ask-bar { margin-top: 32px; }
 .ask-bar-head { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-dim); }
