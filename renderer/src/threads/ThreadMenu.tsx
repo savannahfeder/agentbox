@@ -425,7 +425,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
 
   // The first row takes the focus as the menu opens, so the arrows work at once.
   useEffect(() => {
-    if (open) wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    // Back is not the thing anyone came for, so the first real row takes it.
+    if (open) wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(.sh-back)')?.focus();
   }, [open, giving, waiting, adding, leveling, sharing]);
 
   // Enter, Space or the down arrow on the dots opens the menu. Handled here and
@@ -558,7 +559,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
           <p className="ts-menu-say">{(givingFromShare ? (giveStart === 'give' ? 'Who takes it over?' : 'Who do you want to ask?') : onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
             + (giveTo.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
           {giveTo.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
-            <span className="ico"><GiveMark /></span>
+            <span className="ico">{p.id.startsWith('mate:') ? <GiveMark /> : <Face name={p.name} size={18} />}</span>
             <span className="ts-more-label">{p.name}</span>
             {p.detail && <kbd>{p.detail}</kbd>}
           </button>)}

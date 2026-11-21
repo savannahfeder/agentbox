@@ -30,3 +30,4 @@
 /* The way back to the panel this one opened from. */
 .sh-back .ts-more-label, .sh-back .ico { color: var(--text-dim); }
 .sh-back:hover .ts-more-label, .sh-back:hover .ico { color: var(--text); }
+.sh-sep + .ts-menu-say { border-bottom: 0; padding-bottom: 4px; }
