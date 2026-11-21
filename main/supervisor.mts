@@ -12,8 +12,8 @@ import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot, stopS
 import { MainTests } from './main-went-red.mts';
 import { SecurityScan } from './the-security-scan-went-red.mts';
 import { CloudServerWatch, serverError } from './cloud-server-down.mts';
-import { folderJob } from './task-folders-offthread.mts';
-import { gitJob } from './git-change-offthread.mts';
+import { folderJob, warmFolderThread } from './task-folders-offthread.mts';
+import { gitJob, warmGitThread } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes } from './notes-wake.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
@@ -1038,6 +1038,10 @@ const LEVEL_TRIES = 3;
 const CATCH_UP_AT_ONCE = 3;
 /** Someone is looking at these rows, so a miss is tried again far sooner than a name is. */
 const CATCH_UP_RETRY_MS = 60_000;
+/** How long after its start a local agent without a session id still counts as booting (`_anAgentIsStarting`). */
+const AGENT_BOOT_MS = 20_000;
+/** The longest tidying waits on agents that are starting. */
+const TIDYING_WAITS_MS = 60_000;
 // How long one account gets to say who takes a thread sent to Auto. A person is
 // waiting on this one, unlike a name, and a miss sends the thread to an agent.
 const ROUTE_TIMEOUT_MS = 60_000;
@@ -1442,6 +1446,8 @@ export class Supervisor {
   declare _catchingUp: Set<string>;
   declare _nameMisses: Map<string, number>;
   declare _naming: boolean | undefined;
+  declare _tidyingWaitedSince: number | undefined;
+  declare _tidyingHeld: boolean | undefined;
   declare _routing: boolean | undefined;
   declare _sortedMessages: Set<string>;
   declare _sortingMessages: boolean | undefined;
@@ -5107,7 +5113,7 @@ export class Supervisor {
    *   row behind it waited for good (tests/a-row-is-named-on-an-account-that-has-room).
    */
   nameTheRows(items: WorkItem[], now = Date.now()) {
-    if (this._naming || this._memoryCritical(now)) return undefined;
+    if (this._naming || this._memoryCritical(now) || this._tidyingWaits(now)) return undefined;
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
@@ -5132,7 +5138,7 @@ export class Supervisor {
    * agent's own last message.
    */
   catchUpTheImports(items: WorkItem[], now = Date.now()) {
-    if (this._memoryCritical(now)) return Promise.resolve([]);
+    if (this._memoryCritical(now) || this._tidyingWaits(now)) return Promise.resolve([]);
     this._catchingUp ??= new Set();
     this._catchUpMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
@@ -5202,6 +5208,36 @@ export class Supervisor {
     return pressureFrom(r) === 'critical';
   }
 
+  /** A local agent between being asked for and having booted: its folder being made, or its process up without its session id. */
+  _anAgentIsStarting(now = Date.now()) {
+    if (this._preparing?.size) return true;
+    for (const s of this.sessions?.values() ?? []) {
+      if (!s.cloud && !s.command && !s.sessionId && now - (s.startedAt ?? 0) < AGENT_BOOT_MS) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Whether tidying waits for an agent that is starting: each of these is a
+   * Claude Code process of its own, and booting beside the worker's slowed its
+   * first model request from about 0.9 to 1.8 s (w-9993530556). Never longer
+   * than TIDYING_WAITS_MS, so a run of starts cannot hold it for good.
+   */
+  _tidyingWaits(now = Date.now()) {
+    if (!this._anAgentIsStarting(now)) { this._tidyingWaitedSince = 0; return false; }
+    this._tidyingWaitedSince ||= now;
+    if (now - this._tidyingWaitedSince >= TIDYING_WAITS_MS) return false;
+    this._tidyingHeld = true;
+    return true;
+  }
+
+  /** The pass that held the tidying runs again the moment the agent has booted, not at the next fifteen-second tick. */
+  _tidyingCanGo() {
+    if (!this._tidyingHeld || this._anAgentIsStarting()) return;
+    this._tidyingHeld = false;
+    this.wake?.();
+  }
+
   async _askSmall<T>(ask: (opts: SmallModelAsk) => Promise<T> | T, { product = null }: { product?: string | null } = {}): Promise<T | ''> {
     const home = this._homeEngine();
     const engines = this._projectProfile(product)
@@ -5242,7 +5278,7 @@ export class Supervisor {
    * every fifteen seconds.
    */
   sortTheMessages(items: WorkItem[], me: string | null | undefined) {
-    if (this._sortingMessages || !me || this._memoryCritical()) return undefined;
+    if (this._sortingMessages || !me || this._memoryCritical() || this._tidyingWaits()) return undefined;
     this._sortedMessages ??= new Set();
     const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const next = items
@@ -5271,7 +5307,7 @@ export class Supervisor {
    * the tick. A miss waits ten minutes, and after three the task stays Medium.
    */
   levelTheTasks(items: WorkItem[], me: string | null | undefined, now = Date.now()) {
-    if (this._leveling || this._memoryCritical(now)) return undefined;
+    if (this._leveling || this._memoryCritical(now) || this._tidyingWaits(now)) return undefined;
     this._levelMisses ??= new Map();
     const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
@@ -7832,6 +7868,21 @@ export class Supervisor {
   // code's is running. It outlives the app, so a quit leaves its runs going.
   // A host that lost a run before it started is not used again for ten
   // minutes: runs start directly, as they did before there was one.
+  /**
+   * The threads a local start uses, started with the app rather than by the
+   * first thread that needs them (w-9993530556). Not the run host: it leaves
+   * after a minute with nothing to run.
+   */
+  warmTheStartPath() {
+    try { warmFolderThread(); warmGitThread(); } catch (error) { console.warn(`${nameSlug}: could not start the folder threads early:`, (error as Error).message); }
+  }
+
+  /** The same at the top of a start, with the run host, so each boots while the folder is being made rather than after it. */
+  _warmTheStartPath() {
+    this.warmTheStartPath();
+    if (this.hostRuns) this._runHost();
+  }
+
   _runHost() {
     if (Date.now() - (this._runHostBroken ?? 0) < 10 * 60_000) return null;
     this._runHostSock ??= runHostSocket();
@@ -9592,15 +9643,6 @@ export class Supervisor {
     // day back within reach of the fresh-work pass in this same tick.
     this.sayItOnEveryStrandedRow(items, now);
 
-    // And is there a row still wearing the first line of what she dictated?
-    // One a tick, never awaited, silent on every failure (nameTheRows above).
-    try { this.nameTheRows(items); } catch (e) { console.warn('zero: could not name a row:', (e as Error).message); }
-    // And is there a chat just brought in still reading as the end of a terminal session?
-    try { this.catchUpTheImports(items, now); } catch (e) { console.warn('zero: could not catch up a chat:', (e as Error).message); }
-    // And has a teammate written something that needs sorting by urgency?
-    try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', (e as Error).message); }
-    // And is there a task left on Agent decides that has no level yet?
-    try { this.levelTheTasks(items, process.env.AGENTBOX_PERSON_ID, now); } catch (e) { console.warn('zero: could not rank a task:', (e as Error).message); }
     // And is there a thread sent to Auto still waiting to be given to someone?
     try { this.routeTheThreads(items); } catch (e) { console.warn('zero: could not route a thread:', (e as Error).message); }
 
@@ -9886,6 +9928,18 @@ export class Supervisor {
     // would leave a slot standing empty for fifteen seconds.
     this._settleRunNow(items);
     this._settlePreemptions(items, now);
+
+    // THE TIDYING, AFTER THE STARTS, so an agent this pass started is starting
+    // when they ask and they wait for it (`_tidyingWaits`).
+    // Is there a row still wearing the first line of what she dictated?
+    // One a tick, never awaited, silent on every failure (nameTheRows above).
+    try { this.nameTheRows(items); } catch (e) { console.warn('zero: could not name a row:', (e as Error).message); }
+    // And is there a chat just brought in still reading as the end of a terminal session?
+    try { this.catchUpTheImports(items, now); } catch (e) { console.warn('zero: could not catch up a chat:', (e as Error).message); }
+    // And has a teammate written something that needs sorting by urgency?
+    try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', (e as Error).message); }
+    // And is there a task left on Agent decides that has no level yet?
+    try { this.levelTheTasks(items, process.env.AGENTBOX_PERSON_ID, now); } catch (e) { console.warn('zero: could not rank a task:', (e as Error).message); }
 
     // The digest: NOT a schedule, an INVARIANT. So
     // nothing fires on a clock. Every tick asks whether the invariant holds
@@ -12290,6 +12344,7 @@ export class Supervisor {
       return;
     }
     const startAgain = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure, asked, switched };
+    if (!remoteOnly) this._warmTheStartPath();
     if (this._folderFirst(item, product, engine, startAgain)) return;
     if (this._photoFirst(item, product, engine, startAgain)) return;
 
@@ -12752,6 +12807,7 @@ export class Supervisor {
         this.rememberRowSession(item, { sessionId: session.sessionId, cwd, profile, engine, startedAt: session.startedAt });
         this._stoppedSessionTakenUp(item, session);
         this._saveState();
+        this._tidyingCanGo();
       }
       // THE SENTENCE BEING TYPED, WHILE IT IS BEING TYPED. This is the only
       // reader of the partial frames and it writes nothing to disk; a push

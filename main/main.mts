@@ -1156,6 +1156,7 @@ async function createWindow() {
       }
     };
     supervisor.start();
+    supervisor.warmTheStartPath();
     powerMonitor.on('suspend', () => supervisor.noteSleep());
     powerMonitor.on('resume', () => {
       supervisor.noteWake();

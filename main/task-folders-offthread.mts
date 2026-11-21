@@ -124,6 +124,11 @@ export class FolderLanes {
     });
   }
 
+  /** Starts a lane's thread before its first job needs it. False when no thread can start, and jobs run here. */
+  warm(name: FolderLaneName): boolean {
+    return !!this._threadFor(this.lanes[name]);
+  }
+
   _here(job: Job) {
     try { job.resolve(this.runHere(job.name, job.args)); } catch (error) { job.reject(error); }
   }
@@ -265,6 +270,11 @@ const lanes = new FolderLanes({
   },
   runHere: (name, args) => (folders[name] as (...args: unknown[]) => unknown)(...args),
 });
+
+/** The thread that makes a thread's folder, started before the first one is asked for. */
+export function warmFolderThread(): boolean {
+  return lanes.warm('start');
+}
 
 /** Run one of task-folders.mts's exports without blocking this thread. */
 export function folderJob<N extends FolderJobName>(name: N, ...args: Parameters<(typeof folders)[N]>): Promise<Awaited<ReturnType<(typeof folders)[N]>>> {
