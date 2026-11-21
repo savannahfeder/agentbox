@@ -155,7 +155,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
-  const events = shownOnTheirThread(built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run'), { me: team?.me ?? null, helping: ask?.ask?.kind === 'help' });
+  const events = shownOnTheirThread(built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run'), { me: team?.me ?? null, helping: ask?.ask?.kind === 'help', owner: firstName(person) || '' });
 
   // Their copy publishes its marks with its messages; everyone's come together here.
   const own = useMemo(() => marksOf((work?.lines ?? [])

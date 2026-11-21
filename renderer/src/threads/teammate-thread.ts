@@ -1,6 +1,6 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
 import type { AgentEvent, LinkCommentWaiting, ThreadCard } from '../types';
-import { isHandBack } from '../../../shared/thread-asks.mts';
+import { handBackReadBy, isHandBack } from '../../../shared/thread-asks.mts';
 import { filesInLines, threadFiles, versionForPath, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 /**
@@ -8,9 +8,11 @@ import { filesInLines, threadFiles, versionForPath, type ThreadLine } from '../.
  * says so, both your comment before their copy passes it on and the line it
  * writes once it has (`from` you on an answer), which outlives the ask.
  */
-export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping }: { me: string | null; helping: boolean }): AgentEvent[] {
+export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping, owner = '' }: { me: string | null; helping: boolean; owner?: string }): AgentEvent[] {
   return events.map((e) => {
     if (e.kind || !me) return e;
+    // The owner's copy wrote "You asked" for its owner; here the reader is the helper.
+    if (isHandBack(e.text)) return { ...e, text: handBackReadBy(e.text ?? '', e.fromId === me ? 'helper' : 'other', owner) };
     if (e.fromId === me && !isHandBack(e.text)) {
       const { from: _from, fromId: _fromId, ...rest } = e;
       return { ...rest, who: 'you' as const, by: me, says: 'to-agent' as const };

@@ -147,6 +147,17 @@ const HANDED_BACK = /^\S+ (?:handed this back|reviewed this(?: and it looks good
 /** Whether words on a thread are a hand-back `handedBackWords` wrote. */
 export const isHandBack = (text: string | null | undefined): boolean => HANDED_BACK.test(String(text ?? ''));
 
+/**
+ * A hand-back as one reader sees it: the stored words name both people, so the
+ * asker reads "You asked" and the helper "You reviewed this".
+ */
+export function handBackReadBy(text: string, reader: 'asker' | 'helper' | 'other', asker = ''): string {
+  if (!isHandBack(text)) return text;
+  if (reader === 'asker') return text.replace(/\n\n\S+ had asked: /, '\n\nYou asked: ');
+  const head = reader === 'helper' ? text.replace(/^\S+ (handed this back|reviewed this)/, 'You $1') : text;
+  return asker ? head.replace(/\n\nYou asked: /, `\n\n${asker} asked: `) : head;
+}
+
 /** The first lines of the task the helper gets: who asked, for what, and the step if one was picked. */
 export function askBody({ kind, owner, helper = null, note, step }: { kind: AskKind; owner: string; helper?: string | null; note: string; step?: string | null }): string {
   // The line over the message says who asked and what for; this says only what it means.
