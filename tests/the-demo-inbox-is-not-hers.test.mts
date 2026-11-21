@@ -27,7 +27,7 @@ import path from 'node:path';
 import {
   HOMES as DEMO_HOMES, clearDemoHomes, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
 } from '../main/demo.mts';
-import { DEMO_ENV, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, runningAsADemo } from '../shared/demo-world.mts';
+import { DEMO_ENV, DEMO_GROUP_POSTS, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, demoMessages, runningAsADemo } from '../shared/demo-world.mts';
 import { HOMES as FRESH_HOMES } from '../shared/fresh-user-home.mts';
 import { readInstallId } from '../shared/install-id.mts';
 import { readWorkItems } from '../main/store/work-items.mts';
@@ -267,6 +267,15 @@ describe('how the demo rows are written', () => {
       expect(done.length).toBeLessThanOrEqual(6);
       for (const step of done) expect(step.split(/\s+/).length).toBeLessThanOrEqual(15);
     }
+  });
+
+  it('joins no two sentences with a colon, the same standing rule as the em dash', () => {
+    const said = [
+      ...rows.flatMap((l) => ['title', 'body', 'result', 'problem', 'progress', 'label'].map((k) => l.patch?.[k])),
+      ...demoMessages().flatMap((m) => [m.title, m.body]),
+      ...DEMO_GROUP_POSTS.map((p) => p.body),
+    ].filter((s): s is string => typeof s === 'string');
+    for (const text of said) expect(text).not.toMatch(/[a-z]: [a-z]/i);
   });
 
   it('writes no em dash anywhere, because a screenshot of this is our writing', () => {

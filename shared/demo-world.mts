@@ -115,7 +115,7 @@ function lines(now: number): DemoRow[] {
       label: 'Old file dates after a move',
       problem: 'You wanted files older than 2019 to keep their real date after a move. They were arriving in Google Drive stamped with today\'s date.',
       progress: [
-        'Found the cause: Drive refused the old dates and fell back to today',
+        'Found why. Drive refused the old dates and used today\'s',
         'Carried each file\'s real date across in its details instead',
         'Moved 3,200 test files from 2004 to 2018, every date kept',
         'Shared drives still lose the date, inside the sync engine',
@@ -152,7 +152,7 @@ function lines(now: number): DemoRow[] {
         '',
         'OneDrive works as a destination. I moved 9,400 files across 4 test accounts and every folder and date arrived intact.',
         '',
-        'Moves over 20,000 files stall in the sync engine, which Theo is rewriting this week, so a fix from me would land on top of his. Everything he needs is in this thread: the three test moves that stalled, the error, and where in the engine it happens.',
+        'Moves over 20,000 files stall in the sync engine, which Theo is rewriting this week, so a fix from me would land on top of his. Everything he needs is in this thread, with the three test moves that stalled, the error, and where in the engine it happens.',
       ].join('\n'),
     },
     {
@@ -424,8 +424,8 @@ const SIGN_UP_WORDS: DemoFile = {
     '',
     '## 3. Start your first move',
     '',
-    'Most teams are done before lunch. You can close your laptop: Ferry picks',
-    'up where it left off.',
+    'Most teams are done before lunch. You can close your laptop, and Ferry',
+    'picks up where it left off.',
   ].join('\n'),
 };
 
