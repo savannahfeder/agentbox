@@ -7678,7 +7678,8 @@ export default function App() {
   const askOnThread = async (item: WorkItem, to: GiveTo, kind: 'help' | 'review', note: string, step: string | null) => {
     const first = to.name.split(/\s+/)[0] || to.name;
     const out = await api.teamAsk({ product: item.product, id: item.id, to: to.id, kind, ...(note ? { note } : {}), ...(step ? { step } : {}) });
-    showToast(out.ok ? (kind === 'help' ? `Asked ${first} to help. It stays yours.` : `Asked ${first} to review it.`) : out.error ?? 'That did not work.');
+    // It leaves Needs you for In progress, so the toast says where it went and when it comes back.
+    showToast(out.ok ? `Asked ${first} to ${kind === 'help' ? 'help' : 'review it'}. It waits in In progress until ${first} hands it back.` : out.error ?? 'That did not work.');
     if (out.ok) await refresh();
   };
   const handAskBack = async (task: WorkItem, verdict: 'done' | 'yes' | 'changes', words: string) => {

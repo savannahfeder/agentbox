@@ -1973,7 +1973,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       terminal={direct || onPhone() ? null : terminalOpen ? 'open' : 'closed'}
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
-      onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
+      // An ask is answered by handing it back, so it offers no second way to end it.
+      onCloseTask={canFinish && givenTask && !item.ask ? onCloseTask ?? null : null}
       onStopRepeating={repeat ? repeat.onEnd : null}
       onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
       handedTo={handedName ? { name: handedName, initials: handedInitials(handedName), onOpen: handedTask ? () => onOpenItem(handedTask) : null } : null}

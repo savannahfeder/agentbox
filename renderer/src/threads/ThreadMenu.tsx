@@ -394,7 +394,12 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   // window, which reads Enter as "send the picked option".
   useEffect(() => {
     if (!open) return undefined;
-    const away = (e: PointerEvent) => { if (!wrap.current?.contains(e.target as Node)) close(false); };
+    // A note half-written in a sheet stays: people click into the thread to re-read the step mid-note.
+    const away = (e: PointerEvent) => {
+      if (wrap.current?.contains(e.target as Node)) return;
+      if ([...(wrap.current?.querySelectorAll('textarea') ?? [])].some((t) => t.value.trim())) return;
+      close(false);
+    };
     const keys = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(true); return; }
       const items = [...(wrap.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
