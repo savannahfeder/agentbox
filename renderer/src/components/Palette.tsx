@@ -5,7 +5,7 @@ import { cloudCommands, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, View } from '../types';
 import { commandKeys } from '../palette-keys';
-import { keptPick, namesIt, pointerMoved, titleFirst } from '../palette-pick';
+import { keptPick, nameRank, namesIt, pointerMoved, titleFirst } from '../palette-pick';
 import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
 import { ICONS, iconFor } from '../palette-glyphs';
 import { markedWords } from '../found-inside';
@@ -120,7 +120,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   onFlipView?: () => void;
   /** The threads a query finds, best first. Absent, the box finds commands only. */
   findThreads?: (query: string) => Command[];
-  /** Groups, chats and AI teammates a query finds, shown before the threads. */
+  /** People, groups, chats and AI teammates a query names, best first (../team/chats-found). */
   findChats?: (query: string) => Command[];
   /** Lines, files, comments and decisions a query finds, a few of each, shown after the threads. */
   findInside?: (query: string) => Promise<InsideSection[]>;
@@ -434,6 +434,15 @@ export function threadRows(query: string, findThreads?: (q: string) => Command[]
 /** Commands about the Mac or its keyboard, which a phone has neither of. */
 export const NOT_ON_A_PHONE = ['keyhints', 'shortcuts', 'stale', 'update', 'update-check', 'update-move', 'first-run', 'tutorial', 'demo', 'import-agents', 'open-terminal', 'remote-control', 'flip-view'];
 
+/** Whether the people and groups go ahead of the threads: when the words name one of them better
+ *  than any thread title (../palette-pick nameRank), or as well and its name begins with them. */
+export function peopleLead(query: string, people: readonly Command[], threads: readonly Command[]): boolean {
+  const best = (rows: readonly Command[]) => Math.min(...rows.filter((r) => r.id !== 'all-threads').map((r) => nameRank(query, r.label)));
+  const p = best(people);
+  const t = best(threads);
+  return p < t || (p === t && p <= 1);
+}
+
 /** The rows in the order drawn, and the label over the row each section starts
  *  at. A phone searches threads more than it runs commands, so they go first. */
 // These replace the whole screen, so a word that merely touches a hidden keyword
@@ -442,38 +451,48 @@ const ASKED_FOR_BY_NAME = new Set(['first-run']);
 
 export function paletteOrder(all: Command[], threads: Command[], phone = false, query = '', chats = 0): { rows: Command[]; labels: Map<number, string> } {
   const labels = new Map<number, string>();
-  // The people and groups found lead the found rows, under their own heading.
-  const found = (at: number) => {
-    if (chats > 0) labels.set(at, 'People and groups');
-    if (threads.length > chats) labels.set(at + chats, 'Threads');
+  // The first `chats` of `threads` are the people and groups found.
+  const people = threads.slice(0, chats);
+  const rest = threads.slice(chats);
+  const sections = peopleLead(query, people, rest)
+    ? [{ rows: people, label: 'People and groups' }, { rows: rest, label: 'Threads' }]
+    : [{ rows: rest, label: 'Threads' }, { rows: people, label: 'People and groups' }];
+  const found = sections.flatMap((s) => s.rows);
+  const heads = (at: number) => {
+    for (const s of sections) {
+      if (s.rows.length) labels.set(at, s.label);
+      at += s.rows.length;
+    }
   };
   // Ahead of the threads only when the words start words of its name: "sum up"
   // is not "reSUMe interrUPted agents". A name it had before a rename counts.
   const named = (c: Command) => namesIt(query, c.label) || (c.oldNames ?? []).some((n) => namesIt(query, n));
-  const matched = all.filter((c) => !ASKED_FOR_BY_NAME.has(c.id) || !query.trim() || named(c));
+  // A group or teammate under People and groups is not listed again as a command.
+  const listed = new Set(people.map((c) => c.id.replace(/^chat-/, '')));
+  const matched = all.filter((c) => !listed.has(c.id) && (!ASKED_FOR_BY_NAME.has(c.id) || !query.trim() || named(c)));
   // "Waits on <that thread>" names a thread the words name, so it stays below
   // that thread unless its label starts with them.
   const said = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-  const namedTitles = threads.filter((t) => namesIt(query, t.label)).map((t) => said(t.label));
+  const namedTitles = found.filter((t) => namesIt(query, t.label)).map((t) => said(t.label));
   const carriesANamedTitle = (c: Command) => namedTitles.some((t) => said(c.label).includes(t));
   const ahead = (c: Command) => named(c) && (!carriesANamedTitle(c) || said(c.label).startsWith(said(query)));
   if (!phone) {
     // A command the words only touch by keyword comes after the threads they found.
-    if (threads.length && query.trim()) {
+    if (found.length && query.trim()) {
       const first = matched.filter(ahead);
       const after = matched.filter((c) => !ahead(c));
-      found(first.length);
-      if (after.length) labels.set(first.length + threads.length, 'Commands');
-      return { rows: [...first, ...threads, ...after], labels };
+      heads(first.length);
+      if (after.length) labels.set(first.length + found.length, 'Commands');
+      return { rows: [...first, ...found, ...after], labels };
     }
-    if (threads.length) found(matched.length);
-    return { rows: [...matched, ...threads], labels };
+    if (found.length) heads(matched.length);
+    return { rows: [...matched, ...found], labels };
   }
-  if (threads.length) {
-    found(0);
-    if (matched.length) labels.set(threads.length, 'Commands');
+  if (found.length) {
+    heads(0);
+    if (matched.length) labels.set(found.length, 'Commands');
   }
-  return { rows: [...threads, ...matched], labels };
+  return { rows: [...found, ...matched], labels };
 }
 
 function RowIcon({ row }: { row: Command }) {

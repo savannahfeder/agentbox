@@ -140,11 +140,26 @@ describe('the team a demo copy is signed in to', () => {
     const ask = lines.find((l) => String(l.line.patch.answer ?? '').includes('agentbox-agent:'));
     expect(String(ask?.line.patch.answer)).toContain(`[@Claude Code in Website](agentbox-agent:claude?project=website&task=${SUBJECT_TASK})`);
     // Lena has the last word, so the thread still waits on you.
-    expect(lines.at(-1)?.line.patch.assignee).toBe(DEMO_ME.id);
+    expect(lines.filter((l) => 'answer' in l.line.patch).at(-1)?.line.patch.assignee).toBe(DEMO_ME.id);
     const task = demoLedgerLines().website.filter((l) => l.id === SUBJECT_TASK);
     expect(task.some((l) => (l.patch.labels as string[] | undefined)?.includes(`asked-in:${LENA_THREAD.slug}/${LENA_THREAD.id}`))).toBe(true);
     expect(task.some((l) => String(l.patch.result ?? '').length > 40)).toBe(true);
     expect(task.some((l) => l.patch.status === 'done')).toBe(true);
+  });
+
+  // Opened from the Standup, a teammate's thread said "Priya's app has not
+  // shared these messages yet" and nothing else (founder, on a call, 2026-11-21).
+  it('opens every teammate thread on their ask, what it is about, and a finished one on its answer', async () => {
+    const b = await signedIn();
+    const cards = await b.listCards() as { personId: string; threadId: string; state: string; problem: string | null }[];
+    expect(cards.length).toBeGreaterThanOrEqual(15);
+    for (const c of cards) {
+      expect(String(c.problem ?? '').length).toBeGreaterThan(20);
+      const got = await b.getThreadWork(c.personId, c.threadId) as { work: { lines: { source: string; patch: Record<string, string> }[] } } | null;
+      const lines = got?.work.lines ?? [];
+      expect(lines.some((l) => l.source === 'founder' && l.patch.body)).toBe(true);
+      if (c.state !== 'running') expect(lines.some((l) => l.source === 'agent' && l.patch.result)).toBe(true);
+    }
   });
 
   it('shows what each teammate is on', async () => {
@@ -175,7 +190,7 @@ describe('what waits on the person when it opens', () => {
 
   it('includes a thread that belongs with a teammate, by name', () => {
     const lines = Object.values(demoLedgerLines()).flat();
-    expect(lines.some((l) => DEMO_TEAMMATES.some((p) => String(l.patch.result ?? '').startsWith(`**Hand this to ${p.name.split(' ')[0]}.`)))).toBe(true);
+    expect(lines.some((l) => DEMO_TEAMMATES.some((p) => String(l.patch.result ?? '').includes(`\n1. Hand it to ${p.name.split(' ')[0]} (recommended)`)))).toBe(true);
   });
 });
 

@@ -1,7 +1,7 @@
 // The side-panel composer discarded unsent words and files on navigation.
 // Exercise the real editor across unmounts, thread changes, reloads and sends.
-// A file's chip now carries its size (2b4d937f), so it is found as "review.txt
-// 1 KB ×", and the size has to come back with the draft.
+// A file is a tile with its size (2b4d937f) and its own × named "Remove
+// review.txt" (w-f689c07680), and the size has to come back with the draft.
 import { beforeAll, afterAll, beforeEach, it, expect } from 'vitest';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
@@ -54,17 +54,19 @@ beforeEach(async () => {
   await page.goto('http://draft.test/');
   await page.addScriptTag({ content: bundle });
 });
-// The Send cap is ↵ on a Mac and Enter elsewhere (shared/key-caps.mts).
-const sendButton = () => page.getByRole('button', { name: /^Send (↵|Enter)$/ });
+const sendButton = () => page.getByRole('button', { name: 'Send', exact: true });
 const editor = () => page.getByRole('textbox', { name: 'Reply in thread', exact: true });
 const text = () => editor().innerText();
+const removeFile = () => page.getByRole('button', { name: 'Remove review.txt', exact: true });
+const fileTile = () => page.locator('.attach-file', { hasText: 'review.txt' });
 async function reopen() {
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('button', { name: 'Open thread', exact: true }).click();
 }
 async function attach() {
   await page.locator('input[type=file]').setInputFiles({ name: 'review.txt', mimeType: 'text/plain', buffer: Buffer.from('Review notes') });
-  await page.getByRole('button', { name: 'review.txt 1 KB ×', exact: true }).waitFor();
+  await removeFile().waitFor();
+  expect(await fileTile().innerText()).toContain('1 KB');
 }
 
 it.skipIf(!browserAvailable)('restores paragraphs and formatting after Back and after reloading', async () => {
@@ -103,14 +105,18 @@ for (const scope of ['thread', 'conversation', 'project']) {
 it.skipIf(!browserAvailable)('keeps an attachment-only draft, then remembers its removal and deleted text', async () => {
   await attach();
   await reopen();
-  expect(await page.getByRole('button', { name: 'review.txt 1 KB ×', exact: true }).count()).toBe(1);
-  await page.getByRole('button', { name: 'review.txt 1 KB ×', exact: true }).click();
+  expect(await removeFile().count()).toBe(1);
+  expect(await fileTile().innerText()).toContain('1 KB');
+  // Pressing the file itself leaves it in; only its × takes it out.
+  await fileTile().click();
+  expect(await removeFile().count()).toBe(1);
+  await removeFile().click();
   await editor().fill('Erase this');
   await editor().press('Control+a');
   await editor().press('Backspace');
   await reopen();
   expect((await text()).trim()).toBe('');
-  expect(await page.getByRole('button', { name: 'review.txt 1 KB ×', exact: true }).count()).toBe(0);
+  expect(await removeFile().count()).toBe(0);
   expect(await sendButton().isDisabled()).toBe(true);
 });
 
@@ -154,5 +160,5 @@ it.skipIf(!browserAvailable)('returns a failed send to its own thread after navi
   await page.getByRole('button', { name: 'Switch thread', exact: true }).click();
   expect(await text()).toContain('Newer words');
   expect(await text()).toContain('Reply that fails');
-  expect(await page.getByRole('button', { name: 'review.txt 1 KB ×', exact: true }).count()).toBe(1);
+  expect(await removeFile().count()).toBe(1);
 });
