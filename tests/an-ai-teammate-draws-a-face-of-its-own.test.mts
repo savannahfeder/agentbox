@@ -41,11 +41,22 @@ describe('a teammate’s face', () => {
     expect(svg).not.toMatch(/<rect[^>]*fill="#(?!000|fff)/i);
   });
 
-  // At the inbox's 18px the hair ran into the circle's top and read as a cut-off head.
-  it('is drawn smaller and lower than its square, so the head clears a round frame', () => {
+  // At the inbox's 18px the hair ran into the circle's top and read as a cut-off
+  // head; drawn whole, the face was too small to make out.
+  it('is drawn closer than the whole bust, and low enough that the head clears a round frame', () => {
     const svg = svgOf(faceDrawing('t-iris'));
     expect(svg).toMatch(/transform="translate\(0 [1-9][\d.]*\)"/);
-    expect(svg).toMatch(/scale\(0\.8[0-9]*\)/);
+    expect(svg).toMatch(/scale\(1\.2[0-9]*\)/);
+  });
+
+  // About one face in twelve raised a hand or held a phone, which the closer crop cut off at the circle's edge.
+  it('never draws hands', async () => {
+    const { createAvatar } = await import('@dicebear/core');
+    const notionists = await import('@dicebear/notionists');
+    const withHands = Array.from({ length: 200 }, (_, i) => `t-${i}`)
+      .filter((s) => createAvatar(notionists, { seed: s, scale: 125, translateY: 18 }).toString() !== createAvatar(notionists, { seed: s, scale: 125, translateY: 18, gestureProbability: 0 }).toString());
+    expect(withHands.length).toBeGreaterThan(5);
+    for (const s of withHands) expect(svgOf(faceDrawing(s))).toBe(createAvatar(notionists, { seed: s, scale: 125, translateY: 18, gestureProbability: 0 }).toString());
   });
 
   // Measured in the inbox: the face sat 2.5px above its title, the other rows' marks at 0.

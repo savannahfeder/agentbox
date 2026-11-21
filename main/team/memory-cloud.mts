@@ -50,7 +50,7 @@ export interface MemoryInvite { teamId: string; email: string; invitedBy: string
 export interface MemoryProject { id: string; teamId: string; name: string; visibility: string; createdBy: string; direct: boolean }
 export interface MemoryLine { seq: number; projectId: string; uid: string; byPerson: string; body: LedgerLine; createdAt: number }
 export interface MemoryFile { projectId: string; name: string; byPerson: string; data: string }
-export interface MemoryFolder { id: string; teamId: string; project: string; name: string; parent: string | null; people: string[] | null; by: string; at: number }
+export interface MemoryFolder { id: string; teamId: string; project: string; name: string; parent: string | null; people: string[] | null; by: string; gone: boolean; at: number }
 export interface MemoryFilePlace { owner: string; threadId: string; project: string; family: string; folder: string | null; by: string; at: number }
 export interface MemoryFileVersion { teamId: string; file: string; n: number; hash: string; name: string | null; by: string | null; at: number }
 export interface MemoryThreadWork { owner: string; threadId: string; teamId: string; hash: string; work: unknown; updatedAt: number }
@@ -705,14 +705,14 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     // FOLDERS (20261102000000_a_teams_folders.sql). A folder says who reads it; a
     // file's place hangs on a card, so it reaches only those who may read the
     // file, and goes when the card does.
-    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; at: number }) {
+    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, gone, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; gone?: boolean; at: number }) {
       if (!myTeams().includes(teamId)) refuse('make a folder on a team you are not on');
       const clean = String(name ?? '').trim();
       if (!clean || clean.length > MAX_FOLDER_NAME) refuse('a folder with no name, or that long a name');
       if (people && (!people.length || !people.includes(personId))) refuse('share a folder with nobody, or leave yourself out');
       const was = cloud.fileFolders.find((f) => f.id === id);
       if (was && !canReadFolder(was)) refuse('change a folder you cannot read');
-      const row = { id, teamId, project: String(project), name: clean, parent: parent ?? null, people: people ?? null, by: was?.by ?? personId, at };
+      const row = { id, teamId, project: String(project), name: clean, parent: parent ?? null, people: people ?? null, by: was?.by ?? personId, gone: gone ?? was?.gone ?? false, at };
       if (was) Object.assign(was, row); else cloud.fileFolders.push(row);
       cloud.events.emit('work', {});
     },
