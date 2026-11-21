@@ -151,8 +151,11 @@ const MODES: { id: GiveMode; label: string; detail: (first: string) => string; a
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
-export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack, only, onCancel }: {
+export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack, only, onCancel, note: kept, onNote }: {
   onBack?: () => void;
+  /** The note kept by whoever opens the sheet, so Escape or Back does not lose it. */
+  note?: string;
+  onNote?: (note: string) => void;
   /** Closes the sheet; a click outside keeps a note with words in it, so this is the way out. */
   onCancel?: () => void;
   /** Came in through Ask (help or a review only) or through Hand over (no choice to make). */
@@ -165,7 +168,9 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
   step?: string | null;
   start?: GiveMode;
 }) {
-  const [note, setNote] = useState('');
+  const [own, setOwn] = useState('');
+  const note = kept ?? own;
+  const setNote = onNote ?? setOwn;
   const [mode, setMode] = useState<GiveMode>(onAsk && only !== 'give' ? (only === 'ask' && start === 'give' ? 'help' : start) : 'give');
   const choices = MODES.filter((x) => (only === 'ask' ? x.id !== 'give' : true));
   const team = useContext(TeamContext);

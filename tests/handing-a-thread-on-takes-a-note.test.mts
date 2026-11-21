@@ -91,7 +91,9 @@ describe('the wiring', () => {
   it('picking a person opens the sheet; an AI teammate still starts at once', () => {
     const menu = read('renderer/src/threads/ThreadMenu.tsx');
     expect(menu).toContain("if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p);");
-    expect(menu).toMatch(/<GiveSheet to=\{givingTo\} step=\{step\} start=\{giveStart\} only=\{[^}]*\} onBack=\{\(\) => setGivingTo\(null\)\} onCancel=\{\(\) => close\(true\)\} onGive=\{\(note\) => \{ close\(false\); onGive\?\.\(givingTo, note\); \}\}/);
+    expect(menu).toMatch(/<GiveSheet to=\{givingTo\} step=\{step\} start=\{giveStart\} only=\{[^}]*\} onBack=\{\(\) => setGivingTo\(null\)\} onCancel=\{\(\) => close\(true\)\}/);
+    // The note is kept by the menu until it is sent (tests/a-note-a-face-and-a-back-from-stay-true-across-an-ask).
+    expect(menu).toContain("onGive={(note) => { setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onGive?.(givingTo, note); }}");
   });
   it('the note travels to the hand-off', () => {
     expect(read('renderer/src/App.tsx')).toContain('api.teamHandOn({ product: item.product, id: item.id, to: to.id, ...(note.trim() ? { note: note.trim() } : {}) })');

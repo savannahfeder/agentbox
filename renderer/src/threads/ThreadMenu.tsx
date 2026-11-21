@@ -347,6 +347,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   const [sharing, setSharing] = useState<null | 'list' | 'send' | 'copied' | 'see' | 'choose'>(null);
   const [sendTo, setSendTo] = useState<string[]>([]);
   const [step, setStep] = useState<string | null>(null);
+  // One note per person, kept until it is sent.
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const asking = (givingFromShare && giveStart === 'help') || !!step;
   const listed = giveTo.filter((p) => !(asking && p.id.startsWith('mate:')));
   const wrap = useRef<HTMLSpanElement>(null);
@@ -560,8 +562,10 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
         onPick={(to) => { if (to === 'people') { setSharing('choose'); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
       {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} onBack={() => setSharing('see')} />}
       {open && !waiting && !adding && !leveling && !sharing && (giving && givingTo
-        ? <GiveSheet to={givingTo} step={step} start={giveStart} only={givingFromShare ? (giveStart === 'give' ? 'give' : 'ask') : step ? 'ask' : undefined} onBack={() => setGivingTo(null)} onCancel={() => close(true)} onGive={(note) => { close(false); onGive?.(givingTo, note); }}
-          onAsk={onAsk ? (kind, note) => { const s = step; close(false); onAsk(givingTo, kind, note, s); } : undefined} />
+        ? <GiveSheet to={givingTo} step={step} start={giveStart} only={givingFromShare ? (giveStart === 'give' ? 'give' : 'ask') : step ? 'ask' : undefined} onBack={() => setGivingTo(null)} onCancel={() => close(true)}
+          note={notes[givingTo.id] ?? ''} onNote={(n) => setNotes((was) => ({ ...was, [givingTo.id]: n }))}
+          onGive={(note) => { setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onGive?.(givingTo, note); }}
+          onAsk={onAsk ? (kind, note) => { const s = step; setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onAsk(givingTo, kind, note, s); } : undefined} />
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">
           <PanelBack label={step ? 'Close' : 'Back'} onBack={() => { if (step) { close(false); return; } setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />

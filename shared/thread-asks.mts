@@ -100,10 +100,11 @@ export function stepOf(text: string): string {
 }
 
 /** Who handed this thread back to you, when their words are the newest thing on it and it waits for you. */
-export function handedBackBy(row: { status?: string; wrote?: Record<string, { ts?: number; teammate?: string } | undefined> | null } | null | undefined): string | null {
+export function handedBackBy(row: { status?: string; wrote?: Record<string, { ts?: number; teammate?: string } | undefined> | null } | null | undefined, askedSince = 0): string | null {
   const answer = row?.wrote?.answer;
   if (row?.status !== 'blocked' || !answer?.teammate) return null;
-  const after = Math.max(row.wrote?.result?.ts ?? 0, row.wrote?.note?.ts ?? 0);
+  // A newer ask (still out, or taken back) makes an older hand-back old news.
+  const after = Math.max(row.wrote?.result?.ts ?? 0, row.wrote?.note?.ts ?? 0, askedSince);
   return (answer.ts ?? 0) >= after ? answer.teammate : null;
 }
 
@@ -133,6 +134,13 @@ export function handedBackWords({ kind, name, verdict, words, asked = null }: { 
   const ask = asked?.note.trim() ? `${asked.by} had asked: “${asked.note.trim()}”` : '';
   return [head, said, ask].filter(Boolean).join('\n\n');
 }
+
+// A hand-back is written on the thread as the helper's words to the agent are
+// (`from` on an answer), so only its head line tells the two apart.
+const HANDED_BACK = /^\S+ (?:handed this back|reviewed this(?: and it looks good| and asked for changes)?)\.(?:\n|$)/;
+
+/** Whether words on a thread are a hand-back `handedBackWords` wrote. */
+export const isHandBack = (text: string | null | undefined): boolean => HANDED_BACK.test(String(text ?? ''));
 
 /** The first lines of the task the helper gets: who asked, for what, and the step if one was picked. */
 export function askBody({ kind, owner, helper = null, note, step }: { kind: AskKind; owner: string; helper?: string | null; note: string; step?: string | null }): string {
