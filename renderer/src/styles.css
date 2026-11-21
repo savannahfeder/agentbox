@@ -2327,21 +2327,27 @@ body {
 
 .focus-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 30px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
+  gap: 8px;
+  margin-top: 28px;
 }
+/* The same size and shape as the buttons in the thread's bar, each with its mark. */
 .focus-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px 0 9px;
   background: none;
   border: 1px solid var(--line);
   color: var(--text-dim);
   border-radius: var(--radius);
-  padding: 7px 14px;
   font-size: 13px;
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
 }
+.focus-actions button > svg { flex: none; color: var(--text-faint); }
+.focus-actions button:hover > svg { color: var(--text); }
 .focus-actions button:hover { color: var(--text); border-color: var(--text-faint); }
 .focus-actions b { color: var(--text); margin-right: 4px; }
 .focus-actions { align-items: center; }

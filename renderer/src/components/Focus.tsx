@@ -2572,10 +2572,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
           <span className="focus-when">Opens the app it is running in</span></>
         )}
-        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>Send back to agent</button>}
+        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}><ActMark d="M9.5 7 5 11.5 9.5 16M5.5 11.5H15a4 4 0 0 1 0 8h-2" />Send back to agent</button>}
         {/* Where the agent stopped is the step a teammate is asked about. */}
         {!agent && item.status === 'blocked' && onAsk && !asked && giveTo.some((p) => !p.id.startsWith('mate:')) && (
-          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}>Ask for help or a review</button>
+          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}><ActMark d="M5 5.5h14v10H10l-4 3.5v-3.5H5zM10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4M12 14.2v.1" />Ask for help or a review</button>
         )}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
@@ -3837,3 +3837,8 @@ function chipsOverflow(chips: HTMLElement): boolean {
 }
 
 const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
+/** The 15px line mark on a button in a stopped thread's action row. */
+function ActMark({ d }: { d: string }) {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
+}
