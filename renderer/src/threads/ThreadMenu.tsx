@@ -131,7 +131,7 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, share
   if (rename) rows.push({ id: 'rename', label: 'Rename', key: null });
   if (move) rows.push({ id: 'move', label: 'Move to another project', key: null });
   if (pin) rows.push({ id: 'pin', label: pin === 'pinned' ? 'Unpin thread' : 'Pin thread', key: null });
-  if (give && !share) rows.push({ id: 'give', label: 'Ask or hand off…', key: null });
+  if (give && !share) rows.push({ id: 'give', label: 'Ask or hand over…', key: null });
   if (wait) rows.push({ id: 'wait', label: wait === 'blocked' ? 'Blocked by…' : 'Waits on…', key: null });
   if (shipped) rows.push({ id: 'shipped', label: shipped === 'marked' ? 'Not shipped after all' : 'Mark as shipped', key: null });
   if (stopRepeat) rows.push({ id: 'stop-repeat', label: 'Stop repeating', key: null });
@@ -343,6 +343,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   const [sharing, setSharing] = useState<null | 'list' | 'send' | 'copied' | 'see' | 'choose'>(null);
   const [sendTo, setSendTo] = useState<string[]>([]);
   const [step, setStep] = useState<string | null>(null);
+  const listed = giveTo.filter((p) => !(((givingFromShare && giveStart === 'help') || !!step) && p.id.startsWith('mate:')));
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const close = useCallback((refocus: boolean) => {
@@ -559,9 +560,9 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">
           <PanelBack label="Back" onBack={() => { if (step) { close(false); return; } setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />
-          <p className="ts-menu-say">{(givingFromShare ? (giveStart === 'give' ? 'Who takes it over?' : 'Who do you want to ask?') : onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
-            + (giveTo.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
-          {giveTo.filter((p) => !(givingFromShare && giveStart === 'help' && p.id.startsWith('mate:'))).map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
+          <p className="ts-menu-say">{(givingFromShare ? (giveStart === 'give' ? 'Who takes it over?' : 'Who do you want to ask?') : step ? 'Who do you want to ask?' : onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
+            + (listed.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
+          {listed.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
             <span className="ico">{p.id.startsWith('mate:') ? <GiveMark /> : <Face name={p.name} size={18} />}</span>
             <span className="ts-more-label">{p.name}</span>
             {p.detail && <span className="ts-more-detail">{p.detail}</span>}

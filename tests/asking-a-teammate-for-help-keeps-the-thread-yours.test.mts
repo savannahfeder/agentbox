@@ -371,7 +371,7 @@ describe('the sheet after you pick a person', () => {
     expect(help).toContain('Theo can write to your agent, then hands it back to you.');
     expect(help).not.toContain('from now on');
     const give = sheet({ start: 'give' });
-    expect(give).toContain('Theo gets it as a task, with its conversation and files. It closes for you.');
+    expect(give).toContain('Theo gets it as a task, with its conversation and files. It moves to your Done.');
     expect(give).not.toContain('write to your agent');
     expect(sheet({ start: 'review' })).toContain('Theo reads it and tells you it looks good or what to change.');
   });

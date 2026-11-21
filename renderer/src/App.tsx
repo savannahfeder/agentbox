@@ -521,7 +521,8 @@ export default function App() {
   const [pointedHint, setPointedHint] = useState<{ id: string; el: HTMLElement } | null>(null);
   const [shownHint, setShownHint] = useState<{ id: string; el: HTMLElement } | null>(null);
   const hints = useRef<HintScheduler<{ id: string; el: HTMLElement }> | null>(null);
-  if (!hints.current) hints.current = hintScheduler(setShownHint);
+  // A plate due after its button opened a menu never shows: the menu is what it would cover.
+  if (!hints.current) hints.current = hintScheduler((h) => setShownHint(h && h.el.getAttribute('aria-expanded') === 'true' ? null : h));
   useEffect(() => { hints.current?.point(pointedHint); }, [pointedHint]);
   useEffect(() => () => hints.current?.stop(), []);
   // THE SWITCH OVER ALL OF IT. Off means the row keeps
@@ -3106,7 +3107,7 @@ export default function App() {
     if (!card) return;
     setFocused(null);
     openTeammateCard(card);
-  }, [focused?.product, focused?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focused?.product, focused?.id, weekCards.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const w = linkWaiting.current;
     if (!w) return;

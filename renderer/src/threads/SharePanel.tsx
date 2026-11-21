@@ -147,7 +147,7 @@ export type GiveMode = 'help' | 'review' | 'give';
 const MODES: { id: GiveMode; label: string; detail: (first: string) => string; ask: (first: string) => string; go: (first: string) => string }[] = [
   { id: 'help', label: 'Help', detail: (f) => `${f} can write to your agent, then hands it back to you.`, ask: () => 'What do you need help with?', go: (f) => `Ask ${f} to help` },
   { id: 'review', label: 'Review', detail: (f) => `${f} reads it and tells you it looks good or what to change.`, ask: (f) => `What should ${f} look at?`, go: (f) => `Ask ${f} to review` },
-  { id: 'give', label: 'Hand over', detail: (f) => `${f} gets it as a task, with its conversation and files. It closes for you.`, ask: () => 'Add a note', go: (f) => `Hand over to ${f}` },
+  { id: 'give', label: 'Hand over', detail: (f) => `${f} gets it as a task, with its conversation and files. It moves to your Done.`, ask: (f) => `Anything ${f} should know?`, go: (f) => `Hand over to ${f}` },
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
@@ -169,9 +169,11 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
   const team = useContext(TeamContext);
   const first = to.name.split(/\s+/)[0] || to.name;
   const m = MODES.find((x) => x.id === mode)!;
-  const go = () => { if (mode === 'give' || !onAsk) onGive(note.trim()); else onAsk(mode, note.trim()); };
+  // Help with no step picked and no words would reach them as an empty ask.
+  const empty = mode === 'help' && !step && !note.trim();
+  const go = () => { if (empty) return; if (mode === 'give' || !onAsk) onGive(note.trim()); else onAsk(mode, note.trim()); };
   return (
-    <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Bring in ${first}`}>
+    <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Ask or hand over to ${first}`}>
       {onBack && <PanelBack label="Back" onBack={onBack} />}
       <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
       {onAsk && only !== 'give' && <div className="sh-modes">
@@ -186,7 +188,7 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); } }} />
       <div className="sh-foot">
-        <button type="button" className="th-new sh-go" onClick={go}>{m.go(first)}<kbd>{sendKeyFor(false)}</kbd></button>
+        <button type="button" className="th-new sh-go" disabled={empty} onClick={go}>{m.go(first)}<kbd>{sendKeyFor(false)}</kbd></button>
       </div>
     </div>
   );

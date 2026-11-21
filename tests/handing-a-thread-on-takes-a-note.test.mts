@@ -81,7 +81,7 @@ describe('the sheet after you pick a person', () => {
   const html = renderToStaticMarkup(h(GiveSheet, { to: { id: 'u-lena', name: 'Lena Fischer' }, onGive() {} }));
   it('names who gets it, has a note box, and a button that says so', () => {
     expect(html).toContain('Lena');
-    expect(html).toContain('placeholder="Add a note"');
+    expect(html).toContain('placeholder="Anything Lena should know?"');
     expect(html).toContain('Hand over to Lena');
   });
 });

@@ -26,9 +26,9 @@ describe('the thread menu', () => {
     const rows = threadMenuRows({ change: false, terminal: null, finish: true, share: true, give: true });
     expect(rows.filter((r) => r.id === 'share' || r.id === 'give').map((r) => r.label)).toEqual(['Ask, hand over or share…']);
   });
-  it('keeps Share… alone where it cannot be handed off, and Ask or hand off… where it cannot be shared', () => {
+  it('keeps Share… alone where it cannot be handed off, and Ask or hand over… where it cannot be shared', () => {
     expect(threadMenuRows({ change: false, terminal: null, finish: true, share: true }).map((r) => r.label)).toContain('Share…');
-    expect(threadMenuRows({ change: false, terminal: null, finish: true, give: true }).map((r) => r.label)).toContain('Ask or hand off…');
+    expect(threadMenuRows({ change: false, terminal: null, finish: true, give: true }).map((r) => r.label)).toContain('Ask or hand over…');
   });
 });
 
@@ -79,12 +79,39 @@ describe('the sheet after picking a person', () => {
     const give = sheet({ only: 'give', start: 'give' });
     expect(give).not.toContain('Review');
     expect(give).toContain('Hand over to Theo');
-    expect(give).toContain('Theo gets it as a task, with its conversation and files. It closes for you.');
+    expect(give).toContain('Theo gets it as a task, with its conversation and files. It moves to your Done.');
   });
   it('names the person in the review prompt and shows the send key on the button', async () => {
     const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');
     const html = renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, onAsk() {}, start: 'review' } as never));
     expect(html).toContain('What should Theo look at?');
     expect(html).toMatch(/Ask Theo to review<kbd>/);
+  });
+});
+
+// A second review of the flow: asking from the button under a message listed
+// AI teammates, and picking one handed the thread over at once; the heading
+// said an AI teammate starts on it when none was listed; Help could go with no
+// question; the hand-over line said "It closes for you".
+describe('the second pass', () => {
+  const menu = fs.readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
+  it('lists no AI teammate wherever you came to ask', () => {
+    expect(menu).toContain("const listed = giveTo.filter((p) => !(((givingFromShare && giveStart === 'help') || !!step) && p.id.startsWith('mate:')));");
+  });
+  it('says an AI teammate starts on it only when one is listed', () => {
+    expect(menu).toContain("(listed.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')");
+  });
+  it('holds Help with no step and no words', async () => {
+    const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');
+    const html = renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, onAsk() {}, only: 'ask' } as never));
+    expect(html).toMatch(/<button type="button" class="th-new sh-go" disabled="">Ask Theo to help/);
+    const withStep = renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, onAsk() {}, only: 'ask', step: 'Should I drop it?' } as never));
+    expect(withStep).not.toMatch(/sh-go" disabled/);
+  });
+  it('asks the person taking it over what they should know, and says it moves to your Done', async () => {
+    const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');
+    const html = renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, only: 'give', start: 'give' } as never));
+    expect(html).toContain('placeholder="Anything Theo should know?"');
+    expect(html).toContain('It moves to your Done.');
   });
 });

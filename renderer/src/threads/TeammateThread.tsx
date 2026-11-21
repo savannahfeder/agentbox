@@ -189,7 +189,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const acts = (
     <div className="tp-acts">
-      {following && card.state !== 'done' && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
+      {following && card.state !== 'done' && !ask && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
         onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
         {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
       </button>}

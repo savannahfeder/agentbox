@@ -17,4 +17,8 @@ describe('the hint plate', () => {
     expect(app).toContain("watch.observe(shownHint.el, { attributes: true, attributeFilter: ['aria-expanded'] });");
     expect(app).toContain("shownHint.el.getAttribute('aria-expanded') === 'true') drop();");
   });
+  it('never draws a plate that came due after its button opened a menu', () => {
+    // A second review saw it still on top of the menu: the plate was picked before the click and drawn after.
+    expect(app).toContain("hintScheduler((h) => setShownHint(h && h.el.getAttribute('aria-expanded') === 'true' ? null : h))");
+  });
 });

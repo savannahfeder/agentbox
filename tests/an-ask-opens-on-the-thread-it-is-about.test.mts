@@ -23,4 +23,11 @@ describe('opening an ask you were asked', () => {
     expect(block).toContain('f.assignee !== team.me');
     expect(block).toContain('!askIsOpen(f)');
   });
+  it("tries again when the thread's card arrives after the ask was opened", () => {
+    expect(app).toContain('}, [focused?.product, focused?.id, weekCards.length]);');
+  });
+  it('offers the person asked no Tell me when it is done on that thread', () => {
+    const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
+    expect(page).toContain("{following && card.state !== 'done' && !ask && <button");
+  });
 });
