@@ -16,7 +16,7 @@ import path from 'node:path';
 import type { TeamBackend, TeamSession } from './team/index.mts';
 import type { MemoryCloud } from './team/memory-cloud.mts';
 import {
-  type DemoPerson, DEMO_CHATS, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
+  type DemoPerson, yesterdayAt, DEMO_CHATS, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
 } from '../shared/demo-world.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED } from '../shared/team-look.mts';
 
@@ -82,10 +82,10 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
   // A chat with one teammate is a group of the two of you, named for the
   // other person, as the app makes one (main/team/rooms.mts `create`).
   for (const c of DEMO_CHATS) {
-    clock = now - c.said[0].hoursAgo * HR;
+    clock = yesterdayAt(now, c.said[0].at);
     const room = await memoryBackend(cloud, c.with.id).createRoom({ name: DEMO_ME.name, kind: 'group', people: [DEMO_ME.id] }) as string;
     for (const s of c.said) {
-      clock = now - s.hoursAgo * HR;
+      clock = yesterdayAt(now, s.at);
       await memoryBackend(cloud, s.by === 'me' ? DEMO_ME.id : c.with.id).sendRoomMessage(room, { body: s.text });
     }
   }

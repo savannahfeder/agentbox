@@ -34,7 +34,7 @@ function setup({ ledger = null }: { ledger?: unknown } = {}) {
     if (m) return subs.has(m[1]) ? json(200, subs.get(m[1])) : json(404, { error: { message: 'No such subscription' } });
     return json(404, { error: { message: 'not faked' } });
   };
-  const team = { id: 'team-1', createdAt: MADE, members: [A, B], owners: [A] };
+  const team: { id: string; createdAt: number; freeUntil?: number; members: string[]; owners: string[] } = { id: 'team-1', createdAt: MADE, members: [A, B], owners: [A] };
   const gw = createGateway({
     agentcore: { async invoke() { return { ok: true }; }, async stop() {} },
     links: { get: async (k: string) => `https://b/${k}`, put: async (k: string) => `https://b/${k}`, head: async (k: string) => `https://b/${k}` },
@@ -61,7 +61,7 @@ function setup({ ledger = null }: { ledger?: unknown } = {}) {
     const sig = `t=${t},v1=${crypto.createHmac('sha256', SECRET).update(`${t}.${raw}`).digest('hex')}`;
     return gw.handle({ method: 'POST', path: '/v1/stripe', headers: { 'stripe-signature': sig }, body: raw });
   };
-  return { teamOfMember, webhook, tick: (ms: number) => { clock += ms; } };
+  return { teamOfMember, webhook, team, tick: (ms: number) => { clock += ms; } };
 }
 
 describe('a team subscription that was never paid', () => {
@@ -73,9 +73,12 @@ describe('a team subscription that was never paid', () => {
     expect(await teamOfMember()).toBeUndefined();
   });
 
-  it('is still the trial while the free days last', async () => {
-    const { teamOfMember, webhook } = setup();
+  // Until 2026-11-21 a team had free days from the day it was made, card or not; now only given ones.
+  it('is no team at all, unless it has free days given by hand', async () => {
+    const { teamOfMember, webhook, team } = setup();
     await webhook('sub_team', 'past_due');
+    expect(await teamOfMember()).toBeUndefined();
+    team.freeUntil = MADE + TEAM.trialDays * DAY;
     expect(await teamOfMember()).toMatchObject({ trial: true, seats: 0, hours: TEAM.trialHoursPerMember });
   });
 });

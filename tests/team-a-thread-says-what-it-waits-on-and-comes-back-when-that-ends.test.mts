@@ -17,7 +17,7 @@ import { threadCommands } from '../renderer/src/thread-commands.ts';
 import { noticeEndedWaits } from '../main/team/waits.mts';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TeammateCard, TeammateStanding } from '../renderer/src/threads/Summary.tsx';
+import { TeammateSummary, TeammateStanding } from '../renderer/src/threads/Summary.tsx';
 import { TeamContext } from '../renderer/src/team/people.tsx';
 
 const now = new Date(2026, 9, 30, 15).getTime();
@@ -194,14 +194,17 @@ describe('where a person says it', () => {
     expect(out.map((c) => c.id)).toEqual([personWait('maya'), 'w-2', cardWait('maya', 't')]);
   });
   // Seen on screen: the card's head said "Waiting on Dev" over "Blocked by Maya".
-  it('the head of a teammate’s thread says who it waits on, the same as its Blocked by', () => {
+  // Since w-8a8eac7620 the head is the one place that says it: the summary under it does not repeat it.
+  it('the head of a teammate’s thread says who it waits on, and the summary does not say it again', () => {
     const maya = { id: 'maya', name: 'Maya Chen', email: '', avatarUrl: null };
-    const card = { personId: 'dev', threadId: 't', visible: true, title: 'x', project: 'p', state: 'waiting', priority: null, problem: 'x', progress: null, solution: null, blockedBy: [{ id: personWait('maya'), title: null }], blocks: [], people: null, updatedAt: now };
-    const draw = (part) => renderToStaticMarkup(createElement(TeamContext.Provider, { value: { me: 'dev', byId: new Map([['maya', maya]]), state: {}, products: new Map() } }, createElement(part, { card, person: { id: 'dev', name: 'Dev', email: '', avatarUrl: null }, now })));
+    const card = { personId: 'dev', threadId: 't', visible: true, title: 'x', project: 'p', state: 'waiting', priority: null, problem: 'Reminders went out twice.', progress: null, solution: null, blockedBy: [{ id: personWait('maya'), title: null }], blocks: [], people: null, updatedAt: now };
+    const draw = (part) => renderToStaticMarkup(createElement(TeamContext.Provider, { value: { me: 'dev', byId: new Map([['maya', maya]]), state: {}, products: new Map() } }, createElement(part, { card, person: { id: 'dev', name: 'Dev', email: '', avatarUrl: null }, owner: 'Dev', now })));
     const html = draw(TeammateStanding);
     expect(html).toContain('Waits on Maya');
     expect(html).not.toContain('Waiting on Dev');
-    expect(draw(TeammateCard)).toMatch(/Blocked by<\/span><p><span class="">Maya<\/span>/);
+    const summary = draw(TeammateSummary);
+    expect(summary).toContain('Reminders went out twice.');
+    expect(summary).not.toMatch(/Blocked by|Maya/);
   });
   it('a teammate’s card names the wait without saying a private thread’s title', () => {
     const cards = cardsFor({

@@ -231,6 +231,7 @@ import { isNew } from '../../shared/notify-rules.mts';
 import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mts';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { StartTeam } from './team/StartTeam';
+import { sharingNeedsPro } from './team/multiplayer-words';
 import { inboxBadge } from './needs-count';
 import { givenStage as givenStageOf, namedCards, taskWords } from './team/company';
 import { FaceHover } from './team/status';
@@ -243,7 +244,7 @@ import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, stoppedIds, type Fleet } from './fleet';
 import { factsFor } from './status-word';
 import { isCarrying } from './threads/row-drag';
-import { TeammateThread } from './threads/TeammateThread';
+import { TEAMMATE_REPLY, TeammateThread } from './threads/TeammateThread';
 import { SharedFileCards, SharedFileRows } from './threads/SharedFileRows';
 import { FollowCards, FollowRows } from './threads/FollowRows';
 import { FollowContext, follow, followNews, isFollowing, markTold, readFollows, unfollow, writeFollows, type Follow } from './team/following';
@@ -2305,7 +2306,8 @@ export default function App() {
     asking: [...askingIds],
     whyNotCloud: snap?.supervisor.whyNotCloud,
     signInBar: !!planWords,
-  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds, planWords]);
+    engines: snap?.engines,
+  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds, planWords, snap?.engines]);
   const savedCloudKeyList = snap?.cloud?.setUp ? snap.cloud.keys : null;
   const savedCloudKeys = useMemo(() => (savedCloudKeyList ?? []).map((k) => k.name), [savedCloudKeyList]);
   const cloudIds = useMemo(() => new Set(runningRows.filter((r) => r.where === 'cloud').map((r) => r.itemId)), [runningRows]);
@@ -3112,7 +3114,7 @@ export default function App() {
       const w = linkWaiting.current;
       if (w?.personId !== personId || w.threadId !== threadId) return;
       linkWaiting.current = null;
-      showToast(`${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
+      showToast(sharingNeedsPro(team?.state) ?? `${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
     }, 1500));
   }, [weekCards, openTeammateCard, team, items]);
 
@@ -6829,7 +6831,8 @@ export default function App() {
       // A TEAMMATE'S CARD IS A SCREEN, LIKE AN OPEN THREAD (w-fb16bcaeba). It
       // had no keys of its own, so J, K and E all ran against the list hidden
       // behind it. J and K walk on, Escape goes back to the page, N and Z mean
-      // what they mean everywhere, and nothing else reaches the list.
+      // what they mean everywhere, R opens its reply box as on a thread of your
+      // own, and nothing else reaches the list.
       if (openCard && teamShown) {
         if (e.key === 'Escape') { e.preventDefault(); if (putAwayTheNewest(openDoc ? docOpenedAt.current : -Infinity)) return; if (openDoc) closeArtifact(); else { setOpenCard(null); setTeamOpen(false); } }
         else if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
@@ -6839,6 +6842,7 @@ export default function App() {
         }
         else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
+        else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); window.dispatchEvent(new Event(TEAMMATE_REPLY)); }
         return;
       }
       // On the page J and K move the keyboard and open nothing: onto a
@@ -7736,6 +7740,9 @@ export default function App() {
   // Help or a review keeps the thread yours; the task they get leads back to it.
   const askOnThread = async (item: WorkItem, to: GiveTo, kind: 'help' | 'review', note: string, step: string | null) => {
     const first = to.name.split(/\s+/)[0] || to.name;
+    // Their task leads back to this thread, which they could not open.
+    const paused = sharingNeedsPro(team?.state);
+    if (paused && !to.id.startsWith('mate:')) { showToast(paused); return; }
     const out = await api.teamAsk({ product: item.product, id: item.id, to: to.id, kind, ...(note ? { note } : {}), ...(step ? { step } : {}) });
     // It leaves Needs you for In progress, so the toast says where it went and when it comes back.
     showToast(out.ok ? `Asked ${first} to ${kind === 'help' ? 'help' : 'review it'}. It waits in In progress until ${first} hands it back.` : out.error ?? 'That did not work.');
@@ -7839,6 +7846,9 @@ export default function App() {
       const item = items.find((i) => i.product === target.product && i.id === target.id);
       const link = threadLink(team?.me, target.id);
       if (!item || !link || !to.length) return;
+      // A link nobody could open is not sent.
+      const paused = sharingNeedsPro(team?.state);
+      if (paused) { showToast(paused); return; }
       const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
       showToast(sendingTo(names));
       const seen = seenNow(item, team?.products.get(item.product), team?.state.since ?? null);
@@ -9622,6 +9632,7 @@ export default function App() {
              has no team in it, and this keeps the team's code in the team's
              files. No team cloud, no pane and no Team row. */
           teamPane={snap?.team?.configured ? <TeamPage team={snap?.team} inviteFocus={inviteFocus} /> : undefined}
+          teamShares={snap?.team?.pro !== false}
           roomsPane={roomsUi.settingsPane}
           // WHO SEES A PROJECT'S THREADS (w-b989839656): the button beside a
           // project's name and the Projects list's column, only while someone

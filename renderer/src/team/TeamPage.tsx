@@ -14,6 +14,8 @@ import { Face } from './people';
 import { handoverAsk, handoverOf } from './handover';
 import { inviteWords } from './invite-words';
 import { AskForMultiplayer, NOT_LET_IN } from './ask-for-multiplayer';
+import { StartPro } from './StartPro';
+import { PRO_FOR_INVITES, askOwnerForPro } from './multiplayer-words';
 
 
 export function TeamPage({ team, inviteFocus = false }: {
@@ -220,6 +222,11 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
     {team.multiplayer === false ? <div className="tm-field-row">
       <span className="tm-leave-ask">{NOT_LET_IN}.</span>
       <AskForMultiplayer email={me?.email} className="tm-btn" />
+    </div> : team.pro === false ? <div className="tm-field-row">
+      {owner ? <>
+        <span className="tm-leave-ask">{PRO_FOR_INVITES}</span>
+        <StartPro hasTeam name={me?.name} className="tm-btn" autoFocus={inviteFocus} />
+      </> : <span className="tm-leave-ask">{askOwnerForPro(team.people.find((p) => p.role === 'owner')?.name)}</span>}
     </div> : <form className="tm-field-row" onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
       <input className="tm-input" placeholder="Their email" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)} />
       <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>

@@ -35,7 +35,7 @@ const HARNESSES: Harness[] = ['claude', 'codex'];
 
 // The labels that mark a conversation as Codex's, the same set the byline reads
 // (`bylineFacts`). Exact words, so a label that merely contains "codex" is not one.
-const CODEX_LABELS = new Set(['codex', 'codex-import', 'not-imported']);
+export const CODEX_LABELS = new Set(['codex', 'codex-import', 'not-imported']);
 
 /**
  * WHICH AGENT A ROW BELONGS TO. Measured on her store 2026-09-28: 11 rows carry
