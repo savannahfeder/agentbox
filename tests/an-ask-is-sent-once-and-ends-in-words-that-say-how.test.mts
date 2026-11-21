@@ -79,3 +79,12 @@ describe('a finished ask says how it ended', () => {
     expect(taskWords(plain as never, product as never, 'sam', nameOf, false)?.word).toBe('Done');
   });
 });
+
+// Theo's Home still read "Sam asks for a review" 20 seconds after Sam took it back.
+describe('Home says how a closed ask ended', () => {
+  it('uses the same words as the row', () => {
+    const app = read('renderer/src/App.tsx');
+    expect(app).toContain("const ended = from && i.ask && i.status === 'done' && team ? taskWords(");
+    expect(app).toContain('from: ended ?? (from ? `${from}${asks}` : null)');
+  });
+});

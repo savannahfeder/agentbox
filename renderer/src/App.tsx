@@ -232,7 +232,7 @@ import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, is
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { StartTeam } from './team/StartTeam';
 import { inboxBadge } from './needs-count';
-import { givenStage as givenStageOf, namedCards } from './team/company';
+import { givenStage as givenStageOf, namedCards, taskWords } from './team/company';
 import { FaceHover } from './team/status';
 import { TeamPage } from './team/TeamPage';
 import { TeamBilling } from './team/TeamBilling';
@@ -7976,8 +7976,10 @@ export default function App() {
       const from = sent ? (team?.byId.get(sent.from)?.name?.split(/\s+/)[0] ?? 'Someone') : mate?.name ?? null;
       // A conversation's record is named for nobody; the row's sender says who it is with.
       const project = directSlugs.has(i.product) ? '' : i.productName;
-      const asks = from && i.ask && i.assignee === team?.me ? (i.ask.kind === 'help' ? ' asks for help' : ' asks for a review') : '';
-      return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), ...(!from && !mate ? { agent: true } : {}), letter: sent ? initialsOf(team?.byId.get(sent.from)?.name || from || '?') : from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: from ? `${from}${asks}` : null, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+      // A closed ask says how it ended ("Sam took it back"), not what it asked.
+      const ended = from && i.ask && i.status === 'done' && team ? taskWords(i, team.products.get(i.product), team.me, (id) => firstName(team.byId.get(id) ?? null), true)?.word ?? null : null;
+      const asks = from && i.ask && i.assignee === team?.me && !ended ? (i.ask.kind === 'help' ? ' asks for help' : ' asks for a review') : '';
+      return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), ...(!from && !mate ? { agent: true } : {}), letter: sent ? initialsOf(team?.byId.get(sent.from)?.name || from || '?') : from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: ended ?? (from ? `${from}${asks}` : null), priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
     },
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : busiestFirst(members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
