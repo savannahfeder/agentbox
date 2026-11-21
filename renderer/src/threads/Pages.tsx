@@ -497,8 +497,6 @@ export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => v
   states?: { away: boolean; onTab: (v: TabView) => void };
   /** The team's day (team/TodayPage.tsx). */
   today?: { on: boolean; onToday: () => void };
-  /** Every task on the team (team/TasksPage.tsx). */
-  tasks?: { on: boolean; onTasks: () => void };
   /** Your finished threads, on the layout whose tabs are only states. */
   done?: { on: boolean; onDone: () => void } };
 export const EVERYTHING_ELSE = 'Everything else';
@@ -531,14 +529,13 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
   const tabs = team && !states ? INBOX_TABS.filter((t) => t.view === 'inbox')
     : INBOX_TABS.filter((t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater }));
   const on = (t: TabView) => (states ? view === t && !states.away && !dim
-    : team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on && !team.done?.on : view === t && !dim);
+    : team ? t === 'inbox' && !team.on && !team.today?.on && !team.done?.on : view === t && !dim);
   const press = (t: TabView) => (states ? (t === 'inbox' ? team!.onNeeds() : states.onTab(t)) : team ? team.onNeeds() : onView(t));
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
     {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} {...actsOnPress(() => press(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
     {team && !states && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.on ? ' on' : ''}`} {...actsOnPress(team.onEverything)}>{EVERYTHING_ELSE}</button>}
     {team?.today && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.today.on ? ' on' : ''}`} {...actsOnPress(team.today.onToday)}>Today</button>}
-    {team?.tasks && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.tasks.on ? ' on' : ''}`} {...actsOnPress(team.tasks.onTasks)}>Tasks</button>}
     {team?.done && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.done.on ? ' on' : ''}`} {...actsOnPress(team.done.onDone)}>{DONE.short}</button>}
     {after}
   </div>{team?.corner}{onSearch && <SearchButton onSearch={onSearch} />}</div>;

@@ -504,7 +504,7 @@ export function demoCards(now: number = Date.now()): DemoCard[] {
     { by: PRIYA, threadId: 'w-b2a78e3f51', project: 'Ferry', title: 'A progress bar for every move', state: 'done', updatedAt: done - 4 * HR, shippedAt: done - 4 * HR, progress: 'Shows files moved and time left' },
     { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email for the trial users', state: 'done', updatedAt: done - 1.3 * HR, progress: 'For all 4,000 trial users\nSent to Jamie to read' },
     { by: LENA, threadId: 'w-d4b37e0c84', project: 'Website', title: 'Welcome emails for new teams', state: 'running', updatedAt: now - 6 * MIN, progress: 'Three of the five emails written' },
-    // The team's tasks, for the Tasks page: one late, one blocked on you, one ahead.
+    // The team's tasks, for the Standup: one late, one blocked on you, one ahead.
     { by: PRIYA, threadId: 'w-b2c07d5e94', project: 'Website', title: 'Screenshots for the launch email', state: 'running', updatedAt: now - 50 * MIN, progress: 'Two of the four taken', task: { from: LENA, dueInDays: -1 } },
     { by: LENA, threadId: 'w-d4e61f9a03', project: 'Website', title: 'Pricing page for the per-seat plan', state: 'waiting', updatedAt: now - 1.4 * HR, progress: 'Drafted both versions\nWaiting on the price from Jamie', task: { from: DEMO_ME, dueInDays: 1 }, blockedOn: DEMO_ME },
     { by: THEO, threadId: 'w-c3e95a2b70', project: 'Ferry', title: 'Dates on shared drives', state: 'running', updatedAt: now - 30 * MIN, progress: 'Old dates carried through the new engine\nTesting on 40 shared drives', task: { from: DEMO_ME, dueInDays: 3 } },

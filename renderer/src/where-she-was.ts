@@ -115,7 +115,6 @@ export interface Place {
   room?: string;
   teammate?: string;
   today?: boolean;
-  tasks?: boolean;
 }
 
 // Anything at all can be in localStorage, including a place written by a build
@@ -162,11 +161,13 @@ export function readPlace(storage: Pick<Storage, 'getItem'>): Place | null {
     const f = (p.files as Record<string, unknown>).project;
     if (f === null || (typeof f === 'string' && f)) place.files = { project: f };
   }
-  for (const key of ['connections', 'team', 'today', 'tasks'] as const) if (p[key] === true) place[key] = true;
+  for (const key of ['connections', 'team', 'today'] as const) if (p[key] === true) place[key] = true;
   for (const key of ['chats', 'room', 'teammate'] as const) {
     const v = p[key];
     if (typeof v === 'string' && v) place[key] = v;
   }
+  // The Team page's Tasks was taken out; its tasks are on the Standup.
+  if (place.chats === 'tasks') place.chats = 'team';
   return place;
 }
 
@@ -201,5 +202,5 @@ export function placeIsSomewhere(place: Place | null): place is Place {
     || !!place.item || !!place.repeat || !!place.settings
     || place.search !== undefined || !!place.row
     || place.home === false || !!place.files || !!place.connections || !!place.team
-    || !!place.chats || !!place.room || !!place.teammate || !!place.today || !!place.tasks;
+    || !!place.chats || !!place.room || !!place.teammate || !!place.today;
 }

@@ -12,7 +12,7 @@ const fn = app.slice(app.indexOf('const startTutorial = useCallback'), app.index
 
 describe('starting the tutorial', () => {
   it('leaves Team, Today, the board of a person and the Chats page for the inbox', () => {
-    expect(fn).toMatch(/setTeamOpen\(false\); setChatsPlace\(null\); setEvPick\(null\); setTodayOn\(false\); setTasksOn\(false\); setHomeOpen\(false\);/);
+    expect(fn).toMatch(/setTeamOpen\(false\); setChatsPlace\(null\); setEvPick\(null\); setTodayOn\(false\); setHomeOpen\(false\);/);
     expect(fn).toMatch(/setView\('inbox'\)/);
   });
 });
