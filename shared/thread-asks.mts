@@ -162,7 +162,8 @@ export function handedBackWords({ kind, name, verdict, words, asked = null }: { 
     : `${name} handed this back.`;
   // What was asked lived only on the task, so the thread lost it once the ask came back (round four of the team test).
   const ask = asked?.note.trim() ? `${asked.by} had asked: “${asked.note.trim()}”` : '';
-  return [head, said, ask].filter(Boolean).join('\n\n');
+  // The question before the answer, as a reply reads (a walk-through read it backwards).
+  return [head, ask, said].filter(Boolean).join('\n\n');
 }
 
 // A hand-back is written on the thread as the helper's words to the agent are

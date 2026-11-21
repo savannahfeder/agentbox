@@ -11,7 +11,7 @@ const stored = handedBackWords({ kind: 'review', name: 'Theo', verdict: 'yes', w
 
 describe('the asker', () => {
   it('reads You asked', () => {
-    expect(handBackReadBy(stored, 'asker')).toBe('Theo reviewed this and it looks good.\n\nShip it.\n\nYou asked: “Is the index safe?”');
+    expect(handBackReadBy(stored, 'asker')).toBe('Theo reviewed this and it looks good.\n\nYou asked: “Is the index safe?”\n\nShip it.');
   });
   it('leaves other words alone', () => {
     expect(handBackReadBy('Sam had asked: no', 'asker')).toBe('Sam had asked: no');
@@ -23,10 +23,10 @@ describe('the helper, on the owner\'s thread', () => {
   const ev = (fromId: string) => ({ at: 1, who: 'agent', text: asSam, fromId }) as never;
   it('reads You reviewed this, and Sam asked', () => {
     const [e] = shownOnTheirThread([ev('theo')], { me: 'theo', helping: false, owner: 'Sam' });
-    expect(e.text).toBe('You reviewed this and it looks good.\n\nShip it.\n\nSam asked: “Is the index safe?”');
+    expect(e.text).toBe('You reviewed this and it looks good.\n\nSam asked: “Is the index safe?”\n\nShip it.');
   });
   it('someone else\'s hand-back keeps their name, and Sam asked', () => {
     const [e] = shownOnTheirThread([ev('lena')], { me: 'theo', helping: false, owner: 'Sam' });
-    expect(e.text).toBe('Theo reviewed this and it looks good.\n\nShip it.\n\nSam asked: “Is the index safe?”');
+    expect(e.text).toBe('Theo reviewed this and it looks good.\n\nSam asked: “Is the index safe?”\n\nShip it.');
   });
 });
