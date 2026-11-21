@@ -17,7 +17,7 @@ import { approvableFiled, doItHereWords, threadsMade } from '../../../renderer/s
 import { closeAsk } from '../../../renderer/src/close-asks-first';
 import { figuresFrom } from '../../../renderer/src/change-figures';
 import { referencedFiles } from '../../../renderer/src/referenced-files';
-import { changedFiles, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom } from '../../../renderer/src/ship-offer';
+import { agentSaidNotReady, changedFiles, onlyNamedFiles, saidNotToShip, shipOfferFor, shipOfferLive, standingFrom } from '../../../renderer/src/ship-offer';
 import { conversationGap, gapIndex } from '../../../shared/agents.mts';
 import { groupWork } from '../../../shared/work-lines.mts';
 import type { AgentSaid, AgentWork, ThreadStateWord, WorkItem } from '../../../renderer/src/types';
@@ -111,7 +111,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const figures = change ? figuresFrom(change) : null;
   const dir = view.products.find((p) => p.slug === product)?.dir || null;
   const shipAsk = !item.waitsForMac && shipOfferLive(item, { change: !!figures, running: !!session })
-    ? shipOfferFor(standingFrom(change), onlyNamedFiles(changedFiles(change), referencedFiles(item.result, item.note, item.body, item.answer, { dir }), dir))
+    ? shipOfferFor(standingFrom(change), onlyNamedFiles(changedFiles(change), referencedFiles(item.result, item.note, item.body, item.answer, { dir }), dir), { held: saidNotToShip(item.body, item.answer) || agentSaidNotReady(item.result) })
     : null;
   return {
     item,
