@@ -58,3 +58,22 @@ describe('taking a handed-over thread back', () => {
     expect(taskWords(finished as never, product as never, 'sam', nameOf, true)?.word).toBe('Theo marked it done');
   });
 });
+
+// A live check after the first try: the menu's Take it back ran a plain
+// reopen, so Theo kept the task; and every ask read as a hand-over on Theo's
+// copy, "Sam handed this thread to you".
+describe('the wiring a live check caught', () => {
+  const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
+  it('the menu row on a handed-on thread runs the take-back, not a plain reopen', () => {
+    expect(focus).toContain('onReopen={!canFinish && !agent ? (handedName ? onReopen : onReopenDone) ?? null : null}');
+  });
+  it('a handed-on thread offers no Mark as shipped', () => {
+    expect(focus).toContain('shipped={handedName ? null : shippedMark}');
+  });
+  it('an ask is not taken for the task a hand-over made', async () => {
+    const { taskHandedFrom } = await import('../renderer/src/threads/page-rules.ts');
+    const asked = task({ ask: { kind: 'review', owner: 'sam', thread: 'w-1', product: 'api' } });
+    expect(taskHandedFrom([asked] as never, 'w-1', 'sam')).toBeNull();
+    expect(taskHandedFrom([task()] as never, 'w-1', 'sam')).not.toBeNull();
+  });
+});

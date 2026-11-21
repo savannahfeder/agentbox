@@ -1012,7 +1012,8 @@ export { initialsOf as handedInitials } from '../team/rooms/room-rules';
 /** The task a thread became when it was handed on: its link leads back here, from the one who gave it. */
 export function taskHandedFrom<T extends TeamRow & { id: string; body?: string | null }>(items: readonly T[], threadId: string, me: string | null = null): T | null {
   return items.find((t) => {
-    if (!isTaskRow(t)) return false;
+    // An ask links back to the thread too, and is not a hand-over.
+    if (!isTaskRow(t) || (t as { ask?: unknown }).ask) return false;
     const giver = taskGiver(t);
     return (!me || giver === me) && handedFrom(t.body, giver)?.id === threadId;
   }) ?? null;

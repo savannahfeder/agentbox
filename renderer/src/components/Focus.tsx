@@ -1976,7 +1976,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       // An ask is answered by handing it back, so it offers no second way to end it.
       onCloseTask={canFinish && givenTask && !item.ask ? onCloseTask ?? null : null}
       onStopRepeating={repeat ? repeat.onEnd : null}
-      onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
+      // A handed-on thread's row is Take it back, which ends their task too (App's onReopen).
+      onReopen={!canFinish && !agent ? (handedName ? onReopen : onReopenDone) ?? null : null}
       handedTo={handedName ? { name: handedName, initials: handedInitials(handedName), onOpen: handedTask ? () => onOpenItem(handedTask) : null } : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
       onLater={canFinish ? onSnooze ?? null : null}
@@ -1994,7 +1995,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       giveTo={giveTo}
       onGive={onGive}
       onAsk={onAsk}
-      shipped={shippedMark}
+      shipped={handedName ? null : shippedMark}
       onShipped={onShipped}
       waitChoices={waitChoices}
       waitsNow={!!waitNow}
