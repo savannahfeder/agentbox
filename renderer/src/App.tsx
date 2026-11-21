@@ -2710,8 +2710,10 @@ export default function App() {
   const [repeats, setRepeats] = useState<RepeatRule[]>([]);
   useEffect(() => { api.repeats().then(setRepeats).catch(() => {}); }, [snap?.items?.length, view]);
 
+  // The chats put off with L are rows there too (useRooms' laterRows).
+  const chatsLater = snap?.alpha?.rooms && snap.team?.rooms?.on ? snap.team.rooms.later?.length ?? 0 : 0;
   // What the Scheduled tab counts, and it is exactly what the page lists.
-  const scheduledCount = snoozed.length + repeats.length;
+  const scheduledCount = snoozed.length + repeats.length + chatsLater;
 
   /**
    * THE ROTATION Tab TAKES, IN ONE PLACE. It was written out inline in the key
@@ -9012,7 +9014,7 @@ export default function App() {
                       inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length,
                       progress: (mineShown ? shownCount(progressTab) : 0) + theirCount('progress'),
                       // The repeating tasks and the chats put off are rows on Later's page whatever the filters are.
-                      snoozed: (mineShown ? shownCount(snoozed) : 0) + repeats.length + roomsUi.laterRows.length + theirCount('snoozed'),
+                      snoozed: (mineShown ? shownCount(snoozed) : 0) + repeats.length + chatsLater + theirCount('snoozed'),
                       done: (mineShown ? shownCount(done) : 0) + theirCount('done'),
                     }}
                     needs={team ? needsWord(picked, team.me) : undefined}

@@ -536,12 +536,12 @@
 .gr-page.in-inbox .rm-full .rm-cm .tx { font-size: var(--task-type, 16px); line-height: 1.6; }
 .gr-page.in-inbox .rm-full .rm-chat-err { margin-left: var(--task-indent, 32px); }
 .gr-page.in-inbox .rm-full .rm-compose {
-  margin: 8px 32px 44px var(--task-indent, 32px); max-width: var(--task-measure, 760px);
+  margin: 8px 32px 24px var(--task-indent, 32px); max-width: var(--task-measure, 760px);
   border-color: var(--line); background: var(--bg-raised); box-shadow: var(--shadow-md);
 }
 .gr-page.in-inbox .rm-full .rm-compose:focus-within { border-color: var(--line-strong); background: var(--surface); }
 .gr-page.in-inbox .rm-compose.folded { flex-direction: row; align-items: center; cursor: text; }
-.gr-page.in-inbox .rm-compose.folded .rm-compose-input { flex: 1; min-width: 0; min-height: 0; padding: 11px 16px; font-size: max(14.5px, calc(var(--task-type, 16px) * 0.78)); }
+.gr-page.in-inbox .rm-compose.folded .rm-compose-input { flex: 1; min-width: 0; min-height: 0; padding: 11px 16px; font-size: max(14.5px, calc(var(--task-type, 16px) * 0.78)); line-height: 19px; }
 .gr-page.in-inbox .rm-compose.folded :is(.rm-compose-bar, .fmt-marks-slot) { display: none; }
 .rm-fold-key { padding-right: 14px; display: flex; align-items: center; }
 .rm-fold-key kbd {
