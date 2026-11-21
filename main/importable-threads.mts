@@ -20,11 +20,13 @@ import { appSessionFolders } from './agent-homes.mts';
 import { RECENT_DAYS, readProjectChats, readSessionThreads } from './agent-sessions.mts';
 import { readCodexThreads } from './codex-threads.mts';
 import type { CodexThreadsOptions, CodexThreadsRead } from './codex-threads.mts';
-import type { ImportThread } from './agent-sessions.mts';
+import type { ImportThread, SessionThreadOptions } from './agent-sessions.mts';
 
 type FolderSource = NonNullable<Parameters<typeof appSessionFolders>[0]>;
 
 export type CodexReader = (opts: CodexThreadsOptions) => CodexThreadsRead | Promise<CodexThreadsRead>;
+type SessionThreadsRead = ReturnType<typeof readSessionThreads>;
+export type ClaudeReader = (opts: SessionThreadOptions) => SessionThreadsRead | Promise<SessionThreadsRead>;
 
 export interface ImportableOptions {
   config?: FolderSource['config'];
@@ -34,6 +36,7 @@ export interface ImportableOptions {
   home?: string;
   now?: number;
   readCodex?: CodexReader;
+  readClaude?: ClaudeReader;
 }
 
 export interface RecentThreadsOptions extends ImportableOptions {
@@ -51,14 +54,14 @@ export interface SearchableThreadsOptions extends ImportableOptions {
 export const OLDER_DAYS = 90;
 export const OLDER_MOST = 20;
 
-// `readCodex` is the app's own reader off the main process (codex-threads.mts
-// readCodexThreadsOffThread): a large Codex folder takes seconds to read.
-export async function readImportableThreads({ config = null, supervisor = null, env = process.env, shellEnv, home = os.homedir(), now = Date.now(), readCodex = readCodexThreads }: ImportableOptions = {}): Promise<ImportThread[]> {
+// `readCodex` and `readClaude` are the app's own readers off the main process
+// (main/chat-reader.mts): a heavy user's folders take seconds to read.
+export async function readImportableThreads({ config = null, supervisor = null, env = process.env, shellEnv, home = os.homedir(), now = Date.now(), readCodex = readCodexThreads, readClaude = readSessionThreads }: ImportableOptions = {}): Promise<ImportThread[]> {
   const { dirs, codexDirs } = appSessionFolders({ config, supervisor, env, home, ...(shellEnv ? { shellEnv } : {}) });
   const read = async (days: number, max?: number) => {
     let claude: ImportThread[] = [];
     let codex: ImportThread[] = [];
-    try { ({ threads: claude } = readSessionThreads({ home, dirs, now, days, ...(max ? { max } : {}) })); } catch { claude = []; }
+    try { ({ threads: claude } = await readClaude({ home, dirs, now, days, ...(max ? { max } : {}) })); } catch { claude = []; }
     try { ({ threads: codex } = await readCodex({ home, codexDirs, now, days })); } catch { codex = []; }
     return [...claude, ...codex].sort((a, b) => (b.when ?? 0) - (a.when ?? 0));
   };
@@ -106,14 +109,14 @@ const SEARCH_BUDGET_MS = 8000;
 
 export async function readSearchableThreads({
   config = null, supervisor = null, env = process.env, shellEnv, home = os.homedir(), now = Date.now(),
-  days = SEARCH_DAYS, max = SEARCH_MOST, budgetMs = SEARCH_BUDGET_MS, readCodex = readCodexThreads,
+  days = SEARCH_DAYS, max = SEARCH_MOST, budgetMs = SEARCH_BUDGET_MS, readCodex = readCodexThreads, readClaude = readSessionThreads,
 }: SearchableThreadsOptions = {}) {
   const { dirs, codexDirs } = appSessionFolders({ config, supervisor, env, home, ...(shellEnv ? { shellEnv } : {}) });
   let claude: ImportThread[] = [];
   let codex: ImportThread[] = [];
   let reached = 0;
   try {
-    ({ threads: claude, reached } = readSessionThreads({ home, dirs, now, days, max, budgetMs, ends: false }));
+    ({ threads: claude, reached } = await readClaude({ home, dirs, now, days, max, budgetMs, ends: false }));
   } catch { claude = []; }
   // Codex keeps its names in an index of its own (main/codex-threads.mts), so
   // its side costs no transcript reads and never gives up early. Only the

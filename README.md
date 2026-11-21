@@ -39,11 +39,19 @@
 
 ## Install
 
-**As a Mac app.** [Download Agentbox for Mac](https://agentbox.ac/download). It is signed and notarised, and runs on Apple silicon and Intel.
+| Your computer | How you get Agentbox |
+| --- | --- |
+| Mac | [Download the app](https://agentbox.ac/download) |
+| Windows | [Build it from this repo](#install-on-windows) |
+| Linux | [Build it from this repo](#install-on-linux), or [run it in your browser](#run-it-in-your-browser-on-a-mac-or-linux) |
 
-Every way needs Claude Code or Codex installed and signed in. Building it from source or running it in the browser also needs Node 22.18 or newer.
+Every way runs Claude Code or Codex on the plan you already have. If your computer has neither, the first run installs one and opens its sign-in.
 
-**As a desktop app from source.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
+### Install on a Mac
+
+[Download Agentbox for Mac](https://agentbox.ac/download). It is signed and notarised, and runs on Apple silicon and Intel.
+
+To build it from this repo instead, you need Git and Node 22.18 or newer.
 
 ```
 git clone https://github.com/savannahfeder/agentbox.git
@@ -52,21 +60,60 @@ npm install
 npm start
 ```
 
-`npm install` ends with a count of vulnerabilities. What is left after `npm audit fix` are advisories on Vite,
-Vitest and the Tiptap editor that only a new major version of each would clear.
-The install worked if it exits without an error.
+On macOS, the system may ask to let Terminal find devices on your local network. Agentbox does not need that, so Don't Allow is fine.
 
-**In your browser.** One command, nothing to install first:
+### Install on Windows
+
+There is no Windows download, so you build it from this repo. Building it needs Git and Node 22.18 or newer.
+
+1. Open PowerShell. If you do not have both yet, install them with winget, then close the PowerShell window and open a new one so it finds them.
+
+   ```
+   winget install --id Git.Git -e
+   winget install --id OpenJS.NodeJS.LTS -e
+   ```
+
+2. Get Agentbox and start it.
+
+   ```
+   git clone https://github.com/savannahfeder/agentbox.git
+   cd agentbox
+   npm install
+   npm start
+   ```
+
+   If PowerShell says running scripts is disabled on this system, allow scripts for your own account and run `npm install` again.
+
+   ```
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
+The first `npm start` downloads Electron, builds the app and opens it. It also adds Agentbox to the Start menu, so you can open it from there next time.
+
+### Install on Linux
+
+There is no Linux download, so you build it from this repo. Building it needs Git and Node 22.18 or newer. The terminal inside the app also needs `make` and a C++ compiler, which `sudo apt install build-essential` gives you on Debian or Ubuntu. Without them everything works except the terminal, which says what to install.
+
+```
+git clone https://github.com/savannahfeder/agentbox.git
+cd agentbox
+npm install
+npm start
+```
+
+`npm install` puts `agentbox` on `~/.local/bin` and adds the app to the launcher, so after the first `npm start` you can open it from there. The entry is `$XDG_DATA_HOME/applications/agentbox.desktop` (`~/.local/share/applications` when that variable is unset).
+
+### Run it in your browser on a Mac or Linux
+
+It needs Node 22.18 or newer.
 
 ```
 npx agentbox-app
 ```
 
-It starts on your machine and opens a tab. On Linux that open goes through `xdg-open`. Nothing is hosted: it listens only on `127.0.0.1`, and the address carries a key that is new every run. Add `--help` to see the options. `--no-open` prints the address and leaves the browser to you.
+It starts on your machine and opens a tab, through `xdg-open` on Linux. Nothing is hosted. It listens only on `127.0.0.1`, and the address carries a key that is new every run. `--no-open` prints the address and leaves the browser to you, and `--help` lists the other options. On Linux the terminal needs `make` and a C++ compiler here too.
 
-The terminal is the one piece that is compiled while it installs, and on Linux that needs `make` and a C++ compiler. Without them the install leaves the terminal out, everything else works, and the command says so each time it starts. On Debian or Ubuntu, `sudo apt install build-essential` and install again.
-
-From a checkout, build the screen once, then start it the same way. The install links the checkout's own command, so `npx` runs this copy rather than looking for `agentbox` on your PATH:
+From a checkout, build the screen once, then start it the same way. The install links the checkout's own command, so `npx` runs this copy rather than looking for `agentbox` on your PATH.
 
 ```
 npm install
@@ -74,15 +121,11 @@ npm run build
 npx agentbox-app
 ```
 
-On Linux, `npm install` puts `agentbox` on `~/.local/bin` and adds the app to the launcher. The entry is `$XDG_DATA_HOME/applications/agentbox.desktop` (`~/.local/share/applications` when that variable is unset), and it runs `agentbox`. That command starts this checkout, and it is written before Electron has downloaded its binary, so the first launch off the launcher does that download. Open the app from the launcher.
+### When npm install prints warnings
 
-On Windows, `npm install` adds nothing. The first `npm start` adds Agentbox to the Start menu, and later starts keep that shortcut pointing at this checkout.
+`npm install` ends with a count of vulnerabilities. What is left after `npm audit fix` are advisories on Vite, Vitest and the Tiptap editor that only a new major version of each would clear. The install worked if it exits without an error.
 
-Two of this repo's dependencies need an install script to work: `node-pty`, which is the terminal and is the one optional dependency here, and `esbuild`. `package.json` names them in `allowScripts`, by name rather than pinned to a version, so a dependency bump does not need re-approving. `electron-winstaller` is denied there: it is only for packing a Windows installer, which this repo does not do. npm 11 and newer print anything in neither list on every install, and `npm approve-scripts --allow-scripts-pending` lists them.
-
-`npm start` builds the app and opens it. On first run it walks you through connecting Claude Code or Codex and choosing a folder to work in.
-
-On macOS, the system may ask to let Terminal find devices on your local network. Agentbox does not need that, so Don't Allow is fine.
+`node-pty`, which is the terminal, and `esbuild` need their install scripts to work. `package.json` names them in `allowScripts`, by name rather than pinned to a version, so a dependency bump does not need re-approving. `electron-winstaller` is denied there, because it only packs a Windows installer and this repo builds none. npm 11 and newer print anything in neither list on every install, and `npm approve-scripts --allow-scripts-pending` lists them.
 
 ## The chat window is the bottleneck
 
@@ -309,7 +352,7 @@ A released copy counts nineteen things, and they are counts:
 - counts were turned off
 
 Each carries a random install id, the app and platform version, whether it
-came from the Mac app or the browser copy, which of two first runs a new install was shown, and at most
+came from the Mac app or the browser copy, which first run a new install was shown, and at most
 eight other things: how long something took, how many of a thing there were,
 which kind of row it was out of six fixed words, whether an agent or you did
 it, whether an agent's run failed, whether it happened in setup's practice

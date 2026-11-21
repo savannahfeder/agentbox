@@ -17,8 +17,8 @@
 // THE DECISION. Summary keeps S, which is the half that was approved. Later
 // takes L, which nothing else in the app uses and which is the word the row
 // already draws. Then every place that says a key for either says the same one:
-// the row chip, the hover plate, ⌘K, the shortcuts page, the tutorial and the
-// two refusal sentences the tutorial speaks.
+// the row keys, the hover plate, ⌘K and the shortcuts page. (The old walk's
+// card and refusals said it too; they went with it, 2026-11-21.)
 //
 // WHAT THIS FILE IS FOR, AND IT IS NOT THE LETTER. It is that there is ONE
 // answer per letter and that every surface reads it off the same place. The
@@ -37,8 +37,6 @@ import { HINTS } from '../renderer/src/hint-plate.ts';
 import { OPENS_A_TEXT_FIELD } from '../renderer/src/keys.ts';
 import { SHORTCUTS, everyKey } from '../renderer/src/shortcuts.ts';
 import { rowKeys } from '../renderer/src/list-rules.ts';
-import { closingRefused, coach, laterIndex, waitingIndex } from '../renderer/src/onboarding.ts';
-import { PRACTICE_ROWS } from '../shared/first-run-practice.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -80,7 +78,7 @@ describe('every surface that says a key says the same one', () => {
     }
   });
 
-  it('the chip drawn on a row while the tutorial is on', () => {
+  it('the keys a row offers', () => {
     expect(rowKeys('inbox').map((k) => k.key)).toEqual(['R', 'E', 'L']);
     expect(rowKeys('snoozed').map((k) => k.key)).toEqual(['E', 'L']);
     for (const view of ['inbox', 'snoozed', 'progress', 'done']) {
@@ -101,35 +99,6 @@ describe('every surface that says a key says the same one', () => {
     expect(rowsFor('S')).toHaveLength(0);
     expect(everyKey()).toContain('L');
     expect(everyKey()).not.toContain('S');
-  });
-
-  it('the tutorial, on the beat that teaches putting work off', () => {
-    const say = coach('snooze', 0);
-    expect(say.key).toBe('L');
-    // The key alone: the beat named a click for an hour on 2026-10-01 and the
-    // chip it pointed at exists only inside the tutorial, which is written up
-    // in tests/every-tutorial-beat-says-what-to-click.test.mts. What this file
-    // is about is unchanged, which is that the letter is L.
-    expect(`${say.lead}${say.key}${say.tail}`).toBe('Press L to deal with it later.');
-  });
-
-  it('the tutorial refusal that sends somebody to the other key', () => {
-    // The walk refuses E on the row that is real work and not for today, and
-    // the sentence names the key that IS right for it. Naming a key the app no
-    // longer answers would be the worst version of this fault: the one place
-    // somebody is being taught.
-    // The walk's own rows, in the order it stages them, which is the link the
-    // refusals read: the row that is real work and not for today is the one at
-    // `laterIndex`. Walked at length in
-    // tests/the-walk-keeps-the-beat-that-presses-one.test.mts.
-    const ids = PRACTICE_ROWS.map((_, i) => `w-example${i}`);
-    const run = {
-      step: 'clear', folder: '/tmp', name: 'Zero', product: 'zero',
-      practice: 'practice', item: 'w-hers', sentAt: 1, examples: ids,
-    };
-    const later = laterIndex(PRACTICE_ROWS);
-    const refused = closingRefused(run, ids[later], waitingIndex(PRACTICE_ROWS), later);
-    expect(refused).toBe('That one is not finished. Press L to deal with it later.');
   });
 });
 

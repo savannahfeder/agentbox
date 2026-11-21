@@ -16,7 +16,7 @@ import path from 'node:path';
 import type { TeamBackend, TeamSession } from './team/index.mts';
 import type { MemoryCloud } from './team/memory-cloud.mts';
 import {
-  type DemoPerson, endOfDayIn, yesterdayAt, DEMO_CHATS, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
+  type DemoPerson, endOfDayIn, yesterdayAt, DEMO_CHATS, DEMO_THREAD_WORDS, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
 } from '../shared/demo-world.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED } from '../shared/team-look.mts';
 
@@ -100,12 +100,22 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
   for (const person of DEMO_TEAMMATES) {
     const cards = demoCards(now).filter((c) => c.by.id === person.id).map((c) => ({
       threadId: c.threadId, visible: true, title: c.title, project: c.project, people: null, state: c.state,
-      priority: null, problem: null, progress: c.progress ?? null, solution: null, blocks: [],
+      priority: null, problem: DEMO_THREAD_WORDS[c.threadId]?.about ?? null, progress: c.progress ?? null, solution: null, blocks: [],
       blockedBy: c.blockedOn ? [{ id: `person:${c.blockedOn.id}`, title: null }] : [],
       updatedAt: c.updatedAt, ...(c.shippedAt ? { shippedAt: c.shippedAt } : {}),
       ...(c.task ? { task: { from: c.task.from.id, dueAt: endOfDayIn(now, c.task.dueInDays), clock: false } } : {}),
     }));
     await memoryBackend(cloud, person.id).putCards(DEMO_TEAM.id, cards);
+    // The thread behind each card, as their copy would publish it (main/team/thread-share.mts).
+    for (const c of demoCards(now).filter((d) => d.by.id === person.id)) {
+      const words = DEMO_THREAD_WORDS[c.threadId];
+      if (!words) continue;
+      const lines = [
+        { id: c.threadId, ts: Math.round(c.updatedAt - 2 * HR), source: 'founder', by: person.id, uid: `demo-${c.threadId}-ask`, patch: { body: words.ask } },
+        ...(words.said ? [{ id: c.threadId, ts: Math.round(c.updatedAt - 1), source: 'agent', by: person.id, uid: `demo-${c.threadId}-said`, patch: { result: words.said } }] : []),
+      ];
+      await memoryBackend(cloud, person.id).putThreadWork(DEMO_TEAM.id, { threadId: c.threadId, hash: `demo-${c.threadId}`, work: { lines, earlier: 0, files: [] } });
+    }
   }
   // The team's group: the Team look, filled in, then the morning's posts. A
   // group with a Team look already in it is not given the blank one.

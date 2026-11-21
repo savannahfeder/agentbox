@@ -16,7 +16,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readRollout, readCodexThreads, readCodexThreadsOffThread } from '../main/codex-threads.mts';
+import { readRollout, readCodexThreads } from '../main/codex-threads.mts';
+import { readCodexThreadsOffThread } from '../main/chat-reader.mts';
 import { scanCodex, startCodexWatch } from '../main/codex-watch.mts';
 
 let home; let codexDir;

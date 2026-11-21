@@ -111,6 +111,25 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
       return (await call('POST', '/v1/billing_portal/sessions', { customer, return_url: returnUrl, ...flow })).url;
     },
     subscription: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`),
+    /** What one seat costs a month in cents with the subscription's codes taken off, or null when its price names no amount. */
+    async seatCents(sub) {
+      const item = sub?.items?.data?.[0];
+      const unit = Number(item?.price?.unit_amount);
+      if (!Number.isFinite(unit)) return null;
+      if (!sub.discounts?.length) return unit;
+      const seats = Math.max(1, Math.floor(Number(item.quantity)) || 1);
+      // A subscription names its discounts by id until they are expanded, and an expanded one may still name its coupon by id.
+      const { discounts = [] } = await call('GET', `/v1/subscriptions/${encodeURIComponent(sub.id)}`, { expand: ['discounts'] });
+      let cents = unit * seats;
+      for (const d of discounts) {
+        const named = d?.source?.coupon;
+        const coupon = typeof named === 'string' ? await call('GET', `/v1/coupons/${encodeURIComponent(named)}`) : named;
+        if (Number(coupon?.percent_off) > 0) cents -= (cents * Number(coupon.percent_off)) / 100;
+        // Dollars off come off the whole bill, so each seat bears its share.
+        else if (Number(coupon?.amount_off) > 0) cents -= Number(coupon.amount_off);
+      }
+      return Math.max(0, Math.round(cents / seats));
+    },
     // Ends a trial at once, which charges the first month now; answers the subscription as it then stands.
     endTrial: (id) => call('POST', `/v1/subscriptions/${encodeURIComponent(id)}`, { trial_end: 'now' }),
     // A team's seats, set to the people on it. A seat added mid-month is charged for the rest of that month.

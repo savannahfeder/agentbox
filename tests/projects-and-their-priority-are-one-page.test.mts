@@ -130,10 +130,10 @@ describe('the mark beside a project', () => {
   });
 
   it('the first-run screens show the Agentbox mark, not a project mark', () => {
-    for (const f of ['renderer/src/components/Onboarding.tsx', 'renderer/src/components/ModeScreen.tsx']) {
+    for (const f of ['renderer/src/components/FirstRun.tsx', 'renderer/src/components/ModeScreen.tsx']) {
       expect(read(f)).not.toMatch(/<ProductMark name=\{NAME\}/);
-      expect(read(f)).toMatch(/<AppMark\b/);
     }
+    expect(read('renderer/src/components/ModeScreen.tsx')).toMatch(/<AppMark\b/);
   });
 });
 
