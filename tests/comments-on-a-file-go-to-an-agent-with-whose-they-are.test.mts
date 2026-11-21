@@ -81,6 +81,12 @@ describe('what the agent is told', () => {
     expect(words).toContain('launch-email-v2.md');
   });
 
+  // Rerun: Lena asked for clinic-checkout-mobile-review.html above the comments,
+  // and the line under them told the agent to save clinic-checkout-v3.html.
+  it('yields to a name the person gave above', () => {
+    expect(words).toContain('Unless told otherwise above, save the result as sign-up-screens-v2.md');
+  });
+
   it('nothing, when none are chosen', () => {
     expect(commentsForTheAgent([], { nameOf })).toBe('');
   });

@@ -68,7 +68,8 @@ export function commentsForTheAgent(comments: readonly HandedComment[], { nameOf
       ...c.replies.map((r) => `  - ${r.text} (${who(r)})`),
     ].join('\n')),
     '',
-    `Make the changes they ask for and save the result as ${nextVersionName(name, 1)} beside ${name}. Name the new file in your reply.`,
+    // What the person typed above comes first: a name they gave the result wins over this one.
+    `Make the changes they ask for. Unless told otherwise above, save the result as ${nextVersionName(name, 1)} beside ${name}, and name the new file in your reply.`,
   ].join('\n')).join('\n\n');
 }
 
