@@ -7955,7 +7955,8 @@ export default function App() {
       // A conversation's record is named for nobody; the row's sender says who it is with.
       const project = directSlugs.has(i.product) ? '' : i.productName;
       const asks = from && i.ask && i.assignee === team?.me ? (i.ask.kind === 'help' ? ' asks for help' : ' asks for a review') : '';
-      return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: from ? `${from}${asks}` : null, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+      const photo = sent && !sent.agent ? team?.byId.get(sent.from)?.avatarUrl : null;
+      return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), ...(photo ? { photo } : {}), letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: from ? `${from}${asks}` : null, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
     },
   }) : [];
   const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : busiestFirst(members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
