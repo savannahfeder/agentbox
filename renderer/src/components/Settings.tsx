@@ -51,6 +51,7 @@ import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-
 import { runningFigures, type GateReading } from '../running-reading';
 import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
+import { accountName } from '../../../shared/account-names.mts';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
 import { MatchMark } from './MatchMark';
@@ -320,7 +321,7 @@ export { accountReadingFor };
 /**
  * One agent's whole story, gathered from the pieces the model still keeps
  *  apart. Nothing is derived here that main already answers. */
-function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 'codex') {
+export function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 'codex') {
   const reading = readings.find((r) => r.engine === engine) ?? null;
   if (engine === 'codex') {
     return {
@@ -348,7 +349,7 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
       email: a.email ?? null,
       plan: a.plan?.label ?? null,
       chosen: !!a.chosen,
-      signedIn: !!a.email,
+      signedIn: a.signedIn ?? !!a.email,
       trouble: a.trouble?.note ?? null,
       atLimit: a.trouble?.cause === 'at-limit',
       limitAt: a.trouble?.at ?? null,
@@ -2844,7 +2845,7 @@ function WebPhoneProjects({ web, onWorkspace }: { web: WebComputer; onWorkspace:
 
 type WebAccount = { id: string; email: string | null; name?: string | null; plan: string | null; chosen: boolean; note?: string | null; signedIn?: boolean };
 type AccountAsk = { engine: string; account: string | null };
-function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'claude' | 'codex'; list: WebAccount[]; reading: Reading; refusedAsk: AccountAsk | null; onUse: (id: string) => void }) {
+export function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'claude' | 'codex'; list: WebAccount[]; reading: Reading; refusedAsk: AccountAsk | null; onUse: (id: string) => void }) {
   const asked = reading.value as AccountAsk | null;
   const mine = asked?.engine === engine ? asked : null;
   const chosen = (a: WebAccount) => (mine ? mine.account === a.id : a.chosen);
@@ -2853,10 +2854,10 @@ function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'cl
   if (!list.length) return <Row label="Not signed in" />;
   return (
     <>
-      {list.map((a) => {
+      {list.map((a, i) => {
         const live = picked && chosen(a) && a.signedIn !== false;
         return (
-          <ReadRow key={a.id} label={a.email ?? a.name ?? 'Not signed in'} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
+          <ReadRow key={a.id} label={a.email ?? a.name ?? (a.signedIn === false ? 'Not signed in' : accountName({ engine, index: i, total: list.length }))} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
             {live ? <span className="set-in-use">In use</span>
               : list.length > 1 && a.signedIn !== false && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
           </ReadRow>
