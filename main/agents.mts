@@ -443,15 +443,14 @@ export function listAgents(opts: RefreshOptions = {}) {
 const CLI_KEPT_MS = 60_000;
 let cliKept: { at: number; seen: string; records: SessionRecord[] } | null = null;
 
-/** The Claude Code processes `stillTheSame` could match, as one comparable string. */
-function claudeProcesses(table: Map<number, ProcessRow>) {
-  return [...table].filter(([, p]) => /claude/i.test(p.command)).map(([pid, p]) => `${pid} ${p.started}`).sort().join('\n');
-}
+/** Claude Code itself, as a program or as its npm script; not a hook or skill that only has `.claude` in its path. */
+const CLAUDE_CODE = /^(\S*\/)?claude(\s|$)|claude-code\/cli\.m?js/;
 
 async function cliRecordsFor(table: Map<number, ProcessRow>, claudeBin: string | null | undefined) {
-  const procs = claudeProcesses(table);
-  if (!procs) { cliKept = null; return { records: [] as SessionRecord[], kept: false }; }
-  const seen = `${claudeBin}\n${procs}`;
+  // None that `stillTheSame` could match, so no session either source names.
+  if (![...table.values()].some((p) => /claude/i.test(p.command))) { cliKept = null; return { records: [] as SessionRecord[], kept: false }; }
+  const sessions = [...table].filter(([, p]) => CLAUDE_CODE.test(p.command)).map(([pid, p]) => `${pid} ${p.started}`).sort().join('\n');
+  const seen = `${claudeBin}\n${sessions}`;
   const now = Date.now();
   if (cliKept && cliKept.seen === seen && now - cliKept.at < CLI_KEPT_MS) return { records: cliKept.records, kept: true };
   const records = await fromCli(claudeBin);

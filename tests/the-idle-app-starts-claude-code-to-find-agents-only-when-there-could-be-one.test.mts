@@ -116,6 +116,22 @@ describe('looking for agents outside the app', () => {
     expect(calls.claude).toBe(3);
   });
 
+  it('does not count a program that only has .claude in its path as a change', async () => {
+    const agents = await load();
+    psOut = `${CLAUDE(HEADLESS)}\n`;
+    await agents.refresh(opts);
+    for (const command of ['node /Users/x/.claude/hooks/guard.mjs', 'sh /Users/x/dev/app/.claude/skills/run.sh', '/Applications/Claude.app/Contents/MacOS/Claude']) {
+      psOut = `${CLAUDE(HEADLESS)}\n${row(777, command)}\n`;
+      now += 5_000;
+      await agents.refresh(opts);
+    }
+    expect(calls.claude).toBe(1);
+    psOut = `${CLAUDE(HEADLESS)}\n${row(778, 'node /usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js')}\n`;
+    now += 5_000;
+    await agents.refresh(opts);
+    expect(calls.claude).toBe(2);
+  });
+
   it('counts a pid reused by a new Claude Code as a change', async () => {
     const agents = await load();
     psOut = `${CLAUDE(HEADLESS)}\n`;
