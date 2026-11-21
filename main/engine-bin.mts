@@ -466,6 +466,7 @@ export function shellRunner(env: NodeJS.ProcessEnv = process.env): ShellRun {
         // spawn blocks the whole app until the shell has exited (2026-10-16).
         killSignal: 'SIGKILL',
         env,
+        windowsHide: true,
       });
     } catch (e) {
       const failed = e as ShellFailure | null;
@@ -492,6 +493,7 @@ export function shellRunnerLater(env: NodeJS.ProcessEnv = process.env): ShellRun
   return (shell, [flags, command], timeout = 4000) => new Promise<string>((resolve, reject) => {
     const child = execFile(shell, [flags, `echo ${REACHED}; ${command}`], {
       encoding: 'utf8', timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024, env,
+      windowsHide: true,
     }, (err, stdout) => {
       if (!err) {
         const answer = afterReached(stdout);

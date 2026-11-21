@@ -21,6 +21,65 @@ export interface FitTools {
   scale: () => number;
   /** Copies already made, so a picture seen before is not shrunk again. */
   kept?: KeptCopies;
+  /** The same copies on disk, so they outlive a restart. */
+  stored?: StoredCopies;
+}
+
+type Copy = { blob: Blob; shrunk: boolean };
+
+export interface StoredCopies {
+  get(key: string): Promise<Copy | undefined>;
+  put(key: string, copy: Copy): Promise<void>;
+}
+
+/** The keys to let go so the rest fit in `budget` bytes, the one used longest ago first. */
+export function oldestOverBudget(copies: { key: string; size: number; used: number }[], budget: number): string[] {
+  let bytes = copies.reduce((sum, c) => sum + c.size, 0);
+  const out: string[] = [];
+  for (const c of [...copies].sort((a, b) => a.used - b.used)) {
+    if (bytes <= budget) break;
+    out.push(c.key);
+    bytes -= c.size;
+  }
+  return out;
+}
+
+const req = <T,>(r: IDBRequest<T>) => new Promise<T>((ok, bad) => { r.onsuccess = () => ok(r.result); r.onerror = () => bad(r.error); });
+const PRUNE_EVERY = 20;
+
+export function storedCopies(budget: number, idb: IDBFactory = indexedDB): StoredCopies {
+  let opened: Promise<IDBDatabase> | null = null;
+  const db = () => (opened ??= new Promise((ok, bad) => {
+    const r = idb.open('agentbox-picture-copies', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('copies', { keyPath: 'key' }); };
+    r.onsuccess = () => {
+      const d = r.result;
+      d.onclose = () => { opened = null; };
+      d.onversionchange = () => { d.close(); opened = null; };
+      ok(d);
+    };
+    r.onerror = () => { opened = null; bad(r.error); };
+  }));
+  let puts = 0;
+  const prune = async () => {
+    const copies = (await db()).transaction('copies', 'readwrite').objectStore('copies');
+    const all = await req(copies.getAll() as IDBRequest<{ key: string; blob: Blob; used: number }[]>);
+    for (const key of oldestOverBudget(all.map((c) => ({ key: c.key, size: c.blob.size, used: c.used })), budget)) copies.delete(key);
+  };
+  return {
+    async get(key) {
+      const copies = (await db()).transaction('copies', 'readwrite').objectStore('copies');
+      const had = await req(copies.get(key) as IDBRequest<{ key: string; blob: Blob; shrunk: boolean; used: number } | undefined>);
+      if (!had) return undefined;
+      copies.put({ ...had, used: Date.now() });
+      return { blob: had.blob, shrunk: had.shrunk };
+    },
+    async put(key, copy) {
+      if (copy.blob.size > budget) return;
+      await req((await db()).transaction('copies', 'readwrite').objectStore('copies').put({ key, ...copy, used: Date.now() }));
+      if (puts++ % PRUNE_EVERY === 0) await prune();
+    },
+  };
 }
 
 export interface KeptCopies {
@@ -78,6 +137,7 @@ const browser: FitTools = {
   link: (blob) => URL.createObjectURL(blob),
   scale: () => (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
   kept: keptCopies(48 * 2 ** 20),
+  stored: typeof indexedDB === 'undefined' ? undefined : storedCopies(512 * 2 ** 20),
 };
 
 // A still PNG or JPEG only. A GIF, an animated PNG or a drawing would lose its
@@ -133,9 +193,13 @@ export async function fitPicture(url: string, box: Box, tools: FitTools = browse
   if (signal?.aborted) throw gone();
   if (!(await shrinkable(blob))) return { url: tools.link(blob), shrunk: false };
   const pixels = tools.scale();
-  const key = tools.kept ? await keyOf(blob, box, pixels) : null;
-  const had = key === null ? undefined : tools.kept?.get(key);
-  if (had) return { url: tools.link(had.blob), shrunk: had.shrunk };
+  const key = tools.kept || tools.stored ? await keyOf(blob, box, pixels) : null;
+  const had = key === null ? undefined : tools.kept?.get(key) ?? await tools.stored?.get(key).catch(() => undefined);
+  if (signal?.aborted) throw gone();
+  if (had) {
+    tools.kept?.put(key!, had);
+    return { url: tools.link(had.blob), shrunk: had.shrunk };
+  }
   const copy = await inTurn(async () => {
     const whole = await tools.decode(blob);
     const across = box.width / whole.width;
@@ -148,6 +212,9 @@ export async function fitPicture(url: string, box: Box, tools: FitTools = browse
     try { small = await tools.decode(whole, { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' }); } finally { whole.close(); }
     try { return { blob: await tools.encode(small), shrunk: true }; } finally { small.close(); }
   }, signal);
-  if (key !== null) tools.kept?.put(key, copy);
+  if (key !== null) {
+    tools.kept?.put(key, copy);
+    if (copy.shrunk) tools.stored?.put(key, copy).catch(() => {});
+  }
   return { url: tools.link(copy.blob), shrunk: copy.shrunk };
 }

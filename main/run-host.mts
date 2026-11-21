@@ -185,7 +185,7 @@ export function serveRuns({ sockPath, spoolDir, idleMs = 60_000, keepEndedMs = K
     runs.set(runId, run);
     let child: ChildProcessWithoutNullStreams | null;
     try {
-      child = spawn(bin, argv.map(String), { cwd, env: env && typeof env === 'object' ? env : {}, stdio: ['pipe', 'pipe', 'pipe'] });
+      child = spawn(bin, argv.map(String), { cwd, env: env && typeof env === 'object' ? env : {}, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     } catch (err) {
       child = null;
       ended(run, { code: -2, signal: null, said: (err as Error | null)?.message ?? String(err) });

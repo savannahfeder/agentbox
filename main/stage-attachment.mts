@@ -93,5 +93,5 @@ export async function turnIntoPicture(file: string, { platform = process.platfor
 }
 
 const sips = (args: string[]) => new Promise<void>((resolve, reject) => {
-  execFile('/usr/bin/sips', args, { timeout: SIPS_MS }, (err) => (err ? reject(err) : resolve()));
+  execFile('/usr/bin/sips', args, { timeout: SIPS_MS, windowsHide: true }, (err) => (err ? reject(err) : resolve()));
 });

@@ -355,6 +355,9 @@ function summary(f: GroupedFile): PlacedFile {
   };
 }
 
+/** A path as the big view's lines carry it: the line readers split on forward slashes only. */
+export const linkPath = (p: string, sep: string = path.sep): string => p.split(sep).join('/');
+
 /** The big view's lines: one per version, at the path it opens from. */
 const linesOf = (file: LinedFile, opened: Map<string, string>): ThreadLine[] => file.chain.map((v): ThreadLine => (v.edited
   ? { ts: v.at, by: v.by, source: 'founder', patch: { artifact: { do: 'edit', file: v.id, path: opened.get(v.id) } } }
@@ -786,7 +789,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const file: LinedFile = { ...asOf(whole, chain), notes: whole.notes.map(onLine), approvals: whole.approvals.map(onLine) };
     const opened = new Map<string, string>();
     // A path that finds nothing, so the view says where the version is rather than drawing the one it was written over.
-    for (const v of file.chain) opened.set(v.id, await openedToView(file, v) ?? (v.away ? `line/${v.n}/${v.name}` : v.copies[0]?.path ?? v.name));
+    for (const v of file.chain) opened.set(v.id, linkPath(await openedToView(file, v) ?? (v.away ? `line/${v.n}/${v.name}` : v.copies[0]?.path ?? v.name)));
     return { file, opened, same };
   }
 

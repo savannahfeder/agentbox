@@ -164,7 +164,7 @@ const PS_DEADLINE_MS = 30_000;
 
 function ps(args: string[]): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    execFile('/bin/ps', args, { timeout: PS_DEADLINE_MS, maxBuffer: 256 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile('/bin/ps', args, { timeout: PS_DEADLINE_MS, maxBuffer: 256 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       if (!err) { resolve(stdout); return; }
       const { killed, code } = err as { killed?: boolean; code?: unknown };
       const said = String(stderr ?? '').trim().split('\n')[0];
@@ -276,7 +276,7 @@ export async function listProcesses(platform: string = process.platform): Promis
   const renamed = procs.filter((p) => !p.exe.startsWith('/')).map((p) => p.pid);
   if (renamed.length) {
     const out = await new Promise<string>((resolve) => {
-      execFile('/usr/sbin/lsof', ['-a', '-p', renamed.join(','), '-d', 'txt', '-Fpn'], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024 },
+      execFile('/usr/sbin/lsof', ['-a', '-p', renamed.join(','), '-d', 'txt', '-Fpn'], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
         (_err, stdout) => resolve(stdout ?? ''));
     });
     applyExecutables(procs, out);
