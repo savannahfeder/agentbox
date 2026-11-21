@@ -57,7 +57,8 @@ describe('the bounded walk gives the answer Vitest.filterTestsBySource gives', (
     'src/mid.mjs': "export { core } from './core.mjs';\n",
     'tests/transitive.test.mjs': "import { core } from '../src/mid.mjs';\nexport default core;\n",
     'src/dyn.mjs': 'export const dyn = 1;\n',
-    'tests/dynamic.test.mjs': "export async function later() { return import('../src/dyn.mjs'); }\n",
+    // Escaped quotes, so the import scanner does not read this fixture as the test's own import.
+    'tests/dynamic.test.mjs': 'export async function later() { return import(\'../src/dyn.mjs\'); }\n',
     'lib/aliased.mjs': 'export const aliased = 1;\n',
     'tests/alias.test.mjs': "import { aliased } from '@lib/aliased.mjs';\nexport default aliased;\n",
     'src/loop-a.mjs': "import './loop-b.mjs';\nexport const a = 1;\n",
