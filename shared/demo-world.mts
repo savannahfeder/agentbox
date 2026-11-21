@@ -380,15 +380,15 @@ export function demoCards(now: number = Date.now()): DemoCard[] {
   const done = lastWorkingMorning(now);
   return [
     { by: THEO, threadId: 'w-c3a1e09d42', project: 'Ferry', title: 'Sync engine rewrite for large moves', state: 'running', updatedAt: now - 12 * MIN, progress: 'Batches of 5,000 files instead of one queue\n60,000 file test finished in 41 minutes\nShared drives next' },
-    { by: THEO, threadId: 'w-c3b27f8e15', project: 'Ferry', title: 'Uploads retry on a slow connection', state: 'done', updatedAt: done - 19 * HR, shippedAt: done - 19 * HR, progress: 'Retries three times, then says which file' },
-    { by: THEO, threadId: 'w-c3c84a1f06', project: 'Ferry', title: 'Shared drives keep their permissions', state: 'done', updatedAt: done - 15 * HR, progress: 'Owners, editors and viewers carry across' },
-    { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Ferry', title: 'Sign-up screens drawn', state: 'done', updatedAt: done - 40 * MIN, progress: 'Drawn in light and dark\nWords sent to Jamie for a yes' },
+    { by: THEO, threadId: 'w-c3b27f8e15', project: 'Ferry', title: 'Retries on a slow connection', state: 'done', updatedAt: done - 19 * HR, shippedAt: done - 19 * HR, progress: 'Retries three times, then says which file' },
+    { by: THEO, threadId: 'w-c3c84a1f06', project: 'Ferry', title: 'Permissions on shared drives', state: 'done', updatedAt: done - 15 * HR, progress: 'Owners, editors and viewers carry across' },
+    { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Ferry', title: 'Sign-up screens', state: 'done', updatedAt: done - 40 * MIN, progress: 'Drawn in light and dark\nWords sent to Jamie for a yes' },
     { by: PRIYA, threadId: 'w-b2d91e6c50', project: 'Ferry', title: 'Empty states for the move list', state: 'running', updatedAt: now - 25 * MIN, progress: 'Four states drawn, two to go' },
     { by: PRIYA, threadId: 'w-b2e3f7a915', project: 'Website', title: 'Pricing page in dark mode', state: 'done', updatedAt: done - 17 * HR, shippedAt: done - 17 * HR, progress: 'Checked on a phone and a laptop' },
-    { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email written', state: 'done', updatedAt: done - 1.3 * HR, progress: 'For all 4,000 trial users\nSent to Jamie to read' },
+    { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email for the trial users', state: 'done', updatedAt: done - 1.3 * HR, progress: 'For all 4,000 trial users\nSent to Jamie to read' },
     { by: LENA, threadId: 'w-d4b37e0c84', project: 'Website', title: 'Welcome emails for new teams', state: 'running', updatedAt: now - 6 * MIN, progress: 'Three of the five emails written' },
-    { by: LENA, threadId: 'w-d4f05c1b98', project: 'Website', title: 'Comparison page against two similar tools', state: 'done', updatedAt: done - 21 * HR, shippedAt: done - 21 * HR, progress: 'Live, linked from pricing' },
-    { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'Trial teams who never started a move', state: 'done', updatedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
+    { by: LENA, threadId: 'w-d4f05c1b98', project: 'Website', title: 'Comparison page', state: 'done', updatedAt: done - 21 * HR, shippedAt: done - 21 * HR, progress: 'Live, linked from pricing' },
+    { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'A note to trial teams that never started a move', state: 'done', updatedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
   ];
 }
 
