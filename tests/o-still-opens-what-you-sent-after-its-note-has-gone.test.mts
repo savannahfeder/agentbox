@@ -122,6 +122,6 @@ describe('the key handler answers it', () => {
 describe('the shortcuts page', () => {
   it('says how long O keeps working', () => {
     const o = SHORTCUTS.flatMap((g) => g.keys).find((k) => k.keys.includes('O'));
-    expect(o?.what).toBe('Open the task you just sent or answered, for up to two minutes.');
+    expect(o?.what).toBe('Open the task you sent or answered in the last two minutes.');
   });
 });

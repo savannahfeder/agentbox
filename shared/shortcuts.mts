@@ -212,7 +212,7 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // opensTheToast(e.key, toast) above the focused branch → openToastRow,
       // and opensTheLastToast once the toast has gone (O_STILL_OPENS_MS).
       // Z's other half: Z takes back what the toast announced, O goes into it.
-      { keys: ['O'], what: 'Open the task you just sent or answered, for up to two minutes.' },
+      { keys: ['O'], what: 'Open the task you sent or answered in the last two minutes.' },
       // (meta||ctrl) && 'a' && !inInput && !modal → tick the whole list
       { keys: ['⌘A'], what: 'Tick every task in the list. Press it again to untick.' },
     ],

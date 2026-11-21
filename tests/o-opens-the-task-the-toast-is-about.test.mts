@@ -74,6 +74,6 @@ describe('the window handler answers O', () => {
 
   it('the shortcuts page lists it', () => {
     const all = SHORTCUTS.flatMap((g) => g.keys);
-    expect(all.find((k) => k.keys.includes('O'))?.what).toMatch(/^Open the task you just sent or answered/);
+    expect(all.find((k) => k.keys.includes('O'))?.what).toMatch(/^Open the task you sent or answered/);
   });
 });
