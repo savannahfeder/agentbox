@@ -84,11 +84,11 @@ describe('drawn in the inbox', () => {
 
   it('shows the sender’s face and name first', () => {
     const html = draw([open(ROSA, 'cut-v2.mp4')]);
-    expect(html).toMatch(/<span class="th-slot"><span class="tm-av"[^>]*>Ro<\/span><\/span>[\s\S]*<span class="th-who-name">Rosa, Otto<\/span>/);
+    expect(html).toMatch(/<span class="th-slot"><span class="tm-av"[^>]*>RD<\/span><\/span>[\s\S]*<span class="th-who-name">Rosa, Otto<\/span>/);
   });
 
   it('shows the other teammate first once they write the newest line', () => {
     const html = draw([open(ROSA, 'cut-v2.mp4'), say(OTTO, 'u-1', 'Looks right.')]);
-    expect(html).toMatch(/<span class="th-slot"><span class="tm-av"[^>]*>Ot<\/span><\/span>[\s\S]*<span class="th-who-name">Otto, Rosa<\/span>/);
+    expect(html).toMatch(/<span class="th-slot"><span class="tm-av"[^>]*>OP<\/span><\/span>[\s\S]*<span class="th-who-name">Otto, Rosa<\/span>/);
   });
 });

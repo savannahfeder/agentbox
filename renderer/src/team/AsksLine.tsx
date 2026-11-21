@@ -35,11 +35,13 @@ export function AskSentLine({ task, onOpenThread }: { task: WorkItem; onOpenThre
 }
 
 /** In the thread's header while someone you asked has it: small, and the rest on pressing it. */
-export function AsksChip({ item, items, now = Date.now(), onTakeBack }: {
+export function AsksChip({ item, items, now = Date.now(), onTakeBack, onMessage }: {
   item: WorkItem;
   items: readonly WorkItem[];
   now?: number;
   onTakeBack: (task: WorkItem) => void;
+  /** Nudging them is a message about this thread, not taking it back. */
+  onMessage?: (personId: string) => void;
 }) {
   const team = useContext(TeamContext);
   const [open, setOpen] = useState(false);
@@ -76,6 +78,7 @@ export function AsksChip({ item, items, now = Date.now(), onTakeBack }: {
               {a.ask.note && <p className="asks-note">{a.ask.note}</p>}
               <div className="asks-pop-foot">
                 <span className="asks-when">{seenAt >= a.at ? `Seen ${updatedWords(seenAt, now)}` : `Asked ${updatedWords(a.at, now)}, not opened yet`}</span>
+                {onMessage && <button type="button" className="asks-take" onClick={() => { setOpen(false); onMessage(a.to); }}>Message {first}</button>}
                 <button type="button" className="asks-take" onClick={() => { setOpen(false); onTakeBack(a.row as WorkItem); }}>Take it back</button>
               </div>
             </div>

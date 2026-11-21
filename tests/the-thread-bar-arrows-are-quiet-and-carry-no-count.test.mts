@@ -43,8 +43,8 @@ describe('the arrows in the thread bar', () => {
 
   it('while Cloud, Done and the menu keep theirs', () => {
     const summary = read('renderer/src/threads/summary.css');
-    expect(rule(summary, '.ts-more')).toMatch(/border:\s*1px solid var\(--line\)/);
-    expect(rule(summary, '.ts-done')).toMatch(/border:\s*1px solid var\(--line\)/);
+    expect(rule(summary, '.ts-more')).toMatch(/border:\s*1px solid var\(--line-strong\)/);
+    expect(rule(summary, '.ts-done')).toMatch(/border:\s*1px solid var\(--line-strong\)/);
   });
 
   it('sit together as one pair, with the bar\'s own gap after them', () => {

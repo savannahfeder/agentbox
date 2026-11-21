@@ -37,9 +37,9 @@ describe('whom a thread was handed to', () => {
 });
 
 describe('the initials on the button', () => {
-  it('takes the first letter of the first two names', () => {
+  it('takes the first letter of the first and last names', () => {
     expect(handedInitials('Jordan Ellis')).toBe('JE');
-    expect(handedInitials('Ana María Ruiz')).toBe('AM');
+    expect(handedInitials('Ana María Ruiz')).toBe('AR');
   });
 
   it('takes two letters of a single name', () => {
@@ -82,8 +82,8 @@ describe('the bar of a handed-on thread', () => {
 });
 
 describe('the menu of a handed-on thread', () => {
-  it('holds Reopen', () => {
-    expect(threadMenuRows({ change: false, terminal: null, finish: false, reopen: true }).map((r) => r.label)).toContain('Reopen');
+  it('holds Take it back (w-f702d60afe: Reopen left the other person holding it)', () => {
+    expect(threadMenuRows({ change: false, terminal: null, finish: false, reopen: true }).map((r) => r.label)).toContain('Take it back');
   });
 
   it('holds no Reopen otherwise', () => {

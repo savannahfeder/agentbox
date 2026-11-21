@@ -92,10 +92,20 @@ export const broughtIn = (item: { labels?: string[] }): boolean =>
  * above what was said or picked and the agent's work since. -1 when the answer
  * is still the newest word, or there is none.
  */
-export function standsAt(events: AgentEvent[], newest: { at: number } | null): number {
+export function standsAt(events: AgentEvent[], newest: { at: number; fromId?: string } | null): number {
   if (!newest) return -1;
   const answered = events.some((e) => e.at > newest.at && (said(e) ? e.who === 'you' : !!e.yours));
-  return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : -1;
+  return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : helperAnswered(events, newest);
+}
+
+/** A teammate's words are the newest answer: start at the agent's message they answer, so its question and choices stay in view. */
+export function helperAnswered(events: AgentEvent[], newest: { at: number; fromId?: string } | null): number {
+  if (!newest?.fromId) return -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (said(e) && e.who !== 'you' && !e.fromId && e.at < newest.at && e.text?.trim()) return i;
+  }
+  return -1;
 }
 
 /**

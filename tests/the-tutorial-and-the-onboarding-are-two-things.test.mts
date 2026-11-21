@@ -224,7 +224,8 @@ describe('2. the two of them are two things, and a stranger can tell them apart'
     // What each leaves behind. The onboarding makes a real project on its way
     // through and that fact has survived every cut to this hint since 08-23.
     expect(ONBOARDING.hint).toContain('makes a project');
-    expect(ONBOARDING.hint).toContain('welcome screen');
+    // "from the welcome screen" left on 2026-11-21, when every hint became four
+    // words or fewer; the label already says it starts again.
     expect(TUTORIAL.hint).toContain('nothing is kept');
   });
 

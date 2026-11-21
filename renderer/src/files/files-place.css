@@ -8,11 +8,11 @@
 .fp-crumb:hover { color: var(--text); }
 .fp-crumb.is-on { color: var(--text); cursor: default; }
 .fp-find {
-  flex: none; width: 220px; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+  flex: none; width: 220px; height: 32px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 0 10px;
   background: var(--wash); border: 1px solid var(--line); border-radius: var(--artifact-corner-small); color: var(--text-faint);
 }
 .fp-find:focus-within { border-color: var(--line-strong); }
-.fp-find svg { flex: none; width: 13px; height: 13px; }
+.fp-find svg { flex: none; width: 15px; height: 15px; stroke-width: 1.5; }
 .fp-find input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; padding: 0; font: inherit; font-size: 13px; color: var(--text); }
 .fp-find input::placeholder { color: var(--text-faint); }
 
@@ -20,12 +20,12 @@
 .fp-kinds, .fp-views, .fp-switch { display: flex; align-items: center; gap: 2px; }
 .fp-views { flex: none; gap: 12px; }
 .fp-kind {
-  height: 26px; padding: 0 9px; display: inline-flex; align-items: center; background: none; border: 0; border-radius: var(--artifact-corner-small);
+  height: 32px; padding: 0 10px; display: inline-flex; align-items: center; background: none; border: 0; border-radius: var(--artifact-corner-small);
   font: inherit; font-size: 12.5px; color: var(--text-faint); white-space: nowrap; cursor: pointer;
 }
 .fp-kind:hover { color: var(--text-dim); }
 .fp-kind.is-on { color: var(--text); background: var(--wash-strong); }
-.fp-view-icon { width: 26px; padding: 0; justify-content: center; }
+.fp-view-icon { width: 32px; padding: 0; justify-content: center; }
 .fp-new-box { position: relative; flex: none; }
 .fp-new-box .fp-menu { top: 38px; width: 180px; }
 .th-new[aria-expanded="true"] { background: var(--wash-strong); }

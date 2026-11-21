@@ -115,7 +115,7 @@ describe('an ask for help', () => {
     await both();
     await both();
     const back = told.filter((x) => x.hold);
-    expect(back).toEqual([{ slug: 'api', id: t.id, hold: true, from: { teammate: theo.personId, name: 'Theo Okafor' }, text: 'Theo handed this back.\n\nSafe to drop. I told your agent to do it concurrently.\n\nSam had asked: “Is dropping the index safe?”' }]);
+    expect(back).toEqual([{ slug: 'api', id: t.id, hold: true, from: { teammate: theo.personId, name: 'Theo Okafor' }, text: 'Theo handed this back.\n\nSam had asked: “Is dropping the index safe?”\n\nSafe to drop. I told your agent to do it concurrently.' }]);
   });
 });
 
@@ -186,7 +186,7 @@ describe('an ask for a review', () => {
     await both();
     await both();
     expect(told.filter((x) => !x.hold)).toEqual([]);
-    expect(told.filter((x) => x.hold).map((x) => x.text)).toEqual(['Theo reviewed this and asked for changes.\n\nSay "Book a visit", not Submit.\n\nSam had asked: “Is dropping the index safe?”']);
+    expect(told.filter((x) => x.hold).map((x) => x.text)).toEqual(['Theo reviewed this and asked for changes.\n\nSam had asked: “Is dropping the index safe?”\n\nSay "Book a visit", not Submit.']);
   });
 });
 
@@ -302,7 +302,8 @@ describe('the wiring', () => {
   // Round two: Priya messaged Dana from Dana's thread and had to spell out which thread she meant.
   it('a message started from a teammate\'s thread starts by naming that thread', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toContain("const about = openCard.title ? `About “${openCard.title}”: ` : '';");
+    expect(app).toContain("const about = title ? `About “${title}”: ` : '';");
+    expect(app).toContain('onMessage={() => messageAbout(openCard.personId, openCard.title)} />');
     expect(app).toContain('if (about && !readDraft(convo).trim()) { saveDraft(convo, about);');
   });
   // Rounds three and four: Home said a teammate had nothing running while their profile showed two in progress.
@@ -372,13 +373,13 @@ describe('the sheet after you pick a person', () => {
     expect(help).toContain('Theo can write to your agent, then hands it back to you.');
     expect(help).not.toContain('from now on');
     const give = sheet({ start: 'give' });
-    expect(give).toContain('It becomes Theo’s thread from now on.');
+    expect(give).toContain('Theo owns it from now on, with its conversation and files. You can take it back.');
     expect(give).not.toContain('write to your agent');
     expect(sheet({ start: 'review' })).toContain('Theo reads it and tells you it looks good or what to change.');
   });
   it('offers only handing over when asking is not possible', () => {
     const html = renderToStaticMarkup(h(GiveSheet, { to: { id: 'u', name: 'Theo Okafor' }, onGive() {} }));
     expect(html).not.toContain('role="radiogroup"');
-    expect(html).toContain('Give to Theo');
+    expect(html).toContain('Hand over to Theo');
   });
 });
