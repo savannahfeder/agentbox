@@ -766,7 +766,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
   const answeredBy = (n: FileNote): string | null => {
     const v = n.resolved && n.resolvedIn ? flat.find((x) => x.v.id === n.resolvedIn)?.v : undefined;
-    return v ? resolvedInWords(v, { me, nameOf }) : null;
+    return v ? resolvedInWords(v, { me, nameOf, owner: ownerOfRow }) : null;
   };
   const card = (n: FileNote) => (
     <FileNoteCard key={n.id} note={n} product={product} answeredBy={answeredBy(n)} wordsGone={goneQuotes.includes(n.id)} active={n.id === activeId} settling={n.id === undo} person={person} me={me} onGo={() => pickNote(n)} onSettle={(r) => void settle(n, r)} nameOf={nameOf}

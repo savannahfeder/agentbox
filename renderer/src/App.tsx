@@ -261,7 +261,7 @@ import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shar
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
 import { fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
-import { commentsToHand } from './threads/comments-to-hand';
+import { commentsToHand, type HandedComment } from './threads/comments-to-hand';
 import { teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
@@ -3159,9 +3159,9 @@ export default function App() {
     setFocused(null);
     openTeammateCard(card);
   }, [weekCards, openTeammateCard]);
-  const continueTeammateThread = useCallback((card: ThreadCard) => {
+  const continueTeammateThread = useCallback((card: ThreadCard, comments: HandedComment[] = []) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
-      .then((b) => { setComposeInitial(continueStart(b, card, snap?.products ?? [])); setModal('compose'); })
+      .then((b) => { setComposeInitial({ ...continueStart(b, card, snap?.products ?? []), ...(comments.length ? { comments } : {}) }); setModal('compose'); })
       .catch((err) => showToast(String(err?.message ?? err)));
   }, [snap?.products]);
   const [teamBody, setTeamBody] = useState<HTMLElement | null>(null);
@@ -8602,7 +8602,7 @@ export default function App() {
                   }}
                   backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : chatsPlace === 'tasks' ? 'Tasks' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
-                  onContinue={() => continueTeammateThread(openCard)}
+                  onContinue={(comments) => continueTeammateThread(openCard, comments)}
                   onMessage={() => messageAbout(openCard.personId, openCard.title)} />
               </div>
             ) : (

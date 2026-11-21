@@ -32,6 +32,7 @@ import { ThreadMenu } from './ThreadMenu';
 import { askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
 import { HAND_BACK_EVENT, type AskVerdict } from '../thread-commands';
 import { canContinue } from './continue-thread';
+import { commentsToHand, type HandedComment } from './comments-to-hand';
 import { readDraft, saveDraft } from '../drafts';
 import { agoWords } from './summary-rules';
 import { applyDockHeight } from '../dock-height';
@@ -132,8 +133,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   /** The task this thread became when its owner handed it to you, which the page links to. */
   handedToYou?: WorkItem | null;
   onOpenTask?: (task: WorkItem) => void;
-  /** Carry it on in a thread of your own. */
-  onContinue?: () => void;
+  /** Carry it on in a thread of your own, with the comments on its files to tick. */
+  onContinue?: (comments: HandedComment[]) => void;
   /** Where the back button goes: Threads, or the group it was opened from. */
   backLabel: string;
   onBack: () => void;
@@ -323,7 +324,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const acts = (
     <TeammateCorner person={person} onMessage={onMessage}
       followed={followed} onFollow={following && card.state !== 'done' && !ask ? () => (followed ? following.unfollow(card) : following.follow(card)) : null}
-      onContinue={onContinue && !ask && canContinue(work, card, team?.me ?? null) ? onContinue : null} />
+      onContinue={onContinue && !ask && canContinue(work, card, team?.me ?? null) ? () => onContinue(commentsToHand(marks.notes, { me: team?.me ?? null })) : null} />
 
   );
 
@@ -379,6 +380,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             return out?.ok ? null : out?.error ?? 'That did not save.';
           }}
           editGoes={`Sent to ${owner}.`}
+          onHandToAgent={onContinue ? (files) => { setBig(null); onContinue(commentsToHand(marks.notes, { me: team?.me ?? null, files })); } : undefined}
           onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}

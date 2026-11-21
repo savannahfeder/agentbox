@@ -840,9 +840,10 @@ export function agentOfVersion(versions: ReadonlyArray<Pick<FileVersion, 'id' | 
   return null;
 }
 
-/** "Resolved by your agent in v15": a comment the version `v` answered. */
-export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, { me, nameOf }: { me: string | null; nameOf: (id: string) => string }): string {
-  const whose = !v?.by || v.by === me ? null : nameOf(v.by);
+/** "Resolved by your agent in v15": a comment the version `v` answered. `owner`: whose thread, for a version that names nobody. */
+export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, { me, nameOf, owner = null }: { me: string | null; nameOf: (id: string) => string; owner?: string | null }): string {
+  const by = v?.by ?? owner;
+  const whose = !by || by === me ? null : nameOf(by);
   let who: string;
   if (typeof v?.agent !== 'string') who = whose ?? 'you';
   else if (v.agent && v.agent !== PLAIN_AGENT) who = v.agent;

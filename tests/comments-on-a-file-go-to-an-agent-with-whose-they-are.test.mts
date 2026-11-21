@@ -102,6 +102,14 @@ describe('every way to an agent carries them', () => {
     expect(app.match(/commentsToHand\(notes, /g)?.length).toBe(2);
     expect(app).toContain("'zero:hand-comments'");
   });
+  // Round one of the testers (2026-11-21): reviewing a teammate's thread, three
+  // of four looked beside Approve for Hand to an agent and found only Send to.
+  it("a teammate's thread hands its comments on too, from its notes and from Continue it yourself", () => {
+    const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
+    expect(page).toMatch(/onHandToAgent=\{onContinue \? \(files\) => \{[^}]*commentsToHand\(marks\.notes, \{ me: team\?\.me \?\? null, files \}\)/);
+    expect(page).toMatch(/onContinue\(commentsToHand\(marks\.notes, \{ me: team\?\.me \?\? null \}\)\)/);
+    expect(app).toMatch(/continueTeammateThread = useCallback\(\(card: ThreadCard, comments: HandedComment\[\] = \[\]\)/);
+  });
   it('the card shows them and sends the ticked ones', () => {
     expect(card).toContain('<HandedComments');
     expect(card).toMatch(/withComments\(/);
