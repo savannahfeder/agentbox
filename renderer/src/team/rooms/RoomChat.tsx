@@ -77,6 +77,8 @@ export type RoomChatCalls = {
   onDecide?: (messageId: string, kind: 'decision' | 'priority', on: boolean) => void;
 };
 
+const FileChipMark = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3" strokeLinejoin="round" /></svg>;
+
 export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, along, ...calls }: {
   room: Room; messages: RoomMessage[]; people: ChatPerson[]; meId: string | null; now: number;
   onInvite?: () => void; onExpand?: () => void;
@@ -340,7 +342,7 @@ function RoomFile({ name, shown, load, opensBig, film = false, children }: { nam
   const bytes = useCallback(() => load?.(name) ?? Promise.resolve(null), [load, name]);
   const close = useCallback(() => setOpen(false), []);
   return <>
-    <button type="button" className={film ? 'inline-image-open rm-film' : children ? 'inline-image-open' : 'rm-file'} title={`Open ${shown}`} onClick={() => { if (!opensBig?.(name)) setOpen(true); }}>{children ?? shown}</button>
+    <button type="button" className={film ? 'inline-image-open rm-film' : children ? 'inline-image-open' : 'rm-file'} title={`Open ${shown}`} onClick={() => { if (!opensBig?.(name)) setOpen(true); }}>{children ?? <><FileChipMark />{shown}</>}</button>
     {open && createPortal(<FileSheet name={name} shown={shown} load={bytes} onClose={close} />, document.body)}
   </>;
 }
