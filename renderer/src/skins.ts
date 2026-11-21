@@ -256,7 +256,11 @@ export function storeTune(stored: string | null | undefined, skin: SkinId, tune:
 export function applyTune(tune: SkinTune, root: { style: { setProperty(k: string, v: string): void } } = document.documentElement): void {
   root.style.setProperty('--skin-panel-opacity', tune.panelOpacity === undefined ? '' : String(tune.panelOpacity));
   root.style.setProperty('--skin-background-blur', `${tune.backgroundBlur ?? 0}px`);
-  root.style.setProperty('--skin-blur', `${tune.blur}px`);
+  // Chromium draws blur(0px) as a real filter, and the one under the workspace
+  // card redraws the whole window every frame. `initial` makes each
+  // blur(var(--skin-blur)) invalid, which computes to none
+  // (tests/a-look-with-no-blur-draws-no-backdrop-filter).
+  root.style.setProperty('--skin-blur', tune.blur > 0 ? `${tune.blur}px` : 'initial');
   root.style.setProperty('--skin-dim', String(tune.dim));
 }
 
