@@ -10,6 +10,11 @@
 //
 // The backdrop now closes on the press itself, only for the main button and
 // only when the press lands on the backdrop and not on the box.
+//
+// The scan used to demand at least 12 backdrops, and went red when Pro took
+// the Start a team box away (11 left). It now finds every class that names
+// modal-backdrop and reads each tag to its real end, so a raw click after an
+// `() =>` is seen too.
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -63,20 +68,73 @@ const walk = (dir: string): string[] => readdirSync(dir).flatMap((n) => {
   return statSync(p).isDirectory() ? walk(p) : /\.tsx$/.test(n) ? [p] : [];
 });
 
-describe('every backdrop over the app', () => {
-  const backdrops = walk(root).flatMap((file) => {
-    const text = readFileSync(file, 'utf8');
-    return [...text.matchAll(/<div className=\{?[`"]modal-backdrop[^>]*>/g)].map((m) => ({ file: file.slice(root.length), tag: m[0] }));
+// The whole opening tag, to its real end: a `>` inside `{...}` or a string
+// (as in `() =>`) does not close it.
+const openingTag = (text: string, start: number): string => {
+  const open: string[] = [];
+  for (let i = start; i < text.length; i++) {
+    const c = text[i], mode = open[open.length - 1];
+    if (mode === '"' || mode === "'") { if (c === '\\') i++; else if (c === mode) open.pop(); continue; }
+    if (mode === '`') {
+      if (c === '\\') i++;
+      else if (c === '`') open.pop();
+      else if (c === '$' && text[i + 1] === '{') { open.push('{'); i++; }
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`' || c === '{') open.push(c);
+    else if (c === '}') open.pop();
+    else if (c === '>' && !open.length) return text.slice(start, i + 1);
+  }
+  return text.slice(start);
+};
+
+const backdropsIn = (text: string, file = '') =>
+  [...text.matchAll(/className=\{?[`"'][^`"']*?(?<![\w-])modal-backdrop(?![\w-])/g)]
+    .map((m) => ({ file, tag: openingTag(text, text.lastIndexOf('<', m.index)) }));
+
+const wrong = (backdrops: { file: string; tag: string }[]) => ({
+  rawPress: backdrops.filter((b) => /\bon(Click|MouseDown|MouseUp|PointerDown|PointerUp)=/.test(b.tag)),
+  noClose: backdrops.filter((b) => !/closesOnPress\(/.test(b.tag) && !(b.file === 'components/ImportAgents.tsx' && /in-walk">$/.test(b.tag))),
+  walks: backdrops.filter((b) => /in-walk">$/.test(b.tag)),
+});
+
+describe('the backdrop scan', () => {
+  it('finds a raw click written after an arrow function in the same tag', () => {
+    const [b] = backdropsIn('<div className="modal-backdrop" {...closesOnPress(() => { a(); })} onClick={() => b()}>');
+    expect(wrong([b]).rawPress).toHaveLength(1);
   });
 
+  it('finds a backdrop whose class is not first or that is not a div, and one with no way to close', () => {
+    const found = backdropsIn('<section className={`veil modal-backdrop${x ? " y" : ""}`} onMouseDown={f}><div className="modal-backdrop">');
+    expect(found).toHaveLength(2);
+    expect(wrong(found).rawPress).toHaveLength(1);
+    expect(wrong(found).noClose).toHaveLength(2);
+  });
+
+  it('allows the walkthrough only in its own file', () => {
+    const tag = '<div className="modal-backdrop compose-backdrop in-walk">';
+    expect(wrong(backdropsIn(tag, 'components/ImportAgents.tsx')).noClose).toEqual([]);
+    expect(wrong(backdropsIn(tag, 'components/Other.tsx')).noClose).toHaveLength(1);
+  });
+
+  it('does not take a selector or a longer class name for a backdrop', () => {
+    expect(backdropsIn(`document.querySelector('.modal-backdrop'); <div className="modal-backdrop-x"> <i className="no-modal-backdrop">`)).toEqual([]);
+  });
+});
+
+describe('every backdrop over the app', () => {
+  const backdrops = walk(root).flatMap((file) => backdropsIn(readFileSync(file, 'utf8'), file.slice(root.length)));
+  const found = wrong(backdrops);
+
   it('closes on the press, not on the click', () => {
-    expect(backdrops.filter((b) => /onClick=|onMouseDown=/.test(b.tag))).toEqual([]);
-    expect(backdrops.filter((b) => /closesOnPress\(/.test(b.tag)).length).toBeGreaterThanOrEqual(12);
+    expect(backdrops.length).toBeGreaterThan(1);
+    expect(found.rawPress).toEqual([]);
+    expect(found.noClose).toEqual([]);
   });
 
   it('leaves alone the one box nothing outside it may close', () => {
-    const walkthrough = backdrops.filter((b) => b.file === 'components/ImportAgents.tsx' && /in-walk">/.test(b.tag));
-    expect(walkthrough).toHaveLength(1);
+    expect(found.walks.filter((b) => b.file === 'components/ImportAgents.tsx')).toHaveLength(1);
+    expect(found.walks).toHaveLength(1);
   });
 });
 
