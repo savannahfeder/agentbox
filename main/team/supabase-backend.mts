@@ -575,15 +575,21 @@ export function supabaseBackend(client: SupabaseClient) {
     },
 
     // Row level security holds who reads a folder and a place (20261102000000_a_teams_folders.sql).
-    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; at: number }) {
+    // `gone` is 20261121000000_a_folder_can_be_removed.sql; a folder that was never removed does not name it.
+    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, gone, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; gone?: boolean; at: number }) {
       await myId();
-      must(await client.from('file_folders').upsert({ id, team_id: teamId, project, name, parent, people, at }, { onConflict: 'id' }), 'saving a folder');
+      must(await client.from('file_folders').upsert({ id, team_id: teamId, project, name, parent, people, at, ...(gone === undefined ? {} : { gone }) }, { onConflict: 'id' }), 'saving a folder');
     },
 
     async fileFolders() {
       await myId();
-      const rows = must<{ id: string; team_id: string; project: string; name: string; parent: string | null; people: string[] | null; created_by: string; at: number | string }[]>(await client.from('file_folders').select('id,team_id,project,name,parent,people,created_by,at'), 'reading folders');
-      return rows.map((r) => ({ id: r.id, teamId: r.team_id, project: r.project, name: r.name, parent: r.parent, people: r.people, by: r.created_by, at: Number(r.at) }));
+      type Row = { id: string; team_id: string; project: string; name: string; parent: string | null; people: string[] | null; created_by: string; gone?: boolean | null; at: number | string };
+      const columns = 'id,team_id,project,name,parent,people,created_by,at';
+      let read = await client.from('file_folders').select(`${columns},gone`);
+      // A database the migration has not reached yet has no column to read.
+      if (read.error && /gone/.test(read.error.message ?? '')) read = await client.from('file_folders').select(columns);
+      const rows = must<Row[]>(read, 'reading folders');
+      return rows.map((r) => ({ id: r.id, teamId: r.team_id, project: r.project, name: r.name, parent: r.parent, people: r.people, by: r.created_by, gone: r.gone === true, at: Number(r.at) }));
     },
 
     async placeFile(owner: string, threadId: string, { project, family, folder = null, at }: { project: unknown; family: string; folder?: string | null; at: number }) {
