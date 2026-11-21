@@ -8,6 +8,12 @@ import './file-views.css';
 
 /** A slide in the strip, as wide as the deck view draws its own. */
 const THUMB = 104;
+/** How far past the edge of what scrolls a page is drawn before it is reached. */
+const DRAW_WITHIN = '150%';
+/** How far past it a drawn page may go before its drawing is let go of. */
+const KEEP_WITHIN = '400%';
+/** A resize draws a page again once the width has held this long. */
+const REDRAW_AFTER_MS = 150;
 
 export type Pdf = { numPages: number; getPage: (n: number) => Promise<PdfPage> };
 type PdfPage = {
@@ -26,40 +32,85 @@ export async function openPdf(data: Uint8Array): Promise<Opened> {
   return pdfjs.getDocument({ data }) as unknown as Opened;
 }
 
-export function Page({ pdf, n, width, onCanvas, onSpot, over }: {
+export function Page({ pdf, n, width, aspect, onCanvas, onSpot, over }: {
   pdf: Pdf; n: number; width: number; onCanvas?: (n: number, el: HTMLElement) => void;
+  /** The first page's width over its height, the size a page takes until its own is read. */
+  aspect?: number;
   onSpot?: (n: number, spot: { x: number; y: number }) => void;
   /** Drawn over the page, such as its pins. */
   over?: ReactNode;
 }) {
   const box = useRef<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLCanvasElement | null>(null);
+  const [shape, setShape] = useState<{ w: number; h: number } | null>(null);
+  // Drawn while near enough to be reached soon; its drawing kept until it is far.
+  const [toDraw, setToDraw] = useState(false);
+  const [toKeep, setToKeep] = useState(false);
+  // The width the canvas holds a drawing for, 0 for none.
+  const drawnAt = useRef(0);
   useEffect(() => {
     if (box.current) onCanvas?.(n, box.current);
   }, [n, onCanvas]);
   useEffect(() => {
     let live = true;
-    let job: { cancel: () => void } | null = null;
     void pdf.getPage(n).then((page) => {
-      const el = canvas.current;
-      const ctx = el?.getContext('2d');
-      if (!live || !el || !ctx || width <= 0) return;
-      const scale = width / page.getViewport({ scale: 1 }).width;
-      const shown = page.getViewport({ scale });
-      const dpr = window.devicePixelRatio || 1;
-      el.width = Math.round(shown.width * dpr);
-      el.height = Math.round(shown.height * dpr);
-      el.style.width = `${shown.width}px`;
-      el.style.height = `${shown.height}px`;
-      const task = page.render({ canvasContext: ctx, canvas: el, viewport: shown, transform: [dpr, 0, 0, dpr, 0, 0] });
-      job = task;
-      task.promise.catch(() => { /* a cancelled draw; the next one takes over */ });
+      const whole = page.getViewport({ scale: 1 });
+      if (live) setShape({ w: whole.width, h: whole.height });
     });
-    return () => { live = false; job?.cancel(); };
-  }, [pdf, n, width]);
+    return () => { live = false; };
+  }, [pdf, n]);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return undefined;
+    // What scrolls is the page list or the strip of slides; a cover on its own is judged against the window.
+    const root = el.closest<HTMLElement>('.pdf-pages, .deck-strip');
+    const draw = new IntersectionObserver(([seen]) => { if (seen) setToDraw(seen.isIntersecting); }, { root, rootMargin: DRAW_WITHIN });
+    const keep = new IntersectionObserver(([seen]) => { if (seen) setToKeep(seen.isIntersecting); }, { root, rootMargin: KEEP_WITHIN });
+    draw.observe(el);
+    keep.observe(el);
+    return () => { draw.disconnect(); keep.disconnect(); };
+  }, []);
+  useEffect(() => {
+    const el = canvas.current;
+    if (!el) return undefined;
+    if (!toKeep && !toDraw) {
+      if (drawnAt.current) { el.width = 0; el.height = 0; drawnAt.current = 0; }
+      return undefined;
+    }
+    if (!toDraw || !shape || width <= 0 || drawnAt.current === width) return undefined;
+    let live = true;
+    let job: { cancel: () => void } | null = null;
+    const drawNow = () => {
+      void pdf.getPage(n).then((page) => {
+        if (!live) return;
+        const shown = page.getViewport({ scale: width / page.getViewport({ scale: 1 }).width });
+        const dpr = window.devicePixelRatio || 1;
+        // Drawn aside and copied in whole, so a page being drawn again keeps its old drawing meanwhile.
+        const aside = document.createElement('canvas');
+        aside.width = Math.round(shown.width * dpr);
+        aside.height = Math.round(shown.height * dpr);
+        const ctx = aside.getContext('2d');
+        if (!ctx) return;
+        const task = page.render({ canvasContext: ctx, canvas: aside, viewport: shown, transform: [dpr, 0, 0, dpr, 0, 0] });
+        job = task;
+        task.promise.then(() => {
+          if (!live) return;
+          el.width = aside.width;
+          el.height = aside.height;
+          el.getContext('2d')?.drawImage(aside, 0, 0);
+          drawnAt.current = width;
+        }, () => { /* a cancelled draw; the next one takes over */ });
+      });
+    };
+    const later = drawnAt.current ? window.setTimeout(drawNow, REDRAW_AFTER_MS) : null;
+    if (!later) drawNow();
+    return () => { live = false; if (later) window.clearTimeout(later); job?.cancel(); };
+  }, [pdf, n, width, toDraw, toKeep, shape]);
+  const tall = shape ? shape.h / shape.w : aspect ? 1 / aspect : 0;
+  const size = tall && width > 0 ? { width, height: width * tall } : undefined;
   return <div className={`pdf-page${onSpot ? ' can-pin' : ''}`} ref={box} data-page={n}
     onClick={onSpot ? (e) => { if (!(e.target as HTMLElement).closest('.av-pin')) onSpot?.(n, spotIn(e.currentTarget, e)); } : undefined}>
-    <canvas ref={canvas} aria-label={`Page ${n}`} />
+    <canvas ref={canvas} aria-label={`Page ${n}`} width={0} height={0} style={size} />
     {over}
   </div>;
 }
@@ -164,9 +215,9 @@ export function PdfPages({ load, name, onPage, onShape, goTo, fit = false, word 
       <div className={`pdf-pages${fit ? ' is-fit' : ''}`} ref={scroller} onScroll={onScroll}
         // A slide fills the screen on its own: the air around it is whatever the page leaves.
         style={fit && aspect && width ? { '--pdf-gap': `${Math.max(24, (height - width / aspect) / 2)}px` } as React.CSSProperties : undefined}>
-        {pdf && Array.from({ length: pdf.numPages }, (_, i) => (
-          <Page key={i + 1} pdf={pdf} n={i + 1} width={width} onCanvas={(n, el) => { pages.current.set(n, el); }}
-            onSpot={onSpot} over={aspect ? pins?.(i + 1, { w: width, h: width / aspect }) : null} />
+        {pdf && aspect > 0 && Array.from({ length: pdf.numPages }, (_, i) => (
+          <Page key={i + 1} pdf={pdf} n={i + 1} width={width} aspect={aspect} onCanvas={(n, el) => { pages.current.set(n, el); }}
+            onSpot={onSpot} over={pins?.(i + 1, { w: width, h: width / aspect })} />
         ))}
         {children}
       </div>
@@ -175,7 +226,7 @@ export function PdfPages({ load, name, onPage, onShape, goTo, fit = false, word 
       <div ref={strip} className="deck-strip" aria-label={`Every ${word.toLowerCase()}`}>
         {Array.from({ length: pdf.numPages }, (_, i) => (
           <button key={i} type="button" className={`deck-thumb${i + 1 === at ? ' is-on' : ''}`} aria-label={`${word} ${i + 1}`} aria-current={i + 1 === at ? 'page' : undefined} onClick={() => go(i + 1)}>
-            <span className="deck-slide is-small pdf-thumb" style={{ width: thumb, height: thumb / aspect }}><Page pdf={pdf} n={i + 1} width={thumb} /></span>
+            <span className="deck-slide is-small pdf-thumb" style={{ width: thumb, height: thumb / aspect }}><Page pdf={pdf} n={i + 1} width={thumb} aspect={aspect} /></span>
             <span className="deck-thumb-n">{i + 1}{commented?.has(i + 1) && <i aria-label={`${commented.get(i + 1)} open`} />}</span>
           </button>
         ))}
