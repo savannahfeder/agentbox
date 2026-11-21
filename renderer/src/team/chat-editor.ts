@@ -20,8 +20,8 @@ import { EndingLink } from '../editor/ending-link';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { lift, toggleMark, wrapIn } from '@tiptap/pm/commands';
-import { liftListItem, wrapInList } from '@tiptap/pm/schema-list';
+import { lift, newlineInCode, toggleMark, wrapIn } from '@tiptap/pm/commands';
+import { liftListItem, splitListItem, wrapInList } from '@tiptap/pm/schema-list';
 import type { Node as PmNode, Schema } from '@tiptap/pm/model';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
 import { STARTER_KIT_EXTRAS_OFF } from '../editor/extensions';
@@ -126,6 +126,21 @@ export const CHAT_KEYS: Record<string, Exclude<Format, 'link'>> = {
   'Mod-Shift-9': 'quote',
 };
 
+/**
+ * SHIFT+RETURN, SLACK'S WAY. Return sends a chat message, so this is the only
+ * new line there is: in a list it starts the next point and on an empty point
+ * ends the list, and in a code block it is a new line of code. Anywhere else it
+ * takes nothing, and the editor's own line break follows.
+ */
+export function shiftReturn(schema: Schema): Command {
+  const { nodes } = schema;
+  return (state, dispatch) => {
+    if (state.selection.$from.parent.type === nodes.codeBlock) return newlineInCode(state, dispatch);
+    if (!inside(state, nodes.listItem.name)) return false;
+    return splitListItem(nodes.listItem)(state, dispatch) || liftListItem(nodes.listItem)(state, dispatch);
+  };
+}
+
 const ChatKeys = Extension.create({
   name: 'chatKeys',
   priority: 1000,
@@ -134,6 +149,7 @@ const ChatKeys = Extension.create({
     for (const [key, what] of Object.entries(CHAT_KEYS)) {
       keys[key] = () => formatCommand(what, this.editor.schema)(this.editor.state, this.editor.view.dispatch);
     }
+    keys['Shift-Enter'] = () => shiftReturn(this.editor.schema)(this.editor.state, this.editor.view.dispatch);
     return keys;
   },
 });

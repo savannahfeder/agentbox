@@ -3,7 +3,7 @@
 // do with them in the header.
 import { useEffect, useState, type ReactNode } from 'react';
 import { agoQuiet } from '../../format';
-import { sendKeyFor } from '../../reply-keys';
+import { ChatSend } from '../ChatSend';
 import { MemberFace, MemberWord } from './TeamStrip';
 import type { Member } from './members';
 
@@ -104,7 +104,7 @@ export function MateWork({ name, active, done, now, onGive }: {
       <textarea className="rm-compose-input" rows={2} value={text} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void give(); } }} />
       <div className="rm-compose-bar">
-        <button type="button" className="dock-send" disabled={!text.trim() || busy} title={`Send · ${sendKeyFor(true)}`} onClick={() => { void give(); }}>Send <kbd>{sendKeyFor(true)}</kbd></button>
+        <ChatSend ready={!!text.trim()} busy={busy} onSend={() => { void give(); }} />
       </div>
     </div>
     {error && <p className="tq-error" role="alert">{error}</p>}
@@ -197,7 +197,7 @@ export function SendBox({ placeholder, note, onSend, empty }: {
       <textarea className="rm-compose-input" autoFocus rows={1} value={text} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} />
       <div className="rm-compose-bar">
-        <button type="button" className="dock-send" disabled={!text.trim() || busy} title={`Send · ${sendKeyFor(true)}`} onClick={() => { void send(); }}>Send <kbd>{sendKeyFor(true)}</kbd></button>
+        <ChatSend ready={!!text.trim()} busy={busy} onSend={() => { void send(); }} />
       </div>
     </div>
     {note && <p className="pl-note">{note}</p>}

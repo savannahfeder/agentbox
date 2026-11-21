@@ -254,13 +254,13 @@
 .fmt-bar { display: flex; align-items: center; gap: 1px; flex: none; margin-right: 14px; }
 .fmt-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; padding: 0;
+  width: 28px; height: 28px; padding: 0;
   appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   color: var(--text-faint); font: inherit;
 }
 .fmt-btn:hover { background: var(--wash); color: var(--text); }
 .fmt-btn:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
-.fmt-btn svg { width: 15px; height: 15px; }
+.fmt-btn svg { width: 16px; height: 16px; }
 .fmt-letter { font-size: 13px; line-height: 1; }
 /* B, I and S say what they do by being drawn the way they do it. */
 .fmt-b { font-weight: 700; }
@@ -269,6 +269,23 @@
 .fmt-gap { width: 13px; }
 .fmt-aa.on { color: var(--text); background: var(--wash); }
 .fmt-aa .fmt-letter { font-size: 12px; letter-spacing: .02em; }
+/* Aa's marks, in a row along the top of the box (FormatBar's `marksAt`). */
+.fmt-marks-slot:empty { display: none; }
+.fmt-marks { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 1px; }
+.fmt-marks .fmt-gap { width: 9px; }
+
+/* SEND IN A CHAT'S BOX (ChatSend): an arrow at the bottom right, faint until
+   there is something to send, then on the fill every Send in the app wears. */
+.dock-send.chat-send {
+  flex: none; display: grid; place-items: center; width: 34px; height: 28px; padding: 0; margin-left: 0;
+  border: 0; border-radius: var(--artifact-corner-small); color: var(--text);
+  background: color-mix(in srgb, var(--text) 15%, transparent);
+}
+.dock-send.chat-send:hover:not(:disabled) { filter: brightness(1.15); background: color-mix(in srgb, var(--text) 15%, transparent); }
+.dock-send.chat-send:focus-visible { outline: 1px solid var(--text); outline-offset: 1px; }
+.dock-send.chat-send:disabled, .dock-send.chat-send:disabled:hover { background: none; color: var(--text-faint); cursor: default; }
+.chat-send .dock-send-arrow { display: block; width: 16px; height: 16px; }
+.chat-sending { flex: none; font-size: 12px; color: var(--text-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* RECORDING A VOICE NOTE: the bar becomes the recording, on the same line. */
 .fmt-recording { gap: 8px; }
@@ -474,10 +491,9 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
   font: inherit; font-size: 14.5px; line-height: 1.45; color: var(--text);
 }
 .chat-thread-box textarea::placeholder { color: var(--text-faint); }
-/* What is attached sits under the words, small, and the box grows to hold
-   it; full-size thumbnails took over a panel this narrow. */
-.chat-thread-box .attach-row { padding: 2px 16px 10px; }
-.chat-thread-box .attach-thumb img { height: 48px; max-width: 120px; }
+/* What is attached sits under the words as the chat's tiles, and the box grows to hold them. */
+.chat-thread-box .attach-row { padding: 4px 16px 10px; }
+.chat-thread-box .fmt-marks { padding: 8px 10px 0; }
 /* THE FOOTER IS THE CHAT'S OWN (.compose-sentence): the formatting bar on the
    left, Send in the bottom-right corner. */
 .chat-thread-box { container-type: inline-size; }
@@ -485,17 +501,8 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
   display: flex; align-items: center; gap: 10px;
   padding: 7px 10px 8px 12px; border-top: 1px solid var(--line);
 }
-.chat-thread-bar .fmt-bar { margin-right: 0; min-width: 0; }
-.chat-thread-bar .dock-send { padding: 4px 12px; }
-.chat-thread-bar .dock-send:disabled { color: var(--text-faint); background: none; border-color: var(--line-strong); cursor: default; }
-.chat-thread-bar .dock-send:disabled:hover { background: none; }
-/* A PANEL DRAGGED NARROW keeps what puts something INTO the message (@, the
-   paperclip, the microphone, the emoji) and lets the marks go, rather than
-   pushing Send off the edge. The marks are the buttons after the bar's gap. */
-@container (max-width: 400px) {
-  .chat-thread-bar .fmt-mark, .chat-thread-bar .fmt-gap { display: none; }
-}
-/* And the bar over a message keeps every button but drops the words of Hand
+.chat-thread-bar .fmt-bar { margin-right: auto; min-width: 0; }
+/* The bar over a message keeps every button but drops the words of Hand
    to an agent, which would otherwise cover the name beside it. */
 .chat-thread-panel { container: thread-panel / inline-size; }
 @container thread-panel (max-width: 400px) {

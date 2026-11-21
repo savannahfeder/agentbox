@@ -17,7 +17,8 @@ import { chatLayout } from '../chat-layout';
 import { MessageActions, Reactions } from '../ChatActions';
 import { DeleteMessage, MessageEditor } from '../MessageMore';
 import { messageMore, withEmbeds, wordsOf } from '../message-more';
-import { FormatBar } from '../FormatBar';
+import { FormatBar, useMarksRow } from '../FormatBar';
+import { ChatSend } from '../ChatSend';
 import { RichReply, type RichBox } from '../RichReply';
 import { VoiceNote } from '../VoiceNote';
 import { voiceNoteOf } from '../voice-note';
@@ -32,7 +33,6 @@ import { ChatLink } from '../../threads/ContinuedFrom';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
 import { pictureUrl } from '../../picture';
 import { holdAtBottom } from '../../thread-bottom';
-import { sendKeyFor } from '../../reply-keys';
 import { I } from './icons';
 import type { MessageMarks } from '../decisions';
 import { LINE_MISSING } from '../../reveal-line';
@@ -511,6 +511,7 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   const [pick, setPick] = useState(0);
   const ref = useRef<RichBox | null>(null);
   const filePicker = useRef<HTMLInputElement>(null);
+  const [marksAt, setMarksAt] = useMarksRow();
   useEffect(() => { saveDraft(draftAt, text); }, [draftAt, text]);
   // A chat that is the page, or a thread opened to reply in: its box takes the typing, not the app's letter keys.
   useEffect(() => { if (takesTyping) requestAnimationFrame(() => ref.current?.focus()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -621,6 +622,7 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
         {matches.map((p, i) => <button type="button" key={p.id} className={`row${i === pick ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); choose(p); }}>
           <Face name={p.name} url={p.avatarUrl} size={18} /><span>{p.name}</span></button>)}
       </div>}
+      <div className="fmt-marks-slot" ref={setMarksAt} />
       <RichReply className="rm-compose-input" boxRef={ref} value={text} onChange={setText} onPlain={setPlain}
         placeholder={placeholder} label={placeholder}
         onCaret={(box) => setCaret(box.selectionStart)}
@@ -636,18 +638,16 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
           if (e.key === 'Escape') { ref.current?.blur(); return true; }
           return false;
         }} />
-      <AttachRow attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+      <AttachRow look="tiles" attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
       <input ref={filePicker} type="file" multiple style={{ display: 'none' }}
         onChange={async (e) => { add(await collectFiles(e.target.files ?? [])); e.target.value = ''; }} />
       <div className="rm-compose-bar">
-        <FormatBar box={ref as unknown as { current: HTMLTextAreaElement | null }} onChange={setText}
+        <FormatBar box={ref as unknown as { current: HTMLTextAreaElement | null }} onChange={setText} marksAt={marksAt}
           onAttach={onPutFile ? () => filePicker.current?.click() : undefined}
           onFromFiles={onPutFile ? (f) => add([f]) : undefined}
           onVoice={onPutFile ? (note) => add([{ name: note.name, dataBase64: note.dataBase64, image: isImageName(note.name), draftId: note.draftId }]) : undefined}
           onNotice={setError} voiceKey={voiceKey} voice={voiceCtl} onRecording={setRecording} />
-        <button type="button" className="dock-send" disabled={!ready || busy} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>
-          {busy ? sendingWords(sending, roomId, attachments) : <>Send <kbd>{sendKeyFor(true)}</kbd></>}
-        </button>
+        <ChatSend ready={ready} busy={busy} sending={sendingWords(sending, roomId, attachments)} onSend={() => void send()} />
       </div>
     </div>
   </>;

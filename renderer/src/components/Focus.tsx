@@ -104,7 +104,7 @@ import { effortSaid, modelShown, pickOnItsWay, pickToSend, replyOpensOn } from '
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, paneForThread, threadToOpen } from '../team/chat-threads';
 import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
-import { FormatBar } from '../team/FormatBar';
+import { FormatBar, useMarksRow } from '../team/FormatBar';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
 import { VoiceNote } from '../team/VoiceNote';
 import { voiceNoteName, voiceNoteOf } from '../team/voice-note';
@@ -3053,6 +3053,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   // The hidden file input the formatting bar's attach button opens.
   const filePicker = useRef<HTMLInputElement>(null);
   const pickFiles = () => filePicker.current?.click();
+  const [marksAt, setMarksAt] = useMarksRow();
   // A finished voice note waits with the other attachments until Send, once.
   const addVoice = (note: Recorded) => setAttachments((a) => (a.some((x) => x.draftId === note.draftId)
     ? a : [...a, { name: note.name, dataBase64: note.dataBase64, image: false, draftId: note.draftId }]));
@@ -3590,6 +3591,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
           <span>{to.words}</span>
         </div>;
       })()}
+      {talkTo?.length ? <div className="fmt-marks-slot" ref={setMarksAt} /> : null}
       {richBox ? (
         // The editor draws a mention's chip on its own words; the layer of
         // chips behind a text field has no text field to sit behind.
@@ -3669,7 +3671,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
           e.target.value = '';
         }}
       />
-      <AttachRow attachments={attachments} attaching={attaching} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+      <AttachRow look={talkTo?.length ? 'tiles' : undefined} attachments={attachments} attaching={attaching} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
       {/* The notes, which cost a line only when there is something true to say,
           and which are NOT in the sentence: a sentence that grows a clause when
           something goes wrong is a sentence that moves under her. Same rule and
@@ -3715,7 +3717,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
             left of "Goes to Maya's inbox." and left of Send. A reply to an agent
             is an instruction rather than a formatted message, so that box keeps
             exactly the footer it had. */}
-        {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
+        {talkTo?.length ? <FormatBar box={ref} onChange={changeText} marksAt={marksAt} onAttach={pickFiles} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
         {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
