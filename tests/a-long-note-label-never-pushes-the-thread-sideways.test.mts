@@ -8,7 +8,8 @@
 // with the app's own styles: the conversation was wider than its box.
 //
 // A short label still drops under the name whole rather than breaking inside
-// its box (e52768c4).
+// its box (e52768c4). Since 2026-11-21 the label is a card at the top of the
+// message's body (NoteOnFile), and the same holds for it.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
@@ -68,18 +69,20 @@ async function measure(width: number) {
   await page.goto('http://fits.test/');
   await page.addScriptTag({ content: stand_in });
   await page.addScriptTag({ content: bundle });
-  await page.locator('.msg-kind').nth(1).waitFor();
+  await page.locator('.note-on').nth(1).waitFor();
   const m = await page.evaluate((quoted) => {
     const scroll = document.querySelector('.focus-scroll')!;
-    const kinds = [...document.querySelectorAll('.msg-head > .msg-kind')] as HTMLElement[];
+    const kinds = [...document.querySelectorAll('.note-on')] as HTMLElement[];
     const short = kinds.find((k) => !k.textContent!.includes('“'))!;
     const long = kinds.find((k) => k.textContent!.includes('“'))!;
     return {
       sideways: scroll.scrollWidth - scroll.clientWidth,
       longFits: long.getBoundingClientRect().right <= scroll.getBoundingClientRect().right,
       longWhole: long.textContent!.includes(quoted),
-      // One 11px line plus its border and padding is about 19px.
-      shortOneLine: short.getBoundingClientRect().height < 24,
+      // The file's one 18px line plus its border and padding is about 35px.
+      shortOneLine: short.getBoundingClientRect().height < 40,
+      cards: kinds.length,
+      chipsInHeads: [...document.querySelectorAll('.msg-head .msg-kind')].filter((k) => k.textContent!.startsWith('Note on')).length,
     };
   }, LONG);
   await page.close();
@@ -98,6 +101,10 @@ describe.skipIf(!browserAvailable)('a note with a long quote beside an open file
   });
   it('still keeps a short label on one line', () => {
     expect(m.shortOneLine).toBe(true);
+  });
+  it('gives each note its own card, the one under the other included, and no chip in the head', () => {
+    expect(m.cards).toBe(2);
+    expect(m.chipsInHeads).toBe(0);
   });
 });
 

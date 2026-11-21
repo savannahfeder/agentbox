@@ -58,6 +58,13 @@ describe('the thread draws the tag in the message head', () => {
   it('both kinds of message head use it', () => {
     expect(src.match(/<MessageKind e=\{e\} \/>/g)?.length).toBe(2);
   });
+  // A note's place in the head wrapped under the name and pushed the face down,
+  // and a second note grouped under the first had no head, so no file (2026-11-21).
+  it('a note on a file is drawn in the body of both kinds, where a grouped one keeps it', () => {
+    expect(src.match(/<NoteOnFile e=\{e\} \/>/g)?.length).toBe(2);
+    const line = fs.readFileSync(new URL('../renderer/src/components/FileMarkLine.tsx', import.meta.url), 'utf8');
+    expect(line).toMatch(/if \(e\.fileMark\?\.kind === 'note'\) return null;/);
+  });
 });
 
 describe('the comment box carries no line explaining it', () => {

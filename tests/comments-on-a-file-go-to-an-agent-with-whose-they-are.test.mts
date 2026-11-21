@@ -99,7 +99,7 @@ describe('every way to an agent carries them', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
   it('the hand-over opens the card with the thread\'s comments', () => {
-    expect(app.match(/= commentsToHand\(notes, /g)?.length).toBe(2);
+    expect(app.match(/commentsToHand\(notes, /g)?.length).toBe(2);
     expect(app).toContain("'zero:hand-comments'");
   });
   it('the card shows them and sends the ticked ones', () => {
