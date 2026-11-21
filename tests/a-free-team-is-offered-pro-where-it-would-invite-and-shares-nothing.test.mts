@@ -171,6 +171,22 @@ describe('the stand-in team cloud with teams on Free', () => {
       await expect(dev.acceptInvite(team.id)).rejects.toThrow(/needs Pro to take anyone new/);
     } finally { await up.stop(); }
   });
+
+  it('can have the team someone has not made yet pay from the start, so a test team forms at once', async () => {
+    const { startStandinCloud } = await import('../cloud/standin/server.mjs');
+    const { standinSession } = await import('../main/team/standin-backend.mts');
+    const up = await startStandinCloud({ freeTeams: true });
+    try {
+      const said = await fetch(`${up.url}/pay`, { method: 'POST', body: JSON.stringify({ team: 'ana@team.test', pays: true }) }).then((r) => r.json());
+      expect(said).toEqual({ team: null, owner: 'ana@team.test', pays: true });
+      const ana = await standinSession({ cloudConfig: { url: up.url }, testLogin: 'ana@team.test:x' }).restore();
+      const team = await ana.createTeam('Lumen');
+      await ana.invite(team.id, 'theo@team.test');
+      const sam = await standinSession({ cloudConfig: { url: up.url }, testLogin: 'sam@team.test:x' }).restore();
+      await sam.createTeam('Not paid for');
+      expect(await sam.teamPays()).toBe(false);
+    } finally { await up.stop(); }
+  });
 });
 
 describe('the phone', () => {

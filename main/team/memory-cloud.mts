@@ -134,6 +134,8 @@ export interface MemoryCloud extends MemoryRoomsFields {
    *  20261121120000_team_features_need_pro.sql has it. Unset, every team pays, as before. */
   freeTeams?: boolean;
   paying?: Set<string>;
+  /** Emails whose next team pays from the moment it is made. */
+  payingOwners?: Set<string>;
   phoneCommands?: MemoryPhoneCommand[];
   phoneProjects?: Map<string, MemoryPhoneProject>;
   phoneThreads?: Map<string, MemoryPhoneThread>;
@@ -330,6 +332,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       cloud.teamsMade += 1;
       cloud.teams.set(id, { id, name, createdBy: personId, made: cloud.teamsMade });
       cloud.members.push({ teamId: id, personId, role: 'owner' });
+      if (cloud.payingOwners?.has(String(cloud.people.get(personId)?.email).toLowerCase())) cloud.paying?.add(id);
       return { id, name };
     },
 

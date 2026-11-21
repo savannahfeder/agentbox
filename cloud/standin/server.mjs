@@ -105,11 +105,18 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000, f
   }
 
   const handlers = {
-    // A team found by its name or its owner's email starts or stops paying.
+    // A team found by its name or its owner's email starts or stops paying. An
+    // email that owns no team yet has the team it makes pay from the start.
     async pay({ team, pays = true }) {
       if (!cloud.freeTeams) throw new Error('every team pays on this cloud; start it with freeTeams');
-      const owner = [...cloud.people.values()].find((p) => p.email === String(team).toLowerCase());
+      const email = String(team).toLowerCase();
+      const owner = [...cloud.people.values()].find((p) => p.email === email);
       const found = [...cloud.teams.values()].find((t) => t.id === team || t.name === team || (owner && cloud.members.some((m) => m.teamId === t.id && m.personId === owner.id && m.role === 'owner')));
+      if (!found && email.includes('@')) {
+        cloud.payingOwners ??= new Set();
+        if (pays) cloud.payingOwners.add(email); else cloud.payingOwners.delete(email);
+        return { team: null, owner: email, pays: !!pays };
+      }
       if (!found) throw new Error(`no team named ${team}`);
       if (pays) cloud.paying.add(found.id); else cloud.paying.delete(found.id);
       cloud.events.emit('cards', {});
