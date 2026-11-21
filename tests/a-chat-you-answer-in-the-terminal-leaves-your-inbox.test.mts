@@ -13,6 +13,9 @@
 // agent working outside this window, and its lease brings it back if this app
 // stops watching. A thread brought in is a question, which Needs you keeps
 // whatever else is true of it, so the list rules let this one claim through.
+// What you typed there goes on the thread as yours, before the answer it got;
+// the first version said only "Replied in Claude Code", and the agent's "as you
+// said" then pointed at nothing on the screen.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -177,6 +180,20 @@ describe('a Claude Code chat brought in, answered in the terminal', () => {
     await follow();
     expect(row().status).toBe('open');
     expect(inbox(row())).toBe(true);
+  });
+
+  it('leaves a hold to its lease while the transcript cannot be found, and the lease brings it back', async () => {
+    write(typed(Date.now() - 20_000, 'Mock the clock.'), runs(Date.now() - 15_000));
+    session('busy');
+    await follow();
+    expect(row().status).toBe('claimed');
+    fs.renameSync(file, `${file}.moved`);
+    await followClaudeChats({ store: s, dirs: [home] });
+    expect(row().status).toBe('claimed');
+    const later = Date.now() + 6 * 60_000;
+    const lapsed = s.listItems(later).find((i) => i.product === slug && (i.labels ?? []).includes(`thread:${SID}`));
+    expect(lapsed.status).toBe('open');
+    expect(belongsInInbox(lapsed, { now: later })).toBe(true);
   });
 
   it('counts a chat still being written to as running when no session file says otherwise', async () => {

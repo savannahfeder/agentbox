@@ -133,8 +133,11 @@ export async function followClaudeChats(
       if (c.held) { store.letGoOfChat(c.product, c.id, { now }); moved += 1; }
       continue;
     }
+    // Not found yet is looked for in the background; a hold meanwhile is left
+    // to its lease rather than let go of mid-turn.
     const file = claudeChatFile(c.chat, dirs);
-    const { turn, mtimeMs } = file ? turnOf(file) : { turn: null, mtimeMs: 0 };
+    if (!file) continue;
+    const { turn, mtimeMs } = turnOf(file);
     const words = newWords(turn, c.heardThrough);
     if (words) store.chatSaidOutside(c.product, c.id, words, { now });
     const state = turn && !turn.ended ? status(c.chat, dirs) : null;
