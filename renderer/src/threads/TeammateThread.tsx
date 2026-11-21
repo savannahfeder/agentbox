@@ -95,14 +95,14 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   // An ask that ends while the page is open is said on the page, unless you handed it back yourself.
   const lastAsk = useRef<WorkItem | null>(null);
   const handedBack = useRef(false);
-  const [ended, setEnded] = useState<{ target: BoxTarget } | null>(null);
+  const [ended, setEnded] = useState<{ target: BoxTarget; note: string } | null>(null);
   const askKey = ask ? `${ask.product}/${ask.id}` : null;
   useEffect(() => { lastAsk.current = null; setEnded(null); }, [personId, threadId]);
   useEffect(() => {
     const was = lastAsk.current;
     lastAsk.current = ask;
     if (ask) { handedBack.current = false; setEnded(null); return; }
-    if (was && !handedBack.current) setEnded({ target: boxTarget(was.ask?.kind ?? null) });
+    if (was && !handedBack.current) setEnded({ target: boxTarget(was.ask?.kind ?? null), note: String(was.ask?.note ?? '').trim() });
   }, [askKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const oldDraftAt = ended && ended.target !== target ? draftAtFor(personId, threadId, ended.target) : null;
   const oldDraft = oldDraftAt ? readDraft(oldDraftAt) : '';
@@ -339,6 +339,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           {askGoes === 'foot' && askBar}
           {(handedToYou || (ended && !ask)) && <p className="th-work-note tp-ask-ended">
             {askEndedWords(owner, !!handedToYou)}
+            {/* The ask's own words leave with it, so what was asked stays said here. */}
+            {!handedToYou && ended?.note && <q className="tp-ask-was">{ended.note.length > 160 ? `${ended.note.slice(0, 160)}…` : ended.note}</q>}
             {handedToYou && onOpenTask && <button type="button" onClick={() => onOpenTask(handedToYou)}>Open your task</button>}
             {oldDraft.trim() && <button type="button" onClick={takeOldDraft}>Use your draft</button>}
           </p>}

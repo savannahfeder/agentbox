@@ -97,3 +97,13 @@ describe('the page', () => {
     expect(src).toMatch(/onClick=\{takeOldDraft\}>Use your draft<\/button>/);
   });
 });
+
+// A live check: once Sam took the help ask back, "Sam asked you to help: …"
+// left Theo's page with it, so Theo could no longer see what had been asked.
+describe('what was asked stays on the line that says it ended', () => {
+  const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
+  it('keeps the ask\'s note when it ends, and quotes it', () => {
+    expect(page).toContain("note: String(was.ask?.note ?? '').trim() });");
+    expect(page).toContain('{!handedToYou && ended?.note && <q className="tp-ask-was">');
+  });
+});
