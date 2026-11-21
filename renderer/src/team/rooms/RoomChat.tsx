@@ -6,7 +6,7 @@
 // Every message carries what a direct chat's does: reactions, the bar on
 // pointing with its more menu (edit, copy, mark unread, delete), an edited
 // mark, and voice notes and files. The box is the direct chat's too.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from 'react';
 import { MessageMarkdown } from '../../components/MessageMarkdown';
 import { ConnectionLink } from '../../connections/ConnectionsPlace';
 import { connectionLinkOf, keepConnectionLinks } from '../../connections/connections-shown';
@@ -17,7 +17,8 @@ import { chatLayout } from '../chat-layout';
 import { MessageActions, Reactions } from '../ChatActions';
 import { DeleteMessage, MessageEditor } from '../MessageMore';
 import { messageMore, withEmbeds, wordsOf } from '../message-more';
-import { FormatBar } from '../FormatBar';
+import { FormatBar, useMarksRow } from '../FormatBar';
+import { ChatSend } from '../ChatSend';
 import { RichReply, type RichBox } from '../RichReply';
 import { VoiceNote } from '../VoiceNote';
 import { voiceNoteOf } from '../voice-note';
@@ -32,11 +33,10 @@ import { ChatLink } from '../../threads/ContinuedFrom';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
 import { pictureUrl } from '../../picture';
 import { holdAtBottom } from '../../thread-bottom';
-import { sendKeyFor } from '../../reply-keys';
 import { I } from './icons';
 import type { MessageMarks } from '../decisions';
 import { LINE_MISSING } from '../../reveal-line';
-import { readDraft, saveDraft } from '../../drafts';
+import { readDraft, readDraftAttachments, saveDraft, saveDraftAttachments } from '../../drafts';
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { clockOf } from '../../teammates/chat-lines';
@@ -467,7 +467,8 @@ function AlongRow({ a, day, head, face, name, size }: {
           <span className="rm-thread-what">{a.text}</span>
         </button>
         : <>
-          <div className="tx">{a.text}</div>
+          {/* A reply on a task is a message too: its list or quote is drawn as one. */}
+          <div className="tx"><MessageMarkdown remarkPlugins={MARKDOWN_PLUGINS}>{a.text}</MessageMarkdown></div>
           <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
         </>}
     </div>
@@ -507,12 +508,22 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   const [text, setText] = useState(() => readDraft(draftAt));
   const [plain, setPlain] = useState('');
   const [caret, setCaret] = useState(0);
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  // Its files are kept beside its words, so leaving the chat does not lose them.
+  const [attachments, setAttachmentsState] = useState<PendingAttachment[]>(() => readDraftAttachments(draftAt).map(staged));
+  const attachedNow = useRef(attachments);
+  const [tooBig, setTooBig] = useState(0);
+  const setAttachments = (change: SetStateAction<PendingAttachment[]>) => {
+    const next = typeof change === 'function' ? change(attachedNow.current) : change;
+    attachedNow.current = next;
+    setTooBig(saveDraftAttachments(draftAt, next).dropped.length);
+    setAttachmentsState(next);
+  };
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pick, setPick] = useState(0);
   const ref = useRef<RichBox | null>(null);
   const filePicker = useRef<HTMLInputElement>(null);
+  const [marksAt, setMarksAt] = useMarksRow();
   useEffect(() => { saveDraft(draftAt, text); }, [draftAt, text]);
   // A chat that is the page, or a thread opened to reply in: its box takes the typing, not the app's letter keys.
   useEffect(() => { if (takesTyping) requestAnimationFrame(() => ref.current?.focus()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -623,6 +634,7 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
         {matches.map((p, i) => <button type="button" key={p.id} className={`row${i === pick ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); choose(p); }}>
           <Face name={p.name} url={p.avatarUrl} size={18} /><span>{p.name}</span></button>)}
       </div>}
+      <div className="fmt-marks-slot" ref={setMarksAt} />
       <RichReply className="rm-compose-input" boxRef={ref} value={text} onChange={setText} onPlain={setPlain}
         placeholder={placeholder} label={placeholder}
         onCaret={(box) => setCaret(box.selectionStart)}
@@ -638,18 +650,19 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
           if (e.key === 'Escape') { ref.current?.blur(); return true; }
           return false;
         }} />
-      <AttachRow attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+      <AttachRow look="tiles" attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+      {tooBig > 0 && <div className="compose-note attach-problem" role="alert">{tooBig === 1
+        ? 'One pasted image is too big to keep. Leaving this chat loses it.'
+        : `${tooBig} pasted images are too big to keep. Leaving this chat loses them.`}</div>}
       <input ref={filePicker} type="file" multiple style={{ display: 'none' }}
-        onChange={async (e) => { add(await collectFiles(e.target.files ?? [])); e.target.value = ''; }} />
+        onChange={async (e) => { add(await collectFiles(e.target.files ?? [])); e.target.value = ''; ref.current?.focus(); }} />
       <div className="rm-compose-bar">
-        <FormatBar box={ref as unknown as { current: HTMLTextAreaElement | null }} onChange={setText}
+        <FormatBar box={ref as unknown as { current: HTMLTextAreaElement | null }} onChange={setText} marksAt={marksAt}
           onAttach={onPutFile ? () => filePicker.current?.click() : undefined}
           onFromFiles={onPutFile ? (f) => add([f]) : undefined}
           onVoice={onPutFile ? (note) => add([{ name: note.name, dataBase64: note.dataBase64, image: isImageName(note.name), draftId: note.draftId }]) : undefined}
           onNotice={setError} voiceKey={voiceKey} voice={voiceCtl} onRecording={setRecording} />
-        <button type="button" className="dock-send" disabled={!ready || busy} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>
-          {busy ? sendingWords(sending, roomId, attachments) : <>Send <kbd>{sendKeyFor(true)}</kbd></>}
-        </button>
+        <ChatSend ready={ready} busy={busy} sending={sendingWords(sending, roomId, attachments)} onSend={() => void send()} />
       </div>
     </div>
   </>;

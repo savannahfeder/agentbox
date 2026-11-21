@@ -96,6 +96,20 @@ export async function listProcesses(): Promise<ProcessSample[]> {
 // Used only to find whose command a hook was, never to decide anything.
 const AGENT = /(^|\/)(claude|codex)(\s|$)/;
 
+// A hook asking for a later command runs under the same agent but is no
+// command's work. Only its exact launch matches, so a command that merely
+// names the file is still measured.
+const HOOK = /^\S*sh (-c '[^']*\/memory-gate-hook\.sh'|\/[^']*\/memory-gate-hook\.sh) (pre|post)$/;
+
+/** A process's parent from /proc, or null where there is none (macOS). */
+export function readParentPid(pid: number): number | null {
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    const ppid = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1]);
+    return Number.isInteger(ppid) && ppid > 0 ? ppid : null;
+  } catch { return null; }
+}
+
 export interface HookPayload {
   session_id?: unknown;
   tool_use_id?: unknown;
@@ -114,6 +128,7 @@ export interface HookBody {
 export interface Grant {
   id: string;
   ppid: number | null;
+  lineage: number[];
   anchor: number | null;
   anchorArgs: string | null;
   baseline: Set<number>;
@@ -146,6 +161,7 @@ export interface MemoryGateServerOptions {
   urgentFor?: ((product: string | null, item: string | null) => unknown) | null;
   readPressure?: () => Promise<PressureReading>;
   sampleProcesses?: () => Promise<ProcessSample[]>;
+  parentOf?: (pid: number) => number | null;
   pollMs?: number;
   takeoverMs?: number;
   lockPort?: number;
@@ -172,6 +188,7 @@ export class MemoryGateServer {
   declare urgentFor: MemoryGateServerOptions['urgentFor'];
   declare readPressure: () => Promise<PressureReading>;
   declare sampleProcesses: () => Promise<ProcessSample[]>;
+  declare parentOf: (pid: number) => number | null;
   declare pollMs: number;
   declare takeoverMs: number;
   declare lockPort: number;
@@ -215,6 +232,7 @@ export class MemoryGateServer {
     urgentFor = null,
     readPressure = readMacPressure,
     sampleProcesses = listProcesses,
+    parentOf = readParentPid,
     pollMs = 2_000,
     takeoverMs = 5_000,
     // The port whose holder is the one coordinator on this Mac. Fixed so that
@@ -246,6 +264,7 @@ export class MemoryGateServer {
     this.urgentFor = urgentFor;
     this.readPressure = readPressure;
     this.sampleProcesses = sampleProcesses;
+    this.parentOf = parentOf;
     this.pollMs = pollMs;
     this.takeoverMs = takeoverMs;
     this.lockPort = lockPort;
@@ -447,6 +466,10 @@ export class MemoryGateServer {
     let urgent = false;
     try { urgent = typeof this.urgentFor === 'function' && this.urgentFor(whose.product, whose.item) === true; } catch { urgent = false; }
     this.counts.asked++;
+    // Read while the hook is alive: on Linux its parent is a `sh -c` launcher
+    // that is gone before the first sample could walk up through it.
+    const ppid = Number(body!.ppid) || null;
+    const lineage = this._lineage(ppid);
     let answered = false;
     this.gate.submit({
       id, command, score, urgent, item: whose.item, product: whose.product, session: whose.session ?? null,
@@ -455,7 +478,7 @@ export class MemoryGateServer {
       answered = true;
       if (decision.allow) {
         const grant: Grant = this.grants.get(id) ?? {
-          id, ppid: Number(body!.ppid) || null, anchor: null, anchorArgs: null,
+          id, ppid, lineage, anchor: null, anchorArgs: null,
           baseline: this.lastPids, wallStart: Date.now(), startedAt: this.clock(), ambiguous: false, emptySince: null,
         };
         this.grants.set(id, grant);
@@ -474,6 +497,19 @@ export class MemoryGateServer {
     res.on('close', () => {
       if (!answered) this.gate.finish(id);
     });
+  }
+
+  /** The pids above `pid`, nearest first, as far as they can be read. */
+  _lineage(pid: number | null): number[] {
+    const out: number[] = [];
+    for (let at = pid; at && out.length < 8;) {
+      let up: number | null = null;
+      try { up = this.parentOf(at); } catch { up = null; }
+      if (!up || up <= 1 || out.includes(up)) break;
+      out.push(up);
+      at = up;
+    }
+    return out;
   }
 
   _post(body: HookBody | null) {
@@ -571,7 +607,11 @@ export class MemoryGateServer {
       if (!grant.anchor) {
         let at = byPid.get(grant.ppid);
         for (let up = 0; at && up < 8 && !AGENT.test(at.args); up++) at = byPid.get(at.ppid);
-        const found = at && AGENT.test(at.args) ? at : byPid.get(grant.ppid);
+        // A recorded pid counts only while an agent that was already running
+        // when the command was allowed still holds it, never a reused one.
+        const recorded = () => grant.lineage.map((pid) => byPid.get(pid))
+          .find((p) => p && AGENT.test(p.args) && !((p.startedAt ?? 0) > grant.wallStart));
+        const found = (at && AGENT.test(at.args) ? at : recorded()) ?? byPid.get(grant.ppid);
         if (found) { grant.anchor = found.pid; grant.anchorArgs = found.args; }
       }
       const anchor = grant.anchor ? byPid.get(grant.anchor) : null;
@@ -597,6 +637,7 @@ export class MemoryGateServer {
       const stack = [...(children.get(anchorPid) ?? [])];
       while (stack.length) {
         const p = stack.pop()!;
+        if (HOOK.test(p.args)) continue;
         if (ours(p)) mb += p.mb;
         stack.push(...(children.get(p.pid) ?? []));
       }
