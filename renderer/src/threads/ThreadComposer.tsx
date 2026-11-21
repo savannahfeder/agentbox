@@ -86,6 +86,14 @@ import { nameWait } from '../../../shared/thread-waits.mts';
 import { continuedFromLabel } from '../../../shared/thread-continued.mts';
 import { closesOnPress } from '../press';
 
+/** PROPOSAL ROUND (w-83da0ab961): the Home layouts drawn for a pick, read from
+ *  localStorage `tc-home-layout`. Unset is today's box; this goes once one is chosen. */
+export type HomeLayout = 'top' | 'quiet' | 'give' | 'rows' | 'tabs' | 'tidy';
+const HOME_LAYOUTS: readonly HomeLayout[] = ['top', 'quiet', 'give', 'rows', 'tabs', 'tidy'];
+function readHomeLayout(): HomeLayout | null {
+  try { const v = localStorage.getItem('tc-home-layout'); return HOME_LAYOUTS.includes(v as HomeLayout) ? v as HomeLayout : null; } catch { return null; }
+}
+
 /** What went out, so the caller can say so and offer the way back. */
 export interface ThreadSent {
   kind: 'task' | 'repeat' | 'message';
@@ -109,7 +117,7 @@ export interface ThreadSent {
   given?: boolean;
 }
 
-type MenuKey = 'to' | 'model' | 'dueOn' | 'blockedBy' | 'project' | 'priority' | 'visibility' | 'later';
+type MenuKey = 'to' | 'model' | 'dueOn' | 'blockedBy' | 'project' | 'priority' | 'visibility' | 'later' | 'give';
 
 /** What a card opens on. Project, model and priority need no field: the card
  *  reads them from what was last picked and from the saved draft. */
@@ -434,6 +442,7 @@ export function ThreadComposer({
     setOpen((o) => { const next = o === key ? null : key; if (next) onOpenMenu?.(next); return next; });
     setModelPage('recent');
     setLaterPage('list');
+    setGivePage('list');
     // Who sees it opens on its three rows, even if the picker was last open.
     setVisPage('rows');
     setLaterText('');
@@ -708,14 +717,14 @@ export function ThreadComposer({
     }
   };
 
-  const sendMessage = async () => {
-    if (!canSend || !person) return;
+  const sendMessage = async (forceTask?: boolean) => {
+    if (!canSend || !person || (forceTask && extra.length > 0)) return;
     setSending(true);
     setError(null);
     // Handed over at once, as a task is, and the written-down copy kept until
     // the cloud answers (sendTask above).
     const taken = takeTheDraft();
-    const asTask = sendAs === 'task';
+    const asTask = forceTask ?? sendAs === 'task';
     const toMany = !asTask && extra.length ? [person.id, ...also] : undefined;
     onSending?.({ kind: 'message', to: person.id, ...(toMany ? { toMany } : {}) });
     if (inline) emptyForTheNext();
@@ -779,7 +788,7 @@ export function ThreadComposer({
   // A picked suggestion that keeps a schedule sends as that repeating task, while its words are unchanged.
   const [idea, setIdea] = useState<Idea | null>(null);
   const ideaRule = idea?.repeat && text.trim() === idea.text ? (({ short: _s, label: _l, ...rule }) => rule)(idea.repeat) : null;
-  const send = () => (person ? sendMessage() : sendTask(when ? whenToSend(when) : ideaRule ? { repeat: ideaRule } : {}));
+  const send = (asTask?: boolean) => (person ? sendMessage(asTask) : sendTask(when ? whenToSend(when) : ideaRule ? { repeat: ideaRule } : {}));
   const ideaList = useRef<HTMLDivElement>(null);
   const takeIdea = (i: Idea) => {
     setIdea(i);
@@ -853,6 +862,8 @@ export function ThreadComposer({
     setAuto(false);
     writeLastRecipient({ to: id, mate: null, auto: false });
     setTo(id); setAlso([]); setError(null); close('text');
+    // The tabs layout picks the kind first, so a person picked under Task is given a task.
+    if (lay === 'tabs') { if (id === 'agent') setTabMessage(false); else { setSendAs(msgTab ? 'message' : 'task'); setTabMessage(msgTab); } }
   };
   const chooseMate = (id: string) => { setAdding(false); setAuto(false); setTo('agent'); setAlso([]); setMate(id); writeLastRecipient({ to: 'agent', mate: id, auto: false }); setError(null); close('text'); };
   const chooseAuto = () => { setAdding(false); setMate(null); setTo('agent'); setAlso([]); setAuto(true); writeLastRecipient({ to: 'agent', mate: null, auto: true }); setError(null); close('text'); };
@@ -887,6 +898,12 @@ export function ThreadComposer({
   const peopleHere = !!team && (others.length > 0 || !!team.state.sent?.length);
   const matesHere = !!agentMates && !!onToTeammate;
   const toShown = toOffered({ people: peopleHere, auto: autoHere, mates: matesHere, chosen: !!person || !!mate });
+  const layout = inline && toShown ? readHomeLayout() : null;
+  // An AI teammate in To keeps today's bar in every layout.
+  const lay = mate ? null : layout;
+  const [tabMessage, setTabMessage] = useState(false);
+  const msgTab = person ? sendAs === 'message' : tabMessage;
+  const [givePage, setGivePage] = useState<'list' | 'due' | 'blocked' | 'sees'>('list');
   const sections = toSections({
     people: peopleHere,
     auto: toFound.auto,
@@ -947,11 +964,13 @@ export function ThreadComposer({
         ))}
         {!found.length && !invitedFound.length && sections.length === 1 && <span className="tc-none">Nobody on the team matches that.</span>}
       </Fragment>);
+  // A message goes to people, so the tabs layout's Message tab lists nobody else.
+  const toRows = lay === 'tabs' && msgTab ? sections.filter((s) => s === 'people') : sections;
   const toMenu = (
     <div className="tc-menu tc-drop tc-to-menu" role="listbox" aria-label="To" onKeyDown={menuKeys}>
-      {sections.map((s, i) => (
+      {toRows.map((s, i) => (
         <Fragment key={s}>
-          {i > 0 && (s === 'mates' || sections[i - 1] === 'people') && <span className="tc-sep" />}
+          {i > 0 && (s === 'mates' || toRows[i - 1] === 'people') && <span className="tc-sep" />}
           {toSection(s)}
         </Fragment>
       ))}
@@ -1023,7 +1042,7 @@ export function ThreadComposer({
     </div>
   );
 
-  const blockOffers = person && rows.includes('blockedBy') ? blockChoicesFor?.(person.id) ?? [] : [];
+  const blockOffers = person && (rows.includes('blockedBy') || lay === 'give') ? blockChoicesFor?.(person.id) ?? [] : [];
   const typedBlock = nameWait(blockText);
   const blockLabel = !blockedBy ? NOT_BLOCKED : blockOffers.find((c) => c.id === blockedBy)?.label ?? (blockedBy.startsWith('name:') ? blockedBy.slice('name:'.length) : NOT_BLOCKED);
   const pickBlock = (id: string | null) => { setBlockedBy(id); setBlockText(''); close('text'); };
@@ -1247,15 +1266,17 @@ export function ThreadComposer({
   /* ------------------------------- card --------------------------------- */
   // Each head field is a labelled row on the dialog and a chip at the front of
   // the bar on the page.
-  const trigger = (key: MenuKey) => `${inline ? 'tc-chip' : 'tc-word'} ${open === key ? 'open' : ''}`;
+  const trigger = (key: MenuKey) => `${inline && lay !== 'rows' ? 'tc-chip' : 'tc-word'} ${open === key ? 'open' : ''}`;
+  // The agent's words come back where the layout gives the To field a line of its own.
+  const faceOnly = inline && !mate && !person && !onAuto && lay !== 'top' && lay !== 'rows';
   const fields: { label: string; node: ReactNode }[] = [
     ...(toShown ? [{ label: 'To', node: (
-      <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person ? dropRank('to') : undefined}>
-        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'} title={inline && !mate && !person && !onAuto ? 'To: Agent' : undefined}
+      <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person && lay !== 'top' && lay !== 'rows' ? dropRank('to') : undefined}>
+        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'} title={faceOnly ? 'To: Agent' : undefined}
           onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
           {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : onAuto ? <AutoFace /> : <AgentFace />}
           {/* On the page's narrow box the agent is its face alone, so the bar keeps room for the level. */}
-          {inline && !mate && !person && !onAuto
+          {faceOnly
             ? <span className="tc-word-text tc-face-only">Agent</span>
             : <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>}
         </button>
@@ -1273,28 +1294,38 @@ export function ThreadComposer({
       </span>
     ) }] : []),
     ...(rows.includes('sendAs') ? [{ label: 'Send As', node: sendAsChoice }] : []),
-    ...(rows.includes('subject') ? [{ label: 'Subject', node: (
+    ...(rows.includes('subject') ? [{ label: 'Subject', node: lay && lay !== 'rows' ? (
+      // A chip you type in: the short word never runs out of room, and the reason is its tooltip.
+      <label className={`tc-chip tc-subject-chip${subject.trim() ? '' : ' tc-at-rest'}`} title="A subject gives it a thread of its own">
+        <SubjectIcon />
+        <input className="tc-subject-in tc-chip-text" value={subject} aria-label="Subject" spellCheck placeholder="Subject"
+          onChange={(e) => setSubject(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) { e.preventDefault(); textRef.current?.focus(); } }} />
+      </label>
+    ) : (
       <input className="tc-subject" value={subject} aria-label="Subject" spellCheck
-        placeholder={inline ? 'Subject, for a thread of its own' : 'Name the work to give it a thread of its own'}
+        placeholder={inline && lay !== 'rows' ? 'Subject, for a thread of its own' : 'Name the work to give it a thread of its own'}
         onChange={(e) => setSubject(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) { e.preventDefault(); textRef.current?.focus(); } }} />
     ) }] : []),
     ...(rows.includes('dueOn') ? [{ label: 'Due On', node: (
       <span className="tc-anchor" ref={anchor('dueOn')}>
-        <button type="button" data-trigger className={trigger('dueOn')} aria-haspopup="listbox" aria-expanded={open === 'dueOn'}
-          onClick={() => toggle('dueOn')} onKeyDown={triggerKeys('dueOn')}>
+        <button type="button" data-trigger className={`${trigger('dueOn')}${due ? '' : ' tc-at-rest'}`} aria-haspopup="listbox" aria-expanded={open === 'dueOn'}
+          title={lay ? 'Due On' : undefined} onClick={() => toggle('dueOn')} onKeyDown={triggerKeys('dueOn')}>
+          {lay && lay !== 'rows' && <CalendarIcon />}
           {/* A day nobody set is drawn in the faint ink a placeholder
               uses: it is an answer, but a quiet one. */}
-          <span className={`tc-word-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
+          <span className={`tc-word-text tc-chip-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
         </button>
         {open === 'dueOn' && dueOnMenu}
       </span>
     ) }] : []),
     ...(rows.includes('blockedBy') && blockOffers.length ? [{ label: 'Blocked By', node: (
       <span className="tc-anchor" ref={anchor('blockedBy')}>
-        <button type="button" data-trigger className={trigger('blockedBy')} aria-haspopup="listbox" aria-expanded={open === 'blockedBy'}
-          onClick={() => toggle('blockedBy')} onKeyDown={triggerKeys('blockedBy')}>
-          <span className={`tc-word-text${blockedBy ? '' : ' tc-unset'}`}>{blockLabel}</span>
+        <button type="button" data-trigger className={`${trigger('blockedBy')}${blockedBy ? '' : ' tc-at-rest'}`} aria-haspopup="listbox" aria-expanded={open === 'blockedBy'}
+          title={lay ? 'Blocked By' : undefined} onClick={() => toggle('blockedBy')} onKeyDown={triggerKeys('blockedBy')}>
+          {lay && lay !== 'rows' && <WaitIcon />}
+          <span className={`tc-word-text tc-chip-text${blockedBy ? '' : ' tc-unset'}`}>{blockLabel}</span>
         </button>
         {open === 'blockedBy' && blockedByMenu}
       </span>
@@ -1346,10 +1377,209 @@ export function ThreadComposer({
     </div>
   ) : null;
 
+  /* ---------------- the proposal layouts (w-83da0ab961) ----------------
+     The same controls as today's bar, arranged five ways for Home on a team. */
+  const fieldNode = (label: string) => fields.find((f) => f.label === label)?.node ?? null;
+  const toNode = fieldNode('To');
+  const modelNode = fieldNode('Model');
+  const quiet = lay === 'quiet';
+  const prioChip = (
+    <span className="tc-anchor" ref={anchor('priority')} data-drop={dropRank('priority')}>
+      <button type="button" data-trigger className={`tc-chip ${open === 'priority' ? 'open' : ''}${prio === null ? ' tc-at-rest' : ''}`} title={`Priority: ${choiceLabelOf(prio)}`}
+        aria-haspopup="listbox" aria-expanded={open === 'priority'} onClick={() => toggle('priority')} onKeyDown={triggerKeys('priority')}>
+        <PrioGlyph id={prio} /><span className="tc-chip-text">{choiceLabelOf(prio)}</span>
+      </button>
+      {open === 'priority' && priorityMenu}
+    </span>
+  );
+  const seesChip = (sees: Visibility) => (
+    <span className="tc-anchor" ref={anchor('visibility')}>
+      <button type="button" data-trigger className={`tc-chip ${open === 'visibility' ? 'open' : ''}${picked === null ? ' tc-at-rest' : ''}`} title={`Who sees it: ${sees === 'team' ? 'Team' : sees === 'private' ? 'Private' : chosenWords(chosenHere, others)}`}
+        aria-haspopup="listbox" aria-expanded={open === 'visibility'} onClick={() => toggle('visibility')} onKeyDown={triggerKeys('visibility')}>
+        {sees === 'private' ? <LockIcon /> : <PeopleIcon />}
+        <span className="tc-chip-text">{sees === 'team' ? 'Team' : sees === 'private' ? 'Private' : chosenWords(chosenHere, others)}</span>
+      </button>
+      {open === 'visibility' && visibilityMenu}
+    </span>
+  );
+  const projectChip = (
+    <span className="tc-anchor" ref={anchor('project')} data-tour="project">
+      <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
+        aria-haspopup="listbox" aria-expanded={open === 'project'} onClick={() => toggle('project')} onKeyDown={triggerKeys('project')}>
+        {product && !unpicked && <Swatch slug={product.slug} />}
+        <span ref={projName} className={`tc-chip-name ${projCut ? 'cut' : ''}`}>{unpicked ? 'Choose a folder' : product?.name ?? 'No project'}</span>
+      </button>
+      {open === 'project' && projectMenu}
+    </span>
+  );
+  const clipButton = talk.on && !person ? <Listening talk={talk} /> : (
+    <button type="button" className="tc-icon" title="Attach files" aria-label="Attach files" data-drop={dropRank('attach')} onClick={() => fileRef.current?.click()}>
+      <ClipIcon />
+    </button>
+  );
+  const fileInput = <input ref={fileRef} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />;
+  const sendSolo = (
+    <span className="tc-send solo">
+      <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={`Send · ${SEND}`}>
+        Send <kbd data-drop={dropRank('send-keys')}>{SEND}</kbd>
+      </button>
+    </span>
+  );
+  const sendSplit = (
+    <span className="tc-send" ref={anchor('later')}>
+      <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? outNote ?? `Send · ${SEND}`}>
+        Send <kbd data-drop={dropRank('send-keys')}>{SEND}</kbd>
+      </button>
+      <button type="button" data-trigger className={`tc-send-caret${when ? ' set' : ''}`} disabled={sending}
+        aria-label={when ? `Sends ${whenWords(when)}. Change when` : 'Send later'} title={when ? 'Change when it sends' : 'Send later'}
+        aria-haspopup="menu" aria-expanded={open === 'later'} onClick={() => toggle('later')} onKeyDown={triggerKeys('later')}>
+        {when && <span className="tc-send-when">{whenWords(when)}</span>}
+        <CaretIcon />
+      </button>
+      {open === 'later' && laterMenu}
+    </span>
+  );
+  const stopperNote = stopper && (
+    <span className="tc-why">
+      {stopper.reason}{' '}
+      {onNewProject && stopper.action ? <button type="button" className="tc-why-do" onClick={onNewProject}>{stopper.action}</button> : stopper.action}
+    </span>
+  );
+  // SEND OR GIVE: what it is is chosen at the end, by which button sends it.
+  const pickGiveDue = (key: string | null) => { setDue(key); setGivePage('list'); };
+  const giveMenu = (
+    <div className="tc-menu tc-drop tc-right tc-give-menu" role="menu" aria-label="Send as a task" onKeyDown={menuKeys}>
+      {givePage === 'list' ? (<>
+        <span className="tc-menu-head">As a task</span>
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setGivePage('due')}>
+          <CalendarIcon /><span className="tc-row-label">Due On</span><small>{dueWords(due)}</small>
+        </button>
+        {blockOffers.length > 0 && (
+          <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setGivePage('blocked')}>
+            <WaitIcon /><span className="tc-row-label">Blocked By</span><small>{blockLabel}</small>
+          </button>
+        )}
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setGivePage('sees')}>
+          {taskSees === 'private' ? <LockIcon /> : <PeopleIcon />}<span className="tc-row-label">Who sees it</span><small>{taskSees === 'team' ? 'Team' : taskSees === 'private' ? 'Private' : chosenWords(chosenHere, others)}</small>
+        </button>
+      </>) : (<>
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setGivePage('list')}>
+          <span className="tc-row-label">‹ As a task</span>
+        </button>
+        <span className="tc-sep" />
+        {givePage === 'due' && dueChoices().map((c) => (
+          <button key={c.key ?? 'none'} type="button" data-item className={`tc-row ${c.key === due?.slice(0, 10) || (!c.key && !due) ? 'on' : ''}`} onPointerMove={hover} onClick={() => pickGiveDue(c.key)}>
+            <span className="tc-row-label">{c.label}</span>
+          </button>
+        ))}
+        {givePage === 'blocked' && [{ id: null as string | null, label: NOT_BLOCKED }, ...blockOffers].map((c) => (
+          <button key={c.id ?? 'none'} type="button" data-item className={`tc-row ${c.id === blockedBy ? 'on' : ''}`} onPointerMove={hover} onClick={() => { setBlockedBy(c.id); setGivePage('list'); }}>
+            <span className="tc-row-label">{c.label}</span>
+          </button>
+        ))}
+        {givePage === 'sees' && VISIBILITY_ROWS.filter((v) => v.id !== 'people').map((v) => (
+          <button key={v.id} type="button" data-item className={`tc-row ${v.id === taskSees ? 'on' : ''}`} onPointerMove={hover} onClick={() => { pickVisibility(v.id); setGivePage('list'); }}>
+            {v.id === 'private' ? <LockIcon /> : <PeopleIcon />}<span className="tc-row-label">{v.label}</span>
+          </button>
+        ))}
+      </>)}
+    </div>
+  );
+  const giveButton = (
+    <span className="tc-give" ref={anchor('give')}>
+      <button type="button" className="tc-give-main" disabled={!canSend || extra.length > 0} onClick={() => void send(true)}
+        title={extra.length ? 'A task goes to one person' : `Give ${person ? firstName(person) : 'them'} this as a task`}>
+        Send as a task
+      </button>
+      <button type="button" data-trigger className={`tc-give-caret${due ? ' set' : ''}`} aria-label="Task details" title="Due date, what it waits on, who sees it"
+        aria-haspopup="menu" aria-expanded={open === 'give'} onClick={() => toggle('give')} onKeyDown={triggerKeys('give')}>
+        {due && <span className="tc-send-when">{dueWords(due)}</span>}
+        <CaretIcon />
+      </button>
+      {open === 'give' && giveMenu}
+    </span>
+  );
+  const kindTabs = (
+    <div className="tc-tabs" role="tablist" aria-label="What it is">
+      {(['task', 'message'] as const).map((k) => (
+        <button key={k} type="button" role="tab" aria-selected={(k === 'message') === msgTab} className={(k === 'message') === msgTab ? 'on' : ''}
+          onClick={() => {
+            if (person) { setSendAs(k); if (k === 'message') setDue(null); textRef.current?.focus(); return; }
+            setTabMessage(k === 'message');
+            if (k === 'message' && open !== 'to') toggle('to'); else textRef.current?.focus();
+          }}>
+          {k === 'task' ? 'Task' : 'Message'}
+        </button>
+      ))}
+    </div>
+  );
+  const gap = <span className="tc-gap" />;
+  const sendAsHere = lay !== 'give' && lay !== 'tabs' ? sendAsChoice : null;
+  const whoInBar = lay !== 'top' && lay !== 'rows';
+  const layoutHead = !lay ? null
+    : lay === 'top' ? (
+      <div className="tc-top">
+        <span className="tc-top-label">To</span>
+        {toNode}
+        {gap}
+        {person ? sendAsHere : modelNode}
+      </div>
+    )
+    : lay === 'rows' ? (
+      <div className="tc-head">
+        {fields.map((f) => (
+          <div key={f.label} className="tc-field">
+            <span className="tc-label">{f.label}</span>
+            {f.node}
+          </div>
+        ))}
+      </div>
+    )
+    : lay === 'tabs' ? kindTabs : null;
+  const layoutBar = !lay ? null : (
+    <div className="tc-bar tc-fit" ref={fitBar}>
+      {whoInBar && toNode}
+      {person ? (<>
+        {whoInBar && sendAsHere}
+        {sendAs === 'message' || lay === 'give' ? (<>
+          {quiet && gap}
+          {lay !== 'rows' && fieldNode('Subject')}
+          {lay !== 'quiet' && prioChip}
+        </>) : (<>
+          {quiet && gap}
+          {lay !== 'rows' && fieldNode('Due On')}
+          {lay !== 'rows' && fieldNode('Blocked By')}
+          {seesChip(taskSees)}
+          {lay !== 'quiet' && prioChip}
+        </>)}
+        {taskToMany && <span className="tc-why">A task goes to one person.</span>}
+        {quiet && prioChip}
+        {!quiet && gap}
+        {clipButton}
+        {fileInput}
+        {lay === 'give' && giveButton}
+        {sendSolo}
+      </>) : (<>
+        {whoInBar && modelNode}
+        {projectChip}
+        {quiet ? gap : null}
+        {!quiet && prioChip}
+        {team && seesChip(visibility)}
+        {quiet && prioChip}
+        {!quiet && gap}
+        {stopperNote}
+        {clipButton}
+        {talk.allowed && !talk.on && <MicButton talk={talk} />}
+        {fileInput}
+        {sendSplit}
+      </>)}
+    </div>
+  );
+
   const box = (
       <div
         ref={card}
-        className={`tc-card${inline ? ' tc-inline' : ''}`}
+        className={`tc-card${inline ? ' tc-inline' : ''}${lay ? ` tc-lay tc-lay-${lay}` : ''}`}
         role={inline ? 'group' : 'dialog'}
         aria-label="New thread"
         data-tour-folder={product?.repoPath || projectChosen || !askFolder ? '1' : '0'}
@@ -1377,6 +1607,7 @@ export function ThreadComposer({
             ))}
           </div>
         )}
+        {layoutHead}
 
         {convo && onOpenConversation && sendAs === 'message' && goes === 'direct' && !messageSubject(subject) && (
           <div className="tc-note tc-continues">
@@ -1408,7 +1639,7 @@ export function ThreadComposer({
             e.preventDefault();
             ideaList.current?.querySelector<HTMLButtonElement>('button')?.focus();
           }}
-          placeholder={mate === 'new' ? 'What should they do?' : mateRow ? `What should ${mateRow.name} do?` : person ? (sendAs === 'task' && !extra.length ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
+          placeholder={mate === 'new' ? 'What should they do?' : mateRow ? `What should ${mateRow.name} do?` : person ? (lay === 'give' ? `Write to ${names}` : sendAs === 'task' && !extra.length ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
           onPaste={async (e) => {
             const pasted = await fromPaste(e);
             if (pasted.length) { e.preventDefault(); setAttachments((a) => [...a, ...pasted]); }
@@ -1459,7 +1690,7 @@ export function ThreadComposer({
         {error && <div className="tc-note tc-error" role="alert">{error}</div>}
         {!talk.on && talk.problem && <div className="tc-note">{talk.problem}</div>}
 
-        {person ? (
+        {lay ? layoutBar : person ? (
           <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
             {taskToMany && <span className="tc-why">A task goes to one person.</span>}
@@ -1592,6 +1823,21 @@ const PeopleIcon = () => (
 const LockIcon = () => (
   <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
     <rect x="5.5" y="10.5" width="13" height="9" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+  </svg>
+);
+const SubjectIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+    <path d="M6 7h12M12 7v11" />
+  </svg>
+);
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+    <rect x="4.5" y="5.5" width="15" height="14" rx="2.5" /><path d="M4.5 10h15M8.5 3.5v3.5M15.5 3.5v3.5" />
+  </svg>
+);
+const WaitIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M7.5 4.5h9M7.5 19.5h9M8.5 4.5c0 4 7 4.2 7 7.5s-7 3.5-7 7.5M15.5 4.5c0 4-7 4.2-7 7.5s7 3.5 7 7.5" />
   </svg>
 );
 const ClipIcon = () => (

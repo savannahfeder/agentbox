@@ -411,3 +411,80 @@
 /* The agent's face stands for the word on the page's box; the word stays for screen readers. */
 .tc-chip .tc-face-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .tc-chip:has(> .tc-face-only) { padding: 0 7px; }
+
+/* ---------------- the proposal layouts (w-83da0ab961) ----------------
+   Shared by all five: every control in the bar is 28px, rounded and drawn in
+   the chips' own line, and the space between the left group and Send is a gap. */
+.tc-lay .tc-bar .tc-icon { margin-left: 0; }
+.tc-lay .tc-gap { flex: 1 1 0; min-width: 6px; }
+.tc-lay .tc-seg {
+  height: 28px; box-sizing: border-box; flex: none;
+  border: 1px solid var(--line); border-radius: var(--tag-radius); overflow: hidden; background: rgba(255, 255, 255, 0.03);
+}
+.tc-lay .tc-seg button { height: 26px; padding: 0 11px; }
+.tc-lay .tc-seg button + button { border-left: 1px solid var(--line); }
+.tc-lay .tc-seg button.on { font-weight: 500; }
+.tc-lay .tc-add {
+  width: 28px; height: 28px; box-sizing: border-box; margin-left: 6px; display: inline-grid; place-items: center;
+  border: 1px solid var(--line); border-radius: var(--tag-radius); background: rgba(255, 255, 255, 0.03); color: var(--text-dim);
+}
+.tc-lay .tc-add:hover { border-style: solid; border-color: var(--line-strong); color: var(--text); background: rgba(255, 255, 255, 0.03); }
+.tc-lay .tc-also { border-radius: var(--tag-radius); font-size: 13px; }
+.tc-subject-chip { cursor: text; }
+.tc-subject-chip .tc-subject-in {
+  field-sizing: content; min-width: 7ch; max-width: 220px; height: 26px; padding: 0; margin: 0;
+  border: 0; background: none; outline: none; font: inherit; color: var(--text);
+}
+.tc-subject-chip .tc-subject-in::placeholder { color: var(--text-dim); }
+.tc-subject-chip:hover .tc-subject-in::placeholder, .tc-subject-chip:focus-within .tc-subject-in::placeholder { color: var(--text-faint); }
+.tc-subject-chip:focus-within { border-color: var(--line-strong); color: var(--text); }
+.tc-chip > svg { flex: none; }
+
+/* 1. WHO ON TOP: To and what it is on a line of their own, above the words. */
+.tc-top { display: flex; align-items: center; gap: 6px; margin: -2px 0 14px; }
+.tc-top-label { font-size: 13px; color: var(--text-faint); margin-right: 4px; }
+
+/* 2. QUIET MARKS: a control nobody changed is its mark alone, and shows its word once changed. */
+.tc-lay-quiet .tc-chip.tc-at-rest { width: 28px; padding: 0; justify-content: center; border-color: transparent; background: none; }
+.tc-lay-quiet .tc-chip.tc-at-rest .tc-chip-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.tc-lay-quiet .tc-chip.tc-at-rest:hover, .tc-lay-quiet .tc-chip.tc-at-rest.open, .tc-lay-quiet .tc-chip.tc-at-rest:focus-visible { background: var(--wash); border-color: transparent; }
+.tc-lay-quiet .tc-chip.tc-at-rest svg { color: var(--text-faint); }
+.tc-lay-quiet .tc-chip.tc-at-rest:hover svg, .tc-lay-quiet .tc-chip.tc-at-rest.open svg { color: var(--text); }
+.tc-lay-quiet .tc-subject-chip.tc-at-rest:focus-within { width: auto; padding: 0 10px; border-color: var(--line-strong); background: rgba(255, 255, 255, 0.03); }
+.tc-lay-quiet .tc-subject-chip.tc-at-rest:focus-within .tc-chip-text { position: static; width: auto; height: 26px; clip-path: none; }
+.tc-lay-quiet .tc-bar { gap: 4px; }
+.tc-lay-quiet .tc-bar > .tc-anchor:first-child + .tc-seg, .tc-lay-quiet .tc-bar > .tc-anchor:first-child + .tc-anchor { margin-left: 2px; }
+
+/* 3. SEND OR GIVE: two buttons decide what it is; the task's details sit on the second's caret. */
+.tc-give { display: inline-flex; height: 28px; position: relative; flex: none; }
+.tc-give > button {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; box-sizing: border-box;
+  border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.03); color: var(--text); cursor: pointer;
+  font: inherit; font-size: 13.5px; font-weight: 500; padding: 0 12px;
+}
+.tc-give > .tc-give-main { border-radius: var(--tag-radius) 0 0 var(--tag-radius); }
+.tc-give > .tc-give-caret { padding: 0 8px; border-left: 0; border-radius: 0 var(--tag-radius) var(--tag-radius) 0; color: var(--text-dim); }
+.tc-give > .tc-give-caret.set { padding-left: 10px; color: var(--text); }
+.tc-give > button:hover:not(:disabled), .tc-give > .tc-give-caret[aria-expanded='true'] { background: var(--wash); }
+.tc-give > button:disabled { opacity: 0.45; cursor: default; }
+.tc-give:has(> .tc-give-main:disabled) > .tc-give-caret { opacity: 0.45; }
+.tc-give-menu { min-width: 260px; }
+.tc-give-menu .tc-row small { color: var(--text-dim); }
+
+/* 4. LIKE THE POP-UP: the New thread card's labelled rows, drawn on Home's glass. */
+.tc-lay-rows .tc-head { margin: -16px -18px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.tc-lay-rows .tc-field { height: 42px; padding: 0 18px; }
+.tc-lay-rows .tc-field + .tc-field { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.tc-lay-rows .tc-field .tc-subject { flex: 1; height: auto; padding: 0; border: 0; font-size: 14px; }
+.tc-lay-rows .tc-field .tc-seg { height: 28px; }
+:root[data-theme="light"] .tc-lay-rows .tc-head, :root[data-theme="light"] .tc-lay-rows .tc-field + .tc-field { border-color: rgba(30, 22, 36, 0.08); }
+
+/* 5. KIND TABS: Task or Message first, then who it is to in the bar. */
+.tc-tabs { display: flex; gap: 2px; margin: -4px 0 10px -10px; }
+.tc-tabs button {
+  height: 28px; padding: 0 10px; border: 0; border-radius: var(--tag-radius); background: none; cursor: pointer;
+  font: inherit; font-size: 14px; color: var(--text-dim);
+}
+.tc-tabs button:hover { color: var(--text); background: var(--wash); }
+.tc-tabs button.on { color: var(--text); background: var(--wash-strong); font-weight: 500; }
+.tc-tabs button:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
