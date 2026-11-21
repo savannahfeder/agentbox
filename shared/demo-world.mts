@@ -338,28 +338,36 @@ export function demoMessages(now: number = Date.now()): DemoMessage[] {
 
 // A teammate's page opens on your chat with them (a group of the two of you),
 // which was empty. One short exchange each, answered by you.
-export interface DemoChat { with: DemoPerson; said: { by: 'them' | 'me'; hoursAgo: number; text: string }[] }
+/** `at` is a time on the day before the demo opens, so a chat never reads as said at midnight. */
+export interface DemoChat { with: DemoPerson; said: { by: 'them' | 'me'; at: [number, number]; text: string }[] }
+
+/** That moment, the day before `now`, in local time. */
+export function yesterdayAt(now: number, [h, m]: [number, number]): number {
+  const d = new Date(now);
+  d.setDate(d.getDate() - 1);
+  return d.setHours(h, m, 0, 0);
+}
 
 export const DEMO_CHATS: DemoChat[] = [
   {
     with: THEO,
     said: [
-      { by: 'them', hoursAgo: 26, text: 'I start rewriting the sync engine tomorrow. Anything big that touches it, send my way first.' },
-      { by: 'me', hoursAgo: 25.6, text: 'Will do. The OneDrive work will hit it, so that one comes to you.' },
+      { by: 'them', at: [10, 12], text: 'I start rewriting the sync engine tomorrow. Anything big that touches it, send my way first.' },
+      { by: 'me', at: [10, 31], text: 'Will do. The OneDrive work will hit it, so that one comes to you.' },
     ],
   },
   {
     with: LENA,
     said: [
-      { by: 'them', hoursAgo: 22, text: 'The comparison page is live and linked from pricing.' },
-      { by: 'me', hoursAgo: 21.7, text: 'Read it. Clear, and fair to both of them.' },
+      { by: 'them', at: [13, 40], text: 'The comparison page is live and linked from pricing.' },
+      { by: 'me', at: [13, 58], text: 'Read it. Clear, and fair to both of them.' },
     ],
   },
   {
     with: PRIYA,
     said: [
-      { by: 'them', hoursAgo: 18, text: 'The pricing page works in dark mode now. Checked on a phone and a laptop.' },
-      { by: 'me', hoursAgo: 17.8, text: 'Looks great, thank you.' },
+      { by: 'them', at: [16, 5], text: 'The pricing page works in dark mode now. Checked on a phone and a laptop.' },
+      { by: 'me', at: [16, 22], text: 'Looks great, thank you.' },
     ],
   },
 ];
