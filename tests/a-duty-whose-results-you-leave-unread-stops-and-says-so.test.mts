@@ -43,7 +43,8 @@ describe('a duty nobody reads', () => {
   });
 
   it('starts again once you answer one of them', () => {
-    const answered = sent('w-3', 1.5, { answer: 'Not today.', wrote: { result: { ts: NOW - 1.5 * DAY, source: 'agent' }, answer: { ts: NOW - DAY, source: 'founder' } } });
+    // It has since replied to your answer; an answered run that has not is still running and holds the slot.
+    const answered = sent('w-3', 1.5, { answer: 'Not today.', wrote: { result: { ts: NOW - 0.9 * DAY, source: 'agent' }, answer: { ts: NOW - DAY, source: 'founder' } } });
     expect(runs(plan([sent('w-1', 3), sent('w-2', 2), answered]))).toHaveLength(1);
   });
 
