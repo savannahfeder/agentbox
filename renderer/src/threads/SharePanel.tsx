@@ -151,8 +151,10 @@ const MODES: { id: GiveMode; label: string; detail: (first: string) => string; a
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
-export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack, only }: {
+export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack, only, onCancel }: {
   onBack?: () => void;
+  /** Closes the sheet; a click outside keeps a note with words in it, so this is the way out. */
+  onCancel?: () => void;
   /** Came in through Ask (help or a review only) or through Hand over (no choice to make). */
   only?: 'ask' | 'give';
   to: { id: string; name: string };
@@ -188,6 +190,7 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); } }} />
       <div className="sh-foot">
+        {onCancel && <button type="button" className="th-new sh-ghost" onClick={onCancel}>Cancel</button>}
         <button type="button" className="th-new sh-go" disabled={empty} onClick={go}>{m.go(first)}<kbd>{sendKeyFor(false)}</kbd></button>
       </div>
     </div>

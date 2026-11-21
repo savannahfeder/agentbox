@@ -114,4 +114,10 @@ describe('the second pass', () => {
     expect(html).toContain('placeholder="Anything Theo should know?"');
     expect(html).toContain('It moves to your Done.');
   });
+  it('has a Cancel, since a click outside keeps a note with words in it', async () => {
+    const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');
+    const html = renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, onCancel() {}, only: 'give', start: 'give' } as never));
+    expect(html).toMatch(/>Cancel<\/button><button type="button" class="th-new sh-go"/);
+    expect(menu).toContain('onCancel={() => close(true)}');
+  });
 });
