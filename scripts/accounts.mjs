@@ -2,6 +2,7 @@
 // npm run accounts               every login, as its engine sees it and as Agentbox holds it
 // npm run accounts -- --reset    Agentbox forgets what it holds against every login
 // npm run accounts -- --json     the same, with each engine's own words
+// npm run accounts -- --config <zero.config.json>   another copy's settings
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,13 +10,16 @@ import { loadConfig, configFile } from '../main/config.mts';
 import { readLogins, describeLogins, resetAccounts } from '../main/accounts-command.mts';
 import { Name } from '../shared/product-name.mjs';
 
-const appDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
+const named = args.includes('--config') ? args[args.indexOf('--config') + 1] : null;
+const appDir = named ? path.dirname(path.resolve(named)) : path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // loadConfig writes a new config when there is none, which would make a fresh
 // checkout's first launch look like an old one.
 if (!fs.existsSync(configFile(appDir))) {
-  console.error(`${Name} has not run from ${appDir} yet, so there is nothing to read. Run this in the folder the app runs from.`);
+  console.error(named
+    ? `There is no ${path.basename(configFile(appDir))} in ${appDir}.`
+    : `${Name} has not run from ${appDir} yet, so there is nothing to read. Run this in the folder the app runs from.`);
   process.exit(1);
 }
 const config = loadConfig(appDir);

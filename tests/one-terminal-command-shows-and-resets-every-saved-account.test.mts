@@ -73,6 +73,21 @@ describe('what the command reads', () => {
     expect(describeLogins(rows, { home })).toMatch(/~\/\.claude-3\n.*\n {4}Agentbox does not list it/);
   });
 
+  it('a second folder holding a listed account names the folder that is listed', async () => {
+    login(path.join(home, '.claude-9', '.claude.json'), 'main@example.com', 'u-main');
+    const rows = await readLogins(config(), { home, now: NOW, ask: asking({}) });
+    expect(rows.find((r) => r.folder.endsWith('.claude-9'))!.sameAs).toBe(path.join(home, '.claude'));
+    expect(rows.find((r) => r.folder.endsWith('.claude-3'))!.sameAs).toBeNull();
+    expect(describeLogins(rows, { home })).toMatch(/~\/\.claude-9\n.*\n {4}Agentbox lists this account once, as ~\/\.claude\n/);
+  });
+
+  it('an old mark reads as the Accounts page reads it: an ended plan is ended', async () => {
+    login(path.join(home, '.claude-2', '.claude.json'), 'second@example.com', 'u-second', { billingType: 'none' });
+    saved({ profileTrouble: { [path.join(home, '.claude-2')]: { cause: 'unknown', since: NOW - 60_000 } } });
+    const rows = await readLogins({ ...config(), authProfiles: [path.join(home, '.claude-2')] }, { home, now: NOW, ask: asking({}) });
+    expect(rows.find((r) => r.folder.endsWith('.claude-2'))!.appHolds!.cause).toBe('subscription-ended');
+  });
+
   it('each folder is asked as itself, and the default with no folder named', async () => {
     const asked: (string | null | undefined)[] = [];
     await readLogins(config(), { home, now: NOW, ask: async (engine, { folder }) => { if (engine === 'claude') asked.push(folder); return OUT; } });

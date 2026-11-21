@@ -8,7 +8,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { askEngine } from './ask-the-engine.mts';
 import type { EngineAnswer } from './ask-the-engine.mts';
-import { effectiveProfiles } from './account-discovery.mts';
+import { effectiveProfiles, troubleForProfile } from './account-discovery.mts';
+import { refineCause } from '../shared/spawn-trouble.mts';
 import { defaultClaudeHome, accountIdentity } from './account-tooling.mts';
 import { readPlan } from './claude-plan.mts';
 import { codexAccount } from './codex-account.mts';
@@ -32,6 +33,8 @@ export interface LoginRow {
   folder: string;
   /** The key the app files trouble under; null for a folder the app does not list. */
   key: string | null;
+  /** For a folder the app does not list: the listed folder holding the same account. */
+  sameAs?: string | null;
   email: string | null;
   plan: string | null;
   engineSays: EngineAnswer | null;
@@ -55,12 +58,14 @@ function dotFolders(home: string, prefix: string): string[] {
 
 export async function readLogins(config: AccountsConfig, { home = os.homedir(), ask = askEngine as Ask, now = Date.now() }: { home?: string; ask?: Ask; now?: number } = {}): Promise<LoginRow[]> {
   const state = savedState(config.storeRoot);
-  const held = (key: string | null): Held | null => {
+  // Read as the Accounts page reads it (main/settings.mts), so the two say the same.
+  const held = (key: string | null, plan: { ended?: boolean } | null = null): Held | null => {
     if (!key) return null;
-    const t = state.profileTrouble?.[key];
+    const t = key.startsWith('codex:') ? state.profileTrouble?.[key] : troubleForProfile(state.profileTrouble, key, { home });
     const until = state.profileCooldown?.[key] ?? 0;
     if (!t && until <= now) return null;
-    return { cause: t?.cause ?? 'resting', since: t?.since ?? t?.at ?? null, resetsAt: t?.resetsAt ?? null, restingUntil: until > now ? until : null };
+    const cause = t?.cause ? refineCause(t.cause, plan) : 'resting';
+    return { cause, since: t?.since ?? t?.at ?? null, resetsAt: t?.resetsAt ?? null, restingUntil: until > now ? until : null };
   };
 
   const dflt = defaultClaudeHome(home);
@@ -82,15 +87,24 @@ export async function readLogins(config: AccountsConfig, { home = os.homedir(), 
     if (!codex.has(dir) && fs.existsSync(path.join(dir, 'auth.json'))) codex.set(dir, null);
   }
 
+  const uuidOf = (folder: string) => accountIdentity(folder === dflt ? null : folder, { home })?.accountUuid ?? null;
+  const listedBy = new Map<string, string>();
+  for (const [folder, key] of claude) {
+    const uuid = key ? uuidOf(folder) : null;
+    if (uuid && !listedBy.has(uuid)) listedBy.set(uuid, folder);
+  }
+
   const rows: Promise<LoginRow>[] = [];
   for (const [folder, key] of claude) {
     const own = folder === dflt ? null : folder;
     const plan = readPlan(own ?? 'default', { home });
+    const uuid = key ? null : uuidOf(folder);
     rows.push((config.claudeBin ? ask('claude', { bin: config.claudeBin, folder: own }) : Promise.resolve(null)).then((says) => ({
       engine: 'claude' as const, folder, key,
+      sameAs: uuid ? listedBy.get(uuid) ?? null : null,
       email: says?.email ?? accountIdentity(own, { home })?.email ?? null,
       plan: plan.known ? plan.label : says?.plan ?? null,
-      engineSays: says, appHolds: held(key),
+      engineSays: says, appHolds: held(key, plan),
     })));
   }
   for (const [folder, key] of codex) {
@@ -125,7 +139,8 @@ export function describeLogins(rows: LoginRow[], { home = os.homedir() }: { home
         : r.engineSays?.signedIn === false ? 'signed out'
         : `no answer${r.engineSays?.said ? ` (${r.engineSays.said.split('\n')[0].slice(0, 80)})` : ''}`;
       const plan = r.plan && r.engineSays?.signedIn !== false ? `, ${r.plan}` : '';
-      const app = !r.key ? `${Name} does not list it`
+      const app = r.sameAs ? `${Name} lists this account once, as ${short(r.sameAs)}`
+        : !r.key ? `${Name} does not list it`
         : r.appHolds ? `${Name} thinks: ${WORDS[r.appHolds.cause] ?? r.appHolds.cause}`
         : `${Name} thinks: fine`;
       out.push(`  ${short(r.folder)}`);
