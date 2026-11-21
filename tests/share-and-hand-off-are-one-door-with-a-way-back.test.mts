@@ -82,7 +82,7 @@ describe('the sheet after picking a person', () => {
     const give = sheet({ only: 'give', start: 'give' });
     expect(give).not.toContain('Review');
     expect(give).toContain('Hand over to Theo');
-    expect(give).toContain('Theo owns it from now on, with its conversation and files. It moves to your Done.');
+    expect(give).toContain('Theo owns it from now on, with its conversation and files. You can take it back.');
     // A row that already chose Help or Review draws no switch.
     for (const kind of ['help', 'review']) {
       const one = sheet({ only: kind });
@@ -119,11 +119,12 @@ describe('the second pass', () => {
     const withStep = renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, onAsk() {}, only: 'ask', step: 'Should I drop it?' } as never));
     expect(withStep).not.toMatch(/sh-go" disabled/);
   });
-  it('asks the person taking it over what they should know, and says it moves to your Done', async () => {
+  it('asks the person taking it over what they should know, and says it can be taken back', async () => {
     const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');
     const html = renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, only: 'give', start: 'give' } as never));
     expect(html).toContain('placeholder="Anything Theo should know?"');
-    expect(html).toContain('It moves to your Done.');
+    // It waits in your In progress as With Theo now, so it no longer says Done (w-f702d60afe).
+    expect(html).toContain('You can take it back.');
   });
   it('has a Cancel, since a click outside keeps a note with words in it', async () => {
     const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');

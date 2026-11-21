@@ -116,7 +116,10 @@ export function newestAskPerThread<R extends AskRow & { body?: string | null }>(
     const key = threadKey(r);
     if (!key) continue;
     const had = newest.get(key);
-    if (!had || (r.updatedAt ?? r.createdAt ?? 0) > (had.updatedAt ?? had.createdAt ?? 0)) newest.set(key, r);
+    // One still open wins over any closed; otherwise the one sent last.
+    const rank = (x: R) => [x.status !== 'done' ? 1 : 0, x.createdAt ?? 0, x.updatedAt ?? 0];
+    const later = (a: number[], b: number[]) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
+    if (!had || later(rank(r), rank(had))) newest.set(key, r);
   }
   return rows.filter((r) => { const key = threadKey(r); return !key || newest.get(key) === r; });
 }

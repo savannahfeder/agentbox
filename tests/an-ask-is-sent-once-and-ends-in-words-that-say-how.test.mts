@@ -129,3 +129,16 @@ describe('Done gives way to a newer row about the same thread', () => {
     expect(read('renderer/src/App.tsx')).toContain('&& !handedOut.has(i.id)), items)');
   });
 });
+
+// The last live check: a hand-over taken back after a newer one went out was
+// updated last, so the closed one won and stayed in Done.
+describe('an open row wins over a closed one, whenever each was touched', () => {
+  it('keeps the open hand-over and drops the closed one from Done', async () => {
+    const { newestAskPerThread } = await import('../shared/thread-asks.mts');
+    const { sentWords, threadLink } = await import('../shared/thread-link.mts');
+    const body = sentWords('Add a key', threadLink('sam', 'w-1')!, '');
+    const closed = ask({ id: 'closed', ask: undefined, body, status: 'done', createdAt: 1, updatedAt: 20 });
+    const open = ask({ id: 'open', ask: undefined, body, status: 'open', createdAt: 10, updatedAt: 10 });
+    expect(newestAskPerThread([closed] as never, [closed, open] as never)).toEqual([]);
+  });
+});
