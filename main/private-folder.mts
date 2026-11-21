@@ -38,7 +38,7 @@ const lastFailure = new Map<string, string>();
 
 function git(cwd: string, args: string[], timeout = LOCAL_MS): { ok: boolean; out: string } {
   try {
-    const out = execFileSync('git', args, { cwd, encoding: 'utf8', timeout, killSignal: 'SIGKILL', env: NO_PROMPT, stdio: ['ignore', 'pipe', 'pipe'] });
+    const out = execFileSync('git', args, { cwd, encoding: 'utf8', timeout, killSignal: 'SIGKILL', env: NO_PROMPT, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
     return { ok: true, out: out.trim() };
   } catch (error) {
     const e = error as { stderr?: unknown; message?: string };

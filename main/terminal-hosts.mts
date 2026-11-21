@@ -61,6 +61,7 @@ export function launchTerminalHost(sockPath: string, { logFile = null }: { logFi
       env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
       detached: true,
       stdio: ['ignore', out, out],
+      windowsHide: true,
     });
     proc.on('error', () => {});
     proc.unref();

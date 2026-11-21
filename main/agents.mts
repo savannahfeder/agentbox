@@ -159,7 +159,7 @@ const PROJECTS_DIR = () => path.join(os.homedir(), '.claude', 'projects');
 async function processTable() {
   const table = new Map<number, ProcessRow>();
   const { stdout: out } = await run('/bin/ps', ['-Ao', 'pid=,ppid=,lstart=,command='], {
-    encoding: 'utf8', maxBuffer: 16 << 20, timeout: 5000,
+    encoding: 'utf8', maxBuffer: 16 << 20, timeout: 5000, windowsHide: true,
   });
   for (const line of out.split('\n')) {
     // pid ppid <lstart: Www Mmm dd hh:mm:ss yyyy = 5 fields> command...
@@ -204,6 +204,7 @@ async function fromCli(claudeBin: string | null | undefined): Promise<SessionRec
       // So the CLI does not think it is a child of this session, and never
       // inherits an API key.
       env: scrubbed(process.env),
+      windowsHide: true,
     });
     const parsed = JSON.parse(stdout);
     return Array.isArray(parsed) ? parsed : [];
@@ -642,7 +643,7 @@ const CPU_MOVED = 0.15;
 
 async function cpuSeconds(pid: number): Promise<number | null> {
   try {
-    const { stdout } = await run('/bin/ps', ['-o', 'time=', '-p', String(pid)], { encoding: 'utf8', timeout: 3000 });
+    const { stdout } = await run('/bin/ps', ['-o', 'time=', '-p', String(pid)], { encoding: 'utf8', timeout: 3000, windowsHide: true });
     const m = stdout.trim().match(/(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)/);
     if (!m) return null;
     const [, d = 0, h = 0, mi, sec] = m;

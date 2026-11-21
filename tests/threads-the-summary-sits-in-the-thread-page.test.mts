@@ -28,8 +28,10 @@ describe('the top bar', () => {
     // One thing at a time (w-65bcefb857) puts the line saying where an answer
     // went, and its place and arrows, beside the dots, in that mode only.
     // The faces sit with them so the header is one row (2026-11-02); Add
-    // people is a row in the menu since w-c25aae4035.
-    expect(portal.startsWith('createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)')).toBe(true);
+    // people is a row in the menu since w-c25aae4035. Whoever you asked onto
+    // the thread sits beside the faces, small, rather than in a bar over the
+    // reply box (w-f702d60afe).
+    expect(portal.startsWith('createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && !givenTask && (direct || summarised) && <ConversationAside item={item} />}{asksCorner}{threadMenu}</span>, cornerHeaderTarget)')).toBe(true);
     expect(focus).toContain('lead={summarised ? <ThreadStateMark item={item} /> : null}');
   });
 });

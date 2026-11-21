@@ -45,6 +45,7 @@ describe('App.tsx', () => {
   });
   it('draws the first-message box only when the rule says so, and nothing while it waits', () => {
     expect(place).toMatch(/chatShows === 'not yet' \? null/);
-    expect(place).toMatch(/chatShows === 'first message'\s*\?\s*<ChatStart empty=\{<EmptyChat/);
+    // With history and no chat yet the history stands in for the empty picture (w-f702d60afe).
+    expect(place).toMatch(/chatShows === 'first message'\s*\?\s*<ChatStart empty=\{history\.rows\.length \? <AlongHistory [^]*?: <EmptyChat/);
   });
 });

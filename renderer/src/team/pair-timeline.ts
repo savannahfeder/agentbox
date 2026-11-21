@@ -19,6 +19,10 @@ export interface PairTask {
   createdAt?: number;
   labels?: string[];
   talk?: { chat: readonly { by: string; ts: number; text: string }[] } | null;
+  /** Help or a review asked on a thread (shared/thread-asks.mts), and what came back. */
+  ask?: { kind?: string } | null;
+  verdict?: string | null;
+  wrote?: Readonly<Record<string, { ts: number; by?: string } | undefined>>;
 }
 
 export type PairOpens =
@@ -26,7 +30,9 @@ export type PairOpens =
   | { to: 'thread'; owner: string; threadId: string }
   | { to: 'file'; owner: string; threadId: string; file: string; note: string };
 
-export type PairKind = 'message' | 'task' | 'handoff' | 'reply' | 'comment' | 'note';
+export type PairKind = 'message' | 'task' | 'handoff' | 'help' | 'review' | 'back' | 'reply' | 'comment' | 'note';
+/** The kinds that are a thread passing between the two, drawn as a card that opens it. */
+export const THREAD_KINDS: ReadonlySet<PairKind> = new Set(['task', 'handoff', 'help', 'review', 'back']);
 
 export interface PairEntry {
   key: string;
@@ -79,7 +85,13 @@ export function pairTimeline({ me, other, rooms, messages, directItems, talk, ti
     const title = t.label || t.title;
     const open: PairOpens = { to: 'task', id: t.id };
     const handoff = !!handedFrom(t.body, giver);
-    out.push({ key: `task:${t.id}`, at: t.createdAt ?? 0, kind: handoff ? 'handoff' : 'task', by: giver, to: otherOf(giver), text: title, where: { label: title, open } });
+    const asked = t.ask?.kind === 'help' || t.ask?.kind === 'review' ? t.ask.kind : null;
+    out.push({ key: `task:${t.id}`, at: t.createdAt ?? 0, kind: asked ?? (handoff ? 'handoff' : 'task'), by: giver, to: otherOf(giver), text: title, where: { label: title, open } });
+    const back = asked && t.verdict ? t.wrote?.verdict : null;
+    if (back?.by && pair.has(back.by)) {
+      const word = t.verdict === 'yes' ? 'Said it looks good' : t.verdict === 'changes' ? 'Asked for changes' : 'Handed it back';
+      out.push({ key: `back:${t.id}`, at: back.ts ?? 0, kind: 'back', by: back.by, to: otherOf(back.by), text: word, where: { label: title, open } });
+    }
     const brief = said(t.body ?? '');
     let briefSeen = false;
     for (const [k, line] of (t.talk?.chat ?? []).entries()) {
@@ -113,5 +125,12 @@ export function pairLine(e: PairEntry, me: string, nameOf: (id: string) => strin
   const whom = e.to === me ? 'you' : nameOf(e.to ?? '').split(' ')[0];
   if (e.kind === 'task') return `Gave ${whom} a task`;
   if (e.kind === 'handoff') return `Handed ${whom} a thread`;
-  return e.text;
+  if (e.kind === 'help') return `Asked ${whom} to help`;
+  if (e.kind === 'review') return `Asked ${whom} for a review`;
+  return linksAsWords(e.text);
+}
+
+/** These lines are drawn as plain words, so a Markdown link shows its words; where it leads is the button under the line. */
+export function linksAsWords(text: string): string {
+  return text.replace(/\[([^\]\n]+)\]\((?:https?:\/\/|\/)[^)\s]+\)/g, '$1');
 }

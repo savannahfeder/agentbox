@@ -73,9 +73,16 @@ describe('the comment box explains nothing', () => {
 
 describe('the page uses the window', () => {
   const css = read('renderer/src/threads/pages.css');
-  it('puts the conversation and what it is about side by side', () => {
-    expect(rule(css, '.tp-grid')).toMatch(/grid-template-columns: minmax\(0, 1fr\) 340px/);
-    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/<aside className="tp-side"/);
+  // 2026-11-20 (w-f702d60afe): the founder found the two-column page did not
+  // match an opened thread of her own. The conversation now takes the task
+  // page's column, and About puts the card beside it when pressed.
+  it('sets the conversation in the opened-thread column, with About beside it on asking', () => {
+    expect(css).toMatch(/--tp-measure: min\(calc\(var\(--tp-type\) \* 47\.5\), calc\(100cqi - 96px\)\)/);
+    expect(rule(css, '.tp-grid.tp-with-about')).toMatch(/grid-template-columns: minmax\(0, var\(--tp-measure\)\) 300px/);
+    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/\{about && <aside className="tp-side"/);
+    // 2026-11-21: in the thread page's own column, reply box at the foot.
+    expect(read('renderer/src/threads/TeammateThread.tsx')).toContain('<div className="focus-pane tp-thread" ref={pageEl}>');
+    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/<div className="focus-dock">[\s\S]*?<div className="dock-card">/);
   });
   it('no longer caps the whole page at 760px', () => {
     expect(css).not.toMatch(/\.th-card-page \{[^}]*max-width: 760px/);

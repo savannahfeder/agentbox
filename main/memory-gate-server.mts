@@ -57,7 +57,7 @@ export function denyOutput(reason: string): string {
 
 function run(cmd: string, args: string[]): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
-    execFile(cmd, args, { timeout: 5_000, maxBuffer: 16 * 1024 * 1024 }, (err, stdout) => resolve(err ? null : stdout));
+    execFile(cmd, args, { timeout: 5_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (err, stdout) => resolve(err ? null : stdout));
   });
 }
 

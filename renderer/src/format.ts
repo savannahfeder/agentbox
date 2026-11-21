@@ -2,6 +2,7 @@ import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/rep
 import { isShippedNote } from '../../shared/shipped-note.mts';
 import { readMoment } from './when-words';
 import { localDate } from './local-dates';
+import { handedBackBy } from '../../shared/thread-asks.mts';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
 
@@ -158,8 +159,14 @@ export function optionsFrom(item: HasFields): OptionsField {
 }
 
 export function itemOptions(item: HasFields): ParsedOption[] {
-  return parseOptions(item[optionsFrom(item)]);
+  const options = parseOptions(item[optionsFrom(item)]);
+  // A reviewer who asked for changes outranks what the agent recommended before they looked.
+  if (!changesAskedSince(item)) return options;
+  return options.map((o) => ({ ...o, text: o.text.replace(/\s*\(recommended\)\s*/i, ''), recommended: false }));
 }
+
+const changesAskedSince = (item: HasFields & { status?: string; answer?: string }) =>
+  !!handedBackBy(item as never) && / reviewed this and asked for changes\.(\n|$)/.test(item.answer ?? '');
 
 // With the options strip riding on the composer, the field's own "## Options"
 // section would say everything twice; drop the heading and its numbered items
@@ -218,6 +225,8 @@ export function offerIsLive(item: HasFields & { answer?: string }): boolean {
   const afterTheShip = isShippedNote(item.note) && !options.some((o) => asksToShip(o.text));
   if (later.some((f) => f !== field && writtenAt(item, f) > offered && !(f === 'note' && afterTheShip))) return false;
   if (!item.answer || item.answer === '(withdrawn)') return true;
+  // A teammate's words handed back to you are not your pick (round three of the team test).
+  if ((item.wrote?.answer as { teammate?: string } | undefined)?.teammate) return true;
   const spoke = item.wrote?.answer?.ts ?? 0;
   return offered > spoke;
 }

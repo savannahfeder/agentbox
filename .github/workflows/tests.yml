@@ -14,7 +14,8 @@
 # use bash when zsh is absent, `~/.agentbox`, and Control-K for the palette.
 # The macOS job stays because the app still ships an arm64 dmg, and that job
 # still covers login zsh, the keychain, and `/Users`. A green run on one
-# machine does not stand in for the other.
+# machine does not stand in for the other. Windows runs only the tests
+# written for it, so a change that breaks Windows shows here.
 #
 # A macOS minute costs about ten Linux ones, so the macOS runner is the
 # expensive one. A whole macOS job, checkout and `npm ci` included, has
@@ -90,6 +91,24 @@ jobs:
       - run: npm ci
 
       - run: npx vitest run --reporter=basic
+
+  # Windows runs the tests written for it, the files with "windows" in their
+  # name. The rest of the suite assumes a Mac or Linux machine.
+  vitest-windows:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx vitest run windows --reporter=basic
 
   # Strict tsc over the renderer and the back end (main/, shared/, mcp/), and
   # over the phone app, which imports shared/ too. Its own job so a type error

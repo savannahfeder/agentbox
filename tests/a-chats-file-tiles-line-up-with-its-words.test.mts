@@ -8,17 +8,17 @@
 // 14px gap, then the words; the timeline already moves its lines by the same
 // 42px (the-timeline-lines-up-with-the-words-in-a-conversation).
 //
-// Pinned: in a chat, the tile row starts on the words' line and keeps to the
-// width beside it; an agent's thread, which draws no faces, is not matched.
+// Since 2026-11-20 (w-f702d60afe) the face sits beside the name and the words
+// start at the column's edge, so the tiles need no margin to line up with them.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
 const css = fs.readFileSync(new URL('../renderer/src/team/chat.css', import.meta.url), 'utf8');
 
 describe("a chat's file tiles", () => {
-  it('start where the words start, the face and its gap in', () => {
-    expect(css).toMatch(/\.focus:has\(> \.focus-body \.thread\.is-chat\) > \.message-files \{ margin-left: 42px; width: calc\(100% - 42px\); \}/);
-    expect(css).toMatch(/\.chat-msg \{ display: grid; grid-template-columns: 28px minmax\(0, 1fr\); column-gap: 14px; \}/);
+  it('start where the words start, at the column\'s edge', () => {
+    expect(css).not.toMatch(/message-files \{ margin-left: 42px/);
+    expect(css).toMatch(/\.chat-msg > :not\(\.chat-gutter, \.msg-head\) \{ grid-column: 1 \/ -1;/);
   });
 
   it('move only in a chat', () => {

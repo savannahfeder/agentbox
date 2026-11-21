@@ -241,8 +241,13 @@ export async function cloudSignIn({ config, session, method, email, password, na
     return { ok: false, error: (err as Cancelable)?.message || String(err), ...((err as Cancelable)?.cancelled ? { cancelled: true } : {}) };
   }
   session.held = token;
-  const acceptedTerms = agreeing ? await currentCloudTerms(config) : undefined;
-  const out = await signInToCloud({ config, acceptedTerms, googleSignIn: async () => token, env, home });
+  let out: AccountOutcome;
+  try {
+    const acceptedTerms = agreeing ? await currentCloudTerms(config) : undefined;
+    out = await signInToCloud({ config, acceptedTerms, googleSignIn: async () => token, env, home });
+  } catch (err) {
+    return { ok: false, error: (err as Error)?.message || String(err) };
+  }
   if (out.ok) { session.held = null; return out; }
   if (out.error === 'terms' && !agreeing) return { ok: false, needsTerms: true, terms: out.terms ?? null };
   return { ok: false, error: out.message || out.error };
@@ -273,8 +278,9 @@ export async function signInToCloud({ config, acceptedTerms, name = os.hostname(
   const file = cloudConfigPath(env, home);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ gateway: config.gateway }, null, 2) + '\n', { mode: 0o600 });
-  const me = await ask(config.gateway, '/v1/me', { key: made.body.key });
-  return { ok: true, ...(me.status === 200 ? me.body : {}) };
+  // The key is kept by now, so this Mac is signed in whether or not its profile comes back.
+  const me = await ask(config.gateway, '/v1/me', { key: made.body.key }).catch(() => null);
+  return { ok: true, ...(me?.status === 200 ? me.body : {}) };
 }
 
 /**

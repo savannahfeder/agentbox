@@ -91,6 +91,11 @@ const ORG_BLOCKED = [
   /ask your admin/i,
 ];
 
+// Claude Code 2.1.330 on a subscription whose payment lapsed: "Claude Code
+// can't use your Claude subscription, usually because a payment is past due".
+// The login's file still says it pays, so these words are the only sign.
+const SUBSCRIPTION_ENDED = [/can['’]?t use your claude subscription/i];
+
 // A CODEX SIGNED IN WITH AN API KEY. Our own line, said before the worker
 // starts (main/codex-account.mts `codexKeyRefusal`), because Codex reads the
 // key out of auth.json past the worker scrub and bills every call to it.
@@ -292,6 +297,7 @@ export function troubleCause(raw: unknown): string {
   // FIRST, because an organization's refusal mentions the subscription and
   // reads as a signed-out login to the list below.
   if (ORG_BLOCKED.some((re) => re.test(text))) return 'org-blocked';
+  if (SUBSCRIPTION_ENDED.some((re) => re.test(text))) return 'subscription-ended';
   // BEFORE SIGNED-OUT, because Codex's sentence says "ChatGPT account".
   if (MODEL_NOT_ON_PLAN.some((re) => re.test(text))) return 'model-not-on-plan';
   if (LEVEL_NOT_OFFERED.some((re) => re.test(text))) return 'level-not-offered';
@@ -317,13 +323,14 @@ export function troubleCause(raw: unknown): string {
 // Claude subscription access for Claude Code" (2026-10-11), the same line a
 // workspace policy prints, so the text alone cannot tell them apart. The
 // login's own file can: `plan` is main/claude-plan.mts's reading of it, and
-// `ended` is its billing gone to "none". Anything else keeps its cause.
+// `ended` is its billing gone to "none"; a refusal nobody could name on such a
+// login is the same fact. Anything else keeps its cause.
 // A LOGIN THAT RAN OUT AND ONE NOBODY EVER MADE REFUSE IN THE SAME WORDS, and
 // the second is what somebody who skipped setup meets: "Sign that account back
 // in" about an account they never had. `everSignedIn` is the caller's reading
 // of the login's own files; false only where that reading is proof.
 export function refineCause(cause: string, plan: { ended?: unknown } | null | undefined, { everSignedIn = true }: { everSignedIn?: boolean } = {}): string {
-  if (cause === 'org-blocked' && plan?.ended) return 'subscription-ended';
+  if ((cause === 'org-blocked' || cause === 'unknown') && plan?.ended) return 'subscription-ended';
   if (cause === 'signed-out' && !everSignedIn) return 'no-plan';
   return cause;
 }
@@ -750,6 +757,7 @@ const RUN_STOPPED: Record<string, string> = {
   // Same refusal text for an admin's block and an ended subscription, and this
   // line has only the text, so it says what is true of both.
   'org-blocked': 'This run stopped because Claude Code will not run on that account.',
+  'subscription-ended': "This run stopped because that account's Claude subscription has ended.",
   'at-limit': 'This run stopped because the account hit its usage limit.',
   workspace: "This run stopped because it would not start in this project's folder.",
   interrupted: 'This run was cut off in the middle.',

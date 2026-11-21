@@ -1,9 +1,10 @@
-/* AN AGENT'S FACE (./AgentFace.tsx). The same 18px as a person's (.tm-av),
-   dashed and softly cornered because it is not a person. */
+/* AN AGENT'S FACE (./AgentFace.tsx). The same 18px as a person's (.tm-av).
+   A faint solid ring, not a dashed one (w-585619d660): down a list of mostly
+   agents' threads the dashes read as clutter. */
 .agent-face {
   display: inline-grid; place-items: center; flex: none; vertical-align: middle;
   width: 18px; height: 18px; box-sizing: border-box;
-  border: 1px dashed var(--line-strong); border-radius: var(--mate-corner);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); border-radius: var(--mate-corner);
   color: var(--text-dim);
 }
 .agent-eyes { display: block; width: 16px; height: 16px; fill: currentColor; }

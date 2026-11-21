@@ -47,6 +47,8 @@
   font: inherit; outline: none;
 }
 .av-name-box:focus { border-color: var(--underline); }
+/* Gives way before the name does. */
+.av-label { flex: 0 4 auto; min-width: 0; max-width: 60ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
 .av-versions { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
 .av-of { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; padding: 0 2px; white-space: nowrap; }
 .av-newest { flex: none; height: 24px; margin-left: 4px; padding: 0 6px; background: none; border: 0; border-radius: var(--radius); font: inherit; font-size: 13px; color: var(--text); white-space: nowrap; }

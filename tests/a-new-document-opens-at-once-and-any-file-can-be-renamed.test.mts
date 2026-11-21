@@ -20,6 +20,7 @@ import { appFilesPlace } from '../main/files-place.mts';
 import { foldFolders } from '../shared/file-folders.mts';
 import { shownName } from '../renderer/src/files/files-shown.ts';
 import { canWrite } from '../main/doc-file.mts';
+import { fileRenameUndo } from '../renderer/src/files/files-undo.ts';
 
 let store; let place; let dir; let accountRoot; let storeRoot;
 
@@ -153,6 +154,23 @@ describe('the folder log', () => {
     ]);
     expect(shelf.titleOf('k')).toBe('Newer');
     expect(shelf.titleOf('other')).toBeNull();
+  });
+});
+
+// Z undoes a folder rename (w-6025e74bb0), so a file's rename undoes the same way.
+describe('Z after a file rename', () => {
+  it('names the file back to what it showed before', () => {
+    const u = fileRenameUndo({ key: 'k', name: 'untitled-document.md', sentIn: [], title: 'Untitled document' }, 'Call notes');
+    expect(u?.back).toEqual({ do: 'name', key: 'k', name: 'Untitled document' });
+    expect(u?.label).toBe('Renamed Untitled document back');
+  });
+
+  it('puts back the name on disk for a file that had no name of its own', () => {
+    expect(fileRenameUndo({ key: 'k', name: 'q3-plan.md', sentIn: [] }, 'Q3 plan')?.back).toEqual({ do: 'name', key: 'k', name: 'q3-plan.md' });
+  });
+
+  it('leaves nothing to undo when the name did not change', () => {
+    expect(fileRenameUndo({ key: 'k', name: 'a.md', sentIn: [], title: 'Plan' }, '  Plan ')).toBeNull();
   });
 });
 

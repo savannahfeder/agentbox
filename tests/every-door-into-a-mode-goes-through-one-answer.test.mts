@@ -156,7 +156,8 @@ describe('every door into a permission mode goes through that one answer', () =>
   // gated twice, on purpose: `query` feeds nothing else, but a null query means
   // the menu cannot open even if somebody widens `slashRows` later.
   it('keeps external agent queries gated while allowing Codex commands', () => {
-    expect(composer).toContain('const query = !item.agent ? slashQuery(text) : null;');
+    expect(composer).toContain('const toAgent = !item.agent && !talkTo?.length;');
+    expect(composer).toContain('const query = toAgent ? slashQuery(text) : null;');
   });
 });
 
