@@ -1754,7 +1754,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             </div>
             : <div className="tbl-edit" data-row={order[editing.r] + 1} data-col={table.columns[editing.c].name} style={{ left: place.left, top: place.top, width: place.w }}>
               <GrowingText className="tbl-edit-box" value={editing.draft} autoFocus caretAtEnd readOnly={!editable} label={table.columns[editing.c].name}
-                onChange={(v) => setEditing((x) => (x ? { ...x, draft: v } : x))}
+                onChange={(v) => { if (open.current) open.current = { ...open.current, draft: v }; setEditing((x) => (x ? { ...x, draft: v } : x)); }}
                 // Rows copied from a spreadsheet into an empty cell go across the table, not into the one cell.
                 onPaste={(e) => {
                   const text = e.clipboardData.getData('text/plain');

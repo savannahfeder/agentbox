@@ -706,3 +706,10 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-tried .ts-trail { font-size: 14px; line-height: 21px; color: var(--text); }
 .tp-tried .ts-step::before { top: 8px; }
 .tp-tried .ts-step:not(:last-child)::after { top: 15px; }
+
+/* A teammate's thread opened from the Inbox is drawn as a thread of your own (TeammateThread.tsx). */
+.tm-team-pane.th-pane:has(> .tp-thread) { display: flex; flex-direction: column; overflow: hidden; }
+.tp-thread > .tp-side { position: absolute; top: 28px; right: 32px; width: 300px; max-height: calc(100% - 56px); overflow: auto; z-index: 2; }
+.tp-thread .tp-files { margin: 12px 0 0; }
+.tp-dock-form { margin: 0; }
+.tp-dock-form .compose-clauses { margin-right: auto; }
