@@ -4512,6 +4512,7 @@ export default function App() {
       if (one) openChatsPlace(`person:${one.people[0]}`); else roomsUi.pickGroup(key);
     },
     onTeam: homeLayout === 'chats' ? () => openChatsPlace('team') : undefined,
+    onTasks: homeLayout === 'chats' ? () => openChatsPlace('tasks') : undefined,
     persons: homeLayout === 'chats' && team ? (team.state.people ?? []).filter((p) => p.id !== team.me).map((p) => ({ id: p.id, name: p.name, url: p.avatarUrl ?? null, waits: false })) : undefined,
     onPerson: (id) => openChatsPlace(`person:${id}`),
   } : null;
@@ -7565,7 +7566,7 @@ export default function App() {
     : s.at === 'files' ? 'Files'
     : s.at === 'connections' ? 'Connections'
     : s.at === 'settings' ? 'Settings'
-    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : members.find((m) => m.key === s.place)?.name ?? 'Team')
+    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : s.place === 'tasks' ? 'Tasks' : members.find((m) => m.key === s.place)?.name ?? 'Team')
     : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
     : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
     : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
@@ -8098,9 +8099,9 @@ export default function App() {
   // A teammate's waiting thread waits on them, not on you, so it never wears the accent.
   const CARD_WORD: Record<string, [string, PlaceRow['tone']]> = { running: ['Working', 'work'], waiting: ['Waiting', 'hold'], scheduled: ['Later', 'later'], done: ['Done', 'done'] };
   const placeMember = evOn && evPlace ? members.find((m) => m.key === evPlace) ?? null
-    : chatsPlaceShown && chatsPlace !== 'team' ? members.find((m) => m.key === chatsPlace) ?? null : null;
-  // Where Chats' list marks the open page: the team, an AI teammate, or the person's one-to-one chat.
-  const chatsListKey = !chatsPlaceShown || !chatsPlace ? null : chatsPlace === 'team' ? 'team'
+    : chatsPlaceShown && chatsPlace !== 'team' && chatsPlace !== 'tasks' ? members.find((m) => m.key === chatsPlace) ?? null : null;
+  // Where Chats' list marks the open page: the team, its tasks, an AI teammate, or the person's one-to-one chat.
+  const chatsListKey = !chatsPlaceShown || !chatsPlace ? null : chatsPlace === 'team' || chatsPlace === 'tasks' ? chatsPlace
     : chatsPlace.startsWith('mate:') ? `teammate:${chatsPlace.slice('mate:'.length)}`
       : chatsPlace;
   const backTo = 'Needs you';
@@ -8569,7 +8570,7 @@ export default function App() {
                     const task = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;
                     return task ? handAskBack(task, verdict, words) : Promise.resolve(false);
                   }}
-                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
+                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : chatsPlace === 'tasks' ? 'Tasks' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
                   onMessage={() => messageAbout(openCard.personId, openCard.title)} />
@@ -8597,7 +8598,7 @@ export default function App() {
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
                   onOpen={homeOpenRow} onMember={(key) => openChatsPlace(key)} onTeam={() => openChatsPlace('team')} />
-              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{standupPage(homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : placeEl}</ChatsFrame>
+              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{standupPage(homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : chatsPlace === 'tasks' ? <div className="team-page">{tasksPage('Tasks')}</div> : placeEl}</ChatsFrame>
               : connectionsShown ? (
                 <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} cloudKeys={savedCloudKeyList} />
               ) : filesShown ? (
