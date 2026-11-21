@@ -15,13 +15,14 @@ export function fileToSendBack(lines: readonly ThreadLine[] | null | undefined):
 type Row = TeamRow & { product: string; id: string; labels?: string[] | null };
 export type GoesBack = { to: string; task: Row } | { to: string; thread: { personId: string; threadId: string } };
 
-/** The teammate whose task or thread this one was started from, or null. */
+/** The teammate whose task, conversation or thread this one was started from, or null. */
 export function whereItGoesBack(item: Pick<Row, 'labels'>, items: readonly Row[], me: string | null): GoesBack | null {
   const handed = (item.labels ?? []).find((l) => l.startsWith('handed-from:'))?.split(':');
   if (handed?.length === 3) {
-    const task = items.find((i) => i.product === handed[1] && i.id === handed[2]);
-    const giver = task && isTaskRow(task) ? taskGiver(task) : null;
-    return task && giver && giver !== me ? { to: giver, task } : null;
+    const row = items.find((i) => i.product === handed[1] && i.id === handed[2]);
+    if (!row) return null;
+    const to = isTaskRow(row) ? taskGiver(row) : (row.people ?? []).find((p) => p !== me) ?? row.createdBy ?? null;
+    return to && to !== me ? { to, task: row } : null;
   }
   const from = continuedFrom(item.labels);
   return from && from.personId !== me ? { to: from.personId, thread: from } : null;

@@ -47,6 +47,13 @@ describe('who it goes back to', () => {
     expect(whereItGoesBack(agentThread, [task], ME)).toMatchObject({ to: PRIYA, task: { id: 'w-t1' } });
   });
 
+  // Rerun, 2026-11-21: Theo handed Sam's message in their conversation to his
+  // agent, and its new version had no way back to Sam.
+  it('the other person in the conversation a message was handed from', () => {
+    const chat = { product: 'direct-ab', id: 'w-c1', labels: [], createdBy: 'sam', people: [ME, 'sam'], status: 'open' };
+    expect(whereItGoesBack({ product: 'ferry', id: 'w-a4', labels: ['handed-from:direct-ab:w-c1'] }, [chat], ME)).toMatchObject({ to: 'sam', task: { id: 'w-c1' } });
+  });
+
   it('the owner of the teammate thread it carries on', () => {
     expect(whereItGoesBack({ product: 'ferry', id: 'w-a2', labels: ['continued-from:sam:w-s1'] }, [], ME)).toEqual({ to: 'sam', thread: { personId: 'sam', threadId: 'w-s1' } });
   });
