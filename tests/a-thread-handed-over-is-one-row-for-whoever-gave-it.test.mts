@@ -113,3 +113,13 @@ describe('the giver\'s thread while it is out', () => {
     expect(pages).toContain('`${handedOnName.split(/\\s+/)[0]} finished it`');
   });
 });
+
+// The regression look: Sam replied on a thread he had handed over, which
+// reopened it for him while Theo still held the task, so both owned it.
+describe('the reply box on a thread they have', () => {
+  const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
+  it('makes way for Take it back while their task is open', () => {
+    expect(focus).toContain("const outWithThem = !!handedTask && handedTask.status !== 'done';");
+    expect(focus).toContain('{outWithThem ? <div className="dock-handed"><span>{handedName!.split(/\\s+/)[0]} has this now.</span>{onReopen && <button type="button" className="ts-done" onClick={onReopen}>Take it back</button>}</div> : <div className="dock-card">');
+  });
+});

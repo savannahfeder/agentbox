@@ -1059,6 +1059,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const audience = teamCtx ? workAudience(item, teamCtx.products.get(item.product), teamCtx.me, (id) => firstName(teamCtx.byId.get(id) ?? null)) : null;
   const handedName = handedTo(item);
   const handedTask = handedName ? taskHandedFrom(items ?? [], item.id, teamCtx?.me ?? null) : null;
+  // While they have it a reply here would reopen it for you too: the box makes way for taking it back.
+  const outWithThem = !!handedTask && handedTask.status !== 'done';
   const summarised = !agent && !made && !direct;
   // Read before the first paint, so the thread's width is right from the start.
   const paneRef = useRef<HTMLDivElement>(null);
@@ -2620,7 +2622,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           </div>
         )}
         {!sentUp && aboveDock}
-        <div className="dock-card">
+        {outWithThem ? <div className="dock-handed"><span>{handedName!.split(/\s+/)[0]} has this now.</span>{onReopen && <button type="button" className="ts-done" onClick={onReopen}>Take it back</button>}</div> : <div className="dock-card">
           {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back.
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
@@ -2703,7 +2705,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && !answered && <ChoicesShow count={options.length} onShow={foldChoices} />}
             </button>
           )}
-        </div>
+        </div>}
       </div>
     </div>
     {!direct && <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} onOpenChange={setTerminalOpen}/>}
