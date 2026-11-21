@@ -16,36 +16,34 @@ import { lastThreadAfter, type Stop } from '../renderer/src/back-and-forward';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => fs.readFileSync(path.join(here, '..', rel), 'utf8');
 
-const inbox: Stop = { at: 'list', view: 'inbox' };
-const home: Stop = { at: 'home' };
 const thread = (id: string): Stop => ({ at: 'thread', product: 'p', id });
-// Every place you stood on, in the order you stood on it, however you got
-// there: a click, esc, or the back and forward arrows.
+const card: Stop = { at: 'card', person: 'm', thread: 'x' };
+// Every thread you stood on, in the order you stood on it, however you got
+// there: a click, E, or the back and forward arrows. The list is not a stop.
 const stoodOn = (...stops: Stop[]) => stops.reduce(lastThreadAfter, null as ReturnType<typeof lastThreadAfter>);
 
 describe('the last thread you were in', () => {
   it('is the thread you just left for the inbox', () => {
-    expect(stoodOn(inbox, thread('a'), inbox)).toEqual({ product: 'p', id: 'a' });
+    expect(stoodOn(thread('a'))).toEqual({ product: 'p', id: 'a' });
   });
 
   it('is only the most recent one, not the one before it', () => {
-    expect(stoodOn(inbox, thread('a'), inbox, thread('b'), home, inbox)).toEqual({ product: 'p', id: 'b' });
+    expect(stoodOn(thread('a'), thread('b'))).toEqual({ product: 'p', id: 'b' });
   });
 
-  it('is nothing before you have opened a thread', () => {
+  it('is nothing before you have opened a thread of your own', () => {
     expect(stoodOn()).toBeNull();
-    expect(stoodOn(home, inbox)).toBeNull();
+    expect(stoodOn(card)).toBeNull();
   });
 
-  // The reported case: the wash sat on an older thread, not the one just left.
-  // Back from B lands on the inbox stop that came before B, and the old rule
-  // read the trail only up to there, so it found A.
-  it('is the thread you left with the back arrow, not one from before it', () => {
-    expect(stoodOn(inbox, thread('a'), inbox, thread('b'), inbox)).toEqual({ product: 'p', id: 'b' });
+  // The reported case: the wash sat on an older thread, not the one just left,
+  // because the old rule read the trail only up to where back had moved it.
+  it("is your own thread you left last, not a teammate's opened after it", () => {
+    expect(stoodOn(thread('a'), thread('b'), card)).toEqual({ product: 'p', id: 'b' });
   });
 
   it('is the thread back or forward took you into', () => {
-    expect(stoodOn(inbox, thread('a'), inbox, thread('b'), inbox, thread('a'), inbox)).toEqual({ product: 'p', id: 'a' });
+    expect(stoodOn(thread('a'), thread('b'), thread('a'))).toEqual({ product: 'p', id: 'a' });
   });
 
   it('is noted for every place the arrows take you to, not only new visits', () => {

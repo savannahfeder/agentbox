@@ -290,7 +290,7 @@ import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sk
 import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
-import { stopOnScreen, useBackAndForward, type Stop as TrailStop } from './back-and-forward';
+import { onInboxPage, stopOnScreen, useBackAndForward, type Screen as TrailScreen, type Stop as TrailStop } from './back-and-forward';
 import { BackForward } from './components/BackForward';
 
 
@@ -7478,63 +7478,44 @@ export default function App() {
   // opened from Needs you lands back on the Chats screen with another reply box.
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setOpenCard(null); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setTasksOn(false); setChatsPlace(null); setHomeOpen(false); };
 
-  // BACK AND FORWARD, on every computer. Above the early returns below, because
-  // it is a hook; `homeShown` is worked out again here for the same reason.
+  // BACK AND FORWARD WALK THE THREADS YOU WERE IN, on every computer and only
+  // on the inbox page. A thread opened inside another page keeps that page's
+  // own back. Above the early returns below, because it is a hook; `homeShown`
+  // is worked out again here for the same reason.
   const backForwardOn = !onPhone();
   const homeHere = homeOn && homeOpen && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
-  const groupHere = roomShown && roomsUi.openId !== 'groups' ? roomsUi.openId : null;
-  const stopHere = stopOnScreen({
-    settings: settingsOpen ? { pane: settingsAt } : null,
-    thread: focused ? { product: focused.product, id: focused.id } : null,
-    card: teamShown && openCard ? { person: openCard.personId, thread: openCard.threadId } : null,
-    home: homeHere,
-    files: filesShown ? { project: filesPage?.project ?? null } : null,
-    connections: connectionsShown,
-    group: groupHere,
-    teammate: teammatesShown ? teammatesUi.open : null,
-    teamPlace: chatsPlaceShown ? chatsPlace : null,
-    unrecorded: search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || !!focusedRepeat || todayOn || tasksOn,
-    view,
-  });
+  // A teammate's direct record is one of your groups, so Groups is the page it is on.
+  const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
+  const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
+  // The Inbox button is only on an inbox thread: anywhere else the sidebar's
+  // own Inbox is as close, and on the inbox it would lead to itself.
+  const onInboxThread = !!focused && !settingsOpen && !inChats;
+  // A teammate's thread opened from the Inbox is an inbox thread too.
+  const onTeammateThread = teamShown && !!openCard && !cardFromPlace;
+  const screenHere: TrailScreen = {
+    thread: focused && !settingsOpen && !inChats && !teamOpen && !(directOpen && roomsUi.openId) ? { product: focused.product, id: focused.id } : null,
+    card: openCard && onTeammateThread && !roomsUi.roomName ? { person: openCard.personId, thread: openCard.threadId } : null,
+    inbox: !focused && !settingsOpen && !teamShown && !homeHere && !filesShown && !connectionsShown && !roomShown && !teammatesShown && !chatsPlaceShown,
+  };
   const cardOf = (s: { person: string; thread: string }) => cards.find((c) => c.personId === s.person && c.threadId === s.thread);
   const trail = useBackAndForward({
     on: backForwardOn,
-    here: stopHere,
-    exists: (s) => s.at === 'thread' ? selectable.some((i) => i.id === s.id && i.product === s.product)
-      : s.at === 'card' ? !!cardOf(s)
-      : s.at === 'team' ? s.place === 'team' || members.some((m) => m.key === s.place)
-      : true,
+    inbox: onInboxPage(screenHere),
+    here: stopOnScreen(screenHere),
+    exists: (s) => s.at === 'thread' ? selectable.some((i) => i.id === s.id && i.product === s.product) : !!cardOf(s),
+    // Over the inbox whatever was open before, so the thread's own back says Inbox.
     go: (s) => {
-      if (s.at === 'home') { openView('inbox'); setHomeOpen(true); }
-      else if (s.at === 'list') openView(s.view);
-      else if (s.at === 'files') openFiles(s.project);
-      else if (s.at === 'connections') openConnectionsPage(null);
-      else if (s.at === 'team') openChatsPlace(s.place);
-      else if (s.at === 'group') { openView(view); roomsUi.open(s.id); }
-      else if (s.at === 'teammate') teammatesUi.go(s.id);
-      else if (s.at === 'card') {
+      if (s.at === 'card') {
         const card = cardOf(s);
-        // The page it was opened from stays, so its Back still names it.
-        if (card) { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); openTeammateCard(card); }
-      } else if (s.at === 'settings') {
-        setTeamOpen(false); closeSearch(); setFocused(null);
-        setSettingsPane(s.pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true);
+        if (card) { openView(view); openTeammateCard(card); }
       } else {
-        const card = selectable.find((i) => i.id === s.id && i.product === s.product);
-        if (card) { openView(view); setFocused(card); }
+        const item = selectable.find((i) => i.id === s.id && i.product === s.product);
+        if (item) { openView(view); setFocused(item); }
       }
     },
   });
-  const stopName = (s: TrailStop): string => s.at === 'home' ? 'Home'
-    : s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
-    : s.at === 'files' ? 'Files'
-    : s.at === 'connections' ? 'Connections'
-    : s.at === 'settings' ? 'Settings'
-    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : members.find((m) => m.key === s.place)?.name ?? 'Team')
-    : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
-    : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
-    : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
+  const stopName = (s: TrailStop): string => s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
     : selectable.find((i) => i.id === s.id && i.product === s.product)?.title ?? 'the thread';
   useEffect(() => {
     if (!onPhone()) return;
@@ -7855,15 +7836,7 @@ export default function App() {
   // neither, so only there does the list draw a magnifier, and it opens ⌘K.
   const searchInTheList = onPhone() ? () => setModal('palette') : undefined;
   const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks, pointedAt: railOpen });
-  // A teammate's direct record is one of your groups, so Groups is the page it is on.
-  const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
-  const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
-  // The Inbox button is only on an inbox thread: anywhere else the sidebar's
-  // own Inbox is as close, and on the inbox it would lead to itself.
-  const onInboxThread = !!focused && !settingsOpen && !inChats;
-  // A teammate's thread opened from the Inbox is an inbox thread too.
-  const onTeammateThread = teamShown && !!openCard && !cardFromPlace;
-  const backForward = backForwardOn
+  const backForward = backForwardOn && onInboxPage(screenHere)
     ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward}
       onInbox={onInboxThread ? () => openView('inbox') : onTeammateThread ? () => { setOpenCard(null); setTeamOpen(false); openView('inbox'); } : undefined} name={stopName} />
     : null;
