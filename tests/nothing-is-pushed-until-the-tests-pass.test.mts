@@ -279,6 +279,9 @@ function repoWithBase(tag) {
   // the hook ASKS for, not about retries.
   fs.writeFileSync(path.join(dir, 'node_modules/.bin/vitest'),
     `#!/bin/sh\necho ran > "${path.join(dir, 'vitest-ran')}"\necho "$@" >> "${path.join(dir, 'vitest-calls')}"\nexit 0\n`);
+  // The real package beside the stand-in binary: the hook's selector walks
+  // vitest's module graph itself.
+  fs.symlinkSync(path.join(root, 'node_modules/vitest'), path.join(dir, 'node_modules/vitest'));
   fs.writeFileSync(path.join(dir, '.gitignore'), 'node_modules/\nvitest-*\npre-push\nscripts/red-test-files.mjs\n');
   const base = commit(dir, { 'main/a.mjs': 'export const a = 1;\n', 'docs/notes.md': 'notes\n' }, 'base');
   return { dir, calls, base };
@@ -291,9 +294,9 @@ describe('a push tests what it changed', () => {
     const { code, out } = runHook(dir, `refs/heads/main ${head} refs/heads/main ${base}\n`);
     expect(code).toBe(0);
     expect(calls()).toHaveLength(1);
-    expect(calls()[0]).toMatch(/^related --run /);
-    expect(calls()[0]).toContain('main/a.mjs');
-    expect(calls()[0]).toContain('tests/a.test.mjs');
+    // The exact list, not `related`, which opens every test file at once
+    // (tests/finding-the-tests-a-change-reaches-opens-a-few-files-at-a-time).
+    expect(calls()[0].trim().split(/\s+/).slice(0, 3)).toEqual(['run', '--passWithNoTests', 'tests/a.test.mjs']);
     expect(out).toContain('GitHub runs the whole suite');
   });
 
@@ -315,13 +318,16 @@ describe('a push tests what it changed', () => {
   });
 
   it('measures a new branch from where it left main, not from nothing', () => {
-    const { dir, calls, base } = repoWithBase('branch');
+    const { dir, calls } = repoWithBase('branch');
+    const base = commit(dir, {
+      'tests/reads-a.test.mjs': "read('main/a.mjs');\n",
+      'tests/reads-b.test.mjs': "read('main/b.mjs');\n",
+    });
     execFileSync('git', ['update-ref', 'refs/remotes/origin/main', base], { cwd: dir });
     const head = commit(dir, { 'main/b.mjs': 'export const b = 1;\n' });
     runHook(dir, `refs/heads/x ${head} refs/heads/x ${ZERO}\n`, {}, ['origin', 'https://example.test/r.git']);
-    expect(calls()[0]).toMatch(/^related --run /);
-    expect(calls()[0]).toContain('main/b.mjs');
-    expect(calls()[0]).not.toContain('main/a.mjs');
+    expect(calls()[0].trim().split(/\s+/)).toEqual(['run', '--passWithNoTests', 'tests/reads-b.test.mjs',
+      '--reporter=basic', '--reporter=json', expect.stringMatching(/^--outputFile\.json=/)]);
   });
 
   it('runs the whole suite when it cannot tell what changed', () => {
