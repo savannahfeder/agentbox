@@ -351,6 +351,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   const [sharing, setSharing] = useState<null | 'list' | 'send' | 'copied' | 'see' | 'choose'>(null);
   const [sendTo, setSendTo] = useState<string[]>([]);
   const [step, setStep] = useState<string | null>(null);
+  const [shareDirect, setShareDirect] = useState(false);
   // One note per person, kept until it is sent.
   const [notes, setNotes] = useState<Record<string, string>>({});
   const asking = (givingFromShare && giveStart !== 'give') || !!step;
@@ -368,6 +369,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
     setAdding(false);
     setLeveling(false);
     setSharing(null);
+    setShareDirect(false);
     if (refocus) button.current?.focus();
   }, []);
 
@@ -507,7 +509,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
       {handedTo && !done && <button type="button" className="ts-done ts-handed" disabled={!handedTo.onOpen} onClick={handedTo.onOpen ?? undefined}><span className="ts-handed-face" aria-hidden="true">{handedTo.initials}</span><span>{handedTo.name}</span></button>}
       {onReopen && !handedTo && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
       {share && canGive && <button type="button" className="ts-done ts-share" aria-haspopup="menu" aria-expanded={open && !!sharing}
-        onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); }}>
+        onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); setShareDirect(true); }}>
         <PeopleMark /><span>Share</span>
       </button>}
       {done && (
@@ -575,7 +577,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
           onSee={() => setSharing('see')}
           onAsk={canGive && onAsk ? (kind) => { setSharing(null); setGiveStart(kind); setGivingFromShare(true); setGiving(true); } : undefined}
           onHand={canGive ? () => { setSharing(null); setGiveStart('give'); setGivingFromShare(true); setGiving(true); } : undefined}
-          onBack={() => setSharing(null)} />;
+          // Opened by the Share button there is no menu behind it to go back to.
+          onBack={shareDirect ? undefined : () => setSharing(null)} />;
       })()}
       {open && share && sharing === 'send' && <SendSheet people={share.people} start={sendTo} link={!!share.link} onCopy={copyLink} onBack={() => setSharing('list')}
         onSend={(to, note) => { close(false); onSendTo?.(to, note); }} />}

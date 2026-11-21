@@ -17,7 +17,11 @@ describe('the Share button', () => {
     expect(at).toBeLessThan(menu.indexOf('data-hint="done"'));
   });
   it('opens the share panel, and closes it when pressed again', () => {
-    expect(menu).toContain("onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); }}>");
+    expect(menu).toContain("onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); setShareDirect(true); }}>");
+  });
+  it('opens with no Back row, since no menu sits behind it', () => {
+    expect(menu).toContain('onBack={shareDirect ? undefined : () => setSharing(null)} />;');
+    expect(menu).toContain('    setShareDirect(false);');
   });
   it('wears the same mark as the menu row', () => {
     expect(menu).toContain('<PeopleMark /><span>Share</span>');
