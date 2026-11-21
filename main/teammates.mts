@@ -197,7 +197,7 @@ interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', due: 'bring its duty to its thread', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
 
 // When each project last shipped, from the note the ship queue leaves.
 function shippedByProduct(items?: TeamItem[] | null) {
@@ -621,6 +621,9 @@ export class Teammates {
           // An answer is made from a message, and a message always carries its words.
           await deliver?.(a.product, a.item, a.text as string);
           if (a.priority) workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { priority: a.priority }, { source: 'founder', now });
+        } else if (a.type === 'due') {
+          if (!tell) throw new Error('nothing here can wake a thread');
+          await tell(a.product, a.item, { text: a.text, from: { teammate: t.id, name: t.name }, hold: false, hop: 0 });
         } else if (a.type === 'tell') {
           if (!tell) throw new Error('nothing here can hand work to a thread');
           await tell(a.product, a.item, { text: a.text, from: a.from, hold: a.hold, hop: a.hop });
@@ -642,6 +645,7 @@ export class Teammates {
         done.push(a);
       } catch (err) {
         if (a.msg) failed.add(a.msg);
+        if (a.type === 'due') failed.add(`${a.teammate}#${a.duty}@${a.key}`);
         if (a.trigger?.msg) failed.add(a.trigger.msg);
         if (a.trigger?.key) failed.add(a.trigger.kind === 'duty' ? `${a.teammate}#${a.trigger.duty}@${a.trigger.key}` : `${a.teammate}@${a.trigger.key}`);
         this.noteTrouble(`${t?.name ?? 'A teammate'} could not ${TROUBLE_VERB[a.type] ?? 'carry on'}: ${(err as Error).message}`, now);

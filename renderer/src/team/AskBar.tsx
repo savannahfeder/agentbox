@@ -78,7 +78,8 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
         <div className="ask-bar-acts">
           {onOpenThread && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
           {change && !under && <button type="button" className="ask-bar-change" onClick={() => onOpenChange?.(change)}><CodeMark />View the change</button>}
-          {answeredBelow ? null : ask.kind === 'review'
+          {/* Under the ask on its own page, the reply box below carries the answer (TeamRouteStrip). */}
+          {answeredBelow || under ? null : ask.kind === 'review'
             ? <>
               <button type="button" onClick={() => setGiving('yes')}>Looks good</button>
               <button type="button" onClick={() => setGiving('changes')}>Needs changes</button>

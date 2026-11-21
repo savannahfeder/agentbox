@@ -45,7 +45,8 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
-import { ChooseList, CopiedSheet, GiveSheet, PanelBack, SeeList, SendSheet, ShareList } from './SharePanel';
+import { ChooseList, CopiedSheet, GiveSheet, PanelBack, SeeList, SendSheet, ShareList, pointsAtStep } from './SharePanel';
+import { readAskDraft, saveAskDraft, type AskDraft, type ItemRef } from '../drafts';
 import type { SeenBy } from './share-rules';
 
 /** ⌘K asking a person: the thread's menu opens its sheet for them. */
@@ -287,12 +288,14 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ following = null, onFollow, onContinue = null, share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ thread = null, following = null, onFollow, onContinue = null, share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
   /** On a teammate's thread: whether you are told when it is done, or null where you cannot be. */
   following?: boolean | null;
   onFollow?: () => void;
   /** On a teammate's thread: carry it on in a thread of your own. */
   onContinue?: (() => void) | null;
+  /** The thread the ask sheet sends, by its name; what the sheet holds is kept for it across closes and visits. */
+  thread?: (ItemRef & { name?: string }) | null;
   /** What Share… offers, or null where the thread cannot be shared. */
   share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string; chosen?: readonly string[] } | null;
   /** Puts the link on the clipboard; false when it could not. */
@@ -377,8 +380,9 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
   const [sendTo, setSendTo] = useState<string[]>([]);
   const [step, setStep] = useState<string | null>(null);
   const [shareDirect, setShareDirect] = useState(false);
-  // One note per person, kept until it is sent.
-  const [notes, setNotes] = useState<Record<string, string>>({});
+  // One note per person, kept until it is sent, across closes and visits to the thread.
+  const [notes, setNotes] = useState<Record<string, string>>(() => (thread ? readAskDraft(thread).notes : {}));
+  const keepAsk = (patch: Partial<AskDraft>) => { if (thread) saveAskDraft(thread, { ...readAskDraft(thread), ...patch }); };
   const asking = (givingFromShare && giveStart !== 'give') || !!step;
   const listed = giveTo.filter((p) => !(asking && p.id.startsWith('mate:')));
   const wrap = useRef<HTMLSpanElement>(null);
@@ -409,13 +413,26 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
     window.addEventListener('zero:add-people', askToAdd);
     return () => window.removeEventListener('zero:add-people', askToAdd);
   }, [askToAdd]);
-  // "Ask about this step" on one of the agent's messages opens the people list with that message as the step.
+  useEffect(() => { keepAsk({ notes }); }, [notes]);
+  // A sheet that closes unsent is where Ask a teammate opens next; back on the people, or a send, ends it.
+  useEffect(() => {
+    if (open && giving) keepAsk({ last: givingTo ? { to: { id: givingTo.id, name: givingTo.name }, mode: giveStart } : null });
+  }, [open, giving, givingTo?.id, giveStart]);
+  // "Ask a teammate" on one of the agent's messages opens the people list with that message as the step,
+  // or the sheet a close left, now pointing at this message.
   useEffect(() => {
     if (!onAsk || !giveTo.length) return undefined;
-    const askAbout = (e: Event) => { setStep(String((e as CustomEvent<string>).detail ?? '') || null); setGiving(true); setOpen(true); };
+    const askAbout = (e: Event) => {
+      const last = thread ? readAskDraft(thread).last : null;
+      const back = last ? giveTo.find((p) => p.id === last.to.id && !p.id.startsWith('mate:') && !p.asked) : null;
+      setStep(String((e as CustomEvent<string>).detail ?? '') || null);
+      if (last && back) { setGiveStart(last.mode); setGivingTo(back); }
+      setGiving(true);
+      setOpen(true);
+    };
     window.addEventListener('zero:ask-step', askAbout);
     return () => window.removeEventListener('zero:ask-step', askAbout);
-  }, [!!onAsk, giveTo.length]);
+  }, [!!onAsk, giveTo.map((p) => `${p.id}${p.asked ? ' asked' : ''}`).join(), thread?.product, thread?.id]);
   // ⌘K's Ask Theo for a review or for help (ASK_PERSON_EVENT) opens the same sheet the menu's row does, Theo picked.
   useEffect(() => {
     if (!onAsk) return undefined;
@@ -614,9 +631,10 @@ export function ThreadMenu({ following = null, onFollow, onContinue = null, shar
       {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} onBack={() => setSharing('see')} />}
       {open && !waiting && !adding && !leveling && !sharing && (giving && givingTo
         ? <GiveSheet to={givingTo} step={step} start={giveStart} only={givingFromShare ? giveStart : step ? 'ask' : undefined} onBack={() => setGivingTo(null)} onCancel={() => close(true)}
+          threadName={thread?.name ?? null} onMode={setGiveStart}
           note={notes[givingTo.id] ?? ''} onNote={(n) => setNotes((was) => ({ ...was, [givingTo.id]: n }))}
-          onGive={(note) => { setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onGive?.(givingTo, note); }}
-          onAsk={onAsk ? (kind, note) => { const s = step; setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onAsk(givingTo, kind, note, s); } : undefined} />
+          onGive={(note) => { keepAsk({ last: null }); setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onGive?.(givingTo, note); }}
+          onAsk={onAsk ? (kind, note) => { const s = pointsAtStep(kind) ? step : null; keepAsk({ last: null }); setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onAsk(givingTo, kind, note, s); } : undefined} />
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">
           <PanelBack label={step ? 'Close' : 'Back'} onBack={() => { if (step) { close(false); return; } setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />

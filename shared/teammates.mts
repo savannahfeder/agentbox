@@ -732,13 +732,29 @@ export function dutyUnread(teammateId: string, dutyId: string, items: readonly R
   return false;
 }
 
-// A duty's job is still open while its first-job run or an earlier run of the
-// same duty is running, queued, or asking you something. One that only
-// delivered a result is finished; the next slot is new work.
-export function jobStillOpen(teammateId: string, dutyId: string, items: readonly RunItem[], chat: ChatLike): boolean {
+// The one thread a duty's job lives in: its first-job run while that is still
+// open, else the newest run of the duty itself. Code finds it; the thread
+// decides what the round needs. `busy` is a thread already at work, or one
+// waiting on your answer, which the duty never goes around.
+export function dutyHome(teammateId: string, dutyId: string, items: readonly RunItem[], chat: ChatLike): { item: RunItem; busy: boolean } | null {
   const firstId = runIdFor(`${teammateId}#first`);
-  return runsOf(teammateId, items).some((i) => (i.id === firstId || dutyOf(i) === dutyId) && i.status !== 'done'
-    && (isActiveRun(i) || isQueued(i) || (waitingOnYou(i) && asksYouStill(i, teammateId, chat))));
+  const newest = (a: RunItem, b: RunItem) => (b.createdAt ?? 0) - (a.createdAt ?? 0);
+  const runs = runsOf(teammateId, items);
+  const item = runs.filter((i) => i.id === firstId && i.status !== 'done').sort(newest)[0]
+    ?? runs.filter((i) => dutyOf(i) === dutyId).sort(newest)[0];
+  if (!item || (item.status === 'done' && item.wrote?.status?.source === 'founder')) return null;
+  const busy = item.status !== 'done' && (isActiveRun(item) || isQueued(item) || (waitingOnYou(item) && asksYouStill(item, teammateId, chat)));
+  return { item, busy };
+}
+
+export function dutyDueText(d: { what: string; tell?: string | null }): string {
+  const tell = d.tell ? `Bring the person in only when ${d.tell.replace(/[.\s]+$/, '')}.` : 'Bring the person in only with something worth their time.';
+  return [
+    `Your duty is due again: ${d.what.replace(/[.\s]+$/, '')}.`,
+    '',
+    'This thread is where that job lives. Decide what this round needs: run it now, start helpers for it, or close with one line saying why it can wait.',
+    tell,
+  ].join('\n');
 }
 
 export function isQueued(item: { status?: string; start?: string } | null | undefined): boolean {
@@ -936,6 +952,7 @@ export type WakeAction =
   | (ActionBase & { type: 'seen'; msg: string; run?: string })
   | (ActionBase & { type: 'served'; key: string })
   | (ActionBase & { type: 'dutyServed'; duty: string; key: string })
+  | (ActionBase & { type: 'due'; item: string; product: string; duty: string; key: string; text: string })
   | (ActionBase & { type: 'answer'; item: string; product: string; text: string | undefined; msg: string; priority?: number })
   | (ActionBase & { type: 'tell'; item: string; product: string | null; text: string; from: { teammate: string; name: string }; hop: number; hold: boolean; msg: string })
   | (ActionBase & { type: 'release'; item: string; product: string })
@@ -1161,8 +1178,11 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         if (!slot || slot <= served) continue;
         key = slot;
       }
-      // The job's own thread is still open, so a new one would only duplicate it.
-      if (jobStillOpen(t.id, d.id, items, chat)) {
+      // A duty after each ship keeps a thread per ship, which its weekly most counts.
+      const home = d.after === 'ship' ? null : dutyHome(t.id, d.id, items, chat);
+      if (home) {
+        if (!home.busy && overLimit(t)) { limited.add(t.id); continue; }
+        if (!home.busy) actions.push({ type: 'due', teammate: t.id, item: home.item.id, product: home.item.product, duty: d.id, key, text: dutyDueText(d) });
         actions.push({ type: 'dutyServed', teammate: t.id, duty: d.id, key });
         continue;
       }
