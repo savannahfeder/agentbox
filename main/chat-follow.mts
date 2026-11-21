@@ -36,12 +36,19 @@ export function whereTheChatIs(turn: ChatTurn | null, { running, knownAt }: { ru
   return { move: 'stays' };
 }
 
+/** What you typed there since the row last heard from the chat, or ''. */
+export function newWords(turn: { heard?: string; heardAt?: number } | null | undefined, heardThrough: number): string {
+  return turn?.heard && (turn.heardAt ?? 0) > heardThrough ? turn.heard : '';
+}
+
 export interface FollowedChat {
   product: string;
   id: string;
   engine: 'claude' | 'codex';
   chat: string;
   knownAt: number;
+  /** When the row last heard from either side of the chat. */
+  heardThrough: number;
   /** The follow holds it now. */
   held: boolean;
   /** Still the follow's to move: open or held, not answered here, not shared. */
@@ -50,12 +57,26 @@ export interface FollowedChat {
 
 export interface FollowStore {
   chatsToFollow(now?: number): FollowedChat[];
+  chatSaidOutside(slug: string, id: string, words: string, opts?: { now?: number }): unknown;
   holdChatOutside(slug: string, id: string, holder: string, opts?: { now?: number }): Promise<unknown>;
   chatAnsweredOutside(slug: string, id: string, said: string, opts?: { now?: number }): unknown;
   letGoOfChat(slug: string, id: string, opts?: { now?: number }): unknown;
 }
 
-export interface CodexChatLike { id?: string; herTurnLast?: boolean; live?: boolean }
+export interface CodexChatLike {
+  id?: string; herTurnLast?: boolean; live?: boolean; herLast?: string; herLastAt?: number; turnOpen?: boolean | null; lastActive?: number;
+}
+
+/** A Codex turn this quiet is taken to have died, so the row comes back. */
+export const CODEX_QUIET_MS = 10 * 60_000;
+
+/** Codex is at work on what was typed to it. A rollout that marks no turns
+ *  falls back to who wrote last, while it is still being written. */
+export function codexWorking(t: CodexChatLike | null | undefined, now = Date.now()): boolean {
+  if (!t) return false;
+  if (t.turnOpen === true || t.turnOpen === false) return t.turnOpen && now - (t.lastActive ?? 0) < CODEX_QUIET_MS;
+  return !!t.herTurnLast && !!t.live;
+}
 
 type Status = (sessionId: string, homes: string[]) => string | null;
 
@@ -114,11 +135,29 @@ export async function followClaudeChats(
     }
     const file = claudeChatFile(c.chat, dirs);
     const { turn, mtimeMs } = file ? turnOf(file) : { turn: null, mtimeMs: 0 };
+    const words = newWords(turn, c.heardThrough);
+    if (words) store.chatSaidOutside(c.product, c.id, words, { now });
     const state = turn && !turn.ended ? status(c.chat, dirs) : null;
     const running = state ? RUNNING.has(state) : now - mtimeMs < FRESH_MS;
     moved += await move(store, c, whereTheChatIs(turn, { running, knownAt: c.knownAt }), HELD_IN.claude, now);
   }
   return { moved };
+}
+
+/** Your words from Codex, written before `refreshCodexMirrors` writes its
+ *  answer to them, so the thread reads in the order it happened. */
+export function noteCodexWords(
+  { store, threads, now = Date.now() }: { store: FollowStore; threads: readonly CodexChatLike[]; now?: number },
+) {
+  const byId = new Map(threads.map((t) => [String(t?.id ?? ''), t]));
+  let noted = 0;
+  for (const c of store.chatsToFollow(now)) {
+    if (c.engine !== 'codex' || !c.follow) continue;
+    const t = byId.get(c.chat);
+    const words = newWords({ heard: t?.herLast, heardAt: t?.herLastAt }, c.heardThrough);
+    if (words) { store.chatSaidOutside(c.product, c.id, words, { now }); noted += 1; }
+  }
+  return noted;
 }
 
 /** Runs after `refreshCodexMirrors` has given each row Codex's latest answer. */
@@ -129,8 +168,7 @@ export async function followCodexChats(
   let moved = 0;
   for (const c of store.chatsToFollow(now)) {
     if (c.engine !== 'codex') continue;
-    const t = byId.get(c.chat);
-    const working = c.follow && !!t?.herTurnLast && !!t?.live;
+    const working = c.follow && codexWorking(byId.get(c.chat), now);
     moved += await move(store, c, working ? { move: 'working' } : { move: 'stays' }, HELD_IN.codex, now);
   }
   return { moved };
@@ -176,7 +214,12 @@ export function startChatFollow(
   const timer = setInterval(claude, everyMs);
   return {
     followNow: claude,
-    followCodex: (threads: readonly CodexChatLike[]) => queue('codex', () => followCodexChats({ store, threads })),
+    // Called before the Codex watch writes this read's answers: the words go
+    // down now, and the moves after those answers.
+    followCodex: (threads: readonly CodexChatLike[]) => {
+      try { noteCodexWords({ store, threads }); } catch (e) { log('chat follow (codex words):', (e as Error)?.message ?? e); }
+      return queue('codex', () => followCodexChats({ store, threads }));
+    },
     stop: () => { clearTimeout(first); clearInterval(timer); },
   };
 }

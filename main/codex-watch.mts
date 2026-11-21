@@ -101,7 +101,7 @@ export function noticeCodexAgents(
 
 // Answers at once for a reader that answers at once, and as a promise for one
 // that reads off the main process (readCodexThreadsOffThread).
-/** Handed every read once its answers are on the rows (main/chat-follow.mts). */
+/** Handed every read before its answers go on the rows (main/chat-follow.mts). */
 type Follow = (threads: CodexThread[]) => unknown;
 
 interface ScanOptions {
@@ -126,9 +126,9 @@ function applyCodexThreads(
   { store, now, count, seen, follow }: { store: CodexStore; now: number; count: Count | null; seen: Set<unknown> | null; follow: Follow | null },
 ) {
   noticeCodexAgents(threads, { count, seen, now });
+  try { follow?.(threads); } catch (e) { console.warn('codex watch: follow:', (e as Error)?.message ?? e); }
   const refreshed = store.refreshCodexMirrors(threads, { now });
   const retold = store.refreshCodexAsks(threads, { now });
-  try { follow?.(threads); } catch (e) { console.warn('codex watch: follow:', (e as Error)?.message ?? e); }
   return { refreshed, retold, threads: threads.length };
 }
 

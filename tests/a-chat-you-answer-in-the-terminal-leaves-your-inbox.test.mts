@@ -18,8 +18,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import { followClaudeChats, followCodexChats, whereTheChatIs } from '../main/chat-follow.mts';
+import { CODEX_QUIET_MS, codexWorking, followClaudeChats, followCodexChats, newWords, noteCodexWords, whereTheChatIs } from '../main/chat-follow.mts';
 import { readChatTurn } from '../main/agent-sessions.mts';
+import { readRollout } from '../main/codex-threads.mts';
 import { transcriptSearch } from '../main/transcript-search.mts';
 import { HELD_IN, carriedOnIn, heldOutside } from '../shared/carried-on-outside.mts';
 import { belongsInInbox, belongsInProgress, stillAsksYou } from '../renderer/src/list-rules.ts';
@@ -100,9 +101,32 @@ describe('a Claude Code chat brought in, answered in the terminal', () => {
     expect(inbox(r)).toBe(false);
     expect(progress(r)).toBe(true);
     expect(liveLine(r, { inProgress: true, now: Date.now() }).state).toBe('elsewhere');
-    const said = threadEvents(s.readHistory(slug, r.id)).map((e) => e.said);
-    expect(said).toContain('You replied in Claude Code');
-    expect(said).not.toContain('An agent picked it up');
+    const events = threadEvents(s.readHistory(slug, r.id));
+    const yours = events.filter((e) => e.said === 'You replied in Claude Code');
+    expect(yours).toHaveLength(1);
+    expect(yours[0]).toMatchObject({ who: 'you', words: 'Mock the clock.', message: true });
+    expect(events.map((e) => e.said)).not.toContain('An agent picked it up');
+  });
+
+  it('draws what you typed there before the answer it got, and each only once', async () => {
+    write(typed(Date.now() - 20_000, 'Mock the clock.'), says(Date.now() - 5_000, 'Mocked. It passes now.'));
+    session('idle');
+    await follow();
+    await follow();
+    const events = threadEvents(s.readHistory(slug, row().id)).filter((e) => e.message);
+    expect(events.map((e) => e.words)).toEqual([
+      'The checkout test fails one run in five. Fix it.',
+      'It races the clock. Mock the clock, or retry once. Which one?',
+      'Mock the clock.',
+      'Mocked. It passes now.',
+    ]);
+    expect(events[2].who).toBe('you');
+  });
+
+  it('does not take words an agent wrote on the row for yours', () => {
+    s.modules.workItemsDisk.updateWorkItem(s.productDir(slug), row().id, { saidOutside: 'Ship it.' }, { source: 'agent' });
+    const events = threadEvents(s.readHistory(slug, row().id));
+    expect(events.some((e) => e.words === 'Ship it.')).toBe(false);
   });
 
   it('comes back to Needs you with the answer its agent gave there', async () => {
@@ -192,7 +216,9 @@ describe('a Claude Code chat brought in, answered in the terminal', () => {
     write(typed(Date.now() - 20_000, 'Mock the clock.'), runs(Date.now() - 15_000));
     session('busy');
     await follow();
-    const phone = threadSnapshot(row(), s.readHistory(slug, row().id)).item;
+    const snap = threadSnapshot(row(), s.readHistory(slug, row().id));
+    const phone = snap.item;
+    expect(snap.history.some((l) => l.patch?.saidOutside === 'Mock the clock.')).toBe(true);
     expect(phone.claim).toBeUndefined();
     expect(phone.carriedOn).toBe('Claude Code');
     expect(belongsInInbox(phone, { now: Date.now() })).toBe(false);
@@ -228,28 +254,53 @@ describe('a Codex chat brought in, answered in Codex', () => {
     }], { now: T0 + 1_000 });
   });
 
-  it('leaves Needs you while Codex works on your reply, and comes back after', async () => {
+  // What the Codex watch hands over: one read, words first, then its answers, then the moves.
+  const pass = async (t) => {
+    noteCodexWords({ store: s, threads: [t] });
+    s.refreshCodexMirrors([t]);
+    await followCodexChats({ store: s, threads: [t] });
+  };
+  const thread = (over) => ({ id: CID, prompt: 'Rename the plans', title: 'Rename the plans', last: 'Which names?', lastActive: Date.now(), when: Date.now(), ...over });
+
+  it('leaves Needs you while Codex works on your reply, and comes back with its answer', async () => {
     expect(codexRow().status).toBe('open');
-    await followCodexChats({ store: s, threads: [{ id: CID, herTurnLast: true, live: true }] });
+    await pass(thread({ herTurnLast: true, herLast: 'Starter, Team and Scale.', herLastAt: Date.now() - 5_000, turnOpen: true, live: true }));
     expect(codexRow().status).toBe('claimed');
     expect(codexRow().claim.holder).toBe(HELD_IN.codex);
     expect(belongsInInbox(codexRow(), { now: Date.now() })).toBe(false);
-    expect(threadEvents(s.readHistory(slug, codexRow().id)).map((e) => e.said)).toContain('You replied in Codex');
-    await followCodexChats({ store: s, threads: [{ id: CID, herTurnLast: false, live: true }] });
+    await pass(thread({ herTurnLast: false, herLast: 'Starter, Team and Scale.', herLastAt: Date.now() - 5_000, turnOpen: false, last: 'Renamed all three.', live: true }));
+    expect(codexRow().status).toBe('open');
+    expect(codexRow().result).toBe('Renamed all three.');
+    const messages = threadEvents(s.readHistory(slug, codexRow().id)).filter((e) => e.message);
+    expect(messages.slice(-2).map((e) => [e.said, e.words])).toEqual([
+      ['You replied in Codex', 'Starter, Team and Scale.'],
+      ['It came back to you', 'Renamed all three.'],
+    ]);
+  });
+
+  it('stays In progress through Codex\'s own messages mid-turn, which is what its turn marks are for', async () => {
+    await pass(thread({ herTurnLast: false, herLast: 'Starter, Team and Scale.', herLastAt: Date.now() - 5_000, turnOpen: true, last: 'Looking at the plans page.' }));
+    expect(codexRow().status).toBe('claimed');
+  });
+
+  it('is let go of when Codex goes quiet mid-turn for long enough to have died', async () => {
+    await pass(thread({ herTurnLast: true, turnOpen: true }));
+    expect(codexRow().status).toBe('claimed');
+    await pass(thread({ herTurnLast: true, turnOpen: true, lastActive: Date.now() - CODEX_QUIET_MS - 1 }));
     expect(codexRow().status).toBe('open');
   });
 
-  it('is let go of when Codex is no longer running, answered or not', async () => {
-    await followCodexChats({ store: s, threads: [{ id: CID, herTurnLast: true, live: true }] });
-    await followCodexChats({ store: s, threads: [{ id: CID, herTurnLast: true, live: false }] });
-    expect(codexRow().status).toBe('open');
+  it('falls back to who wrote last on a conversation that marks no turns', () => {
+    expect(codexWorking({ herTurnLast: true, live: true, turnOpen: null })).toBe(true);
+    expect(codexWorking({ herTurnLast: true, live: false, turnOpen: null })).toBe(false);
+    expect(codexWorking({ herTurnLast: false, live: true })).toBe(false);
   });
 });
 
 describe('reading where a chat stands', () => {
   it('reads your last message, the answer since, and whether that turn is over', () => {
     write(typed(T0 + 200_000, 'Mock the clock.'), runs(T0 + 210_000), ran(T0 + 220_000), says(T0 + 230_000, 'Mocked.'));
-    expect(readChatTurn(file)).toEqual({ heardAt: T0 + 200_000, said: 'Mocked.', saidAt: T0 + 230_000, ended: true });
+    expect(readChatTurn(file)).toEqual({ heard: 'Mock the clock.', heardAt: T0 + 200_000, said: 'Mocked.', saidAt: T0 + 230_000, ended: true });
   });
 
   it('does not take a tool result, an interruption or a reminder for something you typed', () => {
@@ -273,6 +324,34 @@ describe('reading where a chat stands', () => {
     expect(whereTheChatIs(turn, { running: false, knownAt: 19 })).toEqual({ move: 'answered', said: 'Done.' });
     expect(whereTheChatIs(turn, { running: false, knownAt: 20 })).toEqual({ move: 'stays' });
     expect(whereTheChatIs({ ...turn, said: '' }, { running: false, knownAt: 0 })).toEqual({ move: 'stays' });
+  });
+
+  it('reads a Codex turn the way Codex 0.171 writes one: open until task_complete, your words kept', () => {
+    // The shape of a real rollout on Codex 0.171.0: no user_message events, the
+    // turns as response_item messages, and the turn marked by task_started and task_complete.
+    const rollout = path.join(root, 'rollout-2026-11-21T21-19-27-codex.jsonl');
+    const line = (ms, type, payload) => JSON.stringify({ timestamp: at(ms), type, payload });
+    const head = [
+      line(T0, 'session_meta', { id: 'c-1', session_id: 'c-1', cwd: path.join(root, 'kestrel'), source: 'cli', thread_source: 'user', originator: 'codex_cli_rs', history_mode: 'paginated', timestamp: at(T0) }),
+      line(T0 + 1_000, 'event_msg', { type: 'task_started', turn_id: 't1' }),
+      line(T0 + 1_100, 'response_item', { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Rename the plans' }] }),
+      line(T0 + 9_000, 'response_item', { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Which names?' }] }),
+      line(T0 + 9_100, 'event_msg', { type: 'task_complete', turn_id: 't1', last_agent_message: 'Which names?' }),
+      line(T0 + 60_000, 'event_msg', { type: 'task_started', turn_id: 't2' }),
+      line(T0 + 60_100, 'response_item', { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Starter, Team and Scale.' }] }),
+      line(T0 + 65_000, 'response_item', { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Looking at the plans page.' }] }),
+    ];
+    fs.writeFileSync(rollout, `${head.join('\n')}\n`);
+    expect(readRollout(rollout)).toMatchObject({ herLast: 'Starter, Team and Scale.', herLastAt: T0 + 60_100, turnOpen: true, herTurnLast: false });
+    fs.appendFileSync(rollout, `${line(T0 + 70_000, 'event_msg', { type: 'task_complete', turn_id: 't2' })}\n`);
+    expect(readRollout(rollout).turnOpen).toBe(false);
+  });
+
+  it('takes only words typed after the row last heard from the chat', () => {
+    expect(newWords({ heard: 'Mock it.', heardAt: 20 }, 19)).toBe('Mock it.');
+    expect(newWords({ heard: 'Mock it.', heardAt: 20 }, 20)).toBe('');
+    expect(newWords({ heard: '', heardAt: 30 }, 0)).toBe('');
+    expect(newWords(null, 0)).toBe('');
   });
 
   it('names only the follow\'s own claims as carried on outside', () => {

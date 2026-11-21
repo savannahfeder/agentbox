@@ -109,6 +109,7 @@ export type WorkItemPatch = {
   handedOver?: SaidAt;
   linkComment?: LinkComment;
   linkReply?: { file: string; text: string };
+  saidOutside?: string;
   comment?: { text: string; name?: string };
   artifact?: ArtifactMarkPatch;
   putAway?: boolean;
@@ -398,6 +399,10 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // THE OWNER'S ANSWER TO THOSE, POSTED ON THE LINK PAGE: `{ file, text }`. It
   // answers the comments before it and starts no agent.
   'linkReply',
+  // WHAT YOU TYPED TO A CHAT BROUGHT IN, WHERE IT STARTED (main/chat-follow.mts),
+  // written by the app as yours. Like `linkReply` it starts no agent: the agent
+  // it was typed to already has it.
+  'saidOutside',
   // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
   // writes from the cloud's own comment (main/team/thread-share.mts). A delta
   // like `react`, read back as `waitingComments` until the owner deals with
@@ -679,7 +684,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     // rule about how the app writes, and it lives with the writer in
     // main/row-label.mts. This module holds no taxonomy, only storage.
     case 'label': return str(value, MAX_TITLE);
-    case 'body': case 'result': case 'note': case 'answer': case 'typed': return str(value, MAX_TEXT_BYTES);
+    case 'body': case 'result': case 'note': case 'answer': case 'typed': case 'saidOutside': return str(value, MAX_TEXT_BYTES);
     // kind and product are free strings on purpose: the taxonomy of work is the
     // caller's to invent and change without a migration here.
     //

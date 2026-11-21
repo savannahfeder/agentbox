@@ -2002,12 +2002,19 @@ export class Store {
       const follow = (item.status === 'open' || held) && !shared.has(item.product)
         && !(item.answer && item.answer !== '(withdrawn)');
       if (!follow && !held) continue;
+      const knownAt = Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0);
       out.push({
         product: item.product, id: item.id, engine: thread ? 'claude' : 'codex', chat,
-        knownAt: Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0), held, follow,
+        knownAt, heardThrough: Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), held, follow,
       });
     }
     return out;
+  }
+
+  /** What you typed there, on the thread as yours. */
+  chatSaidOutside(slug: string, id: string, words: string, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    return workItemsDisk.updateWorkItem(this.productDir(slug), id, { saidOutside: words }, { source: 'founder', now });
   }
 
   /** Into In progress while its agent works on what was typed there. A claim

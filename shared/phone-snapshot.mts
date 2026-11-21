@@ -226,7 +226,7 @@ const ROW_FIELDS = [
 const LINE_FIELDS = [
   'title', 'label', 'body', 'kind', 'labels', 'priority', 'status', 'result',
   'note', 'answer', 'runAt', 'snoozedUntil', 'start', 'due', 'problem',
-  'progress', 'solution', 'inReplyTo',
+  'progress', 'solution', 'inReplyTo', 'saidOutside',
 ];
 const SOURCES: ReadonlySet<unknown> = new Set(['founder', 'agent', 'system']);
 

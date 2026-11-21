@@ -83,6 +83,9 @@ export interface Rollout extends RolloutMeta {
   prompt: string;
   last: string;
   herTurnLast: boolean;
+  herLast: string;
+  herLastAt: number;
+  turnOpen: boolean | null;
   turns: number;
   images: number;
   lastActive: number;
@@ -118,8 +121,12 @@ export interface CodexThread {
   live: boolean;
   waiting?: boolean;
   ask?: string;
-  /** The person wrote after Codex's last answer (main/chat-follow.mts). */
+  /** The person wrote after Codex's last answer, what and when, and whether
+   *  Codex's turn is still open (main/chat-follow.mts). */
   herTurnLast?: boolean;
+  herLast?: string;
+  herLastAt?: number;
+  turnOpen?: boolean | null;
   lastSaid: string;
   firstSaid: string;
 }
@@ -329,6 +336,11 @@ function readRolloutAfresh(file: string): Rollout | null {
   let last = '';
   // Whether the person wrote after Codex's last answer, so it is not waiting.
   let herTurnLast = false;
+  // What she last wrote and when, and whether Codex's turn on it is still open
+  // (task_started to task_complete; null in a rollout that marks no turns).
+  let herLast = '';
+  let herLastAt = 0;
+  let turnOpen: boolean | null = null;
   let turns = 0;
   let images = 0;
   let lastActive = 0;
@@ -363,10 +375,12 @@ function readRolloutAfresh(file: string): Rollout | null {
     if (Number.isFinite(at) && at > lastActive) lastActive = at;
     const p = j.payload ?? {};
     if (j.type === 'event_msg') {
-      if (p.type === 'user_message') {
+      if (p.type === 'task_started') turnOpen = true;
+      else if (p.type === 'task_complete' || p.type === 'turn_complete' || p.type === 'turn_aborted') turnOpen = false;
+      else if (p.type === 'user_message') {
         const said = cleanPrompt(p.message);
         if (!prompt && said && !isInjected(said)) prompt = said;
-        if (said && !isInjected(said)) herTurnLast = true;
+        if (said && !isInjected(said)) { herTurnLast = true; herLast = said; herLastAt = Number.isFinite(at) ? at : herLastAt; }
         turns += 1;
         sawEventTurns = true;
       } else if (p.type === 'agent_message') {
@@ -386,6 +400,7 @@ function readRolloutAfresh(file: string): Rollout | null {
       if (!hers.length) continue; // a turn made of nothing but Codex's own preamble
       if (!prompt) prompt = hers.join('\n\n').trim();
       herTurnLast = true;
+      if (!sawEventTurns) { herLast = hers.join('\n\n').trim(); herLastAt = Number.isFinite(at) ? at : herLastAt; }
       if (!sawEventTurns) turns += 1;
     } else if (p.role === 'assistant') {
       const said = cleanAnswer(partsOf(p).filter((c) => c.type === 'output_text').map((c) => c.text ?? '').join('\n'));
@@ -395,7 +410,7 @@ function readRolloutAfresh(file: string): Rollout | null {
   if (!meta || !meta.id) return null;
   let mtime = 0;
   try { mtime = fs.statSync(file).mtimeMs; } catch { mtime = 0; }
-  return { ...meta, prompt, last, herTurnLast, turns, images, lastActive, path: file, mtime };
+  return { ...meta, prompt, last, herTurnLast, herLast, herLastAt, turnOpen, turns, images, lastActive, path: file, mtime };
 }
 
 /**
@@ -476,6 +491,9 @@ function readOneCodexHome(codexDir: string, { home, days, now, cutoff, index, by
       last: r.last,
       live: isLive(r.mtime, now),
       herTurnLast: r.herTurnLast,
+      herLast: r.herLast,
+      herLastAt: r.herLastAt,
+      turnOpen: r.turnOpen,
       ...(r.herTurnLast ? { waiting: false, ask: '' } : howTheChatEnded(r.last)),
       lastSaid: r.last,
       firstSaid: r.prompt,

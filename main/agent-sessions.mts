@@ -377,10 +377,10 @@ export function readTranscriptTail(file: string, bytes = TAIL_BYTES): Transcript
 }
 
 /** Where a chat stands at its end, for a row that follows it
- *  (main/chat-follow.mts). `heardAt` is when the person last typed, 0 when that
- *  is further back than the tail; `said` is the agent's reply since, and
- *  `ended` whether that reply's turn is over. */
-export interface ChatTurn { heardAt: number; said: string; saidAt: number; ended: boolean }
+ *  (main/chat-follow.mts). `heard` is what the person last typed and `heardAt`
+ *  when, 0 when that is further back than the tail; `said` is the agent's reply
+ *  since, and `ended` whether that reply's turn is over. */
+export interface ChatTurn { heard: string; heardAt: number; said: string; saidAt: number; ended: boolean }
 
 export function readChatTurn(file: string, bytes = TAIL_BYTES): ChatTurn | null {
   let fd: number | null = null;
@@ -392,7 +392,7 @@ export function readChatTurn(file: string, bytes = TAIL_BYTES): ChatTurn | null 
     const n = fs.readSync(fd, buf, 0, buf.length, from);
     const lines = buf.slice(0, n).toString('utf8').split('\n');
     if (from > 0) lines.shift();
-    const turn: ChatTurn = { heardAt: 0, said: '', saidAt: 0, ended: false };
+    const turn: ChatTurn = { heard: '', heardAt: 0, said: '', saidAt: 0, ended: false };
     for (const line of lines) {
       if (!line.trim()) continue;
       let row: TranscriptRow & { isSidechain?: boolean; message?: { content?: unknown; stop_reason?: unknown } };
@@ -400,7 +400,7 @@ export function readChatTurn(file: string, bytes = TAIL_BYTES): ChatTurn | null 
       if (row.isSidechain || (row.type !== 'user' && row.type !== 'assistant')) continue;
       const at = Date.parse(String(row.timestamp ?? '')) || 0;
       if (typedTurn(row)) {
-        Object.assign(turn, { heardAt: at, said: '', saidAt: 0, ended: false });
+        Object.assign(turn, { heard: messageText(row).trim().slice(0, FIRST_CHARS), heardAt: at, said: '', saidAt: 0, ended: false });
         continue;
       }
       // A tool's result: the agent carries on from it.

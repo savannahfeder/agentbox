@@ -92,6 +92,8 @@ export interface ThreadEvent {
   // sentence someone rewords must never quietly turn that block off, because a
   // thread with no answer at the end of it still draws.
   field?: 'body' | 'answer' | 'result' | 'note';
+  /** Your words to a chat brought in, typed where it started. */
+  saidOutside?: true;
   /** The agent teammate who handed this over, on a reply the app wrote for it. */
   from?: string;
   /** Whose that was, by id: a person you asked to help draws with their face. */
@@ -244,6 +246,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // The newest ask written from your side, for an imported Codex
   // conversation's opening (see the relabel branch in the loop).
   let yourBody: string | null = null;
+  // Where a chat brought in started, for your words typed there.
+  let startedIn: 'Claude Code' | 'Codex' | null = null;
   // The short written name, folded forward like `title`. Read once at the end:
   // see `withTitleSaid`.
   let label: string | null = null;
@@ -344,9 +348,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     // news: an agent that held a task for an hour did one thing, not thirty.
     if (line.heartbeat || line.release) continue;
     // A chat brought in, carried on where it started (main/chat-follow.mts): no
-    // run of ours, so no diary hangs off it.
+    // run of ours, so no diary hangs off it. Your words there, when they were
+    // read, are the line just before and say it already.
     const carriedOn = line.claim ? carriedOnIn(line.claim.holder) : null;
     if (carriedOn) {
+      if (events.at(-1)?.saidOutside) continue;
       events.push({ at, who: 'you', said: `You replied in ${carriedOn}` });
       continue;
     }
@@ -398,6 +404,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // A chat the import brought in from Claude Code was yours, not an agent's,
       // and its row is dated when the chat started there.
       const broughtIn = Array.isArray(patch!.labels) && patch!.labels.includes('thread-import');
+      if (broughtIn) startedIn = 'Claude Code';
       events.push({
         at, who: ruled ? 'you' : who,
         said: leaver ? 'Handed over to you' : mine || ruled ? 'You opened this' : broughtIn ? 'Started in Claude Code' : 'An agent opened this',
@@ -424,6 +431,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // dated when the chat started there (store.importCodexThreads).
       const birth = events.findIndex((e) => e.said === 'An agent opened this' && !e.field);
       if (birth >= 0) events[birth] = { ...events[birth], said: 'Started in Codex' };
+      startedIn = 'Codex';
     }
 
     // The ask, on whichever line it arrived. See `opened` above: on her own
@@ -507,6 +515,13 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       const s = fromLink.place?.kind === 'time' && typeof fromLink.place.s === 'number' ? Math.floor(fromLink.place.s) : null;
       const moment = s === null ? '' : ` at ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
       events.push({ at, who: 'agent', said: `${fromLink.name} commented on ${fromLink.file}${moment}`, ...(words(fromLink.text) ? { words: words(fromLink.text)! } : {}) });
+      continue;
+    }
+
+    // Written by the app, as yours, only ever on the founder's side of the ledger.
+    const there = mine ? words((patch as { saidOutside?: unknown } | null)?.saidOutside) : undefined;
+    if (there) {
+      events.push({ at, who: 'you', said: `You replied in ${startedIn ?? 'Claude Code'}`, words: there, message: true, saidOutside: true });
       continue;
     }
 
