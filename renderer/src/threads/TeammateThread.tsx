@@ -29,7 +29,7 @@ import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Pers
 import { AskBar } from '../team/AskBar';
 import { DoneTrail, MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
 import { doneSteps } from '../../../shared/thread-cards.mts';
-import { earlierWords, filesOnThread, notSharedWords, notesOnFile, keyInTheBox, shownOnTheirThread } from './teammate-thread';
+import { earlierWords, filesOnThread, notSharedWords, notesOnFile, keyInTheBox, shownOnTheirThread, whereTheAskGoes } from './teammate-thread';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
 
@@ -204,6 +204,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     ...f, open: () => open(f.src),
   })), [work?.lines, marks, open]);
 
+  const askBar = ask && onHandBack ? <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={onHandBack} answeredBelow onOpenChange={(src) => onOpenDoc(ask.product, src)} /> : null;
+  const askGoes = whereTheAskGoes(events, built.outcome, ask?.createdAt ?? null);
+
   const acts = (
     <div className="tp-acts">
       {following && card.state !== 'done' && !ask && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
@@ -273,8 +276,10 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
           </section>}
           {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
           {work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
+          {askGoes === 'top' && askBar}
           <FileMarkOpener.Provider value={openMark}>
-            {events.length > 0 && <Thread events={events} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />}
+            {events.length > 0 && <Thread events={events} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md}
+              tail={(i) => (askGoes !== 'top' && askGoes !== 'foot' && i === askGoes.after ? askBar : null)} />}
           </FileMarkOpener.Provider>
           {built.outcome && (
             <div className="appendix appendix-foot">
@@ -282,8 +287,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
               {md(built.outcome.text)}
             </div>
           )}
-          {/* The ask is the newest thing said here, so it comes last, as a message. */}
-          {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={onHandBack} answeredBelow onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+          {askGoes === 'foot' && askBar}
           <form className="th-comment" onSubmit={(e) => { e.preventDefault(); if (!reviewing) void send(); }}>
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />

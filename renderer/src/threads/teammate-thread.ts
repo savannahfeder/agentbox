@@ -30,6 +30,17 @@ export function keyInTheBox(e: { key: string; ctrlKey?: boolean; metaKey?: boole
   return (e.ctrlKey || e.metaKey) && words.trim() ? 'changes' : null;
 }
 
+/**
+ * Where an ask on you goes among the owner's messages: after the message `after`
+ * (an index into `events`), above them all, or at the foot under the outcome.
+ */
+export function whereTheAskGoes(events: readonly { at: number }[], outcome: { at: number } | null, askAt: number | null): { after: number } | 'top' | 'foot' {
+  if (askAt == null) return 'foot';
+  const later = events.findIndex((e) => e.at > askAt);
+  if (later === -1) return outcome && outcome.at > askAt ? (events.length ? { after: events.length - 1 } : 'top') : 'foot';
+  return later === 0 ? 'top' : { after: later - 1 };
+}
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export const earlierWords = (n: number, owner: string) => `${plural(n, 'earlier message')} ${n === 1 ? 'stays' : 'stay'} on ${owner}'s computer.`;
