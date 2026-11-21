@@ -16,8 +16,11 @@ import path from 'node:path';
 import type { TeamBackend, TeamSession } from './team/index.mts';
 import type { MemoryCloud } from './team/memory-cloud.mts';
 import {
-  DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAMMATES, demoCards, demoMessages,
+  DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoMessages, withFile,
 } from '../shared/demo-world.mts';
+import { TEAM_LOOK, TEAM_LOOK_POSTED } from '../shared/team-look.mts';
+
+const HR = 3_600_000;
 
 /** Where the moment a demo was seeded is kept, in its throwaway home. */
 export const SEEDED_FILE = '.demo-seeded.json';
@@ -58,9 +61,11 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
     const them = memoryBackend(cloud, m.from.id);
     const people = [m.from.id, DEMO_ME.id];
     await them.shareProject({ id: m.projectId, teamId: DEMO_TEAM.id, name: 'Direct', visibility: 'people', people, direct: true });
+    if (m.file) await them.putFile(m.projectId, m.file.path, Buffer.from(`${m.file.text}\n`).toString('base64'));
     await them.pushLines(m.projectId, [
-      line(m.from.id, m.at, 'system', { title: m.title, kind: 'directive', priority: 0, status: 'open' }, m.id),
-      line(m.from.id, m.at + 1, 'founder', { title: m.title, body: m.body, assignee: DEMO_ME.id, people, ...(m.given ? { labels: ['given-task'] } : {}) }, m.id),
+      // A task's mark rides the line that opens it, or the pull drops it (shared/team-rules.mts).
+      line(m.from.id, m.at, 'system', { title: m.title, kind: 'directive', priority: 0, status: 'open', ...(m.given ? { labels: ['given-task'] } : {}) }, m.id),
+      line(m.from.id, m.at + 1, 'founder', { title: m.title, body: withFile(m), assignee: DEMO_ME.id, people }, m.id),
     ]);
     // Sorted already, as the copy's own agent would have sorted it.
     await me.pushLines(m.projectId, [line(DEMO_ME.id, m.at + 2, 'agent', { priority: m.priority }, m.id)]);
@@ -73,6 +78,19 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
       updatedAt: c.updatedAt, ...(c.shippedAt ? { shippedAt: c.shippedAt } : {}),
     }));
     await memoryBackend(cloud, person.id).putCards(DEMO_TEAM.id, cards);
+  }
+  // The team's group: the Team look, filled in, then the morning's posts. A
+  // group with a Team look already in it is not given the blank one.
+  const priya = memoryBackend(cloud, DEMO_TEAMMATES[0].id);
+  const group = ((await priya.myRooms()) as { id: string; teamId: string | null }[]).find((r) => r.teamId === DEMO_TEAM.id);
+  if (group) {
+    clock = now - 26 * HR;
+    await priya.putRoomFile(group.id, TEAM_LOOK, Buffer.from(DEMO_TEAM_LOOK).toString('base64'));
+    await priya.sendRoomMessage(group.id, { body: TEAM_LOOK_POSTED });
+    for (const post of DEMO_GROUP_POSTS) {
+      clock = now - post.hoursAgo * HR;
+      await memoryBackend(cloud, post.by.id).sendRoomMessage(group.id, { body: post.body });
+    }
   }
   cloud.now = () => Date.now();
   await keepTeammatesWorking(cloud);

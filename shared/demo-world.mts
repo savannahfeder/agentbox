@@ -65,34 +65,41 @@ const [PRIYA, THEO, LENA] = DEMO_TEAMMATES;
 // shows a stranger's folder name or a warning that the folder is missing.
 export const DEMO_PRODUCTS = [
   { slug: 'ferry', name: 'Ferry', oneLiner: 'Moves a team off Dropbox without losing a folder.', projectId: id('f101') },
-  { slug: 'website', name: 'Website', oneLiner: 'ferry.test, the launch and the changelog.', projectId: id('f102') },
+  { slug: 'website', name: 'Website', oneLiner: 'The site, the launch email and the changelog.', projectId: id('f102') },
 ];
 
 /* ------------------------------ your threads ------------------------------ */
 
 // Six things wait on you when the copy opens: two from teammates
-// (`DEMO_MESSAGES`) and four from agents here. Each lands on a screen worth
-// showing: options answered with one key, a decision, a thread that belongs
-// with a teammate, something blocked on you.
+// (`demoMessages`) and four threads an agent has answered. Each lands on a
+// screen worth showing: options answered with one key, a decision, a thread
+// that belongs with a teammate, something blocked on you.
 //
-// The bodies follow the worker brief: the ask in bold on the first line, then
-// the context, then `## Options`, which is what the reply box draws its
-// numbered choices from.
+// EACH IS SHAPED LIKE A REAL THREAD: your ask, then the agent's answer, its
+// summary (`problem` and `progress`, drawn as Context and Done) and its short
+// name. The name is written here so the copy never asks a model for one, which
+// would spend a plan and give a different name on every open (main/row-label.mts).
+// The answers follow the worker brief: the ask in bold on the first line, then
+// plain sentences, then `## Options`, which the reply box draws as choices.
 const MIN = 60_000;
 const HR = 3_600_000;
 
 interface DemoRow {
   product: string;
   id: string;
-  kind: string;
+  engine: 'claude' | 'codex';
   priority: number;
   at: number;
-  title: string;
-  body?: string;
-  bodyBy?: 'founder';
+  /** Your words, which open the thread. */
+  ask: string;
+  label: string;
+  problem: string;
+  progress: string[];
+  /** The agent's answer, written when it finished. */
+  result: string;
+  answeredAt: number;
   status?: 'done' | 'blocked';
-  statusAt?: number;
-  result?: string;
+  doneAt?: number;
 }
 
 function lines(now: number): DemoRow[] {
@@ -100,100 +107,146 @@ function lines(now: number): DemoRow[] {
     {
       product: 'ferry',
       id: 'w-f1d8a20c41',
-      kind: 'review',
+      engine: 'claude',
       priority: 7,
-      at: now - 18 * MIN,
-      title: 'The fix for file dates before 2019 is built and tested.',
-      body: [
-        '**Ship the date fix, or hold it until shared drives are covered too.**',
+      at: now - 2.2 * HR,
+      answeredAt: now - 18 * MIN,
+      ask: 'Files older than 2019 arrive in Google Drive stamped with today\'s date. Fix it so they keep their real date.',
+      label: 'Old file dates after a move',
+      problem: 'You wanted files older than 2019 to keep their real date after a move. They were arriving in Google Drive stamped with today\'s date.',
+      progress: [
+        'Found the cause: Drive refused the old dates and fell back to today',
+        'Carried each file\'s real date across in its details instead',
+        'Moved 3,200 test files from 2004 to 2018, every date kept',
+        'Shared drives still lose the date, inside the sync engine',
+      ],
+      result: [
+        '**Ship the date fix now, or hold it until shared drives work too?**',
         '',
-        'Files older than 2019 were landing stamped with today. They now keep their real date, on every one of the 3,200 test files I moved, and nothing already moved is touched.',
+        'Files older than 2019 now keep their real date. I moved 3,200 test files dated 2004 to 2018 and every one arrived with its date. Nothing already moved is touched.',
         '',
-        'Shared drives still lose the date, because that path goes through the sync engine. I would ship this now and leave shared drives to the thread that is already on the sync engine.',
+        'Shared drives still lose the date, because they go through the sync engine, which Theo is changing this week. I would ship this now and leave shared drives to his work.',
         '',
         '## Options',
-        '1. Ship it (recommended)',
+        '1. Ship it now (recommended)',
         '2. Hold it until shared drives work too',
-        '3. Ship it and open a thread for shared drives',
       ].join('\n'),
     },
     {
       product: 'ferry',
       id: 'w-f27c9e5b10',
-      kind: 'question',
+      engine: 'codex',
       priority: 5,
-      at: now - 47 * MIN,
-      title: 'The Google Drive import needs Theo. He owns the sync engine.',
-      body: [
-        '**Hand this thread to Theo.**',
+      at: now - 3.5 * HR,
+      answeredAt: now - 47 * MIN,
+      ask: 'Add OneDrive as a place to move to, beside Google Drive.',
+      label: 'OneDrive as a destination',
+      problem: 'You wanted Ferry to move teams to OneDrive as well as Google Drive. Small moves work. Large ones stall in the sync engine, which Theo owns.',
+      progress: [
+        'Built OneDrive as a second destination',
+        'Moved 9,400 files across 4 test accounts, folders and dates intact',
+        'Moves over 20,000 files stall in the sync engine',
+      ],
+      result: [
+        '**Hand this to Theo. Large moves stall inside his sync engine.**',
         '',
-        'The import works on personal drives. Shared drives fail inside the sync engine, which Theo is changing this week, so a fix from me would land on the same code as his.',
+        'OneDrive works as a destination. I moved 9,400 files across 4 test accounts and every folder and date arrived intact.',
         '',
-        'Everything I found is in this thread: the three failing drives, the error, and where in the engine it happens. He can start from here.',
+        'Moves over 20,000 files stall in the sync engine, which Theo is rewriting this week, so a fix from me would land on top of his. Everything he needs is in this thread: the three test moves that stalled, the error, and where in the engine it happens.',
       ].join('\n'),
     },
     {
       product: 'ferry',
       id: 'w-f3a04d7e62',
-      kind: 'question',
+      engine: 'claude',
       priority: 7,
-      at: now - 1.6 * HR,
-      title: 'Ferry needs a price before the first team can pay for it.',
-      body: [
-        '**Say per seat, or one flat price for the whole team.**',
+      at: now - 5 * HR,
+      answeredAt: now - 1.6 * HR,
+      ask: 'We need a price before the first trial team pays. Read the trial team interviews, look at what similar tools charge, and recommend one.',
+      label: 'Ferry pricing',
+      problem: 'You wanted a price for Ferry before the first trial team pays. It comes down to per seat or one flat price per team.',
+      progress: [
+        'Read the interview notes from three trial teams',
+        'Compared what two similar tools charge',
+        'Worked out what each team would pay under each price',
+      ],
+      result: [
+        '**Per seat, or one flat price per team?**',
         '',
-        'Per seat is what all three trial teams expected, and it grows as they do. A flat price is easier to say out loud, and it is what both competitors charge.',
+        'All three trial teams you interviewed expected to pay per seat, and per seat grows as a team does. Both similar tools charge one flat price per team, which is easier to say out loud.',
         '',
-        'At the sizes the trial teams are today, per seat earns more from two of the three and less from the biggest.',
+        'Those three teams have 6, 18 and 40 people. At $8 a seat, two of them would pay more than a $99 flat price and the smallest would pay less.',
         '',
         '## Options',
-        '1. Per seat (recommended)',
-        '2. One flat price per team',
-        '3. Per seat, capped at the flat price',
+        '1. Per seat, $8 a month (recommended)',
+        '2. One flat price, $99 a month per team',
+        '3. Per seat, never more than $99 a team',
       ].join('\n'),
     },
     {
       product: 'ferry',
       id: 'w-f4b6e1c093',
-      kind: 'task',
-      priority: 9,
-      at: now - 3.1 * HR,
+      engine: 'codex',
+      priority: 7,
+      at: now - 7 * HR,
+      answeredAt: now - 3.1 * HR,
       status: 'blocked',
-      title: 'Payments cannot go live until Stripe verifies the account.',
-      body: [
-        '**Finish Stripe\'s verification. It needs a bank detail only you have.**',
+      ask: 'Set up payments with Stripe, so a team can pay when its trial ends.',
+      label: 'Payments with Stripe',
+      problem: 'You wanted teams to be able to pay when their trial ends. Checkout is built. Stripe needs the company account verified first.',
+      progress: [
+        'Built checkout with Stripe',
+        'Passed every test with Stripe\'s test keys',
+        'Live keys refused until the account is verified',
+      ],
+      result: [
+        '**Finish Stripe\'s account check. It needs the company\'s bank details.**',
         '',
-        'Checkout is built and passes with the test keys. The live keys are refused until the account is verified, and that form asks for the company\'s bank account.',
+        'Checkout is built and passes every test with Stripe\'s test keys. The live keys are refused until the account is verified, and only you can fill in that form.',
         '',
-        'Everything else on the paid plan is done and waiting behind it.',
+        'Once it is verified, reply here and I will switch to the live keys and make one real $1 charge to check it end to end.',
       ].join('\n'),
     },
     {
       product: 'ferry',
       id: 'w-f5c2a8d714',
-      kind: 'directive',
+      engine: 'claude',
       priority: 5,
-      at: now - 6 * HR,
-      bodyBy: 'founder',
-      title: 'A move that stops halfway should pick up where it left off.',
-      body: 'When a move stops halfway, from a closed laptop or a dropped connection, it starts again from the first file. Make it pick up where it left off.',
+      at: now - 9 * HR,
+      answeredAt: now - 6 * HR,
       status: 'done',
-      statusAt: now - 4 * HR,
+      doneAt: now - 5.5 * HR,
+      ask: 'When a move stops halfway, from a closed laptop or a dropped connection, it starts again from the first file. Make it pick up where it left off.',
+      label: 'Resume a stopped move',
+      problem: 'You wanted a move that stops halfway to pick up where it left off, not start again from the first file.',
+      progress: [
+        'Ferry now remembers the last file each move finished',
+        'Cut the connection at 10%, 50% and 90% of a 12,000 file move',
+        'Each one finished with every file there once',
+      ],
       result: [
-        'A move that stops now picks up from the last file it finished. Tested by cutting the connection at 10%, 50% and 90% of a 12,000 file move: each one finished with every file there once and none twice.',
+        'A move that stops now picks up from the last file it finished.',
         '',
-        'It is shipped. Nothing changes for a move that never stops.',
+        'I cut the connection at 10%, 50% and 90% of a 12,000 file move. Each one finished with every file there once and none twice. A move that never stops works as before.',
       ].join('\n'),
     },
     {
       product: 'website',
       id: 'w-e1d93f2a58',
-      kind: 'review',
+      engine: 'codex',
       priority: 2,
-      at: now - 22 * HR,
+      at: now - 26 * HR,
+      answeredAt: now - 22 * HR,
       status: 'done',
-      statusAt: now - 20 * HR,
-      title: 'The changelog page is live with this month\'s six changes.',
+      doneAt: now - 21 * HR,
+      ask: 'Make a changelog page for the site with this month\'s changes, in plain words.',
+      label: 'Changelog page',
+      problem: 'You wanted a changelog page on the site with this month\'s changes, in plain words.',
+      progress: [
+        'Wrote this month\'s six changes in plain words',
+        'Added a picture for each of the three you can see',
+        'Published it and checked it on a phone',
+      ],
       result: [
         'The changelog page is live, with this month\'s six changes in plain words and a picture for each of the three you can see.',
         '',
@@ -205,9 +258,10 @@ function lines(now: number): DemoRow[] {
 
 /* ------------------------------ ledger lines ------------------------------ */
 
-// ONE ROW BECOMES THE LINES IT WOULD REALLY HAVE BEEN WRITTEN AS: filed, said,
-// then finished, each with its own time, because the thread view draws them in
-// that order. `source` decides who may overwrite what (shared/work-items.mts).
+// ONE ROW BECOMES THE LINES IT WOULD REALLY HAVE BEEN WRITTEN AS, each with its
+// own time, the way the app writes them (main/store.mts `composeItem`, then the
+// agent's summary and answer): the thread view draws them in that order.
+// `source` decides who may overwrite what (shared/work-items.mts).
 export type DemoLedgerLine = {
   id: string;
   ts: number;
@@ -221,27 +275,16 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
 
   for (const row of lines(now)) {
     const at = Math.round(row.at);
+    const answered = Math.round(row.answeredAt);
     const out = byProduct[row.product];
-    out.push({
-      id: row.id,
-      ts: at,
-      source: 'system',
-      // Seen by the team: a thread made before the copy signed in is otherwise yours alone.
-      patch: { title: row.title, status: 'open', kind: row.kind, priority: row.priority, labels: row.bodyBy === 'founder' ? ['founder'] : [], visibility: 'team' },
-    });
-    if (row.body) {
-      out.push({
-        id: row.id,
-        ts: at + 1,
-        source: row.bodyBy === 'founder' ? 'founder' : 'agent',
-        patch: { title: row.title, body: row.body },
-      });
-    }
-    if (row.status === 'done') {
-      out.push({ id: row.id, ts: Math.round(row.statusAt ?? at + HR), source: 'agent', patch: { status: 'done', result: row.result ?? '' } });
-    } else if (row.status === 'blocked') {
-      out.push({ id: row.id, ts: at + 2, source: 'agent', patch: { status: 'blocked' } });
-    }
+    // Seen by the team: a thread made before the copy signed in is otherwise yours alone.
+    out.push({ id: row.id, ts: at, source: 'system', patch: { title: row.ask, kind: 'directive', priority: row.priority, labels: ['founder'], status: 'open', visibility: 'team' } });
+    out.push({ id: row.id, ts: at + 1, source: 'founder', patch: { title: row.ask, body: row.ask, engine: row.engine } });
+    out.push({ id: row.id, ts: at + 2, source: 'agent', patch: { label: row.label } });
+    out.push({ id: row.id, ts: answered - 1, source: 'agent', patch: { problem: row.problem, progress: row.progress.join('\n') } });
+    out.push({ id: row.id, ts: answered, source: 'agent', patch: { result: row.result } });
+    if (row.status === 'blocked') out.push({ id: row.id, ts: answered + 1, source: 'system', patch: { status: 'blocked' } });
+    if (row.status === 'done') out.push({ id: row.id, ts: Math.round(row.doneAt ?? answered + 1), source: 'founder', patch: { status: 'done' } });
   }
 
   return byProduct;
@@ -253,7 +296,11 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
 // keeps a message (main/team/index.mts `message`). `given` makes it a task they
 // handed you rather than talk. `priority` is set so the copy does not ask a
 // model to sort it on a call.
-export interface DemoMessage { from: DemoPerson; projectId: string; id: string; at: number; title: string; body: string; priority: number; given?: boolean }
+export interface DemoFile { path: string; title: string; text: string }
+export interface DemoMessage { from: DemoPerson; projectId: string; id: string; at: number; title: string; body: string; priority: number; given?: boolean; file?: DemoFile }
+
+/** A message's file, linked under its words the way the reply box links one. */
+export const withFile = (m: DemoMessage) => (m.file ? `${m.body}\n\n[${m.file.path}](attachments/${m.file.path})` : m.body);
 
 export function demoMessages(now: number = Date.now()): DemoMessage[] {
   return [
@@ -263,22 +310,61 @@ export function demoMessages(now: number = Date.now()): DemoMessage[] {
       projectId: '7c41e2d9-3b8a-4f15-9e62-1d0a5c8b4f21',
       id: 'w-d1a7c3e590',
       at: now - 9 * MIN,
-      title: 'Can you read the launch email before 3?',
-      body: 'Can you read the launch email before 3? It goes to all 4,000 trial users at 4, and the subject line is the part I am least sure of. It is in the Website project.',
+      title: 'Can you read the launch email today?',
+      body: 'Can you read the launch email today? It goes to all 4,000 trial users tomorrow morning, and the subject line is the part I am least sure of.',
       priority: 7,
+      file: LAUNCH_EMAIL,
     },
     {
       from: PRIYA,
       projectId: 'a93f0b6e-52c7-4d18-8b3e-6f2d9c1e7a54',
       id: 'w-d2b84f6a31',
       at: now - 34 * MIN,
-      title: 'Pick one of the three first screens after sign-up',
-      body: 'I drew three versions of the first screen after sign-up. Pick the one you would ship and my agent will build it this afternoon. My vote is the second: it starts the first move straight away instead of showing a tour.',
+      title: 'Approve the words on the sign-up screens',
+      body: 'Can you read the words for the three sign-up screens and say yes, or change what you would? My agent builds the screens as soon as you do.',
       priority: 5,
       given: true,
+      file: SIGN_UP_WORDS,
     },
   ];
 }
+
+/* ------------------------------ the team's group ------------------------------ */
+
+// What the team said in its group this morning, oldest first, beside the Team
+// look Priya filled in. `hoursAgo` is from the moment the demo was seeded.
+export const DEMO_GROUP_POSTS: { by: DemoPerson; hoursAgo: number; body: string }[] = [
+  { by: THEO, hoursAgo: 2.5, body: 'The sync engine rewrite is on a branch. Large moves now go in batches of 5,000 files, and a 60,000 file test finished in 41 minutes instead of stalling.' },
+  { by: LENA, hoursAgo: 1.2, body: 'Launch email is written. It goes to all 4,000 trial users tomorrow morning, once Jamie has read it.' },
+  { by: PRIYA, hoursAgo: 0.6, body: 'Sign-up screens are drawn in light and dark. The words are with Jamie, then my agent builds them.' },
+];
+
+/** The Team look, filled in, so the one file every agent reads is not a blank form. */
+export const DEMO_TEAM_LOOK = [
+  '# Team look',
+  '',
+  'What every agent on the team reads before it makes a design, a page, a picture or a film. Anyone on the team can edit it.',
+  '',
+  '## Colours',
+  '',
+  '- Main: #2F6FEB, the blue of the Ferry mark',
+  '- Text: #1B1F24',
+  '- Background: #F7F8FA',
+  '',
+  '## Fonts',
+  '',
+  '- Headings: Inter, semibold',
+  '- Body: Inter, regular',
+  '',
+  '## Logo',
+  '',
+  'The Ferry mark sits top left on every page, never smaller than 24 pixels.',
+  '',
+  '## Voice',
+  '',
+  'Plain and short. Say what moved and how long it took. No exclamation marks.',
+  '',
+].join('\n');
 
 /* ---------------------------- what they are on ---------------------------- */
 
@@ -289,14 +375,14 @@ export interface DemoCard { by: DemoPerson; threadId: string; project: string; t
 export function demoCards(now: number = Date.now()): DemoCard[] {
   const done = lastWorkingMorning(now);
   return [
-    { by: THEO, threadId: 'w-c3a1e09d42', project: 'Ferry', title: 'Shared drives keep their permissions after a move', state: 'running', updatedAt: now - 12 * MIN, progress: 'Owners and editors carry across\nViewers next, then the 40 drive test' },
+    { by: THEO, threadId: 'w-c3a1e09d42', project: 'Ferry', title: 'Sync engine rewrite for large moves', state: 'running', updatedAt: now - 12 * MIN, progress: 'Batches of 5,000 files instead of one queue\nShared drives next, then a 60,000 file test' },
     { by: THEO, threadId: 'w-c3b27f8e15', project: 'Ferry', title: 'Uploads retry on a slow connection', state: 'done', updatedAt: done - 19 * HR, shippedAt: done - 19 * HR, progress: 'Retries three times, then says which file' },
-    { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Ferry', title: 'Three first screens after sign-up', state: 'done', updatedAt: done - 40 * MIN, progress: 'Drawn in light and dark' },
+    { by: THEO, threadId: 'w-c3c84a1f06', project: 'Ferry', title: 'Shared drives keep their permissions', state: 'done', updatedAt: done - 15 * HR, progress: 'Owners, editors and viewers carry across' },
+    { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Ferry', title: 'Sign-up screens', state: 'waiting', updatedAt: now - 34 * MIN, progress: 'Drawn in light and dark\nWords waiting on a yes from Jamie' },
     { by: PRIYA, threadId: 'w-b2d91e6c50', project: 'Ferry', title: 'Empty states for the move list', state: 'running', updatedAt: now - 25 * MIN, progress: 'Four states drawn, two to go' },
+    { by: PRIYA, threadId: 'w-b2e3f7a915', project: 'Website', title: 'Pricing page in dark mode', state: 'done', updatedAt: done - 17 * HR, shippedAt: done - 17 * HR, progress: 'Checked on a phone and a laptop' },
     { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email for the trial users', state: 'waiting', updatedAt: now - 9 * MIN, progress: 'Written, waiting on a read from Jamie' },
-    { by: LENA, threadId: 'w-d4f05c1b98', project: 'Website', title: 'Changelog page', state: 'done', updatedAt: done - 21 * HR, shippedAt: done - 21 * HR, progress: 'Six changes this month' },
-    { by: THEO, threadId: 'w-c3c84a1f06', project: 'Ferry', title: 'Folders over 50,000 files move in one go', state: 'done', updatedAt: done - 15 * HR, progress: 'Tested on a 61,000 file folder' },
-    { by: PRIYA, threadId: 'w-b2e3f7a915', project: 'Website', title: 'Pricing page in dark mode', state: 'done', updatedAt: done - 17 * HR, progress: 'Checked on a phone and a laptop' },
+    { by: LENA, threadId: 'w-d4f05c1b98', project: 'Website', title: 'Comparison page against two similar tools', state: 'done', updatedAt: done - 21 * HR, shippedAt: done - 21 * HR, progress: 'Live, linked from pricing' },
     { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'Trial teams who never started a move', state: 'done', updatedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
   ];
 }
@@ -315,10 +401,55 @@ export function lastWorkingMorning(now: number): number {
 
 /* --------------------------------- papers --------------------------------- */
 
-// A document or two per project, so the documents pane is not empty. Short on
+// The files the messages carry, and a document or two per project. Short on
 // purpose: somebody in the room will start reading a long one.
-export const DEMO_DOCS: Record<string, { path: string; title: string; text: string }[]> = {
+const SIGN_UP_WORDS: DemoFile = {
+  path: 'sign-up-screens.md',
+  title: 'Sign-up screens',
+  text: [
+    '# Sign-up screens',
+    '',
+    'The words on the three screens after somebody signs up. Priya\'s drawings',
+    'use these exactly.',
+    '',
+    '## 1. Where are your files now?',
+    '',
+    'Pick the Dropbox you are moving from. Ferry only reads it. Nothing in it',
+    'changes until you say so.',
+    '',
+    '## 2. Where should they go?',
+    '',
+    'Pick the Google Drive they should land in. Every folder arrives where',
+    'you left it.',
+    '',
+    '## 3. Start your first move',
+    '',
+    'Most teams are done before lunch. You can close your laptop: Ferry picks',
+    'up where it left off.',
+  ].join('\n'),
+};
+
+const LAUNCH_EMAIL: DemoFile = {
+  path: 'launch-email.md',
+  title: 'Launch email',
+  text: [
+    '# Your whole Dropbox, moved by Friday',
+    '',
+    'Hi {first name},',
+    '',
+    'Ferry now moves your whole team to Google Drive with every folder where',
+    'you left it. Close your laptop halfway and the move picks up where it',
+    'stopped.',
+    '',
+    'Start a move from the link below. Most teams are done before lunch.',
+    '',
+    'Lena, for the Ferry team',
+  ].join('\n'),
+};
+
+export const DEMO_DOCS: Record<string, DemoFile[]> = {
   ferry: [
+    SIGN_UP_WORDS,
     {
       path: 'notes.md',
       title: 'Ferry notes',
@@ -332,28 +463,11 @@ export const DEMO_DOCS: Record<string, { path: string; title: string; text: stri
         '',
         '## Open',
         '',
-        '- A price. Per seat or flat.',
-        '- Shared drives lose permissions and dates. Theo has the sync engine.',
-        '- Stripe is waiting on the bank details.',
+        '- A price. Per seat or one flat price per team.',
+        '- Large moves stall in the sync engine. Theo is rewriting it.',
+        '- Stripe is waiting on the company\'s bank details.',
       ].join('\n'),
     },
   ],
-  website: [
-    {
-      path: 'launch-email.md',
-      title: 'Launch email',
-      text: [
-        '# Your whole Dropbox, moved by Friday',
-        '',
-        'Hi {first name},',
-        '',
-        'Ferry now moves a whole team across with every folder where you left it,',
-        'every file date kept, and a move that picks up where it stopped.',
-        '',
-        'Start a move from the link below. Most teams are done before lunch.',
-        '',
-        'Lena, for the Ferry team',
-      ].join('\n'),
-    },
-  ],
+  website: [LAUNCH_EMAIL],
 };

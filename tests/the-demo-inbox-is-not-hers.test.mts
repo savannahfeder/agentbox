@@ -160,7 +160,7 @@ describe('the store a demo opens on', () => {
       for (const p of out.products) all.push(...readWorkItems(p.dir));
       expect(all.length).toBeGreaterThanOrEqual(6);
       // Every screen worth demoing has a row that lands on it.
-      expect(all.some((i) => i.status === 'open' && /## Options/.test(i.body ?? ''))).toBe(true);
+      expect(all.some((i) => i.status === 'open' && /## Options/.test(i.result ?? ''))).toBe(true);
       expect(all.some((i) => i.status === 'blocked')).toBe(true);
       expect(all.some((i) => i.status === 'done' && (i.result ?? '').length > 40)).toBe(true);
       // And one row the user wrote, which an agent may not overwrite.
@@ -240,17 +240,32 @@ describe('what a demo never shows', () => {
 
 describe('how the demo rows are written', () => {
   const rows = Object.values(demoLedgerLines(Date.now())).flat();
-  // AGENT BODIES ONLY. The user's own row is their sentence, written the way
-  // somebody types a sentence, and a rule about how we open a card does not
-  // apply to what the user wrote.
-  const bodies = rows.filter((l) => l.source === 'agent').map((l) => l.patch?.body).filter(Boolean);
+  // THE AGENTS' ANSWERS ON THREADS STILL WAITING ON YOU. The user's own words
+  // are a sentence somebody typed, and a finished thread's answer is a report.
+  const finished = new Set(rows.filter((l) => l.patch?.status === 'done').map((l) => l.id));
+  const bodies = rows.filter((l) => l.source === 'agent' && !finished.has(l.id)).map((l) => l.patch?.result).filter(Boolean);
 
-  it('opens every body with the ask in bold on the first line', () => {
-    expect(bodies.length).toBeGreaterThan(0);
+  it('opens every answer waiting on you with the ask in bold, under fifteen words', () => {
+    expect(bodies.length).toBeGreaterThanOrEqual(4);
     for (const body of bodies) {
       const first = body.split('\n')[0];
       expect(first.startsWith('**')).toBe(true);
       expect(first.endsWith('**')).toBe(true);
+      expect(first.replace(/\*/g, '').split(/\s+/).length).toBeLessThan(15);
+    }
+  });
+
+  it('names and summarises every thread itself, so the copy never asks a model to', () => {
+    // main/row-label.mts names any row without a label on a timer.
+    const ids = new Set(rows.map((l) => l.id));
+    for (const id of ids) {
+      const mine = rows.filter((l) => l.id === id);
+      expect(mine.some((l) => String(l.patch?.label ?? '').trim())).toBe(true);
+      const summary = mine.find((l) => l.patch?.problem);
+      expect(String(summary?.patch.problem).split(/\s+/).length).toBeLessThanOrEqual(45);
+      const done = String(summary?.patch.progress).split('\n');
+      expect(done.length).toBeLessThanOrEqual(6);
+      for (const step of done) expect(step.split(/\s+/).length).toBeLessThanOrEqual(15);
     }
   });
 
@@ -265,9 +280,9 @@ describe('how the demo rows are written', () => {
     // section. A demo whose questions have none demonstrates the app with its
     // best feature switched off.
     // An ask that offers a choice ("Ship it, or hold it") draws one.
-    const asks = rows.filter((l) => l.source === 'agent' && /^\*\*[^*\n]*, or /.test(String(l.patch?.body ?? '')));
+    const asks = rows.filter((l) => l.source === 'agent' && /^\*\*[^*\n]*, or /.test(String(l.patch?.result ?? '')));
     expect(asks.length).toBeGreaterThanOrEqual(2);
-    for (const ask of asks) expect(ask.patch.body).toMatch(/\n## Options\n/);
+    for (const ask of asks) expect(ask.patch.result).toMatch(/\n## Options\n/);
   });
 });
 

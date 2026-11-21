@@ -13,8 +13,9 @@ import path from 'node:path';
 import { DEMO_CLOUD, loadCloudConfig, supabaseSession } from '../main/team/session.mts';
 import { readSeededAt, seedDemoTeam, writeSeededAt } from '../main/demo-team.mts';
 import {
-  DEMO_ENV, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAMMATES, demoCards, demoLedgerLines, demoMessages, lastWorkingMorning,
+  DEMO_ENV, DEMO_GROUP_POSTS, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, DEMO_TEAM_LOOK, DEMO_TEAMMATES, demoCards, demoLedgerLines, demoMessages, lastWorkingMorning,
 } from '../shared/demo-world.mts';
+import { TEAM_LOOK } from '../shared/team-look.mts';
 
 const made: string[] = [];
 const dir = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'demo-team-')); made.push(d); return d; };
@@ -81,6 +82,26 @@ describe('the team a demo copy is signed in to', () => {
     }
   });
 
+  it('carries each message\'s file, so it opens from the message', async () => {
+    const b = await signedIn();
+    for (const m of demoMessages().filter((x) => x.file)) {
+      expect(await b.hasFiles(m.projectId, [m.file!.path])).toEqual([m.file!.path]);
+      const lines = await b.pullLines(m.projectId) as { line: { patch: Record<string, unknown> } }[];
+      expect(lines.some((l) => String(l.line.patch.body ?? '').includes(`](attachments/${m.file!.path})`))).toBe(true);
+    }
+  });
+
+  it('has the team\'s group with a filled-in Team look and the morning\'s posts', async () => {
+    const b = await signedIn();
+    const group = (await b.myRooms() as { id: string; teamId: string | null }[]).find((r) => r.teamId === DEMO_TEAM.id)!;
+    const said = await b.roomMessages(group.id) as { body: string; person_id?: string; by?: string }[];
+    expect(said.some((m) => m.body.includes(TEAM_LOOK))).toBe(true);
+    expect(said.filter((m) => !m.body.includes(TEAM_LOOK))).toHaveLength(DEMO_GROUP_POSTS.length);
+    const look = Buffer.from(String(await b.roomFile(group.id, TEAM_LOOK)), 'base64').toString('utf8');
+    expect(look).toBe(DEMO_TEAM_LOOK);
+    expect(look).not.toMatch(/^- \w+:\s*$/m);
+  });
+
   it('shows what each teammate is on', async () => {
     const cards = await (await signedIn()).listCards() as { personId: string; state: string }[];
     for (const p of DEMO_TEAMMATES) expect(cards.some((c) => c.personId === p.id)).toBe(true);
@@ -109,7 +130,7 @@ describe('what waits on the person when it opens', () => {
 
   it('includes a thread that belongs with a teammate, by name', () => {
     const lines = Object.values(demoLedgerLines()).flat();
-    expect(lines.some((l) => DEMO_TEAMMATES.some((p) => String(l.patch.body ?? '').includes(`Hand this thread to ${p.name.split(' ')[0]}`)))).toBe(true);
+    expect(lines.some((l) => DEMO_TEAMMATES.some((p) => String(l.patch.result ?? '').startsWith(`**Hand this to ${p.name.split(' ')[0]}.`)))).toBe(true);
   });
 });
 

@@ -240,7 +240,8 @@ export function loadConfig(appDir: string, { home = os.homedir(), env = process.
   // only be written by hand, so a new person with both engines never got
   // Codex at all. A Mac with no config file has no old rows, so its first
   // launch is that moment. An install with a config is left as it was.
-  const firstLaunch = fresh && !config.engineChoice ? new Date().toISOString() : null;
+  // A demo's seeded threads are a day old and name their engine, so its moment is earlier.
+  const firstLaunch = fresh && !config.engineChoice ? new Date(Date.now() - (runningAsADemo(env) ? 30 * 86_400_000 : 0)).toISOString() : null;
   if (firstLaunch) config.engineChoice = firstLaunch;
   if (typeof config.accountId !== 'string' || !config.accountId) {
     // A demo copy's store was seeded under this id before it opened (main/demo.mts).
