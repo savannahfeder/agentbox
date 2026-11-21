@@ -100,3 +100,15 @@ describe('a thread handed over says so in the inbox', () => {
     expect(taskWords(ask({ ask: undefined, body: 'Do this' }) as never, inbox as never, 'theo', nameOf)?.word).toBe('From Sam');
   });
 });
+
+// A live check: Theo's Done list showed one thread four and eight times, once per ask.
+describe('Done shows a thread you were asked about once', () => {
+  it('keeps the newest ask per thread and every other row', async () => {
+    const { newestAskPerThread } = await import('../shared/thread-asks.mts');
+    const rows = [ask({ id: 'a', updatedAt: 3 }), ask({ id: 'b', updatedAt: 9 }), { id: 'plain' }, ask({ id: 'c', updatedAt: 5, ask: { kind: 'help', owner: 'sam', thread: 'w-2', product: 'api' } })];
+    expect(newestAskPerThread(rows as never).map((r: { id: string }) => r.id)).toEqual(['b', 'plain', 'c']);
+  });
+  it('is what the Done list draws', () => {
+    expect(read('renderer/src/App.tsx')).toContain('return newestAskPerThread(items.filter((i) => !needsYou.has(i.id)');
+  });
+});

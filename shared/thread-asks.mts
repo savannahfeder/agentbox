@@ -95,6 +95,19 @@ export function sentAwayByMe(row: (AskRow & { body?: string | null }) | null | u
   return isTaskRow(row as Parameters<typeof isTaskRow>[0]) && taskGiver(row as Parameters<typeof taskGiver>[0]) === me && !!handedFrom(row.body, me);
 }
 
+/** Rows with every ask on one thread after the newest left out, so a thread you were asked about often is one row. Keeps the order given. */
+export function newestAskPerThread<R extends AskRow>(rows: readonly R[]): R[] {
+  const newest = new Map<string, R>();
+  for (const r of rows) {
+    const a = askOf(r);
+    if (!a) continue;
+    const key = `${a.owner}/${a.product}/${a.thread}`;
+    const had = newest.get(key);
+    if (!had || (r.updatedAt ?? r.createdAt ?? 0) > (had.updatedAt ?? had.createdAt ?? 0)) newest.set(key, r);
+  }
+  return rows.filter((r) => { const a = askOf(r); return !a || newest.get(`${a.owner}/${a.product}/${a.thread}`) === r; });
+}
+
 /** Asks you gave that were handed back and not yet carried onto the thread. */
 export function handedBackAsks(rows: readonly AskRow[], me: string | null, done: ReadonlySet<string>): AskRow[] {
   return rows.filter((r) => {

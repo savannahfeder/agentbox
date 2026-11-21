@@ -70,7 +70,7 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy, sentAwayByMe } from '../../shared/thread-asks.mts';
+import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy, newestAskPerThread, sentAwayByMe } from '../../shared/thread-asks.mts';
 import { ASK_PERSON_EVENT, HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -2651,7 +2651,7 @@ export default function App() {
   // In progress until it does (w-bc976fd247).
   const done = useMemo(() => {
     const needsYou = new Set(inbox.map((i) => i.id));
-    return items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !sentAwayByMe(i, team?.me ?? null))
+    return newestAskPerThread(items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && (!scope || i.product === scope) && i.status === 'done' && !sentAwayByMe(i, team?.me ?? null)))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [items, scope, inbox, liveIds, shippingIds, team?.me]);
 
