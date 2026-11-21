@@ -33,6 +33,15 @@ describe('the order held under the pointer', () => {
     expect(inOrderOf(files('c', 'a', 'b'), [], key).map(key)).toEqual(['c', 'a', 'b']);
   });
 
+  // Round two: a tester's click opened a file's menu, a new file then arrived
+  // with the pointer still, and the menu slid away with its tile.
+  it('also holds while a file\'s menu or a rename box is open', () => {
+    const src = fs.readFileSync(new URL('../renderer/src/files/FilesPlace.tsx', import.meta.url), 'utf8');
+    expect(src).toMatch(/const holding = [^;]*HOLD_STILL_MS[^;]*\|\| busy\(\)/);
+    expect(src).toMatch(/\.fp-more-box\.is-open/);
+    expect(src).toMatch(/\.fp-name > \.fp-name-box/);
+  });
+
   it('is what the Files page uses for its tiles and its project cards, only while the pointer moves', () => {
     const src = fs.readFileSync(new URL('../renderer/src/files/FilesPlace.tsx', import.meta.url), 'utf8');
     expect(src).toMatch(/holding \? inOrderOf\(sorted, held\.current\.tiles/);

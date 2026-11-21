@@ -53,7 +53,7 @@ function DocFace({ file }: { file: PlacedFile }) {
       if (live && r.ok) setBlocks(docBlocks(r.text ?? ''));
     });
     return () => { live = false; };
-  }, [file.opened, file.blank]);
+  }, [file.opened, file.versions, file.bytes, file.blank]);
   return <div className="fp-doc" aria-hidden="true">
     {blocks.map((b, i) => (b.kind === 'h1' ? <strong key={i}>{b.text}</strong>
       : b.kind === 'h2' ? <b key={i}>{b.text}</b>
@@ -69,7 +69,7 @@ function PageFace({ file }: { file: PlacedFile }) {
     let live = true;
     void api.readDoc({ product: file.sentIn[0]?.product ?? '', src: file.opened ?? '' }).then((r) => { if (live && r.ok) setText(r.text ?? ''); });
     return () => { live = false; };
-  }, [file.opened]);
+  }, [file.opened, file.versions, file.bytes]);
   // Sandboxed with nothing allowed: a tile runs none of a page's scripts.
   return text === null ? null : <iframe className="fp-page-face" srcDoc={text} title="" tabIndex={-1} sandbox="" />;
 }
@@ -80,7 +80,7 @@ function CodeFace({ file }: { file: PlacedFile }) {
     let live = true;
     void api.readDoc({ product: file.sentIn[0]?.product ?? '', src: file.opened ?? '' }).then((r) => { if (live && r.ok) setText((r.text ?? '').split('\n').slice(0, 12).join('\n')); });
     return () => { live = false; };
-  }, [file.opened]);
+  }, [file.opened, file.versions, file.bytes]);
   return <pre className="fp-code-face" aria-hidden="true">{text}</pre>;
 }
 
@@ -524,7 +524,9 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const [, setSettled] = useState(0);
   const held = useRef<{ tiles: string[]; projects: string[] }>({ tiles: [], projects: [] });
   useEffect(() => () => { if (settle.current) clearTimeout(settle.current); }, []);
-  const holding = Date.now() - movedAt.current < HOLD_STILL_MS;
+  // The page as last drawn: an open menu or rename box keeps its tile where it is.
+  const busy = () => !!document.querySelector('.fp-page .fp-more-box.is-open, .fp-page .fp-name > .fp-name-box');
+  const holding = Date.now() - movedAt.current < HOLD_STILL_MS || busy();
   const pointerMoved = () => {
     movedAt.current = Date.now();
     if (settle.current) clearTimeout(settle.current);
