@@ -1479,6 +1479,8 @@ export interface AccountSetting {
   // emails.
   email: string | null;
   accountUuid: string | null;
+  /** Main's answer. A login with no email on file can still be signed in. */
+  signedIn?: boolean;
   /**
    * Whether her work runs on THIS account and no other. False on every row
    * until she picks one, and then every account runs as it always has. */

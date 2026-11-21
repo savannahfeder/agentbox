@@ -7,6 +7,7 @@
 import { accountLabel, type CloudAccount } from './cloud-menu';
 import type { AccountUsageReading, Usage, UsageLimit } from './types';
 import { readingsDisagree } from '../../shared/usage.mts';
+import { accountName } from '../../shared/account-names.mts';
 
 /** A login on this computer, as the Claude Code page reads it. */
 export type HereLogin = {
@@ -56,11 +57,12 @@ export function accountReadingFor(profile: string, readings: AccountUsageReading
  * order, then the cloud's that are signed in nowhere here. `cloud` is the
  * counted Claude logins (`countedAccounts`), oldest first.
  */
-export function accountsOnce({ here, cloud = [], readings = [], current = null }: {
+export function accountsOnce({ here, cloud = [], readings = [], current = null, engine = 'claude' }: {
   here: HereLogin[];
   cloud?: CloudAccount[];
   readings?: AccountUsageReading[];
   current?: Usage | null;
+  engine?: 'claude' | 'codex';
 }): OneAccount[] {
   const paired = new Map<string, CloudAccount>();
   for (const c of cloud) if (c.profile && here.some((h) => h.profile === c.profile) && !paired.has(c.profile)) paired.set(c.profile, c);
@@ -79,7 +81,7 @@ export function accountsOnce({ here, cloud = [], readings = [], current = null }
     const localError = h ? readings.find((r) => r.profile === h.profile)?.error ?? null : null;
     return {
       key: h?.profile ?? `cloud:${c!.key}`,
-      name: h?.email ?? (c ? accountLabel(c, cloud) : 'Not signed in'),
+      name: h?.email ?? (c ? accountLabel(c, cloud) : h?.signedIn ? accountName({ engine, index: here.indexOf(h), total: here.length }) : 'Not signed in'),
       plan: (h?.signedIn ? h.plan : null) ?? c?.plan ?? null,
       here: h,
       cloud: c,
@@ -103,5 +105,5 @@ export function codexAccountsOnce({ here, cloud = [], readings = [], current = n
 }): OneAccount[] {
   const matched = cloud.map((c) => ({ ...c, profile: c.profile ?? (c.name ? here.find((h) => h.email === c.name)?.profile : null) ?? null }));
   const inUse = here.find((h) => h.chosen)?.profile ?? 'default';
-  return accountsOnce({ here, cloud: matched, readings, current: current && { ...current, profile: inUse } });
+  return accountsOnce({ here, cloud: matched, readings, current: current && { ...current, profile: inUse }, engine: 'codex' });
 }

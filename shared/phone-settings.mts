@@ -123,6 +123,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 interface ClaudeAccountModel {
   profile?: string | null;
   email?: string | null;
+  signedIn?: boolean;
   chosen?: boolean;
   state?: string;
   trouble?: { note?: string | null; resetsAt?: number | null } | null;
@@ -493,8 +494,8 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
       memoryGate: w.memoryGate ? { on: !!gate.on, slots: gate.slots ?? null, slotsAuto: gate.slotsAuto ?? null, slotsMax: gate.slotsMax ?? null, now: gate.now ?? null, reading: memoryReadingOf(gate.reading) } : null,
       leftovers: { on: !!w.leftovers?.on, now: w.leftovers?.now ?? null },
       accounts: (w.accounts ?? []).map((a) => ({
-        // The desktop's rule (Settings.tsx agentStory): a Claude login is signed in once it has an address.
-        id: accountIdOf(a.profile), email: a.email ?? null, signedIn: !!a.email, chosen: !!a.chosen, state: a.state,
+        // Main's answer. The address stands in only for a row that carries none.
+        id: accountIdOf(a.profile), email: a.email ?? null, signedIn: a.signedIn ?? !!a.email, chosen: !!a.chosen, state: a.state,
         note: a.trouble?.note ?? null, resetsAt: a.trouble?.resetsAt ?? null, plan: a.plan?.label ?? null, running: a.running ?? 0,
         usage: usageFor(model.usage?.claude, a.profile),
       })),
