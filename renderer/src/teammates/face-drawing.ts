@@ -11,7 +11,8 @@ export function faceSvg(seed: string): string {
   let svg = drawn.get(seed);
   if (!svg) {
     // Closer than the full bust, so a face reads at the inbox's 18px; low enough that the hair clears a round frame.
-    svg = createAvatar(notionists, { seed, scale: 125, translateY: 18 }).toString();
+    // No hands: a raised hand is cut off by the circle at this crop.
+    svg = createAvatar(notionists, { seed, scale: 125, translateY: 18, gestureProbability: 0 }).toString();
     drawn.set(seed, svg);
   }
   return svg;

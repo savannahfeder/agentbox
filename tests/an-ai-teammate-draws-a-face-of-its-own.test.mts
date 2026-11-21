@@ -49,6 +49,16 @@ describe('a teammate’s face', () => {
     expect(svg).toMatch(/scale\(1\.2[0-9]*\)/);
   });
 
+  // About one face in twelve raised a hand or held a phone, which the closer crop cut off at the circle's edge.
+  it('never draws hands', async () => {
+    const { createAvatar } = await import('@dicebear/core');
+    const notionists = await import('@dicebear/notionists');
+    const withHands = Array.from({ length: 200 }, (_, i) => `t-${i}`)
+      .filter((s) => createAvatar(notionists, { seed: s, scale: 125, translateY: 18 }).toString() !== createAvatar(notionists, { seed: s, scale: 125, translateY: 18, gestureProbability: 0 }).toString());
+    expect(withHands.length).toBeGreaterThan(5);
+    for (const s of withHands) expect(svgOf(faceDrawing(s))).toBe(createAvatar(notionists, { seed: s, scale: 125, translateY: 18, gestureProbability: 0 }).toString());
+  });
+
   // Measured in the inbox: the face sat 2.5px above its title, the other rows' marks at 0.
   it('in an inbox row, centres on the title like every other row’s mark', () => {
     const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
