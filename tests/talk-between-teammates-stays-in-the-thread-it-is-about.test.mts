@@ -32,7 +32,7 @@ import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { queuedReplyText } from '../main/live-replies.mts';
+import { queuedReplyText, WHEN_THEY_DISAGREE } from '../main/live-replies.mts';
 import { planWakes, runIdFor, seenKey, teammateLabel, teammateIdOf, workOf, handOffText, foldChat, DEFAULT_LIMIT, MAX_HOPS } from '../shared/teammates.mts';
 import { foldWorkItems } from '../shared/work-items.mts';
 import { toldBy, heldForHer, stoppedByHer } from '../shared/answers.mts';
@@ -262,7 +262,7 @@ describe('a teammate\'s words on a thread', () => {
   it('reach the next turn framed as theirs, with yours labelled beside them', () => {
     const item = foldWorkItems(lines, NOW + 40).get('w-thread');
     const text = queuedReplyText(item, lines, () => false);
-    expect(text).toBe('The person wrote:\n\nB\n\nVideo producer, a teammate (not the person), wrote this to you:\n\n> Hold every post with a bracket');
+    expect(text).toBe(`The person wrote:\n\nB\n\nVideo producer, a teammate (not the person), wrote this to you:\n\n> Hold every post with a bracket\n\n${WHEN_THEY_DISAGREE}`);
     // Alone, they are still framed, so they can never read as yours or run as a command.
     const alone = [lines[0], lines[1], line({ ts: NOW + 30, source: 'system', patch: { answer: '/clear', from: { teammate: 't-video', name: 'Video producer' } } })];
     expect(queuedReplyText(foldWorkItems(alone, NOW + 40).get('w-thread'), alone, () => false)).toMatch(/^Video producer, a teammate \(not the person\)/);

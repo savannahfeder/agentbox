@@ -426,8 +426,8 @@ describe('a thread can be handed on', () => {
   });
 
   it('lists people in the menu and the command bar', () => {
-    expect(threadMenuRows({ change: false, terminal: null, finish: true, give: true }).map((r) => r.label)).toContain('Give it to someone else…');
-    expect(threadMenuRows({ change: false, terminal: null, finish: true }).map((r) => r.label)).not.toContain('Give it to someone else…');
+    expect(threadMenuRows({ change: false, terminal: null, finish: true, give: true }).map((r) => r.label)).toContain('Ask or hand off…');
+    expect(threadMenuRows({ change: false, terminal: null, finish: true }).map((r) => r.label)).not.toContain('Ask or hand off…');
     const rows = threadCommands({ give: [{ id: 'u-dev', name: 'Dev' }, { id: 'u-jo', name: 'Jordan' }] });
     expect(rows.map((r) => r.label)).toEqual(['Give it to Dev', 'Give it to Jordan']);
     expect(rows[0].does).toEqual({ act: 'give', to: 'u-dev', name: 'Dev' });

@@ -12,9 +12,10 @@ import type { GroupRow } from '../../shared/room-needs-you.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mts';
 import { carryIntoRoom } from './carry-files.mts';
 import type { FoundToSend } from './carry-files.mts';
-import { readRoomMessage } from '../../shared/agent-voice.mts';
+import { readRoomMessage, roomBody } from '../../shared/agent-voice.mts';
+import { Name } from '../../shared/product-name.mjs';
 import { cleanMark } from '../../shared/artifact-marks.mts';
-import { pairRooms } from '../../shared/pair-room.mts';
+import { isPairRoom, pairRooms } from '../../shared/pair-room.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
 import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mts';
 
@@ -363,6 +364,7 @@ export function createRooms({
       const nameOf = (id: string | null) => profiles.get(id as string)?.display_name || everyone?.find((p) => p.id === id)?.name || '';
       const row = groupRow({
         roomId: r.id, roomName: r.name, messages: held, mentioned: mentioned.filter((m) => m.roomId === r.id), me: who, readAt,
+        pair: isPairRoom(r),
         people: [...(called?.map((n) => ({ id: n.person_id, name: n.name })) ?? []), { id: who as string, name: me()?.name ?? '' }, { id: who as string, name: profiles.get(who as string)?.display_name ?? '' }],
         doneAt: p.doneAt[r.id] ?? 0, nameOf,
         answeredAt: Math.max(0, ...(fileMarks.get(r.id) ?? []).filter((m) => m.by === who).map((m) => m.at)),
@@ -425,7 +427,8 @@ export function createRooms({
       lookAsked = true;
       try {
         await b.putRoomFile(room.id, TEAM_LOOK, Buffer.from(TEAM_LOOK_TEMPLATE).toString('base64'));
-        await api.send(room.id, TEAM_LOOK_POSTED);
+        // In the app's name: the person whose copy happened to look first never wrote it.
+        await api.send(room.id, roomBody({ name: Name }, TEAM_LOOK_POSTED));
         text = TEAM_LOOK_TEMPLATE;
       } catch (err) {
         if ((err as { code?: string })?.code !== FILE_EXISTS) throw err;
@@ -446,7 +449,7 @@ export function createRooms({
     const lead = [...(f.running ?? [])].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
     if (!lead) return { workingOn: null, agents: 0 };
     const item = (f.items ?? []).find((i) => i.id === lead.itemId);
-    return { workingOn: (String(item?.label ?? '').trim() || String(item?.title ?? '')).slice(0, 64) || null, agents: f.running!.length };
+    return { workingOn: (String(item?.label ?? '').trim() || String(item?.title ?? '')).slice(0, 64) || null, workingThread: lead.itemId, agents: f.running!.length };
   }
   const local = () => { gen += 1; };
 
@@ -928,6 +931,20 @@ export function createRooms({
       messages.set(roomId, [...all.values()].sort((a, b2) => a.at - b2.at));
       changed();
       return got.length;
+    },
+
+    // My card follows a name or photo I changed in Settings, keeping whether
+    // it shows my full name. Its photo is a link of up to 500 characters.
+    async followMe({ was, name, avatarUrl }: { was: string; name?: string; avatarUrl?: string | null }) {
+      const mine = state.me;
+      if (!mine || !backend() || !started) return null;
+      const patch: Record<string, unknown> = {};
+      if (name !== undefined) {
+        const full = mine.display_name === displayNameOf(was, { full: true }) && displayNameOf(was, { full: true }) !== displayNameOf(was);
+        patch.display_name = displayNameOf(name, { full }) || mine.display_name;
+      }
+      if (avatarUrl !== undefined) patch.avatar_url = avatarUrl && /^https:\/\//.test(avatarUrl) && avatarUrl.length <= 500 ? avatarUrl : null;
+      return Object.keys(patch).length ? api.saveProfile(patch) : null;
     },
 
     // My card: what it says and who sees what.

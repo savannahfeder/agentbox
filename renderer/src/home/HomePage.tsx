@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { agoShort, doors, type DoorKey, type TeamRowState } from './home-model';
+import { doors, type DoorKey, type TeamRowState } from './home-model';
+import { updatedWords } from '../threads/page-rules';
 import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
+import { MateFace } from '../teammates/MateFace';
 import './home.css';
 import { enterIsTheButtons } from '../focused-button';
 
 /** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox; an invitation has no time. */
-export type NeedsRow = { key: string; letter: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
-export type TeamRow = { key: string; name: string; letter: string; ai: boolean; line: string; state: TeamRowState; week: number[]; total: number };
+export type NeedsRow = { key: string; letter: string; face?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
+export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; photo?: string; line: string; state: TeamRowState; week: number[]; total: number };
 export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
 
 const ICONS: Record<DoorKey, JSX.Element> = {
@@ -88,7 +90,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
             {needs.length === 0 && <p className="hm-empty">Nothing needs you.</p>}
             {needs.map((r, i) => (
               <button type="button" key={r.key} className={`hm-row${i === pick ? ' on' : ''}${r.unread ? ' unread' : ''}`} onClick={() => onOpen(r.key)} onMouseEnter={() => setPick(i)}>
-                <span className="hm-face">{r.letter}</span>
+                {r.face ? <MateFace seed={r.face} className="hm-face" /> : <span className="hm-face">{r.letter}</span>}
                 <span className="hm-text"><b>{r.title}</b>
                   <span className="hm-tags">
                     {r.priority && <span className={`hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`} title={priorityLabelOf(r.priority)} aria-label={priorityLabelOf(r.priority)}><PriorityMark id={r.priority} /></span>}
@@ -96,7 +98,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
                     {r.project && <span className="hm-tag">{r.project}</span>}
                   </span>
                 </span>
-                {r.at !== null && <time>{agoShort(r.at, now)}</time>}
+                {r.at !== null && <time>{updatedWords(r.at, now)}</time>}
               </button>
             ))}
           </div>
@@ -111,7 +113,10 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
               {team.length === 0 && <p className="hm-empty">Nobody else on your team yet.</p>}
               {team.map((m) => (
                 <button type="button" key={m.key} className="hm-row hm-mate" onClick={() => onMember(m.key)}>
-                  <span className={`hm-face${m.ai ? ' ai' : ''}${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`}>{m.letter}</span>
+                  {m.face
+                    ? <MateFace seed={m.face} className={`hm-face${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`} />
+                    : <span className={`hm-face${m.ai ? ' ai' : ''}${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`}>
+                      {m.photo ? <img className="hm-photo" src={m.photo} alt="" referrerPolicy="no-referrer" /> : m.letter}</span>}
                   <span className="hm-text"><b>{m.name}</b><small>{m.line}</small></span>
                   <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>
                 </button>
@@ -130,7 +135,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
                 <button type="button" key={r.key} className="hm-row" onClick={() => onOpen(r.key)}>
                   <span className="hm-face live">{r.letter}</span>
                   <span className="hm-text"><b>{r.title}</b><small>{r.line}</small></span>
-                  <time>{agoShort(r.at, now)}</time>
+                  <time>{updatedWords(r.at, now)}</time>
                 </button>
               ))}
             </div>

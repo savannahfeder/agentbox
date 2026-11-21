@@ -69,6 +69,7 @@ import { carryLocalFiles, copyTree, folderChildDeadline, onlyTrackedContent, tra
 import { givePrivateFolder } from './private-folder.mts';
 import type { ExecFailure } from './worktree-include.mts';
 import { HOOK_FREE } from './hook-free-git.mts';
+import { alive } from './process-alive.mts';
 
 /** The answer of a git call that does not throw. */
 export interface GitResult {
@@ -467,12 +468,6 @@ const lockReason = (pid: number) => `agentbox pid=${pid}`;
 const pidInReason = (reason: string | null | undefined) => {
   const found = /agentbox pid=(\d+)/.exec(reason ?? '');
   return found ? Number(found[1]) : null;
-};
-// Signal 0 asks the kernel whether a pid exists without touching it. EPERM
-// means it exists and belongs to somebody else, which still counts as alive.
-const alive = (pid: number | null) => {
-  if (!pid) return false;
-  try { process.kill(pid, 0); return true; } catch (error) { return (error as ExecFailure)?.code === 'EPERM'; }
 };
 
 /** Every worktree git knows about, as records rather than as text. */

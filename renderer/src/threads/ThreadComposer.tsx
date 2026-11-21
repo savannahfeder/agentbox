@@ -34,6 +34,7 @@ import { PhoneStatus } from '../components/PhoneStatus';
 import { SEND } from '../this-keyboard';
 import { Fragment, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { PRACTICE_TASK } from '../../../shared/first-run-practice.mts';
+import { threadLink } from '../../../shared/thread-link.mts';
 import type { Product, TeamMessageFile, WorkItem } from '../types';
 import type { Engine } from '../../../shared/engines.mts';
 import { ENGINES } from '../../../shared/engines.mts';
@@ -688,6 +689,9 @@ export function ThreadComposer({
         });
         dropComposeDraft(taken, undefined, place);
         if (initial?.continueFrom) void api.teamContinued(initial.continueFrom);
+        // The person who handed it over can follow the work to where it went (round two of the team test).
+        const startedAt = initial?.handFrom && made?.id && team?.me ? threadLink(team.me, made.id) : null;
+        if (startedAt && initial?.handFrom) void api.answer({ product: initial.handFrom.product, id: initial.handFrom.id, answer: `Started on this in a thread of my own: [${message.title}](${startedAt})` }).catch(() => {});
         onSent(made, { kind: 'task', product: product.slug, title: message.title, draft: taken, ...(when.runAt ? { runAt: when.runAt } : {}), ...(when.start ? { start: when.start } : {}) });
       }
     } catch (err) {
@@ -1059,7 +1063,8 @@ export function ThreadComposer({
         <button key={p.slug} type="button" data-item className={`tc-row ${p.slug === product?.slug ? 'on' : ''}`} onPointerMove={hover}
           onClick={() => { pickProject(p.slug); setProjectChosen(true); close('text'); }}>
           <Swatch slug={p.slug} /><span className="tc-row-label">{p.name}</span>
-          {!p.repoPath && <span className="tc-row-note">For personal tasks</span>}
+          {/* A project a teammate shared has no folder here either, and is the team's, not personal (round four). */}
+          {p.team?.projectId ? <span className="tc-row-note">Shared with your team</span> : !p.repoPath && <span className="tc-row-note">For personal tasks</span>}
         </button>
       ))}
       {/* MAKING A PROJECT IS A THING YOU CAN DO FROM HERE, ALWAYS (approved

@@ -34,7 +34,8 @@ describe('which threads get the page', () => {
     expect(app).toMatch(/!directSlugs\.has\(focused\.product\)/);
   });
   it('and the window wears the page\'s look whenever the page is drawn', () => {
-    expect(app).toMatch(/\$\{\(queueSpot \|\| onePage\) && focused \? ' one-at-a-time' : ''\}/);
+    // A teammate's thread opened from the Inbox reads the same way (2026-11-21).
+    expect(app).toMatch(/\$\{\(\(queueSpot \|\| onePage\) && focused\) \|\| \(teamShown && openCard && snap\?\.team\?\.signedIn && snap\.team\.team\) \? ' one-at-a-time' : ''\}/);
   });
 });
 
@@ -78,7 +79,7 @@ describe('a thread you have answered since its answer', () => {
   it('and what you did after an answer still the newest word, a move to Later, is drawn under it', () => {
     // The app's own note, when there is one, sits between them
     // (tests/the-page-leads-with-the-agents-answer-not-the-apps-shipped-note).
-    expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{pageTitle\(item\)\} by=\{signer \? \{ t: signer, at: newest\.at \} : null\} \/>\s*(<TeammateOffer item=\{item\} \/>\s*)?(\{byApp && outcome && <p className="one-app-note">\{clean\(outcome\.text\)\}<\/p>\}\s*)?\{afterList\}/);
+    expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{pageTitle\(item\)\} by=\{signer \? \{ t: signer, at: newest\.at \} : null\}(?: person=\{helper \? \{ p: helper, at: newest\.at \} : null\})? \/>\s*(<TeammateOffer item=\{item\} \/>\s*)?(\{byApp && outcome && <p className="one-app-note">\{clean\(outcome\.text\)\}<\/p>\}\s*)?\{afterList\}/);
   });
   it('and not with no answer at all, where the whole conversation is drawn', () => {
     expect(standsAt([you(1, 'go')], null)).toBe(-1);

@@ -11,6 +11,8 @@
   /* A line nobody can scroll to is a line nobody reads: the scrollbar is
      hidden until a trackpad touches it. */
   .markdown pre, .markdown pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* Small enough that most lines of code fit whole, rather than breaking mid-name. */
+  .markdown pre { font-size: 12.5px; line-height: 1.55; }
 }
 
 /* The desktop window only: the phone (phone.css) keeps its own title, choices and Send. */

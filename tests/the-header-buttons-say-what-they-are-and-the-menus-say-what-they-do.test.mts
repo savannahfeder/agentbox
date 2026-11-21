@@ -35,8 +35,13 @@ describe('a menu over a thread says what picking does', () => {
     expect(read('renderer/src/team/TeamFocus.tsx')).toMatch(/<p className="tm-menu-say">They see this thread and its files and can comment\.<\/p>/);
   });
 
-  it('Give it to says it arrives as a task, and an AI teammate starts on it', () => {
-    expect(read('renderer/src/threads/ThreadMenu.tsx')).toMatch(/<p className="ts-menu-say">A person gets it as a task in their Needs you\. An AI teammate starts on it\.<\/p>/);
+  // Since a person can be asked for help or a review as well (shared/thread-asks.mts), the list says so when they can.
+  // The AI half only when an AI teammate is in the list: with only Priya there,
+  // the PM tester could not tell whether a person or an AI got it (round six).
+  it('Ask or hand off says what a person gets, and that an AI teammate starts on it when one is listed', () => {
+    const menu = read('renderer/src/threads/ThreadMenu.tsx');
+    expect(menu).toContain("(onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')");
+    expect(menu).toContain("(giveTo.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')");
   });
 
   it('Waits on says where it goes and when it comes back', () => {
