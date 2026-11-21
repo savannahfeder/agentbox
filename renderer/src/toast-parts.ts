@@ -59,13 +59,25 @@ export function saysWhereItWent(toast: { goes?: ToastGoes } | null, here: Here):
 
 /**
  * O OPENS THE TASK THE TOAST IS ABOUT, while that toast is on screen. A toast
- * with nowhere to go, or none at all, leaves O alone: the key is only ever
- * promised by the cap drawn on the toast, so it only works while that cap is
- * there to be read.
+ * with nowhere to go, or none at all, leaves O to `opensTheLastToast`.
  */
 export function opensTheToast(key: string, toast: { goes?: ToastGoes } | null, here: Here = null): ToastGoes | null {
   if (key !== 'o' && key !== 'O') return null;
   return toastOpens(toast, here) ? toast!.goes! : null;
+}
+
+/**
+ * How long after a toast names a thread O still opens it. O is usually pressed
+ * within thirty seconds of a send and sometimes after a minute or more; much
+ * later, a stray O would land on a thread you no longer have in mind.
+ */
+export const O_STILL_OPENS_MS = 120_000;
+export type LastToast = { goes: ToastGoes; at: number };
+
+/** O after the toast has gone: the thread the last toast with somewhere to go named. */
+export function opensTheLastToast(key: string, last: LastToast | null, now: number, here: Here = null): ToastGoes | null {
+  if (!last || now - last.at >= O_STILL_OPENS_MS) return null;
+  return opensTheToast(key, last, here);
 }
 
 /** How long an O pressed ahead of its thread is kept. */
@@ -81,12 +93,12 @@ export function oWaitsForTheSend(key: string, toast: { goes?: ToastGoes } | null
 }
 
 /**
- * Whether this press is the toast's O, opening its thread or waiting for it.
- * The pages that keep the keyboard to themselves (Files, Connections,
- * Teammates) let it through, because the toast and its cap are drawn over them.
+ * Whether this press is the toast's O: opening its thread, waiting for it, or
+ * opening the last one named. The pages that keep the keyboard to themselves
+ * (Files, Connections, Teammates) let it through, as the toast is drawn over them.
  */
-export function oIsTheToasts(key: string, toast: { goes?: ToastGoes } | null, sentAt: number, now: number): boolean {
-  return !!opensTheToast(key, toast) || oWaitsForTheSend(key, toast, sentAt, now);
+export function oIsTheToasts(key: string, toast: { goes?: ToastGoes } | null, sentAt: number, now: number, last: LastToast | null = null): boolean {
+  return !!opensTheToast(key, toast) || oWaitsForTheSend(key, toast, sentAt, now) || !!opensTheLastToast(key, last, now);
 }
 
 /**

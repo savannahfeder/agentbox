@@ -36,8 +36,8 @@ describe('which presses open the toast’s task', () => {
   });
 
   it('no toast on screen, nothing to open', () => {
-    // Once it has faded the key is dead again rather than reaching back to a
-    // task she can no longer see named anywhere.
+    // Once it has faded, opensTheLastToast answers instead, for two minutes
+    // (o-still-opens-what-you-sent-after-its-note-has-gone).
     expect(opensTheToast('o', null)).toBeNull();
   });
 

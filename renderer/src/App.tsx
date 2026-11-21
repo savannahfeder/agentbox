@@ -275,7 +275,7 @@ import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
 import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
-import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheToast, saysWhereItWent, toastOpens, toastParts, type OWaits, type ToastGoes } from './toast-parts';
+import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -4308,9 +4308,12 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Counts toasts, so each new one is a new element and its clock starts over.
   const toastShown = useRef(0);
+  // What O opens once the toast has gone (opensTheLastToast).
+  const lastToast = useRef<LastToast | null>(null);
   const showToast = useCallback((text: string, goes?: ToastGoes) => {
     toastShown.current += 1;
     setToast({ text, goes });
+    if (goes) lastToast.current = { goes, at: Date.now() };
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
@@ -6237,6 +6240,7 @@ export default function App() {
       pendingRef.current = null;
       clearTimeout(pending.timer);
       advanceRef.current = null;
+      lastToast.current = null;
       letRowGo(pending.item.id);
       // the draft has to be back on disk before the item is focused, because it
       // is the draft's presence that opens the reply dock (the effect below).
@@ -6306,6 +6310,7 @@ export default function App() {
       if (outcome.open) { setFocused(outcome.open); markSeen(outcome.open); }
       return { failed: outcome.refused };
     }
+    lastToast.current = null;
     leaveUndoMarks(last.undid, from, Date.now());
     const restored = last.restore?.();
     const item = restoredItem(restored ?? null);
@@ -6450,7 +6455,7 @@ export default function App() {
         setModal((m) => (m === 'palette' ? null : 'palette'));
         return;
       }
-      const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now());
+      const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now(), lastToast.current);
       // A ROOM OWNS THE KEYBOARD WHILE IT IS OPEN, as Settings does: the list
       // behind it is not on the screen. Escape goes back to the threads and
       // Tab walks on along the tabs. N goes on to the room's branch below the
@@ -6614,8 +6619,8 @@ export default function App() {
       // after submitting a task, click 'Open it' in the toast." Z takes back
       // what the toast announced; O goes into it. Here, above the split, because
       // it means the same thing on the list and inside a task (answering one
-      // moves you on, and O brings you back to it). Only while a toast with
-      // somewhere to go is up: the cap drawn on it is the only promise of it.
+      // moves you on, and O brings you back to it). Anything on screen that
+      // offers O comes first, then the last toast's thread.
       const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);
       if (goesTo) { e.preventDefault(); openToastRow(goesTo); return; }
       if (oWaitsForTheSend(e.key, toast, sentAt.current, Date.now())) {
@@ -6624,6 +6629,8 @@ export default function App() {
         return;
       }
       if ((e.key === 'o' || e.key === 'O') && urgentShownRow) { e.preventDefault(); openUrgentReady(); return; }
+      const lastGoesTo = opensTheLastToast(e.key, lastToast.current, Date.now(), focused ? { product: focused.product, id: focused.id } : null);
+      if (lastGoesTo) { e.preventDefault(); openToastRow(lastGoesTo); return; }
       // AN OPEN REPEATING TASK IS A SCREEN, AND EVERY KEY STOPS HERE.
       //
       // There was no branch for it at all, so with a rule on screen the whole
