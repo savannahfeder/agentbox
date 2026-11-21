@@ -150,7 +150,7 @@ export type GiveMode = 'help' | 'review' | 'give';
 const MODES: { id: GiveMode; label: string; detail: (first: string) => string; ask: string; go: (first: string) => string }[] = [
   { id: 'help', label: 'Help', detail: (f) => `${f} can write to your agent, then hands it back to you.`, ask: 'What do you need help with?', go: (f) => `Ask ${f} to help` },
   { id: 'review', label: 'Review', detail: (f) => `${f} reads it and tells you it looks good or what to change.`, ask: 'What should they look at?', go: (f) => `Ask ${f} to review` },
-  { id: 'give', label: 'Hand over', detail: (f) => `It becomes ${f}’s thread from now on.`, ask: 'Add a note', go: (f) => `Give to ${f}` },
+  { id: 'give', label: 'Hand over', detail: (f) => `It becomes ${f}’s thread from now on.`, ask: 'Add a note', go: (f) => `Hand it to ${f}` },
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */

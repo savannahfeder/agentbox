@@ -82,7 +82,7 @@ describe('the sheet after you pick a person', () => {
   it('names who gets it, has a note box, and a button that says so', () => {
     expect(html).toContain('Lena');
     expect(html).toContain('placeholder="Add a note"');
-    expect(html).toContain('Give to Lena');
+    expect(html).toContain('Hand it to Lena');
   });
 });
 

@@ -378,6 +378,6 @@ describe('the sheet after you pick a person', () => {
   it('offers only handing over when asking is not possible', () => {
     const html = renderToStaticMarkup(h(GiveSheet, { to: { id: 'u', name: 'Theo Okafor' }, onGive() {} }));
     expect(html).not.toContain('role="radiogroup"');
-    expect(html).toContain('Give to Theo');
+    expect(html).toContain('Hand it to Theo');
   });
 });
