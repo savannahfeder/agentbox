@@ -52,7 +52,6 @@ export function SendBack({ item, items }: { item: WorkItem; items: readonly Work
   return <div className="opt-strip">
     <button type="button" className="opt-row" disabled={busy || done} onClick={() => void send()}>
       <span className="opt-text">{done ? `Sent ${file.name} to ${who}` : `Send ${file.name} to ${who}`}</span>
-      {!done && answers.length > 0 && <span className="tm-with-thread">{answers.length === 1 ? 'Answers 1 comment' : `Answers ${answers.length} comments`}</span>}
     </button>
     {error && <div className="opt-head"><span className="tm-error">{error}</span></div>}
   </div>;
