@@ -9,6 +9,7 @@
 // (w-585619d660): every row now has one slot before the title (a face, or a
 // plain ring on your own threads) and the name in grey after the title.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ThreadCells } from '../renderer/src/threads/Pages.tsx';
@@ -87,5 +88,28 @@ describe('every row starts with the same slot', () => {
       const cell = titleCell(html);
       expect(cell.indexOf('th-who-name')).toBeGreaterThan(cell.indexOf('Fix the sign-in test'));
     }
+  });
+});
+
+// THE APPROVED PLACE (2026-11-21): the face starts on the line the Thread
+// heading and "Needs you" start on, and the unread dot keeps the margin to its
+// left. A face hung in the margin pushed the dot out; an indented heading
+// left the titles off the tabs' line.
+describe('where the face sits', () => {
+  const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const slot = css.match(/\.th-slot \{([^}]*)\}/)?.[1] ?? '';
+
+  it('is in the row, not hung in its margin', () => {
+    expect(slot).toMatch(/display: inline-flex/);
+    expect(slot).not.toMatch(/position: absolute/);
+  });
+
+  it('leaves the Thread heading where the titles of rows without faces start', () => {
+    expect(css).not.toMatch(/\.th-head[^{]*\{[^}]*padding-left/);
+  });
+
+  it('leaves the unread dot in the margin', () => {
+    expect(css).not.toMatch(/\.row\.unread[^{]*::before\s*\{[^}]*display: none/);
+    expect(css).not.toMatch(/\.th-slot::after/);
   });
 });

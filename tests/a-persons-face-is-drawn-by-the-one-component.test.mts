@@ -97,11 +97,15 @@ describe('an AI teammate is dashed and round, the same everywhere', () => {
     for (const r of radii) expect(r.body, r.selector).toMatch(/border-radius: var\(--mate-corner\)/);
   });
 
-  it('stays dashed', () => {
-    for (const mark of ['.tq', '.agent-face', '.ev-ai']) {
+  // The agent's own face lost its dashes on 2026-11-20 (w-585619d660): "I'm not
+  // sure how much of a fan I am of the dotted borders of the agents."
+  it('stays dashed, all but the agent face, which is a faint solid ring', () => {
+    for (const mark of ['.tq', '.ev-ai']) {
       const dashed = rulesEndingIn(mark).some((r) => /border: 1px dashed/.test(r.body));
       expect(dashed, mark).toBe(true);
     }
+    expect(rulesEndingIn('.agent-face').some((r) => /border: 1px solid/.test(r.body))).toBe(true);
+    expect(rulesEndingIn('.agent-face').some((r) => /dashed/.test(r.body))).toBe(false);
     expect(rulesEndingIn('.tm-av.bot')[0].body).toMatch(/border-style: dashed/);
   });
 });

@@ -668,10 +668,14 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .phone-status-dismissible > button:hover { color: var(--text); }
 .phone-status-dismissible > button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
 
-/* Every row: a 20px slot, the title, then who it is from in grey (w-585619d660).
-   The name is an inline block so the row's underline stops at the title. */
-.th-slot { display: inline-flex; vertical-align: top; align-items: center; justify-content: center; width: 20px; height: 20px; margin-right: 12px; flex: none; }
-.th-slot .tm-av, .th-slot .tq, .th-slot .agent-face { width: 20px; height: 20px; line-height: 18px; font-size: 9px; }
+/* Every row: a face, the title, then who it is from in grey (w-585619d660).
+   The face starts on the line "Needs you" and the Thread heading start on,
+   which leaves the margin to its left for the unread dot and the select box.
+   The slot is there on every row, empty or not, so the titles line up. The
+   name is an inline block so the row's underline stops at the title. */
+.th-slot { display: inline-flex; vertical-align: top; align-items: center; justify-content: center; width: 18px; height: 20px; margin-right: 10px; flex: none; }
+.th-slot .tm-av, .th-slot .tq, .th-slot .agent-face { width: 18px; height: 18px; line-height: 16px; font-size: 8.5px; }
 .th-who-name { display: inline-block; vertical-align: top; margin-left: 12px; color: var(--text-dim); white-space: nowrap; }
 .th-cell-title.with-aside > .th-who-name { flex: none; }
-.th-head .th-grid > :first-child { padding-left: 32px; }
+/* An AI teammate's letter on its own soft colour until it has a drawn face, so it never reads as an agent. */
+.th-mate .tq { border: 0; background: var(--mate-tint); color: #2b2a33; font-weight: 600; }
