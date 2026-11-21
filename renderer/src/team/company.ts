@@ -6,6 +6,7 @@ import { blockedWords, clockWords, dayDeadline } from '../../../shared/team-task
 import { inMyInbox, isGivenTask, isShared, heldByAPerson, lastSpeaker, runnerOf, taskGiver } from '../../../shared/team-rules.mts';
 import { dayAndTime } from '../format';
 import { shownTitle } from '../../../shared/thread-title.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 
 export const firstName = (person: Person | undefined | null) => (person?.name || person?.email || 'Someone').split(/\s+/)[0];
 
@@ -40,7 +41,9 @@ export function taskWords(item: WorkItem, product: Product | undefined | null, m
   const asks = item.ask?.kind;
   // Handed back stays handed back, whatever a thank-you since did to the status (shared/thread-asks.mts).
   if (asks && item.verdict) return { word: holding ? 'You handed it back' : `${name} handed it back`, unread: false, other, at };
-  if (holding) return { word: inMyInbox(item, product, me) ? (asks ? `${name} asks for ${asks === 'help' ? 'help' : 'a review'}` : `From ${name}`) : 'You have this', unread: false, other, at };
+  // A thread handed over is not just a message from them: it is now yours.
+  const handed = !asks && !!handedFrom(item.body, taskGiver(item));
+  if (holding) return { word: inMyInbox(item, product, me) ? (asks ? `${name} asks for ${asks === 'help' ? 'help' : 'a review'}` : handed ? `${name} handed it to you` : `From ${name}`) : 'You have this', unread: false, other, at };
   return { word: asks ? `${name} is ${asks === 'help' ? 'helping' : 'reviewing'}` : `With ${name}`, unread: false, other, at };
 }
 

@@ -88,3 +88,15 @@ describe('Home says how a closed ask ended', () => {
     expect(app).toContain('from: ended ?? (from ? `${from}${asks}` : null)');
   });
 });
+
+// Theo's inbox read "From Sam" on a thread Sam handed him for good, the same as a message.
+describe('a thread handed over says so in the inbox', () => {
+  it('reads "Sam handed it to you", and a plain task still reads "From Sam"', async () => {
+    const { threadLink, sentWords } = await import('../shared/thread-link.mts');
+    const body = sentWords('Add a key', threadLink('sam', 'w-1')!, 'Yours now.');
+    const given = ask({ ask: undefined, body });
+    const inbox = { slug: 'dm', team: { direct: true, projectId: 'd1', people: ['sam', 'theo'] } };
+    expect(taskWords(given as never, inbox as never, 'theo', nameOf)?.word).toBe('Sam handed it to you');
+    expect(taskWords(ask({ ask: undefined, body: 'Do this' }) as never, inbox as never, 'theo', nameOf)?.word).toBe('From Sam');
+  });
+});
