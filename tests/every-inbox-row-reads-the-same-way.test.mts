@@ -48,7 +48,7 @@ describe('every row starts with the same slot', () => {
     const handed = row({ createdBy: MAYA, people: [MAYA, ME], assignee: ME });
     const withPhoto = renderToStaticMarkup(React.createElement(TeamContext.Provider, { value: photo }, React.createElement(TeammatesContext.Provider, { value: mates }, React.createElement(ThreadCells, { item: handed, product: shared, now: T + 60_000, tab: 'inbox' }))));
     expect(slotOf(withPhoto)).toContain('maya.jpg');
-    expect(slotOf(draw(handed))).toMatch(/class="tm-av"[^>]*>Ma</);
+    expect(slotOf(draw(handed))).toMatch(/class="tm-av"[^>]*>MC</);
     expect(nameOf(withPhoto)).toBe('Maya Chen');
   });
 

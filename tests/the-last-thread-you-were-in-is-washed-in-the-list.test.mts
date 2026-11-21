@@ -72,14 +72,17 @@ describe('its row', () => {
     expect(rule![1]).not.toMatch(/margin|inset|left:|right:/);
   });
 
-  it('fades in the light theme in a whisper of the accent, over enough stops to show no steps', () => {
-    // Two greys were turned down on white: they read as a dirty slab.
+  // The accent wash washed the whole row orange on white (2026-11-21), so the
+  // light theme takes the dark theme's faint fade in its own ink.
+  it('fades in the light theme in the same faint fade, in a neutral ink and not the accent', () => {
     const css = read('renderer/src/styles.css');
     const light = css.match(/\[data-theme="light"\] \.row\.recent\s*\{([^}]*)\}/);
     expect(light, 'a light-theme rule').toBeTruthy();
-    expect(light![1]).toMatch(/rgb\(238 96 24 \/ 0\.0\d+\)/);
-    expect(light![1]).not.toMatch(/rgb\(17 25 48|rgb\(0 0 0/);
-    expect((light![1].match(/rgb\(/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect(light![1]).toMatch(/rgb\(18 24 42 \/ 0\.0\d+\)/);
+    expect(light![1]).not.toMatch(/238 96 24|accent/);
+    const alphas = [...light![1].matchAll(/\/ (0\.\d+)\)/g)].map((m) => Number(m[1]));
+    expect(alphas.length).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...alphas)).toBeLessThanOrEqual(0.02);
   });
 
   // Reported twice as "too strong/visible/distracting": at 0.055 it read as a

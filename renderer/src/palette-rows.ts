@@ -53,8 +53,9 @@ export function threadResult(
 // Keeping those two jobs in separate fields is the point: the hint is UI copy
 // and has to read well, and a search that depends on copy reading a certain way
 // breaks the next time someone improves the sentence.
-/** `onlyWith`: a word the query must name (two letters of it will do) before the row is offered at all. */
-export type Searchable = { label: string; keywords?: string; onlyWith?: string };
+/** `onlyWith`: a word the query must name (two letters of it will do) before the row is offered at all.
+ *  `unlisted`: left out of the list before anything is typed, too. */
+export type Searchable = { label: string; keywords?: string; onlyWith?: string; unlisted?: boolean };
 
 // EVERY WORD OF THE QUERY MUST LAND, in any order, anywhere in the label or the
 // keywords. She types "dark mode", which as one substring appears in no label in
@@ -64,7 +65,7 @@ export type Searchable = { label: string; keywords?: string; onlyWith?: string }
 // her return key, which is the bug palette-keys.ts was written for.
 export function matchesQuery(query: string, row: Searchable): boolean {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.length) return true;
+  if (!words.length) return !row.unlisted;
   const must = row.onlyWith?.toLowerCase();
   if (must && !words.some((w) => w.length >= 2 && (must.startsWith(w) || w.startsWith(must)))) return false;
   const hay = `${row.label} ${row.keywords ?? ''}`.toLowerCase();

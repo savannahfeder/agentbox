@@ -5,6 +5,9 @@ export interface PairRoomFacts { id: string; kind: string; teamId: string | null
 export const listedIn = (r: { wall?: readonly { id: string }[]; people?: readonly { id: string }[] | null }): string[] =>
   [...(r.wall ?? []), ...(r.people ?? [])].map((p) => p.id);
 
+/** A group of two that is not the team's: the chat with that one person. */
+export const isPairRoom = (r: Pick<PairRoomFacts, 'kind' | 'teamId' | 'members'>): boolean => r.kind === 'group' && !r.teamId && r.members === 2;
+
 /**
  * My two-person groups with this person, the one both Macs write to first.
  * Two can exist when both people start the chat in the same moment; ordering
@@ -12,7 +15,7 @@ export const listedIn = (r: { wall?: readonly { id: string }[]; people?: readonl
  */
 export function pairRooms<R extends PairRoomFacts>(rooms: readonly R[], personId: string, peopleOf: (r: R) => readonly string[]): R[] {
   return rooms
-    .filter((r) => r.kind === 'group' && !r.teamId && r.members === 2 && peopleOf(r).includes(personId))
+    .filter((r) => isPairRoom(r) && peopleOf(r).includes(personId))
     .sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 

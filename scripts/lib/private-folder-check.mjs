@@ -40,9 +40,11 @@ export function plantedIn(at, trusted) {
     const file = path.join(own, 'hooks', name);
     if (kind(file) !== 'file' || !read(file)?.equals(read(path.join(given, 'hooks', name)) ?? Buffer.alloc(0))) return 'its git hooks differ from the app folder\'s copy';
   }
+  // A Mac's and a Windows disk hand git `.GIT`, `.git.` or the short name `GIT~1` when it asks for `.git`.
+  const isGit = (name) => name.toLowerCase().replace(/[. ]+$/, '') === '.git' || /^git~\d+$/i.test(name);
   const walk = (folder) => {
     for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
-      if (entry.name === '.git') return path.relative(at, folder) || '.';
+      if (isGit(entry.name)) return path.relative(at, folder) || '.';
       if (entry.isDirectory() && !entry.isSymbolicLink()) { const found = walk(path.join(folder, entry.name)); if (found) return found; }
     }
     return null;

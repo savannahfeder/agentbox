@@ -71,8 +71,11 @@ async function measure(width, docOpen) {
       chips: [...document.querySelectorAll('.pl-chip')].map((b) => b.textContent),
       nameWhole: fits('.pl-name h2'),
       buttonsOneLine: btns.every((b) => {
+        // The words only: the main action's icon sits a pixel lower than its text.
+        const text = [...b.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE);
         const words = document.createRange();
-        words.selectNodeContents(b);
+        words.setStartBefore(text[0]);
+        words.setEndAfter(text[text.length - 1]);
         const lines = new Set([...words.getClientRects()].map((r) => Math.round(r.top)));
         return lines.size === 1 && words.getBoundingClientRect().right <= b.getBoundingClientRect().right;
       }),
