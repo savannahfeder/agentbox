@@ -102,6 +102,13 @@ export function proOffer(days: number) {
   return { trial: { ...PRO_PITCH.trial, label: `First ${days} days` }, paid: PRO_PITCH.paid, cta: `Try Pro free for ${days} days` };
 }
 
+/** Pro's button where inviting would be: the plan page's for the free days the cloud says the team has, and no promise until it has said. */
+export function proButton(hasTeam: boolean, plan: (PlanSeen & { signedIn?: boolean }) | null | undefined): string {
+  if (!hasTeam) return PRO_PITCH.cta;
+  if (!plan || plan.signedIn === false) return 'Start Pro';
+  return proOffer(proFreeDays(true, plan)).cta;
+}
+
 /** A team is made when Pro starts, before anyone has named it; Settings › Team renames it. */
 export function teamNameFor(person: string | null | undefined): string {
   const first = (person ?? '').trim().split(/\s+/)[0];

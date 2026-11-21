@@ -52,8 +52,11 @@ export function unpack(value, blobs) {
 
 const nameFrom = (email) => { const s = String(email).split('@')[0]; return s[0].toUpperCase() + s.slice(1); };
 
-export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } = {}) {
+// `freeTeams`: every team starts on Free and the `pay` door stands in for
+// Stripe's webhook, so a test can start and stop a team's Pro.
+export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000, freeTeams = false } = {}) {
   const cloud = createMemoryCloud();
+  if (freeTeams) { cloud.freeTeams = true; cloud.paying = new Set(); }
   const blobs = file ? `${file}.blobs` : null;
   if (file) {
     fs.mkdirSync(blobs, { recursive: true });
@@ -102,6 +105,16 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
   }
 
   const handlers = {
+    // A team found by its name or its owner's email starts or stops paying.
+    async pay({ team, pays = true }) {
+      if (!cloud.freeTeams) throw new Error('every team pays on this cloud; start it with freeTeams');
+      const owner = [...cloud.people.values()].find((p) => p.email === String(team).toLowerCase());
+      const found = [...cloud.teams.values()].find((t) => t.id === team || t.name === team || (owner && cloud.members.some((m) => m.teamId === t.id && m.personId === owner.id && m.role === 'owner')));
+      if (!found) throw new Error(`no team named ${team}`);
+      if (pays) cloud.paying.add(found.id); else cloud.paying.delete(found.id);
+      cloud.events.emit('cards', {});
+      return { team: found.id, pays: !!pays };
+    },
     async signin({ email, password: _password, name }) {
       const at = String(email ?? '').trim().toLowerCase();
       if (!at.includes('@')) throw new Error('that is not an email');
@@ -174,7 +187,7 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const arg = (name) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : null; };
-  const started = await startStandinCloud({ port: Number(arg('port')) || 54900, file: arg('file') });
+  const started = await startStandinCloud({ port: Number(arg('port')) || 54900, file: arg('file'), freeTeams: process.argv.includes('--free-teams') });
   console.log(`stand-in team cloud on ${started.url}`);
   for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => started.stop().then(() => process.exit(0)));
 }
