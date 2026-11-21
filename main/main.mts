@@ -25,7 +25,7 @@ import { zoomDeltaFor } from './zoom-keys.mts';
 import { copySelection } from './copy-selection.mts';
 import { screenDetailFor } from './screen-detail.mts';
 import { Store } from './store.mts';
-import { storeRootEnv } from './store/home.mts';
+import { carryMovedStoreMachinery, storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
 import { gitHubPushSignIn } from './github-push-sign-in.mts';
@@ -377,6 +377,7 @@ async function createWindow() {
   // Written under every name this app has had, because a store server or a
   // script from before a rename is still out there reading the old one.
   Object.assign(process.env, storeRootEnv(config.storeRoot));
+  carryMovedStoreMachinery(config.storeRoot);
   // What a reply may do is kept in her own folder, not that home, which every
   // worker is granted (main/answer-modes.mts).
   keepAnswerModesIn({ userDir, storeRoot: config.storeRoot });

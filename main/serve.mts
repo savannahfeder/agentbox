@@ -58,7 +58,7 @@ import { liveAddress } from './team/live-room.mts';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mts';
 import { alphaFeatures } from './settings.mts';
-import { appHome, carryMisplacedMachinery, storeRootEnv } from './store/home.mts';
+import { appHome, carryMisplacedMachinery, carryMovedStoreMachinery, storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -267,6 +267,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
   const inheritedHome = appHome();
   Object.assign(process.env, storeRootEnv(config.storeRoot));
   carryMisplacedMachinery(inheritedHome, config.storeRoot);
+  carryMovedStoreMachinery(config.storeRoot);
   keepAnswerModesIn({ userDir, storeRoot: config.storeRoot });
   // EVERYBODY HAS SOMEWHERE TO SEND A THREAD, ON THIS DOOR TOO. main/main.mts
   // says why and makes it for the desktop; this is the door `npx agentbox-app`
