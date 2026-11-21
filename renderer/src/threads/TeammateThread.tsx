@@ -29,7 +29,7 @@ import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Pers
 import { AskBar } from '../team/AskBar';
 import { DoneTrail, MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
 import { doneSteps } from '../../../shared/thread-cards.mts';
-import { earlierWords, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
+import { earlierWords, filesOnThread, notSharedWords, notesOnFile, keyInTheBox, shownOnTheirThread } from './teammate-thread';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
 
@@ -192,9 +192,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     following?.follow(card);
   };
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // A review's Enter is a new line: which verdict it meant is not the key's to guess.
-    if (reviewing) return;
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
+    const goes = keyInTheBox({ key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, isComposing: e.nativeEvent.isComposing }, { reviewing, words: draft });
+    if (goes === 'send') { e.preventDefault(); void send(); }
+    if (goes === 'changes') { e.preventDefault(); void handBack('changes'); }
   };
   const owner = firstName(person) || 'Someone';
   const tried = card.visible ? doneSteps(card.progress) : [];

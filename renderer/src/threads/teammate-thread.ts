@@ -19,6 +19,17 @@ export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping 
   });
 }
 
+/**
+ * What a key in the box under a teammate's thread presses. A review's Enter is
+ * a new line, and Ctrl or ⌘ Enter sends its words as changes, the one verdict
+ * that needs them.
+ */
+export function keyInTheBox(e: { key: string; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; isComposing?: boolean }, { reviewing, words }: { reviewing: boolean; words: string }): 'send' | 'changes' | null {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return null;
+  if (!reviewing) return 'send';
+  return (e.ctrlKey || e.metaKey) && words.trim() ? 'changes' : null;
+}
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export const earlierWords = (n: number, owner: string) => `${plural(n, 'earlier message')} ${n === 1 ? 'stays' : 'stay'} on ${owner}'s computer.`;

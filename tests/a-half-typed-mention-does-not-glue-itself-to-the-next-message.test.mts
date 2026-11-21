@@ -79,7 +79,8 @@ describe('Enter, talking to people', () => {
   it('every box to a person says so: the reply box, a chat thread, a teammate\'s thread', () => {
     expect(read('renderer/src/components/Focus.tsx')).toContain('const enterSends = !!talkTo?.length && !onPhone();');
     expect(read('renderer/src/team/ThreadPanel.tsx')).toMatch(/e\.key === 'Enter' && !e\.shiftKey && !e\.isComposing\) \{ e\.preventDefault\(\); void send\(\)/);
-    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/e\.key === 'Enter' && !e\.shiftKey[^\n]*void send\(\)/);
+    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/if \(goes === 'send'\) \{ e\.preventDefault\(\); void send\(\)/);
+    expect(read('renderer/src/threads/teammate-thread.ts')).toMatch(/if \(e\.key !== 'Enter' \|\| e\.shiftKey \|\| e\.isComposing\) return null;\n\s*if \(!reviewing\) return 'send';/);
   });
 });
 
