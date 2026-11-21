@@ -104,7 +104,7 @@ describe('the order', () => {
     expect(titles(g.open)).toEqual(['Investor update v6']);
   });
   it('one line over it counts what is open, late and blocked', () => {
-    expect(tasksLine(g)).toBe('4 open tasks, 1 late, 2 blocked');
+    expect(tasksLine(g)).toBe('4 open tasks on the team, 1 late, 2 blocked');
     expect(tasksLine({ late: [], blocked: [], open: [], done: [] })).toBe('No open tasks on the team');
   });
 });

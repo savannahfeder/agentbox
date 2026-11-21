@@ -133,7 +133,7 @@ export function teamTasks({ items, products, cards, me, now, nameOf, mates = [] 
 export function tasksLine(g: TaskGroups): string {
   const open = g.late.length + g.blocked.length + g.open.length;
   if (!open) return 'No open tasks on the team';
-  const parts = [`${open} open ${open === 1 ? 'task' : 'tasks'}`];
+  const parts = [`${open} open ${open === 1 ? 'task' : 'tasks'} on the team`];
   if (g.late.length) parts.push(`${g.late.length} late`);
   if (g.blocked.length) parts.push(`${g.blocked.length} blocked`);
   return parts.join(', ');

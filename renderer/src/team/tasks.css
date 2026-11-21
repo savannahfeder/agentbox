@@ -7,19 +7,23 @@
 .tk-sec ul { list-style: none; margin: 0; padding: 0; }
 .tk-label { margin: 0 0 4px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); line-height: 16px; }
 
-/* Who has it, what it is, what blocks it, who gave it, when it is due: the same columns on every row. */
-.tk-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) minmax(0, 250px) 104px 112px; align-items: center; column-gap: 14px;
-  margin: 0 -8px; padding: 5px 8px; border-radius: var(--radius); cursor: pointer; }
+/* Task, Doing it, Asked by, Due. */
+.tk-row { display: grid; grid-template-columns: minmax(0, 1fr) clamp(110px, 10vw, 150px) clamp(110px, 10vw, 150px) 112px; align-items: center; column-gap: 14px;
+  margin: 0 -8px; padding: 7px 8px; border-radius: var(--radius); cursor: pointer; }
 .tk-row:hover { background: var(--wash); }
 .tk-row.is-picked { background: var(--wash-strong, var(--wash)); }
-.tk-who { display: flex; width: 20px; height: 20px; }
-.tk-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; line-height: 20px; color: var(--text); }
-.tk-new { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: 2px; }
-.tk-block { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-faint); }
+/* The inbox table's column names (threads/pages.css .th-head). */
+.tk-row.tk-head { margin-bottom: 4px; padding-top: 0; padding-bottom: 0; font: 10.5px/16px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); cursor: default; }
+.tk-row.tk-head:hover { background: none; }
+.tk-head .tk-due { font-size: inherit; }
+.tk-t { display: flex; align-items: baseline; min-width: 0; font-size: 13.5px; line-height: 20px; color: var(--text); }
+.tk-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-new { flex: none; align-self: center; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--accent); }
+.tk-block { flex: none; margin-left: 12px; white-space: nowrap; font-size: 12px; color: var(--text-faint); }
 .tk-on { color: var(--text-dim); }
 .tk-link { padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong, var(--line)); text-underline-offset: 3px; }
 .tk-link:hover { color: var(--text); text-decoration-color: currentColor; }
-.tk-from { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--text-faint); }
+.tk-person { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 12.5px; color: var(--text-dim); }
 .tk-due { justify-self: end; white-space: nowrap; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .tk-due.late { color: var(--text); }
 .tk-due.late::before { content: ''; display: inline-block; width: 5px; height: 5px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: 2px; }

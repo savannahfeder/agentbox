@@ -5,20 +5,26 @@ import type { Member } from './everything/members';
 import { agentOnTaskWord, tasksInOrder, tasksLine, type TaskGroups, type TaskRow } from './tasks';
 import './tasks.css';
 
-function Row({ r, picked, face, from, onOpen, onOpenBlock, onOpenAgent }: {
-  r: TaskRow; picked: boolean; face?: Member; from: string | null;
+interface TaskPerson { name: string; face?: Member }
+
+function Person({ p }: { p: TaskPerson | null }) {
+  return <span className="tk-person">{p && <>{p.face && <MemberFace m={p.face} size={18} />}{p.name}</>}</span>;
+}
+
+function Row({ r, picked, doing, asked, onOpen, onOpenBlock, onOpenAgent }: {
+  r: TaskRow; picked: boolean; doing: TaskPerson | null; asked: TaskPerson | null;
   onOpen: (r: TaskRow) => void; onOpenBlock: (r: TaskRow) => void; onOpenAgent?: (r: TaskRow) => void;
 }) {
   const opens = !!r.block?.opens;
   return <li>
     <div role="button" tabIndex={-1} className={`tk-row${picked ? ' is-picked' : ''}${r.done ? ' is-done' : ''}`} data-key={r.key} onClick={() => onOpen(r)}>
-      <span className="tk-who" title={face?.name}>{face && <MemberFace m={face} size={20} />}</span>
-      <span className="tk-t">{r.unread && <i className="tk-new" aria-label="New" />}{r.title}</span>
-      <span className="tk-block">{r.block && <>Blocked on {opens
-        ? <button type="button" className="tk-link" onClick={(e) => { e.stopPropagation(); onOpenBlock(r); }}>{r.block.on}</button>
-        : <span className="tk-on">{r.block.on}</span>}</>}
-        {!r.block && r.agent && !r.done && <button type="button" className="tk-link" onClick={(e) => { e.stopPropagation(); onOpenAgent?.(r); }}>{agentOnTaskWord(r.agent)}</button>}</span>
-      <span className="tk-from">{from && `from ${from}`}</span>
+      <span className="tk-t">{r.unread && <i className="tk-new" aria-label="New" />}<span className="tk-name">{r.title}</span>
+        {r.block && <span className="tk-block">Blocked on {opens
+          ? <button type="button" className="tk-link" onClick={(e) => { e.stopPropagation(); onOpenBlock(r); }}>{r.block.on}</button>
+          : <span className="tk-on">{r.block.on}</span>}</span>}
+        {!r.block && r.agent && !r.done && <span className="tk-block"><button type="button" className="tk-link" onClick={(e) => { e.stopPropagation(); onOpenAgent?.(r); }}>{agentOnTaskWord(r.agent)}</button></span>}</span>
+      <Person p={doing} />
+      <Person p={asked} />
       <span className={`tk-due${r.due?.late ? ' late' : ''}`}>{r.due?.word}</span>
     </div>
   </li>;
@@ -73,24 +79,20 @@ export function TasksPage({ groups, faces, nameOf, me, picked, onPicked, keys, o
     if (picked) page.current?.querySelector('.tk-row.is-picked')?.scrollIntoView({ block: 'nearest' });
   }, [picked]);
 
-  const faceOf = (id: string | null) => (!id ? undefined : faces.get(id === me ? 'me' : `person:${id}`));
-  const fromOf = (id: string | null) => (!id ? null : id === me ? 'you' : nameOf(id));
-  const section = (label: string, rows: TaskRow[], named = true) => (rows.length ? <section className="tk-sec" aria-label={label}>
-    {named && <h2 className="tk-label">{label}</h2>}
-    <ul>{rows.map((r) => <Row key={r.key} r={r} picked={picked === r.key} face={faceOf(r.holder)} from={fromOf(r.giver)} onOpen={onOpen} onOpenBlock={onOpenBlock} onOpenAgent={onOpenAgent} />)}</ul>
-  </section> : null);
+  const personOf = (id: string | null): TaskPerson | null => (!id ? null
+    : { name: id === me ? 'You' : nameOf(id), face: faces.get(id === me ? 'me' : `person:${id}`) });
+  const rowOf = (r: TaskRow) => <Row key={r.key} r={r} picked={picked === r.key} doing={personOf(r.holder)} asked={personOf(r.giver)} onOpen={onOpen} onOpenBlock={onOpenBlock} onOpenAgent={onOpenAgent} />;
+  const open = order.filter((r) => !r.done);
 
   return <div className="tk" aria-label="Tasks" ref={page}>
     <div className="tk-col">
       {title && <h2 className="td-title">{title}</h2>}
       <p className="tk-sum">{tasksLine(groups)}</p>
-      {section('Late', groups.late)}
-      {section('Blocked', groups.blocked)}
-      {/* Named only when Late or Blocked is above it to tell it from. */}
-      {section('Open', groups.open, groups.late.length > 0 || groups.blocked.length > 0)}
+      {order.length > 0 && <div className="tk-row tk-head"><span>Task</span><span>Doing it</span><span>Asked by</span><span className="tk-due">Due</span></div>}
+      {open.length > 0 && <section className="tk-sec" aria-label="Open tasks"><ul>{open.map(rowOf)}</ul></section>}
       {groups.done.length > 0 && <section className="tk-sec tk-done" aria-label="Done this week">
         <h2 className="tk-label"><button type="button" className="tk-fold" aria-expanded={doneShown} onClick={() => setDoneShown((o) => !o)}>Done this week<b>{groups.done.length}</b></button></h2>
-        {doneShown && <ul>{groups.done.map((r) => <Row key={r.key} r={r} picked={picked === r.key} face={faceOf(r.holder)} from={fromOf(r.giver)} onOpen={onOpen} onOpenBlock={onOpenBlock} />)}</ul>}
+        {doneShown && <ul>{groups.done.map(rowOf)}</ul>}
       </section>}
     </div>
   </div>;
