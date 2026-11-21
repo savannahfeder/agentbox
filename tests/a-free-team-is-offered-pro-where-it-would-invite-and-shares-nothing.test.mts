@@ -154,9 +154,11 @@ describe('a team that stops paying says so where a thread would go or come', () 
     expect(sharingNeedsPro({ pro: null, people, me: { id: 'theo' } })).toBeNull();
     expect(sharingNeedsPro(null)).toBeNull();
   });
-  it('sends no link nobody could open, and says why a teammate’s link does not open', () => {
+  // Second round: asking Ana for help said Asked, and Ana could not open the thread it led to.
+  it('sends no link nobody could open, asks nobody to help on a thread they could not open, and says why a teammate’s link does not open', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toMatch(/const paused = sharingNeedsPro\(team\?\.state\);\s*if \(paused\) \{ showToast\(paused\); return; \}\s*const names = /);
+    expect(app).toMatch(/const paused = sharingNeedsPro\(team\?\.state\);\s*if \(paused && !to\.id\.startsWith\('mate:'\)\) \{ showToast\(paused\); return; \}\s*const out = await api\.teamAsk/);
     expect(app).toMatch(/showToast\(sharingNeedsPro\(team\?\.state\) \?\? `\$\{firstName\(team\?\.byId\.get\(personId\)/);
   });
   it('drops the promise that everyone can read your threads from Settings › Team', () => {

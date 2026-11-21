@@ -7676,6 +7676,9 @@ export default function App() {
   // Help or a review keeps the thread yours; the task they get leads back to it.
   const askOnThread = async (item: WorkItem, to: GiveTo, kind: 'help' | 'review', note: string, step: string | null) => {
     const first = to.name.split(/\s+/)[0] || to.name;
+    // Their task leads back to this thread, which they could not open.
+    const paused = sharingNeedsPro(team?.state);
+    if (paused && !to.id.startsWith('mate:')) { showToast(paused); return; }
     const out = await api.teamAsk({ product: item.product, id: item.id, to: to.id, kind, ...(note ? { note } : {}), ...(step ? { step } : {}) });
     showToast(out.ok ? (kind === 'help' ? `Asked ${first} to help. It stays yours.` : `Asked ${first} to review it.`) : out.error ?? 'That did not work.');
     if (out.ok) await refresh();
