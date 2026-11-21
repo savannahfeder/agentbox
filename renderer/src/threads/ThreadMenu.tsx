@@ -260,9 +260,9 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ thread = null, share = null, onCopyLink, onSendTo,onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
-  /** The thread whose ask sheet, closed unsent, opens again as it was left. */
-  thread?: ItemRef | null;
+export function ThreadMenu({ thread = null, share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+  /** The thread the ask sheet sends, by its name; closed unsent, the sheet opens again as it was left. */
+  thread?: (ItemRef & { name?: string }) | null;
   /** What Share… offers, or null where the thread cannot be shared. */
   share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string; chosen?: readonly string[] } | null;
   /** Puts the link on the clipboard; false when it could not. */
@@ -566,7 +566,7 @@ export function ThreadMenu({ thread = null, share = null, onCopyLink, onSendTo,o
       {open && !waiting && !adding && !leveling && !sharing && (giving && givingTo
         ? (() => {
           const d = kept();
-          return <GiveSheet to={givingTo} step={step} start={d?.mode} startNote={d?.note}
+          return <GiveSheet to={givingTo} step={step} start={d?.mode} startNote={d?.note} threadName={thread?.name ?? null}
             onChange={(mode, note) => keep({ to: { id: givingTo.id, name: givingTo.name }, mode, note, step })}
             onChangePerson={() => setGivingTo(null)}
             onGive={(note) => { keep(null); close(false); onGive?.(givingTo, note); }}

@@ -1961,7 +1961,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   })();
   const threadMenu = (
     <ThreadMenu
-      thread={item}
+      thread={{ product: item.product, id: item.id, name: pageTitle(item) }}
       share={share}
       onCopyLink={() => onShare!.copy(item)}
       onSendTo={(to, note) => onShare!.send(item, to, note)}

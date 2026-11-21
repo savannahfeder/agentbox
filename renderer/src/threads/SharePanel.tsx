@@ -123,8 +123,12 @@ const MODES: { id: GiveMode; label: string; detail: (first: string) => string; a
   { id: 'give', label: 'Hand over', detail: (f) => `It becomes ${f}’s thread from now on.`, ask: 'Add a note', go: (f) => `Give to ${f}` },
 ];
 
+const ThreadMark = () => <svg {...mark} width={14} height={14}><path d="M4 5h16v11h-9l-4.5 3.5V16H4z" /><path d="M8 9h8M8 12h5" /></svg>;
+
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
-export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', startNote = '', onChange, onChangePerson }: {
+export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', startNote = '', onChange, onChangePerson, threadName = null }: {
+  /** The thread's name, as the person asked sees it in their list. */
+  threadName?: string | null;
   to: { id: string; name: string };
   onGive: (note: string) => void;
   /** Help or a review keeps the thread yours; without it only handing over is offered. */
@@ -145,6 +149,7 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', star
   const m = MODES.find((x) => x.id === mode)!;
   const go = () => { if (mode === 'give' || !onAsk) onGive(note.trim()); else onAsk(mode, note.trim()); };
   const face = <Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />;
+  const quote = step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>;
   return (
     <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Bring in ${first}`}>
       <div className="sh-to"><span className="sh-label">To</span>{onChangePerson
@@ -156,7 +161,8 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', star
         </div>
         <p className="sh-mode-says">{m.detail(first)}</p>
       </div>}
-      {step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>}
+      {/* The whole thread goes, so it is drawn by its name with the message as where to look. */}
+      {threadName ? <div className="sh-thread"><div className="sh-thread-head"><ThreadMark /><span>{threadName}</span></div>{quote}</div> : quote}
       <textarea className="sh-note" autoFocus placeholder={m.ask} value={note} aria-label={m.ask} rows={2}
         onChange={(e) => { setNote(e.target.value); onChange?.(mode, e.target.value); }}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); } }} />
