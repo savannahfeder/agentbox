@@ -99,7 +99,7 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
       return key ? api.filesPlaceMark({ key, mark }) : api.fileMark({ product: item.product, id: item.id, mark });
     }}
     withAgent={withAgent}
-    onHandToAgent={withAgent ? undefined : (files) => window.dispatchEvent(new CustomEvent('zero:hand-comments', { detail: { product: item.product, id: item.id, files } }))}
+    onHandToAgent={withAgent ? undefined : (files) => { onClose(); window.dispatchEvent(new CustomEvent('zero:hand-comments', { detail: { product: item.product, id: item.id, files } })); }}
     onNewVersion={async (_name, text, path, _id, since) => {
       const out = await api.fileNewVersion({ product: item.product, id: item.id, path, text, since });
       return out.ok ? null : out.error ?? 'That did not save.';

@@ -833,8 +833,12 @@ export default function App() {
     });
     // The files a message carries are the ones whose comments go with it.
     const linked = files ?? start.attachments.map((a) => a.srcPath.slice((dir?.length ?? 0) + 1));
-    // From a file's notes there is no message to carry, so the thread is named for the file.
-    const named = !message && files?.length ? { body: `Changes from the comments on ${[...new Set(files.map((f) => shownName(f)))].join(', ')}\n\n` } : {};
+    // From a file's notes there is no message to carry, so the thread is named for
+    // the file and carries it, wherever its newest version is kept.
+    const named = !message && files?.length ? {
+      body: `Changes from the comments on ${[...new Set(files.map((f) => shownName(f)))].join(', ')}\n\n`,
+      attachments: files.map((f) => ({ name: shownName(f), srcPath: f.startsWith('/') || !dir ? f : `${dir}/${f}`, image: /\.(png|jpe?g|gif|webp)$/i.test(f) })),
+    } : {};
     void comments.then((notes) => {
       const handed = linked.length ? commentsToHand(notes, { me: seen?.me ?? null, files: linked }) : [];
       setComposeInitial({ ...start, ...named, ...(handed.length ? { comments: handed } : {}) });

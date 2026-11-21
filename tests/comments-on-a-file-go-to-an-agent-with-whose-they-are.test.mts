@@ -118,6 +118,11 @@ describe('every way to an agent carries them', () => {
   it("a file's notes hand over its newest version by path, so the card can attach it", () => {
     const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
     expect(view).toContain('onHandToAgent!([family!.versions.at(-1)!.path])');
+    // Seen in the running app: the card opened behind the full-page file, and a
+    // newest version kept in another thread came as an absolute path no link matched.
+    const big = fs.readFileSync(new URL('../renderer/src/components/ThreadArtifacts.tsx', import.meta.url), 'utf8');
+    expect(big).toMatch(/onHandToAgent=\{withAgent \? undefined : \(files\) => \{ onClose\(\);/);
+    expect(app).toMatch(/srcPath: f\.startsWith\('\/'\) \|\| !dir \? f : `\$\{dir\}\/\$\{f\}`/);
   });
   it('the card shows them and sends the ticked ones', () => {
     expect(card).toContain('<HandedComments');
