@@ -41,12 +41,12 @@ describe('the note button once a note has gone', () => {
 
 describe('the toast for a hand-off', () => {
   it('names the person by first name', () => {
-    expect(handedToWhom('Theo Okafor')).toBe('Handed to Theo');
-    expect(handedToWhom('Theo')).toBe('Handed to Theo');
+    expect(handedToWhom('Theo Okafor')).toBe('Handed over to Theo');
+    expect(handedToWhom('Theo')).toBe('Handed over to Theo');
   });
 
-  it('says only Handed on when there is no name', () => {
-    expect(handedToWhom('')).toBe('Handed on');
+  it('says only Handed over when there is no name', () => {
+    expect(handedToWhom('')).toBe('Handed over');
   });
 });
 

@@ -61,8 +61,9 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
             onChange={(e) => setWords(e.target.value)}
             onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void back(); } }} />
           <div className="ask-bar-acts">
-            <button type="button" disabled={busy || (giving === 'changes' && !words.trim())} onClick={() => { void back(); }}>Hand back to {first}</button>
-            <button type="button" className="quiet" onClick={() => { setGiving(null); setWords(''); }}>Not yet</button>
+            {/* Named by what it sends: "Looks good" alone left people thinking it had gone. */}
+            <button type="button" disabled={busy || (giving === 'changes' && !words.trim())} onClick={() => { void back(); }}>{giving === 'yes' ? `Send “Looks good” to ${first}` : giving === 'changes' ? `Send changes to ${first}` : `Hand back to ${first}`}</button>
+            <button type="button" className="quiet" onClick={() => { setGiving(null); setWords(''); }}>Cancel</button>
           </div>
         </div>
       ) : (

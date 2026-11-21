@@ -119,7 +119,7 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
     });
   }
   for (const p of f.give ?? []) {
-    rows.push({ id: `give-${p.id}`, label: `Give it to ${p.name}`, keywords: `give hand pass assign delegate someone else ${p.name.toLowerCase()}`, does: { act: 'give', to: p.id, name: p.name } });
+    rows.push({ id: `give-${p.id}`, label: `Hand over to ${p.name}`, keywords: `hand over give pass assign delegate someone else ${p.name.toLowerCase()}`, does: { act: 'give', to: p.id, name: p.name } });
   }
   for (const w of f.waits ?? []) {
     rows.push({ id: `wait-${w.id}`, label: `Waits on ${w.label}`, keywords: `waits waiting blocked by depends needs ${w.label.toLowerCase()}`, does: { act: 'wait', on: w.id } });

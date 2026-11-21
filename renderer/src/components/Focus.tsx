@@ -2575,7 +2575,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>Send back to agent</button>}
         {/* Where the agent stopped is the step a teammate is asked about. */}
         {!agent && item.status === 'blocked' && onAsk && !asked && giveTo.some((p) => !p.id.startsWith('mate:')) && (
-          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}>Ask a teammate</button>
+          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}>Ask for help or a review</button>
         )}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
