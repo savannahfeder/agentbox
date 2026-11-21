@@ -7,7 +7,7 @@
 // pointing with its more menu (edit, copy, mark unread, delete), an edited
 // mark, and voice notes and files. The box is the direct chat's too.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { MessageMarkdown } from '../../components/MessageMarkdown';
 import { ConnectionLink } from '../../connections/ConnectionsPlace';
 import { connectionLinkOf, keepConnectionLinks } from '../../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
@@ -245,7 +245,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
           {m.id === newAt && <div className="rm-new" role="separator"><span>New</span></div>}
           <div className={`rm-cm${headed ? '' : ' cont'}${root && i === 0 ? ' root' : ''}`}>
             {headed && <div className="h">
-              <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 28 : 16} />
+              <Face name={m.voice ? m.voice.name : p?.name ?? '?'} url={m.voice ? undefined : p?.avatarUrl} agent={!!m.voice} size={hang ? 28 : 16} />
               <span>{m.voice ? voiceName(m.voice, p?.name ?? '', { mine }) : nameOf(m.by)}</span><em>{clockOf(m.at)}</em>
               {m.editedAt && !m.deleted && <em className="rm-edited">edited</em>}
             </div>}
@@ -389,7 +389,7 @@ function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine,
       },
     };
   }, [roomId, mine]);
-  return <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={components} urlTransform={keepConnectionLinks}>{mentionMarkdown(text, names, me)}</ReactMarkdown>;
+  return <MessageMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={components} urlTransform={keepConnectionLinks}>{mentionMarkdown(text, names, me)}</MessageMarkdown>;
 }
 
 // Keeps the newest message in view while you are at the bottom, and leaves

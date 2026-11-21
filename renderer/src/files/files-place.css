@@ -29,7 +29,9 @@
 .fp-new-box { position: relative; flex: none; }
 .fp-new-box .fp-menu { top: 38px; width: 180px; }
 .th-new[aria-expanded="true"] { background: var(--wash-strong); }
-.is-new .fp-name { overflow: visible; }
+/* The box sits over the name's own line, so nothing under it moves. */
+.fp-name:has(> .fp-name-box) { overflow: visible; }
+.fp-name > .fp-name-box { display: block; margin-top: -3px; margin-bottom: -3px; }
 
 .fp-empty { margin: 26px 0 0; font-size: 13.5px; line-height: 20px; color: var(--text-faint); }
 

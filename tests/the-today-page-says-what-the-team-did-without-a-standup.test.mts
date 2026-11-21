@@ -11,8 +11,8 @@ import { teamToday, todayLine, rangeOf } from '../renderer/src/team/today.ts';
 const NOW = new Date(2026, 9, 31, 15, 0).getTime();
 const at = (h, dayOffset = 0) => new Date(2026, 9, 31 + dayOffset, h, 0).getTime();
 const products = [{ slug: 'lumen', name: 'Lumen', team: {} }, { slug: 'direct-dev', name: 'Dev', team: { direct: true } }];
-const item = (o) => ({ product: 'lumen', status: 'open', labels: [], updatedAt: at(9), createdAt: at(8, -3), title: o.id, ...o });
-const card = (o) => ({ visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, problem: null, progress: null, solution: null, updatedAt: at(10), ...o });
+const item = (o) => ({ product: 'lumen', status: 'open', labels: [], updatedAt: at(9), createdAt: at(8, -3), title: o.id, ...(o.status === 'done' ? { result: 'Done.' } : {}), ...o });
+const card = (o) => ({ visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, problem: null, progress: null, solution: null, updatedAt: at(10), ...(o.state === 'done' ? { solution: 'Done.' } : {}), ...o });
 
 const items = [
   item({ id: 'mine-done', title: 'Pricing page copy', status: 'done', updatedAt: at(11) }),

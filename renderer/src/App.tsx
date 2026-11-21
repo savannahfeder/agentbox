@@ -11,7 +11,7 @@ import type {FocusControlStyle} from './focus-control';
 import {reviewLabEnabled} from './review-lab';
 import { deliverReply } from './deliver-reply.ts';
 import { ArtifactSurface } from './components/ArtifactSurface';
-import { artifactPlacement, artifactFraction, fullScreenTakes, whereAFileOpens, type ArtifactMode } from './artifact-layout';
+import { artifactPlacement, artifactFraction, fullScreenTakes, keptWidth, whereAFileOpens, type ArtifactMode } from './artifact-layout';
 import { besideDocument } from './message-artifacts';
 import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // the app's renderer: one state machine, keyboard-first. The Superhuman grammar:
@@ -106,7 +106,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
-import { filedByThePerson, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
+import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
@@ -154,14 +154,14 @@ import { personChatShows, personPressOpens } from './team/one-conversation';
 import { pairLine, pairTimeline, THREAD_KINDS, type PairEntry, type PairOpens } from './team/pair-timeline';
 import { AlongHistory, type ChatAlong } from './team/rooms/RoomChat';
 import { listedIn, pairRooms } from '../../shared/pair-room.mts';
-import { isPresenceCard, roomMateCards, roomMatesById } from './team/rooms/room-rules';
+import { isPresenceCard, roomMateCards, roomMatesById, threadOnLine } from './team/rooms/room-rules';
 import { MARK_UNREAD, SAY } from './team/chat-events';
 import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
 import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
 import { ChatStart, EmptyChat, JobBlock, MateWork, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow } from './team/everything/PlacePage';
-import { nowAndFinished, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
+import { nowAndFinished, personThreads, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
 import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, type NeedsGroup, type StackKey } from './threads/stack-rules';
@@ -2308,10 +2308,12 @@ export default function App() {
   const waitingOn = useCallback((i: WorkItem) => waitsThatCanEnd(i, byId), [byId]);
   // Your threads someone you asked for help or a review has right now: out of Needs you, notes and
   // comments included, until they hand it back (shared/thread-asks.mts).
+  // One that has come back and waits on you is yours again, though someone else you asked still has it.
   const askedOut = useMemo(() => new Set(items.flatMap((r) => {
     const a = askIGave(r, team?.me ?? null);
-    return a && askIsOpen(r) ? [a.thread] : [];
-  })), [items, team?.me]);
+    const thread = a ? byId.get(a.thread) : null;
+    return a && askIsOpen(r) && !(thread && heldForHer(thread)) ? [a.thread] : [];
+  })), [items, team?.me, byId]);
 
   // A comment that asks you by name is news to you (fileNewsFor).
   const myName = team?.byId.get(team.me ?? '')?.name ?? null;
@@ -3546,15 +3548,25 @@ export default function App() {
   // A copy of a teammate's file does not outlive their thread on the screen.
   useEffect(() => { setOpenDoc((doc) => (doc?.readOnly ? null : doc)); }, [openCard?.personId, openCard?.threadId]);
   const [artifactBody, setArtifactBody] = useState<HTMLDivElement | null>(null);
+  // The sidebar sliding open changes the body's width every frame, so only a
+  // width that changes what is drawn (keptWidth) draws the app again.
+  const bodyWidth = useRef(1000);
   const [artifactWidth, setArtifactWidth] = useState(1000);
+  const fileOpen = !!openDoc;
   useEffect(() => {
     // The team page takes the body's place, and a hidden body measures nothing.
     const body = teamBody ?? artifactBody;
     if (!body) return;
-    const observer = new ResizeObserver(([entry]) => setArtifactWidth(entry.contentRect.width));
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      bodyWidth.current = width;
+      setArtifactWidth((was) => keptWidth(was, width, fileOpen));
+    });
     observer.observe(body);
     return () => observer.disconnect();
-  }, [artifactBody, teamBody]);
+  }, [artifactBody, teamBody, fileOpen]);
+  // Before the file's first paint, so it opens at the split it keeps.
+  useLayoutEffect(() => { if (fileOpen) setArtifactWidth(bodyWidth.current); }, [fileOpen]);
 
   // HOW MUCH OF THE WINDOW THE FILE TAKES. three quarters, no line down the
   // middle, still resizable. The opening fraction and the floors it moves
@@ -4303,6 +4315,14 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
+  // A second copy on an invented team, for a call where this inbox should stay
+  // off the shared screen (main/demo.mts). The toast says which window is which.
+  const openDemoCopy = useCallback(async () => {
+    setModal(null);
+    const out = await api.openDemo();
+    if (!out.ok) { showToast(out.error ?? 'It could not be opened.'); return; }
+    showToast(`Opening a demo copy in a new window. Yours keeps running.${out.notes?.length ? ` ${out.notes[0]}` : ''}`);
+  }, [showToast]);
   // A CHAT'S OWN ASKS (team/chat-events.ts): mark this conversation unread, and say a short note.
   useEffect(() => {
     const mark = (e: Event) => {
@@ -4352,6 +4372,8 @@ export default function App() {
     renderBoard: (people, { later }) => <RoomBoard items={items} products={snap?.products ?? []} display={DEFAULT_DISPLAY.team} now={now} stateOf={stateOfMine} projectOrder={projectOrder}
       cards={[...cards, ...roomMateCards(snap?.team?.rooms?.rooms ?? [])]} picked={people} onOpenCard={(c) => { if (!isPresenceCard(c)) openTeammateCard(c); }} columnOrder={columnOrder} later={later}
       onOpenItem={(item) => { setFocused(item); markSeen(item); }} />,
+    threadOf: (c) => { const t = threadOnLine(c, weekCards); return t ? () => openContinuedFrom(t.personId, t.threadId) : null; },
+    onTeammate: (id) => pickMember(`person:${id}`),
   });
   // Two people have one conversation while Rooms is live: the chat on the person's page.
   const oneChat = roomsUi.live && homeLayout === 'chats';
@@ -8025,7 +8047,7 @@ export default function App() {
       const given = youWaitOn(items, team?.me ?? null, id);
       // A task you gave them is listed once, under what you are waiting on them for.
       const givenAs = new Set(given.flatMap((i) => [i.id, rowTitle(i)]));
-      const theirs = nowAndFinished(cards.filter((c) => c.personId === id && c.visible && !givenAs.has(c.threadId) && !givenAs.has(c.title ?? '')), { done: (c) => c.state === 'done', at: (c) => c.updatedAt, now });
+      const theirs = personThreads(weekCards, id, { now, skip: (c) => givenAs.has(c.threadId) || givenAs.has(c.title ?? '') });
       const cardRow = (c: ThreadCard): PlaceRow => ({ key: c.threadId, title: c.title ?? 'A thread', word: c.state === 'running' ? '' : (CARD_WORD[c.state] ?? CARD_WORD.running)[0], tone: (CARD_WORD[c.state] ?? CARD_WORD.running)[1], at: c.updatedAt, onOpen: () => openTeammateCard(c) });
       const openPairEntry = (o: PairOpens) => {
         if (o.to === 'task') {
@@ -8176,7 +8198,7 @@ export default function App() {
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
     <CloudOfferContext.Provider value={cloudOfferNow ? { offer: cloudOfferNow, onGo: (go) => void onCloudGo(go) } : null}>
-    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${teamShown && openCard && snap?.team?.signedIn && snap.team.team ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${(queueSpot || onePage) && focused ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}${skyOnPlace ? ' sky-shown sky-place' : ''}`}>
+    <div data-design-toolbar={toolbarExploration ? designToolbar : 'corner'} data-preview-treatment={previewTreatment} data-reading-width={readingWidth} data-artifact-layout={openDoc ? artifactView : undefined} data-chrome={fullScreenDoc ? (chromeUp ? 'up' : 'away') : undefined} className={`app workspace-layout${narrowSidebar ? ` gt-rail gt-inset gt-sumleft${sideFolded ? '' : ' gt-rail-open'}` : ''}${focused && !settingsOpen && !inChats ? ' workspace-task' : ''}${teamShown && openCard && snap?.team?.signedIn && snap.team.team ? ' workspace-task' : ''}${settingsOpen ? ' workspace-settings' : ''}${teamShown ? ' workspace-team' : ''}${backForward ? ' back-forward-on' : ''}${sideFolded ? ' workspace-collapsed' : ''}${panelShown ? ' panel-up' : ''}${openDoc ? ' doc-open' : ''}${notesShown ? ' notes-open' : ''}${notesClosed ? ' notes-closed' : ''}${inPractice ? ' banded' : ''}${modal === 'reply' ? ' composing' : ''}${cardOnScreen ? ' asking' : ''}${((queueSpot || onePage) && focused) || (teamShown && openCard && snap?.team?.signedIn && snap.team.team) ? ' one-at-a-time' : ''}${homeShown ? ' home-shown sky-shown' : skyOnInbox ? (onBoard ? ' sky-shown sky-board' : ' sky-shown') : ''}${skyOnPlace ? ' sky-shown sky-place' : ''}`}>
 
       {/* At the end of <body>, so its drag rectangles are reported after the
           top bar's and this layout's ::after strip. Inside the app, those put
@@ -8465,7 +8487,7 @@ export default function App() {
                 {/* A TEAMMATE'S THREAD, the whole window. Back goes to Threads
                     with the same people picked, or to the room whose board it
                     was opened from. */}
-                <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
+                <TeammateThread key={`${openCard.personId}/${openCard.threadId}`} card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
                   headerTarget={focused ? null : teamHeader} cornerTarget={focused ? null : teamCorner}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
@@ -8702,6 +8724,7 @@ export default function App() {
                   codexModels={codexModels}
                   codexModelDefault={codexModelDefault}
                   engines={snap.engines?.choices}
+                  outOfUsage={snap.supervisor.outOfUsage}
                   items={items}
                   onReplySend={(text, priority, repeat, sent, mode, pick, sendAt) => {
                     // THE REPLY GOES WHERE THE ROW ACTUALLY LIVES. On an agent
@@ -8984,6 +9007,7 @@ export default function App() {
           items={items}
           engines={snap.engines?.choices}
           workspaceEngine={snap.engines?.workspace}
+          outOfUsage={snap.supervisor.outOfUsage}
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card
@@ -9162,6 +9186,7 @@ export default function App() {
         onFirstRun={walkAgain}
         onTutorial={() => startTutorial(comeBackTo(snap.products, productFilter, rememberedProject()))}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}
+        onDemo={openDemoCopy}
         products={rankedProducts}
         typed={paletteTyped}
         supervisorPaused={snap.supervisor.paused}

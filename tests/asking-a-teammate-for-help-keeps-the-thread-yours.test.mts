@@ -292,7 +292,8 @@ describe('the wiring', () => {
   it('a thread someone you asked has is out of your Needs you until it comes back', () => {
     const app = read('renderer/src/App.tsx');
     expect(app).toContain("if (askedOut.has(i.id) && !asking(i)) return false;");
-    expect(app).toMatch(/const askedOut = useMemo\(\(\) => new Set\(items\.flatMap\(\(r\) => \{\s*const a = askIGave\(r, team\?\.me \?\? null\);\s*return a && askIsOpen\(r\) \? \[a\.thread\] : \[\];/);
+    // Unless one ask has come back and waits on you (an-ask-that-comes-back-reaches-needs-you-while-another-is-out).
+    expect(app).toMatch(/const askedOut = useMemo\(\(\) => new Set\(items\.flatMap\(\(r\) => \{\s*const a = askIGave\(r, team\?\.me \?\? null\);\s*const thread = a \? byId\.get\(a\.thread\) : null;\s*return a && askIsOpen\(r\) && !\(thread && heldForHer\(thread\)\) \? \[a\.thread\] : \[\];/);
   });
   // Round two: Dana handed Priya a task, Priya started it in a thread of her own, and Dana could not find it.
   it('a thread started from a task someone handed you leaves its link on that task', () => {

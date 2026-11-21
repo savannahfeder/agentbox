@@ -10,11 +10,13 @@ import fs from 'node:fs';
 const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
 
 describe("the comment box on a teammate's thread", () => {
-  it('names the owner on its button, as a file note does', () => {
-    expect(page).toContain('<button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>');
+  // 2026-11-21: the box is the thread's own reply box; who gets it is said beside Send.
+  it('says who gets it beside Send, as the reply box does', () => {
+    expect(page).toContain("{helping ? `Goes to ${owner}'s agent.` : `Goes to ${owner}.`}");
   });
   it('still says what the box is for', () => {
-    expect(page).toContain('placeholder={`Comment to ${owner}`}');
+    expect(page).toContain("const box = helping ? `Write to ${owner}'s agent` : `Reply to ${owner}`;");
+    expect(page).toContain('placeholder={box}');
   });
   it('has no button that says only Comment', () => {
     expect(page).not.toMatch(/>Comment<\/button>/);

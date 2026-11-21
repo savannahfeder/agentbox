@@ -24,7 +24,7 @@ import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
 import { findFileToSend } from './carry-files.mts';
 import { readableSharedThreads } from '../everything-found.mts';
 import { plainRef } from '../../shared/carried-files.mts';
-import { listSharedProjects, joinSharedProject, markShared, makeDirect } from './projects.mts';
+import { listSharedProjects, joinSharedProject, linkSharedFolders, markShared, makeDirect } from './projects.mts';
 import type { TeamRecord } from './projects.mts';
 import type { SyncBackend, SyncCard, SyncDisk, SyncReport, SyncState } from './sync.mts';
 import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
@@ -666,6 +666,7 @@ export function createTeamService({
         else if (state.multiplayer === false) set({ multiplayer: await readMultiplayer() });
         await clearLapsedStatus();
         const report = await sync!.syncOnce();
+        for (const l of linkSharedFolders(products())) log(`team: ${path.basename(l.dir)} now works in ${l.repoPath}, your own project of the same name`);
         // The people are read again on every pass, with the activity, so a
         // teammate who joined after this Mac signed in has a name and a face
         // on the first line of theirs that arrives here.
@@ -1396,6 +1397,12 @@ export function createTeamService({
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...change.files, ...files],
       });
+      // The asks on it end with it: what they say back would come to a thread you no longer hold.
+      for (const r of store.listItems()) {
+        const a = askOf(r as never);
+        if (!a || a.owner !== state.me.id || a.thread !== id || !askIsOpen(r as never)) continue;
+        try { store.answerItem(r.product, r.id, { answer: `${giver} handed this thread to ${person.name || 'a teammate'}.`, status: 'done' }); } catch (err) { log(`asks: ${(err as Error).message}`); }
+      }
       // As your own words: a note would be drawn as the agent's checkpoint.
       const said = String(note ?? '').trim();
       store.answerItem(slug, id, { answer: `Given to ${person.name || 'a teammate'}.${said ? `\n\n${said}` : ''}`, status: 'done' });
