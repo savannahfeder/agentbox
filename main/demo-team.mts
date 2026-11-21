@@ -64,7 +64,7 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
     if (m.file) await them.putFile(m.projectId, m.file.path, Buffer.from(`${m.file.text}\n`).toString('base64'));
     await them.pushLines(m.projectId, [
       // A task's mark rides the line that opens it, or the pull drops it (shared/team-rules.mts).
-      line(m.from.id, m.at, 'system', { title: m.title, kind: 'directive', priority: 0, status: 'open', ...(m.given ? { labels: ['given-task'] } : {}) }, m.id),
+      line(m.from.id, m.at, 'system', { title: m.title, kind: 'directive', priority: 0, status: 'open', ...(m.given ? { labels: ['given-task'] } : m.subject ? { labels: ['work-thread'] } : {}) }, m.id),
       line(m.from.id, m.at + 1, 'founder', { title: m.title, body: withFile(m), assignee: DEMO_ME.id, people }, m.id),
     ]);
     // Sorted already, as the copy's own agent would have sorted it.

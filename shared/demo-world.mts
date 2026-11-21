@@ -299,7 +299,8 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
 // handed you rather than talk. `priority` is set so the copy does not ask a
 // model to sort it on a call.
 export interface DemoFile { path: string; title: string; text: string }
-export interface DemoMessage { from: DemoPerson; projectId: string; id: string; at: number; title: string; body: string; priority: number; given?: boolean; file?: DemoFile }
+/** `given`: a task they handed you. `subject`: a message about one piece of work, which gets a row of its own named by `title`. */
+export interface DemoMessage { from: DemoPerson; projectId: string; id: string; at: number; title: string; body: string; priority: number; given?: boolean; subject?: boolean; file?: DemoFile }
 
 /** A message's file, linked under its words the way the reply box links one. */
 export const withFile = (m: DemoMessage) => (m.file ? `${m.body}\n\n[${m.file.path}](attachments/${m.file.path})` : m.body);
@@ -312,9 +313,10 @@ export function demoMessages(now: number = Date.now()): DemoMessage[] {
       projectId: '7c41e2d9-3b8a-4f15-9e62-1d0a5c8b4f21',
       id: 'w-d1a7c3e590',
       at: now - 9 * MIN,
-      title: 'Can you read the launch email today?',
+      title: 'Launch email',
       body: 'Can you read the launch email today? It goes to all 4,000 trial users tomorrow morning, and the subject line is the part I am least sure of.',
       priority: 7,
+      subject: true,
       file: LAUNCH_EMAIL,
     },
     {
@@ -377,13 +379,14 @@ export interface DemoCard { by: DemoPerson; threadId: string; project: string; t
 export function demoCards(now: number = Date.now()): DemoCard[] {
   const done = lastWorkingMorning(now);
   return [
-    { by: THEO, threadId: 'w-c3a1e09d42', project: 'Ferry', title: 'Sync engine rewrite for large moves', state: 'running', updatedAt: now - 12 * MIN, progress: 'Batches of 5,000 files instead of one queue\nShared drives next, then a 60,000 file test' },
+    { by: THEO, threadId: 'w-c3a1e09d42', project: 'Ferry', title: 'Sync engine rewrite for large moves', state: 'running', updatedAt: now - 12 * MIN, progress: 'Batches of 5,000 files instead of one queue\n60,000 file test finished in 41 minutes\nShared drives next' },
     { by: THEO, threadId: 'w-c3b27f8e15', project: 'Ferry', title: 'Uploads retry on a slow connection', state: 'done', updatedAt: done - 19 * HR, shippedAt: done - 19 * HR, progress: 'Retries three times, then says which file' },
     { by: THEO, threadId: 'w-c3c84a1f06', project: 'Ferry', title: 'Shared drives keep their permissions', state: 'done', updatedAt: done - 15 * HR, progress: 'Owners, editors and viewers carry across' },
-    { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Ferry', title: 'Sign-up screens', state: 'waiting', updatedAt: now - 34 * MIN, progress: 'Drawn in light and dark\nWords waiting on a yes from Jamie' },
+    { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Ferry', title: 'Sign-up screens drawn', state: 'done', updatedAt: done - 40 * MIN, progress: 'Drawn in light and dark\nWords sent to Jamie for a yes' },
     { by: PRIYA, threadId: 'w-b2d91e6c50', project: 'Ferry', title: 'Empty states for the move list', state: 'running', updatedAt: now - 25 * MIN, progress: 'Four states drawn, two to go' },
     { by: PRIYA, threadId: 'w-b2e3f7a915', project: 'Website', title: 'Pricing page in dark mode', state: 'done', updatedAt: done - 17 * HR, shippedAt: done - 17 * HR, progress: 'Checked on a phone and a laptop' },
-    { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email for the trial users', state: 'waiting', updatedAt: now - 9 * MIN, progress: 'Written, waiting on a read from Jamie' },
+    { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email written', state: 'done', updatedAt: done - 1.3 * HR, progress: 'For all 4,000 trial users\nSent to Jamie to read' },
+    { by: LENA, threadId: 'w-d4b37e0c84', project: 'Website', title: 'Welcome emails for new teams', state: 'running', updatedAt: now - 6 * MIN, progress: 'Three of the five emails written' },
     { by: LENA, threadId: 'w-d4f05c1b98', project: 'Website', title: 'Comparison page against two similar tools', state: 'done', updatedAt: done - 21 * HR, shippedAt: done - 21 * HR, progress: 'Live, linked from pricing' },
     { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'Trial teams who never started a move', state: 'done', updatedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
   ];
