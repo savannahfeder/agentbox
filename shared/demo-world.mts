@@ -34,6 +34,11 @@ export const DEMO_ENV = envName('DEMO');
 export const DEMO_INSTALL_ID = `${nameSlug}-demo`;
 
 /**
+ * The account a demo store is laid out under. A demo copy has no config file,
+ *  so `main/config.mts` takes this id for it instead of minting one. */
+export const DEMO_ACCOUNT = '00000000-0000-4000-8000-000000000000';
+
+/**
  * Is this copy of Agentbox a demo? The environment mark is the answer; there is
  *  no path fallback, because unlike a fresh-user home a demo home is not the
  *  only thing that could ever sit under its folder. */

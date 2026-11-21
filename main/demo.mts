@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { DEMO_DOCS, DEMO_ENV, DEMO_PRODUCTS, demoLedgerLines } from '../shared/demo-world.mts';
+import { DEMO_ACCOUNT, DEMO_DOCS, DEMO_ENV, DEMO_PRODUCTS, demoLedgerLines } from '../shared/demo-world.mts';
 import { prepareHome } from '../shared/fresh-user-home.mts';
 import { relaunchCommand } from './fresh-user.mts';
 import { defaultStoreRoot, encodeProjectPath, storeRootEnv } from './store/home.mts';
@@ -45,11 +45,7 @@ import { NAME, nameSlug } from '../shared/product-name.mjs';
  *  under the wrong fixed id. */
 export const HOMES = path.join(os.tmpdir(), `${nameSlug}-demo`);
 
-/**
- * The account the demo store is laid out under. It matches the id
- *  `main/config.mts` defaults to, because the demo copy has no config file and
- *  will therefore look for its products at exactly this path. */
-export const DEMO_ACCOUNT = '00000000-0000-4000-8000-000000000000';
+export { DEMO_ACCOUNT };
 
 /**
  * Named by the clock, like a fresh-user home, so the newest sorts last and two
