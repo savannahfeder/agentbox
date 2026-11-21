@@ -1,6 +1,5 @@
-/* A HARNESS'S MARK IN ITS TILE (./EngineLogos.tsx HarnessMark), drawn after
-   the picture it was asked with: a tile a shade off the page, a faint edge,
-   the mark in its own colour. The same 18px as a person's face (.tm-av). */
+/* A harness's mark in its tile (./EngineLogos.tsx HarnessMark): the same 18px
+   as a person's face (.tm-av), so every row's title starts in one place. */
 .harness-mark {
   display: inline-grid; place-items: center; flex: none; vertical-align: middle;
   width: 18px; height: 18px; box-sizing: border-box;
