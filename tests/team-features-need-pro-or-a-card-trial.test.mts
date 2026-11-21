@@ -55,7 +55,7 @@ const invite = (person: string, team: string, email: string) =>
   refusal(person, `insert into public.team_invites (team_id, email, invited_by) values ($1, $2, $3)`, [team, email, person]);
 const pays = async (person: string) => ((await as(person, `select public.my_team_pays() as on`)).rows[0] as { on: boolean }).on;
 const sends = async (person: string) => ((await db.query(`select count(*)::int as n from public.team_invite_sends where invited_by = $1`, [person])).rows[0] as { n: number }).n;
-const planOf = async (team: string) => (await db.query(`select pays, free_until from public.team_plans where team_id = $1`, [team])).rows[0] as { pays: boolean; free_until: Date | null } | undefined;
+const planOf = async (team: string) => (await db.query(`select pays, free_until, features_until from public.team_plans where team_id = $1`, [team])).rows[0] as { pays: boolean; free_until: Date | null; features_until: Date | null } | undefined;
 async function setPlan(team: string, cols: string) {
   await db.query(`insert into public.team_plans (team_id) values ($1) on conflict do nothing`, [team]);
   await db.query(`update public.team_plans set ${cols} where team_id = $1`, [team]);
@@ -118,7 +118,6 @@ describe('a team on Free', () => {
 
   it('cannot mark itself as paying or give itself free days', async () => {
     expect(await refusal(FREE, `insert into public.team_plans (team_id, pays) select id, true from public.teams where created_by = $1`, [FREE])).toMatch(/permission denied/);
-    expect(await refusal(FREE, `select public.give_team_days('free@team.test', 30)`)).toMatch(/permission denied/);
     expect(await refusal(FREE, `select * from public.team_plans`)).toMatch(/permission denied/);
   });
 });
@@ -155,10 +154,10 @@ describe('a team that pays, or is in its free week with a card', () => {
 });
 
 describe('free days given by hand', () => {
+  // Only when the owner asks an agent for them (2026-11-21: "I can just query you when I need it").
   it('let a team invite until they end, and not a moment after', async () => {
     const team = await teamOf(GIVEN, 'Given days');
-    const id = (await db.query(`select public.give_team_days('Given@Team.test', 14) as id`)).rows[0] as { id: string };
-    expect(id.id).toBe(team);
+    await setPlan(team, `free_until = now() + interval '14 days'`);
     expect(await invite(GIVEN, team, 'a@team.test')).toBeNull();
     await setPlan(team, `free_until = now() - interval '1 second'`);
     expect(await invite(GIVEN, team, 'b@team.test')).toMatch(/needs Pro/);
@@ -166,20 +165,27 @@ describe('free days given by hand', () => {
     expect(await invite(GIVEN, team, 'b@team.test')).toBeNull();
   });
 
-  it('name nobody when no one with that email owns a team', async () => {
-    await expect(db.query(`select public.give_team_days('mate@team.test', 14)`)).rejects.toThrow(/owns a team/);
+  it('come from no function anyone can call', async () => {
+    expect((await db.query(`select 1 from pg_proc where proname like '%give_team%'`)).rows).toEqual([]);
   });
 });
 
+// Every trial needs a card (2026-11-21), so their two weeks are inviting and sharing, never free cloud hours (free_until).
 describe('teams let into multiplayer before this', () => {
-  it('keep team features until 2026-12-05, and a team never let in gets nothing', async () => {
-    expect((await planOf(earlyTeam))?.free_until?.toISOString()).toBe('2026-12-05T00:00:00.000Z');
+  it('keep inviting and sharing until 2026-12-05, with no free Pro, and a team never let in gets nothing', async () => {
+    expect(await planOf(earlyTeam)).toMatchObject({ pays: false, free_until: null, features_until: new Date('2026-12-05T00:00:00.000Z') });
+    expect(await invite(EARLY, earlyTeam, 'later@let-in.test')).toBeNull();
     expect(await planOf(outsiderTeam)).toBeUndefined();
   });
 
+  it('stop inviting once their two weeks end', async () => {
+    await setPlan(earlyTeam, `features_until = now() - interval '1 second'`);
+    expect(await invite(EARLY, earlyTeam, 'after@let-in.test')).toMatch(/needs Pro/);
+  });
+
   it('keep the later of two ends when the migration runs again', async () => {
-    await setPlan(earlyTeam, `free_until = timestamptz '2027-01-01 00:00:00+00'`);
+    await setPlan(earlyTeam, `features_until = timestamptz '2027-01-01 00:00:00+00'`);
     await db.exec(read([GATE]));
-    expect((await planOf(earlyTeam))?.free_until?.toISOString()).toBe('2027-01-01T00:00:00.000Z');
+    expect((await planOf(earlyTeam))?.features_until?.toISOString()).toBe('2027-01-01T00:00:00.000Z');
   });
 });
