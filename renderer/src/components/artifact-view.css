@@ -34,6 +34,19 @@
 /* The glyph, not its hit area, lines up with the content edge. */
 .av-top > .av-back { margin: 0 -4px 0 -6px; }
 .av-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+/* A name that renames takes clicks, so it cannot drag the window. */
+.av-top .av-name:is(.av-name-edit, .av-name-box) { -webkit-app-region: no-drag; }
+.av-name-edit {
+  height: 28px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: var(--radius);
+  background: none; font: inherit; text-align: left; cursor: text;
+}
+.av-name-edit:hover { background: var(--wash); }
+.av-name-box {
+  height: 28px; box-sizing: border-box; margin: 0 -6px; padding: 0 5px; max-width: 50vw;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg);
+  font: inherit; outline: none;
+}
+.av-name-box:focus { border-color: var(--underline); }
 /* Gives way before the name does. */
 .av-label { flex: 0 4 auto; min-width: 0; max-width: 60ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
 .av-versions { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }

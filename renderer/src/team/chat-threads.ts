@@ -79,6 +79,9 @@ export function clampThreadWidth(width: number, pane: number): number {
   return Math.round(Math.max(THREAD_WIDTH.min, Math.min(want, most)));
 }
 
+/** The pane's width as the panel reads it: any pane wider than the panel's widest beside the chat's narrowest draws the same. */
+export const paneForThread = (pane: number) => Math.min(pane, THREAD_WIDTH.max + THREAD_WIDTH.chat);
+
 /** Where the dragged width is kept, so the panel opens at it next time. */
 export const THREAD_WIDTH_KEY = 'zero.chatThreadWidth';
 
