@@ -25,8 +25,8 @@
 // row in the demo starts a real agent on an invented product, which is the
 // most convincing thing the demo can do.
 //
-// NOTHING IS DELETED HERE, EVER, and there is no version of this file that may
-// delete anything outside `HOMES` below.
+// NOTHING IS DELETED HERE, EVER: not even the demo homes, because one may be
+// open on a call (tests/the-demo-inbox-is-not-hers).
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -66,18 +66,6 @@ export function demoHomes(): string[] {
     .map((name) => path.join(HOMES, name))
     .filter((dir) => { try { return fs.statSync(dir).isDirectory(); } catch { return false; } })
     .sort();
-}
-
-/**
- * Delete every demo home. Only ever this /tmp folder: `HOMES` is not
- *  configurable, and that is on purpose. */
-export function clearDemoHomes(): { ok: boolean; error?: string } {
-  try {
-    fs.rmSync(HOMES, { recursive: true, force: true });
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: (err as Error)?.message ?? String(err) };
-  }
 }
 
 /**

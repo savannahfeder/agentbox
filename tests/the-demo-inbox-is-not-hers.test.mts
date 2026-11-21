@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  HOMES as DEMO_HOMES, clearDemoHomes, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
+  HOMES as DEMO_HOMES, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
 } from '../main/demo.mts';
 import { DEMO_ENV, DEMO_GROUP_POSTS, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, demoMessages, runningAsADemo } from '../shared/demo-world.mts';
 import { HOMES as FRESH_HOMES } from '../shared/fresh-user-home.mts';
@@ -65,12 +65,11 @@ describe('where a demo lives', () => {
     }
   });
 
-  it('clears only its own folder', () => {
-    aHome();
-    expect(fs.existsSync(DEMO_HOMES)).toBe(true);
-    expect(clearDemoHomes()).toEqual({ ok: true });
-    expect(fs.existsSync(DEMO_HOMES)).toBe(false);
-    made.length = 0;
+  // A demo copy may be open on a call while the suite runs on the same
+  // computer. Clearing the whole folder here wiped an open demo's store and
+  // left its inbox empty (2026-11-21), so nothing clears it any more.
+  it('offers nothing that deletes every demo home, so a test run cannot empty an open demo', async () => {
+    expect('clearDemoHomes' in (await import('../main/demo.mts'))).toBe(false);
   });
 });
 

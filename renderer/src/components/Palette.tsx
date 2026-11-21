@@ -390,9 +390,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'onboarding first run new user welcome intro setup start over from scratch install fresh',
       run: onFirstRun,
     },
-    // Offered only once "demo" is typed: on 2026-10-29 it was taken out of
-    // everybody's list as a test rig, and on 2026-11-21 it was asked for back
-    // for onboarding calls (tests/a-demo-copy-opens-from-command-k).
+    // Offered only once "demo" is typed, so it is not in everybody's list
+    // (tests/a-demo-copy-opens-from-command-k).
     ...(onDemo ? [{
       id: 'demo',
       label: 'Open a demo copy',
