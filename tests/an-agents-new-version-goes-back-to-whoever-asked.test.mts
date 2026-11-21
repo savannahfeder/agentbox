@@ -34,9 +34,16 @@ describe('the file that goes back', () => {
     expect(fileToSendBack(handed.slice(0, 1))).toBe(null);
   });
 
-  it('is nothing when the agent only made a file of its own, not a version of one it was handed', () => {
-    const own = [handed[0], line(2, { result: 'Wrote [notes.md](attachments/notes.md).' }, 'agent')];
-    expect(fileToSendBack(own)).toBe(null);
+  // Rerun: Lena's agent saved its answer as clinic-checkout-review.html, so the
+  // thread offered her no way to send it back to Sam.
+  it("is the agent's newest file of its own when it made no version of one it was handed", () => {
+    const own = [handed[0], line(2, { result: 'Wrote [sign-up-review.md](attachments/sign-up-review.md).' }, 'agent')];
+    expect(fileToSendBack(own)?.name).toBe('sign-up-review.md');
+  });
+
+  it('prefers a version of the handed file to a file of its own', () => {
+    const both = [...handed, line(3, { result: 'Also [notes.md](attachments/notes.md).' }, 'agent')];
+    expect(fileToSendBack(both)?.name).toBe('sign-up-screens-v2.md');
   });
 });
 

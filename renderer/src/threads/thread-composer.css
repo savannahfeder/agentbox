@@ -106,11 +106,11 @@
 .hc-tick { flex: 0 0 auto; display: grid; place-items: center; width: 16px; height: 16px; margin-top: 2px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); }
 .hc-tick svg { width: 12px; height: 12px; }
 .hc-row.off .hc-words { opacity: .45; }
-.hc-words { min-width: 0; font-size: 13.5px; line-height: 20px; }
+.hc-words { display: block; min-width: 0; font-size: 13.5px; line-height: 20px; }
 .hc-place { color: var(--text-faint); margin-right: 6px; overflow-wrap: anywhere; }
 .hc-text { overflow-wrap: anywhere; }
-.hc-replies { margin-left: 6px; color: var(--text-faint); }
-.hc-replies::before { content: '\00b7'; margin-right: 6px; }
+.hc-reply { display: flex; align-items: flex-start; gap: 7px; margin-top: 4px; color: var(--text-dim); }
+.hc-reply .tm-av { flex: 0 0 auto; margin-top: 2px; }
 .tc-note { padding: 0 18px 10px; font-size: 13px; line-height: 19px; color: var(--text-dim); }
 /* THE NOTE'S OWN ACTION IS A WORD IN ITS SENTENCE, NOT A CONTROL ON THE BAR.
    Unstyled, a <button> in here draws as the browser's white slab, which in a

@@ -45,7 +45,7 @@ export function HandedComments({ comments, leftOut, onLeftOut, nameOf }: {
               <span className="hc-words">
                 {c.place && <span className="hc-place">{c.quote ? `“${c.place}”` : c.place}</span>}
                 <span className="hc-text">{c.text}</span>
-                {c.replies.length > 0 && <span className="hc-replies">{c.replies.length === 1 ? '1 reply' : `${c.replies.length} replies`}</span>}
+                {c.replies.map((r, i) => <span key={i} className="hc-reply">{face(r.by, r.mine)}<span>{r.text}</span></span>)}
               </span>
             </button>
           </li>;

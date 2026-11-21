@@ -124,6 +124,13 @@ describe('every way to an agent carries them', () => {
     expect(big).toMatch(/onHandToAgent=\{withAgent \? undefined : \(files\) => \{ onClose\(\);/);
     expect(app).toMatch(/srcPath: f\.startsWith\('\/'\) \|\| !dir \? f : `\$\{dir\}\/\$\{f\}`/);
   });
+  // Rerun: a teammate's reply under a comment showed only as "1 reply", so
+  // Sam's words were hidden in the list of what the agent gets.
+  it("the card shows each reply's words and face under its comment", () => {
+    const list = fs.readFileSync(new URL('../renderer/src/threads/HandedComments.tsx', import.meta.url), 'utf8');
+    expect(list).toMatch(/c\.replies\.map\(\(r, i\) => <span key=\{i\} className="hc-reply">\{face\(r\.by, r\.mine\)\}<span>\{r\.text\}<\/span><\/span>\)/);
+    expect(list).not.toContain('1 reply');
+  });
   it('the card shows them and sends the ticked ones', () => {
     expect(card).toContain('<HandedComments');
     expect(card).toMatch(/withComments\(/);
