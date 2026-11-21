@@ -681,7 +681,8 @@ export default function App() {
     const onMove = (e: MouseEvent) => {
       const el = (e.target as HTMLElement | null)?.closest?.('[data-hint]') as HTMLElement | null;
       const id = el?.dataset.hint;
-      if (!el || !id || !HINTS[id]) { setPointedHint((was) => (was ? null : was)); return; }
+      // A button whose menu is open says nothing: the hint would sit on the menu's first row.
+      if (!el || !id || !HINTS[id] || el.getAttribute('aria-expanded') === 'true') { setPointedHint((was) => (was ? null : was)); return; }
       setPointedHint((was) => (was && was.el === el ? was : { id, el }));
     };
     const onOut = (e: MouseEvent) => { if (!e.relatedTarget) setPointedHint(null); };
@@ -722,9 +723,10 @@ export default function App() {
     // re-rendered away by an agent finishing, with no key pressed and nothing
     // scrolled, so the last guard watches the document rather than the input.
     const watch = new MutationObserver(() => {
-      if (!shownHint.el.isConnected) drop();
+      if (!shownHint.el.isConnected || shownHint.el.getAttribute('aria-expanded') === 'true') drop();
     });
     watch.observe(document.body, { childList: true, subtree: true });
+    watch.observe(shownHint.el, { attributes: true, attributeFilter: ['aria-expanded'] });
     return () => {
       window.removeEventListener('scroll', drop, true);
       window.removeEventListener('resize', drop);
