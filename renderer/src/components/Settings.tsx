@@ -52,6 +52,7 @@ import { runningFigures, type GateReading } from '../running-reading';
 import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
 import { accountName } from '../../../shared/account-names.mts';
+import { USAGE_UNREADABLE } from '../../../shared/usage.mts';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
 import { MatchMark } from './MatchMark';
@@ -588,7 +589,8 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
     // now, so the tile with it is the account and the others offer the switch.
     // The supervisor names one Codex login as the one that runs even before it is signed in.
     inUse: !!h?.chosen && !signingIn,
-    limits: a.limits, checkedAt: a.checkedAt, usageError: a.usageError,
+    // An empty usage read says nothing about the plan of a login that is signed in with no trouble.
+    limits: a.limits, checkedAt: a.checkedAt, usageError: a.usageError === USAGE_UNREADABLE && h?.signedIn && !h.trouble ? null : a.usageError,
     use: h?.signedIn && !h.chosen && many ? { word: 'Switch', onUse: () => onUse(h.profile) } : null,
     trouble,
     cmd: trouble && h?.dir ? `CLAUDE_CONFIG_DIR=${h.dir} claude` : null,
