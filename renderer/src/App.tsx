@@ -8714,6 +8714,7 @@ export default function App() {
                   codexModels={codexModels}
                   codexModelDefault={codexModelDefault}
                   engines={snap.engines?.choices}
+                  outOfUsage={snap.supervisor.outOfUsage}
                   items={items}
                   onReplySend={(text, priority, repeat, sent, mode, pick, sendAt) => {
                     // THE REPLY GOES WHERE THE ROW ACTUALLY LIVES. On an agent
@@ -8996,6 +8997,7 @@ export default function App() {
           items={items}
           engines={snap.engines?.choices}
           workspaceEngine={snap.engines?.workspace}
+          outOfUsage={snap.supervisor.outOfUsage}
           codexModels={codexModels}
           codexModelDefault={codexModelDefault}
           // THE TUTORIAL SENDS ITS TASK INTO THE PRACTICE PROJECT, so the card

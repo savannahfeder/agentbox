@@ -981,6 +981,8 @@ const SAID_WHY_NOT_STARTED = new Set(['setup', 'asleep', 'cloud-carried', 'engin
 const NEVER_CLEARS = new Set(['model', 'project', 'practice', 'folder']);
 // Making a thread's folder takes seconds; past this it is said to be slow.
 const SLOW_FOLDER_MS = 2 * 60_000;
+// `toolsOutOfUsage` reads each Codex login's session log, and every snapshot asks.
+const TOOLS_OUT_READ_MS = 15_000;
 // A project's kit for a new thread from the phone: left again at most this
 // often, and once main has moved, looked for at most this often
 // (Supervisor#_leaveNewThreadKit).
@@ -1402,6 +1404,7 @@ export class Supervisor {
   declare _sleeps: { from: number; to: number | null }[] | undefined;
   declare _spawnCooldownUntil: number | undefined;
   declare _limitTries: Map<string, RunState> | undefined;
+  declare _toolsOutRead: { at: number; value: Record<string, { tool: string; until: number }> } | undefined;
   declare _fastExits: number | undefined;
   declare _fleetTroubleSince: number | undefined;
   declare _lastFastExit: { at: number; cause: string; raw: string } | null | undefined;
@@ -8886,6 +8889,8 @@ export class Supervisor {
       atLimit = this._waitingOnLimit(allThreads()
         .filter((i) => mayRunHere(i, productBySlug.get(i.product), me as string | null)));
     } catch {}
+    let outOfUsage: Record<string, { tool: string; until: number }> = {};
+    try { outOfUsage = this.toolsOutOfUsage(); } catch {}
     // QUEUED, BUT NOTHING WILL START IT UNTIL SOMETHING CHANGES, by id, with
     // the reason the last pass gave. Only the reasons no other line explains:
     // a full fleet is what Queued means, and held, folder and model rows
@@ -8954,6 +8959,8 @@ export class Supervisor {
       // above, for the same reason: "Queued" over a Codex task while Codex
       // had no slot until the reset (found by the pre-deploy breaker).
       atLimit,
+      // The same, by tool, for the task box to say before anything is sent.
+      outOfUsage,
       cannotStart,
       whyNotCloud,
       running: this.runsGoing().map((s) => ({
@@ -9223,6 +9230,33 @@ export class Supervisor {
       if (until !== null) out[i.id] = { tool: engineLabel(engine), until };
     }
     return out;
+  }
+
+  /**
+   * Each tool whose work account is out of usage, engine -> { tool, until },
+   * before anything has been sent to it: a refusal it filed, or its own
+   * reading at a hundred. `until` is 0 when the refusal named no time.
+   */
+  toolsOutOfUsage(now = Date.now()) {
+    const kept = this._toolsOutRead;
+    if (kept && now - kept.at < TOOLS_OUT_READ_MS) return kept.value;
+    const value: Record<string, { tool: string; until: number }> = {};
+    for (const engine of [DEFAULT_ENGINE, 'codex']) {
+      const profiles = this._profilesFor(engine);
+      if (!profiles.length) continue;
+      const read = engine === 'codex' ? this._codexBackAt(profiles, now) : null;
+      const backs = profiles.map((p) => {
+        const key = this._accountKey(engine, p);
+        const named = this._namedLimitReset(key, now);
+        if (named) return named;
+        const fromReading = read ? read.get(key) ?? null : this._limitedUntil(p, now);
+        if (fromReading) return fromReading;
+        return this._profileTrouble?.[key]?.cause === 'at-limit' && this._profileResting(key) ? 0 : null;
+      });
+      if (backs.every((b) => b !== null)) value[engine] = { tool: engineLabel(engine), until: Math.min(...backs as number[]) };
+    }
+    this._toolsOutRead = { at: now, value };
+    return value;
   }
 
   /** When each Codex login's own reading says its spent window comes back, by account key. */
