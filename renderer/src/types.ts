@@ -396,6 +396,8 @@ export interface FilesPlaceView {
   project: string | null;
   name: string;
   title?: string;
+  /** The project folder it lives in, for a file no thread was sent. */
+  product?: string;
   /** Its newest version is on its way back from the cloud. */
   coming?: boolean;
   sentIn: FileSentIn[];

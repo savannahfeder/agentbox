@@ -1107,7 +1107,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     async newDocument({ project, name = '', kind = 'document', folder = null, by = team?.state?.().me?.id ?? null }: { project: string; name?: string; kind?: string; folder?: string | null; by?: string | null }) {
       const made = MADE[kind as MadeKind] as (typeof MADE)[MadeKind] | undefined;
       if (!made) throw new Error('New makes a document or a table');
-      // Named once it is open, from its own title, so New asks for nothing first.
+      // New asks for nothing first; the person renames it once it is open.
       const title = cleanFolderName(name) || made.untitled;
       const { home, into } = whereNew(project, folder);
       const stem = title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
@@ -1268,7 +1268,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       if (coming) void keeper!.bringBack(newest!.hash!);
       else if (newest?.hash && keeper) keeper.opened(newest.hash);
       const title = shelf().titleOf(key);
-      return { ...viewOf(seen.file, seen.opened), ...(title ? { title } : {}), ...(coming ? { coming: true } : {}) };
+      // A file made in Files is sent in no thread, so only this says where a table saves.
+      const home = seen.file.project ? store.listProducts().find((p) => !p.team?.direct && projectKey(p.name) === projectKey(seen.file.project)) : null;
+      return { ...viewOf(seen.file, seen.opened), ...(home ? { product: home.slug } : {}), ...(title ? { title } : {}), ...(coming ? { coming: true } : {}) };
     },
 
     /**

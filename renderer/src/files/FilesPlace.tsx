@@ -381,7 +381,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice }: {
     const off = api.onChanged(read);
     return () => { live = false; off?.(); };
   }, [fileKey]);
-  const product = view?.sentIn[0]?.product ?? '';
+  const product = view?.sentIn[0]?.product ?? view?.product ?? '';
   const editsTo = view?.editsTo ?? null;
   const below = !!view?.sentIn.length && <footer className="fp-sent">
     <span className="fp-sent-label">Sent in</span>

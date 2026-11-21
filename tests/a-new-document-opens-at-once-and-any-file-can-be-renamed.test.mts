@@ -19,6 +19,7 @@ import { Store } from '../main/store.mts';
 import { appFilesPlace } from '../main/files-place.mts';
 import { foldFolders } from '../shared/file-folders.mts';
 import { shownName } from '../renderer/src/files/files-shown.ts';
+import { canWrite } from '../main/doc-file.mts';
 
 let store; let place; let dir; let accountRoot; let storeRoot;
 
@@ -64,6 +65,29 @@ describe('New', () => {
   it('shows a name it was given as typed, not as its name on disk', async () => {
     await place.newDocument({ project: 'Company', name: 'Launch plan' });
     expect((await listed())[0]).toMatchObject({ name: 'launch-plan.md', title: 'Launch plan' });
+  });
+});
+
+// Both synthetic testers on 2026-11-21: New, Table, New row said "That file is
+// outside this project, so nothing was saved". A file made in Files is sent in
+// no thread, so the view had no project for the table to save in.
+describe('a file made in Files, opened', () => {
+  it('names its project, so a table can save its rows there', async () => {
+    const out = await place.newDocument({ project: 'Company', kind: 'table' });
+    const view = await place.open(out.key);
+    expect(view.sentIn).toEqual([]);
+    expect(view.product).toBe('company');
+    const prod = store.listProducts().find((p) => p.slug === view.product);
+    const [file] = await listed();
+    expect(canWrite({ file: file.opened, product: prod })).toEqual({ ok: true });
+  });
+
+  it('names no project for a file that is not in one of yours', async () => {
+    const out = await place.newDocument({ project: 'Company' });
+    fs.rmSync(path.join(dir, 'project.json'));
+    store = await new Store({ storeRoot, accountId: 'a', accountRoot, products: [] }).init();
+    place = appFilesPlace({ store, accountRoot, storeRoot });
+    expect((await place.open(out.key))?.product).toBeUndefined();
   });
 });
 
