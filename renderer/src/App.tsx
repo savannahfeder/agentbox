@@ -71,7 +71,7 @@ import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
 import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
-import { SEE_SAID, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
+import { HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
 import { ImportAgents } from './components/ImportAgents';
@@ -268,7 +268,7 @@ import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
 import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
-import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
+import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, taskHandedFrom, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
 import { usePointerHold, useHeldOrder } from './threads/steady-rows';
@@ -8515,6 +8515,8 @@ export default function App() {
                   headerTarget={focused ? null : teamHeader} cornerTarget={focused ? null : teamCorner}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
+                  handedToYou={taskHandedFrom(items, openCard.threadId, openCard.personId) as WorkItem | null}
+                  onOpenTask={(t) => { setOpenCard(null); setTeamOpen(false); setFocused(t); markSeen(t); }}
                   onHandBack={(verdict, words) => {
                     const task = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;
                     return task ? handAskBack(task, verdict, words) : Promise.resolve(false);
@@ -9301,6 +9303,15 @@ export default function App() {
           // The same row the hint and the keys are on, so ⌘K opened over a
           // row cannot mean a different task than E pressed over it.
           // A phone draws no pointed row, so only the open thread.
+          // A teammate's thread has no row of its own: its commands answer the ask on it.
+          if (!focused && openCard && teamShown) {
+            const ask = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;
+            const owner = firstName(team?.byId.get(openCard.personId) ?? null) || 'them';
+            return threadCommands({ answers: askAnswers(ask?.ask?.kind, owner) }).map((c) => ({
+              id: c.id, label: c.label, keywords: c.keywords,
+              run: () => { setModal(null); if (c.does.act === 'hand-back') window.dispatchEvent(new CustomEvent(HAND_BACK_EVENT, { detail: c.does.verdict })); },
+            }));
+          }
           const target = focused ?? (onPhone() ? null : pointed);
           if (!target) return [];
           const options = itemOptions(target);

@@ -69,3 +69,12 @@ describe('the page', () => {
     expect(HAND_BACK_EVENT).toBe('zero:hand-back');
   });
 });
+
+describe('the window wires it', () => {
+  const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  it('offers the answers on a teammate\'s open thread, and the page opens the task a hand-over made', () => {
+    expect(app).toContain('return threadCommands({ answers: askAnswers(ask?.ask?.kind, owner) })');
+    expect(app).toContain('window.dispatchEvent(new CustomEvent(HAND_BACK_EVENT, { detail: c.does.verdict }))');
+    expect(app).toContain('handedToYou={taskHandedFrom(items, openCard.threadId, openCard.personId) as WorkItem | null}');
+  });
+});
