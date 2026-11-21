@@ -51,6 +51,7 @@ import { attachProblem, fromPaste, persistAttachments, useAttaching, type Pendin
 import { AttachRow } from '../components/AttachRow';
 import { HandedComments } from './HandedComments';
 import { withComments, type HandedComment } from './comments-to-hand';
+import { rememberHanded } from './send-back';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
 import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { cardPick, clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
@@ -697,6 +698,7 @@ export function ThreadComposer({
           ...(scripted ? { labels: scripted.labels } : {}),
         });
         dropComposeDraft(taken, undefined, place);
+        if (made?.id && !person) rememberHanded(product.slug, made.id, comments.filter((c) => !leftOut.has(c.id)).map((c) => c.id));
         if (initial?.continueFrom) void api.teamContinued(initial.continueFrom);
         // The person who handed it over can follow the work to where it went (round two of the team test).
         const startedAt = initial?.handFrom && made?.id && team?.me ? threadLink(team.me, made.id) : null;

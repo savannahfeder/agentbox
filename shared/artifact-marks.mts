@@ -1114,7 +1114,7 @@ export const stillWaiting = (note: Pick<FileNote, 'wait' | 'toAgent' | 'sent'> |
  * teammate's next version. A reopen after that version keeps it open.
  * Returns `[{ on, in }]`, the comment and the version.
  */
-export function answeredNotes(lines: readonly ThreadLine[] | null | undefined, { people = [] }: { people?: readonly NotePerson[] } = {}): Array<{ on: string; in: string }> {
+export function answeredNotes(lines: readonly ThreadLine[] | null | undefined, { people = [], owner = null }: { people?: readonly NotePerson[]; owner?: string | null } = {}): Array<{ on: string; in: string }> {
   const entries: MarkEntry[] = [];
   const sentAt = new Map<string, number>();
   const settledAt = new Map<string, number>();
@@ -1136,7 +1136,8 @@ export function answeredNotes(lines: readonly ThreadLine[] | null | undefined, {
     let answer = sentAt.has(n.id) ? later.find((v) => typeof v.agent === 'string' && v.at > sentAt.get(n.id)!) : undefined;
     if (!answer) {
       const goes = noteGoesTo(n, people);
-      if (goes.to === 'person') answer = later.find((v) => v.by === goes.person && v.at > n.ts);
+      // A version nobody signed on the owner's thread is their agent's, so theirs.
+      if (goes.to === 'person') answer = later.find((v) => (v.by ?? (typeof v.agent === 'string' ? owner : null)) === goes.person && v.at > n.ts);
     }
     if (!answer || (settledAt.get(n.id) ?? -Infinity) >= answer.at) continue;
     out.push({ on: n.id, in: answer.id });

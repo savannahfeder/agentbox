@@ -61,6 +61,15 @@ describe('which comments a newer version answered', () => {
     expect(answeredNotes([...base, said(5, 'Done: designs/w/plan-v2.md')], { people })).toEqual([]);
   });
 
+  // Seen 2026-11-21: Priya's note to Theo on his thread stayed open after his
+  // own agent saved the wording she asked for. On his thread, his agent's version is his.
+  it("a comment to the thread's owner is answered by their own agent's next version", () => {
+    const base = [said(1, 'Here: designs/w/plan.md'), note(2, 'n1', 'Sofia, can you fix the dates?')];
+    expect(answeredNotes([...base, said(5, 'Done: designs/w/plan-v2.md')], { people, owner: SOFIA })).toEqual([{ on: 'n1', in: 'plan-v2.md' }]);
+    expect(answeredNotes([...base, said(5, 'Done: designs/w/plan-v2.md')], { people, owner: MAYA })).toEqual([]);
+    expect(answeredNotes([...base, said(1.5, 'Also designs/w/plan-v2.md')], { people, owner: SOFIA })).toEqual([]);
+  });
+
   it('a comment reopened after the version stays open; one reopened before it does not', () => {
     const lines = [said(1, 'Here: designs/w/plan.md'), note(2, 'n1', 'Shorter intro'), mark(3, { do: 'sent', on: ['n1'] }), said(4, 'Done: designs/w/plan-v2.md')];
     expect(answeredNotes([...lines, mark(5, { do: 'resolve', on: 'n1', in: 'plan-v2.md' }), mark(6, { do: 'reopen', on: 'n1' })], { people })).toEqual([]);

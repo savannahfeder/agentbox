@@ -141,6 +141,7 @@ import { useKeepInWindow } from '../keep-in-window';
 import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
+import { SendBack } from '../team/SendBack';
 import { HandedLine } from '../team/HandedBy';
 import { askAboutStep } from '../team/AsksLine';
 import {
@@ -2634,6 +2635,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
           {!stripShown && <TeamRouteStrip item={item} onHandToAgent={onHandToAgent} items={items} onOpenItem={onOpenItem} />}
+          {/* An agent thread started from a teammate's work: its new version goes back to them. */}
+          <SendBack item={item} items={items ?? []} />
           {/* THE OPTIONS ARE NOT DOWN HERE ANY MORE, EXCEPT IN FULL SCREEN
               (w-560647d4db). They are drawn in the pane, at the foot of the turn
               that offered them, and the note at that call site says why.

@@ -37,7 +37,7 @@ export function resolveAnsweredNotes({ store, people = [], now = Date.now(), ite
     if (direct.has(item.product)) continue;
     if (!(item.artifacts?.notes ?? []).some((n) => !n.resolved && (n.sent || people.length))) continue;
     const lines = readItemHistory(store.productDir(item.product), item.id, { max: Number.MAX_SAFE_INTEGER });
-    for (const a of answeredNotes(lines, { people })) {
+    for (const a of answeredNotes(lines, { people, owner: item.runner ?? item.createdBy ?? null })) {
       store.fileMark(item.product, item.id, { do: 'resolve', on: a.on, in: a.in });
       resolved++;
     }
