@@ -29,7 +29,8 @@ import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, File
 import { AskBar } from '../team/AskBar';
 import { DoneTrail, MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
 import { doneSteps } from '../../../shared/thread-cards.mts';
-import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
+import { askEndedWords, earlierWords, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
+import { HAND_BACK_EVENT, type AskVerdict } from '../thread-commands';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
 import { QueueAnswer, QueueSummary } from '../components/OneThingAtATime';
@@ -42,7 +43,7 @@ const THREAD_PLUGINS = [remarkGfm];
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
-export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack, headerTarget = null, cornerTarget = null }: {
+export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack, handedToYou = null, onOpenTask, headerTarget = null, cornerTarget = null }: {
   card: ThreadCard; person: Person | null; now: number;
   /** The window's header, where an opened thread's crumb and buttons go. */
   headerTarget?: HTMLElement | null;
@@ -50,6 +51,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   /** Their open ask of you on this thread: help puts your words to their agent. */
   ask?: WorkItem | null;
   onHandBack?: (verdict: 'done' | 'yes' | 'changes', words: string) => Promise<boolean>;
+  /** The task this thread became when its owner handed it to you, which the page links to. */
+  handedToYou?: WorkItem | null;
+  onOpenTask?: (task: WorkItem) => void;
   /** Carry it on in a thread of your own. */
   onContinue?: () => void;
   /** Where the back button goes: Threads, or the group it was opened from. */
@@ -124,8 +128,38 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
   const helpingNow = ask?.ask?.kind === 'help';
-  const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run')
-    .map((e: AgentEvent) => (helpingNow && 'says' in e && e.says === 'comment' && (e as { by?: string }).by === team?.me ? { ...e, says: 'to-agent' as const } : e));
+  const events = shownOnTheirThread(built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run'), { me: team?.me ?? null, helping: helpingNow, owner: firstName(person) || '' });
+
+  // An ask that ends while the page is open is said on the page, unless you handed it back yourself.
+  const lastAsk = useRef<WorkItem | null>(null);
+  const handedBack = useRef(false);
+  const [ended, setEnded] = useState<{ note: string } | null>(null);
+  const askKey = ask ? `${ask.product}/${ask.id}` : null;
+  useEffect(() => { lastAsk.current = null; setEnded(null); }, [personId, threadId]);
+  useEffect(() => {
+    const was = lastAsk.current;
+    lastAsk.current = ask;
+    if (ask) { handedBack.current = false; setEnded(null); return; }
+    if (was && !handedBack.current) setEnded({ note: String(was.ask?.note ?? '').trim() });
+  }, [askKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const handBack = useCallback(async (verdict: AskVerdict, words: string) => {
+    if (!onHandBack) return false;
+    handedBack.current = true;
+    const ok = await onHandBack(verdict, words);
+    if (!ok) handedBack.current = false;
+    return ok;
+  }, [onHandBack]);
+  // The command bar's answers (thread-commands.ts); changes need words, which the ask's own box takes.
+  useEffect(() => {
+    if (!ask || !onHandBack) return undefined;
+    const press = (e: Event) => {
+      const verdict = (e as CustomEvent<AskVerdict>).detail;
+      if (verdict === 'changes') { onNotice('Write what to change in the box under the ask, then send it.'); return; }
+      void handBack(verdict, '');
+    };
+    window.addEventListener(HAND_BACK_EVENT, press);
+    return () => window.removeEventListener(HAND_BACK_EVENT, press);
+  }, [ask, onHandBack, handBack, onNotice]);
 
   // Their copy publishes its marks with its messages; everyone's come together here.
   const own = useMemo(() => marksOf((work?.lines ?? [])
@@ -194,7 +228,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const acts = (
     <div className="tp-acts">
-      {following && card.state !== 'done' && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
+      {following && card.state !== 'done' && !ask && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
         onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
         {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
       </button>}
@@ -298,7 +332,13 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             </FileMarkOpener.Provider>}
             {newest && <QueueAnswer text={options.length ? stripOptionsSection(newest.text) : newest.text} md={md} name={title} />}
             {/* The ask is the newest thing said here, so it comes last, as a message. */}
-            {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={onHandBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+            {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={handBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+            {(handedToYou || (ended && !ask)) && <p className="th-work-note tp-ask-ended">
+              {askEndedWords(firstName(person) || 'Someone', !!handedToYou)}
+              {/* The ask's own words leave with it, so what was asked stays said here. */}
+              {!handedToYou && ended?.note && <q className="tp-ask-was">{ended.note.length > 160 ? `${ended.note.slice(0, 160)}…` : ended.note}</q>}
+              {handedToYou && onOpenTask && <button type="button" onClick={() => onOpenTask(handedToYou)}>Open your task</button>}
+            </p>}
           </div>
         </div>
       </div>

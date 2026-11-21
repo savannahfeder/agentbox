@@ -40,7 +40,7 @@ export function PeoplePanel({ room, onPerson, threadOf }: {
       const agents = c.agents ? <span className="gr-ag"><LiveMark /><span>{c.agents} {c.agents === 1 ? 'agent' : 'agents'}</span></span> : null;
       const openThread = threadOf?.(c) ?? null;
       if (openThread) return <div key={c.id} className="gr-prow gr-split">
-        <button type="button" className="gr-plink" title={toPage} onClick={() => onPerson(c.id)}><Face name={c.name} url={c.avatarUrl} size={32} /></button>
+        <button type="button" className="gr-plink" title={toPage} onClick={() => onPerson(c.id)}><Face name={c.name} url={c.avatarUrl} size={28} /></button>
         <span className="gr-pw">
           <button type="button" className="gr-l1 gr-plink" title={toPage} onClick={() => onPerson(c.id)}>{name}</button>
           <button type="button" className="gr-l2 rm-one gr-plink" title="Open this thread" onClick={openThread}>{onWords(c)}</button>
@@ -48,7 +48,7 @@ export function PeoplePanel({ room, onPerson, threadOf }: {
         {agents}
       </div>;
       return <button type="button" key={c.id} className="gr-prow" title={toPage} onClick={() => onPerson(c.id)}>
-        <Face name={c.name} url={c.avatarUrl} size={32} />
+        <Face name={c.name} url={c.avatarUrl} size={28} />
         <span className="gr-pw">
           <span className="gr-l1">{name}</span>
           {onWords(c) && <span className={`gr-l2 rm-one${c.agents ? '' : ' idle'}`}>{onWords(c)}</span>}

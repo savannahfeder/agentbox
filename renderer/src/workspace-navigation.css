@@ -138,16 +138,10 @@
 .has-count .workspace-running { margin-left: auto; min-width: 20px; text-align: right; }
 .workspace-collapsed .workspace-running { display: none; }
 @media(max-width:700px) { .workspace-running { display: none; } }
-/* SEARCH, ABOVE THE TABS (w-5988eed6f3). A line under it rather than a box,
-   inset to the glass and the keys so it is no wider than what it underlines,
-   and fainter than any divider: at full width and --line it read as too long
-   and too loud. */
+/* SEARCH, ABOVE THE TABS (w-5988eed6f3): a row like the ones under it, with
+   no line of its own under it. */
 .workspace-find { margin: 0 0 14px; }
-.workspace-navigation .workspace-find button { position: relative; width: 100%; height: 32px; border-radius: 0; color: var(--text-faint); }
-.workspace-navigation .workspace-find button:hover { background: none; color: var(--text); }
-.workspace-find button::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 1px; background: var(--line); opacity: .55; transition: opacity .14s; }
-.workspace-find button:hover::after { opacity: 1; }
-.workspace-collapsed .workspace-find button::after { opacity: 0; }
+.workspace-navigation .workspace-find button { width: 100%; height: 32px; color: var(--text-faint); }
 .workspace-keys { margin-left: auto; font-size: 12px; letter-spacing: .02em; color: var(--text-faint); opacity: .7; transition: opacity .14s .08s; }
 .workspace-collapsed .workspace-keys { opacity: 0; transition: opacity .06s; }
 @media(max-width:700px) { .workspace-keys { display: none; } }
@@ -724,17 +718,17 @@
 }
 [data-preview-treatment="overlay"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {
  position:absolute; bottom:7px; right:10px; margin:0; padding:3px 6px;
- background:var(--surface); opacity:0; pointer-events:none; transition:opacity 140ms ease;
+ background:var(--surface); opacity:0; pointer-events:none;
 }
 [data-preview-treatment="preview-only"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {
  position:absolute; bottom:0; left:0; right:0; margin:0; padding:10px 14px;
  background:var(--surface); border-top:1px solid var(--line);
- opacity:0; pointer-events:none; transition:opacity 140ms ease;
+ opacity:0; pointer-events:none;
 }
 [data-preview-treatment="preview-only"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions {
  position:absolute; top:10px; right:10px; margin:0; padding:6px 10px; gap:14px;
  background:var(--surface); border:1px solid var(--line); border-radius:4px;
- box-shadow:0 2px 8px #0002; opacity:0; pointer-events:none; transition:opacity 140ms ease;
+ box-shadow:0 2px 8px #0002; opacity:0; pointer-events:none;
 }
 :is([data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-card:hover .artifact-entry-actions,
 :is([data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-card:focus-within .artifact-entry-actions,
@@ -743,9 +737,6 @@
 @media (hover:none) {
  :is([data-preview-treatment="overlay"], [data-preview-treatment="preview-only"]) .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-actions,
  [data-preview-treatment="preview-only"] .artifact-entry-card:has(.artifact-thumbnail) .artifact-entry-summary {opacity:1; pointer-events:auto;}
-}
-@media (prefers-reduced-motion:reduce) {
- .artifact-entry-card .artifact-entry-actions, .artifact-entry-card .artifact-entry-summary {transition:none !important;}
 }
 [data-preview-treatment="caption"] .artifact-entry-card:has(.artifact-thumbnail) {display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:110px auto; gap:0 16px;}
 [data-preview-treatment="caption"] .artifact-entry-card .artifact-thumbnail {grid-column:1 / 3; grid-row:1;}
@@ -820,7 +811,6 @@
  position:absolute; z-index:5; opacity:0; pointer-events:none;
  background:var(--skin-solid,var(--surface)); border:1px solid var(--line);
  box-shadow:0 3px 14px #0002; min-height:38px; padding:6px 10px;
- transition:opacity 140ms ease,transform 140ms ease;
 }
 .workspace-layout[data-design-toolbar="floating"][data-artifact-layout="beside"] .doc-html .doc-head {
  top:10px; left:10px; right:10px; border-radius:6px; transform:translateY(-4px);
@@ -848,9 +838,6 @@
 
 @media (hover:none) {
  .workspace-layout[data-design-toolbar][data-artifact-layout="beside"] .doc-html .doc-head { opacity:1; pointer-events:auto; transform:none; }
-}
-@media (prefers-reduced-motion:reduce) {
- .workspace-layout[data-design-toolbar] .doc-html .doc-head { transition:none; }
 }
 
 /* The attachment stays in the conversation; selection identifies its viewer. */
@@ -1102,7 +1089,7 @@ html:root[data-glass][data-theme="light"] .app.workspace-layout { background: tr
 :root[data-skin="ember-grid"] .workspace-navigation .workspace-tab.active {
   background: rgba(40, 38, 37, .7); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); font-weight: 400;
 }
-:root[data-skin="ember-grid"] .workspace-running { color: var(--accent); }
+:root[data-skin="ember-grid"] .workspace-running { color: var(--text-dim); }
 
 /* EMBER'S ACCENTS, ON EVERY THEME (w-3fc39983be, approved on five themes
    drawn this way). Ember's type goes on the small right-side details, such as

@@ -61,15 +61,15 @@ describe('a teammate’s card', () => {
   // state ("Waiting on Maya") heads the page (TeammateStanding) instead.
   it('is exactly the summary’s fields: context first, then done, the links, then the properties', () => {
     const words = text(draw(React.createElement(TeammateCard, { card, person: maya })));
-    expect(words).toBe('About Acme’s contract ends on the 14th. Done Terms are drafted at 8% over last year. Blocked by Sign in with Google Blocks A thread you cannot see Owner Ma Maya Chen Priority High Project Northwind Who sees it The team');
+    expect(words).toBe('About Acme’s contract ends on the 14th. Done Terms are drafted at 8% over last year. Blocked by Sign in with Google Blocks A thread you cannot see Owner MC Maya Chen Priority High Project Northwind Who sees it The team');
   });
   it('shows nothing of a private thread but that it is private, whose it is and its state', () => {
     const words = text(draw(React.createElement(TeammateCard, { card: { ...card, visible: false, title: null, project: null, problem: null, progress: null, solution: null, blockedBy: [], blocks: [] }, person: maya })));
-    expect(words).toBe('Private thread Ma Maya Chen Waiting');
+    expect(words).toBe('Private thread MC Maya Chen Waiting');
   });
   it('offers a square button with their face and the words Message and their first name', () => {
     const html = draw(React.createElement(MessagePerson, { person: maya, onMessage: () => {} }));
-    expect(text(html)).toBe('Ma Message Maya');
+    expect(text(html)).toBe('MC Message Maya');
     expect(html).toContain('ts-msgbtn');
   });
 });

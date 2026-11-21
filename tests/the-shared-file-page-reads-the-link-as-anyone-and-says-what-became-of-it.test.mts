@@ -91,8 +91,8 @@ describe('the words on the page', () => {
     expect(saidOf(new Error('sign in to comment'))).toBe('Sign in to comment.');
     expect(saidOf(new TypeError('Failed to fetch'))).toBe('That did not go through. Try again.');
   });
-  it('draw a face from the first letter of a name', () => {
-    expect(initialOf('maya chen')).toBe('M');
+  it('draw a face from the first letters of the first and last name', () => {
+    expect(initialOf('maya chen')).toBe('MC');
     expect(initialOf('  ')).toBe('?');
   });
 });
