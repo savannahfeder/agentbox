@@ -646,7 +646,9 @@ export class Store {
     if (typeof putAway === 'boolean') item = workItemsDisk.updateWorkItem(dir, id, { putAway }, { source: 'founder' });
     // A reply or a close here takes a chat back from where it started: the run
     // a reply starts is refused a row somebody else holds (main/chat-follow.mts).
-    if ((answer && answer !== '(withdrawn)') || status) item = this.letGoOfChat(slug, id) ?? item;
+    if ((answer && answer !== '(withdrawn)') || status) {
+      try { item = this.letGoOfChat(slug, id) ?? item; } catch (e) { console.warn(`zero: ${id} kept a terminal's hold: ${(e as Error)?.message ?? e}`); }
+    }
     return item;
   }
 
@@ -1990,7 +1992,7 @@ export class Store {
   chatsToFollow(now = Date.now()): FollowedChat[] {
     const shared = new Set(this.listProducts().filter((p) => isShared(p)).map((p) => p.slug));
     const out: FollowedChat[] = [];
-    for (const item of this.listAllWorkItems(now)) {
+    for (const item of this.listItems(now)) {
       const labels = item.labels ?? [];
       const thread = labels.includes(THREAD_LABEL) ? labels.find((l) => l.startsWith('thread:'))?.slice(7).trim() : '';
       const codex = isCodexMirrorRow(item) ? codexIdOf(item) : null;

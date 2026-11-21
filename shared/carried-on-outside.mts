@@ -13,8 +13,11 @@ export function carriedOnIn(holder: unknown): string | null {
   return WHERE[String(holder ?? '')] ?? null;
 }
 
-interface Held { claim?: { holder?: string | null } | null; claimExpired?: boolean }
+// `carriedOn` is the phone's copy of the same fact: its rows carry no claim
+// (shared/phone-snapshot.mts).
+interface Held { claim?: { holder?: string | null } | null; claimExpired?: boolean; carriedOn?: unknown }
 
 export function heldOutside(item: Held | null | undefined): boolean {
+  if (typeof item?.carriedOn === 'string' && item.carriedOn) return true;
   return !!item?.claim && !item.claimExpired && carriedOnIn(item.claim.holder) !== null;
 }
