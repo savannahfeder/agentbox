@@ -537,13 +537,13 @@ export function peopleInConversation(
   return { to: ids[0], also: ids.slice(1) };
 }
 
-/** Who the small menu on an agent thread offers. */
+/** Who the small menu on an agent thread offers. Nobody on a thread of your own, where Share is the one door to people. */
 export function peopleToAdd<P extends { id: string }>({ item, me, company }: {
-  item: { visibleTo?: string[] };
+  item: { visibleTo?: string[]; createdBy?: string | null };
   me: string | null;
   company: readonly P[];
 }): P[] {
-  if (!me) return [];
+  if (!me || (item.createdBy ?? me) === me) return [];
   const on = new Set(item.visibleTo ?? []);
   return company.filter((p) => p.id !== me && !on.has(p.id));
 }

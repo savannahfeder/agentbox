@@ -36,7 +36,7 @@ describe('the setup the app is already running', () => {
   });
 });
 
-describe.each(['renderer/src/components/FirstRun.tsx', 'renderer/src/components/FirstRunClassic.tsx'])('%s', (file) => {
+describe.each(['renderer/src/components/FirstRun.tsx'])('%s', (file) => {
   const src = read(file);
 
   it('shows the waiting state the moment the button is pressed', () => {

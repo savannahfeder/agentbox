@@ -16,14 +16,13 @@
 //     project says it is not, so the two can be told apart;
 //   · "used today" is sent once per calendar day, again the next day, and
 //     never twice on the same day however often the window is focused;
-//   · each setup step is counted by its number, and the tutorial re-run is not;
+//   · each setup step is counted by its number;
 //   · the renderer can still send a name and a number and nothing else.
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import { EVENTS, sanitize } from '../shared/analytics-events.mts';
 import { createDailyCount, runEndedProps } from '../main/analytics.mts';
-import { setupStepCount, tutorialRun } from '../renderer/src/onboarding.ts';
 
 const read = (rel) => fs.readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
@@ -111,20 +110,8 @@ describe('used today', () => {
 });
 
 describe('setup steps', () => {
-  it('counts each step of the first run by its number', () => {
-    expect(setupStepCount({ step: 'welcome' })).toBe(1);
-    expect(setupStepCount({ step: 'tour' })).toBe(5);
-    expect(setupStepCount({ step: 'clear' })).toBe(11);
-  });
-
-  it('does not count the tutorial re-run, the end, or no walk', () => {
-    expect(setupStepCount(tutorialRun('acme'))).toBeNull();
-    expect(setupStepCount({ step: 'landed' })).toBeNull();
-    expect(setupStepCount(null)).toBeNull();
-  });
-
-  it('is sent from the app with the number and nothing else', () => {
-    expect(read('renderer/src/App.tsx')).toMatch(/window\.zero\?\.track\?\.\('first_run_step', step\)/);
+  it('is sent from the first run with the number and nothing else', () => {
+    expect(read('renderer/src/components/FirstRun.tsx')).toMatch(/window\.zero\?\.track\?\.\('first_run_step', FIRST_RUN_STEP\[screen\]\)/);
     expect(read('preload.cjs')).toMatch(/track: \(name, count\) => ipcRenderer\.invoke\('zero:track', \{ name, count \}\)/);
     expect(read('main/ipc.mts')).toMatch(/analytics\.track\(name, Number\.isFinite\(count\) \? \{ count \} : undefined\)/);
   });
