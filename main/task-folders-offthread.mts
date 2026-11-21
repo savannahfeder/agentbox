@@ -35,13 +35,15 @@ import { noteThread } from './thread-heaps.mts';
 
 export type FolderJobName =
   | 'restoreTaskFolder' | 'releaseTaskFolder' | 'parkTaskFolder' | 'listTaskFolders'
-  | 'inventoryWorktrees' | 'strayWorktrees' | 'pruneMissingWorktrees';
+  | 'inventoryWorktrees' | 'strayWorktrees' | 'pruneMissingWorktrees'
+  | 'makeSpareFolder' | 'dropSpareFolder';
 
 const JOBS = new Set<string>([
   'restoreTaskFolder', 'releaseTaskFolder', 'parkTaskFolder', 'listTaskFolders',
   // Looking over every copy of the project, which is a `git worktree list` plus
   // a `stat` each and belongs on this thread for the same reason as the rest.
   'inventoryWorktrees', 'strayWorktrees', 'pruneMissingWorktrees',
+  'makeSpareFolder', 'dropSpareFolder',
 ]);
 
 export type FolderLaneName = 'start' | 'tidy';
@@ -86,12 +88,17 @@ interface Job {
 interface Lane { thread: FolderThread | null; current: Job | null; queue: Job[]; timer: ReturnType<typeof setTimeout> | null }
 
 const ONE_FOLDER = new Set<FolderJobName>(['restoreTaskFolder', 'parkTaskFolder', 'releaseTaskFolder']);
+const SPARE = new Set<FolderJobName>(['makeSpareFolder', 'dropSpareFolder']);
 
 // A prune drops registrations whose folder is missing, and a folder being made
-// is briefly missing while git moves it into place.
+// is briefly missing while git moves it into place. A new thread takes the
+// folder made ahead, so making or dropping that one waits for it, and it waits
+// for them: once it is made, it is taken whole.
 function clash(a: Job, b: Job): boolean {
   if (String(a.args[0]) !== String(b.args[0])) return false;
   if (a.name === 'pruneMissingWorktrees' || b.name === 'pruneMissingWorktrees') return true;
+  const takes = (j: Job) => SPARE.has(j.name) || j.name === 'restoreTaskFolder';
+  if (SPARE.has(a.name) || SPARE.has(b.name)) return takes(a) && takes(b);
   return ONE_FOLDER.has(a.name) && ONE_FOLDER.has(b.name) && String(a.args[1]) === String(b.args[1]);
 }
 

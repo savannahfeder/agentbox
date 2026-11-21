@@ -65,7 +65,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Name, nameSlug } from '../shared/product-name.mjs';
 import { insideGitFolder } from '../shared/project-folder-check.mts';
-import { carryLocalFiles, copyTree, folderChildDeadline, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
+import { carryLocalFiles, copyTree, folderChildDeadline, localFilesIn, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
 import { givePrivateFolder } from './private-folder.mts';
 import type { ExecFailure } from './worktree-include.mts';
 import { HOOK_FREE } from './hook-free-git.mts';
@@ -92,7 +92,7 @@ export interface TaskFolderTaken {
   path: string;
   branch: string;
   created: boolean;
-  how: 'clone' | 'checkout' | 'kept';
+  how: 'clone' | 'checkout' | 'kept' | 'spare';
 }
 
 /** A folder somebody else has, or that could not be given. */
@@ -316,6 +316,15 @@ export function buildingFolderPath(repoPath: string, id: unknown): string {
 }
 
 export function taskBranch(id: unknown): string { return `${BRANCH_PREFIX}${safeTaskName(id)}`; }
+
+/**
+ * Where the next thread's folder waits once made ahead (`makeSpareFolder`).
+ * Named as an unfinished build, so nothing lists, shows or sweeps it, and with
+ * a dot after the marker, which no task name can start with.
+ */
+export function spareFolderPath(repoPath: string): string {
+  return path.join(real(repoPath), ...WORKTREES, `${BUILDING}.spare`);
+}
 
 /** The repository root, or null when this is not a checkout at all. */
 export function repoRoot(dir: string | null | undefined): string | null {
@@ -666,6 +675,14 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
     } catch { return refused({ reason: 'in-the-way', heldBy: null }); }
   }
 
+  // A new thread takes the folder made ahead for it, when there is one still
+  // good. A thread with a branch of its own is made from that branch instead.
+  if (dependencies && !tryGit(root, ['rev-parse', '--verify', '-q', `refs/heads/${branch}`]).ok && takeTheSpare(root, folder, branch, pid)) {
+    const held = acquireTaskFolder(root, folder, { pid });
+    if (!held.taken) return refused(held);
+    return { taken: true, heldBy: pid, path: folder, branch, created: true, how: 'spare' };
+  }
+
   // A registration whose directory somebody deleted by hand would refuse the
   // add below with "already registered", so clear those first. `prune` only
   // ever drops registrations whose folder is already gone.
@@ -689,7 +706,7 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   const branchExists = hasBranch();
   const from = branchExists ? branch : baseRef(root);
   let how: 'clone' | 'checkout' = 'clone';
-  if (!cloneCheckout(root, staging, branch, from, branchExists, pid)) {
+  if (!cloneCheckout(root, staging, from, branchExists ? [staging, branch] : ['-b', branch, staging, from], pid)) {
     how = 'checkout';
     // THE BRANCH IS ASKED ABOUT AGAIN, AND THAT IS NOT BELT AND BRACES.
     //
@@ -798,6 +815,120 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   return { taken: true, heldBy: pid, path: folder, branch, created: true, how };
 }
 
+/** What a folder made ahead was made from, kept in its own git folder so it goes when the folder does. */
+interface SpareStamp { head: string; local: [string, number, number][] }
+
+function spareStampFile(spare: string): string | null {
+  const at = tryGit(spare, ['rev-parse', '--absolute-git-dir']);
+  return at.ok && at.out ? path.join(at.out, 'agentbox-spare.json') : null;
+}
+
+/** The checkout's local files a folder carries in, each with when it last changed and its size. */
+function localFilesNow(root: string): [string, number, number][] {
+  return localFilesIn(root).paths.slice().sort().map((rel) => {
+    const st = fs.lstatSync(path.join(root, rel), { throwIfNoEntry: false });
+    return [rel, st?.mtimeMs ?? -1, st?.size ?? -1];
+  });
+}
+
+/**
+ * Whether the folder made ahead is still exactly what a folder made now would
+ * be: finished, on the commit a new thread starts from, carrying the local
+ * files as they stand now, with nothing changed in it, and ours or left by an
+ * app that has quit.
+ */
+function spareIsGood(root: string, spare: string, pid: number): boolean {
+  if (!fs.existsSync(spare) || !record(root, spare)) return false;
+  const owner = holder(root, spare, pid);
+  if (!owner.ok || owner.free) return false;
+  let stamp: SpareStamp | null = null;
+  try {
+    const file = spareStampFile(spare);
+    stamp = file ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+  } catch { return false; }
+  if (!stamp?.head) return false;
+  const head = tryGit(spare, ['rev-parse', 'HEAD']);
+  const base = tryGit(root, ['rev-parse', baseRef(root)]);
+  if (!head.ok || !base.ok || head.out !== stamp.head || base.out !== stamp.head) return false;
+  try { if (JSON.stringify(localFilesNow(root)) !== JSON.stringify(stamp.local)) return false; } catch { return false; }
+  const status = tryGit(spare, ['status', '--porcelain']);
+  return status.ok && status.out === '';
+}
+
+/**
+ * THE FOLDER MADE AHEAD, TAKEN BY A NEW THREAD IN ONE MOVE (w-9993530556): its
+ * own branch on the commit it already stands on, so no file changes, then
+ * moved to the thread's path. Short of that it is put back detached and the
+ * folder is made the ordinary way; clearing it is left to the next
+ * `makeSpareFolder`, off the thread's start.
+ */
+function takeTheSpare(root: string, folder: string, branch: string, pid: number): boolean {
+  const spare = spareFolderPath(root);
+  if (!spareIsGood(root, spare, pid)) return false;
+  if (!tryGit(spare, ['switch', '-q', '-c', branch]).ok) return false;
+  const putBack = () => { tryGit(spare, ['switch', '-q', '--detach']); return false; };
+  if (fs.existsSync(folder)) return putBack();
+  if (!tryGit(root, ['worktree', 'move', '--force', '--force', spare, folder]).ok) return putBack();
+  try { const stamp = spareStampFile(folder); if (stamp) fs.rmSync(stamp, { force: true }); } catch { /* a stamp left behind is never read again */ }
+  // Given now rather than when it was made, so it is as fresh as a folder made on the spot.
+  const given = givePrivateFolder(root, folder);
+  if (!given.given && given.why) console.warn(`[task-folders] ${path.basename(folder)} has no private folder: ${given.why}`);
+  return true;
+}
+
+/**
+ * ONE FOLDER MADE AHEAD PER REPOSITORY, FOR THE NEXT NEW THREAD (w-9993530556).
+ *
+ * Made the way `ensureTaskFolder` makes one, but detached at the commit a new
+ * thread starts from and left at `spareFolderPath`, locked to this app. A
+ * folder that is not a repository yet is left alone: its first commit is made
+ * for the person's first thread there, not ahead of it.
+ */
+export function makeSpareFolder(dir: string, { pid = process.pid }: { pid?: number } = {}): { made: boolean; path: string | null; why?: string } {
+  if (insideGitFolder(path.resolve(dir))) return { made: false, path: null, why: 'inside a .git folder' };
+  const root = repoRoot(dir);
+  if (!root) return { made: false, path: null, why: 'not a repository' };
+  const base = tryGit(root, ['rev-parse', '--verify', '-q', `${baseRef(root)}^{commit}`]);
+  if (!base.ok || !base.out) return { made: false, path: null, why: 'no commit yet' };
+  const spare = spareFolderPath(root);
+  if (spareIsGood(root, spare, pid)) {
+    // One an app that has quit left is written over to this one.
+    const held = acquireTaskFolder(root, spare, { pid });
+    return held.taken ? { made: false, path: spare, why: 'ready' } : { made: false, path: null, why: held.reason };
+  }
+  const cleared = clearUnfinished(root, spare, pid);
+  if (!cleared.cleared) return { made: false, path: null, why: cleared.reason };
+  tryGit(root, ['worktree', 'prune']);
+  fs.mkdirSync(path.dirname(spare), { recursive: true });
+  keepOutOfBackups(path.dirname(spare));
+  hideFromTheCheckout(root);
+  if (!cloneCheckout(root, spare, base.out, ['--detach', spare, base.out], pid)) {
+    const add = addOwned(root, spare, ['--detach', spare, base.out], pid);
+    if (!add.ok) { clearUnfinished(root, spare, pid); return { made: false, path: null, why: add.out }; }
+  }
+  try {
+    carryLocalFiles(root, spare);
+    const file = spareStampFile(spare);
+    if (!file) throw Error('its git folder could not be found');
+    const stamp: SpareStamp = { head: base.out, local: localFilesNow(root) };
+    fs.writeFileSync(file, JSON.stringify(stamp));
+  } catch (error) {
+    clearUnfinished(root, spare, pid);
+    return { made: false, path: null, why: (error as Error).message };
+  }
+  return { made: true, path: spare };
+}
+
+/** The folder made ahead, put away, unless another running app made it. */
+export function dropSpareFolder(dir: string, { pid = process.pid }: { pid?: number } = {}): { dropped: boolean; why?: string } {
+  const root = repoRoot(dir);
+  if (!root) return { dropped: false, why: 'not a repository' };
+  const spare = spareFolderPath(root);
+  if (!fs.existsSync(spare) && !record(root, spare)) return { dropped: false, why: 'none' };
+  const cleared = clearUnfinished(root, spare, pid);
+  return cleared.cleared ? { dropped: true } : { dropped: false, why: cleared.reason };
+}
+
 /**
  * THE TASK'S BRANCH CHECKED OUT IN A FOLDER THE APP DID NOT MAKE, often one an
  * agent or a person opened beside the repository. Git lets a branch live in one
@@ -898,7 +1029,7 @@ function clearUnfinished(root: string, staging: string, pid: number = process.pi
  * shares blocks where the filesystem can and copies where it cannot, and `-c`
  * is not an option there at all.
  */
-function cloneCheckout(root: string, folder: string, branch: string, from: string, branchExists: boolean, pid: number = process.pid): boolean {
+function cloneCheckout(root: string, folder: string, from: string, addArgs: string[], pid: number = process.pid): boolean {
   // On NTFS the copy shares no blocks, so it writes everything the checkout
   // would, plus the ignored files inside tracked directories.
   if (process.platform === 'win32') return false;
@@ -914,9 +1045,7 @@ function cloneCheckout(root: string, folder: string, branch: string, from: strin
   if (!head.ok || !target.ok || head.out !== target.out) return false;
   if (!clean.ok || clean.out.length > 0) return false;
 
-  const add = branchExists
-    ? addOwned(root, folder, ['--no-checkout', folder, branch], pid)
-    : addOwned(root, folder, ['--no-checkout', '-b', branch, folder, from], pid);
+  const add = addOwned(root, folder, ['--no-checkout', ...addArgs], pid);
   if (!add.ok) return false;
 
   try {
