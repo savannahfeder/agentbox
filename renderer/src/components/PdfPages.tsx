@@ -8,10 +8,11 @@ import './file-views.css';
 
 /** A slide in the strip, as wide as the deck view draws its own. */
 const THUMB = 104;
-/** How far past the edge of what scrolls a page is drawn before it is reached. */
-const DRAW_WITHIN = '150%';
-/** How far past it a drawn page may go before its drawing is let go of. */
-const KEEP_WITHIN = '400%';
+/** How far past the edge of what scrolls a page is drawn before it is reached, and kept after it is passed. */
+type Reach = { draw: string; keep: string };
+const PAGE_REACH: Reach = { draw: '150%', keep: '400%' };
+// The strip is as wide as the window, so a slide in it is drawn only a quarter of its width away.
+const STRIP_REACH: Reach = { draw: '0px 25%', keep: '0px 100%' };
 /** A resize draws a page again once the width has held this long. */
 const REDRAW_AFTER_MS = 150;
 
@@ -32,10 +33,11 @@ export async function openPdf(data: Uint8Array): Promise<Opened> {
   return pdfjs.getDocument({ data }) as unknown as Opened;
 }
 
-export function Page({ pdf, n, width, aspect, onCanvas, onSpot, over }: {
+export function Page({ pdf, n, width, aspect, reach = PAGE_REACH, onCanvas, onSpot, over }: {
   pdf: Pdf; n: number; width: number; onCanvas?: (n: number, el: HTMLElement) => void;
   /** The first page's width over its height, the size a page takes until its own is read. */
   aspect?: number;
+  reach?: Reach;
   onSpot?: (n: number, spot: { x: number; y: number }) => void;
   /** Drawn over the page, such as its pins. */
   over?: ReactNode;
@@ -64,8 +66,8 @@ export function Page({ pdf, n, width, aspect, onCanvas, onSpot, over }: {
     if (!el) return undefined;
     // What scrolls is the page list or the strip of slides; a cover on its own is judged against the window.
     const root = el.closest<HTMLElement>('.pdf-pages, .deck-strip');
-    const draw = new IntersectionObserver(([seen]) => { if (seen) setToDraw(seen.isIntersecting); }, { root, rootMargin: DRAW_WITHIN });
-    const keep = new IntersectionObserver(([seen]) => { if (seen) setToKeep(seen.isIntersecting); }, { root, rootMargin: KEEP_WITHIN });
+    const draw = new IntersectionObserver(([seen]) => { if (seen) setToDraw(seen.isIntersecting); }, { root, rootMargin: reach.draw });
+    const keep = new IntersectionObserver(([seen]) => { if (seen) setToKeep(seen.isIntersecting); }, { root, rootMargin: reach.keep });
     draw.observe(el);
     keep.observe(el);
     return () => { draw.disconnect(); keep.disconnect(); };
@@ -229,7 +231,7 @@ export function PdfPages({ load, name, onPage, onShape, goTo, fit = false, word 
       <div ref={strip} className="deck-strip" aria-label={`Every ${word.toLowerCase()}`}>
         {Array.from({ length: pdf.numPages }, (_, i) => (
           <button key={i} type="button" className={`deck-thumb${i + 1 === at ? ' is-on' : ''}`} aria-label={`${word} ${i + 1}`} aria-current={i + 1 === at ? 'page' : undefined} onClick={() => go(i + 1)}>
-            <span className="deck-slide is-small pdf-thumb" style={{ width: thumb, height: thumb / aspect }}><Page pdf={pdf} n={i + 1} width={thumb} aspect={aspect} /></span>
+            <span className="deck-slide is-small pdf-thumb" style={{ width: thumb, height: thumb / aspect }}><Page pdf={pdf} n={i + 1} width={thumb} aspect={aspect} reach={STRIP_REACH} /></span>
             <span className="deck-thumb-n">{i + 1}{commented?.has(i + 1) && <i aria-label={`${commented.get(i + 1)} open`} />}</span>
           </button>
         ))}
