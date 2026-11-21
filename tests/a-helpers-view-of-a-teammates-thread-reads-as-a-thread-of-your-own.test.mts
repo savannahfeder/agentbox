@@ -23,7 +23,7 @@ describe("a helper's view of a teammate's thread", () => {
   it('offers the step\'s options on the reply box, not as a list in the answer', () => {
     expect(page).toMatch(/<div className="focus-dock-inner">[\s\S]{0,200}<div className="one-choices">\s*<OptionsOffer/);
     expect(page.indexOf('<OptionsOffer')).toBeLessThan(page.indexOf('<div className="dock-card">'));
-    expect(page).toContain('const options = helping && newest ? parseOptions(newest.text) : [];');
+    expect(page).toContain('const options = helping && newest && !answered ? parseOptions(newest.text) : [];');
   });
   it('uses the thread\'s own reply box and Send', () => {
     expect(page).toContain('<textarea className="dock-input"');

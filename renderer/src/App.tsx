@@ -8479,7 +8479,7 @@ export default function App() {
                 {/* A TEAMMATE'S THREAD, the whole window. Back goes to Threads
                     with the same people picked, or to the room whose board it
                     was opened from. */}
-                <TeammateThread card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
+                <TeammateThread key={`${openCard.personId}/${openCard.threadId}`} card={openCard} person={team?.byId.get(openCard.personId) ?? null} now={now}
                   headerTarget={focused ? null : teamHeader} cornerTarget={focused ? null : teamCorner}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
