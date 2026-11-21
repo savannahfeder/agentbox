@@ -83,6 +83,6 @@ describe('code is offered exactly as before', () => {
   });
   it('the thread hands the offer the files its words name', () => {
     const focus = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/components/Focus.tsx'), 'utf8');
-    expect(focus).toMatch(/shipOfferFor\(standing, onlyNamedFiles\(changed, referencedFiles\(item\.result, item\.note, item\.body, item\.answer, \{ dir: productDir \}\), productDir\)\)/);
+    expect(focus).toMatch(/shipOfferFor\(standing, onlyNamedFiles\(changed, referencedFiles\(item\.result, item\.note, item\.body, item\.answer, \{ dir: productDir \}\), productDir\)(, \{ held: saidNotToShip\(item\.body, item\.answer\)( \|\| agentSaidNotReady\(item\.result\))? \})?\)/);
   });
 });

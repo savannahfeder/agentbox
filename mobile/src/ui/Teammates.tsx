@@ -5,7 +5,9 @@ import { router } from '../lib/router';
 import { useState, type ReactNode } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, SvgXml } from 'react-native-svg';
+import { faceSeed, facePaper } from '../../../shared/teammate-face.mts';
+import { faceSvg } from '../../../renderer/src/teammates/face-drawing';
 import type { Room, Teammate } from '../../../renderer/src/types';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import { mateDraft, useDraft } from '../lib/drafts';
@@ -26,11 +28,21 @@ import { color, corner, font, size } from './theme';
 /** The corner of an AI teammate's dashed mark, as `--mate-corner` is on the web: round, like a person. */
 export const mateCorner = (s: number) => s / 2;
 
-/** A teammate's mark: its letter in a dashed ring, with a dot when it waits on you (TeammatesRail.tsx). */
-export function TeammateMark({ t, size: s = 20, waiting = false }: { t: Pick<Teammate, 'letter' | 'name'> | null; size?: number; waiting?: boolean }) {
+/** A teammate's mark: its face, with a dot when it waits on you (TeammatesRail.tsx); a dashed + for a new one. */
+export function TeammateMark({ t, size: s = 20, waiting = false }: { t: (Pick<Teammate, 'name'> & Partial<Pick<Teammate, 'id' | 'letter' | 'face'>>) | null; size?: number; waiting?: boolean }) {
+  if (!t) {
+    return (
+      <View style={{ width: s, height: s, borderRadius: mateCorner(s), borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
+        <T style={{ fontFamily: font.mono, fontSize: Math.max(9.5, Math.round(s * 0.36 * 2) / 2), color: color.faint }}>+</T>
+      </View>
+    );
+  }
+  const seed = faceSeed(t);
   return (
-    <View style={{ width: s, height: s, borderRadius: mateCorner(s), borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
-      <T style={{ fontFamily: font.mono, fontSize: Math.max(9.5, Math.round(s * 0.36 * 2) / 2), color: t ? color.dim : color.faint }}>{t ? t.letter || t.name.slice(0, 1) : '+'}</T>
+    <View style={{ width: s, height: s }}>
+      <View style={{ width: s, height: s, borderRadius: s / 2, overflow: 'hidden', backgroundColor: facePaper(seed) }}>
+        <SvgXml xml={faceSvg(seed)} width={s} height={s} />
+      </View>
       {waiting && <View style={{ position: 'absolute', top: -4, right: -4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: color.accent }} />}
     </View>
   );

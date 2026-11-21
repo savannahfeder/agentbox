@@ -47,8 +47,10 @@ export interface DraftStore {
   key?(index: number): string | null;
 }
 
+// A page drawn with no window (a test, the server) keeps nothing rather than failing.
+const NOWHERE: DraftStore = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 const backing = (store?: DraftStore): DraftStore =>
-  store ?? ((globalThis as unknown as { localStorage: DraftStore }).localStorage);
+  store ?? (globalThis as unknown as { localStorage?: DraftStore }).localStorage ?? NOWHERE;
 
 /** One draft per thread, and the composer opens whatever it finds here. */
 export function draftKey(item: ItemRef): string {

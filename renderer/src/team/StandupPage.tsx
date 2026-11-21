@@ -70,6 +70,10 @@ function Post({ p, face, at, since, all, onOpen, onPerson }: {
         <p className="su-list-l">Working on</p>
         <ul className="su-done">{p.working.map((l) => <li key={l.key}><button type="button" className="su-link" onClick={() => onOpen(l)}>{titleOf(l)}</button></li>)}</ul>
       </>}
+      {open && (p.helped?.length ?? 0) > 2 && <>
+        <p className="su-list-l">Helped on</p>
+        <ul className="su-done">{p.helped!.map((l) => <li key={l.key}><button type="button" className="su-link" onClick={() => onOpen(l)}>{titleOf(l)}</button></li>)}</ul>
+      </>}
     </div>
   </article>;
 }

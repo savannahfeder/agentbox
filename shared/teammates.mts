@@ -65,6 +65,7 @@ export interface Teammate {
   id: string;
   name: string;
   letter?: string | null;
+  face?: string | null;
   role?: string | null;
   job?: string | null;
   goal?: string | null;
@@ -184,6 +185,8 @@ const FIELDS: readonly string[] = [
   // anyone on the team may give it work, rather than asking its owner.
   'readsMessages', 'openToTeam',
   'voice', 'voiceText',
+  // The face picked for it; absent, its face follows its id (teammate-face.mts).
+  'face',
   // 'owed' from going ready until its first run starts, then 'served'; 'waits'
   // when its owner said to start at its first duty's time.
   'firstRun',
@@ -358,6 +361,7 @@ function coerce(field: string, value: unknown): unknown {
     case 'status': return (STATUSES as readonly unknown[]).includes(value) ? value : undefined;
     case 'voice': return value === null ? null : VOICES.some((v) => v.id === value) ? value : undefined;
     case 'voiceText': return value === null ? null : cleanText(value, VOICE_WORDS_MOST);
+    case 'face': return value === null ? null : cleanText(value, 80);
     case 'endedAt': case 'createdAt': return Number.isFinite(value) ? value : value === null ? null : undefined;
     case 'firstRun': return (FIRST_RUNS as readonly unknown[]).includes(value) ? value : undefined;
     case 'served': return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;

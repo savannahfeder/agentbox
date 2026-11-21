@@ -154,6 +154,8 @@
 .rm-cm .h, .rm-cm .tx { user-select: text; -webkit-user-select: text; }
 .rm-cm .tm-av { user-select: none; -webkit-user-select: none; }
 .rm-cm .tx p { margin: 0; white-space: pre-line; }
+/* Markdown leaves a line break between its paragraphs; kept, it drew as a blank line on top of the gap. */
+.rm-cm .tx:has(> p, > ul, > ol, > pre, > blockquote) { white-space: normal; }
 .rm-cm .tx p + p { margin-top: 8px; }
 .rm-cm .tx a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .rm-cm .tx code { font-family: var(--mono); font-size: .88em; background: var(--wash-strong); padding: 1px 4px; }
@@ -479,9 +481,47 @@
 /* A group's chat a size up from a thread's list (w-dcaa2c122e, round 11). */
 .gr-page .rm-full .rm-cm .h { font-size: 15px; }
 .gr-page .rm-full .rm-cm .h em { font-family: inherit; font-size: 12px; }
-.gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 25px; }
-.gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 10px; }
+.gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 24px; }
+/* A small face, its top level with the top of the name's line. */
+.gr-page .rm-full.hang .rm-cm { padding-left: 40px; }
+.gr-page .rm-full.hang .rm-cm .h { line-height: 20px; }
+.gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 14px; }
 .gr-page .rm-compose-input { font-size: 15px; line-height: 22px; }
+/* One sender's lines sit close; a new sender, a day or the New line sets them apart. */
+.gr-page .rm-full .rm-cm { padding-top: 14px; padding-bottom: 2px; }
+.gr-page .rm-full .rm-cm.cont { padding-top: 0; }
+.gr-page .rm-full .rm-day { margin: 22px 0 0; }
+.gr-page .rm-full .rm-chat-msgs > :first-child > .rm-day { margin-top: 18px; }
+.pl .rm-full .rm-chat-msgs > :first-child > .rm-day { margin-top: 0; }
+.gr-page .rm-full .rm-new { margin: 14px 0 0; }
+.gr-page .rm-full .rm-day + .rm-cm.cont, .gr-page .rm-full .rm-new + .rm-cm.cont { padding-top: 8px; }
+
+/* A thread that passed between you is a card that opens it. */
+.rm-thread-card { display: flex; flex-direction: column; gap: 2px; width: fit-content; max-width: min(100%, 520px); box-sizing: border-box; margin-top: 6px; padding: 9px 14px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; text-align: left; color: inherit; cursor: pointer; }
+.rm-thread-card:hover { background: var(--wash); border-color: var(--text-faint); }
+.rm-thread-title { font-size: 15px; line-height: 22px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-thread-what { font-size: 13px; line-height: 18px; color: var(--text-faint); }
+.rm-cm.cont > .rm-thread-card { margin-top: 2px; }
+.gr-page .rm-full .rm-cm:has(> .rm-thread-card) { padding-bottom: 8px; }
+
+/* The box is one line, its tools at the right of that line, as a thread's reply box is. */
+.gr-page .rm-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; border-radius: var(--radius); }
+.gr-page .rm-compose > .rm-compose-input { grid-column: 1; grid-row: 1; min-height: 46px; padding: 12px 8px 12px 14px; }
+.gr-page .rm-compose > .rm-compose-bar { grid-column: 2; grid-row: 1; gap: 4px; padding: 0 8px 8px 0; }
+.gr-page .rm-compose > .attach-row { grid-column: 1 / -1; grid-row: 2; }
+.gr-page .rm-compose-bar .fmt-bar { margin-right: 4px; }
+.gr-page .rm-compose-bar .dock-send { padding: 4px 12px; border-radius: var(--radius); }
+.gr-page .rm-compose-bar .dock-send kbd { display: none; }
+.gr-page .rm-compose-bar .dock-send:disabled { border-color: transparent; }
+/* Squeezed by a file beside it or a small window, the tools go back under the words. */
+.app.doc-open .gr-page .rm-compose { grid-template-columns: minmax(0, 1fr); }
+.app.doc-open .gr-page .rm-compose > .rm-compose-bar { grid-column: 1; grid-row: 3; padding: 0 8px 6px 8px; }
+.app.doc-open .gr-page .rm-compose-bar .fmt-bar { margin-right: auto; }
+@media (max-width: 1000px) {
+  .gr-page .rm-compose { grid-template-columns: minmax(0, 1fr); }
+  .gr-page .rm-compose > .rm-compose-bar { grid-column: 1; grid-row: 3; padding: 0 8px 6px 8px; }
+  .gr-page .rm-compose-bar .fmt-bar { margin-right: auto; }
+}
 .gr-page .gr-pt, .gr-page .gr-l1 { font-size: 14.5px; line-height: 19px; }
 .gr-page .gr-l2 { font-size: 13.5px; line-height: 18px; }
 .gr-page .gr-pn, .gr-page .gr-ag { font-size: 13px; }
