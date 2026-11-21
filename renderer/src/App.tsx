@@ -8212,7 +8212,9 @@ export default function App() {
       // No chat: you give it tasks here and its answers come to the inbox.
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} about={t?.role ?? 'AI teammate'} onBack={back} backTo={backTo} chatLabel="Tasks"
         view={placeView} onView={(next) => { setAboutAtSettings(false); setPlaceView(next); }}
-        under={teammatesUi.settingsOf(id)}
+        side={teammatesUi.settingsOf(id, {
+          onJob: () => { setAboutAtSettings(false); setPlaceView({ of: mateKey, key: 'about' }); },
+        })}
         chat={<MateWork name={placeMember.name} now={now}
           active={[...asks.map((i) => taskRow(i, 'Waiting on you', 'ask')), ...split.now.map((i) => taskRow(i, word(i)[0], word(i)[1]))]}
           done={split.finished.map((i) => taskRow(i, '', 'done'))}

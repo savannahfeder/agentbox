@@ -3,7 +3,7 @@
 // useRooms, whose every field App reads is pinned by its own tests.
 import { useMemo, useState, type ReactNode } from 'react';
 import type { Product, RunningSession, TeammatesView, WorkItem } from '../types';
-import { TeammateAbout, TeammateChat, TeammateMenu, TeammateSettingsLine, TeammatesPage, TeammatesTitle, shownOf, type TeammateModels } from './TeammatesPage';
+import { TeammateAbout, TeammateChat, TeammateMenu, TeammateSettingsColumn, TeammatesPage, TeammatesTitle, shownOf, type TeammateModels } from './TeammatesPage';
 import { MateCorner } from './MateCorner';
 import { SidebarGroups } from '../team/rooms/GroupsSidebar';
 import { api } from '../api';
@@ -91,10 +91,10 @@ export function useTeammates({ items = [], view: stored, asking = [], running = 
       const t = team.find((x) => x.id === id);
       return t ? <TeammateAbout key={`${t.id}${atSettings ? ':settings' : ''}`} t={t} view={view ?? null} products={products} engines={engines} models={models} onOpen={go} onNewProject={onNewProject} onChanged={onChanged} atSettings={atSettings} /> : null;
     },
-    /** Its place's line of settings: when it works on its own, where, and on what model. */
-    settingsOf: (id: string): ReactNode => {
+    /** Its place's settings beside its tasks; `onJob` opens its About. */
+    settingsOf: (id: string, { onJob }: { onJob: () => void }): ReactNode => {
       const t = team.find((x) => x.id === id);
-      return t ? <TeammateSettingsLine key={t.id} t={t} products={products} models={models} onNewProject={onNewProject} onChanged={onChanged} /> : null;
+      return t ? <TeammateSettingsColumn key={t.id} t={t} products={products} models={models} onNewProject={onNewProject} onChanged={onChanged} onJob={onJob} /> : null;
     },
     /** Its place's ⋯, for the window's corner. */
     cornerOf: (id: string, { onSettings, onDeleted }: { onSettings: () => void; onDeleted: () => void }): ReactNode => {

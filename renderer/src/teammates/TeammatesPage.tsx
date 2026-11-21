@@ -657,16 +657,15 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
     <dd><EditName key={t.name} name={t.name} onSave={(name) => keep({ name })} /></dd>
     <dt>Face</dt>
     <dd><FacePick seed={faceSeed(t)} onPick={(face) => keep({ face })} /></dd>
-    {/* On its page these two are on the settings line over the tabs. */}
-    {!whole && <><dt>Model</dt>
+    <dt>Model</dt>
     <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
-      effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd></>}
+      effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>
     {engines.length > 1 && <><dt>Runs on</dt>
       <dd><PickOne value={t.engine ?? ''} label="Runs on" options={[...(t.engine ? [] : [{ id: '', label: 'Your default' }]), ...engines]} onPick={(id) => keep({ engine: id })} /></dd></>}
-    {!whole && <><dt>Works in</dt>
+    <dt>Works in</dt>
     <dd>{real.length > 1 || onNewProject
       ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
-      : product?.name ?? t.product}</dd></>}
+      : product?.name ?? t.product}</dd>
     <dt>Can read</dt>
     <dd><PickOne value={t.readsMessages ? 'all' : 'threads'} label="What it can read" options={READS} onPick={(id) => keep({ readsMessages: id === 'all' })} /></dd>
     <dt>Your team</dt>
@@ -681,8 +680,8 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
       <dd><EditJob key={t.job ?? ''} job={t.job} shown={job && !whole ? clipLine(firstSentence(job), 150) : job} whole={whole} onSave={(next) => keep({ job: next })} onRead={about} /></dd>
       <dt>How it writes</dt>
       <dd><VoicePick voice={voiceOf(t)} words={t.voiceText ?? null} onPick={keep} /></dd>
-      {/* While it is set up its times are guesses it is asking you about. On its page the schedule is on the settings line. */}
-      {t.status !== 'draft' && !whole && <><dt>On its own</dt>
+      {/* While it is set up its times are guesses it is asking you about. */}
+      {t.status !== 'draft' && <><dt>On its own</dt>
       <dd>{t.duties?.length
         ? t.duties.map((d) => <span key={d.id} className="tq-duty">{d.what}
           {d.after === 'ship' || !d.every || !d.at ? <small>{d.when}</small> : <When every={d.every} at={d.at} on={d.on} canStop={false}
@@ -706,9 +705,14 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
   </>;
 }
 
-/** How your AI teammate works, in one line under its name: when it works on its own, where, and on what model. */
-export function TeammateSettingsLine({ t, products, models = NO_MODELS, onNewProject, onChanged }: {
+// Pausing is a state you set, like the others, not a button of its own.
+const STATUS = [{ id: 'active', label: 'Active' }, { id: 'paused', label: 'Paused' }];
+
+/** Your AI teammate's settings beside its tasks, each one you can change drawn as a tag. */
+export function TeammateSettingsColumn({ t, products, models = NO_MODELS, onNewProject, onChanged, onJob }: {
   t: Teammate; products: Product[]; models?: TeammateModels; onNewProject?: () => void; onChanged: () => void;
+  /** Opens About, where the whole job is read and changed. */
+  onJob: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const keep = (patch: Record<string, unknown>) => {
@@ -717,17 +721,29 @@ export function TeammateSettingsLine({ t, products, models = NO_MODELS, onNewPro
   };
   const real = placesToWork(products);
   const product = real.find((p) => p.slug === t.product);
-  return <div className="tq-set-line" aria-label={`How ${t.name} works`}>
-    {t.status !== 'draft' && <span className="tq-set"><span className="tq-set-k">Schedule</span>{t.paused
-      ? <><span className="tq-set-paused">Paused</span><button type="button" className="pl-btn tq-set-btn" onClick={() => keep({ paused: false })}>Resume</button></>
-      : <ScheduleWord t={t} keep={keep} />}</span>}
-    <span className="tq-set"><span className="tq-set-k">Works in</span>{real.length > 1 || onNewProject
-      ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
-      : <span className="tq-set-text">{product?.name ?? t.product}</span>}</span>
-    <span className="tq-set"><span className="tq-set-k">Model</span><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
-      effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></span>
+  const job = t.job?.trim() || null;
+  return <>
+    <dl className="tq-set-col" aria-label={`How ${t.name} works`}>
+      {t.status !== 'draft' && <>
+        <dt>Status</dt>
+        <dd><PickOne value={t.paused ? 'paused' : 'active'} label="Status" options={STATUS} onPick={(id) => keep({ paused: id === 'paused' })} /></dd>
+        <dt>Schedule</dt>
+        <dd><ScheduleWord t={t} keep={keep} /></dd>
+      </>}
+      <dt>Works in</dt>
+      <dd>{real.length > 1 || onNewProject
+        ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
+        : <span className="tq-set-text">{product?.name ?? t.product}</span>}</dd>
+      <dt>Model</dt>
+      <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
+        effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>
+      <dt>This week</dt>
+      <dd className="tq-set-text">{t.runsThisWeek} of {t.limit} runs</dd>
+      {job && <><dt>Job</dt>
+        <dd><button type="button" className="tq-set-job" title={job} onClick={onJob}>{job}</button></dd></>}
+    </dl>
     {error && <p className="tq-error" role="alert">{error}</p>}
-  </div>;
+  </>;
 }
 
 /** When it works on its own, in words: its own schedule, or each duty's. */

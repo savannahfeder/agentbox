@@ -16,7 +16,7 @@ export type PlacePart = { key: string; label: string; count?: number; ask?: bool
 /** Which button over the chat is lit, for whose place; null is the chat. */
 export type PlaceView = { of: string; key: string } | null;
 
-export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, parts = [], chatLabel = 'Chat', under, view: held, onView }: {
+export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, parts = [], chatLabel = 'Chat', side, view: held, onView }: {
   m: Member; waits?: number;
   /** The first button's name, for what `chat` is: an AI teammate's page holds its tasks. */
   chatLabel?: string;
@@ -25,8 +25,8 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, part
   /** Absent inside Chats, where the list beside it is the way back. */
   onBack?: () => void; backTo?: string;
   actions?: ReactNode; chat: ReactNode; parts?: PlacePart[];
-  /** Between the header and the buttons: your AI teammate's settings. */
-  under?: ReactNode;
+  /** Beside the chat while it is shown: your AI teammate's settings. */
+  side?: ReactNode;
   /** Kept by the page around it when something outside the place, such as the window's corner, opens a button's view. */
   view?: PlaceView; onView?: (next: PlaceView) => void;
 }) {
@@ -56,7 +56,6 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, part
       </div>
       {actions && <div className="pl-acts">{actions}</div>}
     </header>
-    {under && <div className="pl-under">{under}</div>}
     {parts.length > 0 && <div className="pl-parts" role="tablist" aria-label={m.name}>
       <button type="button" role="tab" aria-selected={!shown} className="pl-btn pl-chip" onClick={() => setView(null)}>{chatLabel}</button>
       {parts.map((p) => <button type="button" key={p.key} role={p.body ? 'tab' : undefined} aria-selected={p.body ? shown === p : undefined}
@@ -65,9 +64,12 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, part
         {p.ask && <i aria-hidden="true" />}{p.label}{p.count != null && <b>{p.count}</b>}
       </button>)}
     </div>}
-    <div className="pl-body">
-      <div className={`pl-chat${shown ? ' away' : ''}`}>{chat}</div>
-      {shown && <div className="pl-view" role="tabpanel" aria-label={shown.label}>{shown.body}</div>}
+    <div className="pl-main">
+      <div className="pl-body">
+        <div className={`pl-chat${shown ? ' away' : ''}`}>{chat}</div>
+        {shown && <div className="pl-view" role="tabpanel" aria-label={shown.label}>{shown.body}</div>}
+      </div>
+      {side && !shown && <aside className="pl-side" aria-label={`${m.name}'s settings`}>{side}</aside>}
     </div>
   </section>;
 }
