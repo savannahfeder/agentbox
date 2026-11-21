@@ -21,8 +21,9 @@ export const PLANS = Object.freeze({
 // way to more free hours; once they are used, the app offers to start the plan now.
 export const PLAN_TRIAL = Object.freeze({ days: 7, hours: 50 });
 
-// A team's cloud (the owner, 2026-11-06; 7 days since 2026-11-10): free from
-// the day it was made, 50 hours a member (10 until 2026-11-13: "10 cloud hours
+// A team's cloud (the owner, 2026-11-06; 7 days since 2026-11-10): a free week
+// once a card is on file (2026-11-21; it was from the day the team was made,
+// with no card), 50 hours a member (10 until 2026-11-13: "10 cloud hours
 // for pro is very bad given free is 5"); then $40 a seat a month, each seat
 // Pro's hours and files. Hours are its only limit: "there should never be a limit on how
 // many cloud agents a team can use at once" (the owner, 2026-11-13). Kept apart

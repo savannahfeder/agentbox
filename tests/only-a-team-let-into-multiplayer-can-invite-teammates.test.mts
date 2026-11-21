@@ -54,10 +54,13 @@ const sends = async (person: string) => ((await db.query(`select count(*)::int a
 async function signUp(id: string, email: string, confirmed = true) {
   await db.query(`insert into auth.users (id, email, email_confirmed_at) values ($1, $2, ${confirmed ? 'now()' : 'null'})`, [id, email]);
 }
-async function teamOf(owner: string, name: string) {
+async function teamOf(owner: string, name: string, paying = true) {
   const { rows } = await as(owner, `insert into public.teams (name, created_by) values ($1, $2) returning id`, [name, owner]);
   const team = (rows[0] as { id: string }).id;
   await as(owner, `insert into public.team_members (team_id, person_id, role) values ($1, $2, 'owner')`, [team, owner]);
+  // Every team here pays for Pro, so only the invite-only list is in the way
+  // (tests/team-features-need-pro-or-a-card-trial covers paying).
+  if (paying) await db.query(`insert into public.team_plans (team_id, pays) values ($1, true)`, [team]);
   return team;
 }
 
@@ -69,7 +72,7 @@ beforeAll(async () => {
   await db.exec(read(files.filter((f) => f < GATE)));
   await db.exec(GRANTS);
   await signUp(OLD, 'early@before.test');
-  oldTeam = await teamOf(OLD, 'Made before the gate');
+  oldTeam = await teamOf(OLD, 'Made before the gate', false);
   await db.exec(read(files.filter((f) => f >= GATE)));
   await db.exec(GRANTS);
   await signUp(ASKED, 'Asked@Invited.test');
