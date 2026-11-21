@@ -33,7 +33,7 @@
 .su-ar:disabled { opacity: .35; cursor: default; }
 /* The arrow's point, not its button, lines up with the day's title. */
 .su-ar:first-child { margin-left: -11px; }
-.su-day { height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: 15px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+.su-day { height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
 .su-day:hover:not(:disabled) { color: var(--text); }
 .su-day.on { color: var(--text); border-color: var(--line-strong); background: var(--bg-selected); }
 .su-day:disabled { opacity: .45; cursor: default; }

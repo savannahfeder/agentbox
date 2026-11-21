@@ -1089,7 +1089,7 @@ html:root[data-glass][data-theme="light"] .app.workspace-layout { background: tr
 :root[data-skin="ember-grid"] .workspace-navigation .workspace-tab.active {
   background: rgba(40, 38, 37, .7); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); font-weight: 400;
 }
-:root[data-skin="ember-grid"] .workspace-running { color: var(--accent); }
+:root[data-skin="ember-grid"] .workspace-running { color: var(--text-dim); }
 
 /* EMBER'S ACCENTS, ON EVERY THEME (w-3fc39983be, approved on five themes
    drawn this way). Ember's type goes on the small right-side details, such as

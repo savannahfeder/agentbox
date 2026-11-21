@@ -9313,7 +9313,7 @@ export default function App() {
               || (target.status === 'open' && target.kind !== 'question' && !filedByThePerson(target)))
               ? [{ id: 'approve',
                   label: target.kind === 'question' ? 'Approve recommended'
-                    : target.kind === 'review' ? 'Approve (proceed as proposed)' : 'Approve (run it)',
+                    : target.kind === 'review' ? 'Approve as proposed' : 'Approve and run',
                   run: () => { setModal(null); resolve(target); } }]
               : []),
             // RUN NOW, by the same rule as the three-dot menu (run-now.ts).

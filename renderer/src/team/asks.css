@@ -35,7 +35,7 @@
 .sh-mode.on { background: var(--bg-selected); color: var(--text); box-shadow: 0 0 0 1px var(--line-strong) inset; }
 .sh-mode-says { margin: 0; font-size: 12.5px; line-height: 18px; color: var(--text-dim); }
 /* Alone, with no switch above it, the line sits in the sheet's own padding. */
-.sh-mode-says.sh-mode-alone { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.sh-mode-says.sh-mode-alone { padding: 10px 14px 0; }
 .sh-step { margin: 8px 14px 0; padding: 6px 10px; font-size: 12.5px; line-height: 18px; color: var(--text-dim); border-left: 2px solid var(--line-strong); border-radius: 0 8px 8px 0; background: var(--bg-raised); white-space: pre-wrap; max-height: 90px; overflow: hidden; }
 
 /* A helper on someone's thread: what was asked, as a message, and handing it back. */

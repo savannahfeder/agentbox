@@ -446,7 +446,7 @@ export function emptyTabWords(view: View | string, starting = false, waiting = 0
   // persona read as the app losing it. One short line, like In progress's.
   return {
     snoozed: 'Nothing is waiting for later.',
-    done: 'Nothing done yet. Finished threads wait in Needs you.',
+    done: 'Nothing done yet.',
   }[view as string] ?? 'Nothing here.';
 }
 
