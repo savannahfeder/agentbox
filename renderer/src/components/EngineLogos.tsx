@@ -19,10 +19,16 @@ export function EngineLogo({ engine, size = 18 }: { engine: 'claude' | 'codex'; 
     : <svg className="engine-logo claude" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><path fill="#D97757" d={CLAUDE} /></svg>;
 }
 
+// The svg fills the tile's 16px inside and its viewBox holds the margin round
+// the 11px mark. An 11px svg sat 2.5px in, which Chromium rounds to 3: half a
+// pixel right of centre and half a pixel low.
+const MARGIN = (24 * 16 / 11 - 24) / 2;
+const IN_TILE = `${-MARGIN} ${-MARGIN} ${24 + 2 * MARGIN} ${24 + 2 * MARGIN}`;
+
 /** The harness a thread of yours runs on, as its maker's mark in a small tile; the agent face for one with no mark. */
 export function HarnessMark({ engine }: { engine: string }) {
   if (engine !== 'claude' && engine !== 'codex') return <AgentFace />;
   return <span className={`harness-mark ${engine}`} aria-hidden="true">
-    <svg viewBox="0 0 24 24">{engine === 'codex' ? <path fillRule="evenodd" d={OPENAI} /> : <path d={CLAUDE} />}</svg>
+    <svg viewBox={IN_TILE}>{engine === 'codex' ? <path fillRule="evenodd" d={OPENAI} /> : <path d={CLAUDE} />}</svg>
   </span>;
 }

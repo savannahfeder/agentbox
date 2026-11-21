@@ -7,5 +7,6 @@
   background: color-mix(in srgb, var(--text) 7%, transparent);
   color: var(--text);
 }
-.harness-mark > svg { display: block; width: 11px; height: 11px; fill: currentColor; }
+/* The tile's inside; the mark is 11px within it (EngineLogos.tsx IN_TILE). */
+.harness-mark > svg { display: block; width: 16px; height: 16px; fill: currentColor; }
 .harness-mark.claude { color: #d97757; }
