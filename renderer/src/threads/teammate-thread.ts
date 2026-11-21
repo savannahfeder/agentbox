@@ -1,6 +1,23 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
-import type { LinkCommentWaiting, ThreadCard } from '../types';
+import type { AgentEvent, LinkCommentWaiting, ThreadCard } from '../types';
+import { isHandBack } from '../../../shared/thread-asks.mts';
 import { filesInLines, threadFiles, versionForPath, type ThreadLine } from '../../../shared/artifact-marks.mts';
+
+/**
+ * The owner's thread as you read it: what you wrote to their agent is yours and
+ * says so, both your comment before their copy passes it on and the line it
+ * writes once it has (`from` you on an answer), which outlives the ask.
+ */
+export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping }: { me: string | null; helping: boolean }): AgentEvent[] {
+  return events.map((e) => {
+    if (e.kind || !me) return e;
+    if (e.fromId === me && !isHandBack(e.text)) {
+      const { from: _from, fromId: _fromId, ...rest } = e;
+      return { ...rest, who: 'you' as const, by: me, says: 'to-agent' as const };
+    }
+    return helping && e.says === 'comment' && e.by === me ? { ...e, says: 'to-agent' as const } : e;
+  });
+}
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 

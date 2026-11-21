@@ -29,7 +29,7 @@ import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Pers
 import { AskBar } from '../team/AskBar';
 import { DoneTrail, MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
 import { doneSteps } from '../../../shared/thread-cards.mts';
-import { earlierWords, filesOnThread, notSharedWords, notesOnFile } from './teammate-thread';
+import { earlierWords, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
 
@@ -125,9 +125,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
-  const helpingNow = ask?.ask?.kind === 'help';
-  const events = built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run')
-    .map((e: AgentEvent) => (helpingNow && 'says' in e && e.says === 'comment' && (e as { by?: string }).by === team?.me ? { ...e, says: 'to-agent' as const } : e));
+  const events = shownOnTheirThread(built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run'), { me: team?.me ?? null, helping: ask?.ask?.kind === 'help' });
 
   // Their copy publishes its marks with its messages; everyone's come together here.
   const own = useMemo(() => marksOf((work?.lines ?? [])
