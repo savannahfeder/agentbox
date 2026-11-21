@@ -21,4 +21,9 @@ describe('the hint plate', () => {
     // A second review saw it still on top of the menu: the plate was picked before the click and drawn after.
     expect(app).toContain("hintScheduler((h) => setShownHint(h && h.el.getAttribute('aria-expanded') === 'true' ? null : h))");
   });
+  it('says nothing about what was just pressed until the pointer reaches something else', () => {
+    // A second review: "Tab · Next tab" still popped under a tab right after it was clicked.
+    expect(app).toContain("document.addEventListener('pointerdown', onPress, true);");
+    expect(app).toContain('if (pressed && el === pressed) return;');
+  });
 });

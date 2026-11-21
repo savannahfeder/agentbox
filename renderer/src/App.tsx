@@ -679,8 +679,17 @@ export default function App() {
   // for the icon inside it.
   useEffect(() => {
     if (!hintsOn) return undefined;
+    // What was just pressed says nothing until the pointer reaches something else: a hint under a tab you clicked tells you what you just did.
+    let pressed: HTMLElement | null = null;
+    const onPress = (e: PointerEvent) => {
+      pressed = (e.target as HTMLElement | null)?.closest?.('[data-hint]') as HTMLElement | null;
+      setPointedHint(null);
+      hints.current?.stop();
+    };
     const onMove = (e: MouseEvent) => {
       const el = (e.target as HTMLElement | null)?.closest?.('[data-hint]') as HTMLElement | null;
+      if (pressed && el === pressed) return;
+      pressed = null;
       const id = el?.dataset.hint;
       // A button whose menu is open says nothing: the hint would sit on the menu's first row.
       if (!el || !id || !HINTS[id] || el.getAttribute('aria-expanded') === 'true') { setPointedHint((was) => (was ? null : was)); return; }
@@ -689,9 +698,11 @@ export default function App() {
     const onOut = (e: MouseEvent) => { if (!e.relatedTarget) setPointedHint(null); };
     document.addEventListener('mousemove', onMove, true);
     document.addEventListener('mouseout', onOut, true);
+    document.addEventListener('pointerdown', onPress, true);
     return () => {
       document.removeEventListener('mousemove', onMove, true);
       document.removeEventListener('mouseout', onOut, true);
+      document.removeEventListener('pointerdown', onPress, true);
     };
   }, [hintsOn]);
   // A PLATE MUST NEVER OUTLIVE THE THING IT IS ABOUT, and this is three guards
