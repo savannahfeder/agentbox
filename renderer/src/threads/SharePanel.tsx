@@ -154,8 +154,17 @@ const MODES: { id: GiveMode; label: string; detail: (first: string) => string; a
   { id: 'give', label: 'Hand over', detail: (f) => `${f} owns it from now on, with its conversation and files. You can take it back.`, ask: (f) => `Anything ${f} should know?`, go: (f) => `Hand over to ${f}` },
 ];
 
+/** Only help points at a message; a review or a hand-over is of the whole thread, so it shows and sends none. */
+export const pointsAtStep = (mode: GiveMode): boolean => mode === 'help';
+
+const ThreadMark = () => <svg {...mark} width={14} height={14}><path d="M4 5h16v11h-9l-4.5 3.5V16H4z" /><path d="M8 9h8M8 12h5" /></svg>;
+
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
-export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack, only, onCancel, note: kept, onNote }: {
+export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack, only, onCancel, note: kept, onNote, onMode, threadName = null }: {
+  /** The thread's name, as the person asked sees it in their list. */
+  threadName?: string | null;
+  /** The switch was moved, so a sheet closed unsent can open again on it. */
+  onMode?: (mode: GiveMode) => void;
   onBack?: () => void;
   /** The note kept by whoever opens the sheet, so Escape or Back does not lose it. */
   note?: string;
@@ -184,18 +193,20 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
   // Help with no step picked and no words would reach them as an empty ask.
   const empty = mode === 'help' && !step && !note.trim();
   const go = () => { if (empty) return; if (mode === 'give' || !onAsk) onGive(note.trim()); else onAsk(mode, note.trim()); };
+  const quote = step && pointsAtStep(mode) && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>;
   return (
     <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Ask or hand over to ${first}`}>
       {onBack && <PanelBack label="Back" onBack={onBack} />}
       <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
       {onAsk && !fixed && <div className="sh-modes">
         <div className="sh-switch" role="radiogroup" aria-label="What you want from them">
-          {choices.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => setMode(x.id)}>{x.label}</button>)}
+          {choices.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => { setMode(x.id); onMode?.(x.id); }}>{x.label}</button>)}
         </div>
         <p className="sh-mode-says">{m.detail(first)}</p>
       </div>}
       {(!onAsk || fixed) && <p className="sh-mode-says sh-mode-alone">{m.detail(first)}</p>}
-      {step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>}
+      {/* The whole thread goes, so it is drawn by its name with the message as where to look. */}
+      {threadName ? <div className="sh-thread"><div className="sh-thread-head"><ThreadMark /><span>{threadName}</span></div>{quote}</div> : quote}
       <textarea className="sh-note" autoFocus placeholder={m.ask(first)} value={note} aria-label={m.ask(first)} rows={2}
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); } }} />

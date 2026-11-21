@@ -24,7 +24,8 @@ const sent = (id, ago, over = {}) => ({
   result: 'Here is today\'s post.', wrote: { result: { ts: NOW - ago * DAY + 60_000, source: 'agent' } }, ...over,
 });
 const plan = (items) => planWakes({ teammates: [t], chat, items, now: NOW });
-const runs = (acts) => acts.filter((a) => a.type === 'run');
+// The duty waking: a new thread, or its round brought to the thread the job lives in.
+const runs = (acts) => acts.filter((a) => a.type === 'run' || a.type === 'due');
 
 describe('a duty nobody reads', () => {
   it('stops after three results in a row you have not answered, and says so', () => {
