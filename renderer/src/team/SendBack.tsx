@@ -30,7 +30,7 @@ export function SendBack({ item, items }: { item: WorkItem; items: readonly Work
     try {
       const found = await api.resolveDoc({ product: item.product, src: file.path, thread: item.id });
       if (!found.ok || !found.opened) throw new Error(found.error ?? `${file.name} is not on this computer.`);
-      const words = sendBackWords(file.name, answers.length);
+      const words = sendBackWords(answers.length);
       if ('task' in back) {
         const links = await persistAttachments(back.task.product, [{ name: file.name, srcPath: found.opened, image: /\.(png|jpe?g|gif|webp)$/i.test(file.name) }]);
         await api.answer({ product: back.task.product, id: back.task.id, answer: `${words}\n\n${links}` });

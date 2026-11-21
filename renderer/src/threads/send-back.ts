@@ -27,9 +27,10 @@ export function whereItGoesBack(item: Pick<Row, 'labels'>, items: readonly Row[]
   return from && from.personId !== me ? { to: from.personId, thread: from } : null;
 }
 
-export const sendBackWords = (name: string, answered: number): string => (answered === 0
-  ? `Here is ${name}.`
-  : answered === 1 ? `${name} has the change from the comment.` : `${name} has the changes from the ${answered} comments.`);
+// The file is attached under the words, so they do not name it again.
+export const sendBackWords = (answered: number): string => (answered === 0
+  ? 'Here is the new version.'
+  : answered === 1 ? 'Made the change from the comment.' : `Made the changes from the ${answered} comments.`);
 
 // Which comments a hand-over carried, kept on this computer under the thread it started.
 const KEY = (product: string, id: string) => `handed-comments:${product}:${id}`;

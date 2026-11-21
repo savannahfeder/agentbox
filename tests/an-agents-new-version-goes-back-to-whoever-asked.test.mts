@@ -59,10 +59,11 @@ describe('who it goes back to', () => {
 });
 
 describe('what they are told', () => {
-  it('names the file and what it answers, in a sentence', () => {
-    expect(sendBackWords('sign-up-screens-v2.md', 3)).toBe('sign-up-screens-v2.md has the changes from the 3 comments.');
-    expect(sendBackWords('sign-up-screens-v2.md', 1)).toBe('sign-up-screens-v2.md has the change from the comment.');
-    expect(sendBackWords('sign-up-screens-v2.md', 0)).toBe('Here is sign-up-screens-v2.md.');
+  // In the running app the name drew three times: in the words, as the link, as the tile.
+  it('says what it answers without naming the file it carries', () => {
+    expect(sendBackWords(3)).toBe('Made the changes from the 3 comments.');
+    expect(sendBackWords(1)).toBe('Made the change from the comment.');
+    expect(sendBackWords(0)).toBe('Here is the new version.');
   });
 });
 
