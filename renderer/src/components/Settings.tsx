@@ -1010,7 +1010,7 @@ export interface TeamPlanPage {
 /** Starting the team's Pro, as Team › Start Pro does (../pro-trial.ts). */
 export type StartTeamPro = (acceptTerms: boolean) => Promise<{ ok: true } | { ok: false; message: string; terms?: boolean }>;
 
-function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite, teamPro = null }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void; teamPro?: StartTeamPro | null }) {
+export function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite, teamPro = null }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void; teamPro?: StartTeamPro | null }) {
   const [plan, setPlan] = useState<CloudPlan | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
