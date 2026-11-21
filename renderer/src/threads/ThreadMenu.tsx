@@ -239,7 +239,7 @@ export function ThreadMenuList({ rows, change, onPick }: {
           <button key={row.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => onPick(row.id)}>
             <span className="ico"><Mark /></span>
             <span className="ts-more-label">{row.label}</span>
-            {row.id === 'code' ? change : row.key ? <kbd>{chord(row.key)}</kbd> : row.detail && <kbd>{row.detail}</kbd>}
+            {row.id === 'code' ? change : row.key ? <kbd>{chord(row.key)}</kbd> : row.detail && <span className="ts-more-detail">{row.detail}</span>}
           </button>
         );
       })}
@@ -559,7 +559,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
           {giveTo.filter((p) => !(givingFromShare && giveStart === 'help' && p.id.startsWith('mate:'))).map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
             <span className="ico">{p.id.startsWith('mate:') ? <GiveMark /> : <Face name={p.name} size={18} />}</span>
             <span className="ts-more-label">{p.name}</span>
-            {p.detail && <kbd>{p.detail}</kbd>}
+            {p.detail && <span className="ts-more-detail">{p.detail}</span>}
           </button>)}
         </div>
         : <ThreadMenuList rows={rows} change={change} onPick={pick} />)}

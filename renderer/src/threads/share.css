@@ -1,7 +1,7 @@
 /* Share… under the thread's dots: the menu's card, rounded as the theme is. */
 .sh-list { min-width: 280px; }
 .sh-list .ts-more-row .tm-av { margin-left: auto; }
-.sh-list .ts-more-row kbd { margin-left: auto; }
+.sh-list .ts-more-row kbd, .sh-list .ts-more-row .ts-more-detail { margin-left: auto; }
 .sh-sep { height: 1px; margin: 4px 6px; background: var(--line); flex: none; }
 
 .sh-send { width: 400px; text-align: left; padding: 0; gap: 0; overflow: visible; max-height: none; }

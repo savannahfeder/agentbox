@@ -64,7 +64,7 @@ export function ShareList({ link, others, seen, onCopy, onSendOther, onSee, onAs
       </button>}
       <span className="sh-sep" aria-hidden="true" />
       <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSee}>
-        <span className="ico"><PeopleMark /></span><span className="ts-more-label">Who can open it</span><kbd>{seen}</kbd>
+        <span className="ico"><PeopleMark /></span><span className="ts-more-label">Who can open it</span><span className="ts-more-detail">{seen}</span>
       </button>
     </div>
   );
