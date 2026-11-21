@@ -66,3 +66,17 @@ describe('a face reads the same from a first name or a full one', () => {
     expect(renderToStaticMarkup(h(Face, { name: 'Theo' }))).toContain('>TH</span>');
   });
 });
+
+// The hand-off review: "Back from Theo" did not say whether the review passed.
+describe('"Back from" says what came back', () => {
+  it('names the verdict, and falls back to Back from', async () => {
+    const { backWord } = await import('../shared/thread-asks.mts');
+    expect(backWord('Theo', 'yes')).toBe('Theo says it looks good');
+    expect(backWord('Theo', 'changes')).toBe('Theo asked for changes');
+    expect(backWord('Theo', 'done')).toBe('Back from Theo');
+    expect(backWord('Theo', null)).toBe('Back from Theo');
+  });
+  it('the row reads the verdict of that person\'s newest finished ask', () => {
+    expect(read('renderer/src/threads/Pages.tsx')).toContain("backWord(nameFirst(toldBy), asksHere.find((a) => !a.open && a.to === toldBy)?.verdict ?? null)");
+  });
+});

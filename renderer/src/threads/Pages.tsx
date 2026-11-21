@@ -20,7 +20,7 @@ import { PriorityIcon } from '../components/Priority';
 import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
 import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { waitWords } from '../../../shared/thread-waits.mts';
-import { askedOutWord, asksOnThread, handedBackBy } from '../../../shared/thread-asks.mts';
+import { askedOutWord, asksOnThread, backWord, handedBackBy } from '../../../shared/thread-asks.mts';
 import { needsLeft, needsWord } from '../../../shared/cloud-needs.mts';
 import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mts';
 import { commentLine, linkCommentLine } from './teammate-thread';
@@ -785,9 +785,10 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // A cloud run that asked for a key is waiting on it, not finished (round one of the key power test).
   const wants = inNeedsYou && !cell.live && !waits && !peopleWaitOnYou ? needsWord(needsLeft(item, savedKeys)) : null;
   // Handed back by someone you asked (shared/thread-asks.mts): their words are the newest thing on it.
-  const lastAsk = inNeedsYou && team ? Math.max(0, ...asksOnThread(allItems ?? [], team.me, item.id).map((a) => a.at)) : 0;
+  const asksHere = inNeedsYou && team ? asksOnThread(allItems ?? [], team.me, item.id) : [];
+  const lastAsk = Math.max(0, ...asksHere.map((a) => a.at));
   const toldBy = inNeedsYou ? handedBackBy(item as Parameters<typeof handedBackBy>[0], lastAsk) : null;
-  const backFrom = toldBy && team?.byId.has(toldBy) ? `Back from ${nameFirst(toldBy)}` : null;
+  const backFrom = toldBy && team?.byId.has(toldBy) ? backWord(nameFirst(toldBy), asksHere.find((a) => !a.open && a.to === toldBy)?.verdict ?? null) : null;
   // Out with someone you asked: say who, not that nothing is running.
   const askedOut = team && !cell.live && !backFrom ? askedOutWord(allItems ?? [], team.me, item.id, (id) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null;
   const shownWord = wants ?? backFrom ?? askedOut ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });

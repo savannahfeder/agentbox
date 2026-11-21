@@ -108,6 +108,11 @@ export function handedBackBy(row: { status?: string; wrote?: Record<string, { ts
   return (answer.ts ?? 0) >= after ? answer.teammate : null;
 }
 
+/** On your thread's row once someone you asked handed it back: what they said, in a few words. */
+export function backWord(first: string, verdict: string | null): string {
+  return verdict === 'yes' ? `${first} says it looks good` : verdict === 'changes' ? `${first} asked for changes` : `Back from ${first}`;
+}
+
 /** On your thread's row while someone you asked has it: "Theo is reviewing", or null. */
 export function askedOutWord(rows: readonly AskRow[], me: string | null, thread: string, nameOf: (id: string) => string, seenAt?: (row: AskRow) => number): string | null {
   const open = asksOnThread(rows, me, thread).filter((a) => a.open);
