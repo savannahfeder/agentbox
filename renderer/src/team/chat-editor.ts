@@ -20,7 +20,7 @@ import { EndingLink } from '../editor/ending-link';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { lift, newlineInCode, toggleMark, wrapIn } from '@tiptap/pm/commands';
+import { lift, newlineInCode, splitBlock, toggleMark, wrapIn } from '@tiptap/pm/commands';
 import { liftListItem, splitListItem, wrapInList } from '@tiptap/pm/schema-list';
 import type { Node as PmNode, Schema } from '@tiptap/pm/model';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
@@ -40,6 +40,8 @@ const lineJoin = (blocks: Json[]): Json[] => {
   const out: Json[] = [];
   let run: Json[] | null = null;
   for (const block of blocks) {
+    // A quote's lines are lines too, or its second line goes out a paragraph down.
+    if (block.type === 'blockquote') { run = null; out.push({ ...block, content: lineJoin(block.content ?? []) }); continue; }
     if (block.type !== 'paragraph') { run = null; out.push(block); continue; }
     if (run) run.push({ type: 'hardBreak' }, ...(block.content ?? []));
     else { run = [...(block.content ?? [])]; out.push({ type: 'paragraph', content: run }); }
@@ -128,16 +130,20 @@ export const CHAT_KEYS: Record<string, Exclude<Format, 'link'>> = {
 
 /**
  * SHIFT+RETURN, SLACK'S WAY. Return sends a chat message, so this is the only
- * new line there is: in a list it starts the next point and on an empty point
- * ends the list, and in a code block it is a new line of code. Anywhere else it
- * takes nothing, and the editor's own line break follows.
+ * new line there is, and each line is a block of its own: a list button then
+ * makes a list of the line it is on, not of every line above it too. In a list
+ * it starts the next point, in a quote the next line of the quote, and on an
+ * empty one it ends the list or the quote. In a code block it is a new line of
+ * code. A message still goes out as lines one newline apart (`lineJoin`).
  */
 export function shiftReturn(schema: Schema): Command {
   const { nodes } = schema;
   return (state, dispatch) => {
-    if (state.selection.$from.parent.type === nodes.codeBlock) return newlineInCode(state, dispatch);
-    if (!inside(state, nodes.listItem.name)) return false;
-    return splitListItem(nodes.listItem)(state, dispatch) || liftListItem(nodes.listItem)(state, dispatch);
+    const { $from } = state.selection;
+    if ($from.parent.type === nodes.codeBlock) return newlineInCode(state, dispatch);
+    if (inside(state, nodes.listItem.name)) return splitListItem(nodes.listItem)(state, dispatch) || liftListItem(nodes.listItem)(state, dispatch);
+    if (inside(state, nodes.blockquote.name) && $from.parent.content.size === 0) return lift(state, dispatch);
+    return splitBlock(state, dispatch);
   };
 }
 

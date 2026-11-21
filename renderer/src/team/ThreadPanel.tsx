@@ -398,6 +398,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
               const picked = await collect(e.target.files ?? []);
               if (picked.length) setAttachments((a) => [...a, ...picked]);
               e.target.value = '';
+              box.current?.focus();
             }}
           />
           <div className="chat-thread-bar">

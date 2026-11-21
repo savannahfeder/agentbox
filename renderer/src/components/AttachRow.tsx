@@ -39,6 +39,28 @@ export function stagedPictures(attachments: PendingAttachment[], pressed: number
 /** A file's kind as its tile names it: the ending in capitals, or FILE. */
 export const kindOf = (name: string) => /\.([a-z0-9]{1,5})$/i.exec(name)?.[1].toUpperCase() ?? 'FILE';
 
+/**
+ * A long name in two parts, so a tile too narrow for it cuts the first and
+ * keeps the end, which is what tells "report-final-v2" from "report-final-v3":
+ * the last words of up to 12 letters, and the ending.
+ */
+export function nameEnds(name: string): [string, string] {
+  if (name.length <= 20) return [name, ''];
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 && name.length - dot <= 6 ? name.slice(dot) : '';
+  const stem = name.slice(0, name.length - ext.length);
+  const parts = stem.split(/(?<=[\s_-])/);
+  let tail = '';
+  while (parts.length > 1 && parts[parts.length - 1].length + tail.length <= 12) tail = parts.pop() + tail;
+  if (!tail) tail = stem.slice(-8);
+  return [stem.slice(0, stem.length - tail.length), tail + ext];
+}
+
+function FileName({ name }: { name: string }) {
+  const [head, tail] = nameEnds(name);
+  return <span className="attach-name"><span className="attach-head">{head}</span>{tail && <span className="attach-tail">{tail}</span>}</span>;
+}
+
 const Cross = () => (
   <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" /></svg>
 );
@@ -94,7 +116,7 @@ export function AttachRow({ attachments, attaching = [], onRemove, look }: {
           return (
             <div key={i} className={`attach-tile attach-file${a.failed || big ? ' attach-too-big' : ''}`} title={a.failed ?? (big ? overTheLimit(a.size ?? 0) : a.name)}>
               <span className="attach-kind">{kindOf(a.name)}</span>
-              <span className="attach-words"><span className="attach-name">{a.name}</span>{meta && <span className="attach-meta">{meta}</span>}</span>
+              <span className="attach-words"><FileName name={a.name} />{meta && <span className="attach-meta">{meta}</span>}</span>
               {x(i, `Remove ${a.name}`)}
             </div>
           );
@@ -102,7 +124,7 @@ export function AttachRow({ attachments, attaching = [], onRemove, look }: {
         {attaching.map((a) => (
           <div key={a.key} className="attach-tile attach-file attach-coming" role="status">
             <span className="attach-kind">{kindOf(a.name)}</span>
-            <span className="attach-words"><span className="attach-name">{a.name}</span><span className="attach-meta">{a.size ? `${Math.floor((100 * a.done) / a.size)}%` : ''}</span></span>
+            <span className="attach-words"><FileName name={a.name} /><span className="attach-meta">{a.size ? `${Math.floor((100 * a.done) / a.size)}%` : ''}</span></span>
             <span className="attach-bar" style={{ width: `${a.size ? (100 * a.done) / a.size : 0}%` }} aria-hidden="true" />
           </div>
         ))}

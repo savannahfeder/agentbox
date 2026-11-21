@@ -161,7 +161,7 @@
 /* EDITING A MESSAGE IN PLACE: the words in a box where they were. */
 .chat-edit { grid-column: 2; margin-top: 2px; border: 1px solid var(--line-strong); background: var(--wash); }
 .chat-edit-box {
-  display: block; width: 100%; box-sizing: border-box; padding: 9px 12px; resize: none; overflow-y: auto;
+  display: block; width: 100%; box-sizing: border-box; padding: 9px 12px; resize: none; max-height: 320px; overflow-y: auto;
   border: 0; outline: none; background: none; color: var(--text); font: inherit; font-size: 14.5px; line-height: 1.45;
 }
 .chat-edit-foot { display: flex; align-items: center; gap: 6px; padding: 0 8px 8px 12px; }
@@ -276,6 +276,7 @@
 
 /* SEND IN A CHAT'S BOX (ChatSend): an arrow at the bottom right, faint until
    there is something to send, then on the fill every Send in the app wears. */
+.chat-send-at { flex: none; display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
 .dock-send.chat-send {
   flex: none; display: grid; place-items: center; width: 34px; height: 28px; padding: 0; margin-left: 0;
   border: 0; border-radius: var(--artifact-corner-small); color: var(--text);
@@ -324,7 +325,7 @@
 .rich-reply .ProseMirror li p { margin: 0; }
 .rich-reply .ProseMirror blockquote { margin: 2px 0; padding-left: 12px; border-left: 2px solid var(--line-strong); color: var(--text-dim); }
 .rich-reply .ProseMirror code { font-family: var(--mono); font-size: .88em; background: var(--wash-strong); padding: 1px 4px; }
-.rich-reply .ProseMirror pre { margin: 4px 0; padding: 8px 10px; background: var(--wash); font-family: var(--mono); font-size: .88em; white-space: pre-wrap; }
+.rich-reply .ProseMirror pre { margin: 4px 0; padding: 8px 10px; background: var(--wash); border-radius: var(--artifact-corner-small); font-family: var(--mono); font-size: .88em; white-space: pre-wrap; }
 .rich-reply .ProseMirror pre code { background: none; padding: 0; font-size: inherit; }
 .rich-reply .ProseMirror a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .rich-reply .ProseMirror p.is-editor-empty:first-child::before {

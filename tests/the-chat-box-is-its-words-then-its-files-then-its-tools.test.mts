@@ -19,7 +19,8 @@ import fs from 'node:fs';
 import React, { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { FirstChatBox } from '../renderer/src/team/rooms/RoomChat.tsx';
-import { AttachRow } from '../renderer/src/components/AttachRow.tsx';
+import { AttachRow, nameEnds } from '../renderer/src/components/AttachRow.tsx';
+import { MessageEditor } from '../renderer/src/team/MessageMore.tsx';
 globalThis.React = React;
 
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -70,9 +71,18 @@ describe('Send', () => {
     expect(html.lastIndexOf('chat-send')).toBeGreaterThan(html.indexOf('aria-label="Formatting marks"'));
   });
 
-  it('is the same arrow in a chat thread’s reply box', () => {
+  it('is the same arrow in a chat thread’s reply box and in a thread with a person', () => {
     expect(read('renderer/src/team/ThreadPanel.tsx')).toMatch(/<ChatSend /);
     expect(roomChat).toMatch(/<ChatSend /);
+    expect(read('renderer/src/components/Focus.tsx')).toMatch(/talkTo\?\.length \? \(\s*<ChatSend ready=\{hasDraft\}/);
+  });
+
+  it('leaves a reply to an agent its word and its key, which is not Return', () => {
+    expect(read('renderer/src/components/Focus.tsx')).toMatch(/<>Send <kbd>\{sendKeyFor\(enterSends\)\}<\/kbd><\/>/);
+  });
+
+  it('sits at the right end of the bar, with "Sending" beside it while a file goes up', () => {
+    expect(ruleIn(chatCss, '.chat-send-at')).toMatch(/margin-left: auto;/);
   });
 });
 
@@ -104,15 +114,26 @@ describe('what is attached, as tiles', () => {
   it('draws any other file as a card with its kind, its name and its size, which a press does not take out', () => {
     const html = tiles([{ name: 'quarterly-numbers-final-v3.pdf', image: false, srcPath: '/x/q.pdf', size: 240_000 }]);
     expect(html).toMatch(/<span class="attach-kind">PDF<\/span>/);
-    expect(html).toMatch(/<span class="attach-name">quarterly-numbers-final-v3.pdf<\/span>/);
+    expect(html).toMatch(/<span class="attach-name"><span class="attach-head">quarterly-numbers-<\/span><span class="attach-tail">final-v3.pdf<\/span><\/span>/);
     expect(html).toMatch(/<span class="attach-meta">234 KB<\/span>/);
     expect(html).not.toContain('attach-chip');
     expect(html.match(/aria-label="Remove quarterly-numbers-final-v3.pdf"/g)).toHaveLength(1);
     expect(html).toMatch(/<button type="button" class="attach-x"[^>]*aria-label="Remove quarterly-numbers-final-v3.pdf"/);
   });
 
-  it('cuts a long name short on one line rather than wrapping the row', () => {
-    expect(ruleIn(stylesCss, '.attach-tiles .attach-name')).toMatch(/white-space: nowrap; overflow: hidden; text-overflow: ellipsis;/);
+  // A tester attached ten files and could not tell them apart: every long name
+  // was cut at its end, where "final-v3" and "final-v2" differ.
+  it('cuts a long name in its middle on one line, keeping the end that tells files apart', () => {
+    expect(ruleIn(stylesCss, '.attach-tiles .attach-head')).toMatch(/min-width: 0; overflow: hidden; text-overflow: ellipsis;/);
+    expect(ruleIn(stylesCss, '.attach-tiles .attach-tail')).toMatch(/flex: none;/);
+    expect(nameEnds('quarterly-numbers-final-v3.pdf')).toEqual(['quarterly-numbers-', 'final-v3.pdf']);
+    expect(nameEnds('Customer interview recording with the design team.m4a')).toEqual(['Customer interview recording with the ', 'design team.m4a']);
+    expect(nameEnds('averyveryverylongnamewithnobreaks.txt')).toEqual(['averyveryverylongnamewith', 'nobreaks.txt']);
+  });
+
+  it('leaves a short name whole', () => {
+    expect(nameEnds('notes.txt')).toEqual(['notes.txt', '']);
+    expect(nameEnds('launch-plan-draft.md')).toEqual(['launch-plan-draft.md', '']);
   });
 
   it('names a file with no kind by the word File', () => {
@@ -148,5 +169,36 @@ describe('what is attached, as tiles', () => {
 describe('the bar', () => {
   it('has tools big enough to hit', () => {
     expect(ruleIn(chatCss, '.fmt-btn')).toMatch(/width: 28px; height: 28px;/);
+  });
+
+  // A tester attached a picture and typed on, and the words went nowhere: the
+  // file picker had taken the cursor out of the box and nothing gave it back.
+  it('puts the cursor back in the box once files are picked', () => {
+    expect(roomChat).toMatch(/e\.target\.value = ''; ref\.current\?\.focus\(\);/);
+    expect(read('renderer/src/team/ThreadPanel.tsx')).toMatch(/e\.target\.value = '';\s*box\.current\?\.focus\(\);/);
+    expect(read('renderer/src/components/Focus.tsx')).toMatch(/e\.target\.value = '';\s*ref\.current\?\.focus\(\);/);
+  });
+});
+
+// The same tester opened that quote to edit it and found a ">" before the
+// words: editing a sent message was a plain text field showing the marks.
+describe('editing a sent message', () => {
+  it('is the chat box’s own editor, so a quote is edited as a quote', () => {
+    const html = renderToStaticMarkup(h(MessageEditor, { text: '> a quote', onSave: () => {}, onCancel: () => {}, onEmpty: () => {} }));
+    expect(html).toContain('class="chat-edit-box rich-reply"');
+    expect(html).not.toContain('<textarea');
+  });
+});
+
+// A tester sent a customer's words as a quote, and it arrived as plain text: a
+// sent message drew no quote at all, a list's bullets hung out past the words to
+// their left, and a block of code wore the inline code's tint line by line.
+describe('a formatted message, once sent', () => {
+  it('draws its list, quote and code as the box drew them while they were written', () => {
+    expect(ruleIn(rooms, '.rm-cm .tx ul, .rm-cm .tx ol')).toMatch(/padding-left: 22px;/);
+    expect(ruleIn(chatCss, '.rich-reply .ProseMirror ul, .rich-reply .ProseMirror ol')).toMatch(/padding-left: 22px;/);
+    expect(ruleIn(rooms, '.rm-cm .tx blockquote')).toMatch(/border-left: 2px solid var\(--line-strong\); color: var\(--text-dim\);/);
+    expect(ruleIn(rooms, '.rm-cm .tx pre')).toMatch(/background: var\(--wash\); border-radius: var\(--artifact-corner-small\);/);
+    expect(ruleIn(rooms, '.rm-cm .tx pre code')).toMatch(/background: none; padding: 0;/);
   });
 });

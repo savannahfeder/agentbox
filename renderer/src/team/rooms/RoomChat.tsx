@@ -640,7 +640,7 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
         }} />
       <AttachRow look="tiles" attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
       <input ref={filePicker} type="file" multiple style={{ display: 'none' }}
-        onChange={async (e) => { add(await collectFiles(e.target.files ?? [])); e.target.value = ''; }} />
+        onChange={async (e) => { add(await collectFiles(e.target.files ?? [])); e.target.value = ''; ref.current?.focus(); }} />
       <div className="rm-compose-bar">
         <FormatBar box={ref as unknown as { current: HTMLTextAreaElement | null }} onChange={setText} marksAt={marksAt}
           onAttach={onPutFile ? () => filePicker.current?.click() : undefined}

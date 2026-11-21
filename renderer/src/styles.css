@@ -3354,7 +3354,9 @@ body {
   background: var(--wash-strong); font: 9.5px var(--mono); letter-spacing: .04em; color: var(--text-dim);
 }
 .attach-tiles .attach-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.attach-tiles .attach-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; line-height: 17px; color: var(--text); }
+.attach-tiles .attach-name { display: flex; min-width: 0; white-space: pre; font-size: 13px; line-height: 17px; color: var(--text); }
+.attach-tiles .attach-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.attach-tiles .attach-tail { flex: none; }
 .attach-tiles .attach-meta { font-size: 12px; line-height: 16px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .attach-tiles .attach-too-big { border-color: var(--text-faint); }
 .attach-tiles .attach-too-big .attach-meta { color: var(--text-dim); }

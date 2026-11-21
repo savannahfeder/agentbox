@@ -105,6 +105,7 @@ import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, paneForThread, threadToOpen } from '../team/chat-threads';
 import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
 import { FormatBar, useMarksRow } from '../team/FormatBar';
+import { ChatSend } from '../team/ChatSend';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
 import { VoiceNote } from '../team/VoiceNote';
 import { voiceNoteName, voiceNoteOf } from '../team/voice-note';
@@ -3669,6 +3670,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
           if (picked.length) setAttachments((a) => [...a, ...picked]);
           // Cleared so picking the same file twice in a row still fires.
           e.target.value = '';
+          ref.current?.focus();
         }}
       />
       <AttachRow look={talkTo?.length ? 'tiles' : undefined} attachments={attachments} attaching={attaching} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
@@ -3817,7 +3819,9 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
         )}
         {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
         {/* Stop gives way to Send, which would leave focus on the page and the next words typed nowhere. */}
-        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : (
+        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : talkTo?.length ? (
+          <ChatSend ready={hasDraft} busy={saving} sending="Sending…" onSend={() => send()} />
+        ) : (
         <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
         <button
           className="dock-send"

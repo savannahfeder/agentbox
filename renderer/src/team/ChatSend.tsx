@@ -1,6 +1,6 @@
 // Send at the bottom right of a chat's box (w-f689c07680): an arrow, as Slack's
 // is, faint until there is something to send. Its key is in the tooltip, not in
-// the button.
+// the button. A reply to an agent keeps "Send ⌘↵", whose key is not Return.
 import { SendGlyph } from '../components/reply-glyphs';
 import { sendKeyFor } from '../reply-keys';
 
@@ -11,10 +11,10 @@ export function ChatSend({ ready, busy = false, sending, onSend }: {
   sending?: string;
   onSend: () => void;
 }) {
-  return <>
+  return <span className="chat-send-at">
     {busy && sending && <span className="chat-sending" role="status">{sending}</span>}
     <button type="button" className="dock-send chat-send" disabled={!ready || busy} onClick={onSend} title={`Send · ${sendKeyFor(true)}`} aria-label="Send">
       <SendGlyph />
     </button>
-  </>;
+  </span>;
 }
