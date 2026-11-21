@@ -196,6 +196,24 @@ describe('a Monitor still watching after its tests end', () => {
     expect(h.server.status().running).toMatchObject([{ id: 'test', holdsSlot: true }]);
   });
 
+  it('a long test that peaked on its own keeps its slot when it runs low and a quick command beside it reports', async () => {
+    const h = harness({ slots: 2 });
+    h.setProcs([CLAUDE, MCP, ...hookChain(310)]);
+    h.ask('test', 'npm test', 310);
+    const shell: Proc = { pid: 500, ppid: CLAUDE.pid, mb: 4, args: '/bin/bash -c npm test' };
+    h.setProcs([CLAUDE, MCP, shell, { pid: 501, ppid: 500, mb: 900, args: 'node vitest' }]);
+    await h.pollFor(20_000);
+    const low: Proc[] = [shell, { pid: 501, ppid: 500, mb: 50, args: 'node vitest' }];
+    h.setProcs([CLAUDE, MCP, ...low, ...hookChain(320)]);
+    h.ask('quick', READ, 320);
+    h.setProcs([CLAUDE, MCP, ...low, { pid: 520, ppid: CLAUDE.pid, mb: 3, args: `/bin/bash -c ${READ}` }]);
+    await h.pollFor(2_000);
+    h.report('quick', 900);
+    h.setProcs([CLAUDE, MCP, ...low]);
+    await h.pollFor(5 * 60_000);
+    expect(h.server.status().running).toMatchObject([{ id: 'test', holdsSlot: true }]);
+  });
+
   it('with memory short, the slot it gives back starts nothing heavy until memory returns', async () => {
     const h = harness();
     await batchesUnderAMonitor(h);
@@ -217,5 +235,16 @@ describe('a Monitor still watching after its tests end', () => {
     h.setProcs([CLAUDE, MCP, ...watching, { pid: 700, ppid: MCP.pid, mb: 800, args: 'chromium --headless' }]);
     await h.pollFor(20_000);
     expect(h.server.status().running.find((r) => r.id === 'watch')?.peakMb).toBe(9);
+  });
+
+  it('under Codex, whose process tree was never measured, a program under an older child still counts', async () => {
+    const h = harness();
+    const CODEX: Proc = { pid: 200, ppid: 1, mb: 300, args: '/usr/local/bin/codex app-server', startedAt: HOUR_AGO };
+    const HELPER: Proc = { pid: 201, ppid: 200, mb: 40, args: 'codex-code-mode', startedAt: HOUR_AGO };
+    h.setProcs([CODEX, HELPER]);
+    h.ask('test', 'npm test', CODEX.pid);
+    h.setProcs([CODEX, HELPER, { pid: 210, ppid: HELPER.pid, mb: 900, args: 'node vitest' }]);
+    await h.pollFor(20_000);
+    expect(h.server.status().running).toMatchObject([{ id: 'test', peakMb: 900, holdsSlot: true }]);
   });
 });
