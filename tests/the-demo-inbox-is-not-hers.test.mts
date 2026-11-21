@@ -279,6 +279,14 @@ describe('how the demo rows are written', () => {
     for (const text of said) expect(text).not.toMatch(/[a-z]: [a-z]/i);
   });
 
+  // "The word 'fairy,' by the way, is a little funny because it sounds like
+  // 'fairy fairy,' which is like a slur" (founder, 2026-11-21). Renamed Shuttle.
+  it('never calls the invented company Ferry', () => {
+    const src = fs.readFileSync(path.join(import.meta.dirname, '../shared/demo-world.mts'), 'utf8');
+    expect(src).not.toMatch(/ferry/i);
+    expect(src).toContain("name: 'Shuttle'");
+  });
+
   it('writes no em dash anywhere, because a screenshot of this is our writing', () => {
     for (const line of rows) {
       expect(JSON.stringify(line).includes('—')).toBe(false);
