@@ -45,7 +45,7 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
-import { ChooseList, CopiedSheet, GiveSheet, SeeList, SendSheet, ShareList } from './SharePanel';
+import { ChooseList, CopiedSheet, GiveSheet, SeeList, SendSheet, ShareList, pointsAtStep } from './SharePanel';
 import { sendFirst, type SeenBy } from './share-rules';
 import { readAskDraft, saveAskDraft, type AskDraft, type ItemRef } from '../drafts';
 
@@ -570,7 +570,7 @@ export function ThreadMenu({ thread = null, share = null, onCopyLink, onSendTo, 
             onChange={(mode, note) => keep({ to: { id: givingTo.id, name: givingTo.name }, mode, note, step })}
             onChangePerson={() => setGivingTo(null)}
             onGive={(note) => { keep(null); close(false); onGive?.(givingTo, note); }}
-            onAsk={onAsk ? (kind, note) => { const s = step; keep(null); close(false); onAsk(givingTo, kind, note, s); } : undefined} />;
+            onAsk={onAsk ? (kind, note) => { const s = pointsAtStep(kind) ? step : null; keep(null); close(false); onAsk(givingTo, kind, note, s); } : undefined} />;
         })()
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">

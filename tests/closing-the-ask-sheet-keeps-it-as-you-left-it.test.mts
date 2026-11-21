@@ -70,16 +70,16 @@ const picked = (p) => p.locator('[role="radio"][aria-checked="true"]').innerText
 const quote = (p) => p.locator('.sh-step').innerText();
 const clickAway = (p) => p.click('#away');
 
-/** Ask a teammate on a message, pick Tony, switch to a review and start typing. */
+/** Ask a teammate on a message, pick Tony and start typing. */
 async function startAsking(p, step = QUIC) {
   await p.evaluate((t) => window.askAbout(t), step);
   await p.click('text=Tony Reyes');
-  await p.click('[role="radio"]:has-text("Review")');
   await note(p).fill('Can you check the office firewall?');
 }
+const review = (p) => p.click('[role="radio"]:has-text("Review")');
 
 describe.skipIf(!browserAvailable)('the ask sheet, closed before it was sent', () => {
-  it('comes back on Ask a teammate as it was: Tony, Review, the message and the note', async () => {
+  it('comes back on Ask a teammate as it was: Tony, the message and the note', async () => {
     const p = await page();
     await startAsking(p);
     await clickAway(p);
@@ -87,10 +87,24 @@ describe.skipIf(!browserAvailable)('the ask sheet, closed before it was sent', (
     await p.evaluate((t) => window.askAbout(t), QUIC);
     expect(await sheetOpen(p)).toBe(true);
     expect(await note(p).inputValue()).toBe('Can you check the office firewall?');
-    expect(await picked(p)).toBe('Review');
+    expect(await picked(p)).toBe('Help');
     expect(await quote(p)).toBe(QUIC);
-    await p.click('text=Ask Tony to review');
-    expect(await calls(p)).toEqual([['ask', 'u-tony', 'review', 'Can you check the office firewall?', QUIC]]);
+    await p.click('text=Ask Tony to help');
+    expect(await calls(p)).toEqual([['ask', 'u-tony', 'help', 'Can you check the office firewall?', QUIC]]);
+    await p.close();
+  });
+
+  it('comes back on Review, which shows no message, and keeps the message for Help', async () => {
+    const p = await page();
+    await startAsking(p);
+    await review(p);
+    await clickAway(p);
+    await p.evaluate((t) => window.askAbout(t), QUIC);
+    expect(await picked(p)).toBe('Review');
+    expect(await p.locator('.sh-step').count()).toBe(0);
+    expect(await note(p).inputValue()).toBe('Can you check the office firewall?');
+    await p.click('[role="radio"]:has-text("Help")');
+    expect(await quote(p)).toBe(QUIC);
     await p.close();
   });
 
@@ -136,16 +150,17 @@ describe.skipIf(!browserAvailable)('the ask sheet, closed before it was sent', (
     await p.close();
   });
 
-  it('lets you pick someone else by pressing the name, keeping the note', async () => {
+  it('lets you pick someone else by pressing the name, keeping the note and the switch', async () => {
     const p = await page();
     await startAsking(p);
+    await review(p);
     await p.click('.sh-to button:has-text("Tony")');
     expect(await sheetOpen(p)).toBe(false);
     await p.click('text=Maya Lin');
     expect(await note(p).inputValue()).toBe('Can you check the office firewall?');
     expect(await picked(p)).toBe('Review');
     await p.click('text=Ask Maya to review');
-    expect((await calls(p))[0].slice(0, 3)).toEqual(['ask', 'u-maya', 'review']);
+    expect(await calls(p)).toEqual([['ask', 'u-maya', 'review', 'Can you check the office firewall?', null]]);
     await p.close();
   });
 
@@ -166,6 +181,7 @@ describe.skipIf(!browserAvailable)('what is not kept', () => {
   it('an ask once sent: the next one starts from the people, on Help, with an empty note', async () => {
     const p = await page();
     await startAsking(p);
+    await review(p);
     await p.click('text=Ask Tony to review');
     await p.evaluate((t) => window.askAbout(t), QUIC);
     expect(await sheetOpen(p)).toBe(false);

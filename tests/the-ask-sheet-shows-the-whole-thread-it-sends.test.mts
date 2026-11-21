@@ -5,8 +5,10 @@
 // that message. The teammate gets the whole thread, as a task that opens it
 // with the message quoted as where to look (main/team/index.mts askTeammate).
 // The sheet now draws the thread by its name with the message quoted inside
-// it. Five designs were drawn in the real renderer; this is the one proposed.
-// Checked as markup and in Chromium with the app's own menu.
+// it, the one the founder picked of five drawn in the real renderer. They
+// asked that only Help point at a message: a review or a hand-over is of the
+// whole thread, so it shows none and sends none. Checked as markup and in
+// Chromium with the app's own menu.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import { createElement as h } from 'react';
@@ -37,10 +39,13 @@ describe('the sheet', () => {
     expect(card(html)).toContain(NAME);
     expect(html).not.toContain('sh-step');
   });
-  it('quotes no message on Hand over, where the whole thread changes hands', () => {
-    const html = sheet({ start: 'give' });
-    expect(card(html)).toContain(NAME);
-    expect(html).not.toContain(QUIC);
+  // The founder, on the drawings: "for help maybe it should be a particular line but the others maybe not".
+  it('quotes no message on Review or Hand over, where the whole thread is what they look at', () => {
+    for (const start of ['review', 'give']) {
+      const html = sheet({ start });
+      expect(card(html)).toContain(NAME);
+      expect(html).not.toContain(QUIC);
+    }
   });
 });
 
@@ -57,10 +62,12 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ThreadMenu } from './renderer/src/threads/ThreadMenu';
 import { askAboutStep } from './renderer/src/team/AsksLine';
+window.calls = [];
 window.askAbout = (text) => flushSync(() => askAboutStep(text));
 window.mountMenu = (name) => {
   const root = createRoot(document.getElementById('menu'));
-  flushSync(() => root.render(<ThreadMenu thread={{ product: 'infra', id: 'w-1', name }} giveTo={[{ id: 'u-tony', name: 'Tony' }]} onFinish={() => {}} onGive={() => {}} onAsk={() => {}} />));
+  flushSync(() => root.render(<ThreadMenu thread={{ product: 'infra', id: 'w-1', name }} giveTo={[{ id: 'u-tony', name: 'Tony' }]} onFinish={() => {}} onGive={() => {}}
+    onAsk={(to, kind, note, step) => window.calls.push([kind, step])} />));
 };`;
 let browser, bundle;
 beforeAll(async () => {
@@ -86,6 +93,23 @@ describe.skipIf(!browserAvailable)('Ask a teammate on a thread', () => {
     await p.click('text=Tony');
     expect(await p.locator('.sh-thread .sh-thread-head').innerText()).toBe(NAME);
     expect(await p.locator('.sh-thread .sh-step').innerText()).toBe(QUIC);
+    await p.click('text=Ask Tony to help');
+    expect(await p.evaluate(() => window.calls.splice(0))).toEqual([['help', QUIC]]);
+    await p.close();
+  });
+  it('sends a review of the thread with no message, as the sheet shows it', async () => {
+    const p = await browser.newPage();
+    p.setDefaultTimeout(4000);
+    await p.route('http://p.test/**', (r) => r.fulfill({ contentType: 'text/html', body: '<div id="menu"></div>' }));
+    await p.goto('http://p.test/');
+    await p.addScriptTag({ content: bundle });
+    await p.evaluate((n) => window.mountMenu(n), NAME);
+    await p.evaluate((t) => window.askAbout(t), QUIC);
+    await p.click('text=Tony');
+    await p.click('[role="radio"]:has-text("Review")');
+    expect(await p.locator('.sh-step').count()).toBe(0);
+    await p.click('text=Ask Tony to review');
+    expect(await p.evaluate(() => window.calls.splice(0))).toEqual([['review', null]]);
     await p.close();
   });
 });

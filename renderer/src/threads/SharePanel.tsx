@@ -123,6 +123,9 @@ const MODES: { id: GiveMode; label: string; detail: (first: string) => string; a
   { id: 'give', label: 'Hand over', detail: (f) => `It becomes ${f}’s thread from now on.`, ask: 'Add a note', go: (f) => `Give to ${f}` },
 ];
 
+/** Only help points at a message; a review or a hand-over is of the whole thread, so it shows and sends none. */
+export const pointsAtStep = (mode: GiveMode): boolean => mode === 'help';
+
 const ThreadMark = () => <svg {...mark} width={14} height={14}><path d="M4 5h16v11h-9l-4.5 3.5V16H4z" /><path d="M8 9h8M8 12h5" /></svg>;
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
@@ -149,7 +152,7 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', star
   const m = MODES.find((x) => x.id === mode)!;
   const go = () => { if (mode === 'give' || !onAsk) onGive(note.trim()); else onAsk(mode, note.trim()); };
   const face = <Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />;
-  const quote = step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>;
+  const quote = step && pointsAtStep(mode) && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>;
   return (
     <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Bring in ${first}`}>
       <div className="sh-to"><span className="sh-label">To</span>{onChangePerson
