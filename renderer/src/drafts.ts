@@ -152,6 +152,37 @@ export function saveDraftPick(item: ItemRef, pick: DraftPick | null, store?: Dra
   } catch { /* a refused store is not a reason to lose the send */ }
 }
 
+/** The Ask or hand off sheet as it was left on a thread, kept until it is sent. */
+export interface AskDraft {
+  to: { id: string; name: string };
+  mode: 'help' | 'review' | 'give';
+  step: string | null;
+  note: string;
+}
+
+export function askDraftKey(item: ItemRef): string {
+  return `zero.askdraft.${item.product}:${item.id}`;
+}
+
+export function readAskDraft(item: ItemRef, store?: DraftStore): AskDraft | null {
+  try {
+    const d = JSON.parse(backing(store).getItem(askDraftKey(item)) ?? 'null');
+    if (!d || typeof d.to?.id !== 'string' || typeof d.to?.name !== 'string' || !['help', 'review', 'give'].includes(d.mode)) return null;
+    return { to: { id: d.to.id, name: d.to.name }, mode: d.mode, step: typeof d.step === 'string' && d.step ? d.step : null, note: typeof d.note === 'string' ? d.note : '' };
+  } catch {
+    return null;
+  }
+}
+
+/** Null once it is sent. */
+export function saveAskDraft(item: ItemRef, draft: AskDraft | null, store?: DraftStore): void {
+  const s = backing(store);
+  try {
+    if (draft) s.setItem(askDraftKey(item), JSON.stringify(draft));
+    else s.removeItem(askDraftKey(item));
+  } catch { /* kept for as long as the sheet is open */ }
+}
+
 /* ------------------------------ the images ------------------------------- */
 
 /** The images of the same draft, beside the words and never mixed into them. */

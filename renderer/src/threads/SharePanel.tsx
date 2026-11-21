@@ -124,7 +124,7 @@ const MODES: { id: GiveMode; label: string; detail: (first: string) => string; a
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
-export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help' }: {
+export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', startNote = '', onChange, onChangePerson }: {
   to: { id: string; name: string };
   onGive: (note: string) => void;
   /** Help or a review keeps the thread yours; without it only handing over is offered. */
@@ -132,25 +132,33 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help' }: {
   /** The message picked as the step, drawn as a quote. */
   step?: string | null;
   start?: GiveMode;
+  startNote?: string;
+  /** Every pick and keystroke, so a sheet closed unsent can open again as it was. */
+  onChange?: (mode: GiveMode, note: string) => void;
+  /** Pressing the name goes back to the people. */
+  onChangePerson?: () => void;
 }) {
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(startNote);
   const [mode, setMode] = useState<GiveMode>(onAsk ? start : 'give');
   const team = useContext(TeamContext);
   const first = to.name.split(/\s+/)[0] || to.name;
   const m = MODES.find((x) => x.id === mode)!;
   const go = () => { if (mode === 'give' || !onAsk) onGive(note.trim()); else onAsk(mode, note.trim()); };
+  const face = <Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />;
   return (
     <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Bring in ${first}`}>
-      <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
+      <div className="sh-to"><span className="sh-label">To</span>{onChangePerson
+        ? <button type="button" className="sh-chip" title="Pick someone else" onClick={onChangePerson}>{face}{first}</button>
+        : <span className="sh-chip sh-chip-set">{face}{first}</span>}</div>
       {onAsk && <div className="sh-modes">
         <div className="sh-switch" role="radiogroup" aria-label="What you want from them">
-          {MODES.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => setMode(x.id)}>{x.label}</button>)}
+          {MODES.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => { setMode(x.id); onChange?.(x.id, note); }}>{x.label}</button>)}
         </div>
         <p className="sh-mode-says">{m.detail(first)}</p>
       </div>}
       {step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>}
       <textarea className="sh-note" autoFocus placeholder={m.ask} value={note} aria-label={m.ask} rows={2}
-        onChange={(e) => setNote(e.target.value)}
+        onChange={(e) => { setNote(e.target.value); onChange?.(mode, e.target.value); }}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); } }} />
       <div className="sh-foot">
         <button type="button" className="th-new sh-go" onClick={go}>{m.go(first)}</button>
