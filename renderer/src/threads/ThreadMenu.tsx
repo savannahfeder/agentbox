@@ -51,7 +51,7 @@ import type { SeenBy } from './share-rules';
 /** ⌘K asking a person: the thread's menu opens its sheet for them. */
 export const ASK_PERSON_EVENT = 'zero:ask-person';
 
-export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
+export type ThreadMenuRowId = 'follow' | 'continue' | 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
 
 /**
  * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
@@ -71,7 +71,11 @@ export const PLACE_ROW: Record<Exclude<ThreadPlace, 'off'>, { label: string; det
 /** What picking does: keep it on this Mac (true), let the cloud have it (false), move its run now, or turn the whole cloud on. */
 export type PlaceAct = boolean | 'move' | 'cloud-on';
 export const placeAct = (place: Exclude<ThreadPlace, 'off'>): PlaceAct => (place === 'move' ? 'move' : place !== 'kept' && place !== 'needs');
-export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string | null; detail?: string }
+export interface ThreadMenuRow {
+  id: ThreadMenuRowId; label: string; key: string | null; detail?: string;
+  /** A row that is on until it is picked again, ticked meanwhile. */
+  on?: boolean;
+}
 
 /**
  * Which rows a thread's menu offers, in the order they are drawn. `terminal`
@@ -94,7 +98,11 @@ export interface ThreadMenuRow { id: ThreadMenuRowId; label: string; key: string
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, runNow = false, share = false, people = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, stopRepeat = false, closeTask = false, reopen = false }: {
+export function threadMenuRows({ change, terminal, finish, follow = null, carryOn = false, runNow = false, share = false, people = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, stopRepeat = false, closeTask = false, reopen = false }: {
+  /** A teammate's thread: whether you are told when it is done, or null where that cannot change. */
+  follow?: 'on' | 'off' | null;
+  /** A teammate's thread you can carry on in one of your own. */
+  carryOn?: boolean;
   /** A done thread whose corner holds something else, so Reopen is a row. */
   reopen?: boolean;
   /** Share… opens the link, the inbox and who can open it; it takes Add people's place. */
@@ -123,6 +131,8 @@ export function threadMenuRows({ change, terminal, finish, runNow = false, share
   give?: boolean;
 }): ThreadMenuRow[] {
   const rows: ThreadMenuRow[] = [];
+  if (follow) rows.push({ id: 'follow', label: 'Tell me when it is done', key: null, on: follow === 'on' });
+  if (carryOn) rows.push({ id: 'continue', label: 'Continue it yourself', key: null });
   // One door for both: someone looking to hand it off goes to Share first (founder, 2026-11-21).
   if (share) rows.push({ id: 'share', label: give ? 'Ask, hand over or share…' : 'Share…', key: null });
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
@@ -157,7 +167,7 @@ export function splitDone(rows: ThreadMenuRow[]): { done: ThreadMenuRow | null; 
 
 /* ------------------------------------------------------------------ marks */
 
-const mark = { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
+export const mark = { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
 
 function CodeMark() {
   return <svg {...mark}><path d="m8.5 7-5 5 5 5" /><path d="m15.5 7 5 5-5 5" /></svg>;
@@ -223,7 +233,16 @@ function CloseTaskMark() {
 function ReopenMark() {
   return <svg {...mark}><path d="M4 10h11a5 5 0 0 1 0 10h-4" /><path d="m8 6-4 4 4 4" /></svg>;
 }
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { reopen: ReopenMark, share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': CloseTaskMark, done: DoneMark };
+/** The bell a group wears for its alerts (team/rooms/icons.tsx). */
+function FollowMark() {
+  return <svg {...mark}><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5h4" /></svg>;
+}
+/** An arrow turning off the line: carry it on from here. */
+function ContinueMark() {
+  return <svg {...mark}><path d="M6 4.5v7a3.5 3.5 0 0 0 3.5 3.5H19" /><path d="m15 11 4 4-4 4" /></svg>;
+}
+const TICK = <svg className="ts-more-tick" {...mark}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { follow: FollowMark, continue: ContinueMark, reopen: ReopenMark, share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': CloseTaskMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -247,7 +266,7 @@ export function ThreadMenuList({ rows, change, onPick }: {
           <button key={row.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => onPick(row.id)}>
             <span className="ico"><Mark /></span>
             <span className="ts-more-label">{row.label}</span>
-            {row.id === 'code' ? change : row.key ? <kbd>{chord(row.key)}</kbd> : row.detail && <span className="ts-more-detail">{row.detail}</span>}
+            {row.id === 'code' ? change : row.key ? <kbd>{chord(row.key)}</kbd> : row.detail ? <span className="ts-more-detail">{row.detail}</span> : row.on && TICK}
           </button>
         );
       })}
@@ -268,7 +287,12 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ following = null, onFollow, onContinue = null, share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+  /** On a teammate's thread: whether you are told when it is done, or null where you cannot be. */
+  following?: boolean | null;
+  onFollow?: () => void;
+  /** On a teammate's thread: carry it on in a thread of your own. */
+  onContinue?: (() => void) | null;
   /** What Share… offers, or null where the thread cannot be shared. */
   share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string; chosen?: readonly string[] } | null;
   /** Puts the link on the clipboard; false when it could not. */
@@ -340,7 +364,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
 }) {
   const canGive = giveTo.length > 0 && !!onGive && !!onFinish;
   // With both, the Share button beside Done is the one door, so the menu does not repeat it.
-  const { done, menu: rows } = splitDone(threadMenuRows({ change: !!change && !codeButton, share: !!share && !canGive, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: canGive && !share, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ follow: following === null || !onFollow ? null : following ? 'on' : 'off', carryOn: !!onContinue, change: !!change && !codeButton, share: !!share && !canGive, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: canGive && !share, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [givingTo, setGivingTo] = useState<{ id: string; name: string } | null>(null);
@@ -482,7 +506,9 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
     if (id === 'priority') { setLeveling(true); return; }
     if (id === 'share') { setSharing('list'); return; }
     close(id === 'terminal');
-    if (id === 'run') onRunNow?.();
+    if (id === 'follow') onFollow?.();
+    else if (id === 'continue') onContinue?.();
+    else if (id === 'run') onRunNow?.();
     else if (id === 'code') onViewChange?.();
     else if (id === 'terminal') onToggleTerminal?.();
     else if (id === 'later') onLater?.();

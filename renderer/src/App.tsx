@@ -244,7 +244,7 @@ import { cloudOffer, type OfferGo } from './cloud-upgrade';
 import { FleetContext, queuedWithHeld, stoppedIds, type Fleet } from './fleet';
 import { factsFor } from './status-word';
 import { isCarrying } from './threads/row-drag';
-import { TeammateThread } from './threads/TeammateThread';
+import { TEAMMATE_REPLY, TeammateThread } from './threads/TeammateThread';
 import { SharedFileCards, SharedFileRows } from './threads/SharedFileRows';
 import { FollowCards, FollowRows } from './threads/FollowRows';
 import { FollowContext, follow, followNews, isFollowing, markTold, readFollows, unfollow, writeFollows, type Follow } from './team/following';
@@ -6831,7 +6831,8 @@ export default function App() {
       // A TEAMMATE'S CARD IS A SCREEN, LIKE AN OPEN THREAD (w-fb16bcaeba). It
       // had no keys of its own, so J, K and E all ran against the list hidden
       // behind it. J and K walk on, Escape goes back to the page, N and Z mean
-      // what they mean everywhere, and nothing else reaches the list.
+      // what they mean everywhere, R opens its reply box as on a thread of your
+      // own, and nothing else reaches the list.
       if (openCard && teamShown) {
         if (e.key === 'Escape') { e.preventDefault(); if (putAwayTheNewest(openDoc ? docOpenedAt.current : -Infinity)) return; if (openDoc) closeArtifact(); else { setOpenCard(null); setTeamOpen(false); } }
         else if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
@@ -6841,6 +6842,7 @@ export default function App() {
         }
         else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
+        else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); window.dispatchEvent(new Event(TEAMMATE_REPLY)); }
         return;
       }
       // On the page J and K move the keyboard and open nothing: onto a

@@ -28,6 +28,7 @@ describe('opening an ask you were asked', () => {
   });
   it('offers the person asked no Tell me when it is done on that thread', () => {
     const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-    expect(page).toContain("{following && card.state !== 'done' && !ask && <button");
+    // A row in the thread's ⋯ menu since w-8a8eac7620; null leaves the row out.
+    expect(page).toContain("onFollow={following && card.state !== 'done' && !ask ? ");
   });
 });
