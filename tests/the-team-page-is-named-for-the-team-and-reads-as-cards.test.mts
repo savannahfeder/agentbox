@@ -36,8 +36,12 @@ describe('the Everyone view', () => {
 });
 
 describe('a person\'s page', () => {
+  // The one column a place has is an AI teammate's settings (w-0773d2dee5, 2026-11-21).
   it('gives the chat the room, with no column beside it', () => {
-    expect(read('renderer/src/team/everything/everything.css')).not.toContain('.pl-side');
+    const app = read('renderer/src/App.tsx');
+    const person = app.slice(app.indexOf("if (placeMember.kind === 'person') {"), app.indexOf("} else if (placeMember.key.startsWith('mate:')) {"));
+    expect(person).toContain('<MemberPlace m={placeMember}');
+    expect(person).not.toMatch(/\bside=\{/);
   });
   it('wraps a long title to a second line rather than cutting it', () => {
     const css = read('renderer/src/team/everything/everything.css');
