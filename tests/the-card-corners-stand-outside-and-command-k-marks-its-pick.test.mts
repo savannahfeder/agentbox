@@ -46,10 +46,12 @@ describe("the sidebar's selected page", () => {
 });
 
 describe('⌘K', () => {
-  it('marks the selected row with a faint fill and an orange edge', () => {
+  // The orange edge went on 2026-11-21: with the orange icon it showed the
+  // accent twice (tests/the-command-bar-draws-line-icons-like-the-menus).
+  it('marks the selected row with a faint fill alone', () => {
     const sel = rule(styles, '\\.palette-item\\.selected');
     expect(sel).toMatch(/background: var\(--wash\)/);
-    expect(sel).toMatch(/box-shadow: inset 2px 0 0 var\(--accent\)/);
+    expect(sel).not.toMatch(/var\(--accent\)/);
   });
   it('wears no corner marks in Dark', () => {
     expect(rule(nav, `${E} \\.modal`)).not.toMatch(/ticks/);

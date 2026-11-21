@@ -80,7 +80,7 @@ describe('where it is drawn', () => {
   it('above the reply box, in the thread view, and the corner card is not drawn as well', () => {
     expect(app).toMatch(/aboveDock=\{<>.*\{whereItWent\}<\/>\}/);
     // On a Needs you thread it goes up into the bar instead (w-65bcefb857).
-    expect(focus).toMatch(/\{!sentUp && aboveDock\}\s*<div className="dock-card">/);
+    expect(focus).toMatch(/\{!sentUp && aboveDock\}\s*\{outWithThem \? .*: <div className="dock-card">/);
     expect(app).toMatch(/if \(sentLineShown\) return null;/);
   });
 

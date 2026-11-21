@@ -14,7 +14,7 @@ import { SAYS_UNDO } from '../toast-parts';
 import type { LedgerLine } from '../thread-history';
 import type { DragEvent } from 'react';
 import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
-import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, inOrderOf, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
+import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, inOrderOf, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, showsTotal, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
 import { fileRenameUndo, moveUndo, renameUndo } from './files-undo';
 import './files-place.css';
 
@@ -655,6 +655,24 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
           </span>;
         })}
       </nav>
+      {!chosen && <div className="fp-views">
+        {showsTotal(used.onMac) && <TotalMenu where={where} onMac={used.onMac} older={used.older} sort={sort} onSort={setSort}
+          onOlder={() => {
+            const keys = below.filter((f) => (f.older ?? 0) > 0).map((f) => f.key);
+            trash(keys, 'the older versions', true);
+          }}
+          onChoose={() => setChosen(new Set())}
+          cloud={cloud} onCloud={(paid) => onSettings?.(paid ? 'files' : 'cloud')} />}
+        <div className="fp-switch" role="group" aria-label="Sort">
+          <button type="button" className={`fp-kind${sort === 'recent' ? ' is-on' : ''}`} aria-pressed={sort === 'recent'} onClick={() => setSort('recent')}>Recent</button>
+          <button type="button" className={`fp-kind${sort === 'name' ? ' is-on' : ''}`} aria-pressed={sort === 'name'} onClick={() => setSort('name')}>Name</button>
+          {sort === 'size' && <button type="button" className="fp-kind is-on" aria-pressed="true" onClick={() => setSort('recent')}>Size</button>}
+        </div>
+        <div className="fp-switch" role="group" aria-label="View">
+          <button type="button" className={`fp-kind fp-view-icon${asList ? '' : ' is-on'}`} aria-pressed={!asList} aria-label="Grid" title="Grid" onClick={() => setAsList(false)}><GridGlyph /></button>
+          <button type="button" className={`fp-kind fp-view-icon${asList ? ' is-on' : ''}`} aria-pressed={asList} aria-label="List" title="List" onClick={() => setAsList(true)}><ListGlyph /></button>
+        </div>
+      </div>}
       <label className="fp-find">
         <SearchIcon />
         <input ref={box} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search files" aria-label="Search files"
@@ -671,31 +689,13 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
           trash(keys, keys.length === 1 ? shownName(chosenFiles[0]) : `${keys.length} files`);
         }}>Move to the Trash</button>
       </div>
-    </div> : <div className="fp-tools">
+    </div> : (kinds.length > 1 || reviewing > 0 || review) && <div className="fp-tools">
       <div className="fp-kinds" role="group" aria-label="Show">
         {kinds.length > 1 && <>
           <button type="button" className={`fp-kind${kind === null && !review ? ' is-on' : ''}`} aria-pressed={kind === null && !review} onClick={() => { setKind(null); setReview(false); }}>All</button>
           {kinds.map((k) => <button type="button" key={k} className={`fp-kind${kind === k ? ' is-on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(kind === k ? null : k)}>{KIND_PLURAL[k]}</button>)}
         </>}
         {(reviewing > 0 || review) && <button type="button" className={`fp-kind${review ? ' is-on' : ''}`} aria-pressed={review} onClick={() => setReview(!review)}>Needs review</button>}
-      </div>
-      <div className="fp-views">
-        {used.onMac > 0 && <TotalMenu where={where} onMac={used.onMac} older={used.older} sort={sort} onSort={setSort}
-          onOlder={() => {
-            const keys = below.filter((f) => (f.older ?? 0) > 0).map((f) => f.key);
-            trash(keys, 'the older versions', true);
-          }}
-          onChoose={() => setChosen(new Set())}
-          cloud={cloud} onCloud={(paid) => onSettings?.(paid ? 'files' : 'cloud')} />}
-        <div className="fp-switch" role="group" aria-label="Sort">
-          <button type="button" className={`fp-kind${sort === 'recent' ? ' is-on' : ''}`} aria-pressed={sort === 'recent'} onClick={() => setSort('recent')}>Recent</button>
-          <button type="button" className={`fp-kind${sort === 'name' ? ' is-on' : ''}`} aria-pressed={sort === 'name'} onClick={() => setSort('name')}>Name</button>
-          {sort === 'size' && <button type="button" className="fp-kind is-on" aria-pressed="true" onClick={() => setSort('recent')}>Size</button>}
-        </div>
-        <div className="fp-switch" role="group" aria-label="View">
-          <button type="button" className={`fp-kind fp-view-icon${asList ? '' : ' is-on'}`} aria-pressed={!asList} aria-label="Grid" title="Grid" onClick={() => setAsList(false)}><GridGlyph /></button>
-          <button type="button" className={`fp-kind fp-view-icon${asList ? ' is-on' : ''}`} aria-pressed={asList} aria-label="List" title="List" onClick={() => setAsList(true)}><ListGlyph /></button>
-        </div>
       </div>
     </div>}
     {(cards.length > 0 || projectCards.length > 0 || naming?.what === 'folder') && <div className="fp-folders" onPointerMove={pointerMoved}>
