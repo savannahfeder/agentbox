@@ -58,11 +58,11 @@ describe('Settings', () => {
     expect(row).toContain('gap: 11px');
   });
 
-  it('underlines its search the way the app sidebar does, with no box', () => {
+  it('draws its search the way the app sidebar does: no box and no hairline', () => {
     const box = rule(settingsCss, '.set-search');
     expect(box).toContain('border: 0');
     expect(box).toContain('background: none');
-    expect(rule(settingsCss, '.set-search::after')).toContain('height: 1px');
+    expect(settingsCss).not.toContain('.set-search::after');
   });
 });
 
@@ -73,8 +73,10 @@ describe('Connections', () => {
     expect(add).toContain('<PlusGlyph />');
   });
 
-  it('gives the search beside it the same 32px', () => {
-    expect(rule(connectionsCss, '.cn-head .cn-find')).toContain('height: 32px');
+  it("gives the search beside it the same 32px, from Files' box it wears", () => {
+    expect(connections).toContain('className="fp-find cn-find"');
+    expect(rule(read('renderer/src/files/files-place.css'), '.fp-find')).toContain('height: 32px');
+    expect(rule(connectionsCss, '.cn-head .cn-find')).not.toContain('height');
   });
 
   it('shows a tool nobody can connect yet on one dimmed line, the reason in its tooltip', () => {

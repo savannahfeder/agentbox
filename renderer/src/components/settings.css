@@ -31,8 +31,6 @@
   border: 0; background: none;
   color: var(--text-faint); cursor: text; -webkit-app-region: no-drag;
 }
-.set-search::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 1px; background: var(--line); opacity: .55; }
-.set-search:hover::after, .set-search:focus-within::after { opacity: 1; }
 .set-search svg { width: 18px; height: 18px; flex: none; }
 .set-search input {
   flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: none;

@@ -12,7 +12,7 @@
 .su-tog i::after { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); transition: left .15s; }
 .su-tog[aria-checked="true"] i { background: var(--text-dim); }
 .su-tog[aria-checked="true"] i::after { left: 14px; }
-.su-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text-faint); cursor: pointer; }
+.su-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 8px; background: none; color: var(--text-faint); cursor: pointer; }
 .su-icon:hover, .su-icon.on { color: var(--text); border-color: var(--line-strong); }
 
 /* Settings open under the heading, in the page, never over it. */
@@ -37,8 +37,12 @@
 .su-day:hover:not(:disabled) { color: var(--text); }
 .su-day.on { color: var(--text); border-color: var(--line-strong); background: var(--bg-selected); }
 .su-day:disabled { opacity: .45; cursor: default; }
-.su-search { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text-faint); }
-.su-search input { width: 150px; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text); outline: none; }
+/* The search box every page shares, at the 30px of this row. */
+.su-search { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 30px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); background: var(--wash); color: var(--text-faint); }
+.su-search:focus-within { border-color: var(--line-strong); }
+.su-search svg { flex: none; width: 15px; height: 15px; stroke-width: 1.5; }
+.app.sky-shown:not(.home-shown) .su-search { background-color: color-mix(in srgb, var(--sky-under, var(--bg)) 82%, transparent); }
+.su-search input { width: 150px; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text); outline: none; }
 .su-search input::placeholder { color: var(--text-faint); }
 
 .su-sep { display: flex; align-items: center; gap: 14px; margin: 14px 0 2px; font-size: 13px; color: var(--text-faint); }

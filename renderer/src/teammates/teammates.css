@@ -164,8 +164,10 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 /* CHATS: your AI teammates, people and groups in one list. Softer than the
    inbox, as the chat is, with the sections folding. */
 .cx-list, .gc-list.cx-list { padding: 10px 10px 16px; display: flex; flex-direction: column; gap: 1px; background: var(--bg); }
-.cx-search { display: flex; align-items: center; gap: 8px; height: 32px; margin: 0 2px 6px; padding: 0 10px; border-radius: 6px; background: var(--wash); color: var(--text-faint); }
-.cx-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text); }
+.cx-search { display: flex; align-items: center; gap: 8px; height: 32px; box-sizing: border-box; margin: 0 2px 6px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); background: var(--wash); color: var(--text-faint); }
+.cx-search:focus-within { border-color: var(--line-strong); }
+.cx-search svg { flex: none; width: 15px; height: 15px; stroke-width: 1.5; }
+.cx-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: 13px; color: var(--text); }
 .cx-search input::placeholder { color: var(--text-faint); }
 .cx-sec { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
 .cx-head { display: flex; align-items: center; gap: 4px; height: 30px; padding: 0 4px 0 2px; margin-bottom: 2px; }
@@ -179,6 +181,8 @@ span.tq-link:focus-visible { outline: 1px solid var(--text-faint); outline-offse
 .cx-sec > .cx-row { padding-left: 26px; }
 .cx-row:hover { background: var(--wash); }
 .cx-row.on { background: var(--bg-selected); }
+/* Light's --bg-selected is blue; every other selection in light is a neutral fill. */
+:root[data-theme="light"] .cx-row.on { background: var(--wash-strong); }
 .cx-row .tq, .cx-row .gr-tile, .cx-row img, .cx-row .gr-two { flex: none; }
 .cx-row .tq-sm { width: 20px; height: 20px; }
 .cx-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
