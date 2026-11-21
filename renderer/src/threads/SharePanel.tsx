@@ -12,12 +12,25 @@ export const LinkMark = () => <svg {...mark}><path d="M10 14a4 4 0 0 0 5.7 0l3-3
 const InboxMark = () => <svg {...mark}><path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z" /><path d="M4 13.5h4.5l1 2h5l1-2H20" /></svg>;
 const PeopleMark = () => <svg {...mark}><circle cx="9" cy="9" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 6.2a3 3 0 0 1 0 5.6M17.5 14.8c1.8.6 3 2.1 3.4 4.7" /></svg>;
 const LockMark = () => <svg {...mark}><rect x="5.5" y="10.5" width="13" height="9" rx="1.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></svg>;
+const HandMark = () => <svg {...mark}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.5 2.7-5.5 6-5.5 1.4 0 2.7.4 3.7 1" /><path d="M15 17h6m-2.5-2.5L21 17l-2.5 2.5" /></svg>;
+const AskMark = () => <svg {...mark}><path d="M5 5.5h14v10H10l-4 3.5v-3.5H5z" /><path d="M10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4" /><path d="M12 14.2v.1" /></svg>;
+const BackMark = () => <svg {...mark}><path d="m14.5 6-6 6 6 6" /></svg>;
 const Tick = () => <svg className="ts-more-tick" {...mark}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
 
 const row = 'row-i ts-more-row';
 
-/** Copy link, send it to the one teammate named, to anyone else, and who can open it. */
-export function ShareList({ link, first, others, seen, onCopy, onSendFirst, onSendOther, onSee }: {
+/** The way back to the panel this one opened from, at the top of every panel under Share. */
+export function PanelBack({ label, onBack }: { label: string; onBack: () => void }) {
+  return <>
+    <button type="button" role="menuitem" tabIndex={-1} className={`${row} sh-back`} onClick={onBack}>
+      <span className="ico"><BackMark /></span><span className="ts-more-label">{label}</span>
+    </button>
+    <span className="sh-sep" aria-hidden="true" />
+  </>;
+}
+
+/** Hand it to someone or ask them in first, then the link: copy it, send it to an inbox, and who can open it. */
+export function ShareList({ link, first, others, seen, onCopy, onSendFirst, onSendOther, onSee, onAsk, onHand, onBack }: {
   link: boolean;
   first: Person | null;
   others: boolean;
@@ -26,18 +39,31 @@ export function ShareList({ link, first, others, seen, onCopy, onSendFirst, onSe
   onSendFirst: () => void;
   onSendOther: () => void;
   onSee: () => void;
+  /** Help or a review; absent where the thread cannot be asked about. */
+  onAsk?: () => void;
+  /** Hand it over for good; absent where it cannot be. */
+  onHand?: () => void;
+  onBack?: () => void;
 }) {
   return (
-    <div className="th-menu ts-more-menu sh-list" role="menu" aria-label="Share">
+    <div className="th-menu ts-more-menu sh-list" role="menu" aria-label="Share or hand off">
+      {onBack && <PanelBack label="Back" onBack={onBack} />}
+      {onAsk && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onAsk}>
+        <span className="ico"><AskMark /></span><span className="ts-more-label">Ask for help or a review…</span>
+      </button>}
+      {onHand && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onHand}>
+        <span className="ico"><HandMark /></span><span className="ts-more-label">Hand it over…</span>
+      </button>}
+      {(onAsk || onHand) && <span className="sh-sep" aria-hidden="true" />}
       {link && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onCopy}>
         <span className="ico"><LinkMark /></span><span className="ts-more-label">Copy link</span>
       </button>}
       {first && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSendFirst}>
-        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send to {firstName(first)}</span>
+        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send a link to {firstName(first)}</span>
         <Face person={first} size={18} />
       </button>}
       {others && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSendOther}>
-        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send to someone…</span>
+        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send a link to someone…</span>
       </button>}
       <span className="sh-sep" aria-hidden="true" />
       <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSee}>
@@ -48,7 +74,7 @@ export function ShareList({ link, first, others, seen, onCopy, onSendFirst, onSe
 }
 
 /** Team, chosen people, or only you; the one it is now ticked. */
-export function SeeList({ seen, teamName, onPick }: { seen: SeenBy; teamName: string; onPick: (to: SeenBy) => void }) {
+export function SeeList({ seen, teamName, onPick, onBack }: { seen: SeenBy; teamName: string; onPick: (to: SeenBy) => void; onBack?: () => void }) {
   const rows: { id: SeenBy; label: string; Mark: () => JSX.Element }[] = [
     { id: 'team', label: `Everyone at ${teamName}`, Mark: PeopleMark },
     { id: 'people', label: 'Chosen people…', Mark: PeopleMark },
@@ -56,6 +82,7 @@ export function SeeList({ seen, teamName, onPick }: { seen: SeenBy; teamName: st
   ];
   return (
     <div className="th-menu ts-more-menu" role="menu" aria-label="Who can open it">
+      {onBack && <PanelBack label="Back" onBack={onBack} />}
       {rows.map(({ id, label, Mark }) => <button key={id} type="button" role="menuitem" aria-current={seen === id ? 'true' : undefined} tabIndex={-1} className={row} onClick={() => onPick(id)}>
         <span className="ico"><Mark /></span><span className="ts-more-label">{label}</span>{seen === id && <Tick />}
       </button>)}
@@ -64,9 +91,10 @@ export function SeeList({ seen, teamName, onPick }: { seen: SeenBy; teamName: st
 }
 
 /** Chosen people…: the team, ticked where they can open it; a press adds or takes off. */
-export function ChooseList({ people, chosen, onPick }: { people: readonly Person[]; chosen: readonly string[]; onPick: (id: string) => void }) {
+export function ChooseList({ people, chosen, onPick, onBack }: { people: readonly Person[]; chosen: readonly string[]; onPick: (id: string) => void; onBack?: () => void }) {
   return (
     <div className="th-menu ts-more-menu" role="menu" aria-label="Who can open it">
+      {onBack && <PanelBack label="Back" onBack={onBack} />}
       {people.map((p) => <button key={p.id} type="button" role="menuitem" aria-current={chosen.includes(p.id) ? 'true' : undefined} tabIndex={-1} className={row} onClick={() => onPick(p.id)}>
         <span className="ico"><Face person={p} size={18} /></span><span className="ts-more-label">{p.name || firstName(p)}</span>{chosen.includes(p.id) && <Tick />}
       </button>)}
@@ -75,7 +103,8 @@ export function ChooseList({ people, chosen, onPick }: { people: readonly Person
 }
 
 /** To, a note, and Send to inbox; Copy link beside it for a link instead. */
-export function SendSheet({ people, start, link, onCopy, onSend }: {
+export function SendSheet({ people, start, link, onCopy, onSend, onBack }: {
+  onBack?: () => void;
   people: readonly Person[];
   start: readonly string[];
   link: boolean;
@@ -89,7 +118,8 @@ export function SendSheet({ people, start, link, onCopy, onSend }: {
   const add = (id: string) => { setTo((was) => [...new Set([...was, id])]); setTyped(''); };
   const send = () => { if (to.length) onSend(to, note.trim()); };
   return (
-    <div className="th-menu ts-more-menu sh-send" role="dialog" aria-label="Send to someone">
+    <div className="th-menu ts-more-menu sh-send" role="dialog" aria-label="Send a link">
+      {onBack && <PanelBack label="Back" onBack={onBack} />}
       <div className="sh-to">
         <span className="sh-label">To</span>
         {to.map((id) => { const p = people.find((x) => x.id === id); return p && <button key={id} type="button" className="sh-chip" title="Take off" onClick={() => setTo((was) => was.filter((x) => x !== id))}><Face person={p} size={18} />{firstName(p)}</button>; })}
@@ -124,7 +154,8 @@ const MODES: { id: GiveMode; label: string; detail: (first: string) => string; a
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
-export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help' }: {
+export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBack }: {
+  onBack?: () => void;
   to: { id: string; name: string };
   onGive: (note: string) => void;
   /** Help or a review keeps the thread yours; without it only handing over is offered. */
@@ -141,6 +172,7 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help' }: {
   const go = () => { if (mode === 'give' || !onAsk) onGive(note.trim()); else onAsk(mode, note.trim()); };
   return (
     <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Bring in ${first}`}>
+      {onBack && <PanelBack label="Back" onBack={onBack} />}
       <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
       {onAsk && <div className="sh-modes">
         <div className="sh-switch" role="radiogroup" aria-label="What you want from them">
@@ -160,9 +192,10 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help' }: {
 }
 
 /** After Copy link: it is on the clipboard, and anyone can still have it in their inbox. */
-export function CopiedSheet({ link, people, onSend }: { link: string; people: readonly Person[]; onSend: (id: string) => void }) {
+export function CopiedSheet({ link, people, onSend, onBack }: { link: string; people: readonly Person[]; onSend: (id: string) => void; onBack?: () => void }) {
   return (
     <div className="th-menu ts-more-menu sh-copied" role="dialog" aria-label="Link copied">
+      {onBack && <PanelBack label="Back" onBack={onBack} />}
       <div className="sh-done"><Tick /><span>Link copied</span></div>
       <div className="sh-url">{link.replace(/^https?:\/\//, '')}</div>
       {people.length > 0 && <>

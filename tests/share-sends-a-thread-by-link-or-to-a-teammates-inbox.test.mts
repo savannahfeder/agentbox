@@ -68,11 +68,11 @@ describe('Share…', () => {
   const list = (o = {}) => text(renderToStaticMarkup(React.createElement(ShareList, {
     link: true, first: THEO, others: true, seen: 'Lumen', onCopy() {}, onSendFirst() {}, onSendOther() {}, onSee() {}, ...o,
   })));
-  it('says Copy link, Send to the teammate named, Send to someone…, and who can open it, in that order', () => {
+  it('says Copy link, Send a link to the teammate named, to someone…, and who can open it, in that order', () => {
     const t = list();
-    expect(t.indexOf('Copy link')).toBeLessThan(t.indexOf('Send to Theo'));
-    expect(t.indexOf('Send to Theo')).toBeLessThan(t.indexOf('Send to someone…'));
-    expect(t.indexOf('Send to someone…')).toBeLessThan(t.indexOf('Who can open it'));
+    expect(t.indexOf('Copy link')).toBeLessThan(t.indexOf('Send a link to Theo'));
+    expect(t.indexOf('Send a link to Theo')).toBeLessThan(t.indexOf('Send a link to someone…'));
+    expect(t.indexOf('Send a link to someone…')).toBeLessThan(t.indexOf('Who can open it'));
     expect(t).toContain('Lumen');
   });
   it('offers nobody to send to on a team of one, and no link where there is none', () => {

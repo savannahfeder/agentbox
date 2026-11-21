@@ -26,3 +26,7 @@
 .sh-url { padding: 2px 8px 8px 34px; font: 12px/18px var(--mono); color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sh-head { padding: 6px 8px 4px; font: 11px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
 .sh-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 8px 6px; }
+
+/* The way back to the panel this one opened from. */
+.sh-back .ts-more-label, .sh-back .ico { color: var(--text-dim); }
+.sh-back:hover .ts-more-label, .sh-back:hover .ico { color: var(--text); }

@@ -40,7 +40,7 @@ describe('a menu over a thread says what picking does', () => {
   // the PM tester could not tell whether a person or an AI got it (round six).
   it('Ask or hand off says what a person gets, and that an AI teammate starts on it when one is listed', () => {
     const menu = read('renderer/src/threads/ThreadMenu.tsx');
-    expect(menu).toContain("(onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')");
+    expect(menu).toContain("onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')");
     expect(menu).toContain("(giveTo.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')");
   });
 
