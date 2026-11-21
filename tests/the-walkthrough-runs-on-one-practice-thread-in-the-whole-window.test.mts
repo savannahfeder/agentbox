@@ -102,7 +102,7 @@ describe('marking the practice thread done', () => {
   // Walking it in a copy: E on the practice thread opened the next thread in
   // Needs you, a real chat brought in from the computer, with the next tip over it.
   it('goes back to where it was opened from, not on to a real thread', () => {
-    expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: !!focused && !isTourPractice\(tourRef\.current, item\), index, id: item\.id \}\);/);
+    expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: \(!!focused \|\| isTheAskOn\(item, openCard\)\) && !isTourPractice\(tourRef\.current, item\), index, id: item\.id \}\);/);
   });
 });
 

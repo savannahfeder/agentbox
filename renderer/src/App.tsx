@@ -261,7 +261,7 @@ import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shar
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
 import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
-import { teammateThreadsFound } from './threads/teammate-thread';
+import { isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
 import { revealLine } from './reveal-line';
@@ -4894,8 +4894,8 @@ export default function App() {
     const at = shownInbox.findIndex((i) => i.id === item.id);
     const index = at < 0 && focused?.id === item.id && inboxPlace.current?.id === item.id ? inboxPlace.current.index : at;
     // The walkthrough's practice thread does not lead on into real ones.
-    advanceRef.current = advanceAfter({ fromTask: !!focused && !isTourPractice(tourRef.current, item), index, id: item.id });
-  }, [shownInbox, focused]);
+    advanceRef.current = advanceAfter({ fromTask: (!!focused || isTheAskOn(item, openCard)) && !isTourPractice(tourRef.current, item), index, id: item.id });
+  }, [shownInbox, focused, openCard]);
 
   // AND EVERY WAY A ROW LEAVES HER INBOX CLOSES THE TASK THROUGH HERE.
   //
@@ -4911,7 +4911,8 @@ export default function App() {
   const leaveResolved = useCallback((item: WorkItem) => {
     noteAdvance(item);
     setFocused(null);
-  }, [noteAdvance]);
+    if (isTheAskOn(item, openCard)) { setOpenCard(null); setTeamOpen(false); }
+  }, [noteAdvance, openCard]);
 
   // Threads opened with O this session (openToastRow).
   const openedWithO = useRef(new Set<string>());
@@ -6844,6 +6845,8 @@ export default function App() {
       // what they mean everywhere, R opens its reply box as on a thread of your
       // own, and nothing else reaches the list.
       if (openCard && teamShown) {
+        // An ask on you opens here instead of as your task, so its L and E are this page's.
+        const asked = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;
         if (e.key === 'Escape') { e.preventDefault(); if (putAwayTheNewest(openDoc ? docOpenedAt.current : -Infinity)) return; if (openDoc) closeArtifact(); else { setOpenCard(null); setTeamOpen(false); } }
         else if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
           e.preventDefault();
@@ -6853,6 +6856,8 @@ export default function App() {
         else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
         else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); window.dispatchEvent(new Event(TEAMMATE_REPLY)); }
+        else if ((e.key === 'l' || e.key === 'L') && asked) openSnooze(asked);
+        else if ((e.key === 'e' || e.key === 'E') && asked) { e.preventDefault(); void markDone(asked); }
         return;
       }
       // On the page J and K move the keyboard and open nothing: onto a
@@ -6983,7 +6988,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, urgentShownRow, openUrgentReady, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, urgentShownRow, openUrgentReady, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab, team]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
