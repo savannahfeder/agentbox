@@ -147,6 +147,21 @@ describe('the team a demo copy is signed in to', () => {
     expect(task.some((l) => l.patch.status === 'done')).toBe(true);
   });
 
+  // Opened from the Standup, a teammate's thread said "Priya's app has not
+  // shared these messages yet" and nothing else (founder, on a call, 2026-11-21).
+  it('opens every teammate thread on their ask, what it is about, and a finished one on its answer', async () => {
+    const b = await signedIn();
+    const cards = await b.listCards() as { personId: string; threadId: string; state: string; problem: string | null }[];
+    expect(cards.length).toBeGreaterThanOrEqual(15);
+    for (const c of cards) {
+      expect(String(c.problem ?? '').length).toBeGreaterThan(20);
+      const got = await b.getThreadWork(c.personId, c.threadId) as { work: { lines: { source: string; patch: Record<string, string> }[] } } | null;
+      const lines = got?.work.lines ?? [];
+      expect(lines.some((l) => l.source === 'founder' && l.patch.body)).toBe(true);
+      if (c.state !== 'running') expect(lines.some((l) => l.source === 'agent' && l.patch.result)).toBe(true);
+    }
+  });
+
   it('shows what each teammate is on', async () => {
     const cards = await (await signedIn()).listCards() as { personId: string; state: string }[];
     for (const p of DEMO_TEAMMATES) expect(cards.some((c) => c.personId === p.id)).toBe(true);
