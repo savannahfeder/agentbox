@@ -41,11 +41,12 @@ describe('a teammate’s face', () => {
     expect(svg).not.toMatch(/<rect[^>]*fill="#(?!000|fff)/i);
   });
 
-  // At the inbox's 18px the hair ran into the circle's top and read as a cut-off head.
-  it('is drawn smaller and lower than its square, so the head clears a round frame', () => {
+  // At the inbox's 18px the hair ran into the circle's top and read as a cut-off
+  // head; drawn whole, the face was too small to make out.
+  it('is drawn closer than the whole bust, and low enough that the head clears a round frame', () => {
     const svg = svgOf(faceDrawing('t-iris'));
     expect(svg).toMatch(/transform="translate\(0 [1-9][\d.]*\)"/);
-    expect(svg).toMatch(/scale\(0\.8[0-9]*\)/);
+    expect(svg).toMatch(/scale\(1\.2[0-9]*\)/);
   });
 
   // Measured in the inbox: the face sat 2.5px above its title, the other rows' marks at 0.
