@@ -71,10 +71,10 @@ export const DEMO_PRODUCTS = [
 
 /* ------------------------------ your threads ------------------------------ */
 
-// Six things wait on you when the copy opens: two from teammates
-// (`demoMessages`) and four threads an agent has answered. Each lands on a
-// screen worth showing: options answered with one key, a decision, a thread
-// that belongs with a teammate, something blocked on you.
+// Six things wait on you when the copy opens: four threads an agent has
+// answered, each with a picture of the work and options under it, and two from
+// teammates (`demoMessages`). The two Claude Code threads are newest, so they
+// sit on top: a call shows the inbox first and teammates second.
 //
 // EACH IS SHAPED LIKE A REAL THREAD: your ask, then the agent's answer, its
 // summary (`problem` and `progress`, drawn as Context and Done) and its short
@@ -99,7 +99,7 @@ interface DemoRow {
   /** The agent's answer, written when it finished. */
   result: string;
   answeredAt: number;
-  status?: 'done' | 'blocked';
+  status?: 'done';
   doneAt?: number;
   /** A task asked for in a chat: its label naming the chat, and only the chat's people see it. */
   askedIn?: { slug: string; id: string; people: string[] };
@@ -109,11 +109,38 @@ function lines(now: number): DemoRow[] {
   return [
     {
       product: 'ferry',
+      id: 'w-f0c7e31b52',
+      engine: 'claude',
+      priority: 7,
+      at: now - 25 * MIN,
+      answeredAt: now - 6 * MIN,
+      ask: 'Add Sign in with Google to the sign-in page, beside email.',
+      label: 'Sign in with Google',
+      problem: 'You wanted people to sign in to Ferry with their Google account as well as with email.',
+      progress: [
+        'Added Sign in with Google above the email box',
+        'Signed in with 3 test Google accounts, each landed on its own moves',
+        'Someone who signed up by email keeps one account, not two',
+      ],
+      result: [
+        '**Sign in with Google is built. Turn it on for everyone?**',
+        '',
+        'designs/sign-in-with-google.png',
+        '',
+        'It sits above the email box on the sign-in page. I signed in with 3 test Google accounts and each one landed on its own moves. Someone who already signed up by email with the same address keeps one account, not two.',
+        '',
+        '## Options',
+        '1. Turn it on for everyone (recommended)',
+        '2. Trial teams first, everyone next week',
+      ].join('\n'),
+    },
+    {
+      product: 'ferry',
       id: 'w-f1d8a20c41',
       engine: 'claude',
       priority: 7,
-      at: now - 2.2 * HR,
-      answeredAt: now - 18 * MIN,
+      at: now - 50 * MIN,
+      answeredAt: now - 14 * MIN,
       ask: 'Files older than 2019 arrive in Google Drive stamped with today\'s date. Fix it so they keep their real date.',
       label: 'Old file dates after a move',
       problem: 'You wanted files older than 2019 to keep their real date after a move. They were arriving in Google Drive stamped with today\'s date.',
@@ -125,6 +152,8 @@ function lines(now: number): DemoRow[] {
       ],
       result: [
         '**Ship the date fix now, or hold it until shared drives work too?**',
+        '',
+        'designs/old-dates-before-and-after.png',
         '',
         'Files older than 2019 now keep their real date. I moved 3,200 test files dated 2004 to 2018 and every one arrived with its date. Nothing already moved is touched.',
         '',
@@ -151,13 +180,18 @@ function lines(now: number): DemoRow[] {
         'Moves over 20,000 files stall in the sync engine',
       ],
       result: [
-        '**Hand this to Theo. Large moves stall inside his sync engine.**',
+        '**Small moves to OneDrive work. Large ones stall in Theo\'s sync engine.**',
         '',
-        'OneDrive works as a destination. I moved 9,400 files across 4 test accounts and every folder and date arrived intact.',
+        'designs/onedrive-test-moves.png',
         '',
-        'Moves over 20,000 files stall in the sync engine, which Theo is rewriting this week, so a fix from me would land on top of his.',
+        'I moved 9,400 files across 4 test accounts and every folder and date arrived intact. Three larger moves, of 24,000, 31,000 and 58,000 files, each stopped at 20,000, when the engine\'s upload queue ran out of memory.',
         '',
-        'Three test moves stalled, at 24,000, 31,000 and 58,000 files. Each one stopped when the engine\'s upload queue passed 20,000 files and ran out of memory, which is the part Theo is rewriting.',
+        'Theo is rewriting that queue this week, so a fix from me would land on top of his. I would hand this to him.',
+        '',
+        '## Options',
+        '1. Hand it to Theo (recommended)',
+        '2. Ship OneDrive for moves under 20,000 files',
+        '3. Hold it until Theo\'s rewrite lands',
       ].join('\n'),
     },
     {
@@ -178,6 +212,8 @@ function lines(now: number): DemoRow[] {
       result: [
         '**Per seat, or one flat price per team?**',
         '',
+        'designs/what-each-team-would-pay.png',
+        '',
         'All three trial teams you interviewed expected to pay per seat, and per seat grows as a team does. Both similar tools charge one flat price per team, which is easier to say out loud.',
         '',
         'Those three teams have 6, 18 and 40 people. At $8 a seat, two of them would pay more than a $99 flat price and the smallest would pay less.',
@@ -186,30 +222,6 @@ function lines(now: number): DemoRow[] {
         '1. Per seat, $8 a month (recommended)',
         '2. One flat price, $99 a month per team',
         '3. Per seat, never more than $99 a team',
-      ].join('\n'),
-    },
-    {
-      product: 'ferry',
-      id: 'w-f4b6e1c093',
-      engine: 'codex',
-      priority: 9,
-      at: now - 7 * HR,
-      answeredAt: now - 3.1 * HR,
-      status: 'blocked',
-      ask: 'Set up payments with Stripe, so a team can pay when its trial ends.',
-      label: 'Payments with Stripe',
-      problem: 'You wanted teams to be able to pay when their trial ends. Checkout is built. Stripe needs the company account verified first.',
-      progress: [
-        'Built checkout with Stripe',
-        'Passed every test with Stripe\'s test keys',
-        'Live keys refused until the account is verified',
-      ],
-      result: [
-        '**Finish Stripe\'s account check. It needs the company\'s bank details.**',
-        '',
-        'Checkout is built and passes every test with Stripe\'s test keys. The live keys are refused until the account is verified, and only you can fill in that form. It is in Stripe under Settings, then Business details.',
-        '',
-        'Once it is verified, reply here and I will switch to the live keys and make one real $1 charge to check it end to end.',
       ].join('\n'),
     },
     {
@@ -240,10 +252,10 @@ function lines(now: number): DemoRow[] {
       id: SUBJECT_TASK,
       engine: 'claude',
       priority: 5,
-      at: now - 33 * MIN,
-      answeredAt: now - 31 * MIN,
+      at: now - 1.9 * HR,
+      answeredAt: now - 1.87 * HR,
       status: 'done',
-      doneAt: now - 30 * MIN,
+      doneAt: now - 1.85 * HR,
       askedIn: { ...LENA_THREAD, people: [DEMO_ME.id, LENA.id] },
       ask: 'Can you write three other subject lines for this and say which reads clearest?',
       label: 'Subject lines for the launch email',
@@ -317,7 +329,6 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
     out.push({ id: row.id, ts: at + 2, source: 'agent', patch: { label: row.label } });
     out.push({ id: row.id, ts: answered - 1, source: 'agent', patch: { problem: row.problem, progress: row.progress.join('\n') } });
     out.push({ id: row.id, ts: answered, source: 'agent', patch: { result: row.result } });
-    if (row.status === 'blocked') out.push({ id: row.id, ts: answered + 1, source: 'system', patch: { status: 'blocked' } });
     if (row.status === 'done') out.push({ id: row.id, ts: Math.round(row.doneAt ?? answered + 1), source: 'founder', patch: { status: 'done' } });
   }
 
@@ -356,25 +367,25 @@ export function demoMessages(now: number = Date.now()): DemoMessage[] {
       // A conversation's folder is named from the first eight of its id.
       projectId: '7c41e2d9-3b8a-4f15-9e62-1d0a5c8b4f21',
       id: LENA_THREAD.id,
-      at: now - 41 * MIN,
+      at: now - 2.1 * HR,
       title: 'Launch email',
       body: 'Can you read the launch email today? It goes to all 4,000 trial users tomorrow morning, and the subject line is the part I am least sure of.',
-      priority: 7,
+      priority: 5,
       subject: true,
       file: LAUNCH_EMAIL,
       replies: [
-        { by: 'me', at: now - 33 * MIN, text: SUBJECT_ASK },
-        { by: 'them', at: now - 9 * MIN, text: 'The second one is great, going with it. Can you still read the rest before it goes out tomorrow?' },
+        { by: 'me', at: now - 1.9 * HR, text: SUBJECT_ASK },
+        { by: 'them', at: now - 1.1 * HR, text: 'The second one is great, going with it. Can you still read the rest before it goes out tomorrow?' },
       ],
     },
     {
       from: PRIYA,
       projectId: 'a93f0b6e-52c7-4d18-8b3e-6f2d9c1e7a54',
       id: 'w-d2b84f6a31',
-      at: now - 34 * MIN,
+      at: now - 1.3 * HR,
       title: 'Approve the words on the sign-up screens',
       body: 'Can you read the words for the three sign-up screens and say yes, or change what you would? My agent builds the screens as soon as you do.',
-      priority: 7,
+      priority: 5,
       given: true,
       due: dayIn(now, 0),
       file: SIGN_UP_WORDS,
@@ -581,7 +592,6 @@ export const DEMO_DOCS: Record<string, DemoFile[]> = {
         '',
         '- A price. Per seat or one flat price per team.',
         '- Large moves stall in the sync engine. Theo is rewriting it.',
-        '- Stripe is waiting on the company\'s bank details.',
       ].join('\n'),
     },
   ],

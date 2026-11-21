@@ -75,13 +75,15 @@ export async function seedDemoTeam(now: number): Promise<MemoryCloud> {
       line(m.from.id, m.at, 'system', { title: m.title, kind: 'directive', priority: 0, status: 'open', ...(m.given ? { labels: ['given-task'] } : m.subject ? { labels: ['work-thread'] } : {}) }, m.id),
       line(m.from.id, m.at + 1, 'founder', { title: m.title, body: withFile(m), assignee: DEMO_ME.id, people, ...(m.due ? { due: m.due } : {}) }, m.id),
     ]);
-    // Sorted already, as the copy's own agent would have sorted it.
-    await me.pushLines(m.projectId, [line(DEMO_ME.id, m.at + 2, 'agent', { priority: m.priority }, m.id)]);
     for (const r of m.replies ?? []) {
       clock = r.at;
       const [by, to] = r.by === 'me' ? [DEMO_ME.id, m.from.id] : [m.from.id, DEMO_ME.id];
       await memoryBackend(cloud, by).pushLines(m.projectId, [line(by, r.at, 'founder', { answer: r.text, assignee: to }, m.id)]);
     }
+    // Sorted already, as the copy's own agent would have sorted its newest message.
+    const last = Math.max(m.at, ...(m.replies ?? []).map((r) => r.at));
+    clock = last + 2;
+    await me.pushLines(m.projectId, [line(DEMO_ME.id, last + 2, 'agent', { priority: m.priority }, m.id)]);
   }
 
   // A chat with one teammate is a group of the two of you, named for the
