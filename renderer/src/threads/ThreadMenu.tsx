@@ -286,7 +286,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   /** Null stops waiting. */
   onWait?: (id: string | null) => void;
   /** Who it can be handed on to; the row is only there when somebody is. */
-  giveTo?: readonly { id: string; name: string; detail?: string }[];
+  giveTo?: readonly { id: string; name: string; detail?: string; asked?: boolean }[];
   /** `note`: what the giver wants from a person; empty for an AI teammate. */
   onGive?: (to: { id: string; name: string }, note: string) => void;
   /** Help or a review from a person, keeping the thread; `step` is the message picked, if one was. */
@@ -347,7 +347,8 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   const [sharing, setSharing] = useState<null | 'list' | 'send' | 'copied' | 'see' | 'choose'>(null);
   const [sendTo, setSendTo] = useState<string[]>([]);
   const [step, setStep] = useState<string | null>(null);
-  const listed = giveTo.filter((p) => !(((givingFromShare && giveStart === 'help') || !!step) && p.id.startsWith('mate:')));
+  const asking = (givingFromShare && giveStart === 'help') || !!step;
+  const listed = giveTo.filter((p) => !(asking && p.id.startsWith('mate:')));
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const close = useCallback((refocus: boolean) => {
@@ -421,7 +422,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
         return;
       }
       // Typing in the menu's own box is typing.
-      if (document.activeElement?.tagName === 'INPUT' && wrap.current?.contains(document.activeElement)) return;
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName ?? '') && wrap.current?.contains(document.activeElement)) return;
       if ((e.key === 'Enter' || e.key === ' ') && wrap.current?.contains(document.activeElement)) { e.stopImmediatePropagation(); return; }
       if (e.key === 'Tab') close(false);
     };
@@ -563,13 +564,13 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
           onAsk={onAsk ? (kind, note) => { const s = step; close(false); onAsk(givingTo, kind, note, s); } : undefined} />
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">
-          <PanelBack label="Back" onBack={() => { if (step) { close(false); return; } setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />
+          <PanelBack label={step ? 'Close' : 'Back'} onBack={() => { if (step) { close(false); return; } setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />
           <p className="ts-menu-say">{(givingFromShare ? (giveStart === 'give' ? 'Who takes it over?' : 'Who do you want to ask?') : step ? 'Who do you want to ask?' : onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
             + (listed.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
-          {listed.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
+          {listed.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" disabled={asking && p.asked} onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
             <span className="ico">{p.id.startsWith('mate:') ? <GiveMark /> : <Face name={p.name} size={18} />}</span>
             <span className="ts-more-label">{p.name}</span>
-            {p.detail && <span className="ts-more-detail">{p.detail}</span>}
+            {asking && p.asked ? <span className="ts-more-detail">Already asked</span> : p.detail && <span className="ts-more-detail">{p.detail}</span>}
           </button>)}
         </div>
         : <ThreadMenuList rows={rows} change={change} onPick={pick} />)}

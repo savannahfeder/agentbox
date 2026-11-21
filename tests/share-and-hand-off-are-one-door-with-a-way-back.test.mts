@@ -96,7 +96,8 @@ describe('the sheet after picking a person', () => {
 describe('the second pass', () => {
   const menu = fs.readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
   it('lists no AI teammate wherever you came to ask', () => {
-    expect(menu).toContain("const listed = giveTo.filter((p) => !(((givingFromShare && giveStart === 'help') || !!step) && p.id.startsWith('mate:')));");
+    expect(menu).toContain("const asking = (givingFromShare && giveStart === 'help') || !!step;");
+    expect(menu).toContain("const listed = giveTo.filter((p) => !(asking && p.id.startsWith('mate:')));");
   });
   it('says an AI teammate starts on it only when one is listed', () => {
     expect(menu).toContain("(listed.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')");

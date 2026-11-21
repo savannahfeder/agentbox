@@ -111,12 +111,13 @@ export function handedBackBy(row: { status?: string; wrote?: Record<string, { ts
 export function askedOutWord(rows: readonly AskRow[], me: string | null, thread: string, nameOf: (id: string) => string, seenAt?: (row: AskRow) => number): string | null {
   const open = asksOnThread(rows, me, thread).filter((a) => a.open);
   if (!open.length) return null;
+  const people = new Set(open.map((a) => a.to)).size;
   const first = (nameOf(open[0].to) || 'Someone').split(/\s+/)[0];
-  const who = open.length === 1 ? first : `${open.length} people`;
+  const who = people === 1 ? first : `${people} people`;
   const review = open.every((a) => a.ask.kind === 'review');
   // Nobody has opened it yet: it is asked, not being worked on (round eleven).
   if (seenAt && open.every((a) => seenAt(a.row) < (a.row.createdAt ?? 0))) return `Asked ${who} ${review ? 'for a review' : 'for help'}`;
-  return `${who} ${open.length === 1 ? 'is' : 'are'} ${review ? 'reviewing' : 'helping'}`;
+  return `${who} ${people === 1 ? 'is' : 'are'} ${review ? 'reviewing' : 'helping'}`;
 }
 
 /** The word under an ask's name in a list, where "Task" goes on any other. */

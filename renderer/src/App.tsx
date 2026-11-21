@@ -7687,7 +7687,8 @@ export default function App() {
     const people = team ? byWorkHere(giveRows(item, { me: team.me, people: team.state.people ?? [], product: team.products.get(item.product) }), weekCards, team.products.get(item.product)?.name ?? item.productName, now) : [];
     if (!people.length) return [];
     const mates = teammatesUi.list.filter((t) => !t.paused && t.status !== 'draft' && item.routed?.to !== `mate:${t.id}`);
-    return [...people, ...mates.map((t) => ({ id: `mate:${t.id}`, name: t.name }))];
+    const asked = new Set(asksOnThread(items, team?.me ?? null, item.id).filter((a) => a.open).map((a) => a.to));
+    return [...people.map((p) => (asked.has(p.id) ? { ...p, asked: true } : p)), ...mates.map((t) => ({ id: `mate:${t.id}`, name: t.name }))];
   };
   const giveThread = async (item: WorkItem, to: GiveTo, note = '') => {
     if (to.id.startsWith('mate:')) {
@@ -7699,7 +7700,8 @@ export default function App() {
     // A thread handed over is no longer yours to be helped with: anyone still asked onto it is let go.
     const asked = out.ok && team ? asksOnThread(items, team.me, item.id).filter((a) => a.open) : [];
     for (const a of asked) await api.answer({ product: (a.row as WorkItem).product, id: a.row.id, status: 'done' }).catch(() => {});
-    showToast(out.ok ? `${handedToWhom(to.name)}${asked.length ? `. ${asked.map((a) => firstName(team?.byId.get(a.to) ?? null) || 'Your teammate').join(' and ')} no longer ${asked.length === 1 ? 'has' : 'have'} the ask` : ''}` : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
+    const letGo = [...new Set(asked.filter((a) => a.to !== to.id).map((a) => firstName(team?.byId.get(a.to) ?? null) || 'Your teammate'))];
+    showToast(out.ok ? `${handedToWhom(to.name)}${letGo.length ? `. ${letGo.join(' and ')} no longer ${letGo.length === 1 ? 'has' : 'have'} the ask` : ''}` : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
     if (out.ok) await refresh();
   };
   // Help or a review keeps the thread yours; the task they get leads back to it.

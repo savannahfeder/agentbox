@@ -65,7 +65,7 @@ export interface ThreadFacts {
   decide?: boolean;
 }
 
-export interface GiveTo { id: string; name: string; detail?: string }
+export interface GiveTo { id: string; name: string; detail?: string; /** Has an open ask on this thread already. */ asked?: boolean }
 
 const WEEK_MS = 7 * 86_400_000;
 
