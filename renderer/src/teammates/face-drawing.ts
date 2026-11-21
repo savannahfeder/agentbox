@@ -10,7 +10,8 @@ const drawn = new Map<string, string>();
 export function faceSvg(seed: string): string {
   let svg = drawn.get(seed);
   if (!svg) {
-    svg = createAvatar(notionists, { seed }).toString();
+    // Drawn edge to edge, the hair ran into a round frame's top and read as cut off.
+    svg = createAvatar(notionists, { seed, scale: 85, translateY: 6 }).toString();
     drawn.set(seed, svg);
   }
   return svg;

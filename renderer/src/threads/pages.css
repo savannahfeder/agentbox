@@ -689,6 +689,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-cell-title.with-aside > .th-who-name { flex: none; }
 /* An AI teammate's letter on its own soft colour until it has a drawn face, so it never reads as an agent. */
 .th-mate .tq { border: 0; background: var(--mate-tint); color: #2b2a33; font-weight: 600; }
+/* A box, not a run of text, so the face centres on the title rather than sitting on a baseline. */
+.th-mate { display: inline-flex; }
 
 /* What the owner's agent already did, under the thread's name: the first thing someone picking it up reads. */
 .tp-tried { margin: 4px 0 28px; }

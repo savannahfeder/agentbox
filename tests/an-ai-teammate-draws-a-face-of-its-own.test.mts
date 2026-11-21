@@ -41,6 +41,19 @@ describe('a teammate’s face', () => {
     expect(svg).not.toMatch(/<rect[^>]*fill="#(?!000|fff)/i);
   });
 
+  // At the inbox's 18px the hair ran into the circle's top and read as a cut-off head.
+  it('is drawn smaller and lower than its square, so the head clears a round frame', () => {
+    const svg = svgOf(faceDrawing('t-iris'));
+    expect(svg).toMatch(/transform="translate\(0 [1-9][\d.]*\)"/);
+    expect(svg).toMatch(/scale\(0\.8[0-9]*\)/);
+  });
+
+  // Measured in the inbox: the face sat 2.5px above its title, the other rows' marks at 0.
+  it('in an inbox row, centres on the title like every other row’s mark', () => {
+    const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
+    expect(css).toMatch(/\.th-mate \{ display: inline-flex; \}/);
+  });
+
   it('sits on one of the soft papers, the same one each time', () => {
     expect(FACE_PAPERS).toContain(facePaper('t-iris'));
     expect(facePaper('t-iris')).toBe(facePaper('t-iris'));
