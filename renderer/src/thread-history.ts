@@ -92,12 +92,14 @@ export interface ThreadEvent {
   field?: 'body' | 'answer' | 'result' | 'note';
   /** The agent teammate who handed this over, on a reply the app wrote for it. */
   from?: string;
+  /** Whose that was, by id: a person you asked to help draws with their face. */
+  fromId?: string;
   /** The agent that wrote this message on its owner's behalf. */
   voice?: AgentVoice;
   /** A comment or approval on a file: which file, and for a comment where on it. */
   fileMark?: FileMarkLink;
   /** A teammate's comment (reaches the owner, starts nothing) or an agent's checkpoint. */
-  says?: 'comment' | 'progress';
+  says?: 'comment' | 'progress' | 'to-agent';
   // The runs that began at this pickup, oldest first. Set by withRuns, and
   // an array because a session that never got its claim in still has to land
   // somewhere rather than disappear.
@@ -235,6 +237,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // her.
   const claudeCode = (engine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
   let askedACommand = false;
+  // When an ask's verdict was written: the close right after it is the hand-back (shared/thread-asks.mts).
+  let verdictAt = -Infinity;
   // The newest ask written from your side, for an imported Codex
   // conversation's opening (see the relabel branch in the loop).
   let yourBody: string | null = null;
@@ -295,6 +299,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     markVoice = (line.patch?.voice as AgentVoice | undefined) ?? undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
+    if (has(patch, 'verdict')) verdictAt = Number(line.ts) || 0;
     if (has(patch, 'engine')) ranEngine = String(patch!.engine ?? '') || undefined;
     if (has(patch, 'model')) ranModel = String(patch!.model ?? '') || undefined;
     const mine = line.source === 'founder';
@@ -456,7 +461,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     if (has(patch, 'answer') && Array.isArray(patch!.fromNotes) && !typed) continue;
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
-      events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from });
+      const fromId = (patch!.from as { teammate?: unknown }).teammate;
+      events.push({ at, who: 'agent', said: `${from} handed this over`, words: words(patch.answer)!, message: true, field: 'answer', from, ...(typeof fromId === 'string' ? { fromId } : {}) });
       continue;
     }
     if (has(patch, 'answer')) {
@@ -560,7 +566,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // and the pickup above already said it.
       if (status === 'claimed') continue;
       if (status === 'done') {
-        events.push({ at, who, said: mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
+        // Handing it over closes your copy; "Given to …" just above already says what happened.
+        const prev = events.at(-1);
+        if (mine && prev?.field === 'answer' && /^Given to /.test(prev.words ?? '') && at - prev.at < 2000) continue;
+        const handedBack = Number(line.ts) - verdictAt < 2000;
+        events.push({ at, who, said: handedBack ? (mine ? 'You handed it back' : 'It was handed back') : mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
         continue;
       }
       if (status === 'blocked') {
@@ -570,6 +580,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
           askedACommand = false;
           continue;
         }
+        // Nor is a teammate's hand-back, which holds the thread for you the same way.
+        if (line.source === 'system' && events.at(-1)?.from && events.at(-1)?.field === 'answer') continue;
         // HER OWN BLOCKED IS NOT THE AGENT STOPPING. She has no control that
         // writes it; the one thing that does is a Z putting a row back where
         // her reply found it (`withdrawReply`), and it read as "It stopped and
@@ -590,7 +602,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         // repeated once per attempt over a thread out of usage
         // (tests/an-out-of-usage-thread-does-not-say-it-handed-this-back).
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
-        events.push({ at, who, said: mine ? 'You sent it back' : 'It handed this back', ...(mine ? { personal: true as const } : {}) });
+        const said = mine ? 'You sent it back' : 'It handed this back';
+        // One press can write the reopening twice (the notes path does), so the same words within a second are one.
+        const last = events.at(-1);
+        if (last?.said === said && Math.abs(at - last.at) < 1000) continue;
+        events.push({ at, who, said, ...(mine ? { personal: true as const } : {}) });
         continue;
       }
     }

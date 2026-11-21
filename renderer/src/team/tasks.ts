@@ -20,6 +20,14 @@ export function agentOnTask(items: readonly WorkItem[], task: Pick<WorkItem, 'pr
   return { name: mate?.name ?? 'an agent', item };
 }
 
+/** Where that agent thread stands, in the strip over the task: working on it, answered and waiting, or finished. */
+export function agentOnTaskWord(on: { name: string; item: Pick<WorkItem, 'status' | 'result'> }): string {
+  const who = on.name === 'an agent' ? 'The agent' : on.name;
+  if (on.item.status === 'done') return `${who} finished`;
+  if (on.item.status !== 'claimed' && on.item.result) return `${who} answered`;
+  return `With ${on.name}`;
+}
+
 export interface TaskBlock {
   /** "Jordan", "you", "Dev’s “Restyle”". */
   on: string;

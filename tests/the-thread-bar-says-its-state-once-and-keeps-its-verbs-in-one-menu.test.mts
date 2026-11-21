@@ -151,8 +151,9 @@ describe('the right side is the dots', () => {
     // One thing at a time (w-65bcefb857) puts the line saying where an answer
     // went, and its place and arrows, beside the dots, in that mode only.
     // The faces sit with them so the header is one row (2026-11-02); Add
-    // people is a row in the menu since w-c25aae4035.
-    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && \(direct \|\| summarised\) && <ConversationAside item=\{item\} \/>\})?\{threadMenu\}<\/span>/);
+    // people is a row in the menu since w-c25aae4035, and whoever you asked
+    // onto the thread sits beside them (w-f702d60afe).
+    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && \(direct \|\| summarised\) && <ConversationAside item=\{item\} \/>\})?(\{asksCorner\})?\{threadMenu\}<\/span>/);
     expect(focus).not.toMatch(/doneButton|terminalHeaderTarget|done-mark/);
   });
 

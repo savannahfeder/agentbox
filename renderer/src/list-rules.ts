@@ -546,7 +546,9 @@ export function rowSummary(
   const said = i.wrote?.answer;
   if (i.answer && said?.by
     && said.ts >= Math.max(i.wrote?.body?.ts ?? 0, i.wrote?.result?.ts ?? 0)) {
-    return clipToSentence(firstRealLine(i.answer));
+    // A teammate's hand-back opens "Theo handed this back.", which the status says; their own words follow.
+    const theirs = (said as { teammate?: string }).teammate ? i.answer.split(/\n\s*\n/).slice(1).join('\n\n').trim() : '';
+    return clipToSentence(firstRealLine(theirs || i.answer));
   }
   const finished = view === 'done' || i.status === 'done';
   const resultIsNewer = (i.wrote?.result?.ts ?? 0) > (i.wrote?.body?.ts ?? 0);

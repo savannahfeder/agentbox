@@ -44,7 +44,7 @@ export interface MemoryPerson {
   status: { text: string; until: number | null } | null;
   connections?: string[];
 }
-export interface MemoryTeam { id: string; name: string; createdBy: string | null; made?: number }
+export interface MemoryTeam { id: string; name: string; createdBy: string | null; made?: number; logoUrl?: string | null }
 export interface MemoryMember { teamId: string; personId: string; role: string }
 export interface MemoryInvite { teamId: string; email: string; invitedBy: string }
 export interface MemoryProject { id: string; teamId: string; name: string; visibility: string; createdBy: string; direct: boolean }
@@ -118,6 +118,8 @@ export interface MemoryCloud extends MemoryRoomsFields {
   fileLinks: Map<string, MemoryFileLink>;
   fileLinkComments: MemoryFileLinkComment[];
   linkPieces?: Map<string, { owner: string; bytes: Buffer }>;
+  /** The public `pictures` bucket: name -> bytes (20261120000000_a_person_and_a_team_wear_a_picture.sql). */
+  pictures?: Map<string, Buffer>;
   /** token -> the people its owner added (20261112120000_a_link_says_who_can_open_it_and_what_they_can_do.sql). */
   fileLinkPeople?: Map<string, { email: string; can: LinkCan; at: number }[]>;
   reads: Map<string, MemorySeen>;
@@ -281,6 +283,35 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
 
     async myTeam() {
       return (await this.myTeams())[0] ?? null;
+    },
+
+    // The same rules as 20261001000500_security.sql and 20261120000000.
+    async setProfile({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
+      const me = cloud.people.get(personId);
+      if (!me) refuse('change a profile without signing in');
+      if (name !== undefined) me.name = name;
+      if (avatarUrl !== undefined) me.avatarUrl = avatarUrl;
+      cloud.events.emit('people', {});
+    },
+
+    async putPicture(name: string, bytes: Buffer) {
+      const m = /^(people|teams)\/([0-9a-f-]{36})\/[0-9a-f]{32}\.(png|jpg)$/.exec(name);
+      if (!m) refuse('a picture by that name');
+      if (m[1] === 'people' ? m[2] !== personId : !owns(m[2])) refuse(`add a picture to ${m[1]}/${m[2]}`);
+      const kept = (cloud.pictures ??= new Map());
+      if (!kept.has(name)) kept.set(name, bytes);
+      return `https://memory.test/storage/v1/object/public/pictures/${name}`;
+    },
+
+    async setTeamLogo(teamId: string, logoUrl: string | null) {
+      if (!owns(teamId)) refuse('change the logo of a team you do not own');
+      if (logoUrl !== null && !/^https:\/\//.test(logoUrl)) refuse('a logo that is not a link');
+      cloud.teams.get(teamId)!.logoUrl = logoUrl;
+    },
+
+    async teamInfo(teamId: string) {
+      const t = myTeams().includes(teamId) ? cloud.teams.get(teamId) : undefined;
+      return t ? { id: t.id, name: t.name, logoUrl: t.logoUrl ?? null } : null;
     },
 
     async createTeam(name: string) {

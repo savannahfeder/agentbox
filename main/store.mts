@@ -125,6 +125,8 @@ export interface AnswerInput {
 
 export interface ComposeInput {
   id?: string | null;
+  /** On a task to a person: help or a review asked on the giver's thread. */
+  ask?: Record<string, unknown>;
   title?: string;
   body?: string;
   kind?: string;
@@ -623,8 +625,9 @@ export class Store {
     }
     // The pane may still show a running row after Stop or a provider result.
     // Resolve omitted reply status against the ledger that was just written.
+    // Except an ask handed back (shared/thread-asks.mts): a thank-you there is a message, not more work.
     if (status == null && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)'
-      && (item?.status === 'blocked' || item?.status === 'done')) status = 'open';
+      && (item?.status === 'blocked' || item?.status === 'done') && !(item?.ask && item?.verdict)) status = 'open';
     // WHAT THE ANSWER ITSELF MAY DO does not go on the ledger. It is a grant,
     // the ledger is an append-only file every worker writes, and every line on
     // it names its own author with nothing checking the name. It goes in the
@@ -897,7 +900,7 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
-  composeItem(slug: string, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent }: ComposeInput) {
+  composeItem(slug: string, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent, ask }: ComposeInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -912,6 +915,8 @@ export class Store {
     if (allLabels.includes(GIVEN_TASK) && (visibility === 'team' || (visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length))) {
       Object.assign(first, { visibility, ...(visibility === 'people' ? { visibleTo: [...new Set((visibleTo ?? []).map(String))] } : {}) });
     }
+    // So is what the task asks on the giver's thread (shared/thread-asks.mts).
+    if (allLabels.includes(GIVEN_TASK) && ask) Object.assign(first, { ask });
     // A thread the cloud started from the phone keeps the id it ran under there.
     const created = id
       ? workItemsDisk.createWorkItemIfAbsent(dir, id, first, { source: 'system' }).item
