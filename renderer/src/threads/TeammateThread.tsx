@@ -32,6 +32,7 @@ import { doneSteps } from '../../../shared/thread-cards.mts';
 import { earlierWords, filesOnThread, notSharedWords, notesOnFile, askEndedWords, boxTarget, draftAtFor, keyInTheBox, shownOnTheirThread, whereTheAskGoes, type BoxTarget } from './teammate-thread';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
+import { HAND_BACK_EVENT, type AskVerdict } from '../thread-commands';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
 const glyph = (paths: ReactNode) => (
@@ -223,6 +224,22 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     setReread((n) => n + 1);
     following?.follow(card);
   };
+  // The command bar's answers (thread-commands askAnswers) press the same buttons.
+  const boxEl = useRef<HTMLTextAreaElement>(null);
+  const answerFromBar = useRef<(verdict: AskVerdict) => void>(() => {});
+  answerFromBar.current = (verdict) => {
+    if (!ask) return;
+    if (verdict === 'changes' && !draft.trim()) { boxEl.current?.focus(); onNotice(`Write what ${owner} should change first.`); return; }
+    void handBack(verdict);
+  };
+  useEffect(() => {
+    const hear = (e: Event) => {
+      const verdict = (e as CustomEvent<unknown>).detail;
+      if (verdict === 'done' || verdict === 'yes' || verdict === 'changes') answerFromBar.current(verdict);
+    };
+    window.addEventListener(HAND_BACK_EVENT, hear);
+    return () => window.removeEventListener(HAND_BACK_EVENT, hear);
+  }, []);
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     const goes = keyInTheBox({ key: e.key, metaKey: e.metaKey, ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, isComposing: e.nativeEvent.isComposing }, { reviewing, words: draft });
     if (goes === 'send') { e.preventDefault(); void send(); }
@@ -329,10 +346,10 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
               {reviewing
-                ? <textarea value={draft} rows={2} placeholder={`Your review for ${owner}`} aria-label={`Your review for ${owner}`}
+                ? <textarea ref={boxEl} value={draft} rows={2} placeholder={`Your review for ${owner}`} aria-label={`Your review for ${owner}`}
                   onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
                 : helping
-                  ? <textarea value={draft} rows={2} placeholder={`Write to ${owner}'s agent`} aria-label={`Write to ${owner}'s agent`}
+                  ? <textarea ref={boxEl} value={draft} rows={2} placeholder={`Write to ${owner}'s agent`} aria-label={`Write to ${owner}'s agent`}
                     onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
                   : <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
                     onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />}

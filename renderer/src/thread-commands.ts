@@ -11,6 +11,24 @@ import { firstName } from './team/company';
 import type { Person } from './types';
 
 export type TeamRoute = 'agent' | 'me' | 'back';
+export type AskVerdict = 'done' | 'yes' | 'changes';
+export interface AskAnswer { verdict: AskVerdict; label: string }
+
+/** What a teammate's ask on you is answered with, in the words of the page's buttons (threads/TeammateThread). */
+export function askAnswers(kind: 'help' | 'review' | null | undefined, owner: string): AskAnswer[] {
+  if (kind === 'help') return [{ verdict: 'done', label: `Hand back to ${owner}` }];
+  if (kind === 'review') return [{ verdict: 'yes', label: 'Looks good' }, { verdict: 'changes', label: `Send changes to ${owner}` }];
+  return [];
+}
+
+/** Sent to the open teammate's thread, which hands back with what is in its box. `detail` is the verdict. */
+export const HAND_BACK_EVENT = 'zero:hand-back';
+
+const ANSWER_WORDS: Record<AskVerdict, string> = {
+  done: 'hand back return done finish give back help',
+  yes: 'review approve looks good lgtm yes ok fine',
+  changes: 'review changes fix needs request',
+};
 
 export type ThreadDoes =
   | { act: 'see'; to: 'team' | 'private'; already: boolean }
@@ -25,7 +43,8 @@ export type ThreadDoes =
   | { act: 'give'; to: string; name: string }
   | { act: 'shipped'; on: boolean }
   | { act: 'wait'; on: string | null }
-  | { act: 'decide' };
+  | { act: 'decide' }
+  | { act: 'hand-back'; verdict: AskVerdict };
 
 export interface ThreadCommand {
   id: string;
@@ -63,6 +82,8 @@ export interface ThreadFacts {
   waitsNow?: boolean;
   /** An agent thread the team can see, with an answer to save to its project's decisions. */
   decide?: boolean;
+  /** On a teammate's thread with their ask open on you (`askAnswers`). */
+  answers?: readonly AskAnswer[];
 }
 
 export interface GiveTo { id: string; name: string; detail?: string; /** Has an open ask on this thread already. */ asked?: boolean }
@@ -117,6 +138,9 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
       keywords: r.route === 'agent' ? 'give hand agent delegate' : r.route === 'me' ? 'myself me keep mine take' : 'hand back return decline',
       does: { act: 'route', route: r.route },
     });
+  }
+  for (const a of f.answers ?? []) {
+    rows.push({ id: `answer-${a.verdict}`, label: a.label, keywords: ANSWER_WORDS[a.verdict], does: { act: 'hand-back', verdict: a.verdict } });
   }
   for (const p of f.give ?? []) {
     rows.push({ id: `give-${p.id}`, label: `Hand over to ${p.name}`, keywords: `hand over give pass assign delegate someone else ${p.name.toLowerCase()}`, does: { act: 'give', to: p.id, name: p.name } });

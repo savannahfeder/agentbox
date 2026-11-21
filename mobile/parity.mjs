@@ -112,6 +112,7 @@ export const PARITY = {
   'thread:add-people': { missing: 'adding people to a thread' },
   'thread:route-*': { missing: 'routing a thread to an agent or to you' },
   'thread:give-*': { missing: 'giving a thread to a teammate' },
+  'thread:answer-*': { desktopOnly: 'it presses the answer buttons on a teammate\'s shared thread, a page the phone does not open' },
   'thread:run-now': { phone: MENU, find: 'label="Run now"' },
   'thread:priority-*': { phone: MENU, find: 'label="Priority"' },
   'thread:model-*': { phone: 'mobile/src/ui/Pickers.tsx', find: '<SheetHead>Agent</SheetHead>', still: 'the model and agent ride a reply; the desktop also sets them without one' },
