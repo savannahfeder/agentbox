@@ -6423,6 +6423,7 @@ export default function App() {
         // Escape in an open dropdown closes the dropdown, not the page.
         if (modal || inInput || target?.tagName === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
         // A document open over its chat goes first, as its close button says.
+        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); return; }
         if (e.key === 'Escape' && openDoc) { e.preventDefault(); closeArtifact(); return; }
         if (e.key === 'Escape') { e.preventDefault(); teammatesUi.back(); }
         if (e.key === 'g' || e.key === 'G') { const box = document.querySelector<HTMLInputElement>('.cx-search input'); if (box) { e.preventDefault(); box.focus(); } }
@@ -6430,11 +6431,13 @@ export default function App() {
       }
       if (connectionsShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         if (modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); return; }
         if (e.key === 'Escape') { e.preventDefault(); setConnectionsPage(null); }
         return;
       }
       if (filesShown && e.key !== 'n' && e.key !== 'N' && !toastsO) {
         if (modal || inInput || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); return; }
         if (e.key === 'Escape') { e.preventDefault(); setFilesPage(null); }
         else if (e.key === '/') { e.preventDefault(); document.querySelector<HTMLInputElement>('.fp-find input')?.focus(); }
         return;
