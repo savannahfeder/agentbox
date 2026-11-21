@@ -70,7 +70,15 @@ describe('the app remembers the thread each note names', () => {
   const show = app.slice(app.indexOf('const showToast = useCallback('), app.indexOf('showToastRef.current = showToast;'));
 
   it('from every note with somewhere to go, and a note with nowhere to go leaves it', () => {
-    expect(show).toContain('if (goes) lastToast.current = { goes, at: Date.now() };');
+    expect(show).toContain('if (goes && !goes.warns) lastToast.current = { goes, at: Date.now() };');
+  });
+
+  it('but not from a warning about a thread, which is not something you sent', () => {
+    // The first E on an agent that waits for you names it and holds the press;
+    // the second E closes it. Measured on the browser copy with the warning
+    // remembered: send S and T, open S, E, E, then O. O did nothing, and five
+    // seconds later the app jumped to S, the thread just closed. Now O opens T.
+    expect(app).toContain('showToast(held.say, { ...held.goes, warns: true });');
   });
 
   it('and forgets it when an undo goes through, so O never opens a thread Z took back', () => {

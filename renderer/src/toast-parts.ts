@@ -7,8 +7,10 @@
 // `repeat` when it is a repeating task's rule rather than a thread: its id is a
 // rule's, so it is opened the way the Later list opens one. `sent` when it is a
 // reply, an approval or a picked option going to that thread. `at` when that
-// reply waits for a time, in the words its caret said.
-export type ToastGoes = { product: string; id: string; repeat?: boolean; sent?: boolean; at?: string };
+// reply waits for a time, in the words its caret said. `warns` when it warns
+// about that thread rather than reporting something you did to it, so O stops
+// opening it once the toast has gone.
+export type ToastGoes = { product: string; id: string; repeat?: boolean; sent?: boolean; at?: string; warns?: boolean };
 type Here = { product: string; id: string } | null;
 
 // The undo clause about a dozen callers bake onto the end of their sentence.

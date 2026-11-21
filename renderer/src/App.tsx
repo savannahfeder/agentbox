@@ -4313,7 +4313,7 @@ export default function App() {
   const showToast = useCallback((text: string, goes?: ToastGoes) => {
     toastShown.current += 1;
     setToast({ text, goes });
-    if (goes) lastToast.current = { goes, at: Date.now() };
+    if (goes && !goes.warns) lastToast.current = { goes, at: Date.now() };
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
@@ -4739,7 +4739,7 @@ export default function App() {
     if (!held) return false;
     setStoppedWarned(true);
     rememberWarned(localStorage);
-    showToast(held.say, held.goes);
+    showToast(held.say, { ...held.goes, warns: true });
     return true;
   }, [stoppedWarned, run, showToast]);
 
