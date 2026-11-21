@@ -1,0 +1,26 @@
+// SHARE IS A BUTTON BESIDE DONE (w-f702d60afe, 2026-11-21).
+//
+// The founder, trying to hand a thread off, "naturally clicked Share"; a
+// hand-off review found asking, handing over and sharing lived only behind the
+// "…" button, so a first-time user's first clicks were a guess. On your own
+// thread on a team the top bar now has Share beside Done, and it opens the
+// panel that asks, hands over and shares.
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+
+const menu = fs.readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
+
+describe('the Share button', () => {
+  it('is drawn only where the thread can be shared and given, before Done', () => {
+    const at = menu.indexOf('{share && canGive && <button type="button" className="ts-done ts-share"');
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(menu.indexOf('data-hint="done"'));
+  });
+  it('opens the share panel, and closes it when pressed again', () => {
+    expect(menu).toContain("onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); }}>");
+  });
+  it('wears the same mark as the menu row', () => {
+    expect(menu).toContain('<PeopleMark /><span>Share</span>');
+    expect(menu).toMatch(/share: PeopleMark/);
+  });
+});

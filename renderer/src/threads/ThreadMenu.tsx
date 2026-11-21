@@ -506,6 +506,10 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
       {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {handedTo && !done && <button type="button" className="ts-done ts-handed" disabled={!handedTo.onOpen} onClick={handedTo.onOpen ?? undefined}><span className="ts-handed-face" aria-hidden="true">{handedTo.initials}</span><span>{handedTo.name}</span></button>}
       {onReopen && !handedTo && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
+      {share && canGive && <button type="button" className="ts-done ts-share" aria-haspopup="menu" aria-expanded={open && !!sharing}
+        onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); }}>
+        <PeopleMark /><span>Share</span>
+      </button>}
       {done && (
         <button
           type="button"
