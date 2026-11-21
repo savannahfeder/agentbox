@@ -51,7 +51,7 @@ describe('every token exists in both themes', () => {
     // --tag-radius joined them for a sharper version of the same reason: a tag
     // is square in every theme AND under every skin, so it is declared exactly
     // once and re-declaring it anywhere is the bug.
-    const SHARED = new Set(['--mono', '--radius', '--tag-radius', '--mate-corner', '--artifact-corner', '--artifact-corner-small']);
+    const SHARED = new Set(['--mono', '--radius', '--tag-radius', '--mate-corner', '--artifact-corner', '--artifact-corner-small', '--pill']);
     const missing = [...light].filter((t) => !dark.has(t) && !SHARED.has(t));
     expect(missing).toEqual([]);
   });

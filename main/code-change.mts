@@ -501,6 +501,21 @@ function restand(file: string, change: MergedChange): null {
   return null;
 }
 
+/**
+ * The saved change with where its folder stands now. The saved answer is from
+ * the end of the last round, so a round that commits would otherwise go on
+ * showing "not committed" until it exits. A fact the folder cannot answer
+ * keeps the saved one.
+ */
+export function withStandsNow<T extends Partial<WorkStands>>(change: T, now: WorkStands | null | undefined): T {
+  if (!now) return change;
+  return {
+    ...change,
+    committed: now.committed ?? change.committed,
+    uncommitted: now.uncommitted ?? change.uncommitted,
+  };
+}
+
 /** Read a change back off disk for the pane. */
 export function readChange(file: string): SavedChange {
   const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as SavedChange | null;
@@ -511,7 +526,9 @@ export function readChange(file: string): SavedChange {
 export type ChangeSummary = Omit<SavedChange, 'files'> & { files: Omit<ChangedFile, 'hunks'>[] };
 
 const summaries = new Map<string, { mtimeMs: number; size: number; summary: ChangeSummary }>();
-const KEEP_SUMMARIES = 200;
+// The phone reads up to 300 threads a project on every pass, in the same
+// order; a cache smaller than that misses on every read. A summary is ~10 KB.
+const KEEP_SUMMARIES = 2000;
 
 /**
  * A saved change without its rows, for the readers that poll it while a run
@@ -521,7 +538,11 @@ const KEEP_SUMMARIES = 200;
 export function readChangeSummary(file: string): ChangeSummary {
   const st = fs.statSync(file);
   const hit = summaries.get(file);
-  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) return hit.summary;
+  if (hit && hit.mtimeMs === st.mtimeMs && hit.size === st.size) {
+    summaries.delete(file);
+    summaries.set(file, hit);
+    return hit.summary;
+  }
   const { files, ...rest } = readChange(file);
   const summary: ChangeSummary = { ...rest, files: files.map(({ hunks: _rows, ...f }) => f) };
   summaries.delete(file);

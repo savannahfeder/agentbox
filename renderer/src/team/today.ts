@@ -1,12 +1,13 @@
 // The Today page: what each person and AI teammate finished, shipped and
 // decided, what is blocked and on whom, and what waits on you, read from the
 // store with no agent.
-import { cardStateOf, shippedAtOf, type WontStart } from '../../../shared/thread-cards.mts';
+import { cardStateOf, handedOn, shippedAtOf, summaryOf, type WontStart } from '../../../shared/thread-cards.mts';
 import { agentOnOrComing } from '../list-rules';
 import { shownTitle, withoutFiles } from '../../../shared/thread-title.mts';
 import { isShared, isTaskRow, runnerOf, taskNewsAt } from '../../../shared/team-rules.mts';
 import { isSetupTitle } from '../../../shared/teammates.mts';
 import { waitParts } from '../../../shared/thread-waits.mts';
+import { isCause } from '../../../shared/causes.mts';
 import { blockedWords, deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { shownPriority } from '../../../shared/rank.mts';
 import { priorityIdOf, priorityLabelOf } from '../priority';
@@ -65,8 +66,12 @@ export interface TodayPerson {
   waiting?: TodayLine[];
   /** Every open task they hold, whatever the range. */
   tasks: TodayLine[];
+  /** Asks for help or a review on someone's thread they handed back: the thread stays its owner's to finish. */
+  helped?: TodayLine[];
   /** Private threads they finished: counted, never named. */
   privateDone: number;
+  /** Private threads an agent is on for them in the range: counted, never named. */
+  privateWorking?: number;
 }
 
 export interface TodayCounts { needYou: number; blocked: number; shipped: number; listed?: number }
@@ -93,7 +98,12 @@ const oneLine = (s: string) => {
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
 
-export function teamToday({ range, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false, supervisor = {}, undoing = new Set() }: {
+// Closed with no answer and no summary, a thread was stopped, not finished.
+const madeSomething = (s: { progress?: string | null; solution?: string | null }) => !!(s.progress || s.solution);
+
+export function teamToday({ range, window, now, me, items, products, cards, decisions, needs, mentions = [], approvals = [], people, mates, mateOf, directWith = () => null, needsCount, later = () => false, supervisor = {}, undoing = new Set() }: {
+  /** A span of its own, in place of the range's: a standup covers from the one before it. */
+  window?: { from: number; to: number };
   /** This computer's supervisor, which says what it will not start; it rules your own threads, never a teammate's card. */
   supervisor?: WontStart & { running?: readonly { itemId: string }[]; starting?: readonly string[] };
   /** Your rows whose move is held in the undo window: out of Needs you already, not yet written. */
@@ -115,7 +125,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   /** The Needs you tab's own number, so the two never disagree. */
   needsCount?: number;
 }): { people: TodayPerson[]; quiet: string[]; counts: TodayCounts } {
-  const { from, to } = rangeOf(range, now);
+  const { from, to } = window ?? rangeOf(range, now);
   const inRange = (t: number | null | undefined) => !!t && t >= from && t < to;
   const direct = new Set(products.filter((p) => p.team?.direct).map((p) => p.slug));
   const bySlug = new Map(products.map((p) => [p.slug, p]));
@@ -127,7 +137,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   const byKey = new Map<string, TodayPerson>();
   const order: string[] = [];
   const add = (key: string, name: string, kind: TodayPerson['kind']) => {
-    byKey.set(key, { key, name, kind, finished: [], shipped: [], decided: [], blocked: [], waitingOnYou: [], working: [], waiting: [], tasks: [], privateDone: 0 });
+    byKey.set(key, { key, name, kind, finished: [], shipped: [], decided: [], blocked: [], waitingOnYou: [], working: [], waiting: [], tasks: [], helped: [], privateDone: 0 });
     order.push(key);
   };
   add('me', 'You', 'me');
@@ -182,12 +192,29 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   const agentOn = agentOnOrComing(supervisor);
   for (const i of items) {
     // A teammate's "Set up …" thread is often its first day of work; its title says nothing of that work, its progress does.
-    if (i.agent || i.title === 'Set up its job') continue;
+    // A cause row is the app's, standing for the threads stuck behind it.
+    if (i.agent || i.title === 'Set up its job' || isCause(i)) continue;
     const setupSays = isSetupTitle(i.title) && i.labels?.some((l) => l.startsWith('teammate:')) ? howFar(i.progress) : undefined;
     const task = isTaskRow(i);
     if (direct.has(i.product) && !task) continue;
     if (runBy(i) !== me) continue;
     // A task someone gave you is theirs to say finished; open, it is one of yours.
+    // An ask handed back is help on a thread its owner still finishes, said by the helper, whatever a thank-you
+    // did to the task's status since; taken back, it is nobody's news (shared/thread-asks.mts).
+    const back = task && i.ask && i.verdict ? i.wrote?.verdict ?? i.wrote?.status : null;
+    if (back) {
+      const helper = keyOfPerson(back.by === i.assignee ? i.assignee : null);
+      const list = helper && inRange(back.ts) ? byKey.get(helper)?.helped : null;
+      if (list) {
+        // Help and then a review on one thread name it once, by the newer.
+        const same = list.findIndex((l) => l.item?.ask?.thread === i.ask!.thread && l.item?.ask?.product === i.ask!.product);
+        const line = { key: `${i.product}/${i.id}`, title: '', at: back.ts, item: i };
+        if (same < 0) list.push(line);
+        else if (list[same].at < back.ts) list[same] = line;
+      }
+      continue;
+    }
+    if (task && i.ask && i.status === 'done') continue;
     if (task && i.createdBy && i.createdBy !== me) {
       if (i.status !== 'done' && !inNeeds.has(`${i.product}/${i.id}`)) byKey.get('me')!.tasks.push(taskLine(i, { key: `${i.product}/${i.id}`, title: '', at: i.updatedAt, item: i }));
       continue;
@@ -198,6 +225,7 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     const shipped = shippedAtOf(i);
     if (inRange(shipped)) { who.shipped.push(line(shipped!)); continue; }
     if (i.status === 'done') {
+      if (handedOn(i) || (!task && !madeSomething(summaryOf(i)))) continue;
       const doneAt = i.wrote?.status?.ts ?? i.updatedAt;
       // A task you gave is finished by whoever closed it, in their words, not yours.
       const closer = task ? keyOfPerson(i.wrote?.status?.by) : null;
@@ -238,10 +266,13 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
     const line: TodayLine = { key: `card/${c.personId}/${c.threadId}`, title: c.title ?? '', at: c.updatedAt, card: c };
     if (inRange(c.shippedAt)) { if (named) who.shipped.push({ ...line, at: c.shippedAt! }); else who.privateDone += 1; continue; }
     if (c.state === 'done') {
-      if (inRange(c.updatedAt)) { if (named) who.finished.push(line); else who.privateDone += 1; }
+      if (inRange(c.updatedAt) && !handedOn({ status: 'done', answer: c.solution }) && madeSomething(c)) { if (named) who.finished.push(line); else who.privateDone += 1; }
       continue;
     }
-    if (!named) continue;
+    if (!named) {
+      if (c.state === 'running' && inRange(c.updatedAt)) who.privateWorking = (who.privateWorking ?? 0) + 1;
+      continue;
+    }
     const on = blockOn(c.blockedBy.map((b) => b.id), who.key);
     if (on) who.blocked.push({ ...line, on });
     else if (inRange(c.updatedAt) && c.state !== 'scheduled') {
@@ -285,12 +316,12 @@ export function teamToday({ range, now, me, items, products, cards, decisions, n
   // Titles only for the lines a section draws: a week on a big store finishes thousands.
   for (const p of all) {
     p.tasks.sort(byDue);
-    for (const list of [p.finished, p.shipped, p.decided, p.blocked, p.waitingOnYou, p.working, p.waiting!, p.tasks]) {
+    for (const list of [p.finished, p.shipped, p.decided, p.blocked, p.waitingOnYou, p.working, p.waiting!, p.tasks, p.helped ?? []]) {
       if (list !== p.tasks) list.sort(newest);
       for (const l of list.slice(0, SHOWN)) if (!l.title && l.item) l.title = shownTitle(l.item);
     }
   }
-  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + p.privateDone > 0;
+  const says = (p: TodayPerson) => p.finished.length + p.shipped.length + p.decided.length + p.blocked.length + p.waitingOnYou.length + p.working.length + p.waiting!.length + p.tasks.length + (p.helped?.length ?? 0) + p.privateDone + (p.privateWorking ?? 0) > 0;
   return {
     people: all.filter(says),
     quiet: all.filter((p) => p.kind !== 'me' && !says(p)).map(quietName),
@@ -314,6 +345,26 @@ export const GROUPS: readonly { id: TodayGroup; label: string }[] = [
 export interface GroupLine extends TodayLine { task?: true; tag?: string }
 
 const byNewest = (a: TodayLine, b: TodayLine) => b.at - a.at;
+
+/** A section's lines: all of them only in the range "and N more" was pressed in. */
+export function linesShown<T>(lines: readonly T[], openedIn: TodayRange | null, range: TodayRange): readonly T[] {
+  return openedIn === range ? lines : lines.slice(0, SHOWN);
+}
+
+export const EVERYONE_RANGE_KEY = 'zero.everyoneRange';
+const RANGE_IDS: readonly string[] = ['today', 'yesterday', 'week'];
+
+/** The range the Everyone page opens on: the last one picked, else This week. */
+export function everyoneRange(storage: Pick<Storage, 'getItem'>): TodayRange {
+  try {
+    const kept = storage.getItem(EVERYONE_RANGE_KEY);
+    return kept && RANGE_IDS.includes(kept) ? kept as TodayRange : 'week';
+  } catch { return 'week'; }
+}
+
+export function keepEveryoneRange(storage: Pick<Storage, 'setItem'>, range: TodayRange): void {
+  try { storage.setItem(EVERYONE_RANGE_KEY, range); } catch { /* private mode: it opens on This week again */ }
+}
 
 /** A person's lists folded into the three groups. What waits on you is left to Needs you. */
 export function groupsOf(p: TodayPerson): Record<TodayGroup, GroupLine[]> {

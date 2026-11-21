@@ -66,6 +66,6 @@ describe('R just after the app moved you', () => {
 
 it('the app uses all three', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  expect(app).toMatch(/pickSentWords\(option\.text, rowTitle\(item\)\), takeBack, !movesOn\(item\) \|\| pickStaysPut\(option\.text, \{ live: liveIds\.has\(item\.id\) \}\)/);
+  expect(app).toMatch(/pickSentWords\(option\.text, rowTitle\(item\)\), takeBack, isTourPractice\(tourRef\.current, item\) \|\| !movesOn\(item\) \|\| pickStaysPut\(option\.text, \{ live: liveIds\.has\(item\.id\) \}\)/);
   expect(app).toMatch(/sayWhoseBox\(arrived\.current, keyOf\(focused\), Date\.now\(\)\)/);
 });

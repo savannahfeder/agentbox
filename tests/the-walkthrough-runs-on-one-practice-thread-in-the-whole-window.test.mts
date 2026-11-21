@@ -6,9 +6,13 @@
 // like real work; writing back took her to Home with nothing left to mark
 // done; and the app's sidebar was folded to icons. Handing over to the old
 // practice tutorial instead was rejected: "we used the gold components". Now
-// the gold tips run on Home with no list beside them and the sidebar open,
-// on one practice thread that nothing real is behind, which stays open after
-// a reply and goes away when the walkthrough ends.
+// the gold tips run on Home with no list beside them, on one practice thread
+// that nothing real is behind, which stays open after a reply and goes away
+// when the walkthrough ends.
+//
+// 2026-11-12: the sidebar was then pinned open for the walkthrough, and the
+// founder, walking it, said "that's not how the app works". It folds as the
+// app folds it (tests/the-walkthrough-shows-the-inbox-before-the-thread).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { readTour, startTour, withPractice, practiceReplied, isTourPractice } from '../renderer/src/tour.ts';
@@ -51,8 +55,10 @@ describe('the window during the walkthrough', () => {
   it('has no step list beside the app', () => {
     expect(app).not.toMatch(/<TourList /);
   });
-  it('keeps the sidebar open, so every place shows its name', () => {
-    expect(app).toMatch(/sidebarFolded\(\{ phone: onPhone\(\), shrinks: sidebarShrinks && !tourLive\(tour\), pointedAt: railOpen \}\)/);
+  // "It's never supposed to be open like that except when you're hovering over it."
+  it('folds the sidebar as the app does', () => {
+    expect(app).toMatch(/sidebarFolded\(\{ phone: onPhone\(\), shrinks: sidebarShrinks, pointedAt: railOpen \}\)/);
+    expect(app).not.toMatch(/shrinks: sidebarShrinks && !tourLive/);
   });
 });
 

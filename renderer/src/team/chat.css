@@ -1,6 +1,6 @@
 /* A CONVERSATION WITH A TEAMMATE (w-2e8aa16f0f, drawing A of round two).
-   Slack's structure in the app's own materials: a round face in a column on
-   the left, the full name and the time once per run, and the day as a quiet
+   A small round face beside the full name and the time once per run, the words
+   under them at the column's edge, and the day as a quiet
    word with no rule beside it. The run itself is ./chat-layout.ts. Nothing here
    reaches a thread with an agent: every rule hangs off .chat-msg, .chat-day or
    .is-chat-cont, which only a conversation with a person draws. */
@@ -10,36 +10,20 @@
   font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
 }
 
-.chat-msg { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 14px; }
-/* A chat's files line up with its words, not its faces: the face and its gap, as the timeline does. */
-.focus:has(> .focus-body .thread.is-chat) > .message-files { margin-left: 42px; width: calc(100% - 42px); }
-.chat-gutter { grid-column: 1; grid-row: 1 / span 3; padding-top: 2px; }
-/* Every part under the name is told its column. The chips were not, and under a
-   long message, which folds and so draws one line more, they dropped into the
-   face's column (w-45cbac227a). */
-.chat-msg > .msg-head, .chat-msg > .msg-body, .chat-msg > .chat-more, .chat-msg > .chat-chips { grid-column: 2; min-width: 0; }
+.chat-msg { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 10px; }
+/* The face sits on the name's line and the words take the whole width, as an agent's do in a thread. */
+.chat-gutter { grid-column: 1; grid-row: 1; align-self: center; }
+.chat-gutter .tm-av.lg, .chat-gutter .agent-face { width: 22px; height: 22px; line-height: 20px; font-size: 9px; }
+.chat-msg.cont .chat-gutter { display: none; }
+.chat-msg > .msg-head { grid-column: 2; min-width: 0; }
+.chat-msg > :not(.chat-gutter, .msg-head) { grid-column: 1 / -1; min-width: 0; }
 .chat-msg .msg-head { align-items: baseline; }
-.chat-msg > .chat-seen { grid-column: 2; margin-top: 4px; font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); cursor: default; }
+.chat-msg > .chat-seen { margin-top: 4px; font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); cursor: default; }
 .chat-msg .msg-who { font-size: 14.5px; font-weight: 500; color: var(--text); }
 .chat-msg .msg-when { font: 11px var(--mono); letter-spacing: .03em; color: var(--text-faint); }
 
-/* A message that carries on a run sits close under it, and its time waits in
-   the face column until the pointer is on it. */
+/* A message that carries on a run sits close under it. */
 .thread-block.is-chat-cont { margin-top: -12px; }
-/* Wider than the face column, so it grows leftward out of it rather than into the words. */
-.chat-gutter { position: relative; }
-.chat-gt { position: absolute; right: 0; top: 2px; white-space: nowrap; font: 10px/25px var(--mono); color: var(--text-faint); text-align: right; visibility: hidden; }
-.chat-msg:hover .chat-gt { visibility: visible; }
-
-/* WHAT YOU DID STANDS IN THE TEXT COLUMN, NOT THE FACE COLUMN (w-2b0cd0f741).
-   The timeline's ring sat at the column's edge, which in a conversation is the
-   faces' edge, so "Snoozed until 3:36pm" stood 42px left of every word around
-   it. The whole line, ring and words, starts where the names and the messages
-   start now: the face's 28px and the 14px gap. Picked over a ring centred
-   under the faces (2026-10-05). The quiet line that hands a message to an
-   agent is only ever drawn under a conversation, so it moves with them. */
-.thread.is-chat .act-line, .act-after.is-chat .act-line { margin-left: 42px; }
-.ts-hand { padding-left: 42px; }
 
 /* THE RULE A MESSAGE WRITES WITH ---. The message body had no rule style, so it
    drew the browser's own grooved 2px line at full strength. */
@@ -116,7 +100,7 @@
   display: flex; align-items: stretch;
   border: 1px solid var(--line-strong); border-radius: var(--radius);
   background: var(--skin-solid, var(--surface)); box-shadow: 0 2px 10px #0003;
-  opacity: 0; pointer-events: none; transition: opacity 90ms ease;
+  opacity: 0; pointer-events: none;
 }
 .chat-msg:hover > .chat-acts, .chat-acts:focus-within, .chat-acts.open { opacity: 1; pointer-events: auto; }
 .chat-act {
@@ -124,7 +108,9 @@
   appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   color: var(--text-dim); font: inherit; font-size: 12px;
 }
-.chat-act + .chat-act { border-left: 1px solid var(--line); }
+/* The divider is its own straight line: a border on a rounded button curved at both ends. */
+.chat-act { position: relative; }
+.chat-act + .chat-act::before, .chat-quick + .chat-act::before { content: ''; position: absolute; left: -0.5px; top: 0; bottom: 0; width: 1px; background: var(--line); }
 .chat-act:hover { background: var(--wash); color: var(--text); }
 .chat-act:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
 .chat-act svg { width: 14px; height: 14px; flex: none; }
@@ -137,7 +123,6 @@
 }
 .chat-quick:hover { background: var(--wash); }
 .chat-quick:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
-.chat-quick + .chat-act { border-left: 1px solid var(--line); }
 .chat-act-more svg { width: 14px; height: 14px; }
 
 /* THE MORE MENU, placed against the window like the whole emoji list. */
@@ -339,12 +324,12 @@
 
 /* The agent's answer, under the message that asked for it. */
 .thread-block .chat-agent { margin-top: 20px; }
-.chat-gutter .agent-face { width: 28px; height: 28px; }
-.chat-gutter .agent-face .agent-eyes { width: 22px; height: 22px; }
+.chat-gutter .agent-face { width: 22px; height: 22px; }
+.chat-gutter .agent-face .agent-eyes { width: 17px; height: 17px; }
 .chat-agent-name { appearance: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
 .chat-agent-name:hover { text-decoration: underline; text-underline-offset: 3px; }
 .chat-msg .chat-agent-state { color: var(--text-dim); }
-.chat-msg > .chat-agent-made { grid-column: 2; min-width: 0; }
+.chat-msg > .chat-agent-made { grid-column: 1 / -1; min-width: 0; }
 .chat-agent-made .made { margin: 10px 0 0; }
 
 /* The @ menu, rising off the reply box like the / menu does. */
@@ -399,7 +384,7 @@
    the text colour, and when the last one came in, faint. It washes under the
    pointer and while its thread is open, like the chat's other buttons. */
 .chat-thread-line {
-  grid-column: 2; justify-self: start; display: inline-flex; align-items: center; gap: 10px;
+  grid-column: 1 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 10px;
   margin: 8px 0 0 -6px; padding: 4px 10px 4px 6px;
   appearance: none; background: none; border: 0; border-radius: var(--radius); cursor: pointer;
   font: inherit; font-size: 13px; line-height: 18px; color: var(--text-dim);
@@ -441,7 +426,7 @@
   position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; z-index: 3; cursor: col-resize;
 }
 .chat-thread-grip::after {
-  content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background-color 90ms ease;
+  content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent;
 }
 .chat-thread-grip:hover::after, .chat-thread-grip:focus-visible::after, body.chat-thread-dragging .chat-thread-grip::after { background: var(--line-strong); }
 .chat-thread-grip:focus-visible { outline: none; }
@@ -479,7 +464,6 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
 .chat-thread-box {
   position: relative; display: flex; flex-direction: column;
   background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius);
-  transition: border-color .18s, background .18s;
 }
 .chat-thread-box:focus-within { border-color: var(--line-strong); background: var(--surface); }
 /* Room for three lines, growing to 240px as you write (ThreadPanel.tsx). */

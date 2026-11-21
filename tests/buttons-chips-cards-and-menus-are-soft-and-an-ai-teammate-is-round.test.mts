@@ -90,8 +90,9 @@ describe('an AI teammate is round, and still told apart by its dashed ring', () 
   it('rounds the mark all the way, like a person', () => {
     expect(styles).toMatch(/--mate-corner:\s*50%;/);
   });
+  // The agent's own face is a faint solid ring since 2026-11-20 (w-585619d660).
   it('keeps it dashed', () => {
-    for (const sel of ['.agent-face', '.ev-ai', '.tq']) {
+    for (const sel of ['.ev-ai', '.tq']) {
       const dashed = rules.some((r) => r.selectors.includes(sel) && /border: 1px dashed/.test(r.body));
       expect(dashed, sel).toBe(true);
     }

@@ -10,6 +10,7 @@
 // sit in that row any more, and neither of the two verbs that lost a button
 // may lose its mouse route as well. The second one is, and it is the reason
 // those buttons existed at all.
+import { showsWhenItComesBack } from '../renderer/src/list-rules.ts';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -99,7 +100,8 @@ describe('the shortcuts are off the screen and the verbs are not', () => {
     const guard = focus.slice(focus.lastIndexOf('{((', focus.indexOf('<div className="focus-actions">')), focus.indexOf('<div className="focus-actions">'));
     // `scheduledHere` is a scheduled thread that is not closed (w-54cdf7c768).
     expect(guard).toContain('scheduledHere && !!onUnschedule');
-    expect(focus).toMatch(/const scheduledHere = item\.status !== 'done' && \(scheduledUntil \?\? 0\) > 0;/);
+    expect(focus).toMatch(/const scheduledHere = showsWhenItComesBack\(item, scheduledUntil, answered\);/);
+    expect(showsWhenItComesBack({ status: 'done', snoozedUntil: 0 }, Date.now() + 60_000, false)).toBe(false);
     expect(guard).toContain('!!agent && !agentTakesReply && !!onReveal');
     expect(guard).toContain("item.status === 'blocked'");
     // And an In progress task no longer opens this row by itself, because the

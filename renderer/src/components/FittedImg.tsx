@@ -1,6 +1,28 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ImgHTMLAttributes } from 'react';
 import { fitPicture, PictureMissing } from '../fit-picture';
+import { pictureUrl, wholePicturePath } from '../picture';
+import { isImagePath } from '../../../shared/referenced-files.mts';
+
+let inlineWidth = 760;
+
+/** The pictures `text` draws by their full paths, in order, once each. */
+export function picturesNamedIn(text: string | null | undefined): string[] {
+  const out = new Set<string>();
+  for (const m of String(text ?? '').matchAll(/!\[[^\]]*\]\(<?([^)>\s]+)>?\)/g)) {
+    let whole: string | null = null;
+    try { whole = wholePicturePath(m[1]); } catch { continue; }
+    if (whole && /^(\/|[A-Za-z]:[\\/])/.test(whole) && isImagePath(whole)) out.add(whole);
+  }
+  return [...out];
+}
+
+/** Makes the copies a thread will draw these pictures from, before it is opened. */
+export function warmPictures(paths: string[], signal: AbortSignal) {
+  for (const path of paths) {
+    fitPicture(pictureUrl(path), { width: inlineWidth }, undefined, signal).then((r) => URL.revokeObjectURL(r.url), () => {});
+  }
+}
 
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
   src: string;
@@ -42,6 +64,7 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
     const width = Math.max(measured, minWidth, 1);
     const grown = measured > 0 ? width / measured : 1;
     setRoom({ width, height: cover ? Math.max((el?.clientHeight ?? 0) * grown, 1) : maxHeight });
+    if (!cover && maxHeight === undefined && measured > 0 && /\binline-image\b/.test(img.className ?? '')) inlineWidth = width;
   });
   // Made when it comes within a screen of view, so a thread opened at its end
   // draws what is on screen first and the pictures far above cost nothing yet.
@@ -57,7 +80,8 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
     if (!room || !near) return;
     let live = true;
     let made: string | null = null;
-    fitPicture(src, { ...room, cover })
+    const leaving = new AbortController();
+    fitPicture(src, { ...room, cover }, undefined, leaving.signal)
       .then((r) => { made = r.url; if (live) setDrawn({ for: src, url: r.url }); else URL.revokeObjectURL(r.url); })
       .catch((err) => {
         if (!live) return;
@@ -65,7 +89,7 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
         if (err instanceof PictureMissing && img.onError) img.onError(undefined as never);
         else setFailed(src);
       });
-    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+    return () => { live = false; leaving.abort(); if (made) URL.revokeObjectURL(made); };
   }, [src, room, near, cover]);
   if (failed === src) return <img {...img} src={src} />;
   if (drawn?.for !== src) {

@@ -20,3 +20,9 @@ html:root[data-tour-frame][data-theme="light"] body { background: var(--tf-groun
 .tour-frame .tf-skip { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); padding: 5px 8px; border: 0; border-radius: 6px; background: none;
   font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
 .tour-frame .tf-skip:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+:root[data-window-buttons="right"] .tour-frame .tf-skip { right: 150px; }
+.tour-frame.tf-done .tf-steps span { color: var(--text); }
+.tour-frame.tf-done .tf-skip { display: inline-flex; align-items: center; gap: 8px; color: var(--text); }
+/* The last tip's key (./tour.css .tour-k), beside the button that does the same. */
+.tour-frame .tf-key { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; box-sizing: border-box;
+  border: 1px solid rgba(var(--tour-gold), .7); border-radius: 6px; background: none; font: 12px/1 var(--mono); color: var(--text); }

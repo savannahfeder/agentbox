@@ -3,6 +3,19 @@
 // (renderer/src/browser-bridge.ts).
 const { contextBridge, ipcRenderer } = require('electron');
 
+// On Windows this window has the system's buttons over its top-right corner
+// (main/window-buttons.mts). The page keeps clear of them only when told, as
+// preload.cjs tells the app's own window.
+if (process.platform === 'win32') {
+  const markButtons = () => {
+    if (!document.documentElement) return;
+    document.documentElement.dataset.window = 'flat';
+    document.documentElement.dataset.windowButtons = 'right';
+  };
+  if (document.documentElement) markButtons();
+  else document.addEventListener('DOMContentLoaded', markButtons);
+}
+
 contextBridge.exposeInMainWorld('agentboxShell', {
   notify: (payload) => ipcRenderer.invoke('zero:notify', payload),
   badge: (count) => ipcRenderer.invoke('zero:badge', count),

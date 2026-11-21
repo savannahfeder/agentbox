@@ -100,6 +100,12 @@ export function approvalStage<T extends StagedApproval>(
  * so this hears only the presses main never saw. A press in the card's first
  * moment answers nothing (shared/card-settles.mts).
  */
+/** ⌘3 on a key card in front opens its reply box: the card's id, or null. */
+export function cardReplyChord(e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }, cardId: string | null, keyCard: boolean, shownAt: number | null = null, now = Date.now()): string | null {
+  if (!cardId || !keyCard || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key !== '3') return null;
+  return chordLands(shownAt, now) ? cardId : null;
+}
+
 export function cardChord(e: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }, cardId: string | null, shownAt: number | null = null, now = Date.now()): Answered | null {
   if (!cardId || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return null;
   const allow = CHORD_ANSWERS[e.key.toLowerCase()];

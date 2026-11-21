@@ -21,8 +21,8 @@ import { color, corner, font } from './theme';
 export interface MessageFiles {
   /** A link to draw the picture from: a url, undefined while it is looked for, null when it is not on the phone. Asked on every draw, so it should be a lookup. */
   picture(src: string): string | null | undefined;
-  /** Open the file, the folder or the page it names; `among` are the pictures to step through from a picture. */
-  open(src: string, among?: string[]): void;
+  /** Open the file, the folder or the page it names; `among` are the pictures to step through from a picture, `name` what the message called it. */
+  open(src: string, among?: string[], name?: string): void;
   /** A long press: offer to open it in the browser or share it (LinkMenu.ts). */
   hold?(src: string): void;
   /** Says a line on the toast, when a held picture could not be saved or loaded. */
@@ -66,8 +66,8 @@ function MentionIcon({ kind, tint }: { kind: MentionKind; tint: string }) {
   );
 }
 
-function open(src: string, files?: MessageFiles, among?: string[]) {
-  if (files) files.open(src, among);
+function open(src: string, files?: MessageFiles, among?: string[], name?: string) {
+  if (files) files.open(src, among, name);
   else if (WEB.test(src) || /^mailto:/i.test(src)) void Linking.openURL(src);
 }
 
@@ -96,7 +96,7 @@ function Words({ spans }: { spans: Span[] }) {
           const { kind, src } = s.mention;
           const can = WEB.test(src) || /^mailto:/i.test(src) || !!files;
           return (
-            <Text key={i} onPress={can ? () => open(src, files) : undefined} onLongPress={can ? () => hold(src, files) : undefined} accessibilityRole={can ? 'link' : undefined}
+            <Text key={i} onPress={can ? () => open(src, files, undefined, s.text) : undefined} onLongPress={can ? () => hold(src, files) : undefined} accessibilityRole={can ? 'link' : undefined}
               style={[style, { color: can ? color.text : color.dim },
                 can && { textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
               <MentionIcon kind={kind} tint={color.faint} />{s.text}

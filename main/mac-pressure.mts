@@ -77,7 +77,7 @@ function sysctl(): Promise<string> {
   // A name this Mac lacks makes sysctl exit non-zero after printing the rest,
   // so its output is kept whatever the exit.
   return new Promise((resolve) => {
-    execFile('/usr/sbin/sysctl', NAMES, { timeout: 5_000 }, (_err, stdout) => resolve(String(stdout ?? '')));
+    execFile('/usr/sbin/sysctl', NAMES, { timeout: 5_000, windowsHide: true }, (_err, stdout) => resolve(String(stdout ?? '')));
   });
 }
 

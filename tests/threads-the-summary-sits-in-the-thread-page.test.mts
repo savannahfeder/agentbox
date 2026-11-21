@@ -1,14 +1,12 @@
 // THE SUMMARY SITS IN THE THREAD PAGE: ITS ENTRY POINT IN THE TOP BAR, THE
 // PANEL ON THE RIGHT, THE MODEL IN THE REPLY BOX, AND NONE OF IT ON A MESSAGE.
 //
-// Approved 2026-10-01 (w-e731ca9376, rounds 7 and 9). Four things about where
-// the pieces go, each of which an edit to Focus.tsx could undo without any
-// other test noticing:
-//   - the Summary button rides in the top bar's corner, beside the thread's
-//     menu, so it stays put however far down she reads (the state word moved
-//     to the line under the title on 2026-10-01);
-//   - the panel is a sibling of the conversation and the reply dock, so both
-//     narrow beside it and it scrolls on its own;
+// Approved 2026-10-01 (w-e731ca9376, rounds 7 and 9). Where the pieces go,
+// each of which an edit to Focus.tsx could undo without any other test noticing:
+//   - the corner holds the thread's menu, and the state leads the line under
+//     the title;
+//   - the side panel is gone (w-d143fcb40a): every thread opens on the
+//     one-at-a-time page, which keeps its summary on top;
 //   - the model word moved out of the header and into the reply box's pill;
 //   - a message from a person is not work, so it gets no summary and no state,
 //     and one quiet line offers to hand it to an agent.
@@ -17,7 +15,6 @@ import fs from 'node:fs';
 
 const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../renderer/src/threads/summary.css', import.meta.url), 'utf8');
-const summary = fs.readFileSync(new URL('../renderer/src/threads/Summary.tsx', import.meta.url), 'utf8');
 
 describe('the top bar', () => {
   // Since w-e731ca9376 (2026-10-01) the state leads the line under the title
@@ -31,30 +28,18 @@ describe('the top bar', () => {
     // One thing at a time (w-65bcefb857) puts the line saying where an answer
     // went, and its place and arrows, beside the dots, in that mode only.
     // The faces sit with them so the header is one row (2026-11-02); Add
-    // people is a row in the menu since w-c25aae4035.
-    expect(portal.startsWith('createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && (direct || summarised) && <ConversationAside item={item} />}{threadMenu}</span>, cornerHeaderTarget)')).toBe(true);
-    expect(focus).toContain('lead={summarised && !summaryOffered ? <ThreadStateMark item={item} /> : null}');
-  });
-  it('toggles with S only while focus is out of a text field', () => {
-    expect(summary).toMatch(/useSummaryShortcut/);
-    expect(summary).toMatch(/isContentEditable/);
-    expect(focus).toMatch(/useSummaryShortcut\(/);
+    // people is a row in the menu since w-c25aae4035. Whoever you asked onto
+    // the thread sits beside the faces, small, rather than in a bar over the
+    // reply box (w-f702d60afe).
+    expect(portal.startsWith('createPortal(<span className="ts-top">{sentUp && aboveDock}{queue && <QueueNav spot={queue.spot} onStep={queue.onStep} />}{crumbFrom && !inChats && !givenTask && (direct || summarised) && <ConversationAside item={item} />}{asksCorner}{threadMenu}</span>, cornerHeaderTarget)')).toBe(true);
+    expect(focus).toContain('lead={summarised ? <ThreadStateMark item={item} /> : null}');
   });
 });
 
 describe('the panel', () => {
-  it('is drawn beside the scroll and the dock, not inside either', () => {
-    const scroll = focus.indexOf('<div className="focus-scroll"');
-    const dock = focus.indexOf('<div className="focus-dock">');
-    const panel = focus.indexOf('<SummaryPanel');
-    expect(panel).toBeGreaterThan(dock);
-    expect(scroll).toBeLessThan(dock);
-  });
-  it('narrows the conversation and the dock by its own width, and scrolls on its own', () => {
-    // 'rail' while it is folded (w-a3482b8c2c), which narrows them by the rail's width instead.
-    expect(focus).toContain('data-summary={summaryPlace({ offered: summaryOffered, shown: summaryShown, fits: summaryFits(paneWidth) })}');
-    expect(css).toMatch(/\.focus-pane\[data-summary="open"\] > \.focus-scroll,\s*\.focus-pane\[data-summary="open"\] > \.focus-dock \{ margin-right: var\(--ts-panel-w\); \}/);
-    expect(css).toMatch(/\.ts-panel \{[^}]*overflow-y: auto/);
+  it('is gone: no side panel and no folded strip are drawn beside the conversation', () => {
+    expect(focus).not.toMatch(/SummaryPanel|SummaryRail|data-summary=/);
+    expect(css).not.toMatch(/\.ts-panel|\.ts-rail/);
   });
   it('keeps every shape square: no pill radius on anything it draws', () => {
     expect(css).not.toMatch(/border-radius: (1[0-9]|[2-9][0-9])px/);

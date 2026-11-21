@@ -152,6 +152,11 @@ export function captureOpenCodeEvent(session: OpenCodeSession | null | undefined
   }
 }
 
+/** A part of the answer has arrived, so the starting words were taken. */
+export function openCodeTookTheWords(type: unknown, _properties?: unknown): boolean {
+  return type === 'message.part.updated';
+}
+
 /** The error on `session.error`, which is an object and not a string. */
 export function openCodeErrorText(error?: OpenCodeError | null): string | null {
   if (!error) return null;

@@ -103,11 +103,16 @@ describe('a thread sent to Auto', () => {
     }
   });
 
-  it('goes to an agent without asking anything when there is no teammate to give it to', async () => {
+  // Since 2026-11-10 the small model is still asked, after the thread has
+  // gone, about an offer of a teammate (tests/auto-offers-a-teammate-in-the-moment).
+  it('goes to an agent before asking anything when there is no teammate to give it to', async () => {
     for (const setup of [{ team: [] }, { team: [{ ...video, paused: true }] }, { teammatesOn: false }]) {
+      fake.spawns.length = 0;
       const { sup, routed } = build(setup);
-      await sup.routeTheThreads([thread()]);
+      const asked = sup.routeTheThreads([thread()]);
       expect(routed[0].patch.routed).toMatchObject({ to: 'agent', why: NOBODY_WHY });
+      await asked;
+      expect(routed).toHaveLength(1);
     }
     expect(fake.spawns).toHaveLength(0);
   });

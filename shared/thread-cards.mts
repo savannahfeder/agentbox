@@ -29,6 +29,7 @@ export type ThreadState = typeof THREAD_STATES[number];
 
 export interface CardItem extends TaskRow {
   start?: string;
+  answer?: string | null;
   runAt?: number;
   claim?: unknown;
   claimExpired?: boolean;
@@ -186,6 +187,12 @@ const startOfDay = (now: number) => { const d = new Date(now); d.setHours(0, 0, 
 const FINISHED_CARDS_KEPT_MS = 7 * 86_400_000;
 
 /** When this thread shipped: a person's word, else the app's own note once its merge lands. An agent saying so does not count. */
+/** When the row was last closed, from its own ledger, or null. */
+export function closedAt(item: { status?: string; wrote?: { status?: { ts?: number } | null } | null } | null | undefined): number | null {
+  const ts = item?.status === 'done' ? item.wrote?.status?.ts : undefined;
+  return Number.isFinite(ts) ? ts! : null;
+}
+
 export function shippedAtOf(item: Pick<CardItem, 'shippedAt' | 'note' | 'wrote'> | null | undefined): number | null {
   if (Number.isFinite(item?.shippedAt)) return item!.shippedAt! > 0 ? item!.shippedAt! : null;
   if (isShippedNote(item?.note) && item?.wrote?.note?.source === 'system') return item.wrote.note.ts ?? null;
@@ -342,6 +349,10 @@ export function cardStateOf(item: CardItem & { id: string }, { now = Date.now(),
   return { state: held ? 'waiting' : said, waitsOn, gotNowhere, held };
 }
 
+/** Handing a thread on closes it with this note (main/team handOn): the work went to someone else, it did not finish. */
+export const handedOn = (item: { status?: string; answer?: string | null }): boolean =>
+  item.status === 'done' && /^Given to /.test(item.answer ?? '');
+
 export function cardsFor<P extends CardProduct>({ products, readItems, now = Date.now(), since = null, me = null, running = [], wontStart = {} }: {
   products: readonly P[];
   readItems: (product: P) => readonly (CardItem & { id: string })[];
@@ -393,7 +404,9 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     if (state === 'done' && !(item.updatedAt! >= kept)) continue;
     const s = summaryOf(item);
     // The run that got nowhere is said by the wait; as a solution it read as finished.
-    const solution = waitsOn && gotNowhere ? '' : s.solution;
+    // A thread handed on says so, so a teammate's screen never reads its close as finished.
+    // The first line names who has it; the giver's note under it is theirs to read, not the team board's.
+    const solution = handedOn(item) ? String(item.answer).split('\n')[0] : waitsOn && gotNowhere ? '' : s.solution;
     const shippedAt = shippedAtOf(item);
     cards.push({
       threadId: item.id, visible: true, title: shownTitle(item), project: product.name,
@@ -405,7 +418,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
       state, priority: shownPriority(item),
       problem: s.problem || null, progress: s.progress || null, solution: solution || null,
       blockedBy: [...(waitsOn ? [{ id: waitsOn, title: waitsOn.slice('name:'.length) }] : []), ...linked(item.blockedBy)],
-      blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
+      // A finished thread is dated when it finished: a comment on it later is not news that it finished.
+      blocks: linked(item.blocks), updatedAt: (state === 'done' ? closedAt(item) : null) ?? item.updatedAt ?? now,
       ...(shippedAt ? { shippedAt } : {}),
     });
   }

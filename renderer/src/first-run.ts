@@ -18,10 +18,27 @@ export function previousScreen(screen: Screen): Screen | null {
  *  folder and the first task are now the tutorial's (./tour.ts), on the inbox. */
 export const FIRST_RUN_STEP = { welcome: 21, chats: 22, task: 23, where: 24 } as const;
 
-type Reading = { engine: Engine; found?: boolean; signedIn?: boolean } | null;
+type Reading = { engine: Engine; found?: boolean; signedIn?: boolean; certain?: boolean } | null;
+
+/** Found, and its sign-in check never answered: on a busy computer that is not a no, so it is asked again. */
+export function unsureEngines(readings: Reading[]): Engine[] {
+  return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && !r.signedIn && r.certain === false));
+}
 
 export function readyEngines(readings: Reading[]): Engine[] {
   return (['claude', 'codex'] as const).filter((engine) => readings.some((r) => r?.engine === engine && r.found && r.signedIn));
+}
+
+/** What the welcome offers once it has asked all it will: the ready ones, and any installed one nothing said is signed out. */
+export function offeredEngines(readings: Reading[]): Engine[] {
+  const offered = new Set([...readyEngines(readings), ...unsureEngines(readings)]);
+  return (['claude', 'codex'] as const).filter((engine) => offered.has(engine));
+}
+
+/** Signed out for certain, which an unanswered check is not. */
+export function knownSignedOut(readings: Reading[]): Engine[] {
+  const unsure = unsureEngines(readings);
+  return signedOutEngines(readings).filter((engine) => !unsure.includes(engine));
 }
 
 /** Installed here but not signed in: its button signs in rather than installs. */
@@ -63,10 +80,20 @@ export function installGate(setup: EngineSetup, signedOut: Engine[] = []): { hea
   const signingIn = setup!.phase === 'signing-in';
   return {
     heading: signingIn ? `Finish signing in to ${named} in your browser`
-      : setup!.phase === 'checking' && signedOut.includes(setup!.engine) ? `Signing in to ${named}` : `Installing ${named}`,
+      : startsSignIn(setup!, signedOut) ? `Signing in to ${named}` : `Installing ${named}`,
     running: true,
     again: signingIn,
   };
+}
+
+const startsSignIn = (setup: NonNullable<EngineSetup>, signedOut: Engine[]) =>
+  setup.phase === 'checking' && signedOut.includes(setup.engine);
+
+/** The footer's word for a setup that has not reached ready; it must agree with the heading. */
+export function footWord(setup: NonNullable<EngineSetup>, signedOut: Engine[] = []): string {
+  if (setup.phase === 'failed') return setup.error ?? 'did not finish';
+  if (setup.phase === 'signing-in') return 'finish in your browser';
+  return startsSignIn(setup, signedOut) ? 'signing in' : 'installing';
 }
 
 /**

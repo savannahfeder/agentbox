@@ -4,8 +4,9 @@
 // about the Mac's own keys, and Cloud sells plans, which the phone app does not
 // (docs/mobile/PLAN.md, 3.1). Appearance is here, for the phone's own look.
 import Constants from 'expo-constants';
+import { useState } from 'react';
 import { router } from '../lib/router';
-import { accountsAside, cloudOnlyAccounts } from '../lib/cloud-accounts';
+import { accountsAside, cloudOnlyAccounts, computerAccounts } from '../lib/cloud-accounts';
 import { computerLine, versionLine } from '../lib/computer-line';
 import { PHONE_LOOKS, type PhoneLook } from '../lib/look';
 import { useCloud } from '../state/cloud';
@@ -13,6 +14,7 @@ import { useLook } from '../state/look';
 import { useSettings, type SettingsState } from '../state/settings';
 import { GROUPS, SETTINGS_PAGES, type PageId } from './SettingsPages';
 import { Aside, Button, Group, NavRow, Row } from './SettingsParts';
+import { Sheet, SheetHead, SheetRow, SheetSep } from './parts';
 
 export { computerLine };
 
@@ -20,8 +22,7 @@ function asideOf(id: PageId, s: SettingsState, look: PhoneLook) {
   const w = s.settings?.workspace;
   if (id === 'appearance') return PHONE_LOOKS.find((l) => l.id === look)?.name;
   if (!w) return undefined;
-  if (id === 'claude') return accountsAside(w.accounts, cloudOnlyAccounts(w, 'claude').length);
-  if (id === 'codex') return accountsAside(w.codexAccounts, cloudOnlyAccounts(w, 'codex').length);
+  if (id === 'claude' || id === 'codex') return accountsAside(computerAccounts(w, id), cloudOnlyAccounts(w, id).length);
   if (id === 'running') return w.paused ? 'Paused' : w.agentsAuto ? `Automatic (${w.agentsTotal})` : `${w.sessionsAtOnce} at once`;
   if (id === 'instructions') return w.adhdMode ? 'ADHD mode' : undefined;
   if (id === 'projects') return String(s.settings!.projects.length);
@@ -34,11 +35,18 @@ export function PageList() {
   const s = useSettings();
   const { look } = useLook();
   const email = c.cloud?.session()?.user.email ?? undefined;
+  const [askingOut, setAskingOut] = useState(false);
   return (
     <>
       <Group label="Account">
-        <Row first label={email ?? 'Signed in'} control={<Button title="Sign out" onPress={() => { c.signOut(); router.replace('/sign-in'); }} />} />
+        <Row first label={email ?? 'Signed in'} control={<Button title="Sign out" onPress={() => setAskingOut(true)} />} />
       </Group>
+      <Sheet open={askingOut} close={() => setAskingOut(false)}>
+        <SheetHead>Sign out of this phone?</SheetHead>
+        <SheetRow label="Sign out" onPress={() => { setAskingOut(false); c.signOut(); router.replace('/sign-in'); }} />
+        <SheetSep />
+        <SheetRow label="Stay signed in" onPress={() => setAskingOut(false)} />
+      </Sheet>
       {GROUPS.map((g) => {
         const pages = SETTINGS_PAGES.filter((p) => p.group === g && p.shown(s));
         return pages.length ? (

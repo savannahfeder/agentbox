@@ -14,6 +14,7 @@
 // that its code had to come back: the code is now read from the clipboard
 // the moment she returns, and every wait says so with a moving mark.
 import { signingIn, type CloudAccount, type CloudSignIn, type CloudStatus } from './cloud-menu';
+import { PLAN_TRIAL } from '../../cloud/gateway/plans.mjs';
 
 export const SETUP = {
   screenLabel: 'Set up the cloud',
@@ -54,6 +55,7 @@ export const SETUP = {
   loadingLede: 'Checking your account…',
   payHead: 'Choose a plan',
   payLede: 'Pay on Stripe, then add the Claude or Codex account it runs on.',
+  trialLede: `Every plan starts with ${PLAN_TRIAL.days} days free and ${PLAN_TRIAL.hours} cloud hours. Then add the Claude or Codex account it runs on.`,
   payWaitLede: 'Finish paying in your browser. This moves on by itself once you’ve paid.',
   menuBroken: 'A cloud account needs to sign in again.',
   menuFix: 'Fix',

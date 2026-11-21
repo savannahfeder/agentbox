@@ -7,6 +7,8 @@ import { checkFeedback } from '../../../shared/feedback.mts';
 import type { Picked } from '../platform/pick';
 import { reportText, type ReportAbout } from '../lib/report';
 import { useCloud } from '../state/cloud';
+import { useGroups } from '../state/groups';
+import { messageToHide } from '../lib/chat-safety';
 import { AttachSheet, Attached } from './Attach';
 import { withPicked } from '../lib/attach';
 import { Clip } from './icons';
@@ -18,6 +20,7 @@ const asFile = (f: Picked) => ({ name: f.name, type: TYPE[f.name.split('.').pop(
 
 export function FeedbackPage({ about = null }: { about?: ReportAbout } = {}) {
   const c = useCloud();
+  const { hideReported } = useGroups();
   const [text, setText] = useState('');
   const [files, setFiles] = useState<Picked[]>([]);
   const [attaching, setAttaching] = useState(false);
@@ -33,7 +36,7 @@ export function FeedbackPage({ about = null }: { about?: ReportAbout } = {}) {
     const out = await c.sendFeedback(reportText(about, text), list.map(({ name, type, data }) => ({ name, type, data })))
       .catch(() => ({ ok: false, error: 'It did not send. Try again in a moment.' }));
     setBusy(false);
-    if (out.ok) { setSent(true); setText(''); setFiles([]); } else setSaid((out as { error?: string }).error ?? 'It did not send. Try again in a moment.');
+    if (out.ok) { setSent(true); setText(''); setFiles([]); const hide = messageToHide(about); if (hide) hideReported(hide); } else setSaid((out as { error?: string }).error ?? 'It did not send. Try again in a moment.');
   };
   if (sent) {
     return (
@@ -46,7 +49,7 @@ export function FeedbackPage({ about = null }: { about?: ReportAbout } = {}) {
   return (
     <View style={{ marginTop: 14, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: color.fill }}>
       <TextInput multiline autoFocus value={text} onChangeText={(t) => { setText(t); setSaid(null); }} accessibilityLabel="Your feedback"
-        placeholder={about ? 'What is wrong with what the agent wrote?' : 'What happened, and what did you expect?'} placeholderTextColor={color.faint}
+        placeholder={about?.kind === 'message' ? 'What is wrong with this message?' : about ? 'What is wrong with what the agent wrote?' : 'What happened, and what did you expect?'} placeholderTextColor={color.faint}
         style={[{ minHeight: 160, padding: 16, fontFamily: font.regular, fontSize: 15.5, lineHeight: 24, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       {(files.length > 0 || said) && (
         <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>

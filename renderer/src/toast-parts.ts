@@ -116,10 +116,10 @@ export function sentToWhom(team: { people: readonly string[]; sharedBy: string |
   return who ? `Sent to ${who}` : 'Sent';
 }
 
-/** "Handed to Theo" once a thread has gone to them. */
+/** "Handed over to Theo" once a thread has gone to them. */
 export function handedToWhom(name: string): string {
   const first = name.trim().split(/\s+/)[0];
-  return first ? `Handed to ${first}` : 'Handed on';
+  return first ? `Handed over to ${first}` : 'Handed over';
 }
 
 /** Said at the press, since the cloud can take seconds to answer. */

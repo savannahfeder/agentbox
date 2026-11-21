@@ -27,8 +27,8 @@ export const readLink = async (url: string) => {
 };
 
 /** The viewer for a file, a page, a film, or pictures to step through (app/file.tsx). */
-export function showFile(product: string, src: string, among?: string[]) {
-  router.push({ pathname: '/file', params: { product, src, ...(among?.length ? { among: JSON.stringify(among) } : {}) } });
+export function showFile(product: string, src: string, among?: string[], name?: string) {
+  router.push({ pathname: '/file', params: { product, src, ...(among?.length ? { among: JSON.stringify(among) } : {}), ...(name ? { name } : {}) } });
 }
 
 /** The project's folder on the phone and the lookups a message draws its files with. */
@@ -57,7 +57,7 @@ export function useMessageFiles(product: string, thread?: string): { dir: string
       const { places, links, say } = latest.current;
       offerLink(linkToShare(openingOf(places, links, product, src)), src.replace(/\/+$/, '').split('/').pop() || src, say);
     },
-    open: (src, among) => {
+    open: (src, among, name) => {
       const { places, links, say } = latest.current;
       const o = openingOf(places, links, product, src);
       switch (o.kind) {
@@ -69,7 +69,7 @@ export function useMessageFiles(product: string, thread?: string): { dir: string
           else say('This folder is on your computer.');
           return;
         case 'picture': showFile(product, src, among?.length ? among : [src]); return;
-        default: showFile(product, src);
+        default: showFile(product, src, undefined, name);
       }
     },
   }), [product, thread, shape]);

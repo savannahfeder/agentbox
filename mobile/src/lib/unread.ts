@@ -2,6 +2,7 @@
 // unread while its latest answer is newer than when you last opened it here.
 // Keyed by project and id, since two computers can both have a w-1.
 import { arrivedAt } from '../../../renderer/src/unread';
+import { splitSlug } from '../../../renderer/src/phone-rows';
 import type { WorkItem } from '../../../renderer/src/types';
 
 type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void };
@@ -27,6 +28,32 @@ export function markSeen(seen: Seen, item: { product: string; id: string }, stor
   const at = Object.fromEntries(Object.entries({ ...seen.at, [keyOf(item)]: now }).sort((a, b) => b[1] - a[1]).slice(0, KEEP));
   store.setItem(SEEN_AT_KEY, JSON.stringify(at));
   return { ...seen, at };
+}
+
+/**
+ * Opened on one of your computers: read here from then too. Each computer's
+ * settings copy says what its window opened, by id, so only its own threads
+ * take it. A thread marked unread here stays unread until it is opened here.
+ */
+export function seenOnComputers(
+  seen: Seen,
+  rows: readonly { device: string; settings?: { seen?: unknown } | null }[],
+  items: readonly { product: string; id: string }[],
+  store: Store,
+): Seen {
+  const there = new Map(rows.map((r) => [r.device, r.settings?.seen && typeof r.settings.seen === 'object' ? r.settings.seen as Record<string, unknown> : null]));
+  let at: Record<string, number> | null = null;
+  for (const i of items) {
+    const where = splitSlug(i.product);
+    const opened = where ? there.get(where.device)?.[i.id] : undefined;
+    const here = (at ?? seen.at)[keyOf(i)];
+    if (typeof opened !== 'number' || here === 0 || !(opened > (here ?? seen.since))) continue;
+    (at ??= { ...seen.at })[keyOf(i)] = opened;
+  }
+  if (!at) return seen;
+  const kept = Object.fromEntries(Object.entries(at).sort((a, b) => b[1] - a[1]).slice(0, KEEP));
+  store.setItem(SEEN_AT_KEY, JSON.stringify(kept));
+  return { ...seen, at: kept };
 }
 
 /** Unread again until it is next opened (the web app's Mark unread). */

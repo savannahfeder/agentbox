@@ -1,6 +1,5 @@
-// PURE. The ⌘K rows for what a thread's own controls do: the summary panel,
-// the three-dot menu, the S key, a conversation's Add people and the strip a
-// teammate's task opens with. Each row is offered exactly where its control
+// PURE. The ⌘K rows for what a thread's own controls do: the three-dot menu,
+// a conversation's Add people and the strip a teammate's task opens with. Each row is offered exactly where its control
 // is, and says in `does` what App.tsx should run.
 //
 // Every row keeps its own keywords so a word finds only the rows it means:
@@ -12,6 +11,25 @@ import { firstName } from './team/company';
 import type { Person } from './types';
 
 export type TeamRoute = 'agent' | 'me' | 'back';
+export type AskVerdict = 'done' | 'yes' | 'changes';
+export interface AskAnswer { verdict: AskVerdict; label: string }
+
+/** What a teammate's ask on you is answered with, in the words of the page's buttons (threads/TeammateThread). */
+export function askAnswers(kind: 'help' | 'review' | null | undefined, owner: string): AskAnswer[] {
+  if (kind === 'help') return [{ verdict: 'done', label: `Hand back to ${owner}` }];
+  if (kind === 'review') return [{ verdict: 'yes', label: 'Looks good' }, { verdict: 'changes', label: 'Needs changes' }];
+  return [];
+}
+
+/** Sent to the open teammate's thread, which hands back with what is in its box. `detail` is the verdict. */
+export const HAND_BACK_EVENT = 'zero:hand-back';
+export { ASK_PERSON_EVENT } from './threads/ThreadMenu';
+
+const ANSWER_WORDS: Record<AskVerdict, string> = {
+  done: 'hand back return done finish give back help',
+  yes: 'review approve looks good lgtm yes ok fine',
+  changes: 'review changes fix needs request',
+};
 
 export type ThreadDoes =
   | { act: 'see'; to: 'team' | 'private'; already: boolean }
@@ -19,15 +37,17 @@ export type ThreadDoes =
   | { act: 'pin'; pin: boolean }
   | { act: 'place'; keep: PlaceAct }
   | { act: 'code' }
-  | { act: 'summary' }
   | { act: 'rename' }
   | { act: 'end-repeat' }
   | { act: 'add-people' }
   | { act: 'route'; route: TeamRoute }
   | { act: 'give'; to: string; name: string }
+  | { act: 'ask'; kind: 'help' | 'review' | 'give'; to: string; name: string }
+  | { act: 'take-back' }
   | { act: 'shipped'; on: boolean }
   | { act: 'wait'; on: string | null }
-  | { act: 'decide' };
+  | { act: 'decide' }
+  | { act: 'hand-back'; verdict: AskVerdict };
 
 export interface ThreadCommand {
   id: string;
@@ -49,7 +69,7 @@ export interface ThreadFacts {
   pinned?: boolean | null;
   place?: ThreadPlace | null;
   /** What the open thread draws, or null when this thread is not the open one. */
-  open?: { change: boolean; summary: 'open' | 'closed' | null } | null;
+  open?: { change: boolean } | null;
   rename?: boolean;
   repeats?: boolean;
   /** True on a conversation, which opens a new one; 'thread' on an agent thread, which takes them in place. */
@@ -58,6 +78,10 @@ export interface ThreadFacts {
   routes?: { route: TeamRoute; label: string }[];
   /** Who this thread could be handed on to (`giveRows`), and AI teammates beside them. */
   give?: GiveTo[];
+  /** People who can be asked for help or a review here. */
+  ask?: GiveTo[];
+  /** Handed on: it can be taken back. */
+  takeBack?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shipped?: boolean | null;
   /** What it could wait on (`waitChoices`), and whether it waits now. */
@@ -65,9 +89,28 @@ export interface ThreadFacts {
   waitsNow?: boolean;
   /** An agent thread the team can see, with an answer to save to its project's decisions. */
   decide?: boolean;
+  /** On a teammate's thread with their ask open on you (`askAnswers`). */
+  answers?: readonly AskAnswer[];
 }
 
-export interface GiveTo { id: string; name: string }
+export interface GiveTo { id: string; name: string; detail?: string; /** Has an open ask on this thread already. */ asked?: boolean }
+
+const WEEK_MS = 7 * 86_400_000;
+
+/**
+ * WHO KNOWS THIS AREA: each person's threads in the same project this week, as
+ * a short word beside their name, the busiest first. "This is more in their
+ * domain" is the reason to hand something over, and nothing said whose it was.
+ */
+export function byWorkHere<P extends GiveTo>(people: readonly P[], cards: readonly { personId: string; project?: string | null; updatedAt?: number }[], project: string | null | undefined, now = Date.now()): P[] {
+  if (!project) return [...people];
+  const count = new Map<string, number>();
+  for (const c of cards) if (c.project === project && (c.updatedAt ?? 0) >= now - WEEK_MS) count.set(c.personId, (count.get(c.personId) ?? 0) + 1);
+  return people
+    .map((p, k) => ({ p, k, n: count.get(p.id) ?? 0 }))
+    .sort((a, b) => b.n - a.n || a.k - b.k)
+    .map(({ p, n }) => (n ? { ...p, detail: `${n} in ${project} this week` } : p));
+}
 
 /** The people a thread can be handed on to: not a conversation, nor a finished
  *  thread, nor one that is a teammate's to give. */
@@ -103,9 +146,20 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
       does: { act: 'route', route: r.route },
     });
   }
-  for (const p of f.give ?? []) {
-    rows.push({ id: `give-${p.id}`, label: `Give it to ${p.name}`, keywords: `give hand pass assign delegate someone else ${p.name.toLowerCase()}`, does: { act: 'give', to: p.id, name: p.name } });
+  for (const a of f.answers ?? []) {
+    rows.push({ id: `answer-${a.verdict}`, label: a.label, keywords: ANSWER_WORDS[a.verdict], does: { act: 'hand-back', verdict: a.verdict } });
   }
+  for (const p of f.ask ?? []) {
+    const first = p.name.split(/\s+/)[0] || p.name;
+    rows.push({ id: `ask-review-${p.id}`, label: `Ask ${first} for a review…`, keywords: `ask review check look over feedback share ${p.name.toLowerCase()}`, does: { act: 'ask', kind: 'review', to: p.id, name: p.name } });
+    rows.push({ id: `ask-help-${p.id}`, label: `Ask ${first} for help…`, keywords: `ask help stuck pair question share ${p.name.toLowerCase()}`, does: { act: 'ask', kind: 'help', to: p.id, name: p.name } });
+  }
+  for (const p of f.give ?? []) {
+    // A person gets the note step, as from the menu; an AI teammate starts at once.
+    const person = !p.id.startsWith('mate:');
+    rows.push({ id: `give-${p.id}`, label: `Hand over to ${p.name}${person ? '…' : ''}`, keywords: `hand over handover hand off handoff give pass assign delegate share someone else ${p.name.toLowerCase()}`, does: person ? { act: 'ask', kind: 'give', to: p.id, name: p.name } : { act: 'give', to: p.id, name: p.name } });
+  }
+  if (f.takeBack) rows.push({ id: 'take-back', label: 'Take it back', keywords: 'take back takeback reclaim undo hand over handoff return mine', does: { act: 'take-back' } });
   for (const w of f.waits ?? []) {
     rows.push({ id: `wait-${w.id}`, label: `Waits on ${w.label}`, keywords: `waits waiting blocked by depends needs ${w.label.toLowerCase()}`, does: { act: 'wait', on: w.id } });
   }
@@ -145,15 +199,6 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
     rows.push({ id: 'pin', label: f.pinned ? 'Unpin thread' : 'Pin thread', keywords: 'pin pinned unpin top stick sticky', does: { act: 'pin', pin: !f.pinned } });
   }
   if (f.rename) rows.push({ id: 'rename', label: 'Rename thread…', keywords: 'rename name title retitle call it', does: { act: 'rename' } });
-  if (f.open?.summary) {
-    rows.push({
-      id: 'summary',
-      label: f.open.summary === 'open' ? 'Hide summary' : 'Show summary',
-      keyHint: 'S',
-      keywords: 'summary panel context details properties info',
-      does: { act: 'summary' },
-    });
-  }
   if (f.open?.change) rows.push({ id: 'code', label: 'View code changes', keywords: 'code changes diff files what changed', does: { act: 'code' } });
   if (f.place && f.place !== 'off') {
     rows.push({

@@ -1,6 +1,6 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, threadFiles, unsentReplies, versionNamed, viewKind } from '../../shared/artifact-marks.mts';
+import { agentOfVersion, noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, threadFiles, unsentReplies, versionNamed, viewKind } from '../../shared/artifact-marks.mts';
 import type { FileVersion } from '../../shared/artifact-marks.mts';
 import { MAX_ZOOM } from './picture-view';
 import type { FileMarks, FileNote, NotePlace } from './types';
@@ -201,6 +201,12 @@ export function viewOffers(found: Found, signedIn: boolean): { approve: boolean;
 
 type Named = ReadonlyArray<{ id: string; name?: string | null }>;
 
+/** The version as Send reads it: a person's edit of an agent's file is still that agent's. */
+export function withItsAgent<V extends FileVersion>(versions: readonly FileVersion[], v: V): V {
+  const agent = agentOfVersion(versions, v.id);
+  return agent === null ? v : { ...v, agent };
+}
+
 /** Your own open comments on this version that Send hands your agent, and those it has with a reply of yours since. Main sends none on a file the agent did not make. */
 export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, count: number, people: Named, me: string | null): string[] {
   if (typeof version.agent !== 'string') return [];
@@ -217,7 +223,7 @@ export function notesToSendTheAgentAnywhere(marks: FileMarks, families: Readonly
   for (const family of families) {
     const open = family.versions.some((v) => v.id === here);
     for (const v of family.versions) {
-      const got = notesToSendTheAgent(marks, v, family.versions.length, people, me);
+      const got = notesToSendTheAgent(marks, withItsAgent(family.versions, v), family.versions.length, people, me);
       ids.push(...got);
       if (open || !got.length) continue;
       elsewhere += got.length;
@@ -226,6 +232,9 @@ export function notesToSendTheAgentAnywhere(marks: FileMarks, families: Readonly
   }
   return { ids, elsewhere, elsewhereKind: allPictures ? 'picture' : 'file' };
 }
+
+/** Send all sits beside Approve, off the page being read; a film or a picture keeps its bar under the stage. */
+export const sendAllBesideTheNotes = (kind: string | null): boolean => kind !== 'film' && kind !== 'image';
 
 /** The bar under the file: how many comments wait, and how many of them are on another file. */
 export function unsentWords(total: number, elsewhere: number, kind: 'picture' | 'file'): string {
@@ -272,6 +281,25 @@ export function noteSendWords(p: Parameters<typeof whereANoteGoes>[0] & { nameOf
   if (goes.to === 'person') return `Send to ${p.nameOf(goes.person)}`;
   if (goes.to === 'agent') return goes.now ? 'Send to your agent' : 'Note for your agent';
   return 'Comment';
+}
+
+export type NoteBoxKey = 'note' | 'note and send' | 'send waiting' | 'leave';
+
+/**
+ * A key in a note box. Enter keeps the note for Send; ⌘↵ keeps it and sends it
+ * now, and with an empty box sends what is waiting.
+ */
+export function noteBoxKey({ key, chord, shift, composing, typed, waiting }: {
+  key: string; chord: boolean; shift: boolean; composing: boolean; typed: boolean; waiting: number;
+}): NoteBoxKey {
+  if (key !== 'Enter' || composing) return 'leave';
+  if (chord) return typed ? 'note and send' : waiting ? 'send waiting' : 'note';
+  return shift ? 'leave' : 'note';
+}
+
+/** The notes ⌘↵ hands your agent with a new note: none unless the note is for your agent. */
+export function sentWithTheNote(goes: NoteGoes, waiting: readonly string[], id: string): string[] {
+  return goes.to === 'agent' ? [...new Set([...waiting, id])] : [];
 }
 
 /** Everyone but you who noted one of these versions or replied under a note on them, newest first. */

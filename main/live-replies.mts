@@ -49,6 +49,7 @@ export interface ReplySession {
   /** A cloud session between turns, waiting for this reply. */
   between?: boolean;
   engine?: string;
+  ranOn?: { model: string | null; effort: string | null };
   sessionId?: string;
   lastLiveReply?: ReplyItem | null;
   exitFailed?: boolean;
@@ -69,6 +70,8 @@ export interface ReplySupervisor {
   deliverMidflightReply(item: ReplyItem, files: null): unknown;
   /** Answer the sign-in card the run is waiting on, so the wait ends and the reply can be taken. */
   endSignInWait?(product: string, id: string): unknown;
+  /** Whether a file sent from a card is waiting to go with this thread's next cloud run. */
+  hasFilesForCloud?(id: string): boolean;
 }
 
 export interface ReplyPayload {
@@ -81,6 +84,14 @@ export interface ReplyPayload {
   answer?: unknown;
   /** A reply set for later: written down now, handed to no session. */
   later?: boolean;
+  /** The engine, model or effort picked with this reply; absent when none was. */
+  moves?: { engine?: string | null; model?: string | null; effort?: string | null };
+}
+
+function movesOff(session: ReplySession, moves: ReplyPayload['moves']): boolean {
+  if (!moves) return false;
+  const differs = (picked: string | null | undefined, on: string | null | undefined) => picked !== undefined && (picked || null) !== (on || null);
+  return differs(moves.engine, session.engine) || differs(moves.model, session.ranOn?.model) || differs(moves.effort, session.ranOn?.effort);
 }
 
 export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, commit: () => Promise<ReplyItem | null | undefined> | ReplyItem | null | undefined) {
@@ -91,12 +102,15 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
   const previous = sends.get(key) ?? Promise.resolve();
   const session = supervisor.sessions?.get(id);
   // A reply set for later waits in the ledger for its time, never in a session.
-  // Between turns a slash command, a new permission mode or a teammate's word
+  // Between turns a slash command, a new permission mode or model, or a teammate's word
   // is saved instead, and the tick ends the wait so a new run takes it.
   const between = !!session?.between && typeof supervisor.nextReplyBrief === 'function';
+  // A file sent from a card goes only with a new cloud run, so its reply never
+  // goes into the open one: the tick ends that session and the next run takes both.
   const live = !later && session?.product === product && typeof session.child?.steer === 'function'
+    && !supervisor.hasFilesForCloud?.(id)
     && !(from && (session.remoteIdle || session.between))
-    && !(session?.between && (permissionMode != null || String(answer ?? '').trimStart().startsWith('/')))
+    && !(session?.between && (permissionMode != null || String(answer ?? '').trimStart().startsWith('/') || movesOff(session, payload.moves)))
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.
@@ -218,8 +232,10 @@ export function framedPick(answer: string): string{
 }
 
 // A teammate's words, as a turn reads them. A hand-off from a teammate is work
-// to do, not the person's yes to anything.
+// to do, not the person's yes to anything. Two people can now steer one agent
+// (a help ask, shared/thread-asks.mts), so a clash is put to the person, never settled by the agent.
+export const WHEN_THEY_DISAGREE = 'If this disagrees with what the person asked, do not choose between them: say what each asked and ask the person which to follow.';
 export function framedTeammate<T>(name: string | null | undefined,text: T): T | string{
  if(!name)return text;
- return `${name}, a teammate (not the person), wrote this to you:\n\n${String(text).split('\n').map((l)=>`> ${l}`).join('\n')}`;
+ return `${name}, a teammate (not the person), wrote this to you:\n\n${String(text).split('\n').map((l)=>`> ${l}`).join('\n')}\n\n${WHEN_THEY_DISAGREE}`;
 }

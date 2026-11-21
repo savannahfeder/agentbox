@@ -56,12 +56,10 @@ describe('when the plan has no room', () => {
     expect(o).toEqual({ say: 'This month\'s 400 hours are used up.', waiting: '2 threads are waiting.', go: { label: 'Move to Plus · 1,200 hours', act: 'pay', plan: 'plus' } });
   });
 
-  it('every agent running offers the next plan up, with its agents', () => {
+  // No plan limits how many run at once since 2026-11-16, so a bigger plan gives no more of them.
+  it('the ceiling one account can run at once offers no plan, since every plan shares it', () => {
     const o = cloudOffer({ cloud: managed({ noRoom: { error: 'agents', message: null } }), plan: pro, waiting: 2, macFull: true });
-    expect(o?.say).toBe('All 10 cloud agents are running.');
-    expect(o?.go).toEqual({ label: 'Move to Plus · 25 at once', act: 'pay', plan: 'plus' });
-    const plus = { ...pro, plan: 'plus', agents: 25, hoursPerMonth: 1200 };
-    expect(cloudOffer({ cloud: managed({ noRoom: { error: 'agents', message: null } }), plan: plus, waiting: 2, macFull: true })?.go).toEqual({ label: 'Move to Max · unlimited at once', act: 'pay', plan: 'max' });
+    expect(o).toEqual({ say: '200 cloud agents are running, the most one account can run at once.', waiting: '2 threads are waiting.', go: null });
   });
 
   it('on Max, the row says so and offers nothing more', () => {
@@ -76,12 +74,12 @@ describe('when the plan has no room', () => {
 });
 
 describe('the plans page', () => {
-  it('three cards, in order, sold as slots, each with its price and hours', () => {
+  it('three cards, in order, each with its price and hours', () => {
     const cards = planCards({ signedIn: true, plan: 'none', agents: 0 });
-    expect(cards.map((c) => [c.id, c.name, c.price, c.slots, c.hours, c.current, c.button])).toEqual([
-      ['pro', 'Pro', '$40', '+10 agent slots', '400 hours a month', false, 'Choose Pro'],
-      ['plus', 'Plus', '$100', '+25 agent slots', '1,200 hours a month', false, 'Choose Plus'],
-      ['max', 'Max', '$200', 'Unlimited agent slots', '3,000 hours a month', false, 'Choose Max'],
+    expect(cards.map((c) => [c.id, c.name, c.price, c.hours, c.current, c.button])).toEqual([
+      ['pro', 'Pro', '$40', '400 hours a month', false, 'Choose Pro'],
+      ['plus', 'Plus', '$100', '1,200 hours a month', false, 'Choose Plus'],
+      ['max', 'Max', '$200', '3,000 hours a month', false, 'Choose Max'],
     ]);
   });
 

@@ -29,6 +29,22 @@
 import { type Look } from './skins';
 import { type ThemeChoice } from './theme';
 import { DONE } from './done-word';
+import { agoShort } from './home/home-model';
+import { localDate } from './local-dates';
+
+/* ------------------------------- threads --------------------------------- */
+
+export type ThreadResult = { sub: string; hint: string; done: boolean };
+
+/** A thread ⌘K found: the line it was found by, where it is and how old, and whether it is finished. */
+export function threadResult(
+  item: { status: string; updatedAt?: number; createdAt: number },
+  { summary, project, now }: { summary: string; project: string; now: number },
+): ThreadResult {
+  const at = item.updatedAt ?? item.createdAt;
+  const age = now - at < 86_400_000 ? agoShort(at, now) : localDate(at, { month: 'short', day: 'numeric' });
+  return { sub: summary, hint: `${project} · ${age}`, done: item.status === 'done' };
+}
 
 /* ------------------------------- matching -------------------------------- */
 
@@ -37,8 +53,9 @@ import { DONE } from './done-word';
 // Keeping those two jobs in separate fields is the point: the hint is UI copy
 // and has to read well, and a search that depends on copy reading a certain way
 // breaks the next time someone improves the sentence.
-/** `onlyWith`: a word the query must name (two letters of it will do) before the row is offered at all. */
-export type Searchable = { label: string; keywords?: string; onlyWith?: string };
+/** `onlyWith`: a word the query must name (two letters of it will do) before the row is offered at all.
+ *  `unlisted`: left out of the list before anything is typed, too. */
+export type Searchable = { label: string; keywords?: string; onlyWith?: string; unlisted?: boolean };
 
 // EVERY WORD OF THE QUERY MUST LAND, in any order, anywhere in the label or the
 // keywords. She types "dark mode", which as one substring appears in no label in
@@ -48,7 +65,7 @@ export type Searchable = { label: string; keywords?: string; onlyWith?: string }
 // her return key, which is the bug palette-keys.ts was written for.
 export function matchesQuery(query: string, row: Searchable): boolean {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.length) return true;
+  if (!words.length) return !row.unlisted;
   const must = row.onlyWith?.toLowerCase();
   if (must && !words.some((w) => w.length >= 2 && (must.startsWith(w) || w.startsWith(must)))) return false;
   const hay = `${row.label} ${row.keywords ?? ''}`.toLowerCase();
@@ -77,9 +94,10 @@ export function matchesQuery(query: string, row: Searchable): boolean {
 const FIRST_AMONG_MATCHES = ['snooze'];
 
 // THE ROW IS CALLED LATER, after the key (w-66e3ece93d). It said "Remind Me
-// (Snooze)", so typing "later" never found it. The old words stay here, where
-// they are searched and never drawn, for whoever still reaches for them.
+// (Snooze)", so typing "later" never found it. The old names still find it,
+// ahead of any thread they also find.
 export const LATER_KEYWORDS = 'remind me snooze put off defer schedule';
+export const LATER_OLD_NAMES = ['remind me', 'snooze'];
 
 // No "inbox": typed alone it means going there, and this row would sit above
 // Go to Inbox under the return key.
@@ -121,6 +139,15 @@ export function escapeClosesThePalette(
   };
   win.addEventListener('keydown', key, true);
   return () => win.removeEventListener('keydown', key, true);
+}
+
+// A file opened big hears every key before the app does, so it asks these
+// before taking one that belongs to ⌘K opened over it.
+export const paletteIsOpen = (doc: { querySelector: (s: string) => unknown }): boolean => !!doc.querySelector('.palette-backdrop');
+
+export function pressedInThePalette(target: unknown): boolean {
+  const closest = (target as { closest?: (s: string) => unknown } | null)?.closest;
+  return typeof closest === 'function' && !!closest.call(target, '.palette-backdrop');
 }
 
 /* ---------------------------- the appearance rows ------------------------ */

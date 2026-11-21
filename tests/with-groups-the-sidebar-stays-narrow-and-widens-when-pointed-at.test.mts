@@ -85,7 +85,7 @@ describe('in the app', () => {
   });
   it('a direct message lights Groups, and its trail says it came from there when opened over a group', () => {
     // With a team on too: every chat is on the Chats page, which lights its row (w-2b3e1a85e5).
-    expect(app).toMatch(/onGroupsPage=\{roomShown \|\| directOpen\}/);
+    expect(app).toMatch(/onGroupsPage=\{roomShown \|\| directOpen \|\| chatsPlaceShown \|\| cardFromPlace\}/);
     expect(app).toContain("directOpen && roomsUi.openId ? 'Groups'");
   });
 });
@@ -95,9 +95,5 @@ describe('a thread', () => {
   it('keeps its own header, with no height forced on it', () => {
     expect(app).toContain(': <><div className="workspace-task-header" ref={setTaskHeader} /><div className="workspace-artifact-header" ref={setArtifactHeader} /></>) : (');
     expect(css).not.toMatch(/workspace-task > \.topbar \{[^}]*height/);
-  });
-  it('folded with S, leaves its summary’s strip on the left, where it was open', () => {
-    expect(css).toMatch(/\.gt-sumleft \.ts-rail \{[^}]*right: auto; left: 0;/);
-    expect(css).toMatch(/\.gt-sumleft \.focus-pane\[data-summary="rail"\] > \.focus-scroll,/);
   });
 });

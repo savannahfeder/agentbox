@@ -13,10 +13,13 @@ import { cloudShowcase, PRO_PITCH, setupSteps, teamPaid } from '../renderer/src/
 import { TEAM } from '../cloud/gateway/plans.mjs';
 
 const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
+// Starting the trial is shared with Settings and the cloud setup.
+const trial = fs.readFileSync(new URL('../renderer/src/pro-trial.ts', import.meta.url), 'utf8');
 
 describe('where the purchase page comes', () => {
-  it('after the team is named, for Pro', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'pay', 'look']);
+  // 2026-11-12: it is the plan step itself, straight after the account; a second page three steps on read as the offer made twice.
+  it('straight after the account', () => {
+    expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'look']);
   });
   it('nowhere for Free, or for someone joining a team that is already paid for', () => {
     expect(setupSteps({ chats: 3, team: true, teammates: false, project: true, signedIn: false, plan: 'free' })).not.toContain('pay');
@@ -35,12 +38,13 @@ describe('what the page says', () => {
   // rather than keeping the product the same".
   it('names what Pro brings in three short lines, the cloud computer first', () => {
     expect(PRO_PITCH.head).toBe('Upgrade to Pro.');
-    expect(PRO_PITCH.perks.map((p) => p.title)).toEqual(['A computer for every agent', 'Your team in one inbox', 'Files saved in the cloud']);
+    // "unclear what 'your team in one inbox' means. needs something clearer" (2026-11-13).
+    expect(PRO_PITCH.perks.map((p) => p.title)).toEqual(['A computer for every agent', 'Share threads and tasks with your team', 'Files saved in the cloud']);
   });
   it('gives seven free days, and the price with no per person', () => {
     expect(TEAM.trialDays).toBe(7);
     expect(PRO_PITCH.cta).toBe('Try Pro free for 7 days');
-    expect(PRO_PITCH.terms).toBe(`Then $${TEAM.dollarsPerSeat} a month. Cancel any time.`);
+    expect(PRO_PITCH.terms).toBe('Cancel any time.');
     expect(JSON.stringify(PRO_PITCH)).not.toMatch(/per person|a person/);
   });
 });
@@ -49,9 +53,9 @@ describe('the right side of the purchase page', () => {
   const show = fs.readFileSync(new URL('../renderer/src/components/ProShowcase.tsx', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../renderer/src/components/setup-split.css', import.meta.url), 'utf8');
   it('shows Pro in place of the app', () => {
-    expect(split).toMatch(/if \(step === 'pay'\) root\.dataset\.setupPro = ''; else delete root\.dataset\.setupPro;/);
+    expect(split).toMatch(/if \(step === 'plan'\) root\.dataset\.setupPro = ''; else delete root\.dataset\.setupPro;/);
     expect(css).toMatch(/:root\[data-setup-pro\] #root \{ visibility: hidden; opacity: 0; \}/);
-    expect(split).toMatch(/\{step === 'pay' && <ProShowcase agents=\{cloudShowcase\(p\.chats\.map\(\(t\) => t\.title\)\)\} team=\{p\.snap\?\.team\?\.team\?\.name \?\? null\} \/>\}/);
+    expect(split).toMatch(/\{step === 'plan' && <ProShowcase agents=\{cloudShowcase\(p\.chats\.map\(\(t\) => t\.title\)\)\} team=\{p\.snap\?\.team\?\.team\?\.name \?\? null\} \/>\}/);
   });
   it('draws a card for each line on the left, in the same order', () => {
     expect([...show.matchAll(/data-perk="(\w+)"/g)].map((m) => m[1])).toEqual(PRO_PITCH.perks.map((p) => p.id));
@@ -84,20 +88,16 @@ describe('when the page moves on', () => {
 
 describe('the page on screen', () => {
   it('opens the team’s checkout and waits for the cloud to say it is paid', () => {
-    expect(split).toMatch(/\} else if \(step === 'pay'\) \{/);
-    expect(split).toMatch(/await api\.cloudAccountPay\('team'\)/);
-    expect(split).toMatch(/const paid = teamPaid\(await api\.cloudAccountPlan\(\)\); if \(live && paid\) next\(\);/);
+    expect(split).toMatch(/\} else if \(step === 'plan'\) \{/);
+    expect(split).toMatch(/await startProTrial\(\{ hasTeam, name: me\?\.name, acceptTerms: !signedInAtStart \}\)/);
+    expect(trial).toMatch(/await api\.cloudAccountPay\('team'\)/);
+    expect(split).toMatch(/const paid = teamPaid\(await api\.cloudAccountPlan\(\)\); if \(live && paid\) \{ live = false; setPayState\('idle'\); setPlan\('pro'\); next\(\); \}/);
   });
   it('lists what Pro brings, and can be skipped', () => {
     expect(split).toMatch(/PRO_PITCH\.perks\.map\(\(k\) => <div key=\{k\.id\} className="ss-perk">/);
-    expect(split).toMatch(/: PRO_PITCH\.cta, \(\) => void pay\(\), payState !== 'opening'\)\}\{quiet\('Skip for now', next\)\}/);
+    expect(split).toMatch(/: offer\.cta, \(\) => void pay\(\), payState !== 'opening'\)\}\{!paid && quiet\(PRO_PITCH\.free, next\)\}/);
   });
-  it('moves from the team’s name to the email field on Enter, where Enter on nothing goes on', () => {
-    // Walking it, Enter in "Name your team" did nothing at all.
-    expect(split).toMatch(/<input className="ss-input" data-ss-enter="to-email" placeholder="Name your team"/);
-    expect(split).toMatch(/if \(typing && enter === 'to-email'\) \{ e\.preventDefault\(\); document\.querySelector<HTMLInputElement>\('\.setup-split input\[data-ss-enter="add"\]'\)\?\.focus\(\); return; \}/);
-  });
-  it('makes the team for Pro even when nobody is invited yet', () => {
-    expect(split).toMatch(/if \(!list\.length && \(plan !== 'pro' \|\| p\.snap\?\.team\?\.team\)\) \{ next\(\); return; \}/);
+  it('makes the team as Pro starts, before anyone is invited, since its seats are what is paid for', () => {
+    expect(trial).toMatch(/if \(!hasTeam\) \{\n    const made = await api\.teamCreate\(teamNameFor\(name\)\);[\s\S]*await api\.cloudAccountPay\('team'\)/);
   });
 });

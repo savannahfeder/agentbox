@@ -22,7 +22,11 @@
 /** What is drawn when there is nothing readable to draw. Not JSON, and not a
  *  blank box either: it is a sentence, and the honest answer to it is Deny. */
 import { Name } from '../../shared/product-name.mjs';
+import { keyLabel } from '../../shared/cloud-keys.mts';
+import { keySource, keySourceWords } from '../../shared/cloud-key-sources.mts';
 export const UNREADABLE = `${Name} could not read what this asks for.`;
+/** The `tool` of a cloud run's key card: main/cloud/key-asks.mts KEY_CARD. */
+export const KEY_CARD_TOOL = 'cloud_key';
 
 export type ApprovalReading = {
   /** The half-sentence after the product's name in the card's head. */
@@ -161,9 +165,27 @@ function changeView(changes: string): ApprovalView {
   return { title, body: { kind: 'diff', lines: files.length > 1 ? lines : lines.filter((l) => l.mark !== 'head'), added, removed }, where: dir ? folderWords(dir) : null };
 }
 
+/** "PostHog personal API key the daily report reads" as "your PostHog key"; "this key" when no service is named. */
+function keyShortName(label: string | null): string {
+  const words = (label ?? '').split(/\s+/);
+  const noun = words.findIndex((w) => /^(key|token|secret)$/i.test(w));
+  const service = words.slice(0, Math.max(noun, 0)).filter((w) => !/^(personal|api|access|auth|read|write|secret|private|the|a|an)$/i.test(w));
+  return noun > 0 && service.length ? `your ${service.join(' ')} ${words[noun].toLowerCase()}` : 'this key';
+}
+
 /** One approval as the card draws it: what it wants in words, the exact thing, and where. */
 export function approvalView(input: unknown, tool?: string): ApprovalView {
   const it = (input ?? {}) as Record<string, unknown>;
+  // A cloud run asking this computer for a key (main/cloud/key-asks.mts KEY_CARD).
+  if (tool === KEY_CARD_TOOL) {
+    const label = keyLabel(String(it.what ?? ''));
+    const title = `Send ${keyShortName(label)} to the cloud?`;
+    const name = String(it.name ?? '');
+    const src = keySource(it);
+    if (!src || !/^[A-Z][A-Z0-9_]{1,79}$/.test(name)) return { title, body: { kind: 'text', text: UNREADABLE }, where: null };
+    const rows: [string, string][] = [['Key', label ?? name], ['From', capital(keySourceWords(src))], ['To', `Your ${Name} Cloud, for every cloud thread`]];
+    return { title, body: { kind: 'fields', rows }, where: null };
+  }
   const said = typeof it.description === 'string' && it.description.trim() ? it.description.trim().slice(0, 200) : null;
   const cwd = typeof it.cwd === 'string' && it.cwd ? folderWords(it.cwd) : null;
   const mcp = /^mcp__(.+)__(.+)$/.exec(tool ?? '');

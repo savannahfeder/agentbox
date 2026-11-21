@@ -1,8 +1,10 @@
-// Staged attachments, shown as what they are: images as thumbnails, a voice
-// note as a note you can play before sending, other files as chips. Click
-// removes.
+// Staged attachments, shown as what they are: images as thumbnails that open
+// large, a voice note as a note you can play before sending, other files as
+// chips. The × removes.
 
+import { useState } from 'react';
 import { attachProblem, type Attaching, type PendingAttachment } from '../attachments';
+import { PictureView, type Picture } from './PictureView';
 import { pictureUrl } from '../picture';
 import { overTheLimit, sizeWords, tooBigToSend } from '../../../shared/carried-files.mts';
 import { VoiceNote } from '../team/VoiceNote';
@@ -19,12 +21,27 @@ const bytesOf = async (a: PendingAttachment): Promise<Blob | null> => {
   return null;
 };
 
+/** The waiting pictures a click on `pressed` steps through, open at that one. */
+export function stagedPictures(attachments: PendingAttachment[], pressed: number): { pictures: Picture[]; start: number } | null {
+  if (!attachments[pressed]?.image) return null;
+  const pictures: Picture[] = [];
+  let start = 0;
+  attachments.forEach((a, i) => {
+    if (!a.image || voiceNoteOf(a.name)) return;
+    if (i === pressed) start = pictures.length;
+    // The index keeps two pastes with one name apart; the viewer titles it by the last part.
+    pictures.push({ path: `${i}/${a.name}`, url: srcFor(a) || null });
+  });
+  return { pictures, start };
+}
+
 export function AttachRow({ attachments, attaching = [], onRemove }: {
   attachments: PendingAttachment[];
   /** Files still on their way in, with how far each has got. */
   attaching?: Attaching[];
   onRemove: (index: number) => void;
 }) {
+  const [open, setOpen] = useState<{ pictures: Picture[]; start: number } | null>(null);
   if (!attachments.length && !attaching.length) return null;
   const problem = attachProblem(attachments);
   return (
@@ -42,8 +59,10 @@ export function AttachRow({ attachments, attaching = [], onRemove }: {
         }
         return a.image ? (
           <div key={i} className="attach-thumb" title={a.name}>
-            <img src={srcFor(a)} alt={a.name} />
-            <button className="attach-remove" onClick={() => onRemove(i)}>×</button>
+            <button type="button" className="attach-open" aria-label={`Open ${a.name} large`} onClick={() => setOpen(stagedPictures(attachments, i))}>
+              <img src={srcFor(a)} alt={a.name} />
+            </button>
+            <button type="button" className="attach-remove" title="Remove" aria-label={`Remove ${a.name}`} onClick={() => onRemove(i)}>×</button>
           </div>
         ) : (
           <button key={i} className={a.failed || tooBigToSend(a.size ?? 0) ? 'attach-chip attach-too-big' : 'attach-chip'} title={a.failed ?? (tooBigToSend(a.size ?? 0) ? overTheLimit(a.size ?? 0) : 'Remove')} onClick={() => onRemove(i)}>
@@ -59,6 +78,14 @@ export function AttachRow({ attachments, attaching = [], onRemove }: {
       ))}
     </div>
     {problem && <div className="compose-note attach-problem" role="alert">{problem}</div>}
+    {open && (
+      <PictureView
+        pictures={open.pictures}
+        start={open.start}
+        resolve={() => Promise.resolve(null)}
+        onClose={() => setOpen(null)}
+      />
+    )}
     </>
   );
 }

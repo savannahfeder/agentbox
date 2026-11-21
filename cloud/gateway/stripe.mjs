@@ -109,6 +109,15 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
       return (await call('POST', '/v1/billing_portal/sessions', { customer, return_url: returnUrl, ...flow })).url;
     },
     subscription: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`),
+    // Ends a trial at once, which charges the first month now; answers the subscription as it then stands.
+    endTrial: (id) => call('POST', `/v1/subscriptions/${encodeURIComponent(id)}`, { trial_end: 'now' }),
+    // A team's seats, set to the people on it. A seat added mid-month is charged for the rest of that month.
+    async seats(id, quantity) {
+      const item = (await call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`)).items?.data?.[0];
+      if (!item?.id) throw new Error(`subscription ${id} has nothing to count seats on`);
+      if (Number(item.quantity) === quantity) return;
+      await call('POST', `/v1/subscription_items/${encodeURIComponent(item.id)}`, { quantity, proration_behavior: 'create_prorations' });
+    },
     // For a team's billing page: its card, where invoices go, and the last few.
     subscriptionWithCard: (id) => call('GET', `/v1/subscriptions/${encodeURIComponent(id)}`, { expand: ['default_payment_method'] }),
     customer: (id) => call('GET', `/v1/customers/${encodeURIComponent(id)}`, { expand: ['invoice_settings.default_payment_method'] }),

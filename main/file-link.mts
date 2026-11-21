@@ -8,7 +8,8 @@
 import crypto from 'node:crypto';
 import fsDefault from 'node:fs';
 import path from 'node:path';
-import { PHONE_SITE } from '../shared/cloud-address.mts';
+import { PHONE_SITE, WEB_APP } from '../shared/cloud-address.mts';
+import { shownName } from '../shared/artifact-marks.mts';
 
 export const LINK_MAX_BYTES = 6_000_000;
 const MAX_BODY_CHARS = 8_400_000;
@@ -54,13 +55,12 @@ export const linkAddress = (site: string, token: string): string => `${String(si
 
 // Our cloud's web app answers on both addresses; a link people pass around
 // reads as ours.
-const OUR_SITE = 'https://app.agentbox.ac';
 export function linkSiteFor(site: unknown): string | null {
   if (typeof site !== 'string') return null;
   // A stand-in cloud's site on this computer has no certificate.
   if (!/^https:\/\/[^\s/]+\/*$/.test(site) && !/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\/*$/.test(site)) return null;
   const s = site.replace(/\/+$/, '');
-  return s === PHONE_SITE ? OUR_SITE : s;
+  return s === PHONE_SITE ? WEB_APP : s;
 }
 
 const outside = (ref: string): boolean => !ref || /^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(ref);
@@ -159,7 +159,16 @@ export function fileForLink(file: string, { fs = fsDefault }: { fs?: LinkFs } = 
 export function linkCopyOf(file: string, { fs = fsDefault }: { fs?: LinkFs } = {}): LinkCopy | { error: string } {
   const made = fileForLink(file, { fs });
   if (made.error) return made;
-  return { ...(made as LinkFile), name: path.basename(file), version: versionInName(file) };
+  return { ...(made as LinkFile), name: fitName(shownName(file) || path.basename(file)), version: versionInName(file) };
+}
+
+// file_links.name holds 200 characters; the filesystem allows 255.
+const NAME_MAX = 200;
+function fitName(name: string): string {
+  const chars = [...name];
+  if (chars.length <= NAME_MAX) return name;
+  const ending = [...(/\.[^./\s]{1,16}$/.exec(name)?.[0] ?? '')];
+  return `${chars.slice(0, NAME_MAX - ending.length - 1).join('')}…${ending.join('')}`;
 }
 
 /** The version a file's name says (plan-v3.md is 3), as files here are named. */

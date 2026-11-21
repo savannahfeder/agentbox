@@ -166,10 +166,10 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
   }
   // A link is only a signature, so one lost to a dropped connection or a
   // server failure is asked for again; a refusal is an answer.
-  async function linkFor(op: string, k: string, seconds: number = LINK_SECONDS): Promise<string> {
+  async function linkFor(op: string, k: string, seconds: number = LINK_SECONDS, size?: number): Promise<string> {
     const until = Date.now() + throttleMs;
     for (let wait = 250; ; wait = Math.min(wait * 2, 8000)) {
-      try { return (await call('POST', '/v1/link', { op, key: k, seconds })).url as string; } catch (e) {
+      try { return (await call('POST', '/v1/link', { op, key: k, seconds, ...(size != null ? { size } : {}) })).url as string; } catch (e) {
         const err = e as CloudCallError;
         if ((err.status && err.status < 500) || Date.now() >= until) throw err;
         await new Promise((r) => setTimeout(r, Math.min(until - Date.now(), wait * (0.5 + Math.random()))));
@@ -212,11 +212,16 @@ export function managedClients({ url, key, timeoutMs = CALL_MS, fileTimeoutMs = 
 
   const storage: CloudStorage = {
     async put(k: string, body: string | Buffer) {
-      const status = await upload(await linkFor('put', k), { buffer: Buffer.from(body) }, fileTimeoutMs, stallMs);
+      const buffer = Buffer.from(body);
+      // A saved key's link is signed for its size, so the bucket takes nothing bigger.
+      const size = k.startsWith('logins/keys/') ? buffer.length : undefined;
+      const status = await upload(await linkFor('put', k, LINK_SECONDS, size), { buffer }, fileTimeoutMs, stallMs);
       if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
     },
     async putFile(k: string, file: string) {
-      const status = await upload(await linkFor('put', k), { file }, fileTimeoutMs, stallMs);
+      // A kept file's link counts its size against the plan's cap.
+      const size = k.startsWith('files/') ? fs.statSync(file).size : undefined;
+      const status = await upload(await linkFor('put', k, LINK_SECONDS, size), { file }, fileTimeoutMs, stallMs);
       if (status < 200 || status > 299) throw new Error(`the bucket refused ${k}: ${status}`);
     },
     async get(k: string) {

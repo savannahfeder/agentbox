@@ -7,7 +7,6 @@ import type { ItemOutcome } from './item-thread';
 import { optionsFrom } from './format';
 import { instructionOf } from '../../shared/repeats.mts';
 import { rowTitle } from './list-rules';
-import { teammateIdOf } from '../../shared/teammates.mts';
 
 export interface Spot { pos: number; total: number; index: number }
 
@@ -42,11 +41,12 @@ export function appWrote(outcome: ItemOutcome | null, wrote?: Record<string, { s
 }
 
 /** The newest answer: the one lifted to the foot, or else the last thing said that was not yours. */
-export function newestAnswer(events: AgentEvent[], outcome: ItemOutcome | null): { at: number; text: string } | null {
+export function newestAnswer(events: AgentEvent[], outcome: ItemOutcome | null): { at: number; text: string; fromId?: string } | null {
   if (outcome) return { at: outcome.at, text: outcome.text };
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
-    if (said(e) && e.who !== 'you' && e.text?.trim()) return { at: e.at, text: e.text };
+    // A person you asked to help signs what they wrote (team/AsksLine.tsx).
+    if (said(e) && e.who !== 'you' && e.text?.trim()) return { at: e.at, text: e.text, ...(e.fromId ? { fromId: e.fromId } : {}) };
   }
   return null;
 }
@@ -61,9 +61,10 @@ export function earlierCount(events: AgentEvent[], outcome: ItemOutcome | null, 
 const FOLD_FROM = 3;
 
 /** Whether the page draws the whole conversation rather than folding `behind` messages away. None behind is a fold of steps only, which still helps.
- *  A chat brought in from Claude Code or Codex is always folded: its first look is the agent's answer, not the ask it started from. */
-export function drawnWhole(behind: number, imported = false): boolean {
-  return !imported && behind > 0 && behind < FOLD_FROM;
+ *  A page that `leads` with a fresh answer always folds, however short, as does a chat brought in from Claude Code or Codex:
+ *  drawn whole, they read as a chat rather than the answer. Only the view from an answer you have since followed up keeps a short history in place. */
+export function drawnWhole(behind: number, { leads = false, imported = false }: { leads?: boolean; imported?: boolean } = {}): boolean {
+  return !leads && !imported && behind > 0 && behind < FOLD_FROM;
 }
 
 /** The line under the title while an agent works: the first paragraph of what you asked, unless the title already says it. */
@@ -91,10 +92,20 @@ export const broughtIn = (item: { labels?: string[] }): boolean =>
  * above what was said or picked and the agent's work since. -1 when the answer
  * is still the newest word, or there is none.
  */
-export function standsAt(events: AgentEvent[], newest: { at: number } | null): number {
+export function standsAt(events: AgentEvent[], newest: { at: number; fromId?: string } | null): number {
   if (!newest) return -1;
   const answered = events.some((e) => e.at > newest.at && (said(e) ? e.who === 'you' : !!e.yours));
-  return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : -1;
+  return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : helperAnswered(events, newest);
+}
+
+/** A teammate's words are the newest answer: start at the agent's message they answer, so its question and choices stay in view. */
+export function helperAnswered(events: AgentEvent[], newest: { at: number; fromId?: string } | null): number {
+  if (!newest?.fromId) return -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (said(e) && e.who !== 'you' && !e.fromId && e.at < newest.at && e.text?.trim()) return i;
+  }
+  return -1;
 }
 
 /**
@@ -118,20 +129,15 @@ export function earlierThan(events: AgentEvent[], from: number): number {
   return events.slice(0, from).filter(said).length;
 }
 
-/**
- * The page's name. A teammate's row is named after its answer's first line,
- * which would leave the page drawing that line twice or not at all under the
- * Context, so its page is named after what woke it; the answer is signed instead.
- */
+/** The name of an open thread, in its header and on its page: the name its row has. */
 export function pageTitle(item: Parameters<typeof rowTitle>[0]): string {
-  const own = (item.title ?? '').trim();
-  return teammateIdOf(item) && own ? own : rowTitle(item);
+  return rowTitle(item);
 }
 
-/** An answer opening with a line that is bold and nothing else wears it as its headline. */
+/** An answer opening with a line that is bold and nothing else wears it as its headline; one with a link stays in the answer, where links are drawn. */
 export function splitHeadline(text: string): { headline: string | null; rest: string } {
   const m = /^\s*\*\*([^*\n]+)\*\*[ \t]*(?:\n|$)/.exec(text);
-  if (!m) return { headline: null, rest: text };
+  if (!m || /\]\([^)]*\)/.test(m[1])) return { headline: null, rest: text };
   return { headline: m[1].trim(), rest: text.slice(m[0].length).replace(/^\s+/, '') };
 }
 

@@ -311,6 +311,11 @@ verify_jwt = false
 [functions.founder-note]
 verify_jwt = false
 
+# The email an invited person gets (functions/team-invite). Called by the
+# database when someone is invited, with its own key instead of a sign-in.
+[functions.team-invite]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

@@ -31,9 +31,7 @@ export interface GatewayBody {
   message?: string;
   url?: unknown;
   where?: unknown;
-  /** On `/v1/me`: the plan, and the free hours a new account starts with. */
   plan?: unknown;
-  free?: FreeHours;
   [field: string]: unknown;
 }
 
@@ -243,8 +241,13 @@ export async function cloudSignIn({ config, session, method, email, password, na
     return { ok: false, error: (err as Cancelable)?.message || String(err), ...((err as Cancelable)?.cancelled ? { cancelled: true } : {}) };
   }
   session.held = token;
-  const acceptedTerms = agreeing ? await currentCloudTerms(config) : undefined;
-  const out = await signInToCloud({ config, acceptedTerms, googleSignIn: async () => token, env, home });
+  let out: AccountOutcome;
+  try {
+    const acceptedTerms = agreeing ? await currentCloudTerms(config) : undefined;
+    out = await signInToCloud({ config, acceptedTerms, googleSignIn: async () => token, env, home });
+  } catch (err) {
+    return { ok: false, error: (err as Error)?.message || String(err) };
+  }
   if (out.ok) { session.held = null; return out; }
   if (out.error === 'terms' && !agreeing) return { ok: false, needsTerms: true, terms: out.terms ?? null };
   return { ok: false, error: out.message || out.error };
@@ -275,8 +278,23 @@ export async function signInToCloud({ config, acceptedTerms, name = os.hostname(
   const file = cloudConfigPath(env, home);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ gateway: config.gateway }, null, 2) + '\n', { mode: 0o600 });
-  const me = await ask(config.gateway, '/v1/me', { key: made.body.key });
-  return { ok: true, ...(me.status === 200 ? me.body : {}) };
+  // The key is kept by now, so this Mac is signed in whether or not its profile comes back.
+  const me = await ask(config.gateway, '/v1/me', { key: made.body.key }).catch(() => null);
+  return { ok: true, ...(me?.status === 200 ? me.body : {}) };
+}
+
+/**
+ * This Mac's cloud key from the sign-in the team already has. The team and the
+ * cloud are one account on one database, so someone signed in to the first is
+ * not asked to sign in to the second. `acceptTerms` is true only where the
+ * terms were named as that account was made.
+ */
+export async function cloudFromTeamSignIn({ config, teamUrl, token, acceptTerms, env = process.env, home = os.homedir() }: { config: { gateway: string; supabaseUrl: string }; teamUrl: string | null | undefined; token: string | null | undefined; acceptTerms: boolean } & StoreDirs): Promise<AccountOutcome> {
+  if (signedIn(env, home)) return { ok: true };
+  const same = (u: unknown) => String(u ?? '').replace(/\/+$/, '');
+  if (!token || same(teamUrl) !== same(config.supabaseUrl)) return { ok: false, error: 'signed-out', message: `Sign in to ${Name} Cloud first.` };
+  const out = await signInToCloud({ config, acceptedTerms: acceptTerms ? await currentCloudTerms(config) : undefined, googleSignIn: async () => token, env, home });
+  return out.ok ? out : { ...out, message: out.message || out.error };
 }
 
 // The server's cloud and this Mac's key for it, or null when signed out.
@@ -286,21 +304,19 @@ function signedIn(env: NodeJS.ProcessEnv, home: string): { gateway: string; key:
   return key ? { gateway: gateway!, key } : null;
 }
 
-type FreeHours = { agents: number; hours: number; usedSeconds: number };
-type TeamHours = FreeHours & { running: number };
+type TeamHours = { hours: number; usedSeconds: number; running: number };
 
 /**
- * No plan reads as the hours a run would spend next, so every screen draws them
- * like a plan: a team's (`team`), spent or not, since they replace the free
- * hours; otherwise the free hours (`free`) while some are left.
+ * No plan of one's own reads as the team's hours (`team`), spent or not, so
+ * every screen draws them like a plan. A server from before 2026-11-16 may
+ * still send free hours (`free`); they are not a plan and read as none.
  */
-export function cloudPlanOf<T extends { [field: string]: unknown }>(me: T): T | (T & { plan: 'free' | 'team'; agents: number; hoursPerMonth: number; usedSeconds: number }) {
+export function cloudPlanOf<T extends { [field: string]: unknown }>(me: T): T | (T & { plan: 'team'; agents: null; hoursPerMonth: number; usedSeconds: number }) {
   if (me.plan !== 'none') return me;
   const tm = me.team as TeamHours | undefined;
-  if (tm) return { ...me, plan: 'team', agents: tm.agents, hoursPerMonth: tm.hours, usedSeconds: tm.usedSeconds, running: tm.running };
-  const f = me.free as FreeHours | undefined;
-  if (!f || f.usedSeconds >= f.hours * 3600) return me;
-  return { ...me, plan: 'free', agents: f.agents, hoursPerMonth: f.hours, usedSeconds: f.usedSeconds };
+  // A team has no limit at once; its hours are the limit.
+  if (tm) return { ...me, plan: 'team', unlimited: true, agents: null, hoursPerMonth: tm.hours, usedSeconds: tm.usedSeconds, running: tm.running };
+  return me;
 }
 
 /** The plan, its agents and hours, and what is used, as the server counts them. */
@@ -309,7 +325,25 @@ export async function cloudPlan({ env = process.env, home = os.homedir() }: Stor
   if (!at) return { signedIn: false };
   const me = await ask(at.gateway, '/v1/me', { key: at.key });
   if (me.status === 401) forgetCloudKey(at.key, env, home);
-  return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody & { free?: FreeHours }) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
+  return me.status === 200 ? { signedIn: true, ...cloudPlanOf(me.body as GatewayBody) } : { signedIn: me.status !== 401, error: me.body.error || 'refused', message: me.body.message };
+}
+
+/** What this person keeps in the cloud and may, or null while that cannot be known: then nothing is sent or deleted. */
+export async function cloudFilesAccount({ env = process.env, home = os.homedir() }: StoreDirs = {}): Promise<{ bytes: number; cap: number; full: boolean; count: number } | null> {
+  const at = signedIn(env, home);
+  if (!at) return null;
+  const out = await ask(at.gateway, '/v1/files', { key: at.key }).catch(() => null);
+  if (!out || out.status !== 200) return null;
+  const b = out.body as { bytes?: unknown; cap?: unknown; full?: unknown; count?: unknown };
+  return typeof b.cap === 'number' ? { bytes: Number(b.bytes) || 0, cap: b.cap, full: !!b.full, count: Number(b.count) || 0 } : null;
+}
+
+/** The bucket through the cloud server, for files kept there. */
+export async function cloudFilesStorage({ env = process.env, home = os.homedir() }: StoreDirs = {}) {
+  const at = signedIn(env, home);
+  if (!at) return null;
+  const { managedClients } = await import('./managed.mts');
+  return managedClients({ url: at.gateway, key: at.key, onSignedOut: () => forgetCloudKey(at.key, env, home) }).storage;
 }
 
 /** What the team's owner sees of Stripe on Plan and Billing; `{ owner: false }` for anyone else. */
@@ -337,6 +371,8 @@ async function openStripe(route: string, body: unknown, openExternal: (url: stri
   if (!at) return { ok: false, error: 'signed-out', message: `Sign in to ${Name} Cloud first.` };
   const out = await ask(at.gateway, route, { method: 'POST', key: at.key, body });
   if (out.status !== 200) return { ok: false, error: out.body.error || 'refused', message: out.body.message || `the cloud said ${out.status}` };
+  // A plan started from its trial is charged on the card Stripe holds: no page to open.
+  if (out.body.where === 'started') return { ok: true, where: 'started' };
   if (typeof out.body.url !== 'string' || !STRIPE_PAGE.test(out.body.url)) return { ok: false, error: 'not-stripe', message: 'The cloud answered with a page that is not Stripe\'s.' };
   await openExternal(out.body.url);
   return { ok: true, ...(out.body.where ? { where: out.body.where } : {}) };

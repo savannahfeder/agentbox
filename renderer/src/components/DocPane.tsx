@@ -3,6 +3,8 @@ import {FocusControl} from './FocusControl';
 import type {FocusControlStyle} from '../focus-control';
 import {usePreviewReveal} from '../preview-reveal';
 import {PreviewLoading} from './PreviewLoading';
+import {OpeningWait} from './OpeningWait';
+import {didNotOpen} from '../opening-wait';
 import { isLocalPreview, type ArtifactMode } from '../artifact-layout';
 import { LOCAL_APP_SANDBOX, previewShows, previewStatus, useLocalPreview } from '../local-preview';
 import { LocalPreviewStatus } from './LocalPreviewStatus';
@@ -45,7 +47,8 @@ import { familyOfName } from '../../../shared/artifact-marks.mts';
 import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
-import { crumbParts, docKind, docName, isPlainText, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
+import { crumbParts, docKind, docName, FOLLOW_FILE_MS, isPlainText, newerOnDisk, paneCanSave, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
+import { askAtMostEvery } from '../ask-at-most-every';
 import { opening, pictureUrl, seenAt } from '../picture';
 import { fetchableFileUrl } from '../phone-files';
 import { DocText } from './DocText';
@@ -123,7 +126,9 @@ function paneKindClass(kind: PaneKind): string {
   return 'doc-md';
 }
 
-export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle, aside, onComment, firstMark }: {
+export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice, mode, onMode, headerTarget, focusControlStyle, aside, onComment, firstMark }: {
+  /** The thread it was opened from: its own copy of a file comes before the project's. */
+  thread?: string;
   focusControlStyle?: FocusControlStyle;
   /** Drawn beside a document's words, inside the card: the notes sidebar. */
   aside?: ReactNode;
@@ -235,15 +240,16 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
     // A website is not looked for on disk: the address is the document.
     if (kind === 'website') { setFailed(null); setResolved(src); setUrl(src); return () => { live = false; }; }
     if (isLocalPreview(src)) { setFailed(null); setResolved(src); setUrl(src); return () => { live = false; }; }
-    api.resolveDoc({ product: doc.product, src: doc.src }).then((r) => {
+    const unanswered = () => { if (live) setFailed(didNotOpen(docName(src))); };
+    api.resolveDoc({ product: doc.product, src: doc.src, thread }).then((r) => {
       if (!live) return;
       if (!r.ok || !r.opened) { setFailed(r.error ?? 'That file could not be found.'); lookLater(r); return; }
       setFailed(null);
       setResolved(r.opened);
       setUrl(r.url ?? null);
       // No page scheme on this copy (a browser tab): the page is drawn from its text.
-      if (kind === 'html' && !r.url) void api.readDoc({ product: doc.product, src: doc.src }).then((t) => { if (live && t.ok) setText(t.text ?? ''); });
-    });
+      if (kind === 'html' && !r.url) void api.readDoc({ product: doc.product, src: doc.src, thread }).then((t) => { if (live && t.ok) setText(t.text ?? ''); }).catch(unanswered);
+    }).catch(unanswered);
     if (kind === 'code') {
       api.codeChange({ product: doc.product, src: doc.src }).then((r) => {
         if (!live) return;
@@ -252,15 +258,33 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
       });
     }
     if (kind === 'markdown' || kind === 'text' || kind === 'table') {
-      api.readDoc({ product: doc.product, src: doc.src }).then((r) => {
+      api.readDoc({ product: doc.product, src: doc.src, thread }).then((r) => {
         if (!live) return;
         if (!r.ok) { setFailed(r.error ?? 'That file could not be read.'); return; }
         setText(r.text ?? '');
         setMtime(r.mtime ?? 0);
-      });
+      }).catch(unanswered);
     }
     return () => { live = false; };
-  }, [doc.product, doc.src, src, kind, looks]);
+  }, [doc.product, doc.src, src, kind, looks, thread]);
+
+  // An agent can rewrite the open file in place, and a cloud run's copy lands
+  // after its answer, so the pane reads it again while the app changes.
+  const shownMtime = useRef(0);
+  shownMtime.current = mtime;
+  useEffect(() => {
+    if (kind !== 'markdown' && kind !== 'text' && kind !== 'table') return;
+    let live = true;
+    const follow = askAtMostEvery(FOLLOW_FILE_MS, () => {
+      void api.readDoc({ product: doc.product, src: doc.src, thread }).then((r) => {
+        if (!live || !shownMtime.current || !newerOnDisk(shownMtime.current, r)) return;
+        setText(r.text ?? '');
+        setMtime(r.mtime ?? 0);
+      }).catch(() => {});
+    });
+    const off = api.onChanged(follow.changed);
+    return () => { live = false; follow.stop(); off?.(); };
+  }, [doc.product, doc.src, kind, thread]);
 
   // FULLY RESIZABLE, hers. The pointer is captured on the divider, so a fast
   // drag over the document's own iframe does not lose the grip — an iframe eats
@@ -276,7 +300,11 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   useLayoutEffect(() => {
     const el = card.current;
     if (!el) return;
-    const read = () => setEdge({ x: el.offsetLeft, y: el.offsetTop, h: el.offsetHeight, r: getComputedStyle(el).borderTopLeftRadius || '0px' });
+    // Only a moved edge draws the pane again; the card's width changes every frame the sidebar slides.
+    const read = () => {
+      const next = { x: el.offsetLeft, y: el.offsetTop, h: el.offsetHeight, r: getComputedStyle(el).borderTopLeftRadius || '0px' };
+      setEdge((was) => (was.x === next.x && was.y === next.y && was.h === next.h && was.r === next.r ? was : next));
+    };
     read();
     const watch = new ResizeObserver(read);
     watch.observe(el);
@@ -301,7 +329,9 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // A page being browsed has an address rather than a breadcrumb; the bar
   // above it draws that (BrowserChrome).
   const browsingKind: WebChromeKind | null = kind === 'website' ? 'website' : app.local ? 'local' : null;
-  const crumb = crumbParts(resolved ?? doc.src, roots);
+  // A run's change is named by what it is, not by the folder the app keeps it in.
+  const crumb = /(^|\/)runs\/w-[0-9a-f]+\/the-change-it-made\.change$/.test(resolved ?? doc.src) ? ['The change'] : crumbParts(resolved ?? doc.src, roots);
+  const canSave = paneCanSave(resolved, roots);
   // WHAT THE FIRST MARK DOES, AND FOR A CHANGE IT IS HER EDITOR.On a markdown
   // file or a page it is unchanged and still hands the file to the operating
   // system, which is what she approved on 08-20. ON A WEBSITE IT IS THE
@@ -309,7 +339,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
   // rather than the one the thread named.
   const openOutside = () => {
     const src = browsingKind ? here.url : kind === 'code' ? (fileAt ?? doc.src) : doc.src;
-    api.openArtifactExternally({ product: doc.product, src }).then((r) => {
+    api.openArtifactExternally({ product: doc.product, src, thread }).then((r) => {
       if (!r.ok) onNotice(r.error ?? 'That file could not be opened.');
     });
   };
@@ -355,7 +385,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
             {crumb.map((part, i) => (
               <span key={`${part}-${i}`} className="doc-crumb-part">
                 {i > 0 && <span className="doc-crumb-sep">›</span>}
-                <span className={i === crumb.length - 1 ? 'doc-crumb-leaf' : undefined}>{i === crumb.length - 1 ? shownName(resolved ?? doc.src) || part : part}</span>
+                <span className={i === crumb.length - 1 ? 'doc-crumb-leaf' : undefined}>{i === crumb.length - 1 && part !== 'The change' ? shownName(resolved ?? doc.src) || part : part}</span>
               </span>
             ))}
           </div>
@@ -485,10 +515,10 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
                 srcDoc={aside ? pageTextForNotes(text) : text} scrolling={aside && pageHeight ? 'no' : undefined} sandbox="allow-scripts" title={crumb.join('/')} /></PinSheet></div>
               : <PreviewLoading />}</Beside> : <PreviewLoading />
         ) : text === null || (threadsFile && liveTicket === undefined) ? (
-          <PreviewLoading />
+          <OpeningWait key={looks} name={docName(src)} kind={kind === 'markdown' ? kind : null} onAgain={() => setLooks((n) => n + 1)} />
         ) : kind === 'table' ? (
           <Beside aside={aside}>
-            <TableView text={text} path={src} mode="pane" live={liveSession} onComment={onComment} onSave={doc.readOnly ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
+            <TableView text={text} path={src} mode="pane" live={liveSession} onComment={onComment} onSave={doc.readOnly || !canSave ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
           </Beside>
         ) : kind === 'text' ? (
           <Beside aside={aside}><div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div></Beside>
@@ -503,7 +533,7 @@ export function DocPane({ doc, roots, split, onSplit, onClose, onNotice, mode, o
               mtime={mtime}
               onSaved={(at) => setMtime(at)}
               onNotice={onNotice}
-              readOnly={doc.readOnly}
+              readOnly={doc.readOnly || !canSave}
               live={liveSession}
             />
           </Beside>

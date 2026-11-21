@@ -51,6 +51,7 @@ import { EDIT_LAST } from '../team/chat-events';
 import { messageMore, withEmbeds, wordsOf } from '../team/message-more';
 import { ThreadLine } from '../team/ThreadPanel';
 import { AgentAnswers } from '../team/ChatAgents';
+import { AskAboutContext, UnderTheAsk, askAboutStep } from '../team/AsksLine';
 import { NeedOlder } from './NeedCard';
 import {
   conversationGap, fileInChange, gapIndex, groupWork, outputCut, runFailures, runOverflow, runSummary,
@@ -243,6 +244,18 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
     const by = (e as { by?: string }).by;
     return team && by && by !== team.me ? team.byId.get(by) ?? { id: by, email: '', name: 'A teammate', avatarUrl: null } : null;
   };
+  const askAbout = useContext(AskAboutContext) && !chat;
+  const underAsk = useContext(UnderTheAsk);
+  // Words a person you asked for help wrote to the agent: theirs, with their face.
+  const helperOf = (e: AgentEvent) => {
+    const id = (e as { fromId?: string }).fromId;
+    return team && id ? team.byId.get(id) ?? null : null;
+  };
+  // The name over a message in an agent's thread.
+  const whoSaid = (e: AgentTurn): ReactNode => (voiceOf(e) ? <><Face person={teammateOf(e)} agent />{voiceOf(e)}</> : teammateOf(e)
+    ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
+    : helperOf(e) ? <><Face person={helperOf(e)} />{firstName(helperOf(e))}</>
+    : e.who === 'you' ? 'You' : ((e as { from?: string }).from ?? nameOf?.(e) ?? name));
   // AN AGENT'S MESSAGE IS ITS OWN, on its owner's screen as well as anyone's.
   const voiceOf = (e: AgentEvent): string | null => {
     const { voice } = e as { voice?: AgentVoice };
@@ -354,6 +367,8 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // message opens what is ../team/chat-layout.ts; a folded run is work to it.
   const slots = chat ? chatLayout(nodes.map((e) => (e.kind === 'run' ? { kind: 'work', at: e.at } : e))) : null;
   const newest = chat ? newestSaid(nodes) : -1;
+  // A task's first message is the one that asked.
+  const asked = slots ? slots.findIndex((x) => !!x?.head) : -1;
   // Only the agent's last word, with nothing said to it since, takes what a card asks for (NeedCard.tsx).
   const asking = (() => {
     for (let k = nodes.length - 1; k >= 0; k--) {
@@ -459,15 +474,14 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 code={code}
               />
             : slot ? (<>
-              {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face holds the
-                  column; a message that carries on a run keeps the column for
-                  its time, shown on pointing. None of the agent thread's
-                  chapters: no rule above or below your words and no larger
-                  type, because a turn means nothing between two people. */}
+              {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face sits beside
+                  the name once per run. None of the agent thread's chapters: no
+                  rule above or below your words and no larger type, because a
+                  turn means nothing between two people. */}
               <div className={`msg chat-msg${slot.head ? '' : ' cont'}${e.pending ? ' sending' : ''}`}>
-                <div className="chat-gutter">{slot.head
-                  ? <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!voiceOf(e) && !teammateOf(e) && e.who === 'you'} agent={e.who === 'it' || !!voiceOf(e)} size="lg" />
-                  : <span className="chat-gt">{clock(e.at)}</span>}</div>
+                {slot.head && <div className="chat-gutter">
+                  <Face person={teammateOf(e) ?? (team?.me ? team.byId.get(team.me) : null)} me={!voiceOf(e) && !teammateOf(e) && e.who === 'you'} agent={e.who === 'it' || !!voiceOf(e)} size="lg" />
+                </div>}
                 {slot.head && (
                   <div className="msg-head">
                     <span className="msg-who">{voiceOf(e) ?? teammateOf(e)?.name ?? (e.who === 'you' ? 'You' : name)}</span>
@@ -485,6 +499,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     ? <div className="msg-body msg-deleted">{e.text}</div>
                     : <ChatFold lines={e.who === 'you'} newest={n === newest}>{md(e.text ?? '')}</ChatFold>}
                 {e.edited && !slot.head && editing !== e.uid && <span className="msg-edited chat-edited-cont">edited</span>}
+                {n === asked && underAsk && <div className="chat-under">{underAsk}</div>}
                 {/* THE CHIPS, AND THE BAR WHEN YOU POINT AT IT (w-560647d4db).
                     Both hang off the message's own uid, which is the name the
                     store keeps a reaction under and the only name a message has
@@ -544,11 +559,12 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
               <div className={`msg ${e.who === 'you' && !teammateOf(e) && !voiceOf(e) ? 'yours' : ''} ${turnStarts[n] ? 'turn' : ''} ${turnEnds[n] ? 'turn-end' : ''}${e.same && !e.resumed ? 'same' : ''} ${e.pending ? 'sending' : ''}`}>
                 {(!e.same || e.resumed) && (
                   <div className="msg-head">
-                    <span className="msg-who">{voiceOf(e) ? <><Face person={teammateOf(e)} agent />{voiceOf(e)}</> : teammateOf(e)
-                      ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
-                      : e.who === 'you' ? 'You' : ((e as { from?: string }).from ?? nameOf?.(e) ?? name)}</span>
+                    <span className="msg-who">{whoSaid(e)}</span>
                     {headFacts(e, when(e.at))}
                     <MessageKind e={e} />
+                    {askAbout && e.who !== 'you' && !helperOf(e) && !voiceOf(e) && e.text && (
+                      <button type="button" className="msg-ask" onClick={() => askAboutStep(e.text ?? '')}>Ask about this</button>
+                    )}
                   </div>
                 )}
                 {/* WHAT A PERSON TYPED IS NOT MARKDOWN (w-a33b339772).

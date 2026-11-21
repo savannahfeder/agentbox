@@ -111,10 +111,17 @@ export function shortTitle(opening: string | null | undefined): string {
   // Only before a sentence: "OK button" is a name.
   const unspoken = said.replace(FILLER, '');
   const text = unspoken !== said && words(unspoken).length >= 3 ? unspoken[0].toUpperCase() + unspoken.slice(1) : typed;
-  if (alreadyShort(text)) return String(text).trim().replace(/(?<!\.)\.$/, '');
+  // A line that leads into more ("Three fixes:") ends on its words, not the colon.
+  if (alreadyShort(text)) return String(text).trim().replace(/(?<!\.)\.$/, '').replace(/\s*[:;,]+$/, '');
   let t = plain(text);
   if (!t) return '';
   t = t.replace(GREETING, '').replace(ASK, '').replace(LOOK, '').replace(CANNOT, 'Cannot ');
+  // One word before a colon ("M19-B1:", "Bug:") tags the thread; the name is what follows.
+  const tag = /^([^\s:]{1,24}):\s+(\S.*)$/.exec(t);
+  if (tag) {
+    const rest = shortTitle(tag[2]);
+    if (rest) return `${tag[1]}: ${rest}`;
+  }
   // The first sentence, then its first clause.
   t = firstSentenceOf(t);
   t = t.split(/\s*(?:[,;:(]|\s[-–—]\s|—)\s*/)[0] || t;

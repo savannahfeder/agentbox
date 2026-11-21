@@ -66,7 +66,7 @@ function setup({ start = MADE + 60_000 } = {}) {
     const sig = `t=${t},v1=${crypto.createHmac('sha256', SECRET).update(`${t}.${raw}`).digest('hex')}`;
     return gw.handle({ method: 'POST', path: '/v1/stripe', headers: { 'stripe-signature': sig }, body: raw });
   };
-  return { gw, calls, team, owner: as(A), member: as(B), webhook, tick: (ms) => { clock += ms; } };
+  return { gw, calls, team, subs, owner: as(A), member: as(B), webhook, tick: (ms) => { clock += ms; } };
 }
 
 describe('the owner pays for the team', () => {
@@ -98,8 +98,8 @@ describe('Stripe\'s webhook', () => {
   it('puts the whole team on its seats, the trial over', async () => {
     const { owner, member, webhook } = setup();
     await webhook('sub_team', 'active', 3);
-    // Each member's seat is the $40 cloud plan's: 400 hours and 10 agents at once of their own.
-    expect((await member('GET', '/v1/me')).body.team).toMatchObject({ trial: false, seats: 3, hours: 400, agents: 10 });
+    // Each member's seat is the $40 cloud plan's 400 hours, with no limit at once.
+    expect((await member('GET', '/v1/me')).body.team).toMatchObject({ trial: false, seats: 3, hours: 400, agents: null });
     expect((await owner('GET', '/v1/me')).body.team.owner).toBe(true);
   });
 
@@ -125,10 +125,36 @@ describe('what the owner sees of Stripe', () => {
     await webhook('sub_team', 'active', 3);
     expect((await owner('GET', '/v1/team-billing')).body).toEqual({
       owner: true, periodStart: 1794900000 * 1000, periodEnd: 1797500000 * 1000,
-      nextAt: 1797500000 * 1000, nextAmount: 120,
+      nextAt: 1797500000 * 1000, nextAmount: 120, endsAt: null,
       card: { brand: 'Visa', last4: '4242' }, email: 'billing@example.com',
       invoices: [{ at: 1794900000 * 1000, amount: 120, status: 'paid' }, { at: 1792300000 * 1000, amount: 120, status: 'failed' }],
     });
+  });
+
+  // 2026-11-13, the owner after cancelling in Stripe: "it still says that the next bill comes on
+  // November 20th". Their page also said "No card yet" after paying with Link.
+  it('a plan cancelled at the period’s end has no next bill, and says when it ends', async () => {
+    const { owner, webhook, subs } = setup();
+    await webhook('sub_team', 'active', 1);
+    subs.get('sub_team').cancel_at_period_end = true;
+    expect((await owner('GET', '/v1/team-billing')).body).toMatchObject({ nextAt: null, nextAmount: null, endsAt: 1797500000 * 1000 });
+  });
+  it('a plan Stripe marks with an end date and no flag is ending too', async () => {
+    const { owner, webhook, subs } = setup();
+    await webhook('sub_team', 'trialing', 1);
+    subs.get('sub_team').cancel_at = 1797000000;
+    expect((await owner('GET', '/v1/team-billing')).body).toMatchObject({ nextAt: null, nextAmount: null, endsAt: 1797000000 * 1000 });
+  });
+  it('a plan that is not ending has no end date', async () => {
+    const { owner, webhook } = setup();
+    await webhook('sub_team', 'active', 1);
+    expect((await owner('GET', '/v1/team-billing')).body).toMatchObject({ nextAt: 1797500000 * 1000, endsAt: null });
+  });
+  it('a plan paid with Link has a way to pay, named Link', async () => {
+    const { owner, webhook, subs } = setup();
+    await webhook('sub_team', 'active', 1);
+    subs.get('sub_team').default_payment_method = { type: 'link', link: { email: 'billing@example.com' } };
+    expect((await owner('GET', '/v1/team-billing')).body.card).toEqual({ brand: 'Link', last4: '' });
   });
 
   it('before paying, nothing of Stripe, and no call to it', async () => {

@@ -70,7 +70,7 @@ export function readMacPressureNow(): PressureSample {
   let freePct: number | null = null;
   try {
     const out = execFileSync('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level'],
-      { timeout: 2_000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      { timeout: 2_000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
     [level, freePct] = out.trim().split(/\s+/).map(Number);
   } catch { /* not a Mac, or sysctl did not answer */ }
   return { level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null, at: Date.now() };
@@ -86,6 +86,13 @@ export const SETTLE_MS = 3 * 60_000;
 const RANK: Record<Pressure, number> = { normal: 0, tight: 1, critical: 2 };
 /** `kern.memorystatus_vm_pressure_level`'s warn; 1 is normal and 4 critical. */
 const WARN_LEVEL = 2;
+
+/** A reading with the kernel's warn and swapping under heavy taken out, so
+ *  only free memory, critical and heavy swapping are left to judge it. */
+export function withoutWarnOrLightSwap<R extends PressureReading>(r: R): R {
+  const lightSwap = Number.isFinite(r.swapInMbps) && r.swapInMbps! < SWAP_CRITICAL_MBPS;
+  return { ...r, level: r.level === WARN_LEVEL ? null : r.level, swapInMbps: lightSwap ? null : r.swapInMbps };
+}
 
 /** The worst of the readings stamped inside `windowMs` of `now`. Pure. */
 export function worstPressure(readings: (PressureSample | null | undefined)[] | null | undefined, now: number, windowMs = SETTLE_MS): Pressure {
@@ -119,10 +126,8 @@ export function startDecision({
   const at = Number(reading?.at);
   const known = reading && (Number.isFinite(reading.level) || Number.isFinite(reading.freePct) || Number.isFinite(reading.swapInMbps));
   if (!known || !Number.isFinite(at) || Math.abs(now - at) > staleMs) return { start: true, why: 'no-reading' };
-  // Below the Mac's own number, swapping that is only tight is set aside like the warn.
-  const lightSwap = (r: PressureSample) => Number.isFinite(r.swapInMbps) && r.swapInMbps! < SWAP_CRITICAL_MBPS;
   const readings = running < roomy
-    ? [reading, ...recent].map((r) => (r ? { ...r, level: r.level === WARN_LEVEL ? null : r.level, swapInMbps: lightSwap(r) ? null : r.swapInMbps } : r))
+    ? [reading, ...recent].map((r) => (r ? withoutWarnOrLightSwap(r) : r))
     : [reading, ...recent];
   const pressure = worstPressure(readings, now, settleMs);
   if (pressure === 'normal') return { start: true, why: 'normal' };

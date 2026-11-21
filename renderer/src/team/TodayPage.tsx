@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { MemberFace } from './everything/TeamStrip';
 import type { Member } from './everything/members';
-import { GROUPS, SHOWN, groupsOf, lineWhen, linesToStep, shownDay, stepLine, todayLine, type GroupLine, type TodayLine, type TodayPerson, type TodayRange, type TodayCounts } from './today';
+import { GROUPS, SHOWN, groupsOf, lineWhen, linesShown, linesToStep, shownDay, stepLine, todayLine, type GroupLine, type TodayLine, type TodayPerson, type TodayRange, type TodayCounts } from './today';
 import './today.css';
 
 const RANGES: { id: TodayRange; label: string }[] = [{ id: 'today', label: 'Today' }, { id: 'yesterday', label: 'Yesterday' }, { id: 'week', label: 'This week' }];
@@ -14,13 +14,15 @@ function Section({ id, picked, label, lines, extra, range, titleOf, onOpen }: {
   titleOf: (l: TodayLine) => string;
   onOpen: (l: TodayLine) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openedIn, setOpenedIn] = useState<TodayRange | null>(null);
+  if (openedIn && openedIn !== range) setOpenedIn(null);
   if (!lines.length && !extra) return null;
+  const open = openedIn === range;
   const more = lines.length - SHOWN;
   return <div className="td-sec" data-group={id.split('/').pop()}>
     <span className="td-label">{label}</span>
     <ul>
-      {(open ? lines : lines.slice(0, SHOWN)).map((l) => <li key={l.key}>
+      {linesShown(lines, openedIn, range).map((l) => <li key={l.key}>
         <button type="button" className={`td-line${picked === `${id}/${l.key}` ? ' is-picked' : ''}`} onClick={() => onOpen(l)} title={l.says ? `${titleOf(l)}: ${l.says}` : titleOf(l)}>
           <span className="td-t">{titleOf(l)}</span>
           {l.on && <span className="td-on">on {l.on}</span>}
@@ -32,7 +34,7 @@ function Section({ id, picked, label, lines, extra, range, titleOf, onOpen }: {
             : <span className="td-at">{lineWhen(l.at, range, Date.now())}</span>}
         </button>
       </li>)}
-      {!open && more > 0 && <li><button type="button" className="td-more" onClick={() => setOpen(true)}>and {more} more</button></li>}
+      {!open && more > 0 && <li><button type="button" className="td-more" onClick={() => setOpenedIn(range)}>and {more} more</button></li>}
       {extra && <li className="td-extra">{extra}</li>}
     </ul>
   </div>;

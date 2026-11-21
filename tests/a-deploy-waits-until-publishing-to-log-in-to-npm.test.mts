@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
-import { nextVersion, serverConfig, whatIsLive } from '../scripts/lib/deploy-rules.mjs';
+import { nextVersion, serverConfig, whatIsLive, withVersion } from '../scripts/lib/deploy-rules.mjs';
 
 const scriptUrl = new URL('../scripts/deploy.mjs', import.meta.url);
 const source = fs.readFileSync(scriptUrl, 'utf8')
@@ -26,7 +26,7 @@ function deploy({ signedIn = false, expireDuringBuild = false, buildOk = true,
   const failed = { status: 1, stdout: '', stderr: 'failed' };
   let exitCode = 0;
   const context = {
-    path, os, fileURLToPath, nextVersion, serverConfig, whatIsLive,
+    path, os, fileURLToPath, nextVersion, serverConfig, whatIsLive, withVersion,
     RELEASE_REPO: 'example/releases',
     fs: {
       existsSync: () => true,
@@ -52,6 +52,8 @@ function deploy({ signedIn = false, expireDuringBuild = false, buildOk = true,
         signedIn = loginOk && loginWorks;
         return loginOk ? ok() : failed;
       }
+      // Nobody presses Enter to retry a failed publish here; a-deploy-calls-you-back-when-npm-needs-you covers that.
+      if (command === 'bash') return failed;
       if (command === 'security') return ok('"Developer ID Application: Test (ABCDEFGHIJ)"');
       if (command === 'gh' && args[0] === 'api') return ok('true');
       if (command === 'gh' && args[0] === 'release') return ok('v1.0.0');
@@ -121,10 +123,10 @@ describe('npm authentication during deployment', () => {
     expect(run.count('node', 'scripts/publish-download.mjs')).toBe(1);
     expect(run.count('node', 'scripts/cloud-setup.mjs')).toBe(1);
     expect(run.count('node', 'scripts/cloud-gateway-setup.mjs')).toBe(1);
-    // Not finished, and it says npm is the part left and how to get it next time.
+    // Not finished, and it says npm is the part left and the command that puts it there.
     expect(run.exitCode).toBe(1);
     expect(run.messages.some((l) => /✗ npm/.test(l) && l.includes('0.9.0'))).toBe(true);
-    expect(run.messages.some((l) => l.includes('npm login'))).toBe(true);
+    expect(run.messages.some((l) => l.includes('npm run deploy -- --npm'))).toBe(true);
     expect(run.messages.some((l) => /✓ website download/.test(l))).toBe(true);
   });
 

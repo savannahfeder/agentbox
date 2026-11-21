@@ -136,7 +136,8 @@ describe('a process that ends while the list is being read', () => {
   });
 });
 
-describe('listing this machine\'s processes', () => {
+// Windows lists no processes, so this machine has none to find.
+describe.skipIf(process.platform === 'win32')('listing this machine\'s processes', () => {
   it('finds this test among them, without an error of any kind', async () => {
     const procs = await listProcesses();
     const me = procs.find((p) => p.pid === process.pid);

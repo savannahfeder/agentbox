@@ -49,7 +49,8 @@ describe('a stand-in on a teammate\'s run', () => {
     const run = store.modules.workItemsDisk.createWorkItem(dir, { title: 'Set yourself up', labels: ['founder', `teammate:${t.id}`, 'hop:0'] }, { source: 'system' });
     const brief = team.briefFor({ id: run.id, labels: run.labels });
     const child = spawn(process.execPath, [STUB, '-p', 'Find me launch posts worth writing', '--append-system-prompt', brief, '--mcp-config', config], {
-      env: { ...process.env, STUB_CLAUDE_PLAN: '', ZERO_ITEM: run.id, ZERO_PRODUCT: product.id }, stdio: ['ignore', 'pipe', 'pipe'],
+      // A cloud machine running this suite has its own bridge variable set; a run on this computer must not take it.
+      env: { ...process.env, AGENTBOX_BRIDGE_SOCK: '/nonexistent/bridge.sock', STUB_CLAUDE_PLAN: '', ZERO_ITEM: run.id, ZERO_PRODUCT: product.id }, stdio: ['ignore', 'pipe', 'pipe'],
     });
     return new Promise((resolve) => child.on('exit', resolve));
   };

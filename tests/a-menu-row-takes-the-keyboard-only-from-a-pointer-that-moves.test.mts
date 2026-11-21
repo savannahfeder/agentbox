@@ -49,6 +49,6 @@ describe('the new thread box’s menus', () => {
   it('the arrows still walk the rows and Enter is the row’s own press', () => {
     expect(card).toContain("if (e.key === 'ArrowDown') { e.preventDefault(); rows[(at + 1) % rows.length]?.focus(); return; }");
     expect(card).toContain("if (e.key === 'ArrowUp') { e.preventDefault(); rows[at <= 0 ? rows.length - 1 : at - 1]?.focus(); return; }");
-    expect(card).toContain('onClick={() => { chooseAgent(a.id); chooseTo(\'agent\'); }}');
+    expect(card).toContain('onClick={() => chooseTo(\'agent\')}');
   });
 });

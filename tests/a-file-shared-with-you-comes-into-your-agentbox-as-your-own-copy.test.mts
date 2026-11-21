@@ -4,8 +4,10 @@
 // bring that into my Agentbox workspace easily, and edit it?" There was no way
 // at all: the link page offered comments and a download. Now the page's "Open
 // in Agentbox" hands the app agentbox://f/<token>, and the app saves the file
-// into the project on screen, on a closed thread of its own that runs nothing
-// until they write to it. Measured with Maya sharing on the memory cloud and
+// into the project on screen, on a thread of its own that runs nothing until
+// they write to it. It sits in Later, written down and not begun: closed, it
+// read "Marked it done" under Done; held as waiting on them, it read "It
+// stopped and asked you", as if an agent had run (power tests, 2026-11-11). Measured with Maya sharing on the memory cloud and
 // Jun bringing it into a real store: the bytes, the thread, that the pane may
 // edit the copy, a film, a stopped link, and which links count.
 import { it, expect, beforeAll, describe } from 'vitest';
@@ -15,6 +17,8 @@ import path from 'node:path';
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as disk from '../main/store/work-items.mts';
+import { isClaimable, notStarted } from '../shared/work-items.mts';
+import { belongsInInbox } from '../renderer/src/list-rules.ts';
 import { Store } from '../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/memory-cloud.mts';
 import { createTeamService } from '../main/team/index.mts';
@@ -67,7 +71,6 @@ describe('bringing it in', () => {
   const bring = (token: string) => bringSharedFile({
     token, product: slug, read: (t) => jun.readFileLink(t), productDir: store.productDir(slug),
     compose: (fields) => store.composeItem(slug, fields),
-    close: (id) => { store.answerItem(slug, id, { status: 'done' }); },
   });
 
   beforeAll(async () => {
@@ -81,7 +84,7 @@ describe('bringing it in', () => {
     slug = store.createProduct({ name: 'Launch' }).slug;
   });
 
-  it('saves the document into the project, on a closed thread named by its heading that names the file and who sent it', async () => {
+  it('saves the document into the project, on a thread in Later named by its heading, that names the file and who sent it', async () => {
     const token = await shareFrom('pricing.md', '# Pricing plan\n\nThree tiers.\n');
     const out = await bring(token);
     const file = path.join(store.productDir(slug), out.src);
@@ -89,7 +92,11 @@ describe('bringing it in', () => {
     expect(out.src).toMatch(/^attachments\/.+-pricing\.md$/);
     const row = store.readItem(slug, out.id)!;
     expect(row.title).toBe('Pricing plan');
-    expect(row.status).toBe('done');
+    expect(row.status).toBe('open');
+    expect(notStarted(row)).toBe(true);
+    expect(isClaimable(row)).toBe(false);
+    expect(belongsInInbox(row)).toBe(false);
+    expect(JSON.stringify(store.readHistory(slug, out.id, { max: 20 }))).not.toMatch(/Marked it done|stopped/);
     expect(row.body.startsWith('Maya Chen shared this with me.\n')).toBe(true);
     expect(row.body).not.toContain(token);
     expect(row.body).toContain(`[pricing.md](${out.src})`);
@@ -111,6 +118,28 @@ describe('bringing it in', () => {
     expect(store.readItem(slug, pic.id)!.body).toContain(`![shot.png](${pic.src})`);
     const csv = await bring(await shareFrom('leads.csv', 'Name,Fit\n# Ledger,9\n'));
     expect(store.readItem(slug, csv.id)!.title).toBe('leads.csv');
+  });
+
+  // Both testers on 2026-11-11: the brought-in film "drops the partner film
+  // feedback". The link's comments come in with it, written on its thread.
+  it('brings the link\'s comments in with the file, each at its place', async () => {
+    const token = await shareFrom('teaser.mp4', Buffer.alloc(1000, 3));
+    const lena = memoryBackend(cloud, signUpMemory(cloud, { email: 'lena@else.test', name: 'Lena' }));
+    await lena.commentOnFileLink(token, 'The cut here is too fast', { kind: 'time', s: 3.2 });
+    await lena.commentOnFileLink(token, 'Love the ending');
+    const row = store.readItem(slug, (await bring(token)).id)!;
+    expect(row.body).toContain('Comments on the link:\n- Lena at 0:03: The cut here is too fast\n- Lena: Love the ending');
+  });
+
+  it('says where each one pointed in plain words', async () => {
+    const { whereSaid } = await import('../main/bring-shared-file.mts');
+    expect([{ kind: 'time', s: 84 }, { kind: 'time', s: 6.5, x: 0.5, y: 0.4 }, { kind: 'pin', x: 0.1, y: 0.2 }, { kind: 'page', n: 3 }, { kind: 'quote', text: 'ship Tuesday' }, { kind: 'whole' }, null]
+      .map((p) => whereSaid(p))).toEqual([' at 1:24', ' on the frame at 0:06', ' on the picture', ' on page 3', ' on “ship Tuesday”', '', '']);
+  });
+
+  it('says nothing of comments when the link has none', async () => {
+    const row = store.readItem(slug, (await bring(await shareFrom('quiet.md', '# Quiet\n'))).id)!;
+    expect(row.body).not.toContain('Comments on the link');
   });
 
   it('brings a film of several pieces in whole', async () => {

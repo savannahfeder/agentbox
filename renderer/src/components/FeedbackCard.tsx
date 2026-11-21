@@ -1,4 +1,3 @@
-import { Name } from '../../../shared/product-name.mjs';
 import { SEND } from '../this-keyboard';
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react';
 import { FEEDBACK_LIMITS, checkFeedback } from '../../../shared/feedback.mts';
@@ -53,8 +52,8 @@ function screenshotName(at = new Date()) {
 
 const extension = (name: string) => (name.includes('.') ? name.split('.').pop()!.slice(0, 4).toUpperCase() : 'FILE');
 
-export function FeedbackCard({ onClose, onSend }: { onClose: () => void; onSend: Send }) {
-  const [text, setText] = useState('');
+export function FeedbackCard({ onClose, onSend, start = '' }: { onClose: () => void; onSend: Send; start?: string }) {
+  const [text, setText] = useState(start);
   const [files, setFiles] = useState<FeedbackFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const [sending, setSending] = useState(false);
@@ -66,7 +65,12 @@ export function FeedbackCard({ onClose, onSend }: { onClose: () => void; onSend:
   // is up while this count is above zero rather than on the last event.
   const depth = useRef(0);
 
-  useEffect(() => { box.current?.focus(); }, []);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
   // Sent, it thanks you and gets out of the way on its own.
   useEffect(() => {
     if (!sent) return undefined;
@@ -129,7 +133,6 @@ export function FeedbackCard({ onClose, onSend }: { onClose: () => void; onSend:
           <h2>Send feedback</h2>
           <button type="button" className="fb-close" aria-label="Close" title="Close · esc" onClick={onClose}><CrossIcon /></button>
         </div>
-        <p className="fb-sub">Goes straight to the {Name} team.</p>
         <div className="fb-box">
           <textarea ref={box} value={text} onChange={(e) => setText(e.target.value)} maxLength={FEEDBACK_LIMITS.text + 1}
             placeholder="What happened, and what did you expect?" aria-label="Your feedback" />
@@ -145,7 +148,7 @@ export function FeedbackCard({ onClose, onSend }: { onClose: () => void; onSend:
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11.5 12.4 19a5 5 0 0 1-7.1-7.1l8-8a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4l7.3-7.3"/></svg>
               <span>Attach</span>
             </button>
-            <span className="fb-hint">or paste, or drop files here</span>
+            <span className="fb-hint">or drop files</span>
             <input ref={picker} type="file" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ''; }} />
             <button className="dock-send" onClick={() => void send()} disabled={!canSend} title={`Send · ${SEND}`}>{sending ? 'Sending' : 'Send'} <kbd>{SEND}</kbd></button>
           </div>

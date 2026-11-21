@@ -52,7 +52,7 @@ describe('the app', () => {
 
   it('still opens a task row from Needs you as its task', () => {
     expect(app).toMatch(/const onYou = mineInNeeds\.filter\(/);
-    expect(app).toMatch(/<PlaceList title=\{`Tasks you gave \$\{first\}`\} now=\{now\} rows=\{given\.map\(\(i\) => itemRow\(/);
+    expect(app).toMatch(/listPart\('Tasks you gave', given\.map\(\(i\) => itemRow\(/);
     expect(app).toMatch(/const itemRow = \(i: WorkItem, word: string, tone: PlaceRow\['tone'\]\): PlaceRow => \(\{ key: `\$\{i\.product\}\/\$\{i\.id\}`, title: rowTitle\(i\), word, at: i\.updatedAt, tone, onOpen: \(\) => openItem\(i\) \}\);/);
   });
 });

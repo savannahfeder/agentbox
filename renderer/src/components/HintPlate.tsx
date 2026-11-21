@@ -14,11 +14,12 @@ import { capsFor, capWord, placeHint, type HintLine } from '../hint-plate';
  *  It never takes the pointer. A hint you can hover is a hint that can be
  *  hovered off the thing it describes.
  */
-export function HintPlate({ lines, comp, align, text }: {
+export function HintPlate({ lines, comp, align, side, text }: {
   lines: HintLine[];
   /** The live box of the component this belongs to, in window coordinates. */
   comp: DOMRect;
   align?: 'left' | 'right' | 'center';
+  side?: 'below' | 'above';
   /**
    * The box of the WORDS inside that component, when it has any. The plate
    *  lines its first cap up with the first letter of them; see `placeHint`. */
@@ -46,10 +47,11 @@ export function HintPlate({ lines, comp, align, text }: {
       align ?? 'left',
       text ? { left: text.left } : undefined,
       inset,
+      side ?? 'below',
     ));
     // The component's box is the whole of the input, and a new one is a new
     // placement: the same plate follows a row that scrolled.
-  }, [comp, text, align, lines]);
+  }, [comp, text, align, lines, side]);
 
   return (
     <div

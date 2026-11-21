@@ -2,8 +2,9 @@
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mts';
 import { teammateIdOf } from '../../shared/teammates.mts';
-import { answerSettled, filedByThePerson, wakesItselfAt } from '../../shared/answers.mts';
+import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../../shared/answers.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
+import { asksToClose } from '../../shared/asks-to-close.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
@@ -11,6 +12,7 @@ import { shownTitle } from '../../shared/thread-title.mts';
 import { firstRealLine, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
+import { isCause } from '../../shared/causes.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -29,6 +31,8 @@ export interface InboxItem {
   snoozedUntil?: number;
   /** Teammates' comments its owner has not yet dealt with (shared/work-items.mts). */
   waitingComments?: { by: string; ts: number; text: string }[];
+  /** Comments on its shared links its owner has not yet dealt with. */
+  linkComments?: { name: string; file: string; text: string; ts: number }[];
   /** 'later' while a thread sits in Later, written down and not begun. */
   start?: 'later' | 'now';
   /** The thread this one was filed under: what makes it a proposal. */
@@ -124,6 +128,12 @@ export function gaveUpOnTheAnswer(i: InboxItem): boolean {
   return saysARunGotNowhere(i.result);
 }
 
+// Her last words asked for the close and the agent's done came after them:
+// that done is hers, as if she had pressed E.
+function closedAsSheAsked(i: InboxItem): boolean {
+  return asksToClose(liveAnswer(i)) && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity);
+}
+
 // Who deferred a row decides what the deferral means. A future runAt an agent
 // wrote stops workers respawning (`isDue` in shared/work-items.mts) but does
 // not hide the row, or an agent could take its own question away from the
@@ -157,7 +167,9 @@ function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   // Something she said after scheduling it runs now, and its answer is hers to read now.
   const spokeSince = (i.wrote?.answer?.ts ?? 0) > (i.wrote?.runAt?.ts ?? 0);
   const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
-  const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
+  // A pick lifts Later with no write of its own, so an answer after it lifts it here.
+  const answered = !!liveAnswer(i) && (i.wrote?.answer?.ts ?? 0) > (i.wrote?.snoozedUntil?.ts ?? 0);
+  const reminder = i.wrote?.snoozedUntil?.source === 'founder' && !answered ? i.snoozedUntil ?? 0 : 0;
   return Math.max(mine, reminder, legacySnooze);
 }
 
@@ -175,6 +187,10 @@ export function commentsWaitOnYou(i: Pick<InboxItem, 'status' | 'waitingComments
   if (!said.length) return false;
   return i.status !== 'done' || said.some((c) => c.ts > seen);
 }
+
+/** A teammate's words it has not dealt with, or comments on its links: either holds it in Needs you. */
+export const wordsWait = (i: Pick<InboxItem, 'status' | 'waitingComments' | 'linkComments'>, seen = 0): boolean =>
+  commentsWaitOnYou(i, seen) || !!i.linkComments?.length;
 
 // The only copy of the inbox membership rule. Do not duplicate it: call this.
 //
@@ -199,7 +215,7 @@ export function belongsInInbox(
 ): boolean {
   // A teammate's words wait for you whatever the thread is doing, a running
   // agent included (`waitingComments`, shared/work-items.mts).
-  if (commentsWaitOnYou(i, seen)) return true;
+  if (wordsWait(i, seen)) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;
@@ -236,11 +252,14 @@ export function belongsInInbox(
   // The worker answered her ask and left the thread open (`answeredHerAsk`).
   if (answeredHerAsk(i)) return true;
   if (gaveUpOnTheAnswer(i)) return true;
+  // A closed cause row is filed: the threads behind it carrying on are the news.
+  if (i.status === 'done' && isCause(i)) return false;
   if (i.status === 'done') {
     // An agent's `done` on a thread the user wrote or spoke on is news; her own
     // `done` is the archive. A thread she spoke on is hers whoever filed it.
     if (!hers(i) && !liveAnswer(i)) return false;            // agent work she never touched is filed
     if (i.wrote?.status?.source === 'founder') return false; // she archived it herself
+    if (closedAsSheAsked(i)) return false;
     return (i.wrote?.status?.ts ?? i.updatedAt ?? 0) > deliveredThrough;
   }
   // A stopped row is in the inbox whatever its kind. This must come before the
@@ -284,6 +303,15 @@ export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolea
   if (isTaskRow(i)) return false;
   if (setByPerson(i)) return true;
   return waitingOn.length > 0 && i.status === 'blocked' && i.wrote?.status?.source !== 'founder';
+}
+
+/**
+ * Later holds a put-off or waiting row only once no run is on it or queued for
+ *  it. Until then it is In progress, which is "running or queued", so it is
+ *  counted in one tab (tests/a-queued-thread-put-off-stays-in-progress-until-its-run-ends).
+ */
+export function putOffInLater(i: InboxItem, { hiddenUntil, now, waitingOn, runOnIt }: { hiddenUntil: number; now: number; waitingOn: readonly string[]; runOnIt: boolean }): boolean {
+  return (hiddenUntil > now || waitsInLater(i, waitingOn)) && !runOnIt;
 }
 
 /**
@@ -469,8 +497,20 @@ export function withdrawReply(statusWhenReplied: string): { answer: string; stat
 // A reply lifts a reminder, which only hides the row. A moment to run is left
 // alone: the reply runs now anyway (`wordWaits`, shared/work-items.mts) and the
 // moment stays for the run it was set for.
+/** When the window treats a thread's work as due: its moment, unless a reply
+ *  after the moment is running now, as the supervisor does (`isDue`). */
+export function deferredUntil(i: Parameters<typeof wordWaits>[0] & { runAt?: number }): number {
+  return wordWaits(i) ? 0 : i.runAt ?? 0;
+}
+
 export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
   return (i.snoozedUntil ?? 0) > now;
+}
+
+/** Whether a thread shows when it comes back. A word on its way (held for Z) lifts your Later before it is written. */
+export function showsWhenItComesBack(i: Pick<InboxItem, 'status' | 'snoozedUntil'>, scheduledUntil: number | undefined, onItsWay: boolean, now = Date.now()): boolean {
+  if (i.status === 'done' || !((scheduledUntil ?? 0) > 0)) return false;
+  return !(onItsWay && replyClearsSchedule(i as InboxItem, now));
 }
 
 export type ClickTarget = 'row' | 'box';
@@ -506,7 +546,9 @@ export function rowSummary(
   const said = i.wrote?.answer;
   if (i.answer && said?.by
     && said.ts >= Math.max(i.wrote?.body?.ts ?? 0, i.wrote?.result?.ts ?? 0)) {
-    return clipToSentence(firstRealLine(i.answer));
+    // A teammate's hand-back opens "Theo handed this back.", which the status says; their own words follow.
+    const theirs = (said as { teammate?: string }).teammate ? i.answer.split(/\n\s*\n/).slice(1).join('\n\n').trim() : '';
+    return clipToSentence(firstRealLine(theirs || i.answer));
   }
   const finished = view === 'done' || i.status === 'done';
   const resultIsNewer = (i.wrote?.result?.ts ?? 0) > (i.wrote?.body?.ts ?? 0);
@@ -543,10 +585,10 @@ export function rowTitle(i: {
   result?: string;
   wrote?: { title?: { ts: number; source?: string }; label?: { ts: number } };
 }): string {
-  // A teammate's thread reads as its message to you, and before it has said
-  // anything, as its own title, never a name guessed from its opening line.
-  if (teammateIdOf(i)) return (i.result ?? '').split('\n').map((l) => searchText(l).trim()).find(Boolean) || (i.title ?? '');
-  return shownTitle(i);
+  const name = shownTitle(i);
+  // A teammate's thread can start with no words of yours to name it by.
+  if (!name && teammateIdOf(i)) return (i.result ?? '').split('\n').map((l) => searchText(l).trim()).find(Boolean) ?? '';
+  return name;
 }
 
 // The schedule box names a thread the way the list does, not by its raw title

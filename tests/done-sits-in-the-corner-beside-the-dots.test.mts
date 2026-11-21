@@ -74,6 +74,6 @@ describe('Done in the corner, beside the dots', () => {
     const css = read('renderer/src/threads/summary.css');
     expect(css).not.toMatch(/ts-done-joined/);
     expect(css).toMatch(/\.ts-more-wrap \{[^}]*gap: 10px;/);
-    expect(css).toMatch(/\.ts-done \{[^}]*border: 1px solid var\(--line\);/);
+    expect(css).toMatch(/\.ts-done \{[^}]*border: 1px solid var\(--line-strong\);/);
   });
 });

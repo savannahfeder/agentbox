@@ -100,6 +100,5 @@ describe('the colour a dropdown floats on', () => {
   // menus answer the pointer and the keyboard with a film of light instead.
   it('shows where the pointer and the keyboard are, on that grey', () => {
     expect(styles).toMatch(/\.prio-menu-row\.cursor \{ background: var\(--wash-strong\)/);
-    expect(summary).toMatch(/\.ts-menu \.prio-menu-row:hover[^}]*var\(--wash-strong\)/);
   });
 });

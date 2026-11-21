@@ -30,7 +30,8 @@ describe('how far through the walkthrough you are', () => {
 
 describe('the frame', () => {
   it('is up while the walkthrough runs on a computer, and not during the setup', () => {
-    expect(app).toMatch(/const tourFramed = !fresh && homeOn && tourLive\(tour\);/);
+    // And through its last word on Home (tests/the-walkthrough-ends-on-home-and-says-you-finished).
+    expect(app).toMatch(/const tourFramed = !fresh && homeOn && \(tourLive\(tour\) \|\| tourFinishing\(tour\)\);/);
     expect(app).toMatch(/if \(tourFramed\) root\.dataset\.tourFrame = ''; else delete root\.dataset\.tourFrame;/);
   });
   it('insets the app on the setup’s ground, rounded, with room above for its bar', () => {
@@ -45,7 +46,7 @@ describe('the frame', () => {
     expect(css).toMatch(/\.tour-frame button \{[^}]*-webkit-app-region: no-drag;/);
   });
   it('lets you skip the walkthrough from the bar', () => {
-    expect(frame).toMatch(/<button type="button" className="tf-skip" onClick=\{onSkip\}>Skip walkthrough<\/button>/);
-    expect(app).toMatch(/onSkip=\{\(\) => setTour\(skipTour\(tour!\)\)\}/);
+    expect(frame).toMatch(/<button type="button" className="tf-skip" onClick=\{onSkip\}>\{finished \? <>Close <kbd className="tf-key">↵<\/kbd><\/> : 'Skip walkthrough'\}<\/button>/);
+    expect(app).toMatch(/onSkip=\{\(\) => setTour\(finishing \? closeFinish\(tour!\) : skipTour\(tour!\)\)\}/);
   });
 });

@@ -177,9 +177,9 @@ describe('the card, as approved', () => {
   const noop = () => {};
   const html = renderToStaticMarkup(createElement(FeedbackCard, { onClose: noop, onSend: async () => ({ ok: true }) }));
 
-  it('says who it goes to without saying how', () => {
+  it('is titled Send feedback, with no sub-line under it', () => {
     expect(html).toContain('Send feedback');
-    expect(html).toContain('Goes straight to the Agentbox team.');
+    expect(html).not.toContain('fb-sub');
   });
 
   it('has the thread composer’s Send button, with ⌘↵ on it', () => {
@@ -194,9 +194,8 @@ describe('the card, as approved', () => {
     expect(html).not.toMatch(/schedul|later|tomorrow/i);
   });
 
-  it('says files can be pasted, dropped or picked', () => {
+  it('says files can be dropped or picked', () => {
     expect(html).toContain('Attach');
-    expect(html).toMatch(/paste/i);
-    expect(html).toMatch(/drop/i);
+    expect(html).toContain('or drop files');
   });
 });

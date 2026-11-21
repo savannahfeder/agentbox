@@ -33,21 +33,25 @@ describe("the phone app's tabs, now at the top", () => {
     expect(tabs).not.toMatch(/gap: 18/);
   });
   it('draw each word at 15pt in regular, picked or not', () => {
-    expect(tabs).toMatch(/fontSize: 15, lineHeight: 30, color: on === t\.id \? color\.text : color\.dim/);
+    // 15pt until large text pushes the row off the screen (the-phones-tabs-shrink-to-fit-a-small-screen-with-large-text).
+    expect(tabs).toMatch(/const words = \{ fontSize: 15 \* fit\.scale, count: 11 \* fit\.scale \}/);
+    expect(tabs).toMatch(/fontSize: words\.fontSize, lineHeight: 30, color: on === t\.id \? color\.text : color\.dim/);
     expect(tabs).not.toMatch(/font\.medium : font\.regular/);
   });
   it('keep each count 13pt from its word, at 11pt', () => {
     expect(rules).toMatch(/COUNT_GAP = \{ loose: 13,/);
-    expect(tabs).toMatch(/fontSize: 11, lineHeight: 30, fontFamily: font\.medium, marginLeft: tight \? COUNT_GAP\.tight : COUNT_GAP\.loose, color: color\.faint/);
+    expect(tabs).toMatch(/fontSize: words\.count, lineHeight: 30, fontFamily: font\.medium, marginLeft: tight \? COUNT_GAP\.tight : COUNT_GAP\.loose, color: color\.faint/);
   });
   it('underline the picked word itself, not the bar', () => {
     expect(tabs).toMatch(/height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t\.id \? color\.accent : 'transparent'/);
     expect(tabs).not.toMatch(/position: 'absolute'/);
   });
-  it('are drawn inside the title bar, on the list and on Chats, and never at the foot', () => {
+  it('are drawn inside the title bar, on the list, on Chats and on Files, and never at the foot', () => {
     expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{onEverything \? 'everything' : tab\} counts=\{counts\} pick=\{setPlace\} team=\{teamMode\} \/>\}/);
     expect(inbox).toMatch(/<ChatsPlace tabs=\{<Tabs on="chats"/);
+    expect(inbox).toMatch(/<FilesPlace tabs=\{<Tabs on="files"/);
     expect(fs.readFileSync('mobile/src/ui/Teammates.tsx', 'utf8')).toMatch(/<TopBar title="Chats" right=\{[^\n]*below=\{tabs\} \/>/);
-    expect(inbox.match(/<Tabs /g)).toHaveLength(2);
+    expect(fs.readFileSync('mobile/src/ui/FilesPlace.tsx', 'utf8')).toMatch(/<TopBar title="Files" right=\{[^\n]*below=\{tabs\} \/>/);
+    expect(inbox.match(/<Tabs /g)).toHaveLength(3);
   });
 });

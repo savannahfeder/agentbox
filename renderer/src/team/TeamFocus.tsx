@@ -10,9 +10,11 @@ import { isDirect, peopleInConversation, peopleToAdd } from '../threads/page-rul
 import { shownPriority } from '../../../shared/rank.mts';
 import { priorityIdOf, priorityLabelOf } from '../priority';
 import { Face, TeamContext, dueWords, firstName, type TeamView } from './people';
-import { agentOnTask } from './tasks';
+import { agentOnTask, agentOnTaskWord } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
 import { shownTitle } from '../../../shared/thread-title.mts';
+import { askWord } from '../../../shared/thread-asks.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
 export function teamHeld(item: WorkItem, team: TeamView | null): boolean {
@@ -29,12 +31,20 @@ export function TeamSaid({ item }: { item: WorkItem }) {
   const name = firstName(team.byId.get(other ?? ''));
   const due = dueWords(item.due);
   const task = isGivenTask(item, team.products.get(item.product));
-  const closer = item.wrote?.status?.by;
-  const said = task && item.status === 'done'
-    ? `${closer === team.me ? 'you' : firstName(team.byId.get(closer ?? '') ?? team.byId.get(other ?? ''))} marked this done`
+  const ask = task ? item.ask?.kind ?? null : null;
+  // Handed back stays handed back, whatever a thank-you since did to the status.
+  const closer = (ask && item.verdict ? item.wrote?.verdict?.by : null) ?? item.wrote?.status?.by;
+  const said = task && (item.status === 'done' || (ask && item.verdict))
+    ? ask ? (closer === item.assignee
+      ? `${mine ? 'you' : name} ${item.verdict === 'changes' ? 'asked for changes' : item.verdict === 'yes' ? 'said it looks good' : 'handed this back'}`
+      : `${mine ? name : 'you'} took this back`)
+      // A thread handed over and closed by whoever handed it: they took it back.
+      : handedFrom(item.body, taskGiver(item)) && closer === taskGiver(item) ? `${closer === team.me ? 'you' : name} took this back`
+      : `${closer === team.me ? 'you' : firstName(team.byId.get(closer ?? '') ?? team.byId.get(other ?? ''))} marked this done`
+    : ask ? (mine ? `${name} asked you` : `asked ${name}`)
     : mine ? `${name} gave you this` : `with ${name}`;
   return <span className="fm-said">
-    {task ? 'Task' : item.productName} · {said}
+    {ask ? askWord(ask) : task ? 'Task' : item.productName} · {said}
     {task && <> · {priorityLabelOf(priorityIdOf(shownPriority(item)))}</>}
     {due && <> · <span className="tm-due-word">{due}</span></>}
   </span>;
@@ -123,7 +133,7 @@ export function teamRouteChoices(item: WorkItem, team: TeamView | null): { route
   if (!team || !teamHeld(item, team) || item.assignee !== team.me) return [];
   // A task someone gave you stays yours and writing back does not return it, so
   // the one choice is who does the work.
-  if (isGivenTask(item, team.products.get(item.product))) return item.status === 'done' ? [] : [{ route: 'agent', label: 'Give it to an agent' }];
+  if (isGivenTask(item, team.products.get(item.product))) return item.status === 'done' ? [] : [{ route: 'agent', label: 'Carry on with an agent' }];
   // A message is talk, not a task (approved 2026-10-01): work comes out of it
   // only by @-mentioning an agent in the reply box, which works in the project
   // its mention names. There is no line under the conversation offering to
@@ -147,10 +157,12 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
   const [error, setError] = useState<string | null>(null);
   const choices = teamRouteChoices(item, team);
   const on = isGivenTask(item, team?.products.get(item.product)) ? agentOnTask(items, item, [...mates.values()]) : null;
+  // An ask is answered on the asker's thread, from the bar above (team/AskBar.tsx).
+  if (item.ask) return null;
   if (on && item.status !== 'done') {
     return <div className="opt-strip">
       <button type="button" className="opt-row" onClick={() => onOpenItem?.(on.item)}>
-        <span className="opt-text">With {on.name}</span><span className="tm-with-thread">{shownTitle(on.item)}</span>
+        <span className="opt-text">{agentOnTaskWord(on)}</span><span className="tm-with-thread">{shownTitle(on.item)}</span>
       </button>
     </div>;
   }

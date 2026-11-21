@@ -141,7 +141,8 @@ export function awsStorage({ region, bucket, profile, endpoint, credentials, tim
       await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     },
     getUrl: (key: string, seconds: number = LINK_SECONDS) => getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: seconds }),
-    putUrl: (key: string, seconds: number = LINK_SECONDS) => getSignedUrl(s3, new PutObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: seconds }),
+    // With a size, the link is signed for exactly that many bytes.
+    putUrl: (key: string, seconds: number = LINK_SECONDS, size?: number) => getSignedUrl(s3, new PutObjectCommand({ Bucket: bucket, Key: key, ...(size != null ? { ContentLength: size } : {}) }), { expiresIn: seconds }),
     headUrl: (key: string, seconds: number = LINK_SECONDS) => getSignedUrl(s3, new HeadObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: seconds }),
   };
 }

@@ -81,7 +81,7 @@ describe('walking the onboarding again', () => {
     const fn = app.slice(app.indexOf('const walkAgain = useCallback'), app.indexOf('\n  }, [', app.indexOf('const walkAgain = useCallback')));
     expect(fn).toContain('restartFirstRun(localStorage)');
     // The setup a new install meets since w-fbe5e95dea (tests/setting-up-again-is-the-setup-a-new-install-meets).
-    expect(fn).toContain("setArm('tour'); setFresh(true);");
+    expect(fn).toContain('void armNow().then((a) => { setArm(a); setFresh(true); });');
     // Nothing in it may reach the store or the main process.
     expect(fn).not.toMatch(/api\./);
     expect(fn).not.toMatch(/localStorage\.clear/);

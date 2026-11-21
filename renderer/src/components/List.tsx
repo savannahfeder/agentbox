@@ -7,7 +7,7 @@ import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, 
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayAndTime, dayLabel, stamp } from '../format';
 import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
-import { isUrgentRow } from '../interrupt';
+import { isUrgentRow } from '../urgent-arrival';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
 import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
@@ -20,7 +20,7 @@ import { Hits } from './Hits';
 import type { ThreadSearchDetails } from '../threads/search';
 import { nextRunWords, repeatRow, repeatTag } from '../repeat-words';
 import { Face, TeamRowEnd, firstName, type TeamView } from '../team/people';
-import { commentLine } from '../threads/teammate-thread';
+import { commentLine, linkCommentLine } from '../threads/teammate-thread';
 import { fileNewsFor, fileNewsLine } from '../../../shared/artifact-marks.mts';
 import { CloudOfferRow, RepeatMark, RowCells, SectionHead, TableHead, ThreadCells, WaitingContext } from '../threads/Pages';
 import type { StackKey, StackSection } from '../threads/stack-rules';
@@ -32,6 +32,7 @@ import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mts';
+import { shownPriority } from '../../../shared/rank.mts';
 import { catchUpDue } from '../../../shared/agent-import.mts';
 import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
@@ -365,7 +366,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
         <RowCells status={running?.live ? running : laterCell(null)}
           lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
-          priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
+          priority={shownPriority(rule)} updatedAt={rule.updatedAt ?? rule.createdAt}
           when={nextRunWords(rule)} now={Date.now()} />
       </div>
     );
@@ -436,7 +437,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
               return (
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
-                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
+                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} who={{ face: <Face person={team?.byId.get(c.personId) ?? null} />, name: team?.byId.get(c.personId)?.name ?? undefined }} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );
@@ -474,7 +475,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                 {...(tab === 'inbox' && !isImportRow(item)
                   ? { 'data-hint': 'row', 'data-hint-text': '.subject' }
                   : {})}
-                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}${lastThread?.id === item.id && lastThread.product === item.product ? ' recent' : ''}`}
+                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${!hoverTo ? ' hovers' : hoveredId === item.id ? ' pointed' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}${lastThread?.id === item.id && lastThread.product === item.product ? ' recent' : ''}`}
                 /*
                  * ON MOUSE MOVE, NOT ON MOUSE ENTER. A pointer parked over the
                    list while she walks it with J and K would otherwise claim
@@ -558,7 +559,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                       rows' usual openings is a list of rows that look unrelated
                       to what was typed. */}
                   <div className="preview">
-                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
+                    <Hits text={summaries?.get(item.id) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null)) ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null)) ?? linkCommentLine(item.linkComments) ?? rowSummary(item, tab)} terms={terms} phrase={phrase} />
                   </div>
                 </div>
                 {/* Everything that is not the message itself lives at the right end, on the

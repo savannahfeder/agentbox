@@ -22,7 +22,7 @@ const HOUR = 60 * 60_000;
 // pro plan with hours stand in for them.
 const SET = { ...PLANS, test: { agents: 2, hoursPerMonth: 5 }, pro: { agents: 10, hoursPerMonth: 100 } };
 
-function setup({ startAnswer = { ok: true }, answer = () => ({ ok: true }), plans = SET, free } = {}) {
+function setup({ startAnswer = { ok: true }, answer = () => ({ ok: true }), plans = SET } = {}) {
   let clock = Date.UTC(2026, 9, 19, 12, 0, 0);
   const sent = [];
   const objects = memoryObjects();
@@ -47,7 +47,6 @@ function setup({ startAnswer = { ok: true }, answer = () => ({ ok: true }), plan
     whoIs: async (t) => (t === 'session-of-a' ? { id: A } : null),
     now: () => clock,
     plans,
-    ...(free ? { free } : {}),
   });
   let key;
   const call = async (method, path, body) => {
@@ -223,14 +222,13 @@ describe('signing in', () => {
   });
 });
 
-// The owner's call, 2026-10-20 (w-6633e825a7): no free cloud hours. Five
-// hours go in half an hour with ten agents, which sells the cloud short, and
-// the moment someone reaches for the cloud is the moment they will pay. The
-// app itself is the free part.
+// The owner's call, 2026-10-20 (w-6633e825a7), and again on 2026-11-16 after
+// eleven days of 5 free hours: no free cloud hours. The app itself is the free
+// part, and each plan's 7-day trial is how the cloud is tried
+// (tests/every-cloud-plan-starts-with-7-days-free).
 describe('someone with no plan', () => {
-  // The free hours are tests/every-new-cloud-account-gets-five-free-hours.
-  it('past the free hours, is asked to choose a plan before any run starts, and nothing is started', async () => {
-    const { gw, sent } = setup({ free: { agents: 2, hours: 0 } });
+  it('is asked to choose a plan before any run starts, and nothing is started', async () => {
+    const { gw, sent } = setup();
     const key = (await gw.handle({ method: 'POST', path: '/v1/devices', headers: { authorization: 'Bearer session-of-a' }, body: JSON.stringify({ acceptedTerms: TERMS_VERSION }) })).body.key;
     const r = await gw.handle({ method: 'POST', path: '/v1/invoke', headers: { authorization: `Bearer ${key}` }, body: JSON.stringify({ sessionId: 'run-1', payload: { action: 'start', runId: 'r1' } }) });
     expect(r.body).toMatchObject({ ok: false, error: 'plan' });
@@ -247,9 +245,9 @@ describe('someone with no plan', () => {
     expect(sent.map((s) => s.payload?.action)).toEqual(['signin']);
   });
 
-  it('the real plans have no free plan: the free hours are kept apart from them', () => {
+  it('the real plans have no free plan', () => {
     expect(Object.keys(PLANS).sort()).toEqual(['max', 'none', 'plus', 'pro']);
-    expect(PLANS.none).toEqual({ agents: 0, hoursPerMonth: 0 });
+    expect(PLANS.none).toEqual({ agents: 0, hoursPerMonth: 0, filesGB: 0 });
   });
 
   // The owner's numbers, 2026-10-20: Pro 400, Plus 1,200, Max 3,000, so each
@@ -290,11 +288,12 @@ describe('Max runs unlimited agents at once', () => {
     expect(sent.filter((s) => s.payload?.action === 'start')).toHaveLength(200);
   });
 
-  it('a counted plan still says its number and is not unlimited', async () => {
+  // "We got rid of the agent slot limitation" (the owner, 2026-11-16): Pro and Plus are unlimited too.
+  it('Pro is unlimited at once as well, its hours the only limit', async () => {
     const s = setup({ plans: PLANS });
     await s.me();
     await s.gw.admin({ do: 'plan', person: A, plan: 'pro' });
-    expect(await s.me()).toMatchObject({ plan: 'pro', unlimited: false, agents: 10 });
+    expect(await s.me()).toMatchObject({ plan: 'pro', unlimited: true, agents: null });
   });
 });
 
@@ -302,7 +301,7 @@ describe('what the person is told', () => {
   it('names the plan, its agents and hours, and what is used', async () => {
     const { start, me } = setup();
     await start(1);
-    expect(await me()).toEqual({ plan: 'test', unlimited: false, agents: SET.test.agents, hoursPerMonth: SET.test.hoursPerMonth, running: 1, usedSeconds: 0, month: '2026-10', billing: 'given', terms: { accepted: TERMS_VERSION, current: TERMS_VERSION } });
+    expect(await me()).toEqual({ plan: 'test', unlimited: false, agents: SET.test.agents, hoursPerMonth: SET.test.hoursPerMonth, running: 1, usedSeconds: 0, month: '2026-10', billing: 'given', filesCap: 0, terms: { accepted: TERMS_VERSION, current: TERMS_VERSION } });
   });
 });
 
