@@ -70,6 +70,7 @@ import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId }
 import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
+import { TermsLinks } from '../terms-links';
 import { SkyTile } from '../home/SkyPicker';
 import { useHomeSettings } from '../home/home-settings';
 import { SKY_THEMES } from '../home/sky';
@@ -1006,7 +1007,10 @@ export interface TeamPlanPage {
   onPay: () => void; onManage: () => void; onInvite?: () => void;
 }
 
-function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void }) {
+/** Starting the team's Pro, as Team › Start Pro does (../pro-trial.ts). */
+export type StartTeamPro = (acceptTerms: boolean) => Promise<{ ok: true } | { ok: false; message: string; terms?: boolean }>;
+
+function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite, teamPro = null }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void; teamPro?: StartTeamPro | null }) {
   const [plan, setPlan] = useState<CloudPlan | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
@@ -1033,7 +1037,24 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
   }, [waitingFor]);
   const [opening, setOpening] = useState<PaidPlan | null>(null);
   const [chosen, setChosen] = useState<PaidPlan | null>(null);
+  // SIGNED IN TO A TEAM, PRO IS THE TEAM'S, as it is in the setup: one press
+  // opens the team's checkout, with no second sign-in, and is what lets the
+  // team invite. A person's own Pro never did. With no cloud key yet the press
+  // agrees to the terms, which the line under the cards names.
+  const proIsTheTeams = !!teamPro && !(['pro', 'plus', 'max'] as const).some((p) => p === plan?.plan);
+  const [termsAsked, setTermsAsked] = useState(false);
+  const agrees = !signedIn || termsAsked;
+  const startTeamPro = async (start: StartTeamPro) => {
+    setSaid(null); setOpening('pro');
+    const out = await start(agrees);
+    setOpening(null);
+    if (!out.ok) { if (out.terms) setTermsAsked(true); else setSaid(out.message); return; }
+    setChosen('pro');
+    setSwitching(false);
+    setWaitingFor(planKey(plan));
+  };
   const choose = async (id: PaidPlan) => {
+    if (id === 'pro' && proIsTheTeams && teamPro) { await startTeamPro(teamPro); return; }
     if (!signedIn) { onSignIn(); return; }
     setSaid(null); setOpening(id);
     const out = await api.cloudAccountPay(id);
@@ -1069,9 +1090,11 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
     void read();
   };
   const bill = cloudBilling(plan);
-  const cards = <CloudPlanCards plan={plan} opening={opening} waiting={waitingFor ? chosen : null} onChoose={(id) => void choose(id)} />;
+  const cards = <CloudPlanCards plan={plan} opening={opening} waiting={waitingFor ? chosen : null} onChoose={(id) => void choose(id)}
+    proLabel={proIsTheTeams ? (plan?.teamFreeDays ? 'Try Pro free' : 'Choose Pro') : null} />;
   const lines = (
     <>
+      {proIsTheTeams && agrees && !waitingFor && <p className="cloud-plans-say cloud-plans-terms">By choosing Pro, you agree to <TermsLinks />.</p>}
       {said && <p className="cloud-plans-say">{said}</p>}
       {waitingFor && <p className="cloud-plans-say">{switching ? 'Confirm the change on Stripe’s page in your browser. Your plan shows here once it’s done.' : 'Finish paying in your browser. Your plan shows here once you’ve paid.'}</p>}
       {bill.says && !waitingFor && <p className="cloud-plans-say">{bill.says}</p>}
@@ -1764,7 +1787,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   onCloudSignIn?: (key: string | null, email: string | null) => void;
   /** Agentbox Cloud's plans, where this copy offers it: the Cloud page. */
   /** `teamPlan`: a team's own Plan and Billing page, handed in like `teamPane` so this screen holds no team code. */
-  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode } | null;
+  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; teamPro?: StartTeamPro | null } | null;
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -2304,7 +2327,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
         {/* TEAM MANAGEMENT (w-8415594d19). It does not wait on `model`, because
             nothing on it comes from the settings file. */}
         {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan}
-          onInvite={teamPane ? () => setPane('team') : undefined} />}
+          teamPro={cloudPlans.teamPro} onInvite={teamPane ? () => setPane('team') : undefined} />}
 
         {model && w && pane === 'files' && (
           <FilesPage files={w.files ?? { on: true, offAfterDays: 30 }} onSet={(key, value) => setWorkspace(key, value)} onPlans={() => setPane('cloud')} />

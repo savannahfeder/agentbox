@@ -287,6 +287,7 @@ import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
+import { startProTrial } from './pro-trial';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sky';
 import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
@@ -9629,6 +9630,7 @@ export default function App() {
               const known = snap.team?.people?.length ? { people: snap.team.people, meId: snap.team.me?.id ?? null } : api.fixtureTeamPeople();
               return <TeamBilling {...page} people={known.people} meId={known.meId} />;
             },
+            teamPro: snap.team?.signedIn ? (acceptTerms: boolean) => startProTrial({ hasTeam: !!snap.team?.team, name: snap.team?.me?.name, acceptTerms }) : null,
           } : null}
           startPane={settingsPane}
           onNewProject={() => setNewProject(true)}
