@@ -78,7 +78,7 @@ export const PARITY = {
   'palette:theme-sky-*': { missing: 'the sky themes behind the desktop\'s Home and Inbox (an Alpha feature); the phone has neither the skies nor Home' },
 
   // A thread
-  'thread:done': { phone: MENU, find: 'label="Close this thread"' },
+  'thread:done': { phone: THREAD, find: 'accessibilityLabel="Mark done"' },
   'thread:snooze': { phone: MENU, find: 'onLater(row.ts, row.label)' },
   'thread:unsnooze': { phone: MENU, find: 'if (row.now) onBack()' },
   'thread:read': { phone: 'mobile/src/lib/unread.ts', find: 'export function markSeen' },
