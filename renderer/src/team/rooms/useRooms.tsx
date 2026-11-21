@@ -6,7 +6,7 @@ import { api } from '../../api';
 import type { ArtifactMark, Person, Room, RoomCard, RoomMention, RoomMessage, RoomsState, TeamMessageFile } from '../../types';
 import { listedIn, oneConversation, pairRooms } from '../../../../shared/pair-room.mts';
 import './rooms.css';
-import { boardPeople, boardPicked, chatPeople, groupInTab, mentionRows, noticeShown, personOpens, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
+import { boardPeople, boardPicked, cardName, chatPeople, groupInTab, mentionRows, noticeShown, personOpens, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
 import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
@@ -364,6 +364,12 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     if (inInbox) heading = { title: <div className="workspace-task-header"><ThreadCrumb from="Inbox" name={nameOf(open)} onBack={close} /></div> };
   } else if (open && rooms) {
     heading = { title: backTitle(nameOf(open)) };
+    // One step in from a chat in the inbox, its bar stays the thread's, and Back goes to the chat.
+    if (inInbox) {
+      const person = pane.startsWith('person:') ? open.wall.find((c) => c.id === pane.slice('person:'.length)) ?? null : null;
+      const here = person ? cardName(person) : pane === 'ranks' ? 'Agent hours' : 'Everyone’s threads';
+      heading = { title: <div className="workspace-task-header"><ThreadCrumb from={nameOf(open)} name={here} onBack={close} /></div> };
+    }
     page = <RoomPage room={open} rooms={list} ranks={rooms.ranks ?? {}} me={rooms.me} now={now}
       pane={pane} onPane={setPane} chat={null} board={board}
       picked={picked} onPick={(ids) => setPicked(new Set(ids))} onMessage={(ids) => void message(ids, open)}

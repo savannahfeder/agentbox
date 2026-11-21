@@ -56,15 +56,16 @@ beforeAll(async () => {
           'r-three': [said('h1', 'r-three', 'p-priya', 'Sam, who owns the billing email?', 300000)],
         },
         mentions: [asked('r-maya', 'Maya C.', 'm1', 'p-maya', 'Maya Chen', 'Sam, can you check the refund copy before 5?', 240000),
-          asked('r-three', 'Maya C., Priya N.', 'h1', 'p-priya', 'Priya Nair', 'Sam, who owns the billing email?', 300000)],
+          asked('r-three', 'Maya C., Priya N.', 'h1', 'p-priya', 'Priya Nair', 'Sam, who owns the billing email?', 300000),
+          asked('r-team', 'Northwind', 't1', 'p-priya', 'Priya Nair', 'Standup at ten.', 7200000)],
       };
       let ui;
-      // As App.tsx places them: the heading in the bar, and the chat where the list was.
+      // As App.tsx places them: the heading and the chat's options in the bar, and the chat where the list was.
       function Harness() {
         ui = useRooms({ rooms, on: true, meId: 'p-me', myName: 'Sam', hasTeam: true, team: [], directs: [], now: NOW,
-          toast() {}, onOpenDirect() {}, onTeamMessage() {}, onLeavePage() {} });
+          toast() {}, onOpenDirect() {}, onTeamMessage() {}, onLeavePage() {}, renderBoard: () => <div className="the-board" /> });
         return <>
-          <header className="topbar">{ui.heading ? ui.heading.title : <h1 className="workspace-title">Inbox</h1>}</header>
+          <header className="topbar">{ui.heading ? ui.heading.title : <h1 className="workspace-title">Inbox</h1>}{ui.viewButton}</header>
           <main className="list-pane">{ui.page ?? <MentionRows mentions={ui.mentions} faces={ui.faces} now={NOW} onOpen={(m) => ui.openMention(m, 'inbox')} />}</main>
         </>;
       }
@@ -103,7 +104,7 @@ beforeEach(async () => { if (page) await act('ui.leave()'); });
 
 describe.skipIf(!browserAvailable)('a chat pressed in Needs you', () => {
   it('starts on the list', async () => {
-    expect(await drawn()).toMatchObject({ openId: null, rows: 2, chat: null });
+    expect(await drawn()).toMatchObject({ openId: null, rows: 3, chat: null });
   });
 
   it('opens where the list was, with no Team list, under the bar a thread from the inbox has', async () => {
@@ -119,12 +120,23 @@ describe.skipIf(!browserAvailable)('a chat pressed in Needs you', () => {
   it('goes back to the list from the bar', async () => {
     await press('.rm-mention >> nth=0');
     await press('.thread-crumb-back');
-    expect(await drawn()).toMatchObject({ openId: null, inInbox: false, rows: 2, crumb: null, chat: null });
+    expect(await drawn()).toMatchObject({ openId: null, inInbox: false, rows: 3, crumb: null, chat: null });
   });
 
   it('still lists who is in a chat of three, as a chat drawn on its own does', async () => {
     await press('.rm-mention >> nth=1');
     expect(await drawn()).toMatchObject({ openId: 'r-three', inInbox: true, teamList: false, people: true, crumb: 'Inbox/Maya Chen, Priya Nair' });
+  });
+
+  // Without this the board drew the thread's tall bar with the Team page's title in it.
+  it('keeps the same bar one step in, naming the chat Back goes to', async () => {
+    await press('.rm-mention >> nth=2');
+    expect(await drawn()).toMatchObject({ openId: 'r-team', inInbox: true, crumb: 'Inbox/Northwind' });
+    await press('button[aria-label="Group options"]');
+    await press('text=Everyone’s threads');
+    expect(await drawn()).toMatchObject({ openId: 'r-team', inInbox: true, teamList: false, crumb: 'Northwind/Everyone’s threads', back: 'Back to Northwind (esc)' });
+    await press('.thread-crumb-back');
+    expect(await drawn()).toMatchObject({ openId: 'r-team', inInbox: true, crumb: 'Inbox/Northwind' });
   });
 });
 
