@@ -21,6 +21,8 @@ export interface ChatsValue {
   onGroup: (key: string) => void;
   /** The standup, first in the list, on the layout where Chats holds the team. */
   onTeam?: () => void;
+  /** Every task on the team, under the standup on that same layout. */
+  onTasks?: () => void;
   /** Everyone on the team, each opening their page, on that same layout. */
   persons?: { id: string; name: string; url: string | null; waits: boolean }[];
   onPerson?: (id: string) => void;
@@ -72,6 +74,9 @@ export function ChatsColumn({ current }: { current: string | null }) {
     <label className="cx-search">{I.search()}<input value={q} placeholder="Search" aria-label="Search your chats" title="Search your chats (G)" onChange={(e) => setQ(e.target.value)} /></label>
     {c.onTeam && <button type="button" className={`cx-row cx-team${current === 'team' ? ' on' : ''}`} aria-current={current === 'team' ? 'page' : undefined} onClick={c.onTeam}>
       <span className="cx-mark" aria-hidden="true">{I.standupNav()}</span><span className="cx-n">Standup</span>
+    </button>}
+    {c.onTasks && <button type="button" className={`cx-row cx-team${current === 'tasks' ? ' on' : ''}`} aria-current={current === 'tasks' ? 'page' : undefined} onClick={c.onTasks}>
+      <span className="cx-mark" aria-hidden="true">{I.tasksNav()}</span><span className="cx-n">Tasks</span>
     </button>}
     {section('teammates', 'AI teammates', c.teammates.length, <>
       {mates.map((t) => {
