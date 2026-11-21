@@ -63,7 +63,7 @@ describe('the app', () => {
   it('says the hand-off is going at the press, and who has it once it went', () => {
     expect(give.indexOf('showToast(sendingTo(')).toBeGreaterThan(-1);
     expect(give.indexOf('showToast(sendingTo(')).toBeLessThan(give.indexOf('await api.teamHandOn'));
-    expect(give).toMatch(/showToast\(out\.ok \? handedToWhom\(to\.name\) : out\.error \?\? 'That did not work\.'/);
+    expect(give).toMatch(/showToast\(out\.ok \? `\$\{handedToWhom\(to\.name\)\}/);
   });
 
   it('says a share is going at the press, and keeps who it went to up long enough to read', () => {
