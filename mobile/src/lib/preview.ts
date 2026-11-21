@@ -30,7 +30,7 @@ export function previewRows(now = Date.now()): PhoneRows {
   const stuckAsk = 'Threads stuck on a Codex limit should land in Needs you.';
   const stuckNote = 'I found where a run that hits its limit is put back. Two ways to fix it:\n\n- Mark it stopped, so it shows in Needs you with the reason.\n- Retry on another account first, and only then show it.\n\n## Options\n1. Mark it stopped (recommended)\n2. Retry on another account first';
   const fizzAsk = 'Make fizz(15) return FizzBuzz and add a test.';
-  const fizzResult = 'fizz(15) now returns FizzBuzz, with a test for 3, 5 and 15. Committed as 9dfb76a; the working tree is clean.';
+  const fizzResult = 'fizz(15) now returns FizzBuzz, with tests for 15, 9 and 7. Committed as 9dfb76a; the working tree is clean.';
   const meterResult ='Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
   const qualityNote = '**Sign-up fails on a slow connection.**\n\nOn a throttled connection the email step gives up after 10 seconds and the form clears what you typed. The fix keeps your words and waits 30 seconds.\n\n## Options\n1. Ship the fix (recommended)\n2. Show me the steps first';
   return {
