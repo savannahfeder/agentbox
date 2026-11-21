@@ -14,6 +14,10 @@
 // page that you can use to get info about an agent and edit it", so Job became
 // About, the teammate sheet's rows (job, voice, schedule, model and the rest)
 // drawn in the page with the whole job, and Settings left the header.
+//
+// On 2026-11-21 the founder kept a column of settings beside an AI teammate's
+// tasks, warning that "oftentimes the job gets really long" (w-0773d2dee5). So
+// the one column is that one, and its job is cut to three lines.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React, { createElement as h } from 'react';
@@ -70,8 +74,9 @@ describe('a list with nothing in it', () => {
 
 describe('App.tsx', () => {
   const places = app.slice(app.indexOf('if (placeMember && snap) {'), app.indexOf('// BACK LANDS ON THE TAB THE BAR NAMED'));
-  it('gives every place its parts, and none a side', () => {
-    expect(places).not.toMatch(/\bside=\{/);
+  it('gives every place its parts, and a side only to your AI teammate, for its settings', () => {
+    expect(places.match(/\bside=\{/g)).toHaveLength(1);
+    expect(places).toContain('side={teammatesUi.settingsOf(id, {');
     expect(places.match(/parts=\{\[/g)).toHaveLength(3);
   });
   it('gives your AI teammate an About that reads and changes it, and no Settings button', () => {
@@ -94,8 +99,9 @@ describe('the styles', () => {
     expect(css).toMatch(/\.pl-view \{[^}]*overflow-y: auto/);
     expect(css).not.toContain('.pl-pop');
   });
-  it('leave no rule for the old column', () => {
-    expect(css).not.toContain('.pl-side');
+  it('keep the one column narrow, and a long job in it to three lines', () => {
+    expect(css).toMatch(/\n\.pl-side \{[^}]*width: 280px/);
+    expect(read('renderer/src/teammates/teammates.css')).toMatch(/\n\.tq-set-job \{[^}]*-webkit-line-clamp: 3;/);
   });
 });
 
