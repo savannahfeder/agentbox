@@ -322,14 +322,15 @@ textarea.tq-field { resize: vertical; border-color: var(--line); margin-left: 0;
 .tq-details .compose-word::after { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 2px 3px 9px; border-right: 1.25px solid currentColor; border-bottom: 1.25px solid currentColor; transform: rotate(45deg); color: var(--text-faint); vertical-align: middle; }
 .tq-details .compose-word:hover::after, .tq-details .compose-word.open::after { color: var(--text-dim); }
 /* Your AI teammate's settings beside its tasks: each value you can change is a tag, like the composer's. */
-.tq-set-col { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 20px; row-gap: 12px; align-items: baseline; margin: 0; font-size: 13px; line-height: 20px; }
-.tq-set-col dt { color: var(--text-faint); }
-.tq-set-col dd { margin: 0; min-width: 0; }
+/* Every row is a tag's height, so rows of words space out like rows of tags. */
+.tq-set-col { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 20px; row-gap: 12px; align-items: start; margin: 0; font-size: 13px; line-height: 20px; }
+.tq-set-col dt { color: var(--text-faint); line-height: 28px; }
+.tq-set-col dd { display: flex; align-items: center; min-height: 28px; margin: 0; min-width: 0; }
 .tq-set-col .compose-word { display: inline-flex; align-items: center; height: 28px; max-width: 100%; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: rgba(255, 255, 255, 0.03); color: var(--text-dim); font-size: 13px; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tq-set-col .compose-word:hover, .tq-set-col .compose-word.open { color: var(--text); border-color: var(--line-strong); }
 .tq-set-text { color: var(--text-dim); }
 /* A long job is cut to three lines. About holds the whole of it. */
-.tq-set-job { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); text-align: left; cursor: pointer; }
+.tq-set-job { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; flex: 1; min-width: 0; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); text-align: left; cursor: pointer; }
 .tq-set-job:hover { color: var(--text); }
 .tq-set-col + .tq-error { margin: 12px 0 0; }
 .tq-pick .prio-menu.tq-sched-pop { top: calc(100% + 8px); left: -13px; min-width: 240px; padding: 12px; gap: 12px; font-size: 13px; line-height: 20px; color: var(--text); }
