@@ -28,18 +28,31 @@ type Box = { left: number; right: number; top: number; bottom: number };
 /**
  * Where the card stands so it covers no box a person types in: in its corner,
  * narrowed to end beside any such box it would touch, or, when that would make it
- * narrower than NARROWEST, at full width above them, as high as the window lets it.
- * `card` is its full-width place in the corner.
+ * narrower than NARROWEST or than its `buttons` need, at full width above them, as
+ * high as the window lets it. `card` is its full-width place in the corner.
  */
-export function cardPlace(card: { left: number; right: number; height: number }, boxes: Box[], viewport: number): { lift: number; width: number } {
+export function cardPlace(card: { left: number; right: number; height: number }, boxes: Box[], viewport: number, buttons = 0): { lift: number; width: number } {
   const full = card.right - card.left;
   const under = boxes.filter((box) => box.right > box.left && box.bottom > box.top
     && box.right > card.left && box.left < card.right
     && box.bottom > viewport - CARD_FOOT - card.height);
   const width = Math.min(full, ...under.map((box) => card.right - box.right - SIDE_GAP));
-  if (width >= NARROWEST) return { lift: CARD_FOOT, width };
+  if (width >= Math.max(NARROWEST, buttons)) return { lift: CARD_FOOT, width };
   const lift = Math.max(...under.map((box) => viewport - box.top + GAP));
   return { lift: Math.min(lift, Math.max(CARD_FOOT, viewport - card.height - GAP)), width: full };
+}
+
+/** How wide the card must be for its row of buttons to fit on one line. The buttons never shrink (styles.css). */
+function buttonsNeed(el: HTMLElement): number {
+  const card = el.querySelector<HTMLElement>('.approval-card');
+  const row = card?.querySelector<HTMLElement>('.approval-actions');
+  const buttons = row ? [...row.children] as HTMLElement[] : [];
+  if (!card || !row || !buttons.length) return 0;
+  const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+  // Fractional, like the box edge they are compared with. The press animation scales the card, so its scale is divided out.
+  const scale = card.getBoundingClientRect().width / card.offsetWidth || 1;
+  const drawn = buttons.reduce((sum, b) => sum + b.getBoundingClientRect().width / scale, 0);
+  return card.offsetWidth - row.clientWidth + drawn + gap * (buttons.length - 1);
 }
 
 /**
@@ -64,7 +77,7 @@ export function roomForTheCard(el: HTMLElement): () => void {
     const boxes = [...document.querySelectorAll('textarea, [contenteditable="true"], .dock-pill')]
       .filter((box) => !el.contains(box))
       .map((box) => box.getBoundingClientRect());
-    const place = cardPlace(corner, boxes, window.innerHeight);
+    const place = cardPlace(corner, boxes, window.innerHeight, buttonsNeed(el));
     root.style.setProperty(LIFT, `${place.lift}px`);
     root.style.setProperty(WIDTH, `${place.width}px`);
   };
