@@ -133,7 +133,8 @@ import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
 import { ContinuedFrom, HandedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
-import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
+import { threadLink, threadOfLink, seenWord, seenNow, shareFace, type SeenBy, type ShareActs } from '../threads/share-rules';
+import { shownToPeople } from '../../../shared/thread-cards.mts';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle, showsWhenItComesBack } from '../list-rules';
@@ -1954,14 +1955,17 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     if ((item.createdBy ?? teamCtx.me) !== teamCtx.me) return null;
     const seen: SeenBy = seenNow(item, teamCtx.products.get(item.product), teamCtx.state.since ?? null);
     const teamName = teamCtx.state.team.name || 'your team';
+    const people = teamCtx.state.people.filter((p) => p.id !== teamCtx.me);
     return {
       link: threadLink(teamCtx.me, item.id),
-      people: teamCtx.state.people.filter((p) => p.id !== teamCtx.me),
+      people,
       last: onShare.last,
       seen,
       seenWord: seenWord(seen, teamName, item.visibleTo?.length ?? 0),
       teamName,
       chosen: item.visibleTo ?? [],
+      // A thread that names nobody of its own goes by its project's chosen people.
+      face: shareFace({ seen, chosen: seen === 'people' ? shownToPeople(item, teamCtx.products.get(item.product)) : [], people, me: teamCtx.me, teamName: teamCtx.state.team.name }),
     };
   })();
   const threadMenu = (
