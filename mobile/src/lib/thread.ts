@@ -6,7 +6,6 @@
 import { itemThread } from '../../../renderer/src/item-thread';
 import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type ParsedOption } from '../../../renderer/src/format';
 import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
-import { askHeading } from '../../../renderer/src/ask-line';
 import { phoneHistory, phoneRuns, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { recapFor, resultLeads } from '../../../renderer/src/recap';
@@ -132,8 +131,8 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     outcome: outcome && { ...outcome, label: resultLeads(item) && outcome.field === 'result' ? null : outcome.field === 'result' ? 'Result' : 'Latest checkpoint' },
     after: [...built.after, ...receiptsFor(view, product, id)].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)),
     options: (live ? itemOptions(item) : shipAsk?.options ?? []) as ParsedOption[],
-    // The question the options answer, the options card's heading (OptionsOffer.tsx).
-    ask: live ? askHeading(item) : shipAsk?.headed ? shipAsk.ask : '',
+    // The choices are bare unless the ship offer asks its own question (Focus.tsx `bare`).
+    ask: shipAsk?.headed ? shipAsk.ask : '',
     change: figures && change ? { ...figures, list: change.files, more: change.more ?? 0 } : null,
     parent,
     filed,
