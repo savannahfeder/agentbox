@@ -19,10 +19,9 @@ export function StartPro({ hasTeam, name, className, autoFocus = false, onStarte
   }, [hasTeam]);
   const [state, setState] = useState<'idle' | 'opening' | 'waiting'>('idle');
   const [error, setError] = useState<string | null>(null);
-  // With no cloud key on this computer the press makes one, and the cloud
-  // makes one only for someone who agreed to its terms. Someone who stayed on
-  // Free in the setup never did, so the terms are named under this button and
-  // pressing it agrees.
+  // With no cloud key here the press makes one, and the cloud makes one only
+  // for someone who agreed to its terms, which nobody who stayed on Free in the
+  // setup has. So the terms are named under the button, and pressing it agrees.
   const [termsAsked, setTermsAsked] = useState(false);
   const agrees = plan?.signedIn === false || termsAsked;
   const start = async () => {

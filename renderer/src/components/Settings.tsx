@@ -1037,10 +1037,8 @@ export function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite, teamPro
   }, [waitingFor]);
   const [opening, setOpening] = useState<PaidPlan | null>(null);
   const [chosen, setChosen] = useState<PaidPlan | null>(null);
-  // SIGNED IN TO A TEAM, PRO IS THE TEAM'S, as it is in the setup: one press
-  // opens the team's checkout, with no second sign-in, and is what lets the
-  // team invite. A person's own Pro never did. With no cloud key yet the press
-  // agrees to the terms, which the line under the cards names.
+  // Signed in to a team, Pro is the team's, as in the setup: its checkout, with
+  // no second sign-in. A person's own Pro never lets a team invite.
   const proIsTheTeams = !!teamPro && !(['pro', 'plus', 'max'] as const).some((p) => p === plan?.plan);
   const [termsAsked, setTermsAsked] = useState(false);
   const agrees = !signedIn || termsAsked;
