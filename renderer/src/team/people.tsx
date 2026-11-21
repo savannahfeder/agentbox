@@ -58,7 +58,7 @@ export function Face({ person, name, url, me, agent, size, children }: {
     : undefined;
   const photo = url ?? person?.avatarUrl;
   if (photo && !agent) return <img className={`${cls} tm-ph`} src={photo} style={box} alt="" referrerPolicy="no-referrer" />;
-  const letters = name !== undefined ? initialsOf(name) : firstName(person).slice(0, 2);
+  const letters = initialsOf(name ?? (person?.name || person?.email || 'Someone'));
   return <span className={cls} style={box} aria-hidden="true">{children ?? letters}</span>;
 }
 

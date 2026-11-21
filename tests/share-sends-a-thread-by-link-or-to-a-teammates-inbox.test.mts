@@ -108,7 +108,7 @@ describe('Send to someone', () => {
   });
   it('draws To, a note, Copy link and Send to inbox', () => {
     const t = text(renderToStaticMarkup(React.createElement(SendSheet, { people: [THEO], start: ['p-theo'], link: true, onCopy() {}, onSend() {} })));
-    expect(t).toMatch(/^To Th\w* Theo/);
+    expect(t).toMatch(/^To TP Theo/);
     expect(t).toContain('Copy link');
     expect(t).toContain('Send to inbox');
   });

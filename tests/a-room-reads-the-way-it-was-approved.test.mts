@@ -52,7 +52,7 @@ describe('words on a card', () => {
     expect(agentsWords(null)).toBe('Not running');
   });
   it('initials when there is no photo', () => {
-    expect(initialsOf('Sam R.')).toBe('SA');
+    expect(initialsOf('Sam R.')).toBe('SR');
     expect(initialsOf('')).toBe('?');
   });
 });

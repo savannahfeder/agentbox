@@ -4,6 +4,7 @@ import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
 import { MateFace } from '../teammates/MateFace';
 import { AgentFace } from '../components/AgentFace';
+import { initialsOf } from '../team/rooms/room-rules';
 import './home.css';
 import { enterIsTheButtons } from '../focused-button';
 
@@ -119,7 +120,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
                   {m.face
                     ? <MateFace seed={m.face} className={`hm-face${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`} />
                     : <span className={`hm-face${m.ai ? ' ai' : ''}${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`}>
-                      {m.photo ? <img className="hm-photo" src={m.photo} alt="" referrerPolicy="no-referrer" /> : m.letter}</span>}
+                      {m.photo ? <img className="hm-photo" src={m.photo} alt="" referrerPolicy="no-referrer" /> : m.ai ? m.letter : initialsOf(m.name)}</span>}
                   <span className="hm-text"><b>{m.name}</b><small>{m.line}</small></span>
                   {m.total > 0 && <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>}
                 </button>

@@ -37,9 +37,9 @@ describe('whom a thread was handed to', () => {
 });
 
 describe('the initials on the button', () => {
-  it('takes the first letter of the first two names', () => {
+  it('takes the first letter of the first and last names', () => {
     expect(handedInitials('Jordan Ellis')).toBe('JE');
-    expect(handedInitials('Ana María Ruiz')).toBe('AM');
+    expect(handedInitials('Ana María Ruiz')).toBe('AR');
   });
 
   it('takes two letters of a single name', () => {

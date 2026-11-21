@@ -49,7 +49,7 @@ describe('a line on the room’s board', () => {
   });
   it('says You on your own, with your initials where there is no photo', () => {
     const line = row(draw(), 'Pricing page copy');
-    expect(line).toMatch(/<span class="tm-av you"[^>]*>Sa<\/span><span class="txt"><span class="who">You<\/span><span class="t">Pricing page copy<\/span>/);
+    expect(line).toMatch(/<span class="tm-av you"[^>]*>SR<\/span><span class="txt"><span class="who">You<\/span><span class="t">Pricing page copy<\/span>/);
   });
   it('carries the whole title for a hover, however it is cut on screen', () => {
     expect(row(draw(), 'Stripe webhook')).toContain(`title="${LONG}"`);
