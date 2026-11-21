@@ -76,12 +76,10 @@ describe('the Tasks tab', () => {
     expect(html).toContain('Write the words');
   });
 
-  // Its rows sit under column names, late first, with no group names.
-  it('draws no Late or Open over its rows either', () => {
+  it('still names Open when Late or Blocked sits above it', () => {
     const html = draw({ late: [task('Late one')], open: [task('Write the words')] });
-    expect(html).not.toContain('>Late<');
-    expect(html).not.toContain('>Open<');
-    expect(html).toContain('>Doing it<');
+    expect(html).toContain('>Late<');
+    expect(html).toContain('>Open<');
   });
 
   it('keeps Done this week, which folds', () => {
