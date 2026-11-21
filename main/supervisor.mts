@@ -10034,6 +10034,8 @@ export class Supervisor {
       if (current.answer === answerAtSpawn
         && (current.wrote?.answer?.ts ?? 0) === (spawnedItem.wrote?.answer?.ts ?? 0)) return;
       if (current.answer === '(withdrawn)') return; // a cancel, not a reply
+      // A teammate's hand-back held for her yes, or a row she stopped, waits for her reply, as the queue does.
+      if (heldForHer(current) || stoppedByHer(current)) return;
       // A reply set for later waits for its time, and the tick carries it then.
       // A row the run closed meanwhile is opened again, or nothing would.
       if (!this.store.isDue(current, Date.now())) {
