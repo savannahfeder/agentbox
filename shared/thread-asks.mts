@@ -69,6 +69,8 @@ export function helpAskCovering(rows: readonly AskRow[], me: string | null, thre
     if (!a || a.kind !== 'help' || a.thread !== thread || r.assignee !== helper) return false;
     const opened = r.wrote?.ask?.ts ?? r.createdAt ?? 0;
     if (at < opened) return false;
+    // The helper may close the task but never open it: their copy can write its status.
+    if (r.status !== 'done' && r.wrote?.status?.by === helper) return false;
     if (isOpen(r)) return true;
     const closed = r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? r.updatedAt ?? 0;
     return at <= closed;
