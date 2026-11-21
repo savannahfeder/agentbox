@@ -11,7 +11,7 @@ import type {FocusControlStyle} from './focus-control';
 import {reviewLabEnabled} from './review-lab';
 import { deliverReply } from './deliver-reply.ts';
 import { ArtifactSurface } from './components/ArtifactSurface';
-import { artifactPlacement, artifactFraction, fullScreenTakes, whereAFileOpens, type ArtifactMode } from './artifact-layout';
+import { artifactPlacement, artifactFraction, fullScreenTakes, keptWidth, whereAFileOpens, type ArtifactMode } from './artifact-layout';
 import { besideDocument } from './message-artifacts';
 import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // the app's renderer: one state machine, keyboard-first. The Superhuman grammar:
@@ -3546,10 +3546,8 @@ export default function App() {
   // A copy of a teammate's file does not outlive their thread on the screen.
   useEffect(() => { setOpenDoc((doc) => (doc?.readOnly ? null : doc)); }, [openCard?.personId, openCard?.threadId]);
   const [artifactBody, setArtifactBody] = useState<HTMLDivElement | null>(null);
-  // The body's width is kept as state only when what it decides changes: where
-  // a file would open, and the exact split while one is open. The sidebar
-  // sliding open changes the width every frame, and each change drew the whole
-  // app again.
+  // The sidebar sliding open changes the body's width every frame, so only a
+  // width that changes what is drawn (keptWidth) draws the app again.
   const bodyWidth = useRef(1000);
   const [artifactWidth, setArtifactWidth] = useState(1000);
   const fileOpen = !!openDoc;
@@ -3560,7 +3558,7 @@ export default function App() {
     const observer = new ResizeObserver(([entry]) => {
       const width = entry.contentRect.width;
       bodyWidth.current = width;
-      setArtifactWidth((was) => (fileOpen || artifactPlacement('beside', was) !== artifactPlacement('beside', width) ? width : was));
+      setArtifactWidth((was) => keptWidth(was, width, fileOpen));
     });
     observer.observe(body);
     return () => observer.disconnect();
