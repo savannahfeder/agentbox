@@ -112,6 +112,8 @@ export const PARITY = {
   'thread:add-people': { missing: 'adding people to a thread' },
   'thread:route-*': { missing: 'routing a thread to an agent or to you' },
   'thread:give-*': { missing: 'giving a thread to a teammate' },
+  'thread:ask-review-*': { desktopOnly: 'it opens the ask sheet of the desktop thread menu; the phone cannot ask a teammate yet, as with giving above' },
+  'thread:ask-help-*': { desktopOnly: 'it opens the ask sheet of the desktop thread menu; the phone cannot ask a teammate yet, as with giving above' },
   'thread:answer-*': { desktopOnly: 'it presses the answer buttons on a teammate\'s shared thread, a page the phone does not open' },
   'thread:run-now': { phone: MENU, find: 'label="Run now"' },
   'thread:priority-*': { phone: MENU, find: 'label="Priority"' },

@@ -48,6 +48,9 @@ import type { Person } from '../types';
 import { ChooseList, CopiedSheet, GiveSheet, PanelBack, SeeList, SendSheet, ShareList } from './SharePanel';
 import type { SeenBy } from './share-rules';
 
+/** ⌘K asking a person: the thread's menu opens its sheet for them. */
+export const ASK_PERSON_EVENT = 'zero:ask-person';
+
 export type ThreadMenuRowId = 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
 
 /**
@@ -385,6 +388,17 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
     window.addEventListener('zero:ask-step', askAbout);
     return () => window.removeEventListener('zero:ask-step', askAbout);
   }, [!!onAsk, giveTo.length]);
+  // ⌘K's Ask Theo for a review or for help (ASK_PERSON_EVENT) opens the same sheet the menu's row does, Theo picked.
+  useEffect(() => {
+    if (!onAsk) return undefined;
+    const askPerson = (e: Event) => {
+      const d = (e as CustomEvent<{ kind: 'help' | 'review'; to: { id: string; name: string } }>).detail;
+      if (!d) return;
+      setSharing(null); setStep(null); setGiveStart(d.kind); setGivingFromShare(true); setGiving(true); setGivingTo(d.to); setOpen(true);
+    };
+    window.addEventListener(ASK_PERSON_EVENT, askPerson);
+    return () => window.removeEventListener(ASK_PERSON_EVENT, askPerson);
+  }, [!!onAsk]);
   // ⌘K's Share with chosen people… opens the same list Share → Chosen people does.
   useEffect(() => {
     if (!share) return undefined;

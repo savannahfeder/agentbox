@@ -71,7 +71,7 @@ import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
 import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy } from '../../shared/thread-asks.mts';
-import { HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
+import { ASK_PERSON_EVENT, HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
 import { ImportAgents } from './components/ImportAgents';
@@ -7764,6 +7764,11 @@ export default function App() {
         return;
       }
       case 'give': void giveThread(item, { id: d.to, name: d.name }); return;
+      case 'ask':
+        if (!focused || keyOf(focused) !== keyOf(item)) { setFocused(item); markSeen(item); }
+        // Next tick: the menu is on the thread's page, which may only just be opening.
+        setTimeout(() => window.dispatchEvent(new CustomEvent(ASK_PERSON_EVENT, { detail: { kind: d.kind, to: { id: d.to, name: d.name } } })), 60);
+        return;
       case 'shipped': void markShipped(item, d.on); return;
       case 'wait': void waitOn(item, d.on); return;
       case 'decide': {
@@ -9396,6 +9401,7 @@ export default function App() {
                   : page && peopleToAdd({ item: target, me: team?.me ?? null, company: team?.state.people ?? [] }).length > 0 && 'thread',
                 routes: teamRouteChoices(target, team),
                 give: giveToFor(target),
+                ask: giveToFor(target).filter((p) => !p.id.startsWith('mate:') && !p.asked && !target.ask),
                 shipped: shippedFor(target),
                 waits: waitsFor(target),
                 waitsNow: setByPerson(target),
