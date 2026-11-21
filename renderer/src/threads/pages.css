@@ -461,7 +461,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
   padding: 29px 32px 32px max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
 }
 .tp-grid.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
-/* The reply box in the conversation's column, whose left edge both work out from the page's width. */
+/* The reply box sits in the conversation's column: both take their left edge from the page's width, not their own. */
 .tp-dock {
   flex: none; display: grid; grid-template-columns: minmax(0, var(--tp-measure)); gap: 48px;
   padding: 0 32px 24px max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
