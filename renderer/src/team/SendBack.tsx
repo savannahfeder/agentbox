@@ -32,12 +32,12 @@ export function SendBack({ item, items }: { item: WorkItem; items: readonly Work
       if (!found.ok || !found.opened) throw new Error(found.error ?? `${file.name} is not on this computer.`);
       const words = sendBackWords(file.name, answers.length);
       if ('task' in back) {
-        const links = await persistAttachments(back.task.product, [{ name: file.name, srcPath: found.opened }]);
+        const links = await persistAttachments(back.task.product, [{ name: file.name, srcPath: found.opened, image: /\.(png|jpe?g|gif|webp)$/i.test(file.name) }]);
         await api.answer({ product: back.task.product, id: back.task.id, answer: `${words}\n\n${links}` });
         const version = /\]\((attachments\/[^)\s]+)\)/.exec(links)?.[1]?.split('/').pop();
         for (const on of answers) await api.fileMark({ product: back.task.product, id: back.task.id, mark: { do: 'resolve', on, ...(version ? { in: version } : {}) } });
       } else {
-        const out = await api.teamMessage({ to: back.to, body: words, files: [{ name: file.name, srcPath: found.opened }] });
+        const out = await api.teamMessage(back.to, words, undefined, [{ name: file.name, srcPath: found.opened }]);
         if (!out?.ok) throw new Error(out?.error ?? `That did not reach ${who}.`);
         for (const on of answers) await api.teamMarkFile({ personId: back.thread.personId, threadId: back.thread.threadId, mark: { do: 'resolve', on } });
       }
