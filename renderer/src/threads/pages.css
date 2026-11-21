@@ -179,8 +179,12 @@
 .th-table .row { min-height: 0; }
 /* A thread row far off screen is skipped until it comes near, so the sidebar
    sliding open, which narrows every row on every frame, lays out and paints
-   only the rows in view. A row is 54px tall, which holds its place meanwhile. */
-.th-table .row[data-item-id] { content-visibility: auto; contain-intrinsic-size: auto 54px; }
+   only the rows in view. A row is 54px tall, which holds its place meanwhile.
+   Not in the phone layout (phone.css), which has no sliding sidebar and rows
+   of more than one height. */
+@media (min-width: 701px) and (min-height: 521px) {
+  .th-table .row[data-item-id] { content-visibility: auto; contain-intrinsic-size: auto 54px; }
+}
 .th-grid > div { line-height: 20px; }
 .th-grid.with-person { --th-proj: 140px; --th-person: 130px; }
 /* A column no row of the table fills is not drawn, header included. */

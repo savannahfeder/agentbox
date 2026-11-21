@@ -81,6 +81,15 @@ describe('a long Inbox', () => {
     const line = pages.match(/\.th-grid > div \{ line-height: (\d+)px; \}/);
     expect(Number(rule![1])).toBe(Number(pad![1]) + Number(line![1]) + Number(pad![2]));
   });
+  it('leaves the phone layout alone, whose rows are of more than one height', () => {
+    const phone = read('phone.css').match(/@media \(max-width: (\d+)px\), \(max-height: (\d+)px\) \{/);
+    const desk = pages.match(/@media \(min-width: (\d+)px\) and \(min-height: (\d+)px\) \{\s*\.th-table \.row\[data-item-id\] \{ content-visibility: auto;/);
+    expect(phone).not.toBeNull();
+    expect(desk).not.toBeNull();
+    expect(Number(desk![1])).toBe(Number(phone![1]) + 1);
+    expect(Number(desk![2])).toBe(Number(phone![2]) + 1);
+    expect(pages.match(/content-visibility/g)).toHaveLength(1);
+  });
   it('leaves the column headings and section labels drawn, which are not thread rows', () => {
     const pagesTsx = read('threads/Pages.tsx');
     const heads = pagesTsx.match(/<div className=\{?[`"]row th-head[^>]*>/g) ?? [];
