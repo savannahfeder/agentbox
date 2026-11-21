@@ -4,8 +4,8 @@
    the rest of the app, and nothing in the app's own `.modal` or `.compose-*`
    rules can reach in and move it.
 
-   ROUNDED (2026-11-10). The card and its menus take the large corner, and the
-   chips, the toggle and the buttons in it the small one; no pill shapes.
+   ROUNDED. The card and its menus take the large corner, and the chips, the
+   toggle and the buttons in it the small one; no pill shapes.
 
    THE COLOURS ARE THE DRAWING'S IN EMBER GRID, where it was drawn and approved,
    and the theme's own tokens everywhere else: the card on its solid, menus one
@@ -419,11 +419,10 @@
 .tc-chip .tc-face-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .tc-chip:has(> .tc-face-only) { padding: 0 7px; }
 
-/* --------------------------- Home on a team ----------------------------- */
-/* QUIET MARKS (w-83da0ab961, approved 2026-11-21). Who it goes to and what kind
-   it is stay on the left; a control nobody changed is its mark alone on the
-   right, with its word kept for screen readers, and shows the word once it is
-   changed. The left keeps the bar's 6px; the marks sit 4px apart. */
+/* QUIET MARKS, on Home's box on a team (pinned by
+   tests/homes-box-on-a-team-shows-what-you-have-not-changed-as-a-mark). A mark
+   keeps its word for screen readers. The left keeps the bar's 6px; the marks
+   sit 4px apart. */
 .tc-quiet .tc-bar { gap: 4px; }
 .tc-quiet .tc-bar > .tc-anchor:first-child + .tc-seg, .tc-quiet .tc-bar > .tc-anchor:first-child + .tc-anchor { margin-left: 2px; }
 .tc-quiet .tc-bar .tc-icon { margin-left: 0; }

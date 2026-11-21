@@ -887,10 +887,9 @@ export function ThreadComposer({
   const peopleHere = !!team && (others.length > 0 || !!team.state.sent?.length);
   const matesHere = !!agentMates && !!onToTeammate;
   const toShown = toOffered({ people: peopleHere, auto: autoHere, mates: matesHere, chosen: !!person || !!mate });
-  // HOME'S BOX ON A TEAM IS QUIET (w-83da0ab961, approved 2026-11-21): who and
-  // what kind on the left, and a control nobody changed is its mark alone until
-  // it is changed. One row held seven controls of five kinds before. An AI
-  // teammate in To keeps its own short bar.
+  // Home's box on a team draws what nobody changed as a mark, as approved
+  // (tests/homes-box-on-a-team-shows-what-you-have-not-changed-as-a-mark).
+  // An AI teammate in To keeps its own short bar.
   const quiet = inline && toShown && !mate;
   const sections = toSections({
     people: peopleHere,
@@ -1280,7 +1279,7 @@ export function ThreadComposer({
     ) }] : []),
     ...(rows.includes('sendAs') ? [{ label: 'Send As', node: sendAsChoice }] : []),
     ...(rows.includes('subject') ? [{ label: 'Subject', node: quiet ? (
-      // A mark you type in: its short word never runs out of room, and the reason is its tooltip.
+      // One word of hint, so it never runs out of room; what a subject does is its tooltip.
       <label className={`tc-chip tc-subject-chip${subject.trim() ? '' : ' tc-at-rest'}`} title="A subject gives it a thread of its own">
         <SubjectIcon />
         <input className="tc-subject-in tc-chip-text" value={subject} aria-label="Subject" spellCheck placeholder="Subject"
@@ -1361,8 +1360,7 @@ export function ThreadComposer({
     </div>
   ) : null;
 
-  /* --------------------- the pieces every bar draws ----------------------- */
-  // One copy of each, so Home's quiet bar and the pop-up's cannot drift apart.
+  // One copy of each piece the bars draw, so Home's and the pop-up's cannot drift apart.
   const fieldNode = (label: string) => fields.find((f) => f.label === label)?.node ?? null;
   const seesChip = (sees: Visibility) => (
     <span className="tc-anchor" ref={anchor('visibility')}>
@@ -1421,8 +1419,7 @@ export function ThreadComposer({
       {onNewProject && stopper.action ? <button type="button" className="tc-why-do" onClick={onNewProject}>{stopper.action}</button> : stopper.action}
     </span>
   );
-  // HOME'S QUIET BAR: who it goes to and what kind it is, then a gap, then the
-  // rest as marks. On a task, who sees it sits before the level, as approved.
+  // Who sees it sits before the level here, as in the approved picture.
   const quietBar = quiet && (
     <div className="tc-bar tc-fit" ref={fitBar}>
       {fieldNode('To')}
