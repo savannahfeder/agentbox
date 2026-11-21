@@ -31,6 +31,16 @@ describe('the open thread', () => {
   });
 });
 
+describe('the other conversations and a file opened as a sheet', () => {
+  const read = (f: string) => readFileSync(new URL(`../renderer/src/${f}`, import.meta.url), 'utf8');
+
+  it('draw through the memoized markdown with props that keep their identity', () => {
+    expect(read('team/rooms/RoomChat.tsx')).toMatch(/<MessageMarkdown remarkPlugins=\{MARKDOWN_PLUGINS\} components=\{components\} urlTransform=\{keepConnectionLinks\}>/);
+    expect(read('threads/TeammateThread.tsx')).toMatch(/<MessageMarkdown remarkPlugins=\{THREAD_PLUGINS\} components=\{components\} urlTransform=\{artifactUrlTransform\}>/);
+    expect(read('components/FileSheet.tsx')).toMatch(/<MessageMarkdown remarkPlugins=\{PLUGINS\} components=\{TEXT_PARTS\}>/);
+  });
+});
+
 let browser, bundle;
 beforeAll(async () => {
   if (!browserAvailable) return;

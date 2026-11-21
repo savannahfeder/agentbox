@@ -5,7 +5,7 @@
 // comment. About puts what it is about, its files and its properties beside it.
 import { useCallback, useContext, useEffect, useMemo, useState, type KeyboardEvent, type ReactNode, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import ReactMarkdown from 'react-markdown';
+import { MessageMarkdown } from '../components/MessageMarkdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
@@ -35,6 +35,7 @@ import { readDraft, saveDraft } from '../drafts';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
 const COPY = /^attachments\//;
+const THREAD_PLUGINS = [remarkGfm];
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
@@ -114,7 +115,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
       },
       img: ({ src, alt }: { src?: string; alt?: string }) => <ArtifactImg key={src} src={src} alt={alt} roots={roots} onOpen={open} />,
     };
-    return (text: string) => <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={artifactUrlTransform}>{text}</ReactMarkdown>;
+    return (text: string) => <MessageMarkdown remarkPlugins={THREAD_PLUGINS} components={components} urlTransform={artifactUrlTransform}>{text}</MessageMarkdown>;
   }, [product, dir]);
 
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
