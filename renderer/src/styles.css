@@ -267,6 +267,7 @@
   /* The corner marks, which only Ember Grid draws (workspace-navigation.css). */
   --skin-tick: transparent;
   --skin-blur: 0px;
+  --skin-glass: none;
   /* The opaque writing surface. With no skin on there is no photograph to
      average, so it falls back to the card the app already had. */
   --skin-solid: var(--bg-raised);
@@ -576,6 +577,7 @@
   /* The corner marks, which only Ember Grid draws (workspace-navigation.css). */
   --skin-tick: transparent;
   --skin-blur: 0px;
+  --skin-glass: none;
   /* The opaque writing surface. With no skin on there is no photograph to
      average, so it falls back to the card the app already had. */
   --skin-solid: var(--bg-raised);
@@ -657,6 +659,7 @@
   --skin-pane: rgba(60, 69, 81, 0.22);
   --skin-pane-line: rgba(255, 255, 255, 0.11);
   --skin-blur: 2px;
+  --skin-glass: blur(2px);
   --skin-solid: #272d30;
   --skin-dim: 0.745;
   --text-dim: #cfd2d8;
@@ -714,6 +717,7 @@
   --skin-pane: rgba(36, 34, 33, 0.55);
   --skin-pane-line: #464443;
   --skin-blur: 0px;
+  --skin-glass: none;
   --skin-solid: #282625;
   --skin-dim: 0;
   /* The film's L-shaped corner marks, 12px long, 8px in from each corner. */
@@ -4341,8 +4345,8 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  -webkit-backdrop-filter: blur(var(--skin-blur));
-  backdrop-filter: blur(var(--skin-blur));
+  -webkit-backdrop-filter: var(--skin-glass);
+  backdrop-filter: var(--skin-glass);
 }
 :root[data-skin] .idle-field { border-color: var(--skin-pane-line); }
 .idle-field:hover { border-color: var(--text-faint); }
@@ -5227,8 +5231,8 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 */
 :root[data-skin] .set-nav {
   background: var(--skin-pane);
-  -webkit-backdrop-filter: blur(var(--skin-blur));
-  backdrop-filter: blur(var(--skin-blur));
+  -webkit-backdrop-filter: var(--skin-glass);
+  backdrop-filter: var(--skin-glass);
   border-right-color: var(--skin-pane-line);
 }
 /* Clear of the traffic lights: the window is frameless and this column runs to
@@ -5812,8 +5816,8 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 :root[data-skin] .list-pane {
   background: var(--skin-pane);
   border: 1px solid var(--skin-pane-line);
-  -webkit-backdrop-filter: blur(var(--skin-blur));
-  backdrop-filter: blur(var(--skin-blur));
+  -webkit-backdrop-filter: var(--skin-glass);
+  backdrop-filter: var(--skin-glass);
 }
 
 /* AN OPENED TASK, which is the whole window rather than a card (`.app.flat`).
@@ -5823,8 +5827,8 @@ a.set-ghost { text-decoration: none; display: inline-block; }
    --line, which the skin has already lifted. */
 :root[data-skin] .app.flat {
   background: var(--skin-pane);
-  -webkit-backdrop-filter: blur(var(--skin-blur));
-  backdrop-filter: blur(var(--skin-blur));
+  -webkit-backdrop-filter: var(--skin-glass);
+  backdrop-filter: var(--skin-glass);
 }
 
 /* ONE TREATMENT, AND THE WHOLE OPENED TASK WEARS IT. THE INBOX KEEPS ITS
@@ -6444,7 +6448,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 :root[data-skin] .fr-look-mid {
   background: var(--skin-pane);
   border-color: var(--skin-pane-line);
-  -webkit-backdrop-filter: blur(var(--skin-blur)); backdrop-filter: blur(var(--skin-blur));
+  -webkit-backdrop-filter: var(--skin-glass); backdrop-filter: var(--skin-glass);
 }
 /* THE QUESTION IS THE LOUDEST THING ON THE CARD, and not the welcome's 46px:
    the subject here is the four tiles under it. */
@@ -6568,8 +6572,8 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 :root[data-skin] .fr-piece {
   background: var(--skin-pane);
   box-shadow: 0 0 0 1px var(--skin-pane-line), var(--shadow-lg);
-  -webkit-backdrop-filter: blur(var(--skin-blur));
-  backdrop-filter: blur(var(--skin-blur));
+  -webkit-backdrop-filter: var(--skin-glass);
+  backdrop-filter: var(--skin-glass);
 }
 /* A HEIGHT, RATHER THAN THE WHOLE WINDOW. The first cut ran the piece from
    104px to 210px off the foot and left 400 points of empty ground under three
@@ -6817,7 +6821,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 :root[data-skin] .fr-card.fr-folders,
 :root[data-skin] .fr-card.fr-name-card {
   background: var(--skin-pane);
-  -webkit-backdrop-filter: blur(var(--skin-blur)); backdrop-filter: blur(var(--skin-blur));
+  -webkit-backdrop-filter: var(--skin-glass); backdrop-filter: var(--skin-glass);
 }
 .fr-folders-label { padding: 9px 12px 7px; font-size: 12px; color: var(--text-faint); }
 .fr-folder {
@@ -7895,8 +7899,8 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
 :root[data-task-shape="card"][data-skin] .app.flat .list-pane.pinned {
   background: var(--skin-pane);
   border: 1px solid var(--skin-pane-line);
-  -webkit-backdrop-filter: blur(var(--skin-blur));
-  backdrop-filter: blur(var(--skin-blur));
+  -webkit-backdrop-filter: var(--skin-glass);
+  backdrop-filter: var(--skin-glass);
 }
 
 /* --- 5. THE WORDS TAKE THE WIDTH -----------------------------------------

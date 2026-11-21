@@ -220,7 +220,7 @@ describe('each answer is actually written in the stylesheet', () => {
       const bg = paints(rule.body, 'background') ?? paints(rule.body, 'background-color');
       if (answer === 'glass') {
         expect(bg).toBe('var(--skin-pane)');
-        expect(paints(rule.body, 'backdrop-filter')).toBe('blur(var(--skin-blur))');
+        expect(paints(rule.body, 'backdrop-filter')).toBe('var(--skin-glass)');
       }
       if (answer === 'nothing') {
         expect(bg).toBe('transparent');

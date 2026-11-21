@@ -391,7 +391,9 @@ describe('every dial actually reaches the window', () => {
       expect(css, `${named[1]}, which ${sk.id} wears, ignores --skin-dim`)
         .toMatch(new RegExp(`${named[1]}:[^;]*var\\(--skin-dim`));
     }
-    expect(css, 'nothing blurs by --skin-blur').toMatch(/backdrop-filter:\s*blur\(var\(--skin-blur/);
+    // The blur dial reaches the panes as --skin-glass, which applyTune writes
+    // from it (tests/a-moving-page-beside-a-thread-redraws-only-itself).
+    expect(css, 'nothing blurs by the glass').toMatch(/backdrop-filter:\s*var\(--skin-glass\)/);
   });
 
   it('gives the stylesheet a fallback for both, so a fresh window is never bare', () => {

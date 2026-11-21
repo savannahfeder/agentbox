@@ -257,6 +257,10 @@ export function applyTune(tune: SkinTune, root: { style: { setProperty(k: string
   root.style.setProperty('--skin-panel-opacity', tune.panelOpacity === undefined ? '' : String(tune.panelOpacity));
   root.style.setProperty('--skin-background-blur', `${tune.backgroundBlur ?? 0}px`);
   root.style.setProperty('--skin-blur', `${tune.blur}px`);
+  // `none` at zero, never blur(0px): Chromium redraws a backdrop pass whole,
+  // even one that blurs nothing, whenever anything inside it moves
+  // (tests/a-moving-page-beside-a-thread-redraws-only-itself).
+  root.style.setProperty('--skin-glass', tune.blur > 0 ? `blur(${tune.blur}px)` : 'none');
   root.style.setProperty('--skin-dim', String(tune.dim));
 }
 
