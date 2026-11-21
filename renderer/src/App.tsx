@@ -3546,15 +3546,27 @@ export default function App() {
   // A copy of a teammate's file does not outlive their thread on the screen.
   useEffect(() => { setOpenDoc((doc) => (doc?.readOnly ? null : doc)); }, [openCard?.personId, openCard?.threadId]);
   const [artifactBody, setArtifactBody] = useState<HTMLDivElement | null>(null);
+  // The body's width is kept as state only when what it decides changes: where
+  // a file would open, and the exact split while one is open. The sidebar
+  // sliding open changes the width every frame, and each change drew the whole
+  // app again.
+  const bodyWidth = useRef(1000);
   const [artifactWidth, setArtifactWidth] = useState(1000);
+  const fileOpen = !!openDoc;
   useEffect(() => {
     // The team page takes the body's place, and a hidden body measures nothing.
     const body = teamBody ?? artifactBody;
     if (!body) return;
-    const observer = new ResizeObserver(([entry]) => setArtifactWidth(entry.contentRect.width));
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      bodyWidth.current = width;
+      setArtifactWidth((was) => (fileOpen || artifactPlacement('beside', was) !== artifactPlacement('beside', width) ? width : was));
+    });
     observer.observe(body);
     return () => observer.disconnect();
-  }, [artifactBody, teamBody]);
+  }, [artifactBody, teamBody, fileOpen]);
+  // Before the file's first paint, so it opens at the split it keeps.
+  useLayoutEffect(() => { if (fileOpen) setArtifactWidth(bodyWidth.current); }, [fileOpen]);
 
   // HOW MUCH OF THE WINDOW THE FILE TAKES. three quarters, no line down the
   // middle, still resizable. The opening fraction and the floors it moves

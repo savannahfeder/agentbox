@@ -1058,17 +1058,21 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const handedTask = handedName ? taskHandedFrom(items ?? [], item.id, teamCtx?.me ?? null) : null;
   const summarised = !agent && !made && !direct;
   // Read before the first paint, so the thread's width is right from the start.
+  // Only a chat's thread panel reads it, and no wider than the panel's widest
+  // beside the chat's narrowest, so the sidebar sliding open does not draw the
+  // conversation again every frame.
   const paneRef = useRef<HTMLDivElement>(null);
   const [paneWidth, setPaneWidth] = useState(Infinity);
   useLayoutEffect(() => {
     const pane = paneRef.current;
-    if (!pane) return undefined;
-    setPaneWidth(pane.clientWidth);
+    if (!pane || !direct) return undefined;
+    const measure = () => setPaneWidth(Math.min(pane.clientWidth, THREAD_WIDTH.max + THREAD_WIDTH.chat));
+    measure();
     if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver(() => setPaneWidth(pane.clientWidth));
+    const ro = new ResizeObserver(measure);
     ro.observe(pane);
     return () => ro.disconnect();
-  }, []);
+  }, [direct]);
   // A CHAT'S THREAD, OPEN IN THE PANEL BESIDE IT (w-920461cbe6): which one, by
   // its message's uid, and how wide the panel was last dragged. A thread is not
   // carried from one conversation to the next, and a document open beside the
