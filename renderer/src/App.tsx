@@ -3094,6 +3094,19 @@ export default function App() {
       showToast(`${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
     }, 1500));
   }, [weekCards, openTeammateCard, team, items]);
+
+  // AN ASK OPENS ON THE THREAD IT IS ABOUT. The person asked was put on a task
+  // page whose reply box went to the asker, with the thread a button away;
+  // the thread page carries the same hand-back. Where this computer has no card
+  // for the thread yet, the task page stays as it was.
+  useEffect(() => {
+    const f = focused;
+    if (!f?.ask || !team?.me || f.assignee !== team.me || !askIsOpen(f)) return;
+    const card = weekCards.find((c) => c.personId === f.ask!.owner && c.threadId === f.ask!.thread);
+    if (!card) return;
+    setFocused(null);
+    openTeammateCard(card);
+  }, [focused?.product, focused?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const w = linkWaiting.current;
     if (!w) return;
