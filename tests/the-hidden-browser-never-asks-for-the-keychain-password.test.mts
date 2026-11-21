@@ -47,7 +47,8 @@ describe('the hidden browser never asks for the keychain password', () => {
 
   it('every file that starts a headless browser of its own passes them', () => {
     const launchers = sources(ROOT).filter((f) => fs.readFileSync(f, 'utf8').includes("'--headless=new'"));
-    expect(launchers.length).toBeGreaterThanOrEqual(cdp ? 7 : 6);
+    // One fewer since scripts/shot-the-built-walk.mjs went with the old walk (2026-11-21).
+    expect(launchers.length).toBeGreaterThanOrEqual(cdp ? 6 : 5);
     const missing = launchers
       .filter((f) => !fs.readFileSync(f, 'utf8').includes('...KEEPS_OFF_THE_KEYCHAIN'))
       .map((f) => path.relative(ROOT, f));
