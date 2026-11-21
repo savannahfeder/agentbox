@@ -152,7 +152,7 @@ export function splitDone(rows: ThreadMenuRow[]): { done: ThreadMenuRow | null; 
 
 /* ------------------------------------------------------------------ marks */
 
-const mark = { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
+export const mark = { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
 
 function CodeMark() {
   return <svg {...mark}><path d="m8.5 7-5 5 5 5" /><path d="m15.5 7 5 5-5 5" /></svg>;

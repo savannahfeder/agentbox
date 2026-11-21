@@ -428,29 +428,45 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
    PAGE FILLS THE WINDOW): the same type, the same measure, starting a third of
    the way into the spare room. The founder on the page it replaced: "it doesn't
    match our design style ... the padding is really different". */
-/* Measured by its own width: a file opened beside it narrows the page, not the window. */
-.tp-page { padding: 0 0 48px; container: tp / inline-size; }
-.tp-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 32px 0; }
-.tp-acts { display: flex; align-items: center; gap: 10px; }
-.tp-about.on { color: var(--text); border-color: var(--text-faint); }
+/* Measured by its own width: a file opened beside it narrows the page, not the
+   window. The words scroll and the reply box stays under them, as on a thread
+   of your own (.focus-scroll and .focus-dock). */
+.tp-page { display: flex; flex-direction: column; height: 100%; container: tp / inline-size; }
+.tp-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.tp-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 32px 0; }
 .tp-top { margin: 0 0 28px; }
-.tp-whose { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; color: var(--text-dim); }
+/* The title as a thread of your own sets it (.one-sum .one-title). */
+.tp-top .th-card-title { margin: 0 0 12px; font-size: 27px; line-height: 1.25; font-weight: 500; letter-spacing: -.015em; color: var(--text); }
+/* Whose it is and where it stands, each led by the same 20px slot (the face,
+   the state's ring), so both lines' words start 28px in. */
+.tp-whose, .tp-standing { display: flex; align-items: center; gap: 0 8px; margin: 0; font-size: 14px; line-height: 20px; color: var(--text-dim); }
+.tp-whose { margin-bottom: 6px; }
+.tp-mark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; }
+.tp-mark .ts-st { margin-right: 0; }
 .tp-whose .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 8px; }
+.tp-words { min-width: 0; }
+.tp-standing b { font-weight: 500; color: var(--text); }
+.tp-standing-line { margin-left: 8px; }
+.tp-ago { flex: none; color: var(--text-faint); }
+.tp-ago::before { content: "·"; margin-right: 8px; }
 .tp-files { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 0; }
 .tp-files button { display: flex; align-items: center; gap: 9px; max-width: 320px; padding: 5px 10px 5px 5px; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
 .tp-files button:hover { background: var(--wash); border-color: var(--line-strong); }
-.tp-top .th-card-title { margin: 0 0 10px; font-size: calc(var(--tp-type) * 1.7); line-height: 1.2; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
-.tp-standing { display: flex; align-items: center; flex-wrap: wrap; gap: 0 10px; margin: 0; font-size: 14px; color: var(--text-dim); }
-.tp-standing .ts-st { margin-right: 0; }
-.tp-standing b { font-weight: 500; color: var(--text); }
-.tp-standing .tp-ago { margin-left: auto; font-size: 12.5px; color: var(--text-faint); }
-.tp-grid {
+.tp-grid, .tp-dock {
   --tp-type: clamp(16px, calc(0.25cqi + 13px), 18px);
   --tp-measure: min(calc(var(--tp-type) * 47.5), calc(100cqi - 96px));
+}
+.tp-grid {
   display: grid; grid-template-columns: minmax(0, var(--tp-measure)); gap: 48px; align-items: start;
-  padding: 29px 32px 0 max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
+  padding: 29px 32px 32px max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
 }
 .tp-grid.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
+/* The reply box in the conversation's column, whose left edge both work out from the page's width. */
+.tp-dock {
+  flex: none; display: grid; grid-template-columns: minmax(0, var(--tp-measure)); gap: 48px;
+  padding: 0 32px 24px max(32px, calc((100cqi - var(--tp-measure)) * 0.35));
+}
+.tp-dock.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
 .tp-col :is(.msg-body, .appendix) { font-size: var(--tp-type); }
 .tp-side { position: sticky; top: 0; }
 .tp-side .ts-ticket { max-width: none; margin: 0; padding: 20px 22px 18px; border-radius: 10px; }
@@ -544,21 +560,10 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .th-work .msg-body p, .th-work .appendix p { margin: 0 0 10px; }
 /* The numbers sit inside the column, as they do on an opened thread of your own. */
 .th-work .msg-body ul, .th-work .msg-body ol, .th-work .appendix ul, .th-work .appendix ol { margin: 0 0 10px 22px; padding: 0; }
-.th-follow { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
-.th-follow:hover { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
-.th-follow.on { border-color: var(--line); color: var(--text-faint); }
 .th-work-note { margin: 0 0 18px; font-size: 13px; color: var(--text-dim); }
-.th-comment { margin: 28px 0 0; }
-.tp-comment-box { display: flex; align-items: flex-start; gap: 10px; padding: 10px 10px 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--wash); }
-.tp-comment-box:focus-within { border-color: var(--text-faint); }
-.tp-comment-box > .tm-av { margin-top: 5px; }
-.th-comment textarea { flex: 1; min-width: 0; padding: 6px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; line-height: 20px; resize: none; field-sizing: content; min-height: 40px; max-height: 240px; overflow-y: auto; }
-.th-comment textarea:focus { outline: none; }
-.th-comment button { height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
-.th-comment button:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
-.th-comment button:disabled { color: var(--text-faint); border-color: var(--line); cursor: default; }
 @container tp (max-width: 980px) {
   .tp-grid, .tp-grid.tp-with-about { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-left: 32px; }
+  .tp-dock, .tp-dock.tp-with-about { grid-template-columns: minmax(0, 1fr); padding-left: 32px; }
   .tp-side { position: static; }
 }
 @container tp (max-width: 720px) {
@@ -696,5 +701,8 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-tried { margin: 4px 0 28px; }
 .tp-tried h2 { margin: 0 0 10px; font-size: 13px; font-weight: 500; line-height: 18px; color: var(--text-dim); }
 .tp-tried .ts-trail { font-size: 14px; line-height: 21px; color: var(--text); }
-.tp-tried .ts-step::before { top: 8px; }
-.tp-tried .ts-step:not(:last-child)::after { top: 15px; }
+/* On the slot the lines above lead with: the dots on its middle, the words where
+   theirs start, the line 3px off each dot as on the card (summary.css). */
+.tp-tried .ts-step { padding-left: 28px; }
+.tp-tried .ts-step::before { left: 7.5px; top: 8px; }
+.tp-tried .ts-step:not(:last-child)::after { left: 9.5px; top: 16px; bottom: -11px; }

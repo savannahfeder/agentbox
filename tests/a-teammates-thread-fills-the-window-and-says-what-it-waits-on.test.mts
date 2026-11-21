@@ -32,10 +32,12 @@ describe('what it waits on, in words', () => {
     expect(standingLine('done', 'Dev', null)).toBe(null);
     expect(standingLine('scheduled', 'Dev', null)).toBe(null);
   });
-  it('heads the page with the state, the line and when it moved', () => {
+  // When it moved went up beside whose thread it is (w-8a8eac7620): at the
+  // column's right edge it was far from the words it dated.
+  it('heads the page with the state and the line', () => {
     const card = { personId: 'dev', threadId: 't', visible: true, title: 'Reminder emails', project: 'Sandbox', state: 'waiting', priority: 2, problem: 'x', progress: null, solution: null, blockedBy: [], blocks: [], people: null, updatedAt: 1_000 };
-    const html = renderToStaticMarkup(React.createElement(TeammateStanding, { card, person: { id: 'dev', name: 'Dev Rao' }, now: 61_000 }));
-    expect(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).toBe('Waiting on Dev The agent stopped. Dev looks at it next. Updated 1 min ago');
+    const html = renderToStaticMarkup(React.createElement(TeammateStanding, { card, person: { id: 'dev', name: 'Dev Rao' } }));
+    expect(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).toBe('Waiting on Dev The agent stopped. Dev looks at it next.');
   });
 });
 

@@ -7,7 +7,7 @@ import { doneSteps, threadState } from '../../../shared/thread-cards.mts';
 import { PriorityIcon } from '../components/Priority';
 import { priorityIdOf, priorityLabelOf } from '../priority';
 import { Face, TeamContext, firstName } from '../team/people';
-import { STATE_WORD, UNSEEN_THREAD, agoWords, linkPerson, linkWords, stateGlyph, type StateGlyph } from './summary-rules';
+import { STATE_WORD, UNSEEN_THREAD, linkPerson, linkWords, stateGlyph, type StateGlyph } from './summary-rules';
 import { crumbName, renameTo } from './crumb-rules';
 import { chosenNames } from './summary-rules';
 import { inStep, RunningMark } from './Pages';
@@ -173,8 +173,8 @@ export function ThreadCrumb({ from, name, audience = null, onBack, onRename, thr
 
 /* ----------------------------------------------------------- a teammate's */
 
-/** What a teammate's thread waits on, and from whom: the line under its name. */
-export function TeammateStanding({ card, person, now = Date.now() }: { card: ThreadCard; person: Person | null; now?: number }) {
+/** What a teammate's thread waits on, and from whom: the line under its name, its mark in the slot the face above sits in. */
+export function TeammateStanding({ card, person }: { card: ThreadCard; person: Person | null }) {
   const team = useContext(TeamContext);
   const owner = firstName(person) || 'Someone';
   const waits = card.state !== 'done' ? linkWords(card.blockedBy, team?.byId) : null;
@@ -182,10 +182,8 @@ export function TeammateStanding({ card, person, now = Date.now() }: { card: Thr
   const line = card.shippedAt ? null : standingLine(card.state, owner, waits);
   return (
     <p className="tp-standing">
-      <Glyph kind={stateGlyph(card.state, false)} />
-      <b>{word}</b>
-      {line && <span className="tp-standing-line">{line}</span>}
-      <span className="tp-ago">Updated {agoWords(card.updatedAt, now)}</span>
+      <span className="tp-mark"><Glyph kind={stateGlyph(card.state, false)} /></span>
+      <span className="tp-words"><b>{word}</b>{line && <span className="tp-standing-line">{line}</span>}</span>
     </p>
   );
 }
@@ -260,10 +258,10 @@ export function TeammateCard({ card, person, files = [], done = true }: {
   );
 }
 
-/** "Message Maya": their face and the words, in a square button, for the top bar over their card. */
+/** "Message Maya": their face and the words, in the corner's box, the face where the other boxes have a mark. */
 export function MessagePerson({ person, onMessage }: { person: Person | null; onMessage: () => void }) {
   return (
-    <button type="button" className="ts-msgbtn" onClick={onMessage}>
+    <button type="button" className="ts-done ts-msgbtn" onClick={onMessage}>
       <Face person={person} />Message {firstName(person)}
     </button>
   );

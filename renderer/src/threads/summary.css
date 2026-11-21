@@ -63,7 +63,8 @@
 .ts-done.ts-handed { gap: 8px; }
 .ts-done.ts-handed:disabled { cursor: default; }
 .ts-handed-face { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line-strong); font: 600 9px/1 var(--mono); letter-spacing: .02em; color: var(--text); }
-.ts-done.ts-code[aria-pressed="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+/* Pressed: the change open beside the thread, a teammate's thread followed or its About out. */
+.ts-done[aria-pressed="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-code-figures { display: inline-flex; gap: 6px; font-family: var(--mono); font-size: 12.5px; font-weight: 560; letter-spacing: -0.015em; }
 .ts-files-n { font-weight: 400; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
 .ts-files-pop { width: 360px; max-height: min(440px, 70vh); overflow-y: auto; padding: 6px; }
@@ -102,12 +103,14 @@
 /* A label sits close over its words (w-54e9c7243f). */
 .ts-h { display: block; margin: 0 0 2px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 /* THE DONE TRAIL (w-54e9c7243f), on a teammate's card: each step a dot joined
-   to the next by a thin line, the newest dot a shade brighter. */
+   to the next by a thin line, the newest dot a shade brighter. The line leaves
+   3px under one dot and stops 3px over the next: 15 is the dot's 7 + 5 + 3,
+   and -10 reaches back over the step's 6px gap and the next dot's 7, less 3. */
 .ts-trail { list-style: none; margin: 0; padding: 0; font-size: 12.5px; line-height: 19px; color: var(--text-dim); white-space: normal; }
 .ts-step { position: relative; padding-left: 18px; margin: 0 0 6px; }
 .ts-step:last-child { margin-bottom: 0; }
 .ts-step::before { content: ""; position: absolute; left: 3px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); }
-.ts-step:not(:last-child)::after { content: ""; position: absolute; left: 5px; top: 14px; bottom: -8px; width: 1px; background: var(--line-strong); }
+.ts-step:not(:last-child)::after { content: ""; position: absolute; left: 5px; top: 15px; bottom: -10px; width: 1px; background: var(--line-strong); }
 .ts-step-last::before { background: var(--text-dim); }
 
 /* THE MODEL, at the right end of the reply box's pill. A dotted underline
@@ -139,9 +142,9 @@
 .ts-tk-state { display: inline-flex; align-items: center; margin-left: auto; color: var(--text-dim); }
 .ts-ticket-private .ts-tk-lead { margin-bottom: 4px; }
 
-/* "Message <name>": their face and the words, square, for the top bar */
-.ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
-.ts-msgbtn:hover { background: var(--wash-strong); }
+/* "Message <name>", in Done's box: the face is 2px wider than a mark, so it starts 2px further left and the word lands where the others' do. */
+.ts-done.ts-msgbtn { padding-left: 7px; }
+.ts-msgbtn .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 7.5px; }
 
 /* THE THREAD'S BAR WHILE THE SUMMARY IS OPEN (w-922f66bb06, Summary.tsx
    ThreadCrumb): thin, and one line in the app's mono capitals, "NEEDS YOU /

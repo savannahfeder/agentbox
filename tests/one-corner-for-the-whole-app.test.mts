@@ -128,8 +128,9 @@ describe('one corner for the whole app', () => {
       expect(rule, `${sel} must stay at 0`).toMatch(/border-radius:\s*0/)
     }
     // The key chip in the reply box takes the corner like every other chip
-    // since 2026-11-02; the card and Send are rounded in soft-corners.css.
-    expect(ruleFor('.focus-dock kbd')).toMatch(/border-radius:\s*var\(--radius\)/)
+    // since 2026-11-02; the card and Send are rounded in soft-corners.css. A
+    // teammate's thread wears the same reply box, key chip included.
+    expect(ruleFor('.focus-dock kbd, .tp-dock kbd')).toMatch(/border-radius:\s*var\(--radius\)/)
   })
 
   it('never paints a solid ink around the reply card again', () => {
