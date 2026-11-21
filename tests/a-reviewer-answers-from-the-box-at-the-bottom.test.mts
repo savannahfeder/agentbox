@@ -43,7 +43,7 @@ describe('while a review is open on you', () => {
     expect(button(empty, 'Looks good')).not.toContain('disabled');
     expect(button(empty, 'Send changes to Sam')).toContain('disabled');
     expect(button(empty, 'Send to Sam')).toBe(null);
-    saveDraft({ product: 'teammate:sam', id: 't' }, 'Keep the old index one more release.');
+    saveDraft({ product: 'teammate:sam', id: 't:review' }, 'Keep the old index one more release.');
     const typed = box(page(askOf('review')));
     expect(button(typed, 'Send changes to Sam')).not.toContain('disabled');
     expect(button(typed, 'Looks good')).not.toContain('disabled');

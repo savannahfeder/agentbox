@@ -29,7 +29,7 @@ import type { AgentEvent, FileElsewhere, FileLine, FileMarkLink, FileMarks, Pers
 import { AskBar } from '../team/AskBar';
 import { DoneTrail, MessagePerson, TeammateCard, TeammateStanding, ThreadCrumb } from './Summary';
 import { doneSteps } from '../../../shared/thread-cards.mts';
-import { earlierWords, filesOnThread, notSharedWords, notesOnFile, keyInTheBox, shownOnTheirThread, whereTheAskGoes } from './teammate-thread';
+import { earlierWords, filesOnThread, notSharedWords, notesOnFile, askEndedWords, boxTarget, draftAtFor, keyInTheBox, shownOnTheirThread, whereTheAskGoes, type BoxTarget } from './teammate-thread';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
 
@@ -44,7 +44,7 @@ const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
 
-export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack, headerTarget = null, cornerTarget = null }: {
+export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack, handedToYou = null, onOpenTask, headerTarget = null, cornerTarget = null }: {
   card: ThreadCard; person: Person | null; now: number;
   /** The window's header, where an opened thread's crumb and buttons go. */
   headerTarget?: HTMLElement | null;
@@ -52,6 +52,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   /** Their open ask of you on this thread: help puts your words to their agent. */
   ask?: WorkItem | null;
   onHandBack?: (verdict: 'done' | 'yes' | 'changes', words: string) => Promise<boolean>;
+  /** The task this thread became when its owner handed it to you. */
+  handedToYou?: WorkItem | null;
+  onOpenTask?: (task: WorkItem) => void;
   /** Carry it on in a thread of your own. */
   onContinue?: () => void;
   /** Where the back button goes: Threads, or the group it was opened from. */
@@ -73,15 +76,41 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   // What it is about, its files and its properties, beside the thread when asked for.
   const [about, setAbout] = useState(false);
   const { personId, threadId } = card;
+  const target: BoxTarget = ask?.ask?.kind === 'review' && onHandBack ? 'review' : boxTarget(ask?.ask?.kind === 'help' ? 'help' : null);
   // Kept in the draft store, so a page drawn again from nothing still has what you were writing.
-  const draftAt = useMemo(() => ({ product: `teammate:${personId}`, id: threadId }), [personId, threadId]);
+  const draftAt = useMemo(() => draftAtFor(personId, threadId, target), [personId, threadId, target]);
   const [draft, setDraftHere] = useState(() => readDraft(draftAt));
   const setDraft = (text: string) => { setDraftHere(text); saveDraft(draftAt, text); };
+  // A send can end the ask, and so change the box, before it comes back: it clears only the draft it sent.
+  const draftAtNow = useRef(draftAt);
+  draftAtNow.current = draftAt;
+  const sent = (at: typeof draftAt) => { saveDraft(at, ''); if (draftAtNow.current === at) setDraftHere(''); };
   const team = useContext(TeamContext);
   const following = useContext(FollowContext);
   const followed = !!following?.is(card);
 
-  useEffect(() => { setWork(null); setDraftHere(readDraft(draftAt)); }, [draftAt]);
+  useEffect(() => { setWork(null); }, [personId, threadId]);
+  useEffect(() => { setDraftHere(readDraft(draftAt)); }, [draftAt]);
+  // An ask that ends while the page is open is said on the page, unless you handed it back yourself.
+  const lastAsk = useRef<WorkItem | null>(null);
+  const handedBack = useRef(false);
+  const [ended, setEnded] = useState<{ target: BoxTarget } | null>(null);
+  const askKey = ask ? `${ask.product}/${ask.id}` : null;
+  useEffect(() => { lastAsk.current = null; setEnded(null); }, [personId, threadId]);
+  useEffect(() => {
+    const was = lastAsk.current;
+    lastAsk.current = ask;
+    if (ask) { handedBack.current = false; setEnded(null); return; }
+    if (was && !handedBack.current) setEnded({ target: boxTarget(was.ask?.kind ?? null) });
+  }, [askKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const oldDraftAt = ended && ended.target !== target ? draftAtFor(personId, threadId, ended.target) : null;
+  const oldDraft = oldDraftAt ? readDraft(oldDraftAt) : '';
+  const takeOldDraft = () => {
+    if (!oldDraftAt) return;
+    setDraft([draft.trim(), oldDraft.trim()].filter(Boolean).join('\n\n'));
+    saveDraft(oldDraftAt, '');
+    setEnded(null);
+  };
   useEffect(() => {
     let live = true;
     api.teamThreadWork({ personId, threadId }).then((w) => { if (live) setWork(w as Work); });
@@ -175,10 +204,13 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const [handing, setHanding] = useState(false);
   const handBack = async (verdict: 'done' | 'yes' | 'changes') => {
     if (!onHandBack || handing) return;
+    const at = draftAt;
     setHanding(true);
+    handedBack.current = true;
     const ok = await onHandBack(verdict, draft.trim());
+    if (!ok) handedBack.current = false;
     setHanding(false);
-    if (ok) setDraft('');
+    if (ok) sent(at);
   };
   const send = async () => {
     const text = draft.trim();
@@ -288,6 +320,11 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             </div>
           )}
           {askGoes === 'foot' && askBar}
+          {(handedToYou || (ended && !ask)) && <p className="th-work-note tp-ask-ended">
+            {askEndedWords(owner, !!handedToYou)}
+            {handedToYou && onOpenTask && <button type="button" onClick={() => onOpenTask(handedToYou)}>Open your task</button>}
+            {oldDraft.trim() && <button type="button" onClick={takeOldDraft}>Use your draft</button>}
+          </p>}
           <form className="th-comment" onSubmit={(e) => { e.preventDefault(); if (!reviewing) void send(); }}>
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />

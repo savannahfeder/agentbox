@@ -41,6 +41,16 @@ export function whereTheAskGoes(events: readonly { at: number }[], outcome: { at
   return later === 0 ? 'top' : { after: later - 1 };
 }
 
+/** Whom the box under a teammate's thread writes to. */
+export type BoxTarget = 'comment' | 'review' | 'agent';
+
+export const boxTarget = (kind: 'help' | 'review' | null | undefined): BoxTarget => (kind === 'review' ? 'review' : kind === 'help' ? 'agent' : 'comment');
+
+/** One draft per target, so words never change whom they go to on their own. */
+export const draftAtFor = (personId: string, threadId: string, target: BoxTarget) => ({ product: `teammate:${personId}`, id: target === 'comment' ? threadId : `${threadId}:${target}` });
+
+export const askEndedWords = (owner: string, handedToYou: boolean) => (handedToYou ? `${owner} handed this thread to you.` : `${owner} took the ask back.`);
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export const earlierWords = (n: number, owner: string) => `${plural(n, 'earlier message')} ${n === 1 ? 'stays' : 'stay'} on ${owner}'s computer.`;

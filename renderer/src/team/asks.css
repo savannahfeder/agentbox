@@ -45,6 +45,10 @@
 /* Among the messages, where it was asked: the thread's own gap either side. */
 .thread-block > .ask-bar { margin-top: 22px; }
 .ask-bar:has(+ .thread) { margin-bottom: 22px; }
+/* The ask ended while you had the page open. */
+.th-work-note.tp-ask-ended { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0 0; }
+.tp-ask-ended button { padding: 4px 12px; font: inherit; font-size: 13px; color: var(--text-dim); background: none; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.tp-ask-ended button:hover { color: var(--text); border-color: var(--line-strong); }
 .ask-bar-head { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-dim); }
 .ask-bar-head b { font-weight: 500; color: var(--text); }
 .ask-bar-when { font-size: 13px; color: var(--text-faint); }

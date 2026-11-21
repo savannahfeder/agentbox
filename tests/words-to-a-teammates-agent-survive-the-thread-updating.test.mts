@@ -13,9 +13,10 @@ const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx
 
 describe("the box on a teammate's thread", () => {
   it('starts from the draft kept for this teammate and thread', () => {
-    expect(page).toMatch(/const draftAt = useMemo\(\(\) => \(\{ product: `teammate:\$\{personId\}`, id: threadId \}\), \[personId, threadId\]\);/);
+    // One per target since bug 6 (tests/an-ask-that-ends-while-you-write-says-so-and-keeps-your-draft-for-its-own-target).
+    expect(page).toMatch(/const draftAt = useMemo\(\(\) => draftAtFor\(personId, threadId, target\), \[personId, threadId, target\]\);/);
     expect(page).toMatch(/const \[draft, setDraftHere\] = useState\(\(\) => readDraft\(draftAt\)\);/);
-    expect(page).toMatch(/useEffect\(\(\) => \{ setWork\(null\); setDraftHere\(readDraft\(draftAt\)\); \}, \[draftAt\]\);/);
+    expect(page).toMatch(/useEffect\(\(\) => \{ setDraftHere\(readDraft\(draftAt\)\); \}, \[draftAt\]\);/);
   });
   it('keeps every change, and lets go of it once sent', () => {
     expect(page).toMatch(/const setDraft = \(text: string\) => \{ setDraftHere\(text\); saveDraft\(draftAt, text\); \};/);
