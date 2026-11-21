@@ -160,7 +160,7 @@ import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
 import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
-import { ChatStart, EmptyChat, JobBlock, MateWork, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow } from './team/everything/PlacePage';
+import { ChatStart, EmptyChat, JobBlock, MateWork, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow, type PlaceView } from './team/everything/PlacePage';
 import { nowAndFinished, personThreads, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
@@ -4348,6 +4348,9 @@ export default function App() {
   const [chatsDirect, setChatsDirect] = useState<string | null>(null);
   // On the chats layout: the page Chats has open beside its list, a member's key or 'team' for the team's day.
   const [chatsPlace, setChatsPlace] = useState<string | null>(null);
+  // Which button is lit on a place, kept here so the window's corner can open your AI teammate's About at its Settings.
+  const [placeView, setPlaceView] = useState<PlaceView>(null);
+  const [aboutAtSettings, setAboutAtSettings] = useState(false);
   // EVERYTHING ELSE (w-b5f23cff71). With AI teammates or Rooms on, the inbox
   // is two tabs: Needs you, and Everything else, where your team sits as cards
   // over whichever one you opened. The Chats page and its sidebar row are gone;
@@ -8033,6 +8036,8 @@ export default function App() {
       : chatsPlace;
   const backTo = 'Needs you';
   let placeEl: ReactNode = null;
+  // Your AI teammate's ⋯, which stands in the window's corner where the inbox's view and filters do.
+  let mateCorner: ReactNode = null;
   if (placeMember && snap) {
     const back = chatsPlaceShown ? undefined : () => { setEvPick(null); };
     const placeWaits = waits.get(placeMember.key) ?? 0;
@@ -8116,8 +8121,15 @@ export default function App() {
       };
       // Its list is of tasks, so each is named for what it was asked, not for its last message as in the inbox.
       const taskRow = (i: WorkItem, word: string, tone: PlaceRow['tone']): PlaceRow => ({ ...itemRow(i, word, tone), title: shownTitle(i) });
+      const mateKey = placeMember.key;
+      mateCorner = teammatesUi.cornerOf(id, {
+        onSettings: () => { setAboutAtSettings(true); setPlaceView({ of: mateKey, key: 'about' }); },
+        onDeleted: () => { if (chatsPlaceShown) openChatsPlace('team'); else setEvPick(null); },
+      });
       // No chat: you give it tasks here and its answers come to the inbox.
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} about={t?.role ?? 'AI teammate'} onBack={back} backTo={backTo} chatLabel="Tasks"
+        view={placeView} onView={(next) => { setAboutAtSettings(false); setPlaceView(next); }}
+        under={teammatesUi.settingsOf(id)}
         chat={<MateWork name={placeMember.name} now={now}
           active={[...asks.map((i) => taskRow(i, 'Waiting on you', 'ask')), ...split.now.map((i) => taskRow(i, word(i)[0], word(i)[1]))]}
           done={split.finished.map((i) => taskRow(i, '', 'done'))}
@@ -8128,7 +8140,7 @@ export default function App() {
             showToast(`Sent to ${placeMember.name}`);
             return null;
           }} />}
-        parts={[{ key: 'about', label: 'About', body: teammatesUi.aboutOf(id) }]} />;
+        parts={[{ key: 'about', label: 'About', body: teammatesUi.aboutOf(id, { atSettings: aboutAtSettings }) }]} />;
     } else {
       const tm = teamMates.find((x) => `theirmate:${x.owner}:${x.id}` === placeMember.key) ?? null;
       const owner = tm ? team?.byId.get(tm.owner) ?? null : null;
@@ -8414,9 +8426,9 @@ export default function App() {
               onCloudWhenOn={(mode) => { void api.setWorkspaceSetting({ key: 'cloudWhenOn', value: mode }); }}
               onCloudSetUp={() => setCloudSetupOpen(true)}
               onCloudMove={(ids) => { void moveToCloud(ids); }}
-              filters={!roomShown && (!evOn || evKey === 'me' || !!evBoardEl)}
+              filters={!mateCorner && !roomShown && (!evOn || evKey === 'me' || !!evBoardEl)}
               home={teamMode && !onPhone() ? { group: needsGroup, onGroup: setNeedsGroup } : null}
-              view={roomShown ? roomsUi.viewButton : null}
+              view={mateCorner ?? (roomShown ? roomsUi.viewButton : null)}
             />
           ))}
           </>

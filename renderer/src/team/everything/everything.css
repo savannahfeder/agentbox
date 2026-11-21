@@ -132,6 +132,7 @@
 .pl-chat .dock-card.tq-compose { margin: 8px 0 0 6px; }
 /* A file open beside the page squeezes it to 400px: the header keeps the name and Give a task. */
 .app.doc-open :is(.pl-name h2 em, .pl-btn.quiet) { display: none; }
+.pl-under { flex: none; max-width: 900px; margin: -2px 0 18px 6px; }
 .pl-parts { display: flex; flex-wrap: wrap; gap: 8px; flex: none; margin: 0 0 18px 6px; }
 .pl-chip { height: 28px; gap: 7px; font-size: 12.5px; }
 .pl-chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }

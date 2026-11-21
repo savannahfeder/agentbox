@@ -314,9 +314,20 @@ textarea.tq-field { resize: vertical; border-color: var(--line); margin-left: 0;
 .cx-frame-main .focus { margin-left: 40px; }
 .cx-frame-main .focus-dock-inner { margin-left: 40px; }
 /* The side panel's menus read as plain words with a chevron, not underlined. */
-.tq-details .compose-word { text-decoration: none; color: var(--text); text-align: left; }
-.tq-details .compose-word::after { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 2px 3px 9px; border-right: 1.25px solid currentColor; border-bottom: 1.25px solid currentColor; transform: rotate(45deg); color: var(--text-faint); vertical-align: middle; }
-.tq-details .compose-word:hover::after, .tq-details .compose-word.open::after { color: var(--text-dim); }
+:is(.tq-details, .tq-set-line) .compose-word { text-decoration: none; color: var(--text); text-align: left; }
+:is(.tq-details, .tq-set-line) .compose-word::after { content: ''; display: inline-block; width: 5px; height: 5px; margin: 0 2px 3px 9px; border-right: 1.25px solid currentColor; border-bottom: 1.25px solid currentColor; transform: rotate(45deg); color: var(--text-faint); vertical-align: middle; }
+:is(.tq-details, .tq-set-line) .compose-word:hover::after, :is(.tq-details, .tq-set-line) .compose-word.open::after { color: var(--text-dim); }
+/* Your AI teammate's settings under its name: About's labels and pickers, on one line that wraps. */
+.tq-set-line { display: flex; flex-wrap: wrap; align-items: center; column-gap: 32px; row-gap: 8px; font-size: 13.5px; line-height: 22px; color: var(--text); }
+/* As tall as Resume, so pausing does not move the tabs under it. */
+.tq-set { display: inline-flex; align-items: center; gap: 10px; min-width: 0; min-height: 26px; }
+.tq-set-k { flex: none; color: var(--text-faint); }
+.tq-set-text { color: var(--text-dim); }
+.tq-set-line .tq-error { flex-basis: 100%; margin: 0; }
+.pl-btn.tq-set-btn { height: 26px; padding: 0 10px; font-size: 12.5px; }
+.tq-pick .prio-menu.tq-sched-pop { top: calc(100% + 8px); left: -13px; min-width: 240px; padding: 12px; gap: 12px; font-size: 13px; line-height: 20px; color: var(--text); }
+.tq-sched-pop .tq-when-edit { margin-top: 0; }
+.tq-sched-pop .tq-duty { display: flex; flex-direction: column; gap: 6px; }
 .cx-row.cx-team { margin-bottom: 6px; }
 .cx-row .cx-mark { display: inline-flex; width: 20px; justify-content: center; color: var(--text-dim); }
 .cx-row .cx-mark svg { width: 18px; height: 18px; }

@@ -9,6 +9,7 @@ import { type TabView } from '../threads/Pages';
 import { api } from '../api';
 import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, teammateIdOf, voiceOf, yesFirst } from '../../../shared/teammates.mts';
 import { ModelPicker } from '../components/Model';
+import { ruleLabel } from '../../../shared/repeats.mts';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
 import { answerOf, answersMessage, chatEntries, chatWith, openedLines, sentWord, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
@@ -623,7 +624,7 @@ function Details(props: AboutProps) {
 }
 
 /** An AI teammate's About on its place: everything the sheet holds, its whole job, and every setting open. */
-export function TeammateAbout({ onChanged, models = NO_MODELS, ...props }: Omit<AboutProps, 'call' | 'models'> & { models?: TeammateModels; onChanged: () => void }) {
+export function TeammateAbout({ onChanged, models = NO_MODELS, atSettings = false, ...props }: Omit<AboutProps, 'call' | 'models'> & { models?: TeammateModels; onChanged: () => void; atSettings?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const call: Call = async (op, args) => {
     setError(null);
@@ -633,13 +634,15 @@ export function TeammateAbout({ onChanged, models = NO_MODELS, ...props }: Omit<
     return r.value ?? true;
   };
   return <div className="tq-details tq-about-page">
-    <AboutFields {...props} models={models} call={call} whole />
+    <AboutFields {...props} models={models} call={call} whole atSettings={atSettings} />
     {error && <p className="tq-error" role="alert">{error}</p>}
   </div>;
 }
 
-function AboutFields({ t, view, products, engines, models, call, onOpen, onNewProject, whole = false }: AboutProps & { whole?: boolean }) {
+function AboutFields({ t, view, products, engines, models, call, onOpen, onNewProject, whole = false, atSettings = false }: AboutProps & { whole?: boolean; atSettings?: boolean }) {
   const [saved, setSaved] = useState(false);
+  const settingsHead = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { if (atSettings) settingsHead.current?.scrollIntoView({ block: 'start' }); }, [atSettings]);
   useEffect(() => { if (!saved) return undefined; const timer = setTimeout(() => setSaved(false), 2000); return () => clearTimeout(timer); }, [saved]);
   const keep = (patch: Record<string, unknown>) => { void call('update', { id: t.id, patch }).then((ok) => { if (ok !== false) setSaved(true); }); };
   const real = placesToWork(products);
@@ -654,15 +657,16 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
     <dd><EditName key={t.name} name={t.name} onSave={(name) => keep({ name })} /></dd>
     <dt>Face</dt>
     <dd><FacePick seed={faceSeed(t)} onPick={(face) => keep({ face })} /></dd>
-    <dt>Model</dt>
+    {/* On its page these two are on the settings line over the tabs. */}
+    {!whole && <><dt>Model</dt>
     <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
-      effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>
+      effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd></>}
     {engines.length > 1 && <><dt>Runs on</dt>
       <dd><PickOne value={t.engine ?? ''} label="Runs on" options={[...(t.engine ? [] : [{ id: '', label: 'Your default' }]), ...engines]} onPick={(id) => keep({ engine: id })} /></dd></>}
-    <dt>Works in</dt>
+    {!whole && <><dt>Works in</dt>
     <dd>{real.length > 1 || onNewProject
       ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
-      : product?.name ?? t.product}</dd>
+      : product?.name ?? t.product}</dd></>}
     <dt>Can read</dt>
     <dd><PickOne value={t.readsMessages ? 'all' : 'threads'} label="What it can read" options={READS} onPick={(id) => keep({ readsMessages: id === 'all' })} /></dd>
     <dt>Your team</dt>
@@ -677,8 +681,8 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
       <dd><EditJob key={t.job ?? ''} job={t.job} shown={job && !whole ? clipLine(firstSentence(job), 150) : job} whole={whole} onSave={(next) => keep({ job: next })} onRead={about} /></dd>
       <dt>How it writes</dt>
       <dd><VoicePick voice={voiceOf(t)} words={t.voiceText ?? null} onPick={keep} /></dd>
-      {/* While it is set up its times are guesses it is asking you about. */}
-      {t.status !== 'draft' && <><dt>On its own</dt>
+      {/* While it is set up its times are guesses it is asking you about. On its page the schedule is on the settings line. */}
+      {t.status !== 'draft' && !whole && <><dt>On its own</dt>
       <dd>{t.duties?.length
         ? t.duties.map((d) => <span key={d.id} className="tq-duty">{d.what}
           {d.after === 'ship' || !d.every || !d.at ? <small>{d.when}</small> : <When every={d.every} at={d.at} on={d.on} canStop={false}
@@ -696,10 +700,70 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
       <dt>Its work</dt>
       <dd className="tq-sheet-links"><Inline onClick={() => onOpen(`log:${t.id}`)}>Log</Inline><Inline onClick={about}>Everything it knows and how it works</Inline></dd>
     </dl>
-    {whole ? <><h4 className="tq-about-h">Settings</h4>{settings}</>
+    {whole ? <><h4 className="tq-about-h" ref={settingsHead}>Settings</h4>{settings}</>
       : <details className="tq-sheet-more"><summary role="button">Settings</summary>{settings}</details>}
     {saved && <span className="tq-st" role="status">Saved</span>}
   </>;
+}
+
+/** How your AI teammate works, in one line under its name: when it works on its own, where, and on what model. */
+export function TeammateSettingsLine({ t, products, models = NO_MODELS, onNewProject, onChanged }: {
+  t: Teammate; products: Product[]; models?: TeammateModels; onNewProject?: () => void; onChanged: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const keep = (patch: Record<string, unknown>) => {
+    setError(null);
+    void api.teammates('update', { id: t.id, patch }).then((r) => { if (r.ok) onChanged(); else setError(r.error); });
+  };
+  const real = placesToWork(products);
+  const product = real.find((p) => p.slug === t.product);
+  return <div className="tq-set-line" aria-label={`How ${t.name} works`}>
+    {t.status !== 'draft' && <span className="tq-set"><span className="tq-set-k">Schedule</span>{t.paused
+      ? <><span className="tq-set-paused">Paused</span><button type="button" className="pl-btn tq-set-btn" onClick={() => keep({ paused: false })}>Resume</button></>
+      : <ScheduleWord t={t} keep={keep} />}</span>}
+    <span className="tq-set"><span className="tq-set-k">Works in</span>{real.length > 1 || onNewProject
+      ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
+      : <span className="tq-set-text">{product?.name ?? t.product}</span>}</span>
+    <span className="tq-set"><span className="tq-set-k">Model</span><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
+      effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></span>
+    {error && <p className="tq-error" role="alert">{error}</p>}
+  </div>;
+}
+
+/** When it works on its own, in words: its own schedule, or each duty's. */
+export function scheduleWords(t: Pick<Teammate, 'works' | 'duties'>): string {
+  const duties = t.duties ?? [];
+  const low = (s: string) => s.replace(/^./, (c) => c.toLowerCase());
+  if (duties.length > 2) return `${duties[0].when} and ${duties.length - 1} more`;
+  if (duties.length) return duties.map((d, i) => (i ? low(d.when) : d.when)).join(' and ');
+  return t.works ? ruleLabel(t.works).replace(/^./, (c) => c.toUpperCase()) : 'None';
+}
+
+// One word for the schedule, which opens what sets it: About's own controls.
+function ScheduleWord({ t, keep }: { t: Teammate; keep: (patch: Record<string, unknown>) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); } };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  const duties = t.duties ?? [];
+  return <span className="compose-word-wrap tq-pick" ref={wrap}>
+    <button type="button" className={`compose-word set${open ? ' open' : ''}`} aria-haspopup="dialog" aria-expanded={open} aria-label="Schedule" onClick={() => setOpen((o) => !o)}>{scheduleWords(t)}</button>
+    {open && <span className="prio-menu tq-sched-pop" role="dialog" aria-label="Schedule">
+      {duties.length
+        ? duties.map((d) => <span key={d.id} className="tq-duty">{d.what}
+          {d.after === 'ship' || !d.every || !d.at ? <small>{d.when}</small> : <When every={d.every} at={d.at} on={d.on} canStop={false}
+            onChange={(next) => keep({ duties: duties.map(({ when: _when, lastRan: _lastRan, ...x }) => (x.id === d.id ? { ...x, ...next } : x)) })} />}
+        </span>)
+        : <When every={t.works?.every ?? null} at={t.works?.at ? [t.works.at] : []} on={t.works?.on} canStop
+          onChange={(next) => keep({ works: next.every ? { every: next.every, at: next.at[0], ...(next.every === 'week' ? { on: next.on } : {}) } : null })} />}
+    </span>}
+  </span>;
 }
 
 // How it writes: the styles, the sample line of the one picked, or your own words.

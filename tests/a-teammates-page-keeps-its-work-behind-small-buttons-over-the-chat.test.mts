@@ -75,7 +75,7 @@ describe('App.tsx', () => {
     expect(places.match(/parts=\{\[/g)).toHaveLength(3);
   });
   it('gives your AI teammate an About that reads and changes it, and no Settings button', () => {
-    expect(places).toContain("{ key: 'about', label: 'About', body: teammatesUi.aboutOf(id) }");
+    expect(places).toContain("{ key: 'about', label: 'About', body: teammatesUi.aboutOf(id, { atSettings: aboutAtSettings }) }");
     expect(places).not.toContain('>Settings</PlaceAction>');
     expect(places).not.toContain("label: 'Job'");
   });
@@ -103,10 +103,10 @@ describe("an AI teammate's About", () => {
   const page = read('renderer/src/teammates/TeammatesPage.tsx');
   it('draws the same rows as the About sheet, from one place', () => {
     expect(page).toMatch(/function Details\(props: AboutProps\) \{[^]*?<AboutFields \{\.\.\.props\} \/>/);
-    expect(page).toMatch(/export function TeammateAbout\([^]*?<AboutFields \{\.\.\.props\} models=\{models\} call=\{call\} whole \/>/);
+    expect(page).toMatch(/export function TeammateAbout\([^]*?<AboutFields \{\.\.\.props\} models=\{models\} call=\{call\} whole atSettings=\{atSettings\} \/>/);
   });
   it('shows the whole job on the page and every setting open, where the sheet clips and folds them', () => {
     expect(page).toContain('shown={job && !whole ? clipLine(firstSentence(job), 150) : job}');
-    expect(page).toContain('{whole ? <><h4 className="tq-about-h">Settings</h4>{settings}</>');
+    expect(page).toContain('{whole ? <><h4 className="tq-about-h" ref={settingsHead}>Settings</h4>{settings}</>');
   });
 });
