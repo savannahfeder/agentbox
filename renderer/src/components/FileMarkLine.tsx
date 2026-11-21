@@ -28,6 +28,7 @@ export function NoteOnFile({ e }: { e: Pick<AgentTurn, 'fileMark'> }) {
   const link = e.fileMark;
   if (link?.kind !== 'note') return null;
   const file = link.shown ?? link.file.replace(/#\d+$/, '');
+  if (!file) return null;
   const where = link.place && link.place !== 'Whole file' ? link.place : null;
   const quote = !!where && where.startsWith('“');
   const inner = <>
