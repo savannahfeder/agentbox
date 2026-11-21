@@ -35,6 +35,7 @@
 .su-ar:first-child { margin-left: -11px; }
 .su-day { height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
 .su-day:hover:not(:disabled) { color: var(--text); }
+.su-day:hover:not(:disabled, .on) { background: var(--wash); }
 .su-day.on { color: var(--text); border-color: var(--line-strong); background: var(--bg-selected); }
 .su-day:disabled { opacity: .45; cursor: default; }
 /* The search box every page shares, at the 30px of this row. */
