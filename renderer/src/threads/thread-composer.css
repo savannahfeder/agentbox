@@ -87,6 +87,30 @@
 }
 .tc-text::placeholder { color: var(--text-faint); }
 .tc-card .attach-row { padding: 0 18px 10px; }
+
+/* The comments a hand-over carries (HandedComments.tsx), under the words. */
+.hc { margin: 0 18px 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+.hc-head { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 8px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-dim); }
+.hc-count { flex: 1 1 auto; min-width: 0; }
+.hc-whose { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.hc-who { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 4px; border: 1px solid var(--line); border-radius: var(--radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-faint); cursor: pointer; }
+.hc-who .tm-av { opacity: .45; }
+.hc-who.on { border-color: var(--line-strong); color: var(--text); }
+.hc-who.on .tm-av { opacity: 1; }
+.hc-who:hover { border-color: var(--text-faint); }
+.hc-who-n { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.hc-list { list-style: none; margin: 0; padding: 4px 0; max-height: 196px; overflow-y: auto; }
+.hc-row { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 6px 12px; border: 0; background: none; font: inherit; text-align: left; color: var(--text); cursor: pointer; }
+.hc-row:hover { background: color-mix(in srgb, var(--text) 4%, transparent); }
+.hc-row .tm-av { flex: 0 0 auto; margin-top: 1px; }
+.hc-tick { flex: 0 0 auto; display: grid; place-items: center; width: 16px; height: 16px; margin-top: 2px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 4px; color: var(--text); }
+.hc-tick svg { width: 12px; height: 12px; }
+.hc-row.off .hc-words { opacity: .45; }
+.hc-words { min-width: 0; font-size: 13.5px; line-height: 20px; }
+.hc-place { color: var(--text-faint); margin-right: 6px; overflow-wrap: anywhere; }
+.hc-text { overflow-wrap: anywhere; }
+.hc-replies { margin-left: 6px; color: var(--text-faint); }
+.hc-replies::before { content: '\00b7'; margin-right: 6px; }
 .tc-note { padding: 0 18px 10px; font-size: 13px; line-height: 19px; color: var(--text-dim); }
 /* THE NOTE'S OWN ACTION IS A WORD IN ITS SENTENCE, NOT A CONTROL ON THE BAR.
    Unstyled, a <button> in here draws as the browser's white slab, which in a

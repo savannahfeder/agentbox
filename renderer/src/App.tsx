@@ -260,7 +260,8 @@ import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mts';
 import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mts';
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
-import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
+import { fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
+import { commentsToHand } from './threads/comments-to-hand';
 import { teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
@@ -802,8 +803,10 @@ export default function App() {
     setFocused(convo);
     setModal('reply');
   }, []);
-  const handToAgent = useCallback((item: WorkItem, message?: AgentTurn) => {
+  // `files`: only the comments on these, when a file's own notes asked.
+  const handToAgent = useCallback((item: WorkItem, message?: AgentTurn, files?: string[]) => {
     const seen = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer);
+    const notes = item.artifacts?.notes ?? [];
     // A task's files sit in the record it rides in, which a new thread cannot
     // read, so they go on the card and the links come out of the words.
     if (isTaskRow(item)) {
@@ -812,20 +815,37 @@ export default function App() {
         .then((b) => {
           const { attachments, ...start } = taskHandOff({ from, brief: b, message: message ?? null, nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
             handFrom: { product: item.product, id: item.id, message: message?.uid ?? 'first' }, offered: snap?.products ?? [], cards: snap?.team?.cards ?? [] });
-          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}) });
+          const comments = commentsToHand(notes, { me: seen?.me ?? null, files: files ?? null });
+          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(comments.length ? { comments } : {}) });
           setModal('compose');
         })
         .catch((err) => showToast(String(err?.message ?? err)));
       return;
     }
     const dir = snap?.products.find((p) => p.slug === item.product)?.dir ?? null;
-    setComposeInitial(handOffStart({
+    const words = message?.text ?? (files?.length ? files.map((f) => `[${shownName(f)}](${f})`).join('\n') : item.body ?? item.title);
+    const start = handOffStart({
       product: item.product, id: item.id, dir,
-      message: { uid: message?.uid, at: message?.at, text: message?.text ?? item.body ?? item.title, by: message?.by ?? item.createdBy },
+      message: { uid: message?.uid, at: message?.at, text: words, by: message || !files?.length ? message?.by ?? item.createdBy : null },
       nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
-    }));
+    });
+    // The files a message carries are the ones whose comments go with it.
+    const linked = files ?? start.attachments.map((a) => a.srcPath.slice((dir?.length ?? 0) + 1));
+    const comments = linked.length ? commentsToHand(notes, { me: seen?.me ?? null, files: linked }) : [];
+    // From a file's notes there is no message to carry, so the thread is named for the file.
+    const named = !message && files?.length ? { body: `Changes from the comments on ${[...new Set(files.map((f) => shownName(f)))].join(', ')}\n\n` } : {};
+    setComposeInitial({ ...start, ...named, ...(comments.length ? { comments } : {}) });
     setModal('compose');
   }, [snap?.team, snap?.products]);
+  useEffect(() => {
+    const ask = (e: Event) => {
+      const { product, id, files } = (e as CustomEvent<{ product: string; id: string; files: string[] }>).detail ?? {};
+      const row = snap?.items.find((i) => i.product === product && i.id === id);
+      if (row) handToAgent(row, undefined, files);
+    };
+    window.addEventListener('zero:hand-comments', ask);
+    return () => window.removeEventListener('zero:hand-comments', ask);
+  }, [snap?.items, handToAgent]);
   // ADD PEOPLE on an open conversation: New thread, with everyone already in
   // that conversation in To. Nothing is written to the conversation on screen,
   // because adding somebody makes the group's conversation and leaves this one

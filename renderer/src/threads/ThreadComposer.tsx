@@ -49,6 +49,8 @@ import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
+import { HandedComments } from './HandedComments';
+import { withComments, type HandedComment } from './comments-to-hand';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
 import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { cardPick, clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
@@ -126,6 +128,8 @@ export interface ComposeStart {
   caret?: [number, number];
   /** Files already on disk that go with it: what a handed-over message or task carries. */
   attachments?: PendingAttachment[];
+  /** The comments on the files it carries, which go to the agent unless unticked. */
+  comments?: HandedComment[];
   /** The message this card was opened from, when it was handed to an agent. */
   handFrom?: HandFrom;
   /** The task's name, which the thread keeps while its first line still says it. */
@@ -293,6 +297,10 @@ export function ThreadComposer({
   const [dropped, setDropped] = useState(0);
   const { attaching, collect } = useAttaching();
   const onThisWork = initial?.handFrom ? agentOnThisWork(items, initial.handFrom) : null;
+  const comments = initial?.comments ?? [];
+  const [leftOut, setLeftOut] = useState<Set<string>>(() => new Set());
+  const commenter = (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null) || 'A teammate';
+  const withTicked = (words: string) => (person || !comments.length ? words : withComments(words, comments, leftOut, { nameOf: commenter }));
 
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
@@ -653,7 +661,7 @@ export function ThreadComposer({
     if (inline) emptyForTheNext();
     try {
       const attached = await persistAttachments(product.slug, attachments);
-      const body = [message.body, attached].filter(Boolean).join('\n\n');
+      const body = [withTicked(message.body ?? ''), attached].filter(Boolean).join('\n\n');
       const harness = harnessFields({
         engine: pick.engine, model: pick.model,
         effort: effortPicked(effort, effortRows) ? effort : null,
@@ -774,7 +782,7 @@ export function ThreadComposer({
   const sendToAgentOnIt = () => {
     if (!onThisWork || !onSendToAgent || !text.trim()) return;
     clearComposeDraft(undefined, place);
-    onSendToAgent(onThisWork, text.trim());
+    onSendToAgent(onThisWork, withTicked(text.trim()));
   };
   // A picked suggestion that keeps a schedule sends as that repeating task, while its words are unchanged.
   const [idea, setIdea] = useState<Idea | null>(null);
@@ -1435,6 +1443,7 @@ export function ThreadComposer({
             })}
           </div>
         )}
+        {!person && <HandedComments comments={comments} leftOut={leftOut} onLeftOut={setLeftOut} nameOf={commenter} />}
         <AttachRow attachments={attachments} attaching={attaching} onRemove={(i) => setAttachments((x) => x.filter((_, j) => j !== i))} />
         {ideaRule && (
           <div className="tc-note tc-repeat-note">

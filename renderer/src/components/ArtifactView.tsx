@@ -82,7 +82,7 @@ function NameInTop({ shown, onRename }: { shown: string; onRename: (name: string
     }} />;
 }
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onHandToAgent, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** The name a person gave the file in Files, shown over its name on disk. */
@@ -114,6 +114,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   write: (mark: ArtifactMark) => Promise<{ ok: boolean; error?: string }>;
   /** Only on a thread with an agent, on the owner's own computer. */
   withAgent?: boolean;
+  /** Where no agent hears these notes: starts one with them, the file's versions named. */
+  onHandToAgent?: (files: string[]) => void;
   /** Posts edited words as the next version of a document. Null when it went, else why not. */
   onNewVersion?: (name: string, text: string, path: string, id: string, since?: string | null) => Promise<string | null>;
   /** Said after a save that only becomes a version on someone else's computer. */
@@ -434,6 +436,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const sendAll = () => toAgent(unsent.ids);
   const sendBeside = sendAllBesideTheNotes(kind);
   const canSendAll = offers.comment && unsent.ids.length > 0;
+  const handable = !!onHandToAgent && !withAgent && !!family && openNotes.length > 0;
   const sendNotes = withAgent && version ? notesToSendTheAgent(marks, withItsAgent(family!.versions, version), family!.versions.length, people, me) : [];
   const pressSend = () => toAgent(sendNotes);
   const waitingHere = offers.comment ? openNotes.filter((n) => sendNotes.includes(n.id)) : [];
@@ -877,13 +880,14 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0 || linkNotes.comments.length > 0) && <aside className="av-side" aria-label="Notes">
           <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
-          {(offers.approve || othersApproved.length > 0 || earlier || (canSendAll && sendBeside)) && (
+          {(offers.approve || othersApproved.length > 0 || earlier || (canSendAll && sendBeside) || handable) && (
             <div className="av-verdict">
               <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
                 {othersApproved.length > 0 ? `${othersApproved.map((a) => nameOf(a.by)).join(', ')} approved`
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
               {canSendAll && sendBeside && <button type="button" className="av-btn av-unsent-send" title={unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
+              {handable && <button type="button" className="av-btn" onClick={() => onHandToAgent!(family!.versions.map((v) => v.id))}><NoteGlyph name="agent" />Hand to an agent</button>}
               {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>
           )}
