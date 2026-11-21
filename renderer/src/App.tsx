@@ -7776,6 +7776,7 @@ export default function App() {
         return;
       }
       case 'give': void giveThread(item, { id: d.to, name: d.name }); return;
+      case 'take-back': void takeHandOverBack(item); return;
       case 'ask':
         if (!focused || keyOf(focused) !== keyOf(item)) { setFocused(item); markSeen(item); }
         // Next tick: the menu is on the thread's page, which may only just be opening.
@@ -9414,6 +9415,7 @@ export default function App() {
                 routes: teamRouteChoices(target, team),
                 give: giveToFor(target),
                 ask: giveToFor(target).filter((p) => !p.id.startsWith('mate:') && !p.asked && !target.ask),
+                takeBack: !!handedToPage(target),
                 shipped: shippedFor(target),
                 waits: waitsFor(target),
                 waitsNow: setByPerson(target),

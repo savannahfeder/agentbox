@@ -395,7 +395,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   useEffect(() => {
     if (!onAsk) return undefined;
     const askPerson = (e: Event) => {
-      const d = (e as CustomEvent<{ kind: 'help' | 'review'; to: { id: string; name: string } }>).detail;
+      const d = (e as CustomEvent<{ kind: 'help' | 'review' | 'give'; to: { id: string; name: string } }>).detail;
       if (!d) return;
       setSharing(null); setStep(null); setGiveStart(d.kind); setGivingFromShare(true); setGiving(true); setGivingTo(d.to); setOpen(true);
     };

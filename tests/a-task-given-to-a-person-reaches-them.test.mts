@@ -429,8 +429,9 @@ describe('a thread can be handed on', () => {
     expect(threadMenuRows({ change: false, terminal: null, finish: true, give: true }).map((r) => r.label)).toContain('Ask or hand over…');
     expect(threadMenuRows({ change: false, terminal: null, finish: true }).map((r) => r.label)).not.toContain('Ask or hand over…');
     const rows = threadCommands({ give: [{ id: 'u-dev', name: 'Dev' }, { id: 'u-jo', name: 'Jordan' }] });
-    expect(rows.map((r) => r.label)).toEqual(['Hand over to Dev', 'Hand over to Jordan']);
-    expect(rows[0].does).toEqual({ act: 'give', to: 'u-dev', name: 'Dev' });
+    expect(rows.map((r) => r.label)).toEqual(['Hand over to Dev…', 'Hand over to Jordan…']);
+    // A person gets the note step first, as from the menu (w-f702d60afe).
+    expect(rows[0].does).toEqual({ act: 'ask', kind: 'give', to: 'u-dev', name: 'Dev' });
   });
 
   it('offers no person on a conversation, a stranger\'s thread, or yourself', () => {

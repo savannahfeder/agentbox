@@ -172,6 +172,7 @@ const BY_PREFIX: [string, IconName][] = [
   ['rank-', 'top'],
   ['move-', 'move'],
   ['give-', 'give'],
+  ['take-back', 'reopen'],
   ['route-', 'give'],
   ['model-', 'spark'],
   ['group-', 'hash'],

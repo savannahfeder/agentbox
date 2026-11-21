@@ -42,7 +42,8 @@ export type ThreadDoes =
   | { act: 'add-people' }
   | { act: 'route'; route: TeamRoute }
   | { act: 'give'; to: string; name: string }
-  | { act: 'ask'; kind: 'help' | 'review'; to: string; name: string }
+  | { act: 'ask'; kind: 'help' | 'review' | 'give'; to: string; name: string }
+  | { act: 'take-back' }
   | { act: 'shipped'; on: boolean }
   | { act: 'wait'; on: string | null }
   | { act: 'decide' }
@@ -79,6 +80,8 @@ export interface ThreadFacts {
   give?: GiveTo[];
   /** People who can be asked for help or a review here. */
   ask?: GiveTo[];
+  /** Handed on: it can be taken back. */
+  takeBack?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shipped?: boolean | null;
   /** What it could wait on (`waitChoices`), and whether it waits now. */
@@ -148,12 +151,15 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
   }
   for (const p of f.ask ?? []) {
     const first = p.name.split(/\s+/)[0] || p.name;
-    rows.push({ id: `ask-review-${p.id}`, label: `Ask ${first} for a review…`, keywords: `ask review check look over feedback ${p.name.toLowerCase()}`, does: { act: 'ask', kind: 'review', to: p.id, name: p.name } });
-    rows.push({ id: `ask-help-${p.id}`, label: `Ask ${first} for help…`, keywords: `ask help stuck pair question ${p.name.toLowerCase()}`, does: { act: 'ask', kind: 'help', to: p.id, name: p.name } });
+    rows.push({ id: `ask-review-${p.id}`, label: `Ask ${first} for a review…`, keywords: `ask review check look over feedback share ${p.name.toLowerCase()}`, does: { act: 'ask', kind: 'review', to: p.id, name: p.name } });
+    rows.push({ id: `ask-help-${p.id}`, label: `Ask ${first} for help…`, keywords: `ask help stuck pair question share ${p.name.toLowerCase()}`, does: { act: 'ask', kind: 'help', to: p.id, name: p.name } });
   }
   for (const p of f.give ?? []) {
-    rows.push({ id: `give-${p.id}`, label: `Hand over to ${p.name}`, keywords: `hand over handover hand off handoff give pass assign delegate someone else ${p.name.toLowerCase()}`, does: { act: 'give', to: p.id, name: p.name } });
+    // A person gets the note step, as from the menu; an AI teammate starts at once.
+    const person = !p.id.startsWith('mate:');
+    rows.push({ id: `give-${p.id}`, label: `Hand over to ${p.name}${person ? '…' : ''}`, keywords: `hand over handover hand off handoff give pass assign delegate share someone else ${p.name.toLowerCase()}`, does: person ? { act: 'ask', kind: 'give', to: p.id, name: p.name } : { act: 'give', to: p.id, name: p.name } });
   }
+  if (f.takeBack) rows.push({ id: 'take-back', label: 'Take it back', keywords: 'take back takeback reclaim undo hand over handoff return mine', does: { act: 'take-back' } });
   for (const w of f.waits ?? []) {
     rows.push({ id: `wait-${w.id}`, label: `Waits on ${w.label}`, keywords: `waits waiting blocked by depends needs ${w.label.toLowerCase()}`, does: { act: 'wait', on: w.id } });
   }

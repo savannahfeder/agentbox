@@ -113,6 +113,7 @@ export const PARITY = {
   'thread:route-*': { missing: 'routing a thread to an agent or to you' },
   'thread:give-*': { missing: 'giving a thread to a teammate' },
   'thread:ask-review-*': { desktopOnly: 'it opens the ask sheet of the desktop thread menu; the phone cannot ask a teammate yet, as with giving above' },
+  'thread:take-back': { desktopOnly: 'it takes back a thread handed over, which the phone cannot hand over yet, as with giving above' },
   'thread:ask-help-*': { desktopOnly: 'it opens the ask sheet of the desktop thread menu; the phone cannot ask a teammate yet, as with giving above' },
   'thread:answer-*': { desktopOnly: 'it presses the answer buttons on a teammate\'s shared thread, a page the phone does not open' },
   'thread:run-now': { phone: MENU, find: 'label="Run now"' },
