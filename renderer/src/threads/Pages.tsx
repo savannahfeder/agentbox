@@ -40,9 +40,9 @@ import { PinMark } from './ThreadMenu';
 import { bandDrag, cardClickIntent, clickMarks, marqueeMarks, type Box } from './board-select';
 import { shownToPeople } from '../../../shared/thread-cards.mts';
 import { Name } from '../../../shared/product-name.mjs';
-import { FleetContext } from '../fleet';
+import { FleetContext, harnessOn } from '../fleet';
 import { TeammateLead, useTeammateWho } from '../teammates/row-lead';
-import { AgentFace } from '../components/AgentFace';
+import { HarnessMark } from '../components/EngineLogos';
 import { factsFor, laterCell, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
 import { voiceName } from '../../../shared/agent-voice.mts';
@@ -712,9 +712,9 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   </div>;
 }
 
-/** Who a row is from: their face, and their name in grey after the title. Your own threads carry the agent's face and no name. */
+/** Who a row is from: their face, and their name in grey after the title. Your own threads carry their harness's mark and no name. */
 export type Who = { face: ReactNode; name?: string };
-export const YOURS: Who = { face: <AgentFace /> };
+const yours = (engine: string): Who => ({ face: <HarnessMark engine={engine} /> });
 
 /** A message's line: the other person's face and name, then what was said,
  *  "You: " first when you spoke last. A group names everyone else. `mark`
@@ -841,7 +841,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // is untouched and still decides whether the cloud offers itself.
   const handed = team ? handedBy(item, product ?? undefined, team.me) : null;
   const handedFrom: Who | null = handed ? { face: <Face person={team?.byId.get(handed.from) ?? null} />, name: fullName(team?.byId.get(handed.from) ?? null) } : null;
-  const from: Who = handedFrom ?? mateFrom ?? YOURS;
+  const from: Who = handedFrom ?? mateFrom ?? yours(harnessOn(item, fleet));
   const commented = (handed?.note ?? null) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? linkCommentLine(item.linkComments)

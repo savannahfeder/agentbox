@@ -1,0 +1,12 @@
+/* A HARNESS'S MARK IN ITS TILE (./EngineLogos.tsx HarnessMark), drawn after
+   the picture it was asked with: a tile a shade off the page, a faint edge,
+   the mark in its own colour. The same 18px as a person's face (.tm-av). */
+.harness-mark {
+  display: inline-grid; place-items: center; flex: none; vertical-align: middle;
+  width: 18px; height: 18px; box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--text) 16%, transparent); border-radius: 5px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+}
+.harness-mark > svg { display: block; width: 11px; height: 11px; fill: currentColor; }
+.harness-mark.claude { color: #d97757; }

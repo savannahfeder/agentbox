@@ -2291,7 +2291,8 @@ export default function App() {
     asking: [...askingIds],
     whyNotCloud: snap?.supervisor.whyNotCloud,
     signInBar: !!planWords,
-  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds, planWords]);
+    engines: snap?.engines,
+  }), [runningRows, snap?.supervisor, heldAnswer, pendingIds, askingIds, planWords, snap?.engines]);
   const savedCloudKeyList = snap?.cloud?.setUp ? snap.cloud.keys : null;
   const savedCloudKeys = useMemo(() => (savedCloudKeyList ?? []).map((k) => k.name), [savedCloudKeyList]);
   const cloudIds = useMemo(() => new Set(runningRows.filter((r) => r.where === 'cloud').map((r) => r.itemId)), [runningRows]);
