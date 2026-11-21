@@ -8,7 +8,7 @@ import './home.css';
 import { enterIsTheButtons } from '../focused-button';
 
 /** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox; an invitation has no time. */
-export type NeedsRow = { key: string; letter: string; face?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
+export type NeedsRow = { key: string; letter: string; face?: string; photo?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
 export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; photo?: string; line: string; state: TeamRowState; week: number[]; total: number };
 export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
 
@@ -90,7 +90,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
             {needs.length === 0 && <p className="hm-empty">Nothing needs you.</p>}
             {needs.map((r, i) => (
               <button type="button" key={r.key} className={`hm-row${i === pick ? ' on' : ''}${r.unread ? ' unread' : ''}`} onClick={() => onOpen(r.key)} onMouseEnter={() => setPick(i)}>
-                {r.face ? <MateFace seed={r.face} className="hm-face" /> : <span className="hm-face">{r.letter}</span>}
+                {r.face ? <MateFace seed={r.face} className="hm-face" /> : <span className="hm-face">{r.photo ? <img className="hm-photo" src={r.photo} alt="" referrerPolicy="no-referrer" /> : r.letter}</span>}
                 <span className="hm-text"><b>{r.title}</b>
                   <span className="hm-tags">
                     {r.priority && <span className={`hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`} title={priorityLabelOf(r.priority)} aria-label={priorityLabelOf(r.priority)}><PriorityMark id={r.priority} /></span>}
