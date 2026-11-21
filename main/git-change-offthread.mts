@@ -74,6 +74,11 @@ export async function __gitJobsIdle() {
   while (waiting.size) await new Promise((resolve) => { setTimeout(resolve, 10); });
 }
 
+/** The thread started before its first job needs it. False when none can start. */
+export function warmGitThread(): boolean {
+  return !!thread();
+}
+
 /** Run one of git-change.mts's exports without blocking this thread. */
 export function gitJob(name: string, ...args: unknown[]): Promise<unknown> {
   if (!JOBS.has(name)) return Promise.reject(new Error(`not a git job: ${name}`));

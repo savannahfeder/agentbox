@@ -236,7 +236,8 @@ describe('D: an agent can never run in a practice project', () => {
     // deleted (w-d19d6d387c, 2026-09-22), which had one of its own. Five uses
     // since a sleeping Mac hands repeating tasks to the cloud (`_repeatsAhead`).
     // Six since a pass that stops early counts the rows it held (`_noteWaitingRows`).
-    expect(supervisorSrc.match(/worksHere\(/g) ?? []).toHaveLength(7);
+    // Seven since the next thread's folder is made ahead only where threads run (`_nextFolderBase`).
+    expect(supervisorSrc.match(/worksHere\(/g) ?? []).toHaveLength(8);
     // And the refusal is before the plan is built, because a plan for a practice
     // project already carries a working directory that is not a repository.
     const spawn = supervisorSrc.slice(supervisorSrc.indexOf('  spawnWorker(item'));
