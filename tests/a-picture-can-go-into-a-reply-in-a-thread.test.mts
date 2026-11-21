@@ -81,7 +81,7 @@ describe('the reply box in a thread', () => {
     // `files` is the box's attachments plus a note finished by this Send.
     expect(src).toMatch(/if \(!words && !files\.length\) return;/);
     expect(src).toMatch(/const ready = !!draft\.trim\(\) \|\| attachments\.length > 0 \|\| recording;/);
-    expect(panel()).toMatch(/<button type="button" class="dock-send" disabled="" title="Send · ↵">Send <kbd>↵<\/kbd><\/button>/);
+    expect(panel()).toMatch(/<button type="button" class="dock-send chat-send" disabled="" title="Send · ↵" aria-label="Send"><svg/);
   });
 });
 
@@ -102,15 +102,20 @@ describe('the thread reply box is laid out like the chat\'s own', () => {
   it('ends in a footer: the chat\'s formatting bar on the left, Send last, in the corner', () => {
     const bar = html.slice(html.indexOf('class="chat-thread-bar"'));
     expect(bar.indexOf('class="fmt-bar"')).toBeGreaterThan(-1);
-    expect(bar.indexOf('class="dock-send"')).toBeGreaterThan(bar.indexOf('aria-label="Add an emoji"'));
+    expect(bar.indexOf('class="dock-send chat-send"')).toBeGreaterThan(bar.indexOf('aria-label="Add an emoji"'));
     expect(html.indexOf('class="chat-thread-bar"')).toBeGreaterThan(html.indexOf('class="chat-thread-input'));
-    expect(html.lastIndexOf('</button>')).toBe(html.indexOf('Send <kbd>↵</kbd></button>') + 'Send <kbd>↵</kbd>'.length);
+    expect(html.lastIndexOf('</button>')).toBeGreaterThan(html.indexOf('class="dock-send chat-send"'));
+    expect(html.slice(html.indexOf('class="dock-send chat-send"'))).not.toMatch(/<button/);
   });
 
   // THE CASE THAT MUST NOT HAPPEN: a panel dragged narrow pushing Send off the
-  // edge. The marks go; @, the paperclip and the emoji stay.
-  it('lets the formatting marks go before Send when the panel is narrow', () => {
-    expect(css).toMatch(/@container \(max-width: 400px\) \{\s*\.chat-thread-bar \.fmt-mark, \.chat-thread-bar \.fmt-gap \{ display: none; \}/);
+  // edge. The marks live in a row of their own along the top of the box
+  // (w-f689c07680), which wraps, so the footer only ever holds the five tools and Send.
+  it('keeps the formatting marks off the footer, so they can never push Send off the edge', () => {
+    const src = read('renderer/src/team/ThreadPanel.tsx');
+    expect(src.indexOf('className="fmt-marks-slot"')).toBeLessThan(src.indexOf('className="chat-thread-input"'));
+    expect(src).toMatch(/marksAt=\{marksAt\}/);
+    expect(css).toMatch(/\.fmt-marks \{[^}]*flex-wrap: wrap;/);
   });
 });
 
@@ -127,9 +132,10 @@ describe('a picture waiting in the thread box', () => {
     expect(src.indexOf('<AttachRow')).toBeLessThan(src.indexOf('className="chat-thread-bar"'));
   });
 
-  it('is drawn small there, and only there', () => {
-    expect(css).toMatch(/\.chat-thread-box \.attach-thumb img \{ height: 48px; max-width: 120px; \}/);
-    // The chat's own box keeps the full size.
+  it('is drawn small there, as the chat\'s tiles, and only in a chat', () => {
+    expect(src).toMatch(/<AttachRow look="tiles"/);
+    expect(read('renderer/src/styles.css')).toMatch(/\.attach-tiles \.attach-picture img \{ width: 56px; height: 56px;/);
+    // A reply to an agent keeps the full size.
     expect(read('renderer/src/styles.css')).toMatch(/\.attach-thumb img \{\s*height: 84px;/);
   });
 });

@@ -315,6 +315,8 @@
    it, bold is bold and a list is a list, drawn as quietly as the sent message
    draws them. */
 .rich-reply { cursor: text; }
+/* Words scrolled up past the top of a full box fade there, as the chat above it does, rather than being cut through. */
+.rich-reply.more-above { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px); mask-image: linear-gradient(to bottom, transparent 0, #000 16px); }
 .rich-reply .ProseMirror { outline: none; white-space: pre-wrap; overflow-wrap: break-word; }
 .rich-reply .ProseMirror p { margin: 0; }
 .rich-reply .ProseMirror strong { font-weight: 600; }

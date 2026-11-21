@@ -3341,7 +3341,8 @@ body {
 /* A CHAT'S BOX DRAWS WHAT IS ATTACHED AS TILES OF ONE HEIGHT (AttachRow's
    `tiles`): a picture as a square, any other file as a card with its kind, name
    and size, each with its own ×, so pressing a file never takes it out. */
-.attach-tiles { gap: 8px; }
+.attach-tiles { gap: 8px; max-height: 192px; overflow-y: auto; }
+.dock-card .attach-tiles { padding: 4px 16px 12px; }
 .attach-tile { position: relative; flex: none; height: 56px; max-width: 100%; box-sizing: border-box; }
 .attach-tiles .attach-picture img { width: 56px; height: 56px; object-fit: cover; box-sizing: border-box; display: block; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); }
 .attach-tiles .attach-file {

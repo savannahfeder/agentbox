@@ -14,7 +14,11 @@
 //   beside it (founder: "It doesn't really match Slack"); at 36px she found
 //   them "still too large", so they are 28px with their top on the name's;
 // - the box was 79px tall at rest: the field, then a row of tools and a
-//   bordered Send holding a second box with "Enter" in it.
+//   bordered Send holding a second box with "Enter" in it. It became one line
+//   with the tools at its right, which the founder then found messy and unlike
+//   Slack (w-f689c07680): the words wrapped beside an empty column. It is
+//   stacked again, and Send is an arrow with no key in it
+//   (tests/the-chat-box-is-its-words-then-its-files-then-its-tools).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -84,14 +88,10 @@ describe('a person\'s or a group\'s chat', () => {
     expect(fs.readFileSync(new URL('../renderer/src/team/rooms/RoomChat.tsx', import.meta.url), 'utf8')).toContain('size={hang ? 28 : 16}');
   });
 
-  it('has a box one line high with its tools at the right of that line', () => {
-    expect(rule('.gr-page .rm-compose')).toMatch(/grid-template-columns: minmax\(0, 1fr\) auto/);
-    expect(rule('.gr-page .rm-compose > .rm-compose-bar')).toMatch(/grid-column: 2; grid-row: 1;/);
-    expect(rule('.gr-page .rm-compose-bar .dock-send kbd')).toMatch(/display: none/);
-  });
-
-  it('puts the tools back under the words when a file beside it squeezes it', () => {
-    expect(rule('.app.doc-open .gr-page .rm-compose')).toMatch(/grid-template-columns: minmax\(0, 1fr\);/);
+  it('has a box with its words across it and its tools under them, Send with no key inside', () => {
+    expect(rule('.gr-page .rm-compose')).toBe('');
+    expect(rule('.rm-compose')).toMatch(/flex-direction: column;/);
+    expect(fs.readFileSync(new URL('../renderer/src/team/ChatSend.tsx', import.meta.url), 'utf8')).not.toContain('<kbd>');
   });
 });
 
