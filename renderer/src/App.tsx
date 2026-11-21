@@ -7691,12 +7691,15 @@ export default function App() {
   };
   const giveThread = async (item: WorkItem, to: GiveTo, note = '') => {
     if (to.id.startsWith('mate:')) {
-      await api.routeThread({ product: item.product, id: item.id, to: to.id }).then(() => showToast(`Given to ${to.name}`), (err) => showToast(String(err?.message ?? err)));
+      await api.routeThread({ product: item.product, id: item.id, to: to.id }).then(() => showToast(handedToWhom(to.name)), (err) => showToast(String(err?.message ?? err)));
       return;
     }
     showToast(sendingTo(to.name.split(/\s+/)[0] || to.name));
     const out = await api.teamHandOn({ product: item.product, id: item.id, to: to.id, ...(note.trim() ? { note: note.trim() } : {}) });
-    showToast(out.ok ? handedToWhom(to.name) : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
+    // A thread handed over is no longer yours to be helped with: anyone still asked onto it is let go.
+    const asked = out.ok && team ? asksOnThread(items, team.me, item.id).filter((a) => a.open) : [];
+    for (const a of asked) await api.answer({ product: (a.row as WorkItem).product, id: a.row.id, status: 'done' }).catch(() => {});
+    showToast(out.ok ? `${handedToWhom(to.name)}${asked.length ? `. ${asked.map((a) => firstName(team?.byId.get(a.to) ?? null) || 'Your teammate').join(' and ')} no longer ${asked.length === 1 ? 'has' : 'have'} the ask` : ''}` : out.error ?? 'That did not work.', out.made ? { product: out.made.product, id: out.made.id } : undefined);
     if (out.ok) await refresh();
   };
   // Help or a review keeps the thread yours; the task they get leads back to it.
