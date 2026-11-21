@@ -152,7 +152,9 @@ function lines(now: number): DemoRow[] {
         '',
         'OneDrive works as a destination. I moved 9,400 files across 4 test accounts and every folder and date arrived intact.',
         '',
-        'Moves over 20,000 files stall in the sync engine, which Theo is rewriting this week, so a fix from me would land on top of his. Everything he needs is in this thread, with the three test moves that stalled, the error, and where in the engine it happens.',
+        'Moves over 20,000 files stall in the sync engine, which Theo is rewriting this week, so a fix from me would land on top of his.',
+        '',
+        'Three test moves stalled, at 24,000, 31,000 and 58,000 files. Each one stopped when the engine\'s upload queue passed 20,000 files and ran out of memory, which is the part Theo is rewriting.',
       ].join('\n'),
     },
     {
@@ -202,7 +204,7 @@ function lines(now: number): DemoRow[] {
       result: [
         '**Finish Stripe\'s account check. It needs the company\'s bank details.**',
         '',
-        'Checkout is built and passes every test with Stripe\'s test keys. The live keys are refused until the account is verified, and only you can fill in that form.',
+        'Checkout is built and passes every test with Stripe\'s test keys. The live keys are refused until the account is verified, and only you can fill in that form. It is in Stripe under Settings, then Business details.',
         '',
         'Once it is verified, reply here and I will switch to the live keys and make one real $1 charge to check it end to end.',
       ].join('\n'),
@@ -441,7 +443,7 @@ const LAUNCH_EMAIL: DemoFile = {
     'you left it. Close your laptop halfway and the move picks up where it',
     'stopped.',
     '',
-    'Start a move from the link below. Most teams are done before lunch.',
+    'Start a move at ferry.test/start. Most teams are done before lunch.',
     '',
     'Lena, for the Ferry team',
   ].join('\n'),

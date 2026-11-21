@@ -146,6 +146,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   /** Drawn for a phone: full screen, threads first, no keys. */
   phone?: boolean;
 }) {
+  const projects = useMemo(() => products.filter((p) => !p.team?.direct), [products]);
   const commands: Command[] = useMemo(() => [
     // First, and labelled "project" because that is the word people type. Row
     // one by a product decision (tests/her-word-is-project).
@@ -176,10 +177,11 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // user meets it here as a project they never made, with nothing on the row
     // to say so. Its hint says what it is until it is ranked, after which
     // where it stands is the more useful thing to say.
-    ...products.map((p, i) => ({
+    // A conversation with a teammate is kept as a record too, and is not a project.
+    ...projects.map((p, i) => ({
       id: `rank-${p.slug}`,
       label: `Rank ${p.name} first`,
-      hint: order.includes(p.slug) ? `now #${i + 1} of ${products.length}`
+      hint: order.includes(p.slug) ? `now #${i + 1} of ${projects.length}`
         : p.personal ? 'made for you, so a thread always has somewhere to go'
         : 'not ranked yet',
       run: () => onRankFirst(p.slug),
@@ -408,7 +410,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, products, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, cloud, onCloudMode]);
+  ], [itemCommands, batch, projects, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, cloud, onCloudMode]);
   return open ? <PaletteBox commands={commands} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 
