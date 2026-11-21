@@ -36,8 +36,8 @@ describe('which presses open the toast’s task', () => {
   });
 
   it('no toast on screen, nothing to open', () => {
-    // Once it has faded the key is dead again rather than reaching back to a
-    // task she can no longer see named anywhere.
+    // Once it has faded, opensTheLastToast answers instead, for two minutes
+    // (o-still-opens-what-you-sent-after-its-note-has-gone).
     expect(opensTheToast('o', null)).toBeNull();
   });
 
@@ -74,6 +74,6 @@ describe('the window handler answers O', () => {
 
   it('the shortcuts page lists it', () => {
     const all = SHORTCUTS.flatMap((g) => g.keys);
-    expect(all.find((k) => k.keys.includes('O'))?.what).toMatch(/^Open the task you just sent or answered/);
+    expect(all.find((k) => k.keys.includes('O'))?.what).toMatch(/^Open the task you sent or answered/);
   });
 });
