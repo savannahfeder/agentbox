@@ -55,7 +55,8 @@ describe('every row starts with the same slot', () => {
 
   it("an AI teammate's thread has its mark first and its name in grey after the title", () => {
     const html = draw(row({ title: 'Start on its first job', labels: ['founder', 'teammate:disk'] }));
-    expect(slotOf(html)).toContain('class="tq tq-sm"');
+    // Since w-8ae9f6902e the mark is the teammate's drawn face, not its letter.
+    expect(slotOf(html)).toMatch(/class="tq tq-sm mate-face"[^>]*><img src="data:image\/svg\+xml/);
     expect(nameOf(html)).toBe('Disk keeper');
     expect(titleCell(html).indexOf('Start on its first job')).toBeLessThan(titleCell(html).indexOf('Disk keeper'));
   });
