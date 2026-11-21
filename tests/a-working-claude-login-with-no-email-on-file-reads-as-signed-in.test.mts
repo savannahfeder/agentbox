@@ -23,6 +23,7 @@ import { Supervisor } from '../main/supervisor.mts';
 import { readSettings } from '../main/settings.mts';
 import { forgetDiscovery } from '../main/account-discovery.mts';
 import { phoneSettingsOf } from '../shared/phone-settings.mts';
+import { USAGE_UNREADABLE } from '../shared/usage.mts';
 import { accountsOnce } from '../renderer/src/accounts-once';
 import { PlaceTiles, WebAccounts, accountTile, agentStory } from '../renderer/src/components/Settings';
 
@@ -136,6 +137,35 @@ describe('the Claude Code page', () => {
     const html = draw({ profile: 'default', email: 'one@example.test', signedIn: true, chosen: true, plan: null, trouble: null });
     expect(html).toContain('one@example.test');
     expect(html).not.toContain('Not signed in');
+  });
+});
+
+// The after picture showed "Claude Code didn't report usage for this account.
+// Check that its plan is active at claude.ai." on that same working login: a
+// usage read that came back empty is not evidence about its plan.
+describe('a usage read that came back empty', () => {
+  const tile = (here: object, extra: object = {}) => accountTile({
+    key: 'default', name: 'Claude account', plan: null, limits: null, checkedAt: null, usageError: USAGE_UNREADABLE, cloud: null,
+    here: { profile: 'default', email: null, plan: null, chosen: true, signedIn: true, trouble: null, dir: null, ...here }, ...extra,
+  } as never, { many: false, now: Date.now(), onUse: vi.fn() });
+  const html = (t: ReturnType<typeof tile>) => renderToStaticMarkup(React.createElement(PlaceTiles, { accounts: [t] }));
+
+  it('does not tell a signed-in login with no trouble to check its plan', () => {
+    const out = html(tile({}));
+    expect(out).not.toContain('Check that its plan is active');
+    expect(out).toContain('No usage reading yet');
+  });
+
+  it('still says so beside a login with a trouble of its own', () => {
+    expect(tile({ trouble: 'This subscription has ended.' }).usageError).toBe(USAGE_UNREADABLE);
+  });
+
+  it('says nothing new for a login that is not signed in, and keeps a real reading', () => {
+    expect(tile({ signedIn: false }).meters).toBe(false);
+    const limits = [{ span: 'week', name: 'This week', percent: 40 }];
+    const read = tile({}, { usageError: null, limits, checkedAt: Date.now() });
+    expect(read.usageError).toBeNull();
+    expect(read.limits).toEqual(limits);
   });
 });
 
