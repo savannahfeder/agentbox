@@ -37,6 +37,7 @@ export interface LoginRow {
   sameAs?: string | null;
   email: string | null;
   plan: string | null;
+  ended?: boolean;
   engineSays: EngineAnswer | null;
   appHolds: Held | null;
 }
@@ -104,6 +105,7 @@ export async function readLogins(config: AccountsConfig, { home = os.homedir(), 
       sameAs: uuid ? listedBy.get(uuid) ?? null : null,
       email: says?.email ?? accountIdentity(own, { home })?.email ?? null,
       plan: plan.known ? plan.label : says?.plan ?? null,
+      ended: plan.ended === true,
       engineSays: says, appHolds: held(key, plan),
     })));
   }
@@ -138,7 +140,9 @@ export function describeLogins(rows: LoginRow[], { home = os.homedir() }: { home
       const says = r.engineSays?.signedIn === true ? `signed in${r.email ? ` as ${r.email}` : ''}`
         : r.engineSays?.signedIn === false ? 'signed out'
         : `no answer${r.engineSays?.said ? ` (${r.engineSays.said.split('\n')[0].slice(0, 80)})` : ''}`;
-      const plan = r.plan && r.engineSays?.signedIn !== false ? `, ${r.plan}` : '';
+      // Claude Code names the plan (Ultra) and keeps an older tier code (max_20x) beside it.
+      const tier = r.engineSays?.plan && r.engineSays.plan !== r.plan && !r.ended ? ` (tier ${r.engineSays.plan})` : '';
+      const plan = r.plan && r.engineSays?.signedIn !== false ? `, ${r.plan}${tier}` : '';
       const app = r.sameAs ? `${Name} lists this account once, as ${short(r.sameAs)}`
         : !r.key ? `${Name} does not list it`
         : r.appHolds ? `${Name} thinks: ${WORDS[r.appHolds.cause] ?? r.appHolds.cause}`

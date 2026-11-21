@@ -61,7 +61,7 @@ describe('what the command reads', () => {
     expect(main).toMatchObject({ email: 'main@example.com', plan: 'Ultra', appHolds: { cause: 'signed-out' } });
     expect(disagrees(main)).toBe(true);
     const text = describeLogins(rows, { home });
-    expect(text).toMatch(/~\/\.claude\n {4}Claude Code says: signed in as main@example\.com, Ultra\n {4}Agentbox thinks: signed out {3}<- they disagree/);
+    expect(text).toMatch(/~\/\.claude\n {4}Claude Code says: signed in as main@example\.com, Ultra \(tier max_20x\)\n {4}Agentbox thinks: signed out {3}<- they disagree/);
     expect(text).toMatch(/npm run accounts -- --reset/);
   });
 
