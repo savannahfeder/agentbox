@@ -95,17 +95,30 @@ export function sentAwayByMe(row: (AskRow & { body?: string | null }) | null | u
   return isTaskRow(row as Parameters<typeof isTaskRow>[0]) && taskGiver(row as Parameters<typeof taskGiver>[0]) === me && !!handedFrom(row.body, me);
 }
 
-/** Rows with every ask on one thread after the newest left out, so a thread you were asked about often is one row. Keeps the order given. */
-export function newestAskPerThread<R extends AskRow>(rows: readonly R[]): R[] {
+/** The thread an ask or a hand-over task is about, as one key, or null for any other row. */
+function threadKey(r: AskRow & { body?: string | null }): string | null {
+  const a = askOf(r);
+  if (a) return `${a.owner}/${a.thread}`;
+  if (!isTaskRow(r as Parameters<typeof isTaskRow>[0])) return null;
+  const giver = taskGiver(r as Parameters<typeof taskGiver>[0]);
+  const from = handedFrom(r.body, giver);
+  return from ? `${from.owner}/${from.id}` : null;
+}
+
+/**
+ * Rows with every ask or hand-over about one thread left out but the newest,
+ * so a thread you were asked about or handed often is one row. `all` is every
+ * row there is, so a done one gives way to a newer one still open elsewhere.
+ */
+export function newestAskPerThread<R extends AskRow & { body?: string | null }>(rows: readonly R[], all: readonly R[] = rows): R[] {
   const newest = new Map<string, R>();
-  for (const r of rows) {
-    const a = askOf(r);
-    if (!a) continue;
-    const key = `${a.owner}/${a.product}/${a.thread}`;
+  for (const r of all) {
+    const key = threadKey(r);
+    if (!key) continue;
     const had = newest.get(key);
     if (!had || (r.updatedAt ?? r.createdAt ?? 0) > (had.updatedAt ?? had.createdAt ?? 0)) newest.set(key, r);
   }
-  return rows.filter((r) => { const a = askOf(r); return !a || newest.get(`${a.owner}/${a.product}/${a.thread}`) === r; });
+  return rows.filter((r) => { const key = threadKey(r); return !key || newest.get(key) === r; });
 }
 
 /** Asks you gave that were handed back and not yet carried onto the thread. */

@@ -106,7 +106,7 @@ describe('the giver\'s thread while it is out', () => {
   it('is in In progress, not Done, while their task is open', () => {
     expect(app).toContain("return task && task.status !== 'done' ? [r.id] : [];");
     expect(app).toContain('      if (handedOut.has(i.id)) return true;');
-    expect(app).toContain("!sentAwayByMe(i, team?.me ?? null) && !handedOut.has(i.id)))");
+    expect(app).toContain("!sentAwayByMe(i, team?.me ?? null) && !handedOut.has(i.id))");
   });
   it('says With Theo, then Theo finished it', () => {
     expect(pages).toContain('`With ${handedOnName.split(/\\s+/)[0]}`');

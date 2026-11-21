@@ -112,3 +112,20 @@ describe('Done shows a thread you were asked about once', () => {
     expect(read('renderer/src/App.tsx')).toContain('return newestAskPerThread(items.filter((i) => !needsYou.has(i.id)');
   });
 });
+
+// The regression look: one thread sat in Theo's Needs you as "Sam handed it to
+// you" and in his Done as "Sam took it back", from two hand-overs.
+describe('Done gives way to a newer row about the same thread', () => {
+  it('counts hand-overs, and a newer open row anywhere', async () => {
+    const { newestAskPerThread } = await import('../shared/thread-asks.mts');
+    const { sentWords, threadLink } = await import('../shared/thread-link.mts');
+    const body = sentWords('Add a key', threadLink('sam', 'w-1')!, '');
+    const old = ask({ id: 'old', ask: undefined, body, status: 'done', updatedAt: 3 });
+    const now = ask({ id: 'now', ask: undefined, body, status: 'open', updatedAt: 9 });
+    expect(newestAskPerThread([old] as never, [old, now] as never)).toEqual([]);
+    expect(newestAskPerThread([old] as never, [old] as never).map((r: { id: string }) => r.id)).toEqual(['old']);
+  });
+  it('is handed every row by the Done list', () => {
+    expect(read('renderer/src/App.tsx')).toContain('&& !handedOut.has(i.id)), items)');
+  });
+});
