@@ -50,6 +50,14 @@ describe('the Standup page', () => {
     expect(page.match(/Nothing from/g)).toHaveLength(1);
     expect(page).not.toMatch(/Nothing from[^<]*Maya/);
   });
+  // A screen review (w-f702d60afe, 2026-11-21): a day nobody posted said
+  // "Nothing moved." and then "Nothing from Theo since …" indented under no face.
+  it('says a day nobody posted once, at the column edge', () => {
+    const team = [{ key: 'person:p-theo', name: 'Theo Park', kind: 'person' as const }];
+    const page = renderToStaticMarkup(React.createElement(StandupPage, { now: NOW, faces: new Map(), team, dayFor: () => ({ people: [] }), onOpen: () => {} }));
+    expect(page).not.toContain('Nothing moved.');
+    expect(page).toMatch(/<p class="su-quiet alone">Nothing from Theo since/);
+  });
   it('says nothing about quiet teammates when there are none', () => {
     const team = [{ key: 'person:p-maya', name: 'Maya Chen', kind: 'person' as const }];
     const page = renderToStaticMarkup(React.createElement(StandupPage, { now: NOW, faces: new Map(), team, dayFor: () => day, onOpen: () => {} }));
