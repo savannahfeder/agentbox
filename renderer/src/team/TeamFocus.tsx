@@ -14,6 +14,7 @@ import { agentOnTask, agentOnTaskWord } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { askWord } from '../../../shared/thread-asks.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
 export function teamHeld(item: WorkItem, team: TeamView | null): boolean {
@@ -37,6 +38,8 @@ export function TeamSaid({ item }: { item: WorkItem }) {
     ? ask ? (closer === item.assignee
       ? `${mine ? 'you' : name} ${item.verdict === 'changes' ? 'asked for changes' : item.verdict === 'yes' ? 'said it looks good' : 'handed this back'}`
       : `${mine ? name : 'you'} took this back`)
+      // A thread handed over and closed by whoever handed it: they took it back.
+      : handedFrom(item.body, taskGiver(item)) && closer === taskGiver(item) ? `${closer === team.me ? 'you' : name} took this back`
       : `${closer === team.me ? 'you' : firstName(team.byId.get(closer ?? '') ?? team.byId.get(other ?? ''))} marked this done`
     : ask ? (mine ? `${name} asked you` : `asked ${name}`)
     : mine ? `${name} gave you this` : `with ${name}`;

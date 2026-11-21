@@ -102,7 +102,8 @@ import { ReplyLater } from './ReplyLater';
 import { effortSaid, modelShown, pickOnItsWay, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, threadToOpen } from '../team/chat-threads';
-import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
+import { heldByAPerson, isGivenTask, nameIsAPersons, taskGiver, whatWaits } from '../../../shared/team-rules.mts';
+import { handedFrom as handedFromLink } from '../../../shared/thread-link.mts';
 import { FormatBar } from '../team/FormatBar';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
 import { VoiceNote } from '../team/VoiceNote';
@@ -1032,6 +1033,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const direct = teamCtx?.products.get(item.product)?.team?.direct === true;
   // A task given to a person is drawn as talk between the two of them, under its own name.
   const givenTask = isGivenTask(item, teamCtx?.products.get(item.product));
+  // Handed to you and taken back by whoever handed it: it is theirs, not yours to reopen.
+  const takenBack = givenTask && item.status === 'done' && !!item.wrote?.status?.by && item.wrote.status.by === taskGiver(item) && item.wrote.status.by !== teamCtx?.me && !!handedFromLink(item.body, taskGiver(item));
   // A conversation with a person has nothing running to stop.
   const stoppable = stoppableIn && !direct;
   // Who a conversation is with, from where you sit, for its title and reply box.
@@ -1977,7 +1980,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onCloseTask={canFinish && givenTask && !item.ask ? onCloseTask ?? null : null}
       onStopRepeating={repeat ? repeat.onEnd : null}
       // A handed-on thread's row is Take it back, which ends their task too (App's onReopen).
-      onReopen={!canFinish && !agent ? (handedName ? onReopen : onReopenDone) ?? null : null}
+      onReopen={!canFinish && !agent && !takenBack ? (handedName ? onReopen : onReopenDone) ?? null : null}
       handedTo={handedName ? { name: handedName, initials: handedInitials(handedName), onOpen: handedTask ? () => onOpenItem(handedTask) : null } : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
       onLater={canFinish ? onSnooze ?? null : null}

@@ -7736,9 +7736,10 @@ export default function App() {
     const who = firstName(team?.byId.get(task?.assignee ?? '') ?? null) || handedToPage(item) || 'them';
     try {
       if (task && task.status !== 'done') await api.answer({ product: task.product, id: task.id, status: 'done' });
-      await window.zero?.reopen?.({ product: item.product, id: item.id });
+      // Back to you, waiting in Needs you: a reopen would start its agent again.
+      await api.answer({ product: item.product, id: item.id, status: 'blocked' });
     } catch (err) { showToast(`Not taken back: ${(err as Error).message}`); return; }
-    showToast(`Taken back from ${who}. It is yours again.`);
+    showToast(`Taken back from ${who}. It is in your Needs you.`);
     await refresh();
   };
   const takeAskBack = async (task: WorkItem) => {

@@ -46,7 +46,9 @@ describe('taking a handed-over thread back', () => {
     expect(threadMenuRows({ change: false, terminal: null, finish: false, reopen: true }).map((r) => r.label)).toContain('Take it back');
     expect(app).toContain('onReopen={() => (handedToPage(focused) ? takeHandOverBack(focused) : sendBack(focused))}');
     const fn = app.slice(app.indexOf('const takeHandOverBack'), app.indexOf('const takeAskBack'));
-    expect(fn.indexOf("status: 'done'")).toBeLessThan(fn.indexOf('window.zero?.reopen?.('));
+    // Not a reopen: that starts the agent again (a second walk-through saw it run). Back to Needs you instead.
+    expect(fn).not.toContain('window.zero?.reopen?.(');
+    expect(fn.indexOf("status: 'done'")).toBeLessThan(fn.indexOf("await api.answer({ product: item.product, id: item.id, status: 'blocked' });"));
   });
   it('reads "Sam took it back" for whoever held it', async () => {
     const { taskWords } = await import('../renderer/src/team/company.ts');
@@ -65,7 +67,7 @@ describe('taking a handed-over thread back', () => {
 describe('the wiring a live check caught', () => {
   const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
   it('the menu row on a handed-on thread runs the take-back, not a plain reopen', () => {
-    expect(focus).toContain('onReopen={!canFinish && !agent ? (handedName ? onReopen : onReopenDone) ?? null : null}');
+    expect(focus).toContain('onReopen={!canFinish && !agent && !takenBack ? (handedName ? onReopen : onReopenDone) ?? null : null}');
   });
   it('a handed-on thread offers no Mark as shipped', () => {
     expect(focus).toContain('shipped={handedName ? null : shippedMark}');
@@ -82,5 +84,14 @@ describe('the giver\'s Done row', () => {
   it('says who has it, not Done', () => {
     const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
     expect(pages).toContain('(handedOnName ? `Handed to ${handedOnName.split(/\\s+/)[0]}` : null)');
+  });
+});
+
+describe('the side that held it', () => {
+  it('says Sam took this back on the task page, and offers no Reopen', () => {
+    const team = fs.readFileSync(new URL('../renderer/src/team/TeamFocus.tsx', import.meta.url), 'utf8');
+    expect(team).toContain("handedFrom(item.body, taskGiver(item)) && closer === taskGiver(item) ? `${closer === team.me ? 'you' : name} took this back`");
+    const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
+    expect(focus).toContain('onReopen={!canFinish && !agent && !takenBack ?');
   });
 });

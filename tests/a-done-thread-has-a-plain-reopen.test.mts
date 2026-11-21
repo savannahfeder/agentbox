@@ -29,7 +29,7 @@ describe('the wiring', () => {
   it('a done thread that is not an agent row is handed a reopen that opens it again', () => {
     const focus = read('renderer/src/components/Focus.tsx');
     // A handed-on thread's is Take it back instead (tests/a-thread-handed-over-is-one-row-for-whoever-gave-it).
-    expect(focus).toMatch(/onReopen=\{!canFinish && !agent \? \(handedName \? onReopen : onReopenDone\)/);
+    expect(focus).toMatch(/onReopen=\{!canFinish && !agent && !takenBack \? \(handedName \? onReopen : onReopenDone\)/);
     const app = read('renderer/src/App.tsx');
     expect(app).toMatch(/onReopenDone=\{\(\) => reopenDone\(focused\)\}/);
     const fn = app.slice(app.indexOf('const reopenDone = useCallback'), app.indexOf('const reopenDone = useCallback') + 900);
