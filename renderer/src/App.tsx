@@ -11,7 +11,7 @@ import type {FocusControlStyle} from './focus-control';
 import {reviewLabEnabled} from './review-lab';
 import { deliverReply } from './deliver-reply.ts';
 import { ArtifactSurface } from './components/ArtifactSurface';
-import { artifactPlacement, artifactFraction, fullScreenTakes, whereAFileOpens, type ArtifactMode } from './artifact-layout';
+import { artifactPlacement, artifactFraction, fullScreenTakes, keptWidth, whereAFileOpens, type ArtifactMode } from './artifact-layout';
 import { besideDocument } from './message-artifacts';
 import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // the app's renderer: one state machine, keyboard-first. The Superhuman grammar:
@@ -3546,15 +3546,25 @@ export default function App() {
   // A copy of a teammate's file does not outlive their thread on the screen.
   useEffect(() => { setOpenDoc((doc) => (doc?.readOnly ? null : doc)); }, [openCard?.personId, openCard?.threadId]);
   const [artifactBody, setArtifactBody] = useState<HTMLDivElement | null>(null);
+  // The sidebar sliding open changes the body's width every frame, so only a
+  // width that changes what is drawn (keptWidth) draws the app again.
+  const bodyWidth = useRef(1000);
   const [artifactWidth, setArtifactWidth] = useState(1000);
+  const fileOpen = !!openDoc;
   useEffect(() => {
     // The team page takes the body's place, and a hidden body measures nothing.
     const body = teamBody ?? artifactBody;
     if (!body) return;
-    const observer = new ResizeObserver(([entry]) => setArtifactWidth(entry.contentRect.width));
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      bodyWidth.current = width;
+      setArtifactWidth((was) => keptWidth(was, width, fileOpen));
+    });
     observer.observe(body);
     return () => observer.disconnect();
-  }, [artifactBody, teamBody]);
+  }, [artifactBody, teamBody, fileOpen]);
+  // Before the file's first paint, so it opens at the split it keeps.
+  useLayoutEffect(() => { if (fileOpen) setArtifactWidth(bodyWidth.current); }, [fileOpen]);
 
   // HOW MUCH OF THE WINDOW THE FILE TAKES. three quarters, no line down the
   // middle, still resizable. The opening fraction and the floors it moves

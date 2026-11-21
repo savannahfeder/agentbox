@@ -29,7 +29,7 @@ import type { createTeamService } from './team/index.mts';
 type FilesTeam = ReturnType<typeof createTeamService>;
 type TeamNow = Partial<ReturnType<FilesTeam['state']>>;
 
-interface CloudFolder extends FileFolder { people?: string[] | null }
+interface CloudFolder extends FileFolder { people?: string[] | null; gone?: boolean }
 interface CloudPlace { owner: string; threadId: string; project: string; family: string; folder: string | null; at: number; by?: string | null }
 interface CloudShelf { folders: CloudFolder[]; places: CloudPlace[] }
 
@@ -110,10 +110,11 @@ type HistoryReader = (id: string, o: { max?: number }) => readonly ThreadLine[];
 /**
  * `bytes` is the newest version's size on this computer, `onMac` every
  * version's, `older` what Move older versions to the Trash would move and
- * `movable` what the file's own Move to the Trash would. `cloud` is a newest
+ * `movable` what the file's own Move to the Trash would, which is 0 for an
+ * empty document that `trashable` still lets it move. `cloud` is a newest
  * version kept in the cloud and off this computer, drawn from `poster`.
  */
-export interface FileSizes { bytes: number | null; onMac: number; older: number; movable: number; cloud?: boolean; poster?: string | null }
+export interface FileSizes { bytes: number | null; onMac: number; older: number; movable: number; trashable: boolean; cloud?: boolean; poster?: string | null }
 
 export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null } & FileSizes;
 
@@ -481,12 +482,16 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const quietly = async (what: string, fn: () => Promise<unknown>): Promise<void> => {
       try { await fn(); wrote = true; } catch (err) { console.warn(`files: ${what}: ${(err as Error).message}`); }
     };
-    for (const f of local.folders) {
+    for (const f of [...local.folders, ...local.gone]) {
       const was = seenFolder.get(f.id);
       if (was && was.at >= f.at) continue;
       const people = was ? was.people : audienceOf(f.project);
       if (people === 'private') continue;
-      await quietly('sending a folder', () => cloud.putFolder({ id: f.id, project: f.project, name: f.name, parent: f.parent, people, at: f.at }));
+      // A removed folder never sent is nothing for anyone else to remove.
+      if (!was && 'gone' in f) continue;
+      // `gone` is named only when it says something, so a database without the column still takes folders.
+      const gone = 'gone' in f ? { gone: true } : was?.gone ? { gone: false } : {};
+      await quietly('sending a folder', () => cloud.putFolder({ id: f.id, project: f.project, name: f.name, parent: f.parent, people, at: f.at, ...gone }));
     }
     if (wrote) held = await cloud.read() as CloudShelf;
     const merged = shelf();
@@ -896,6 +901,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     let onMac = 0;
     let older = 0;
     let movable = 0;
+    let trashable = false;
     let bytes: number | null = null;
     const seen = new Set<string>();
     const newest = f.chain.at(-1);
@@ -906,10 +912,10 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       if (v.hash) seen.add(v.hash);
       onMac += st.size;
       if (v === newest) bytes = st.size;
-      if (movableIn(roots, v.opened)) { movable += st.size; if (v !== newest) older += st.size; }
+      if (movableIn(roots, v.opened)) { trashable = true; movable += st.size; if (v !== newest) older += st.size; }
     }
     const off = newest?.hash && !newest.opened ? keeper?.off(newest.hash) : null;
-    return { bytes, onMac, older, movable, ...(off ? { cloud: true, poster: off.poster ?? null } : {}) };
+    return { bytes, onMac, older, movable, trashable, ...(off ? { cloud: true, poster: off.poster ?? null } : {}) };
   }
 
   /** Every version on this computer, as the cloud keeper weighs them. */
@@ -1085,6 +1091,34 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return { ok: true };
     },
 
+    /**
+     * A folder and the ones under it, gone. Its files are untouched and show at
+     * the top of the project; their places still name it, so putting it back
+     * returns them.
+     */
+    async removeFolder({ id, by = team?.state?.().me?.id ?? null }: { id: string; by?: string | null }) {
+      const lib = shelf();
+      const was = lib.folders.find((f) => f.id === lib.canon(id));
+      if (!was) throw new Error('that folder is gone');
+      writeFolderLog(logDir(), { op: 'folder', id: was.id, project: was.project, name: was.name, parent: was.parent, gone: true, by, at: Date.now() });
+      void crossing();
+      return { ok: true, ids: [was.id] };
+    },
+
+    async restoreFolders({ ids, by = team?.state?.().me?.id ?? null }: { ids: readonly string[]; by?: string | null }) {
+      const lib = shelf();
+      const at = Date.now();
+      let back = 0;
+      for (const id of ids) {
+        const was = lib.gone.find((f) => f.id === id);
+        if (!was) continue;
+        writeFolderLog(logDir(), { op: 'folder', id: was.id, project: was.project, name: was.name, parent: was.parent, gone: false, by, at });
+        back += 1;
+      }
+      if (back) void crossing();
+      return { ok: true, back };
+    },
+
     /** A file's place is by its identity, so this holds for every version, past and to come. */
     async moveFile({ key, folder = null, by = team?.state?.().me?.id ?? null }: { key: string; folder?: string | null; by?: string | null }) {
       const lib = shelf();
@@ -1109,7 +1143,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const made = MADE[kind as MadeKind] as (typeof MADE)[MadeKind] | undefined;
       if (!made) throw new Error('New makes a document or a table');
       const { home, into } = whereNew(project, folder);
-      const stem = title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
+      const typed = title.toLowerCase().endsWith(made.ext) ? title.slice(0, -made.ext.length) : title;
+      const stem = typed.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
       const file = freeName(home, stem, made.ext);
       fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
       fs.writeFileSync(path.join(home.dir, 'documents', file), made.seed, { flag: 'wx' });
@@ -1281,7 +1316,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           if (!whole) continue;
           const { chain } = await lineChain(whole, audienceOf(whole.project) !== 'private', products);
           for (const v of older ? chain.slice(0, -1) : chain) {
-            const all = await pathsOf(whole, v, products);
+            // A document nothing was written in has no fingerprint, only its file.
+            const all = v.blank && v.opened ? [v.opened] : await pathsOf(whole, v, products);
             // A version with a copy in a code folder is the code's, and stays whole.
             if (!all.length || !all.every((p) => movableIn(roots, p))) continue;
             const paths = all.filter((p) => !gone.has(p));
@@ -1294,10 +1330,10 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
               gone.add(p);
               const back = typeof landed === 'string' ? landed : clone;
               if (clone && back !== clone) fs.rmSync(clone, { force: true });
-              if (back) held.push({ from: p, at: back, hash: v.hash! });
+              if (back) held.push({ from: p, at: back, hash: v.hash ?? '' });
               else undoable = false;
             }
-            trashed[v.hash!] = Date.now();
+            if (v.hash) trashed[v.hash] = Date.now();
             moved += 1;
             bytes += size;
           }
@@ -1338,7 +1374,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         }
         // A Trash that follows the freedesktop spec keeps a note beside each file.
         if (path.basename(path.dirname(h.at)) === 'files') fs.rmSync(path.join(path.dirname(path.dirname(h.at)), 'info', `${path.basename(h.at)}.trashinfo`), { force: true });
-        delete trashed[h.hash];
+        if (h.hash) delete trashed[h.hash];
         back += 1;
       }
       fs.rmSync(hold, { recursive: true, force: true });
