@@ -1,23 +1,14 @@
-// A CHAT BROUGHT IN FOLLOWS THE PLACE IT STARTED.
-//
-// The founder, after the first onboarding call (2026-11-21): "it doesn't matter
-// where people run their agents. We should be a layer on top of it ... If
-// somebody sends a response to an agent in the terminal, you don't want it
-// still in your inbox."
-//
-// So a chat brought in from Claude Code or Codex is read where it lives, and its
-// row follows it:
-//   - you type to it there and its agent goes to work: the row leaves Needs you
-//     for In progress, claimed under `HELD_IN` (shared/carried-on-outside.mts);
-//   - the agent answers there: the answer becomes the row's, and it is back in
-//     Needs you;
-//   - the agent stops without answering, or the app stops watching: the claim
-//     is let go, or its lease runs out, and the row is in Needs you again.
+// A CHAT BROUGHT IN FOLLOWS THE PLACE IT STARTED. Each is read where it lives,
+// and its row follows it:
+//   - typed to there, its agent at work: In progress, claimed under `HELD_IN`
+//     (shared/carried-on-outside.mts);
+//   - answered there: the answer is the row's, and it is back in Needs you;
+//   - stopped there without an answer, or no longer watched: the claim is let
+//     go, or its lease runs out, and it is in Needs you again.
 // A reply here makes it this app's thread, and the follow lets go of it.
-//
-// Codex answers already reached the row (`refreshCodexMirrors`), so for Codex
-// this only adds the move out of Needs you, off the conversations the Codex
-// watch reads anyway (main/codex-watch.mts).
+// Codex answers already reach the row (`refreshCodexMirrors`); for Codex this
+// adds only the move out of Needs you, off what main/codex-watch.mts reads.
+// Pinned by tests/a-chat-you-answer-in-the-terminal-leaves-your-inbox.
 import path from 'node:path';
 import fs from 'node:fs';
 import { readChatTurn } from './agent-sessions.mts';
