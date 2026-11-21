@@ -339,7 +339,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [givingTo, setGivingTo] = useState<{ id: string; name: string } | null>(null);
-  const [giveStart, setGiveStart] = useState<'help' | 'give'>('help');
+  const [giveStart, setGiveStart] = useState<'help' | 'review' | 'give'>('help');
   const [givingFromShare, setGivingFromShare] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -349,7 +349,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
   const [step, setStep] = useState<string | null>(null);
   // One note per person, kept until it is sent.
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const asking = (givingFromShare && giveStart === 'help') || !!step;
+  const asking = (givingFromShare && giveStart !== 'give') || !!step;
   const listed = giveTo.filter((p) => !(asking && p.id.startsWith('mate:')));
   const wrap = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -409,7 +409,12 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
       close(false);
     };
     const keys = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(true); return; }
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopImmediatePropagation();
+        // Like a click outside: a typed note keeps the panel, and Cancel is the way out.
+        if ([...(wrap.current?.querySelectorAll('textarea') ?? [])].some((t) => t.value.trim())) return;
+        close(true); return;
+      }
       const items = [...(wrap.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
         e.preventDefault();
@@ -508,7 +513,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
         data-hint-align="right"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { if (open) close(false); else setOpen(true); }}
         onKeyDown={openFromKeys}
       >
         <Dots />
@@ -549,7 +554,7 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
           onCopy={copyLink}
           onSendOther={() => { setSendTo([]); setSharing('send'); }}
           onSee={() => setSharing('see')}
-          onAsk={canGive && onAsk ? () => { setSharing(null); setGiveStart('help'); setGivingFromShare(true); setGiving(true); } : undefined}
+          onAsk={canGive && onAsk ? (kind) => { setSharing(null); setGiveStart(kind); setGivingFromShare(true); setGiving(true); } : undefined}
           onHand={canGive ? () => { setSharing(null); setGiveStart('give'); setGivingFromShare(true); setGiving(true); } : undefined}
           onBack={() => setSharing(null)} />;
       })()}
@@ -561,14 +566,14 @@ export function ThreadMenu({ share = null, onCopyLink, onSendTo, onSee, onChoose
         onPick={(to) => { if (to === 'people') { setSharing('choose'); return; } close(false); if (to !== share.seen) onSee?.(to); }} />}
       {open && share && sharing === 'choose' && <ChooseList people={share.people} chosen={share.seen === 'people' ? share.chosen ?? [] : []} onPick={(id) => onChoose?.(id)} onBack={() => setSharing('see')} />}
       {open && !waiting && !adding && !leveling && !sharing && (giving && givingTo
-        ? <GiveSheet to={givingTo} step={step} start={giveStart} only={givingFromShare ? (giveStart === 'give' ? 'give' : 'ask') : step ? 'ask' : undefined} onBack={() => setGivingTo(null)} onCancel={() => close(true)}
+        ? <GiveSheet to={givingTo} step={step} start={giveStart} only={givingFromShare ? giveStart : step ? 'ask' : undefined} onBack={() => setGivingTo(null)} onCancel={() => close(true)}
           note={notes[givingTo.id] ?? ''} onNote={(n) => setNotes((was) => ({ ...was, [givingTo.id]: n }))}
           onGive={(note) => { setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onGive?.(givingTo, note); }}
           onAsk={onAsk ? (kind, note) => { const s = step; setNotes((was) => ({ ...was, [givingTo.id]: '' })); close(false); onAsk(givingTo, kind, note, s); } : undefined} />
         : giving
         ? <div className="th-menu ts-more-menu" role="menu" aria-label="Ask or hand off">
           <PanelBack label={step ? 'Close' : 'Back'} onBack={() => { if (step) { close(false); return; } setGiving(false); if (givingFromShare) { setGivingFromShare(false); setSharing('list'); } }} />
-          <p className="ts-menu-say">{(givingFromShare ? (giveStart === 'give' ? 'Who takes it over?' : 'Who do you want to ask?') : step ? 'Who do you want to ask?' : onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
+          <p className="ts-menu-say">{(givingFromShare ? (giveStart === 'give' ? 'Who takes it over?' : giveStart === 'review' ? 'Who should review it?' : 'Who do you want to ask?') : step ? 'Who do you want to ask?' : onAsk ? 'Ask a person for help or a review, or hand it over.' : 'A person gets it as a task in their Needs you.')
             + (listed.some((p) => p.id.startsWith('mate:')) ? ' An AI teammate starts on it.' : '')}</p>
           {listed.map((p) => <button key={p.id} type="button" role="menuitem" tabIndex={-1} className="row-i ts-more-row" disabled={asking && p.asked} onClick={() => { if (p.id.startsWith('mate:')) { close(false); onGive?.(p, ''); } else setGivingTo(p); }}>
             <span className="ico">{p.id.startsWith('mate:') ? <GiveMark /> : <Face name={p.name} size={18} />}</span>

@@ -225,7 +225,9 @@ describe('the menu is reachable by keyboard and every key still works', () => {
 
   it('closes on Escape before the window reads it as "go back"', () => {
     expect(menu).toMatch(/window\.addEventListener\('keydown', keys, true\)/);
-    expect(menu).toMatch(/e\.key === 'Escape'\) \{ e\.preventDefault\(\); e\.stopImmediatePropagation\(\); close\(true\)/);
+    expect(menu).toMatch(/e\.key === 'Escape'\) \{\s+e\.preventDefault\(\); e\.stopImmediatePropagation\(\);/);
+    // Unless a note is typed: then it stays, like a press outside (w-f702d60afe).
+    expect(menu).toContain("if ([...(wrap.current?.querySelectorAll('textarea') ?? [])].some((t) => t.value.trim())) return;\n        close(true); return;");
   });
 
   it('closes on a press outside it', () => {

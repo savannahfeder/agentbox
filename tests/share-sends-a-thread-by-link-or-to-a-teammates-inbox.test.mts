@@ -110,7 +110,8 @@ describe('Send to someone', () => {
     const t = text(renderToStaticMarkup(React.createElement(SendSheet, { people: [THEO], start: ['p-theo'], link: true, onCopy() {}, onSend() {} })));
     expect(t).toMatch(/^To TP Theo/);
     expect(t).toContain('Copy link');
-    expect(t).toContain('Send to inbox');
+    // It lands in the chat with them, so it says so (w-f702d60afe, 2026-11-21).
+    expect(t).toContain('Send in chat');
   });
   it('opens a private or chosen thread to whoever it goes to, and leaves a Team thread Team', () => {
     expect(openTo('team', [], ['p-theo'])).toEqual({ visibility: 'team', visibleTo: ['p-theo'] });
@@ -131,7 +132,7 @@ describe('after Copy link', () => {
     expect(t).toContain('Link copied');
     expect(t).toContain('app.agentbox.ac/t/p-maya/w-1');
     expect(t).not.toContain('https://');
-    expect(t).toContain('Or put it in an inbox');
+    expect(t).toContain('Or send it in chat');
     expect(firstName(THEO)).toBe('Theo');
   });
 });

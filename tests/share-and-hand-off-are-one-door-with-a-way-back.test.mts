@@ -35,7 +35,9 @@ describe('the thread menu', () => {
 describe('the panel it opens', () => {
   it('starts with asking and handing over, then the link', () => {
     const t = list();
-    expect(t.indexOf('Ask for help or a review…')).toBeLessThan(t.indexOf('Hand it over…'));
+    // Two rows, so whoever came for a review is not dropped on Help (w-f702d60afe, 2026-11-21).
+    expect(t.indexOf('Ask for a review…')).toBeLessThan(t.indexOf('Ask for help…'));
+    expect(t.indexOf('Ask for help…')).toBeLessThan(t.indexOf('Hand it over…'));
     expect(t.indexOf('Hand it over…')).toBeLessThan(t.indexOf('Copy link'));
   });
   it('says a send is a link, and has no one-click send that reads like handing it over', () => {
@@ -79,7 +81,14 @@ describe('the sheet after picking a person', () => {
     const give = sheet({ only: 'give', start: 'give' });
     expect(give).not.toContain('Review');
     expect(give).toContain('Hand over to Theo');
-    expect(give).toContain('Theo gets it as a task, with its conversation and files. It moves to your Done.');
+    expect(give).toContain('Theo owns it from now on, with its conversation and files. It moves to your Done.');
+    // A row that already chose Help or Review draws no switch.
+    for (const kind of ['help', 'review']) {
+      const one = sheet({ only: kind });
+      expect(one).not.toContain('Hand over');
+      expect(one).toContain(kind === 'help' ? 'Ask Theo to help' : 'Ask Theo to review');
+      expect(renderToStaticMarkup(React.createElement(GiveSheet, { to: { id: 'theo', name: 'Theo Okafor' }, onGive() {}, onAsk() {}, only: kind } as never))).not.toContain('role="radiogroup"');
+    }
   });
   it('names the person in the review prompt and shows the send key on the button', async () => {
     const { GiveSheet } = await import('../renderer/src/threads/SharePanel.tsx');
@@ -96,7 +105,7 @@ describe('the sheet after picking a person', () => {
 describe('the second pass', () => {
   const menu = fs.readFileSync(new URL('../renderer/src/threads/ThreadMenu.tsx', import.meta.url), 'utf8');
   it('lists no AI teammate wherever you came to ask', () => {
-    expect(menu).toContain("const asking = (givingFromShare && giveStart === 'help') || !!step;");
+    expect(menu).toContain("const asking = (givingFromShare && giveStart !== 'give') || !!step;");
     expect(menu).toContain("const listed = giveTo.filter((p) => !(asking && p.id.startsWith('mate:')));");
   });
   it('says an AI teammate starts on it only when one is listed', () => {

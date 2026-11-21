@@ -10,10 +10,11 @@ import '../team/asks.css';
 
 const mark = { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
 export const LinkMark = () => <svg {...mark}><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>;
-const InboxMark = () => <svg {...mark}><path d="M4 13.5 6.5 5h11l2.5 8.5V19H4z" /><path d="M4 13.5h4.5l1 2h5l1-2H20" /></svg>;
 const PeopleMark = () => <svg {...mark}><circle cx="9" cy="9" r="3.2" /><path d="M3 19.5c.6-3.2 3-5 6-5s5.4 1.8 6 5" /><path d="M15.5 6.2a3 3 0 0 1 0 5.6M17.5 14.8c1.8.6 3 2.1 3.4 4.7" /></svg>;
 const LockMark = () => <svg {...mark}><rect x="5.5" y="10.5" width="13" height="9" rx="1.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></svg>;
 const HandMark = () => <svg {...mark}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.5 2.7-5.5 6-5.5 1.4 0 2.7.4 3.7 1" /><path d="M15 17h6m-2.5-2.5L21 17l-2.5 2.5" /></svg>;
+const ReviewMark = () => <svg {...mark}><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.8" /></svg>;
+const SendMark = () => <svg {...mark}><path d="M20.5 3.5 3.5 10.5l7 3 3 7z" /><path d="m10.5 13.5 4-4" /></svg>;
 const AskMark = () => <svg {...mark}><path d="M5 5.5h14v10H10l-4 3.5v-3.5H5z" /><path d="M10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4" /><path d="M12 14.2v.1" /></svg>;
 const BackMark = () => <svg {...mark}><path d="m14.5 6-6 6 6 6" /></svg>;
 const Tick = () => <svg className="ts-more-tick" {...mark}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
@@ -41,7 +42,7 @@ export function ShareList({ link, others, seen, onCopy, onSendOther, onSee, onAs
   onSendOther: () => void;
   onSee: () => void;
   /** Help or a review; absent where the thread cannot be asked about. */
-  onAsk?: () => void;
+  onAsk?: (kind: 'help' | 'review') => void;
   /** Hand it over for good; absent where it cannot be. */
   onHand?: () => void;
   onBack?: () => void;
@@ -49,8 +50,11 @@ export function ShareList({ link, others, seen, onCopy, onSendOther, onSee, onAs
   return (
     <div className="th-menu ts-more-menu sh-list" role="menu" aria-label="Share or hand off">
       {onBack && <PanelBack label="Back" onBack={onBack} />}
-      {onAsk && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onAsk}>
-        <span className="ico"><AskMark /></span><span className="ts-more-label">Ask for help or a review…</span>
+      {onAsk && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={() => onAsk('review')}>
+        <span className="ico"><ReviewMark /></span><span className="ts-more-label">Ask for a review…</span>
+      </button>}
+      {onAsk && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={() => onAsk('help')}>
+        <span className="ico"><AskMark /></span><span className="ts-more-label">Ask for help…</span>
       </button>}
       {onHand && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onHand}>
         <span className="ico"><HandMark /></span><span className="ts-more-label">Hand it over…</span>
@@ -60,7 +64,7 @@ export function ShareList({ link, others, seen, onCopy, onSendOther, onSee, onAs
         <span className="ico"><LinkMark /></span><span className="ts-more-label">Copy link</span>
       </button>}
       {others && <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSendOther}>
-        <span className="ico"><InboxMark /></span><span className="ts-more-label">Send a link…</span>
+        <span className="ico"><SendMark /></span><span className="ts-more-label">Send a link…</span>
       </button>}
       <span className="sh-sep" aria-hidden="true" />
       <button type="button" role="menuitem" tabIndex={-1} className={row} onClick={onSee}>
@@ -99,7 +103,7 @@ export function ChooseList({ people, chosen, onPick, onBack }: { people: readonl
   );
 }
 
-/** To, a note, and Send to inbox; Copy link beside it for a link instead. */
+/** To, a note, and Send in chat; Copy link beside it for a link instead. */
 export function SendSheet({ people, start, link, onCopy, onSend, onBack }: {
   onBack?: () => void;
   people: readonly Person[];
@@ -136,7 +140,7 @@ export function SendSheet({ people, start, link, onCopy, onSend, onBack }: {
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }} />
       <div className="sh-foot">
         {link && <button type="button" className="th-new sh-ghost" onClick={onCopy}><LinkMark />Copy link</button>}
-        <button type="button" className="th-new sh-go" disabled={!to.length} onClick={send}>Send to inbox</button>
+        <button type="button" className="th-new sh-go" disabled={!to.length} onClick={send}>Send in chat</button>
       </div>
     </div>
   );
@@ -147,7 +151,7 @@ export type GiveMode = 'help' | 'review' | 'give';
 const MODES: { id: GiveMode; label: string; detail: (first: string) => string; ask: (first: string) => string; go: (first: string) => string }[] = [
   { id: 'help', label: 'Help', detail: (f) => `${f} can write to your agent, then hands it back to you.`, ask: () => 'What do you need help with?', go: (f) => `Ask ${f} to help` },
   { id: 'review', label: 'Review', detail: (f) => `${f} reads it and tells you it looks good or what to change.`, ask: (f) => `What should ${f} look at?`, go: (f) => `Ask ${f} to review` },
-  { id: 'give', label: 'Hand over', detail: (f) => `${f} gets it as a task, with its conversation and files. It moves to your Done.`, ask: (f) => `Anything ${f} should know?`, go: (f) => `Hand over to ${f}` },
+  { id: 'give', label: 'Hand over', detail: (f) => `${f} owns it from now on, with its conversation and files. It moves to your Done.`, ask: (f) => `Anything ${f} should know?`, go: (f) => `Hand over to ${f}` },
 ];
 
 /** After a person is picked: help with a step, a review, or the whole thread, and a note. */
@@ -158,8 +162,8 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
   onNote?: (note: string) => void;
   /** Closes the sheet; a click outside keeps a note with words in it, so this is the way out. */
   onCancel?: () => void;
-  /** Came in through Ask (help or a review only) or through Hand over (no choice to make). */
-  only?: 'ask' | 'give';
+  /** Came in through Ask (help or a review), one of its two rows, or Hand over: no switch when the row already chose. */
+  only?: 'ask' | 'give' | 'help' | 'review';
   to: { id: string; name: string };
   onGive: (note: string) => void;
   /** Help or a review keeps the thread yours; without it only handing over is offered. */
@@ -171,7 +175,8 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
   const [own, setOwn] = useState('');
   const note = kept ?? own;
   const setNote = onNote ?? setOwn;
-  const [mode, setMode] = useState<GiveMode>(onAsk && only !== 'give' ? (only === 'ask' && start === 'give' ? 'help' : start) : 'give');
+  const fixed = only === 'help' || only === 'review' || only === 'give';
+  const [mode, setMode] = useState<GiveMode>(only === 'help' || only === 'review' ? (onAsk ? only : 'give') : onAsk && only !== 'give' ? (only === 'ask' && start === 'give' ? 'help' : start) : 'give');
   const choices = MODES.filter((x) => (only === 'ask' ? x.id !== 'give' : true));
   const team = useContext(TeamContext);
   const first = to.name.split(/\s+/)[0] || to.name;
@@ -183,13 +188,13 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
     <div className="th-menu ts-more-menu sh-send sh-give" role="dialog" aria-label={`Ask or hand over to ${first}`}>
       {onBack && <PanelBack label="Back" onBack={onBack} />}
       <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
-      {onAsk && only !== 'give' && <div className="sh-modes">
+      {onAsk && !fixed && <div className="sh-modes">
         <div className="sh-switch" role="radiogroup" aria-label="What you want from them">
           {choices.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => setMode(x.id)}>{x.label}</button>)}
         </div>
         <p className="sh-mode-says">{m.detail(first)}</p>
       </div>}
-      {(!onAsk || only === 'give') && <p className="sh-mode-says sh-mode-alone">{m.detail(first)}</p>}
+      {(!onAsk || fixed) && <p className="sh-mode-says sh-mode-alone">{m.detail(first)}</p>}
       {step && mode !== 'give' && <blockquote className="sh-step">{step.length > 220 ? `${step.slice(0, 220)}…` : step}</blockquote>}
       <textarea className="sh-note" autoFocus placeholder={m.ask(first)} value={note} aria-label={m.ask(first)} rows={2}
         onChange={(e) => setNote(e.target.value)}
@@ -211,7 +216,7 @@ export function CopiedSheet({ link, people, onSend, onBack }: { link: string; pe
       <div className="sh-url">{link.replace(/^https?:\/\//, '')}</div>
       {people.length > 0 && <>
         <span className="sh-sep" aria-hidden="true" />
-        <span className="sh-head">Or put it in an inbox</span>
+        <span className="sh-head">Or send it in chat</span>
         <div className="sh-chips">
           {people.map((p) => <button key={p.id} type="button" className="sh-chip" onClick={() => onSend(p.id)}><Face person={p} size={20} />{firstName(p)}</button>)}
         </div>
