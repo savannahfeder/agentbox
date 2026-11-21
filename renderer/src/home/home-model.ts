@@ -37,6 +37,16 @@ export function doors({ needs, progress, team }: { needs: number; progress: numb
   return out;
 }
 
+/** The command bar's short age for a thread under a day old. */
+export function agoShort(at: number, now: number): string {
+  const m = Math.max(0, Math.floor((now - at) / 60_000));
+  if (m < 1) return 'now';
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hr`;
+  return `${Math.floor(h / 24)} d`;
+}
+
 type EngineFacts = {
   running?: readonly { itemId: string; product: string; engine?: string }[];
   engines?: { workspace?: string | null; byItem?: Record<string, string> } | null;
