@@ -23,7 +23,7 @@ describe('the first message box on a person’s page', () => {
     expect(html).toMatch(/<div class="rm-compose-bar">/);
   });
   it('sends with the same button, naming its key', () => {
-    expect(html).toMatch(new RegExp(`<button type="button" class="dock-send"[^>]*>Send <kbd>${sendKeyFor(true)}</kbd></button>`));
+    expect(html).toMatch(new RegExp(`<button type="button" class="dock-send chat-send" disabled="" title="Send · ${sendKeyFor(true)}" aria-label="Send"><svg`));
     expect(html).not.toContain('pl-btn go');
   });
   it('sits where the reply box sits once the chat has begun', () => {

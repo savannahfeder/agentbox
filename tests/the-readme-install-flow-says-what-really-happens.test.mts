@@ -35,7 +35,8 @@ describe('what the README promises about installing', () => {
   // (tests/a-clean-install-prints-no-deprecation-warnings), so the README no
   // longer promises them.
   it('says that install ends on a vulnerability count', () => {
-    const install = readme.slice(readme.indexOf('## Install'), readme.indexOf('**In your browser.**'));
+    const start = readme.indexOf('## Install');
+    const install = readme.slice(start, readme.indexOf('\n## ', start + 1));
     expect(install).not.toMatch(/deprecation warnings/);
     expect(install).toMatch(/vulnerabilities/);
     expect(install).toMatch(/worked if it exits\s+without an error/);

@@ -32,7 +32,8 @@ describe('every Send button names the key one way', () => {
   it('no box draws its own glyph any more', () => {
     for (const f of ['renderer/src/team/ThreadPanel.tsx', 'renderer/src/team/rooms/RoomChat.tsx']) {
       expect(read(f)).not.toContain('<kbd>↵</kbd>');
-      expect(read(f)).toContain('sendKeyFor(true)');
+      expect(read(f)).toContain('<ChatSend ');
     }
+    expect(read('renderer/src/team/ChatSend.tsx')).toContain('sendKeyFor(true)');
   });
 });
