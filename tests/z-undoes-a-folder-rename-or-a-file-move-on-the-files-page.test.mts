@@ -22,7 +22,7 @@ describe('a rename can be taken back', () => {
   it('puts the old name back', () => {
     const u = renameUndo(folders, 'f1', 'qa46renamed')!;
     expect(u.back).toEqual({ do: 'rename', id: 'f1', name: 'qa46tmp' });
-    expect(u.label).toBe('Renamed back: qa46tmp');
+    expect(u.label).toBe('Renamed qa46tmp back');
     expect(u.undoes).toBe('rename “qa46renamed” back to “qa46tmp”');
   });
 
@@ -42,21 +42,27 @@ describe('a move can be taken back', () => {
   it('one file goes back to the folder it was in', () => {
     const u = moveUndo([file('k1', 'qa46doc.md', 'f1')], ['k1'], null, folders)!;
     expect(u.back).toEqual([{ do: 'move', key: 'k1', folder: 'f1' }]);
-    expect(u.label).toBe('Back in Drafts: qa46doc.md');
+    expect(u.label).toBe('Moved qa46doc.md back');
     expect(u.undoes).toBe('move qa46doc.md back to Drafts');
   });
 
   it('back to the top of its project when it came from there', () => {
     const u = moveUndo([file('k1', 'qa46doc.md', null)], ['k1'], 'f1', folders)!;
     expect(u.back).toEqual([{ do: 'move', key: 'k1', folder: null }]);
-    expect(u.label).toBe('Back at the top of My Workspace: qa46doc.md');
+    expect(u.undoes).toBe('move qa46doc.md back to the top of My Workspace');
   });
 
   it('several files moved at once are one Z, each back where it was', () => {
     const files = [file('k1', 'a.md', 'f1'), file('k2', 'b.md', null), file('k3', 'c.md', 'f2')];
     const u = moveUndo(files, ['k1', 'k2', 'k3'], 'f2', folders)!;
     expect(u.back).toEqual([{ do: 'move', key: 'k1', folder: 'f1' }, { do: 'move', key: 'k2', folder: null }]);
-    expect(u.label).toBe('Moved back: 2 files');
+    expect(u.label).toBe('Moved 2 files back');
+  });
+
+  it('says what it did in a plain sentence, with no colon', () => {
+    const one = moveUndo([file('k1', 'a.md', 'f1')], ['k1'], null, folders)!;
+    const ren = renameUndo(folders, 'f1', 'Final')!;
+    for (const words of [one.label, one.undoes, ren.label, ren.undoes]) expect(words).not.toContain(':');
   });
 
   it('a file already where it was sent did not move, so nothing to undo', () => {
