@@ -95,7 +95,9 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   // actually touched. See `editor/patch-md.ts` for why that matters here and
   // did not matter there: these files are markdown an agent wrote, and two
   // of them are how every session on a product stays in agreement.
-  const baseMd = useRef(pmDocToMd(mdToPmDoc(text)));
+  // Worked out once: the app redraws this several times a second while an agent works.
+  const [firstMd] = useState(() => pmDocToMd(mdToPmDoc(text)));
+  const baseMd = useRef(firstMd);
   const lastMtime = useRef(mtime);
   const dirty = useRef(!!versions?.draft);
   // Unlike `dirty`, stays set once a person changed the file, so a later flush still hands their words over.
@@ -120,9 +122,11 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     live: collab ? liveExtensions(collab) : null,
   }), [folder, collab?.doc]);
 
+  // An editor reads its starting words only when it is made, which is when `extensions` changes.
+  const content = useMemo(() => (collab ? null : mdToPmDoc(versions?.draft ?? text)), [extensions]);
   const editor = useEditor({
     extensions,
-    ...(collab ? {} : { content: mdToPmDoc(versions?.draft ?? text) }),
+    ...(content ? { content } : {}),
     editable: !readOnly && !(live && !collab),
     autofocus: versions?.focus && !readOnly ? 'end' : false,
     onTransaction: ({ transaction }) => {
