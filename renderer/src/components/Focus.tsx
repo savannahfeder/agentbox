@@ -3819,7 +3819,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
         )}
         {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
         {/* Stop gives way to Send, which would leave focus on the page and the next words typed nowhere. */}
-        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : talkTo?.length ? (
+        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : (talkTo?.length ? (
           <ChatSend ready={hasDraft} busy={saving} sending="Sending…" onSend={() => send()} />
         ) : (
         <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
@@ -3831,7 +3831,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
         >{saving ? 'Sending…' : <>Send <kbd>{sendKeyFor(enterSends)}</kbd></>}<SendGlyph /></button>
         {canWait && <ReplyLater at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
         </span>
-        )}
+        ))}
         </>}
       </div>
     </>

@@ -47,8 +47,18 @@ describe('a thread that passed between two people, in their chat', () => {
   it('leaves a comment as words, with where it was left under them', () => {
     const html = drawn([comment]);
     expect(html).not.toContain('rm-thread-card');
-    expect(html).toContain('<div class="tx">The expiry should be a day.</div>');
+    expect(html).toContain('<div class="tx"><p>The expiry should be a day.</p></div>');
     expect(html).toContain('class="rm-there"');
+  });
+
+  // A synthetic tester replied on a task with two points and a quote, and the
+  // person's chat showed the reply with its "- " and "> " (w-f689c07680).
+  it('draws a reply’s list and quote as a list and a quote', () => {
+    const reply = { key: 'reply:1', at: at + 120_000, by: 'sam', text: 'Two things:\n\n- the copy\n- the button\n\n> Keep it short', where: { label: 'on Sign-up screens', onOpen: () => {} } };
+    const html = drawn([reply]);
+    expect(html).toMatch(/<li>the copy<\/li>\s*<li>the button<\/li>/);
+    expect(html).toMatch(/<blockquote>\s*<p>Keep it short<\/p>\s*<\/blockquote>/);
+    expect(html).not.toContain('- the copy');
   });
 
   it('is a card for a task, a hand-off, an ask and its answer, and not for words', () => {

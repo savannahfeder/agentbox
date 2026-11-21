@@ -465,7 +465,8 @@ function AlongRow({ a, day, head, face, name, size }: {
           <span className="rm-thread-what">{a.text}</span>
         </button>
         : <>
-          <div className="tx">{a.text}</div>
+          {/* A reply on a task is a message too: its list or quote is drawn as one. */}
+          <div className="tx"><MessageMarkdown remarkPlugins={MARKDOWN_PLUGINS}>{a.text}</MessageMarkdown></div>
           <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
         </>}
     </div>
