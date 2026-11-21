@@ -8,9 +8,9 @@
 // run. Counted in README.md on main that day: two mentions of Windows as a
 // system and no Windows command.
 //
-// So Install has a section per computer, found here as a fold or a heading, and
-// each one is checked on its own: everything a reader needs is inside it, and
-// nothing from another computer is.
+// So Install opens with a table that sends each computer to its own section,
+// and each section is checked on its own: everything a reader needs is inside
+// it, and nothing from another computer is.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -29,12 +29,8 @@ const start = readme.indexOf('## Install');
 const install = readme.slice(start, readme.indexOf('\n## ', start + 1));
 const floor = String(pkg.engines.node).match(/>=\s*(\d+(?:\.\d+)*)/)?.[1];
 
-/** A section of Install by its title: a fold's body up to its </details>, or a
- *  heading's up to the next heading at its level or above. */
+/** A section of Install by its heading, up to the next heading at its level or above. */
 function section(text: string, title: RegExp): string | null {
-  for (const m of text.matchAll(/<details[^>]*>\s*<summary>([\s\S]*?)<\/summary>([\s\S]*?)<\/details>/g)) {
-    if (title.test(m[1].replace(/<[^>]+>/g, ''))) return m[2];
-  }
   const lines = text.split('\n');
   const at = lines.findIndex((l) => /^#{3,6} /.test(l) && title.test(l));
   if (at < 0) return null;
@@ -45,15 +41,13 @@ function section(text: string, title: RegExp): string | null {
 
 const windows = section(install, /Install on Windows/) ?? '';
 const linux = section(install, /Install on Linux/) ?? '';
-const mac = section(install, /on a Mac$/) ?? '';
+const mac = section(install, /Install on a Mac/) ?? '';
 
 describe('finding a section', () => {
-  it('reads a fold and a heading the same way, and only its own body', () => {
-    const fold = '<details>\n<summary><strong>Install on Windows</strong></summary>\n\nwin\n\n</details>\n\nafter';
-    const heading = '### Install on Windows\n\nwin\n\n### Install on Linux\n\nlin';
-    expect(section(fold, /Install on Windows/)?.trim()).toBe('win');
-    expect(section(heading, /Install on Windows/)?.trim()).toBe('win');
-    expect(section(heading, /Install on Linux/)?.trim()).toBe('lin');
+  it('reads a heading up to the next one as high, keeping any deeper one inside', () => {
+    const text = '### Install on Windows\n\nwin\n\n#### Note\n\nmore\n\n### Install on Linux\n\nlin\n\n## Next';
+    expect(section(text, /Install on Windows/)?.trim()).toBe('win\n\n#### Note\n\nmore');
+    expect(section(text, /Install on Linux/)?.trim()).toBe('lin');
   });
 
   it('finds nothing for a computer the text never gives a section', () => {
@@ -62,10 +56,19 @@ describe('finding a section', () => {
 });
 
 describe('Install has its own steps for each computer', () => {
-  it('gives Windows and Linux a section each, and a Mac build one too', () => {
+  it('gives a Mac, Windows and Linux a section each', () => {
     expect(windows).not.toBe('');
     expect(linux).not.toBe('');
     expect(mac).not.toBe('');
+  });
+
+  it('opens with a table that sends each computer to its way in', () => {
+    // Where the links land is checked by tests/every-readme-link-lands-somewhere.
+    const rows = install.split('\n').filter((l) => /^\| (Mac|Windows|Linux) \|/.test(l));
+    expect(rows.map((r) => r.split('|')[1].trim())).toEqual(['Mac', 'Windows', 'Linux']);
+    expect(rows[0]).toContain(`(${DOWNLOAD})`);
+    expect(rows[1]).toContain('(#install-on-windows)');
+    expect(rows[2]).toContain('(#install-on-linux)');
   });
 
   it('keeps the Mac download above them, where most visitors stop', () => {
