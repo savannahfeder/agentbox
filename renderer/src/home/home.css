@@ -94,6 +94,27 @@
 .hm-row time { font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }
 .hm-mate .hm-text b { font-size: 14px; line-height: 19px; }
 .hm-mate .hm-text small { font-size: 12px; line-height: 16px; }
+.hm-mate-wrap + .hm-mate-wrap > .hm-row, .hm-hidden { border-top: 1px solid rgba(255, 255, 255, .065); }
+:root[data-theme="light"] :is(.hm-mate-wrap + .hm-mate-wrap > .hm-row, .hm-hidden) { border-top-color: rgba(30, 22, 36, .06); }
+/* A long name gives way before the pin does, as in Messages. */
+.hm-name { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.hm-name b { min-width: 0; }
+.hm-pin { display: flex; flex: none; color: var(--text-faint); }
+/* The row's ⋯ waits over the week until you point at the row, as a conversation's does over its time. */
+.hm-mate-wrap { position: relative; }
+.hm-mate-more { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); width: 24px; height: 20px; padding: 0; display: grid; place-items: center;
+  appearance: none; border: 1px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;
+  background: var(--skin-solid, var(--surface)); color: var(--text-dim); visibility: hidden; }
+.hm-mate-more svg { width: 13px; height: 13px; }
+.hm-mate-more:hover { color: var(--text); }
+.hm-mate-wrap:hover .hm-mate-more, .hm-mate-wrap.menu .hm-mate-more, .hm-mate-more:focus-visible { visibility: visible; }
+.hm-mate-wrap:hover .hm-week, .hm-mate-wrap.menu .hm-week { visibility: hidden; }
+.hm-mate-wrap.menu > .hm-row { background: rgba(255, 255, 255, .045); }
+:root[data-theme="light"] .hm-mate-wrap.menu > .hm-row { background: rgba(30, 22, 36, .04); }
+.hm-mate-wrap.gone > .hm-row { opacity: .5; }
+.hm-hidden { display: flex; align-items: center; gap: 6px; width: 100%; padding: 10px 18px 10px 58px; border-right: 0; border-bottom: 0; border-left: 0; background: none;
+  font: inherit; font-size: 12.5px; color: var(--text-faint); text-align: left; cursor: pointer; }
+.hm-hidden:hover { color: var(--text-dim); }
 
 .hm-face { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 500; color: var(--text); background: rgba(255, 255, 255, .12); position: relative; box-sizing: border-box; }
 .hm-face > .hm-photo { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }

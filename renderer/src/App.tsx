@@ -279,7 +279,7 @@ import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, o
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
-import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
+import { HomePage, type MateAct, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
 import { homeNeedsRows } from './home/home-needs';
 import { needsYouList, openNeedsEntry } from './threads/needs-you-list';
 import { SkyBackdrop } from './home/SkyBackdrop';
@@ -287,7 +287,7 @@ import { InboxSky } from './home/InboxSky';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sky';
-import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
+import { engineLetter, engineName, greeting, hideMate, homeRowOpens, pinMate, readTeamCardChoice, rowEngine, showMate, somethingCoversTheList, teamCard, teamRowLine, teamRowState, unpinMate, weekCounts, writeTeamCardChoice, type TeamCardChoice } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { stopOnScreen, useBackAndForward, type Stop as TrailStop } from './back-and-forward';
@@ -4677,6 +4677,8 @@ export default function App() {
   };
   // Cards put away (./team/everything/members `splitHidden`), and how tall the cards are over an open chat.
   const [evHidden] = useState<Hidden>(() => readHidden());
+  // Who you pinned to Home's Team this week and who you hid from it.
+  const [teamChoice, setTeamChoice] = useState<TeamCardChoice>(() => readTeamCardChoice());
   const evSplit = splitHidden(members, evHidden);
 
   // C TURNS THE CLOUD ON OR OFF, from anywhere a key reaches (2026-10-16), and
@@ -7958,7 +7960,7 @@ export default function App() {
       return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), letter: from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: from ? `${from}${asks}` : null, priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
     },
   }) : [];
-  const homeTeam: TeamRow[] | null = !homeShown || !teamMode ? null : busiestFirst(members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m) => {
+  const homeTeam = !homeShown || !teamMode ? null : teamCard(members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m): TeamRow => {
     const id = m.key.slice(m.key.indexOf(':') + 1);
     const done = m.kind === 'person'
       ? weekCards.filter((c) => c.personId === id && c.state === 'done').map((c) => c.updatedAt)
@@ -7969,10 +7971,16 @@ export default function App() {
     const agents = Math.max(m.agents ?? 0, m.inProgress ?? 0);
     return {
       key: m.key, name: m.name, letter: (m.letter || m.name).slice(0, 1).toUpperCase(), ai: m.kind === 'mate', ...(m.face ? { face: m.face } : {}), ...(m.kind === 'person' && m.avatarUrl ? { photo: m.avatarUrl } : {}),
-      line: waiting ? 'Waiting on you' : m.now ?? (agents ? 'Working' : 'Nothing running'),
+      line: teamRowLine({ waiting, now: m.now, agents }),
       state: teamRowState({ agents, waitingOnYou: waiting }), week, total: week.reduce((a, b) => a + b, 0),
     };
-  }));
+  }), teamChoice);
+  const changeTeamChoice = (change: (c: TeamCardChoice) => TeamCardChoice) => setTeamChoice((c) => { const next = change(c); writeTeamCardChoice(next); return next; });
+  const onMate = (key: string, act: MateAct) => {
+    changeTeamChoice((c) => (act === 'pin' ? pinMate(c, key) : act === 'unpin' ? unpinMate(c, key) : act === 'hide' ? hideMate(c, key) : showMate(c, key)));
+    const name = members.find((m) => m.key === key)?.name ?? 'Them';
+    if (act === 'hide') pushUndo({ label: `${name} is back on Home`, undoes: `put ${name} back on Home`, run: async () => { changeTeamChoice((c) => showMate(c, key)); } });
+  };
   const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => {
     const engine = rowEngine(i, engineFacts);
     return { key: `${i.product}/${i.id}`, letter: engineLetter(engine), title: rowTitle(i), line: `${engineName(engine)} · ${i.productName}`, at: sentAtOf(i) };
@@ -8529,7 +8537,7 @@ export default function App() {
               {homeShown ? (
                 <HomePage hello={greeting(new Date(now).getHours(), snap.team?.me?.name ?? null)} now={now}
                   needs={homeNeeds} needsCount={needsList.length} inboxCount={needsYouCount.inbox} progressCount={mineShown ? shownCount(progressTab) : 0}
-                  team={homeTeam} progress={homeProgress} slot={setClearSlot}
+                  team={homeTeam?.shown ?? null} hiddenTeam={homeTeam?.hidden} onMate={onMate} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
                   onOpen={homeOpenRow} onMember={(key) => openChatsPlace(key)} onTeam={() => openChatsPlace('team')} />
               ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{standupPage(homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : placeEl}</ChatsFrame>
