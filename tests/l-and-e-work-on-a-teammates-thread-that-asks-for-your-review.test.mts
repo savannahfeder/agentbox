@@ -42,7 +42,8 @@ describe('the keys on a teammate thread', () => {
 
   it('L puts the ask off and E closes it, only when there is one on you', () => {
     expect(branch).toContain('const asked = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;');
-    expect(branch).toContain("else if ((e.key === 'l' || e.key === 'L') && asked) openSnooze(asked);");
+    // Swallowed here: the list behind the page counts as covered, so the guard lets L through and it was typed into the picker.
+    expect(branch).toContain("else if ((e.key === 'l' || e.key === 'L') && asked) { e.preventDefault(); openSnooze(asked); }");
     expect(branch).toContain("else if ((e.key === 'e' || e.key === 'E') && asked) { e.preventDefault(); void markDone(asked); }");
   });
 

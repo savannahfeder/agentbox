@@ -6856,7 +6856,8 @@ export default function App() {
         else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setModal('compose'); }
         else if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); undo(); }
         else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); window.dispatchEvent(new Event(TEAMMATE_REPLY)); }
-        else if ((e.key === 'l' || e.key === 'L') && asked) openSnooze(asked);
+        // The guard above leaves L alone here, since the list behind counts as covered.
+        else if ((e.key === 'l' || e.key === 'L') && asked) { e.preventDefault(); openSnooze(asked); }
         else if ((e.key === 'e' || e.key === 'E') && asked) { e.preventDefault(); void markDone(asked); }
         return;
       }
