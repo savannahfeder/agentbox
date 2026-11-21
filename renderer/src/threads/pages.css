@@ -450,7 +450,7 @@ body:has([data-sorting]) .hint-plate { display: none !important; }
 .tp-ago::before { content: "·"; margin-right: 8px; }
 /* Its summary, always there under those lines: what it is about, then what its
    agent already tried, its files and what it holds up, with no line between. */
-.tp-summary { max-width: none; margin: 16px 0 0; padding: 18px 22px 20px; }
+.ts-ticket.tp-summary { max-width: none; margin: 16px 0 0; padding: 18px 22px 20px; }
 .tp-summary .ts-tk-lead { margin: 0; }
 .tp-summary .ts-tk-part { margin: 16px 0 0; }
 .tp-summary .ts-tk-lead + .ts-tk-part { margin-top: 18px; }
