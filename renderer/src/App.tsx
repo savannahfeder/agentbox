@@ -4518,21 +4518,20 @@ export default function App() {
     persons: homeLayout === 'chats' && team ? (team.state.people ?? []).filter((p) => p.id !== team.me).map((p) => ({ id: p.id, name: p.name, url: p.avatarUrl ?? null, waits: false })) : undefined,
     onPerson: (id) => openChatsPlace(`person:${id}`),
   } : null;
-  // Command K's chats: a group or chat by name or people, an AI teammate.
-  const findChats = useCallback((q: string) => {
-    const found = chatsFound({ groups: roomsUi.live ? roomsUi.groups : [], teammates: teammatesUi.live ? teammatesUi.list : [], query: q });
-    const persons = (chatsValue?.persons ?? []).filter((p) => p.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q.toLowerCase())));
-    return [
-      ...persons.map((p) => ({
-        id: `chat-person-${p.id}`, label: p.name, hint: 'Their page in Team',
-        run: () => { setModal(null); openChatsPlace(`person:${p.id}`); },
-      })),
-      ...found.filter((f) => !persons.some((p) => p.name === f.label)).map((f) => ({
-        id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
-        run: () => { setModal(null); if (f.kind === 'teammate') teammatesUi.go(f.key); else roomsUi.pickGroup(f.key); },
-      })),
-    ];
-  }, [roomsUi, teammatesUi, chatsValue]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Command K's people and groups. Each id is `chat-` before the id of the
+  // command row for the same group or teammate, which the palette then leaves
+  // out (paletteOrder).
+  const findChats = useCallback((q: string) => chatsFound({
+    groups: roomsUi.live ? roomsUi.groups : [], teammates: teammatesUi.live ? teammatesUi.list : [], persons: chatsValue?.persons ?? [], query: q,
+  }).map((f) => ({
+    id: `chat-${f.kind}-${f.key}`, label: f.label, hint: f.hint,
+    run: () => {
+      setModal(null);
+      if (f.kind === 'person') openChatsPlace(`person:${f.key}`);
+      else if (f.kind === 'teammate') teammatesUi.go(f.key);
+      else roomsUi.pickGroup(f.key);
+    },
+  })), [roomsUi, teammatesUi, chatsValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // LINES, FILES, COMMENTS AND DECISIONS (./found-inside). Threads, conversations
   // and teammates' shared threads are searched in main; groups and decisions are
