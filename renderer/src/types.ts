@@ -720,6 +720,8 @@ export interface RoomsState {
   ranks: Record<string, number>;
   invites: { roomId: string; roomName: string; invitedBy: string | null; invitedByName: string | null }[];
   mentions: RoomMention[];
+  /** Rows put off with L, soonest back first. */
+  later?: (RoomMention & { until: number })[];
   error: string | null;
 }
 

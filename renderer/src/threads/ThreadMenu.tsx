@@ -177,7 +177,7 @@ function TerminalMark() {
   return <svg {...mark}><rect x="3" y="4" width="18" height="16" /><path d="m7 9 3 3-3 3m6 0h4" /></svg>;
 }
 /** The two ticks the Done mark was drawn with, now its row's mark. */
-function DoneMark() {
+export function DoneMark() {
   return <svg {...mark}><path d="m3 13 3.6 3.6L13.4 9" /><path d="m10.6 13 3.6 3.6L21 9" /></svg>;
 }
 /** A play mark with a bar in front of it: start this one, ahead of the line. */

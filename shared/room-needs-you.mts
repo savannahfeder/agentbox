@@ -36,6 +36,13 @@ export interface GroupRow {
   file?: string | null;
 }
 
+/** A group put off with L: `seen` is the newest word in it then. */
+export interface PutOff { until: number; seen: number }
+
+/** Out of Needs you until the moment, or until someone writes after it was put off. */
+export const putOffNow = (row: { at: number }, off: PutOff | undefined, now: number): boolean =>
+  !!off && now < off.until && row.at <= off.seen;
+
 type NameOf = (id: string | null) => string;
 
 const WORD = /[\p{L}\p{N}]/u;
