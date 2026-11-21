@@ -328,9 +328,11 @@ textarea.tq-field { resize: vertical; border-color: var(--line); margin-left: 0;
 .tq-set-col dd { display: flex; align-items: center; min-height: 28px; margin: 0; min-width: 0; }
 .tq-set-col .compose-word { display: inline-flex; align-items: center; height: 28px; max-width: 100%; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: rgba(255, 255, 255, 0.03); color: var(--text-dim); font-size: 13px; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tq-set-col .compose-word:hover, .tq-set-col .compose-word.open { color: var(--text); border-color: var(--line-strong); }
-/* A tag's menu puts its words under the tag's word. */
+/* A tag's menu puts its words under the tag's word. The schedule's is wider than
+   the room right of its tag on a laptop, so it ends at the tag's right edge, as
+   the model menu does everywhere. */
 .tq-set-col .compose-word-wrap .prio-menu { left: -3px; }
-.tq-set-col .compose-word-wrap .prio-menu.tq-sched-pop { left: -2px; }
+.tq-set-col .compose-word-wrap .prio-menu.tq-sched-pop { left: auto; right: 0; }
 .tq-set-text { color: var(--text-dim); }
 /* A long job is cut to three lines. About holds the whole of it. */
 .tq-set-job { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; flex: 1; min-width: 0; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; color: var(--text-dim); text-align: left; cursor: pointer; }

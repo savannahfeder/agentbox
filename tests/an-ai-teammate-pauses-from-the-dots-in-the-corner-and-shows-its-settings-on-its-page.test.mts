@@ -109,6 +109,10 @@ describe('the settings beside its tasks', () => {
     expect(css).not.toMatch(/tq-set-col[^{}]*::after/);
     expect(css).not.toContain('tq-set-line');
   });
+  // In a 1512px window the schedule's menu, opened rightward, ran 6px past the page's edge and was cut.
+  it('open the schedule\'s menu leftward from its tag, so a laptop window does not cut it', () => {
+    expect(rule(css, '.tq-set-col .compose-word-wrap .prio-menu.tq-sched-pop')).toMatch(/left: auto; right: 0;/);
+  });
   it('cut a long job to three lines with an ellipsis, keep it whole on hover, and open About when pressed', () => {
     const html = column(mate({ job: LONG_JOB }));
     expect(html).toContain(`<button type="button" class="tq-set-job" title="${LONG_JOB}">${LONG_JOB}</button>`);
