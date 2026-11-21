@@ -4480,9 +4480,11 @@ export default function App() {
     const res = await roomsUi.markDone(id);
     if (!res.ok) { showToast(res.error ?? 'Not marked done'); return; }
     const was = res.value ?? 0;
+    // Z opens it again, as it opens a thread it puts back.
     pushUndo({ label: `Back in Needs you: ${name}`, undoes: `put ${name} back in Needs you`, run: async () => {
       const back = await roomsUi.undoDone(id, was);
       if (!back.ok) return { refused: back.error ?? `${name} could not be put back.` };
+      roomsUi.open(id, 'inbox');
     } });
     showToast(`${DONE.verb}: ${name}${SAYS_UNDO}`);
     leaveChatFor(next);
@@ -4504,6 +4506,7 @@ export default function App() {
     pushUndo({ label: until ? 'Back in your inbox' : `Later again: ${name}`, undoes: until ? 'undo moving it to Later' : `put ${name} back in Later`, run: async () => {
       const back = await roomsUi.putOff(roomId, was?.until ?? 0, was?.seen);
       if (!back.ok) return { refused: back.error ?? 'That could not be undone.' };
+      if (until) roomsUi.open(roomId, 'inbox');
     } });
     showToast(label ? `Later: ${name}. Back ${label.toLowerCase()}${SAYS_UNDO}` : `Back in Needs you: ${name}${SAYS_UNDO}`);
     if (fromIt && until) leaveChatFor(next);

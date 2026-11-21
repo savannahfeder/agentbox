@@ -83,7 +83,7 @@ function world() {
       device: () => '0123456789ab', presenceFacts: () => ({ running: [], items: [], products: [], summary: { total: 0, week: 0, weekStart: '2026-11-16', today: 0, day: '2026-11-21', streak: 0, activeDays: [], byMonth: [] } }),
       prefsFile, now: () => clock, timers: timers as unknown as Pick<typeof globalThis, 'setTimeout' | 'clearTimeout'>,
     });
-    return { id, backend, make, rooms: make() };
+    return { id, backend, make, prefsFile, rooms: make() };
   };
   return {
     maya: mk('Maya', 'maya@lumen.test'), dev: mk('Dev', 'dev@lumen.test'),
@@ -174,6 +174,18 @@ describe('on two Macs', () => {
   it('refuses a moment that is not one', async () => {
     await expect(w.dev.rooms.later(room, 'tomorrow')).rejects.toThrow();
     expect(rows()).toHaveLength(1);
+  });
+
+  it('reads the settings a Mac saved before Later, with no `later` in them', async () => {
+    await w.dev.rooms.stop();
+    fs.writeFileSync(w.dev.prefsFile, JSON.stringify({ [w.dev.id]: { pinned: [], muted: [], markedUnread: [], autoPinned: true, doneAt: {} } }));
+    w.dev.rooms = w.dev.make();
+    await w.dev.rooms.start();
+    await flush();
+    expect(rows()).toHaveLength(1);
+    expect(later()).toEqual([]);
+    await w.dev.rooms.later(room, T0 + 3_600_000);
+    expect(rows()).toEqual([]);
   });
 });
 

@@ -530,8 +530,10 @@
    waits folded at the column's foot until R. */
 .gr-page.in-inbox .rm-full .rm-chat-list { padding-left: var(--task-indent, 32px); padding-right: 32px; }
 .gr-page.in-inbox .rm-full .rm-chat-msgs { max-width: var(--task-measure, 760px); }
-.gr-page.in-inbox .rm-full.hang .rm-cm { padding-left: 0; }
-.gr-page.in-inbox .rm-full.hang .rm-cm .h > .tm-av:first-child { left: -44px; top: 12px; }
+@container (min-width: 900px) {
+  .gr-page.in-inbox .rm-full.hang .rm-cm { padding-left: 0; }
+  .gr-page.in-inbox .rm-full.hang .rm-cm .h > .tm-av:first-child { left: -44px; top: 12px; }
+}
 .gr-page.in-inbox .rm-full .rm-cm .h { font-size: calc(var(--task-type, 16px) * 0.9); line-height: 24px; }
 .gr-page.in-inbox .rm-full .rm-cm .tx { font-size: var(--task-type, 16px); line-height: 1.6; }
 .gr-page.in-inbox .rm-full .rm-chat-err { margin-left: var(--task-indent, 32px); }
