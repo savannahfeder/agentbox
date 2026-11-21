@@ -31,6 +31,7 @@ import { Supervisor } from './supervisor.mts';
 import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
+import { followChatsFor } from './chat-follow.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './codex-threads.mts';
 import { appSessionFolders } from './agent-homes.mts';
@@ -602,10 +603,14 @@ async function createWindow() {
   // `analytics.track` itself, so this hands it over unconditionally.
   // Every Codex folder on the machine, read fresh each minute so a login made
   // while the app is open is followed too (main/agent-homes.mts).
+  // A chat brought in follows where it started (main/chat-follow.mts).
+  const chatFollow = followChatsFor({ store, config, supervisor });
+  quitStep(app, 'before-quit', 'chatFollow.stop', () => chatFollow.stop());
   const codexWatch = startCodexWatch({
     store,
     count: (name, props) => analytics.track(name, props),
     readThreads: (opts) => readCodexThreadsOffThread({ ...opts, codexDirs: appSessionFolders({ config, supervisor }).codexDirs }),
+    follow: (threads) => chatFollow.followCodex(threads),
   });
   quitStep(app, 'before-quit', 'codexWatch.stop', () => codexWatch.stop());
   // New chats from Claude Code and Codex, once asked for on setup's last

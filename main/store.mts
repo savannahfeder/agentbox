@@ -29,13 +29,16 @@ import { projectWrites, projectWritten } from './store/projects-changed.mts';
 import { imgUrl } from './img-scheme.mts';
 import { teamOf, PERSONAL_FLAG } from './team/projects.mts';
 import {
-  agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL,
+  agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL, THREAD_LABEL,
 } from '../shared/agent-import.mts';
+import { heldOutside } from '../shared/carried-on-outside.mts';
+import { isShared } from '../shared/team-rules.mts';
+import type { FollowedChat } from './chat-follow.mts';
 import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mts';
-import { buildClaimLine, buildReleaseLine, GIVEN_TASK, type LinkComment } from '../shared/work-items.mts';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK, LEASE_MS, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mts';
 import { notShipped } from '../shared/not-shipped.mts';
@@ -641,6 +644,9 @@ export class Store {
     if (priority != null) item = workItemsDisk.updateWorkItem(dir, id, { priority }, { source: 'founder' });
     if (status) item = workItemsDisk.updateWorkItem(dir, id, { status }, { source: 'founder' });
     if (typeof putAway === 'boolean') item = workItemsDisk.updateWorkItem(dir, id, { putAway }, { source: 'founder' });
+    // A reply or a close here takes a chat back from where it started: the run
+    // a reply starts is refused a row somebody else holds (main/chat-follow.mts).
+    if ((answer && answer !== '(withdrawn)') || status) item = this.letGoOfChat(slug, id) ?? item;
     return item;
   }
 
@@ -1974,6 +1980,79 @@ export class Store {
       refreshed += 1;
     }
     return refreshed;
+  }
+
+  /**
+   * THE CHATS BROUGHT IN THAT FOLLOW WHERE THEY STARTED (main/chat-follow.mts),
+   *  and any the follow still holds. Not one in a project shared with a team:
+   *  every line there reaches teammates, and what the agent says next in a
+   *  terminal is nothing anybody chose to share. */
+  chatsToFollow(now = Date.now()): FollowedChat[] {
+    const shared = new Set(this.listProducts().filter((p) => isShared(p)).map((p) => p.slug));
+    const out: FollowedChat[] = [];
+    for (const item of this.listAllWorkItems(now)) {
+      const labels = item.labels ?? [];
+      const thread = labels.includes(THREAD_LABEL) ? labels.find((l) => l.startsWith('thread:'))?.slice(7).trim() : '';
+      const codex = isCodexMirrorRow(item) ? codexIdOf(item) : null;
+      const chat = thread || codex;
+      if (!chat) continue;
+      const held = heldOutside(item);
+      const follow = (item.status === 'open' || held) && !shared.has(item.product)
+        && !(item.answer && item.answer !== '(withdrawn)');
+      if (!follow && !held) continue;
+      out.push({
+        product: item.product, id: item.id, engine: thread ? 'claude' : 'codex', chat,
+        knownAt: Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0), held, follow,
+      });
+    }
+    return out;
+  }
+
+  /** Into In progress while its agent works on what was typed there. A claim
+   *  anybody else holds is theirs; the follow's own is renewed before its lease
+   *  is half gone. */
+  async holdChatOutside(slug: string, id: string, holder: string, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item) return null;
+    if (item.claim && !item.claimExpired) {
+      if (item.claim.holder !== holder) return null;
+      if (item.claim.leaseUntil - now < LEASE_MS / 2) workItemsDisk.heartbeatWorkItem(dir, id, { epoch: item.epoch, holder, now });
+      return item;
+    }
+    if (item.status !== 'open') return null;
+    const got = await workItemsDisk.claimWorkItem(dir, { id, holder, now });
+    if (!got.claimed) return null;
+    // Replied to here while the claim waited for the lock.
+    if (got.item.answer && got.item.answer !== '(withdrawn)') {
+      this.letGoOfChat(slug, id, { now });
+      return null;
+    }
+    return got.item;
+  }
+
+  /** Its agent answered there: the answer is the row's, and the row is open. */
+  chatAnsweredOutside(slug: string, id: string, said: string, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item) return null;
+    workItemsDisk.updateWorkItem(dir, id, { result: said }, { source: 'agent', now });
+    // Written up the way every thread reads (main/catch-up.mts) once already, so again.
+    const labels = item.labels ?? [];
+    if (item.wrote?.problem && !labels.includes(CATCH_UP_LABEL)) {
+      workItemsDisk.updateWorkItem(dir, id, { labels: [...labels, CATCH_UP_LABEL] }, { source: 'system', now });
+    }
+    return this.letGoOfChat(slug, id, { now });
+  }
+
+  letGoOfChat(slug: string, id: string, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item || !heldOutside(item)) return item;
+    return workItemsDisk.releaseWorkItem(dir, id, { epoch: item.epoch, now });
   }
 
   /**

@@ -23,6 +23,7 @@ export interface CodexThread {
   id?: string;
   lastActive?: number;
   live?: boolean;
+  herTurnLast?: boolean;
 }
 
 type Count = (event: string, props: { engine: string }) => void;
@@ -100,35 +101,40 @@ export function noticeCodexAgents(
 
 // Answers at once for a reader that answers at once, and as a promise for one
 // that reads off the main process (readCodexThreadsOffThread).
+/** Handed every read once its answers are on the rows (main/chat-follow.mts). */
+type Follow = (threads: CodexThread[]) => unknown;
+
 interface ScanOptions {
   store: CodexStore;
   readThreads?: ReadThreads;
   now?: number;
   count?: Count | null;
   seen?: Set<unknown> | null;
+  follow?: Follow | null;
 }
 
-export function scanCodex({ store, readThreads = readCodexThreads, now = Date.now(), count = null, seen = null }: ScanOptions) {
+export function scanCodex({ store, readThreads = readCodexThreads, now = Date.now(), count = null, seen = null, follow = null }: ScanOptions) {
   const none = { refreshed: 0, retold: 0, threads: 0 };
   let read: ReturnType<ReadThreads>;
   try { read = readThreads({ now }); } catch { return none; }
-  if (isPending(read)) return read.then(({ threads }) => applyCodexThreads(threads, { store, now, count, seen }), () => none);
-  return applyCodexThreads(read?.threads ?? [], { store, now, count, seen });
+  if (isPending(read)) return read.then(({ threads }) => applyCodexThreads(threads, { store, now, count, seen, follow }), () => none);
+  return applyCodexThreads(read?.threads ?? [], { store, now, count, seen, follow });
 }
 
 function applyCodexThreads(
   threads: CodexThread[],
-  { store, now, count, seen }: { store: CodexStore; now: number; count: Count | null; seen: Set<unknown> | null },
+  { store, now, count, seen, follow }: { store: CodexStore; now: number; count: Count | null; seen: Set<unknown> | null; follow: Follow | null },
 ) {
   noticeCodexAgents(threads, { count, seen, now });
   const refreshed = store.refreshCodexMirrors(threads, { now });
   const retold = store.refreshCodexAsks(threads, { now });
+  try { follow?.(threads); } catch (e) { console.warn('codex watch: follow:', (e as Error)?.message ?? e); }
   return { refreshed, retold, threads: threads.length };
 }
 
 export function startCodexWatch(
-  { store, readThreads = readCodexThreads, pollMs = CODEX_POLL_MS, firstDelayMs = 8_000, count = null }:
-    { store: CodexStore; readThreads?: ReadThreads; pollMs?: number; firstDelayMs?: number; count?: Count | null },
+  { store, readThreads = readCodexThreads, pollMs = CODEX_POLL_MS, firstDelayMs = 8_000, count = null, follow = null }:
+    { store: CodexStore; readThreads?: ReadThreads; pollMs?: number; firstDelayMs?: number; count?: Count | null; follow?: Follow | null },
 ) {
   // Conversations this run has already counted. In memory on purpose, exactly
   // as the Claude side's set is: a fresh launch seeing the same conversation
@@ -138,7 +144,7 @@ export function startCodexWatch(
   let scanning: Promise<unknown> | null = null;
   const run = () => {
     if (scanning) return scanning;
-    scanning = Promise.resolve().then(() => scanCodex({ store, readThreads, count, seen }))
+    scanning = Promise.resolve().then(() => scanCodex({ store, readThreads, count, seen, follow }))
       .catch((e) => console.warn('codex watch:', e?.message ?? e))
       .finally(() => { scanning = null; });
     return scanning;

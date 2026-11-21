@@ -376,6 +376,51 @@ export function readTranscriptTail(file: string, bytes = TAIL_BYTES): Transcript
   }
 }
 
+/** Where a chat stands at its end, for a row that follows it
+ *  (main/chat-follow.mts). `heardAt` is when the person last typed, 0 when that
+ *  is further back than the tail; `said` is the agent's reply since, and
+ *  `ended` whether that reply's turn is over. */
+export interface ChatTurn { heardAt: number; said: string; saidAt: number; ended: boolean }
+
+export function readChatTurn(file: string, bytes = TAIL_BYTES): ChatTurn | null {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size;
+    const from = Math.max(0, size - bytes);
+    const buf = Buffer.alloc(size - from);
+    const n = fs.readSync(fd, buf, 0, buf.length, from);
+    const lines = buf.slice(0, n).toString('utf8').split('\n');
+    if (from > 0) lines.shift();
+    const turn: ChatTurn = { heardAt: 0, said: '', saidAt: 0, ended: false };
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let row: TranscriptRow & { isSidechain?: boolean; message?: { content?: unknown; stop_reason?: unknown } };
+      try { row = JSON.parse(line); } catch { continue; }
+      if (row.isSidechain || (row.type !== 'user' && row.type !== 'assistant')) continue;
+      const at = Date.parse(String(row.timestamp ?? '')) || 0;
+      if (typedTurn(row)) {
+        Object.assign(turn, { heardAt: at, said: '', saidAt: 0, ended: false });
+        continue;
+      }
+      // A tool's result: the agent carries on from it.
+      if (row.type === 'user') { turn.ended = false; continue; }
+      // Claude Code refusing the turn, a usage limit: the agent has stopped.
+      if (row.isApiErrorMessage) { turn.ended = true; continue; }
+      const text = messageText(row).trim();
+      if (text) Object.assign(turn, { said: turn.said ? `${turn.said}\n\n${text}` : text, saidAt: at });
+      const blocks = Array.isArray(row.message?.content) ? row.message.content as { type?: unknown }[] : [];
+      turn.ended = row.message?.stop_reason === 'end_turn' && !blocks.some((b) => b?.type === 'tool_use');
+    }
+    turn.said = turn.said.slice(-SAID_CHARS);
+    return turn;
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) { try { fs.closeSync(fd); } catch { /* nothing to do */ } }
+  }
+}
+
 /** What a finished read knows about how a chat ended, for its row and the
  *  setup card. */
 function endOf(file: string | null): End {

@@ -13,6 +13,7 @@ import { firstRealLine, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 import { isCause } from '../../shared/causes.mts';
+import { heldOutside } from '../../shared/carried-on-outside.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -42,6 +43,8 @@ export interface InboxItem {
   createdAt?: number;
   updatedAt?: number;
   wrote?: Record<string, { ts: number; source: string } | undefined>;
+  claim?: { holder?: string | null; leaseUntil?: number } | null;
+  claimExpired?: boolean;
 }
 
 // The queue's own rule, so In progress never holds a thread it will not start.
@@ -83,6 +86,8 @@ const liveAnswer = (i: InboxItem) => (i.answer && i.answer !== '(withdrawn)' ? i
 export function stillAsksYou(i: InboxItem): boolean {
   if (i.kind !== 'question' && i.kind !== 'review') return false;
   if (i.status === 'done') return false;
+  // Answered where it started, and its agent is at work on that.
+  if (heldOutside(i)) return false;
   return !liveAnswer(i);
 }
 
@@ -223,6 +228,9 @@ export function belongsInInbox(
   // status, the schedule and the waits do: each of those is a reason the thread
   // would be elsewhere, and none is a reason the question has gone away.
   if (asking) return true;
+  // A chat brought in, answered where it started while its agent works on that
+  // there (main/chat-follow.mts). The claim's lease brings it back.
+  if (heldOutside(i)) return false;
   // A session is still on it, so it is In progress until it exits. Unless it is
   // still asking you something (w-fe48447cab): the one thing a session may not
   // do is take away the question it is asking (`stillAsksYou`).

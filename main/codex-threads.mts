@@ -118,6 +118,8 @@ export interface CodexThread {
   live: boolean;
   waiting?: boolean;
   ask?: string;
+  /** The person wrote after Codex's last answer (main/chat-follow.mts). */
+  herTurnLast?: boolean;
   lastSaid: string;
   firstSaid: string;
 }
@@ -473,6 +475,7 @@ function readOneCodexHome(codexDir: string, { home, days, now, cutoff, index, by
       prompt: r.prompt,
       last: r.last,
       live: isLive(r.mtime, now),
+      herTurnLast: r.herTurnLast,
       ...(r.herTurnLast ? { waiting: false, ask: '' } : howTheChatEnded(r.last)),
       lastSaid: r.last,
       firstSaid: r.prompt,

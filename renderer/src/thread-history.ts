@@ -27,6 +27,7 @@ import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { handBackReadBy } from '../../shared/thread-asks.mts';
+import { carriedOnIn } from '../../shared/carried-on-outside.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
@@ -342,6 +343,13 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     // The lease. A heartbeat extends it, a release ends it, and neither is
     // news: an agent that held a task for an hour did one thing, not thirty.
     if (line.heartbeat || line.release) continue;
+    // A chat brought in, carried on where it started (main/chat-follow.mts): no
+    // run of ours, so no diary hangs off it.
+    const carriedOn = line.claim ? carriedOnIn(line.claim.holder) : null;
+    if (carriedOn) {
+      events.push({ at, who: 'you', said: `You replied in ${carriedOn}` });
+      continue;
+    }
     if (line.claim) {
       events.push({ at, who: 'agent', said: 'An agent picked it up', pickup: true });
       continue;
