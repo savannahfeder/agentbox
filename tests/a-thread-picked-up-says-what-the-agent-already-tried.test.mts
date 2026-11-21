@@ -93,8 +93,8 @@ describe('a teammate\'s thread page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
   it('shows the list under the thread\'s name, before the conversation', () => {
     const at = page.indexOf('<section className="tp-tried"');
-    expect(at).toBeGreaterThan(page.indexOf('<header className="tp-top">'));
-    expect(at).toBeLessThan(page.indexOf('<Thread events={events}'));
+    expect(at).toBeGreaterThan(page.indexOf('<QueueSummary title={title}'));
+    expect(at).toBeLessThan(page.indexOf('<Thread events={before}'));
     expect(page).toContain("const tried = card.visible ? doneSteps(card.progress) : [];");
   });
   it('does not show it twice when About is open', () => {
