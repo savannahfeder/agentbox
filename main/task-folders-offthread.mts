@@ -28,6 +28,7 @@
 // IF A THREAD CANNOT START, THE JOB RUNS HERE, the old way. A packaged build
 // reads its code out of an asar archive, and a folder made slowly is better
 // than a task that never gets one.
+import fs from 'node:fs';
 import { Worker } from 'node:worker_threads';
 import * as folders from './task-folders.mts';
 import { stripTypesFlags } from './strip-types.mts';
@@ -90,14 +91,21 @@ interface Lane { thread: FolderThread | null; current: Job | null; queue: Job[];
 const ONE_FOLDER = new Set<FolderJobName>(['restoreTaskFolder', 'parkTaskFolder', 'releaseTaskFolder']);
 const SPARE = new Set<FolderJobName>(['makeSpareFolder', 'dropSpareFolder']);
 
+/** A thread whose folder is not there yet, which is the only kind that may take the one made ahead. */
+function couldTakeTheSpare(job: Job): boolean {
+  if (job.name !== 'restoreTaskFolder') return false;
+  try { return !fs.existsSync(folders.taskFolderPath(String(job.args[0]), job.args[1])); } catch { return true; }
+}
+
 // A prune drops registrations whose folder is missing, and a folder being made
-// is briefly missing while git moves it into place. A new thread takes the
-// folder made ahead, so making or dropping that one waits for it, and it waits
-// for them: once it is made, it is taken whole.
+// is briefly missing while git moves it into place. A new thread may take the
+// folder made ahead, so making or dropping that one and making the new
+// thread's folder wait for each other. A reply to a thread whose folder is
+// there waits for neither.
 function clash(a: Job, b: Job): boolean {
   if (String(a.args[0]) !== String(b.args[0])) return false;
   if (a.name === 'pruneMissingWorktrees' || b.name === 'pruneMissingWorktrees') return true;
-  const takes = (j: Job) => SPARE.has(j.name) || j.name === 'restoreTaskFolder';
+  const takes = (j: Job) => SPARE.has(j.name) || couldTakeTheSpare(j);
   if (SPARE.has(a.name) || SPARE.has(b.name)) return takes(a) && takes(b);
   return ONE_FOLDER.has(a.name) && ONE_FOLDER.has(b.name) && String(a.args[1]) === String(b.args[1]);
 }

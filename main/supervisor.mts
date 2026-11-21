@@ -1045,7 +1045,7 @@ const TIDYING_WAITS_MS = 60_000;
 /** How often the folder made ahead is checked again, so one main has moved past is made again before it is wanted. */
 const SPARE_RECHECK_MS = 10 * 60_000;
 /** What `makeSpareFolder` answers when there is nothing to say. */
-const SPARE_QUIET = new Set(['ready', 'not a repository', 'no commit yet', 'building', 'held']);
+const SPARE_QUIET = new Set(['ready', 'not a repository', 'no commit yet', 'building', 'held', 'not the top of its repository', 'not clean at the commit a thread starts from']);
 // How long one account gets to say who takes a thread sent to Auto. A person is
 // waiting on this one, unlike a name, and a miss sends the thread to an agent.
 const ROUTE_TIMEOUT_MS = 60_000;
@@ -3793,10 +3793,11 @@ export class Supervisor {
         (made) => ({
           cwd: made?.path ?? null,
           failed: made?.taken === false ? Error(`no folder could be made for ${item.id}${whoHasIt(made)}`) : null,
+          created: made?.taken === true && made.created,
         }),
-        (error: Error) => ({ cwd: null, failed: error }),
+        (error: Error) => ({ cwd: null, failed: error, created: false }),
       )
-      .then(({ cwd, failed }) => {
+      .then(({ cwd, failed, created }) => {
         // Stopped, or the app quit, while the folder was being made.
         if (this._preparing.get(item.id) !== entry) return;
         this._preparing.delete(item.id);
@@ -3834,7 +3835,7 @@ export class Supervisor {
         // anybody having just checked asks for itself.
         if (this.sessions.has(item.id)) { this.onChange?.(); return; }
         this._gotAFolderAfterAll(item.id);
-        this._aFolderWasTaken(base);
+        if (created) this._aFolderWasTaken(base);
         this._madeFolders.set(item.id, cwd);
         try { this.spawnWorker(entry.item, entry.opts); }
         catch (error) {

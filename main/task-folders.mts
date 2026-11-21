@@ -677,7 +677,8 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
 
   // A new thread takes the folder made ahead for it, when there is one still
   // good. A thread with a branch of its own is made from that branch instead.
-  if (dependencies && !tryGit(root, ['rev-parse', '--verify', '-q', `refs/heads/${branch}`]).ok && takeTheSpare(root, folder, branch, pid)) {
+  if (tryGit(root, ['rev-parse', '--verify', '-q', `refs/heads/${branch}`]).ok) letTheSpareGoOf(root, branch, pid);
+  else if (dependencies && takeTheSpare(root, dir, folder, branch, pid)) {
     const held = acquireTaskFolder(root, folder, { pid });
     if (!held.taken) return refused(held);
     return { taken: true, heldBy: pid, path: folder, branch, created: true, how: 'spare' };
@@ -818,9 +819,26 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
 /** What a folder made ahead was made from, kept in its own git folder so it goes when the folder does. */
 interface SpareStamp { head: string; local: [string, number, number][] }
 
-function spareStampFile(spare: string): string | null {
+/** Its stamp, and the file whose time is the moment before its local files were copied. */
+function spareFiles(spare: string): { stamp: string; since: string } | null {
   const at = tryGit(spare, ['rev-parse', '--absolute-git-dir']);
-  return at.ok && at.out ? path.join(at.out, 'agentbox-spare.json') : null;
+  return at.ok && at.out ? { stamp: path.join(at.out, 'agentbox-spare.json'), since: path.join(at.out, 'agentbox-spare.since') } : null;
+}
+
+/**
+ * Whether anything under these local files changed after `since` was written:
+ * a file rewritten in place deep in node_modules (a rebuild, a patch) changes
+ * no directory's time, but it changes its own status time. A `find` that
+ * cannot answer counts as a change.
+ */
+function changedSince(root: string, rels: string[], since: string): boolean {
+  if (!rels.length) return false;
+  try {
+    const out = execFileSync('find', [...rels.map((rel) => path.join(root, rel)), '-cnewer', since, '-print', '-quit'], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: folderChildDeadline(), killSignal: 'SIGKILL', maxBuffer: 1024 * 1024, windowsHide: true,
+    });
+    return out.trim() !== '';
+  } catch { return true; }
 }
 
 /** The checkout's local files a folder carries in, each with when it last changed and its size. */
@@ -833,43 +851,60 @@ function localFilesNow(root: string): [string, number, number][] {
 
 /**
  * Whether the folder made ahead is still exactly what a folder made now would
- * be: finished, on the commit a new thread starts from, carrying the local
- * files as they stand now, with nothing changed in it, and ours or left by an
- * app that has quit.
+ * be: finished, detached, on the commit a new thread starts from, carrying the
+ * local files as they stand now, with nothing changed in it, and ours or left
+ * by an app that has quit.
  */
 function spareIsGood(root: string, spare: string, pid: number): boolean {
   if (!fs.existsSync(spare) || !record(root, spare)) return false;
   const owner = holder(root, spare, pid);
   if (!owner.ok || owner.free) return false;
+  // On a branch means a take was cut off half way, and that branch is a thread's.
+  if (tryGit(spare, ['symbolic-ref', '-q', 'HEAD']).ok) return false;
+  const files = spareFiles(spare);
   let stamp: SpareStamp | null = null;
-  try {
-    const file = spareStampFile(spare);
-    stamp = file ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
-  } catch { return false; }
-  if (!stamp?.head) return false;
+  try { stamp = files ? JSON.parse(fs.readFileSync(files.stamp, 'utf8')) : null; } catch { return false; }
+  if (!files || !stamp?.head || !fs.existsSync(files.since)) return false;
   const head = tryGit(spare, ['rev-parse', 'HEAD']);
   const base = tryGit(root, ['rev-parse', baseRef(root)]);
   if (!head.ok || !base.ok || head.out !== stamp.head || base.out !== stamp.head) return false;
   try { if (JSON.stringify(localFilesNow(root)) !== JSON.stringify(stamp.local)) return false; } catch { return false; }
+  if (changedSince(root, stamp.local.map(([rel]) => rel), files.since)) return false;
   const status = tryGit(spare, ['status', '--porcelain']);
   return status.ok && status.out === '';
 }
 
 /**
- * THE FOLDER MADE AHEAD, TAKEN BY A NEW THREAD IN ONE MOVE (w-9993530556): its
- * own branch on the commit it already stands on, so no file changes, then
- * moved to the thread's path. Short of that it is put back detached and the
- * folder is made the ordinary way; clearing it is left to the next
- * `makeSpareFolder`, off the thread's start.
+ * A take cut off between giving the folder made ahead a thread's branch and
+ * moving it leaves that branch checked out there, where the ordinary build
+ * cannot have it. Detached again, or put away when that fails.
  */
-function takeTheSpare(root: string, folder: string, branch: string, pid: number): boolean {
+function letTheSpareGoOf(root: string, branch: string, pid: number): void {
+  const spare = spareFolderPath(root);
+  if (record(root, spare)?.branch !== branch || !holder(root, spare, pid).ok) return;
+  if (!tryGit(spare, ['switch', '-q', '--detach']).ok) clearUnfinished(root, spare, pid);
+}
+
+/**
+ * THE FOLDER MADE AHEAD, TAKEN BY A NEW THREAD IN ONE MOVE (w-9993530556):
+ * claimed for this app first, so two apps over one checkout cannot both take
+ * it, then given the thread's branch on the commit it already stands on, so
+ * no file changes, then moved to the thread's path. Short of that it is put
+ * back detached and the folder is made the ordinary way.
+ */
+function takeTheSpare(root: string, dir: string, folder: string, branch: string, pid: number): boolean {
+  if (real(path.resolve(dir)) !== root) return false;
   const spare = spareFolderPath(root);
   if (!spareIsGood(root, spare, pid)) return false;
+  if (!acquireTaskFolder(root, spare, { pid }).taken) return false;
   if (!tryGit(spare, ['switch', '-q', '-c', branch]).ok) return false;
   const putBack = () => { tryGit(spare, ['switch', '-q', '--detach']); return false; };
   if (fs.existsSync(folder)) return putBack();
   if (!tryGit(root, ['worktree', 'move', '--force', '--force', spare, folder]).ok) return putBack();
-  try { const stamp = spareStampFile(folder); if (stamp) fs.rmSync(stamp, { force: true }); } catch { /* a stamp left behind is never read again */ }
+  try {
+    const files = spareFiles(folder);
+    if (files) { fs.rmSync(files.stamp, { force: true }); fs.rmSync(files.since, { force: true }); }
+  } catch { /* left behind, they are never read again */ }
   // Given now rather than when it was made, so it is as fresh as a folder made on the spot.
   const given = givePrivateFolder(root, folder);
   if (!given.given && given.why) console.warn(`[task-folders] ${path.basename(folder)} has no private folder: ${given.why}`);
@@ -882,12 +917,16 @@ function takeTheSpare(root: string, folder: string, branch: string, pid: number)
  * Made the way `ensureTaskFolder` makes one, but detached at the commit a new
  * thread starts from and left at `spareFolderPath`, locked to this app. A
  * folder that is not a repository yet is left alone: its first commit is made
- * for the person's first thread there, not ahead of it.
+ * for the person's first thread there, not ahead of it. Only by the block
+ * clone: a checkout with edits in it would cost a full checkout each time
+ * main moved (960 MB on hers), for a folder that may never be wanted.
  */
 export function makeSpareFolder(dir: string, { pid = process.pid }: { pid?: number } = {}): { made: boolean; path: string | null; why?: string } {
   if (insideGitFolder(path.resolve(dir))) return { made: false, path: null, why: 'inside a .git folder' };
   const root = repoRoot(dir);
   if (!root) return { made: false, path: null, why: 'not a repository' };
+  // One per repository, so only a project at its top makes one.
+  if (real(path.resolve(dir)) !== root) return { made: false, path: null, why: 'not the top of its repository' };
   const base = tryGit(root, ['rev-parse', '--verify', '-q', `${baseRef(root)}^{commit}`]);
   if (!base.ok || !base.out) return { made: false, path: null, why: 'no commit yet' };
   const spare = spareFolderPath(root);
@@ -903,15 +942,17 @@ export function makeSpareFolder(dir: string, { pid = process.pid }: { pid?: numb
   keepOutOfBackups(path.dirname(spare));
   hideFromTheCheckout(root);
   if (!cloneCheckout(root, spare, base.out, ['--detach', spare, base.out], pid)) {
-    const add = addOwned(root, spare, ['--detach', spare, base.out], pid);
-    if (!add.ok) { clearUnfinished(root, spare, pid); return { made: false, path: null, why: add.out }; }
+    clearUnfinished(root, spare, pid);
+    return { made: false, path: null, why: 'not clean at the commit a thread starts from' };
   }
   try {
+    const files = spareFiles(spare);
+    if (!files) throw Error('its git folder could not be found');
+    // Before the copy, so a change made while it runs reads as newer.
+    fs.writeFileSync(files.since, '');
     carryLocalFiles(root, spare);
-    const file = spareStampFile(spare);
-    if (!file) throw Error('its git folder could not be found');
     const stamp: SpareStamp = { head: base.out, local: localFilesNow(root) };
-    fs.writeFileSync(file, JSON.stringify(stamp));
+    fs.writeFileSync(files.stamp, JSON.stringify(stamp));
   } catch (error) {
     clearUnfinished(root, spare, pid);
     return { made: false, path: null, why: (error as Error).message };
@@ -923,6 +964,7 @@ export function makeSpareFolder(dir: string, { pid = process.pid }: { pid?: numb
 export function dropSpareFolder(dir: string, { pid = process.pid }: { pid?: number } = {}): { dropped: boolean; why?: string } {
   const root = repoRoot(dir);
   if (!root) return { dropped: false, why: 'not a repository' };
+  if (real(path.resolve(dir)) !== root) return { dropped: false, why: 'not the top of its repository' };
   const spare = spareFolderPath(root);
   if (!fs.existsSync(spare) && !record(root, spare)) return { dropped: false, why: 'none' };
   const cleared = clearUnfinished(root, spare, pid);

@@ -145,6 +145,35 @@ describe('a folder made ahead is not taken', () => {
     fs.rmSync(stamp);
     madeOnTheSpot();
   });
+
+  // A rebuild or a patch rewrites a file deep in node_modules and changes no directory's time.
+  it('once a file deep in the local files was rewritten in place', async () => {
+    makeSpareFolder(dir);
+    await new Promise((r) => setTimeout(r, 20));
+    fs.writeFileSync(path.join(dir, 'node_modules', 'left-pad', 'index.js'), 'module.exports = 2\n');
+    const folder = madeOnTheSpot();
+    expect(fs.readFileSync(path.join(folder, 'node_modules', 'left-pad', 'index.js'), 'utf8')).toBe('module.exports = 2\n');
+  });
+});
+
+describe('a take cut off half way', () => {
+  it('leaves the thread its folder all the same, and the one ahead is not offered again on that branch', () => {
+    makeSpareFolder(dir);
+    // The app died after the branch was given and before the move.
+    git(spareFolderPath(dir), 'switch', '-q', '-c', taskBranch('w-1'));
+    expect(makeSpareFolder(dir)).toMatchObject({ made: true });
+    const got = ensureTaskFolder(dir, 'w-1');
+    expect(got).toMatchObject({ taken: true, path: taskFolderPath(dir, 'w-1') });
+    expect(git(taskFolderPath(dir, 'w-1'), 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(taskBranch('w-1'));
+  });
+
+  it('when nothing made a new one ahead meanwhile', () => {
+    makeSpareFolder(dir);
+    git(spareFolderPath(dir), 'switch', '-q', '-c', taskBranch('w-1'));
+    const got = ensureTaskFolder(dir, 'w-1');
+    expect(got).toMatchObject({ taken: true, path: taskFolderPath(dir, 'w-1') });
+    expect(git(spareFolderPath(dir), 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('HEAD');
+  });
 });
 
 describe('nothing is made ahead', () => {
@@ -155,6 +184,18 @@ describe('nothing is made ahead', () => {
       expect(makeSpareFolder(plain)).toMatchObject({ made: false, why: 'not a repository' });
       expect(fs.existsSync(path.join(plain, '.git'))).toBe(false);
     } finally { fs.rmSync(plain, { recursive: true, force: true }); }
+  });
+
+  it('for a project that is a folder inside a repository, since one is kept per repository', () => {
+    fs.mkdirSync(path.join(dir, 'web'));
+    expect(makeSpareFolder(path.join(dir, 'web'))).toMatchObject({ made: false, why: 'not the top of its repository' });
+    expect(fs.existsSync(spareFolderPath(dir))).toBe(false);
+  });
+
+  it('while the checkout has edits in it, which would cost a full checkout each time', () => {
+    fs.writeFileSync(path.join(dir, 'app.txt'), 'being edited\n');
+    expect(makeSpareFolder(dir)).toMatchObject({ made: false, why: 'not clean at the commit a thread starts from' });
+    expect(git(dir, 'worktree', 'list', '--porcelain')).not.toContain('.spare');
   });
 
   it('in a repository with no commit yet', () => {
@@ -199,6 +240,14 @@ describe('the folder threads', () => {
     expect(startThread.posted.map((m) => m.name)).toEqual(['restoreTaskFolder']);
     startThread.answer(startThread.posted[0].id);
     await expect(start).resolves.toBeTruthy();
+  });
+
+  it('give a thread whose folder is already there its folder without waiting', () => {
+    fs.mkdirSync(taskFolderPath(dir, 'w-1'), { recursive: true });
+    const { lanes, threads } = lanesWithFakeThreads();
+    void lanes.run('makeSpareFolder', [dir]);
+    void lanes.run('restoreTaskFolder', [dir, 'w-1']);
+    expect(threads.flatMap((t) => t.posted.map((m) => m.name)).sort()).toEqual(['makeSpareFolder', 'restoreTaskFolder']);
   });
 
   it('make one in another project without waiting', () => {
