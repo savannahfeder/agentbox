@@ -130,15 +130,15 @@
 }
 
 .tc-icon {
-  width: 30px; height: 30px; display: grid; place-items: center; margin-left: auto;
+  width: 28px; height: 28px; display: grid; place-items: center; margin-left: auto;
   color: var(--text-faint); background: none; border: 0; border-radius: var(--radius); cursor: pointer;
 }
 .tc-icon:hover, .tc-icon:focus-visible { color: var(--text); outline: none; }
 
 /* The split Send: the word and the key, and a caret half that opens Send later. */
-.tc-send { display: inline-flex; height: 32px; position: relative; flex: none; }
+.tc-send { display: inline-flex; height: 28px; position: relative; flex: none; }
 .tc-send > button {
-  display: inline-flex; align-items: center; gap: 9px; height: 32px;
+  display: inline-flex; align-items: center; gap: 9px; height: 28px;
   background: var(--send-fill); color: var(--text); border: 0; cursor: pointer;
   font: inherit; font-size: 13.5px; font-weight: 500; padding: 0 14px;
 }
@@ -150,6 +150,8 @@
 .tc-send > button:hover:not(:disabled) { filter: brightness(1.15); }
 .tc-send > button:focus-visible { outline: 1px solid var(--text); outline-offset: 1px; }
 .tc-send > button:disabled { opacity: 0.45; cursor: default; }
+/* With nothing to send, the caret half dims with Send, so the two read as one button. */
+.tc-send:has(> .tc-send-main:disabled) > .tc-send-caret { opacity: 0.45; }
 .tc-send kbd { font: 11px var(--mono); opacity: 0.75; }
 /* A MESSAGE'S BAR IS THE CHIP AND SEND (w-7ba439c883), with nothing between
    them: the line that used to fill that gap is gone, so Send takes the space
