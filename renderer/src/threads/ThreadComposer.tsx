@@ -43,6 +43,7 @@ import { TeamContext, Face, firstName } from '../team/people';
 import { whereAMessageGoes } from '../team/one-conversation';
 import { AgentFace } from '../components/AgentFace';
 import { AutoFace } from '../components/AutoFace';
+import { EngineLogo } from '../components/EngineLogos';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
@@ -1250,10 +1251,13 @@ export function ThreadComposer({
   const fields: { label: string; node: ReactNode }[] = [
     ...(toShown ? [{ label: 'To', node: (
       <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person ? dropRank('to') : undefined}>
-        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'}
+        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'} title={inline && !mate && !person && !onAuto ? 'To: Agent' : undefined}
           onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
-          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : inline ? null : onAuto ? <AutoFace /> : <AgentFace />}
-          <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>
+          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : onAuto ? <AutoFace /> : <AgentFace />}
+          {/* On the page's narrow box the agent is its face alone, so the bar keeps room for the level. */}
+          {inline && !mate && !person && !onAuto
+            ? <span className="tc-word-text tc-face-only">Agent</span>
+            : <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>}
         </button>
         {extra.map((p) => (
           <span key={p.id} className="tc-also">
@@ -1299,6 +1303,7 @@ export function ThreadComposer({
       <span className="tc-anchor" ref={anchor('model')} data-drop={inline ? dropRank('model') : undefined}>
         <button type="button" data-trigger className={trigger('model')} aria-haspopup="listbox" aria-expanded={open === 'model'}
           title={outNote ?? undefined} onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
+          <EngineLogo engine={pick.engine} size={14} />
           <span className="tc-word-text">{labelOf(pick)}</span>
           <OutUntil out={outHere} drop={inline ? dropRank('out-when') : undefined} />
         </button>

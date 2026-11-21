@@ -24,7 +24,8 @@ const sent = (id, ago, over = {}) => ({
   result: 'Here is today\'s post.', wrote: { result: { ts: NOW - ago * DAY + 60_000, source: 'agent' } }, ...over,
 });
 const plan = (items) => planWakes({ teammates: [t], chat, items, now: NOW });
-const runs = (acts) => acts.filter((a) => a.type === 'run');
+// The duty waking: a new thread, or its round brought to the thread the job lives in.
+const runs = (acts) => acts.filter((a) => a.type === 'run' || a.type === 'due');
 
 describe('a duty nobody reads', () => {
   it('stops after three results in a row you have not answered, and says so', () => {
@@ -43,7 +44,8 @@ describe('a duty nobody reads', () => {
   });
 
   it('starts again once you answer one of them', () => {
-    const answered = sent('w-3', 1.5, { answer: 'Not today.', wrote: { result: { ts: NOW - 1.5 * DAY, source: 'agent' }, answer: { ts: NOW - DAY, source: 'founder' } } });
+    // It has since replied to your answer; an answered run that has not is still running and holds the slot.
+    const answered = sent('w-3', 1.5, { answer: 'Not today.', wrote: { result: { ts: NOW - 0.9 * DAY, source: 'agent' }, answer: { ts: NOW - DAY, source: 'founder' } } });
     expect(runs(plan([sent('w-1', 3), sent('w-2', 2), answered]))).toHaveLength(1);
   });
 

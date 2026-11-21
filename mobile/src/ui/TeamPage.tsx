@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { cancelInvite, inviteTo, joinTeam, readTeam, removeFromTeam, type PhoneTeam, type TeamInvite } from '../../../renderer/src/phone-team';
-import { askWords, NOT_LET_IN } from '../../../renderer/src/team/multiplayer-words';
+import { askOwnerForPro, askWords, NOT_LET_IN, PRO_FOR_INVITES } from '../../../renderer/src/team/multiplayer-words';
 import { useCloud } from '../state/cloud';
 import { Aside, Button, Group, Row } from './SettingsParts';
 import { T } from './parts';
@@ -31,6 +31,7 @@ export function TeamPage() {
   const [team, setTeam] = useState<PhoneTeam | null>(null);
   const [invites, setInvites] = useState<TeamInvite[]>([]);
   const [multiplayer, setMultiplayer] = useState<boolean | null>(null);
+  const [pro, setPro] = useState<boolean | null>(null);
   const [read, setRead] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,7 +41,7 @@ export function TeamPage() {
 
   const load = useCallback(async () => {
     if (!cloud) return;
-    try { const got = await readTeam(cloud); setTeam(got.team); setInvites(got.invites); setMultiplayer(got.multiplayer); setError(null); } catch (err) { setError(message(err)); } finally { setRead(true); }
+    try { const got = await readTeam(cloud); setTeam(got.team); setInvites(got.invites); setMultiplayer(got.multiplayer); setPro(got.pro); setError(null); } catch (err) { setError(message(err)); } finally { setRead(true); }
   }, [cloud]);
   useEffect(() => {
     void load();
@@ -72,6 +73,8 @@ export function TeamPage() {
           <Group label="Invite people">
             {multiplayer === false ? (
               <Row first label={`${NOT_LET_IN}.`} control={<AskForInvite email={me?.email} onError={setError} />} />
+            ) : pro === false ? (
+              <Row first label={owner ? PRO_FOR_INVITES : askOwnerForPro(team.people.find((p) => p.role === 'owner')?.name)} desc={owner ? 'Start it on your computer, in Settings, Team.' : undefined} />
             ) : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
               <TextInput value={email} onChangeText={setEmail} placeholder="Their email" placeholderTextColor={color.faint} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" inputMode="email"
                 style={{ flex: 1, height: 36, color: color.text, fontFamily: font.regular, fontSize: 15, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field }} />

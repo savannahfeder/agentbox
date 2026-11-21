@@ -91,7 +91,8 @@ export const HINTS: Record<string, HintLine[]> = {
   // All). Tab walks them, so every tab wears the same plate. It replaced ⌘1 to
   // ⌘4 on the sidebar's sections, 2026-10-02 (w-914b16eab6). NEXT TAB ONLY:
   // Shift-Tab still goes back, but "we don't need to show people the previous
-  // tab shortcut".
+  // tab shortcut". Not under a tab just clicked: it popped up right after the
+  // click (Pages.tsx `quietOnceClicked`, pages.css).
   'state-tab': [{ key: '⇥', what: 'Next tab' }],
   // A task in the list. THE ONLY COMPONENT IN HERE THAT IS NOT A BUTTON, and
   // the reason it says three whole fragments rather than three bare caps: a row
@@ -125,7 +126,6 @@ export const HINTS: Record<string, HintLine[]> = {
   // thread's dots. It prints only its word, so E goes here, in
   // the row plate's own wording.
   done: [{ key: 'E', what: 'Mark done' }],
-  'close-task': [{ key: '', what: 'Close the task for both of you' }],
   back: [{ key: 'esc', what: 'Go back one level' }],
   // The Inbox button left of the back arrow, drawn only on a thread.
   inbox: [{ key: 'esc', what: 'Inbox' }],

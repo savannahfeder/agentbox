@@ -8,6 +8,8 @@
 // spot. The checkout now hands Stripe the team's own trial end, so the card
 // is taken now and charged when the free days are up. Stripe will not take a
 // trial ending within 48 hours, so a team that close to the end pays now.
+// Since 2026-11-21 there is no free time without a card (w-61142123a4): the
+// week runs from the checkout, once a team, unless days given by hand run longer.
 import { describe, it, expect } from 'vitest';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
@@ -20,7 +22,7 @@ const DAY = 24 * 60 * 60_000;
 const MADE = Date.UTC(2026, 10, 17, 9);
 const TRIAL_ENDS = MADE + TEAM.trialDays * DAY;
 
-function setup(start: number) {
+function setup(start: number, { freeUntil = null as number | null, hadSubscription = false } = {}) {
   const calls: Array<{ method: string; path: string; form: Record<string, string> }> = [];
   const fetchImpl = async (url: string, init: { method: string; body?: string }) => {
     const u = new URL(url);
@@ -31,12 +33,14 @@ function setup(start: number) {
     if (u.pathname === '/v1/checkout/sessions') return json(200, { id: 'cs_1', url: 'https://checkout.stripe.com/c/pay/cs_1' });
     return json(404, { error: { message: 'not faked' } });
   };
-  const team = { id: 'team-1', createdAt: MADE, members: [A], owners: [A] };
+  const team = { id: 'team-1', createdAt: MADE, freeUntil, members: [A], owners: [A] };
+  const objects = memoryObjects();
+  if (hadSubscription) void objects.put('ledger/teams/team-1.json', JSON.stringify({ plan: 'none', seats: 0, stripe: { customer: 'cus_1', subscription: 'sub_old', status: 'canceled', paid: true } }));
   const gw = createGateway({
     agentcore: { async invoke() { return { ok: true }; }, async stop() {} },
     links: { get: async (k: string) => `https://b/${k}`, put: async (k: string) => `https://b/${k}`, head: async (k: string) => `https://b/${k}` },
     removeObject: async () => {},
-    objects: memoryObjects(),
+    objects,
     whoIs: async (t: string) => (t === 'session-a' ? { id: A } : null),
     teams: async (p: string) => (team.members.includes(p) ? team : null),
     stripe: stripeClient({ key: 'sk_test_x', webhookSecret: 'whsec_x', fetchImpl }),
@@ -64,25 +68,38 @@ describe('the team checkout', () => {
     expect(end).toBe(TRIAL_ENDS + 60_000);
     expect((end - (MADE + 60_000)) / DAY).toBe(TEAM.trialDays);
   });
-  it('rounds a part day up, never down', async () => {
-    const { owner, made } = setup(MADE + 2.5 * DAY);
+  // Since 2026-11-21 no team has free days without a card, so the week runs from the checkout, not from the day the team was made.
+  it('gives a team made weeks ago its whole week, from the checkout', async () => {
+    const at = MADE + 30 * DAY;
+    const { owner, made } = setup(at);
     await owner({ plan: 'team' });
-    expect(Number(made()['subscription_data[trial_end]']) * 1000).toBe(MADE + 2.5 * DAY + 5 * DAY);
+    expect(Number(made()['subscription_data[trial_end]']) * 1000).toBe(at + TEAM.trialDays * DAY);
   });
-  it('still trials a team a few days in, to the same end', async () => {
-    const { owner, made } = setup(MADE + 3 * DAY);
-    await owner({ plan: 'team' });
-    expect(made()['subscription_data[trial_end]']).toBe(String(Math.floor(TRIAL_ENDS / 1000)));
-  });
-  it('charges now when fewer than two days are left, which Stripe will not trial', async () => {
-    const { owner, made } = setup(TRIAL_ENDS - DAY);
+  it('gives no second week to a team that had a subscription', async () => {
+    const { owner, made } = setup(MADE + DAY, { hadSubscription: true });
     await owner({ plan: 'team' });
     expect(made()['subscription_data[trial_end]']).toBeUndefined();
   });
-  it('charges now once the trial is over', async () => {
-    const { owner, made } = setup(TRIAL_ENDS + DAY);
+  it('runs to the end of days given by hand when they outlast the week, rounded up to a day', async () => {
+    const at = MADE + DAY;
+    const { owner, made } = setup(at, { freeUntil: at + 13.5 * DAY });
     await owner({ plan: 'team' });
-    expect(made()['subscription_data[trial_end]']).toBeUndefined();
+    expect(Number(made()['subscription_data[trial_end]']) * 1000).toBe(at + 14 * DAY);
+  });
+  it('gives the week when days given by hand end sooner', async () => {
+    const at = MADE + DAY;
+    const { owner, made } = setup(at, { freeUntil: at + 3 * DAY });
+    await owner({ plan: 'team' });
+    expect(Number(made()['subscription_data[trial_end]']) * 1000).toBe(at + TEAM.trialDays * DAY);
+  });
+  it('after a subscription, honours days given by hand, and charges now when fewer than two are left, which Stripe will not trial', async () => {
+    const at = MADE + DAY;
+    const given = setup(at, { hadSubscription: true, freeUntil: at + 5 * DAY });
+    await given.owner({ plan: 'team' });
+    expect(Number(given.made()['subscription_data[trial_end]']) * 1000).toBe(at + 5 * DAY);
+    const close = setup(at, { hadSubscription: true, freeUntil: at + DAY });
+    await close.owner({ plan: 'team' });
+    expect(close.made()['subscription_data[trial_end]']).toBeUndefined();
   });
 });
 

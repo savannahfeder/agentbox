@@ -102,7 +102,7 @@
 /* The max keeps BOARD_LEAST (room-rules) for the board when the window narrows. */
 .rm-chat { width: var(--rm-chat-w, 41%); min-width: 300px; max-width: min(720px, calc(100% - 620px)); flex: none; border-left: 1px solid var(--rm-line); display: flex; flex-direction: column; min-height: 0; position: relative; }
 .rm-chat-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 7px; z-index: 6; cursor: col-resize; }
-.rm-chat-grip::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: transparent; transition: background .12s; }
+.rm-chat-grip::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: transparent; }
 .rm-chat-grip:hover::after, .rm-chat.dragging .rm-chat-grip::after { background: var(--accent); }
 .rm-chat.dragging, .rm-chat.dragging * { user-select: none; }
 .rm-chat-head { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 14px; height: 40px; flex: none; border-bottom: 1px solid var(--rm-line); }
@@ -188,10 +188,11 @@
 .rm-film-name { padding: 7px 10px; font-size: 12.5px; color: var(--text); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-cm .tx p:has(> .rm-film ~ .inline-image-open) > .rm-film,
 .rm-cm .tx p:has(> .inline-image-open ~ .rm-film) > .rm-film { width: calc(50% - 4px); }
-.rm-cm .rm-file { display: inline-block; margin-top: 4px; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); font-size: 12.5px; color: var(--text-dim); }
+.rm-cm .rm-file { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); font-size: 12.5px; color: var(--text-dim); }
 /* Every chat page draws a file the same quiet way, never as the browser's own button. */
 .rm-file { display: inline-flex; align-items: center; gap: 8px; margin: 6px 0 2px; padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: var(--artifact-corner-small); background: transparent; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
 .rm-file:hover { background: var(--wash); }
+.rm-file > svg { flex: none; color: var(--text-faint); }
 .rm-cm .chat-chips { margin-top: 6px; }
 .rm-cm .rm-edited, .rm-cm .h .rm-edited { font: normal 10.5px var(--mono); color: var(--text-faint); }
 .rm-cm .rm-gone { color: var(--text-faint); font-style: italic; }

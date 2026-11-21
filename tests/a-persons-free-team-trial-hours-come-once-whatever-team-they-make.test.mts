@@ -13,9 +13,12 @@ const A = '11111111-1111-4111-8111-111111111111';
 const HOUR = 60 * 60_000;
 const START = Date.UTC(2026, 10, 17, 9);
 
+// Each team's trial is a week given by hand, the only one without a card since 2026-11-21.
+const WEEK = TEAM.trialDays * 24 * HOUR;
+
 function setup() {
   let clock = START;
-  let team = { id: 'team-1', createdAt: START, members: [A], owners: [A] };
+  let team = { id: 'team-1', createdAt: START, freeUntil: START + WEEK, members: [A], owners: [A] };
   const gw = createGateway({
     agentcore: { async invoke() { return { ok: true }; }, async stop() {} },
     links: { get: async (k: string) => `https://b/${k}`, put: async (k: string) => `https://b/${k}`, head: async (k: string) => `https://b/${k}` },
@@ -36,7 +39,7 @@ function setup() {
     start: async () => { n += 1; return (await call('POST', '/v1/invoke', { sessionId: `run-${n}`, payload: { action: 'start', runId: `r${n}` } })).body; },
     finishAll: async () => { for (let i = 1; i <= n; i++) await gw.objectCreated(`runs/u-${A}/r${i}/done.json`); },
     later: (ms: number) => { clock += ms; },
-    newTeam: (id: string) => { team = { id, createdAt: clock, members: [A], owners: [A] }; },
+    newTeam: (id: string) => { team = { id, createdAt: clock, freeUntil: clock + WEEK, members: [A], owners: [A] }; },
   };
 }
 

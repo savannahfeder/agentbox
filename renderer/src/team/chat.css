@@ -100,7 +100,7 @@
   display: flex; align-items: stretch;
   border: 1px solid var(--line-strong); border-radius: var(--radius);
   background: var(--skin-solid, var(--surface)); box-shadow: 0 2px 10px #0003;
-  opacity: 0; pointer-events: none; transition: opacity 90ms ease;
+  opacity: 0; pointer-events: none;
 }
 .chat-msg:hover > .chat-acts, .chat-acts:focus-within, .chat-acts.open { opacity: 1; pointer-events: auto; }
 .chat-act {
@@ -451,7 +451,7 @@
   position: absolute; top: 0; bottom: 0; left: -4px; width: 8px; z-index: 3; cursor: col-resize;
 }
 .chat-thread-grip::after {
-  content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background-color 90ms ease;
+  content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent;
 }
 .chat-thread-grip:hover::after, .chat-thread-grip:focus-visible::after, body.chat-thread-dragging .chat-thread-grip::after { background: var(--line-strong); }
 .chat-thread-grip:focus-visible { outline: none; }
@@ -489,7 +489,6 @@ body.chat-thread-dragging * { cursor: col-resize !important; }
 .chat-thread-box {
   position: relative; display: flex; flex-direction: column;
   background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius);
-  transition: border-color .18s, background .18s;
 }
 .chat-thread-box:focus-within { border-color: var(--line-strong); background: var(--surface); }
 /* Room for three lines, growing to 240px as you write (ThreadPanel.tsx). */

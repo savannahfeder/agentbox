@@ -46,17 +46,18 @@ export function runningAsADemo(env: NodeJS.ProcessEnv | Record<string, string | 
 // makes when it starts agree on who is who.
 const id = (n: string) => `00000000-0000-4000-8000-${n.padStart(12, '0')}`;
 
-export interface DemoPerson { id: string; name: string; email: string; job: string }
+/** `face`: a photo in shared/demo-faces, of nobody: each was made by an image model. */
+export interface DemoPerson { id: string; name: string; email: string; job: string; face: string }
 
-export const DEMO_TEAM = { id: id('f001'), name: 'Ferry' };
+export const DEMO_TEAM = { id: id('f001'), name: 'Shuttle' };
 
 /** The person the demo copy is signed in as. */
-export const DEMO_ME: DemoPerson = { id: id('a1'), name: 'Jamie Park', email: 'jamie@ferry.test', job: 'CTO' };
+export const DEMO_ME: DemoPerson = { id: id('a1'), name: 'Jamie Park', email: 'jamie@shuttle.test', job: 'CTO', face: 'jamie.jpg' };
 
 export const DEMO_TEAMMATES: DemoPerson[] = [
-  { id: id('b2'), name: 'Priya Raman', email: 'priya@ferry.test', job: 'Design' },
-  { id: id('c3'), name: 'Theo Brandt', email: 'theo@ferry.test', job: 'Sync engine' },
-  { id: id('d4'), name: 'Lena Ortiz', email: 'lena@ferry.test', job: 'Growth' },
+  { id: id('b2'), name: 'Priya Raman', email: 'priya@shuttle.test', job: 'Design', face: 'priya.jpg' },
+  { id: id('c3'), name: 'Theo Brandt', email: 'theo@shuttle.test', job: 'Sync engine', face: 'theo.jpg' },
+  { id: id('d4'), name: 'Lena Ortiz', email: 'lena@shuttle.test', job: 'Growth', face: 'lena.jpg' },
 ];
 const [PRIYA, THEO, LENA] = DEMO_TEAMMATES;
 
@@ -64,16 +65,16 @@ const [PRIYA, THEO, LENA] = DEMO_TEAMMATES;
 // the rail and the composer's picker. No `repoPath`: a made-up one either
 // shows a stranger's folder name or a warning that the folder is missing.
 export const DEMO_PRODUCTS = [
-  { slug: 'ferry', name: 'Ferry', oneLiner: 'Moves a team off Dropbox without losing a folder.', projectId: id('f101') },
+  { slug: 'shuttle', name: 'Shuttle', oneLiner: 'Moves a team off Dropbox without losing a folder.', projectId: id('f101') },
   { slug: 'website', name: 'Website', oneLiner: 'The site, the launch email and the changelog.', projectId: id('f102') },
 ];
 
 /* ------------------------------ your threads ------------------------------ */
 
-// Six things wait on you when the copy opens: two from teammates
-// (`demoMessages`) and four threads an agent has answered. Each lands on a
-// screen worth showing: options answered with one key, a decision, a thread
-// that belongs with a teammate, something blocked on you.
+// Six things wait on you when the copy opens: four threads an agent has
+// answered, each with a picture of the work and options under it, and two from
+// teammates (`demoMessages`). The two Claude Code threads are newest, so they
+// sit on top: a call shows the inbox first and teammates second.
 //
 // EACH IS SHAPED LIKE A REAL THREAD: your ask, then the agent's answer, its
 // summary (`problem` and `progress`, drawn as Context and Done) and its short
@@ -98,19 +99,48 @@ interface DemoRow {
   /** The agent's answer, written when it finished. */
   result: string;
   answeredAt: number;
-  status?: 'done' | 'blocked';
+  status?: 'done';
   doneAt?: number;
+  /** A task asked for in a chat: its label naming the chat, and only the chat's people see it. */
+  askedIn?: { slug: string; id: string; people: string[] };
 }
 
 function lines(now: number): DemoRow[] {
   return [
     {
-      product: 'ferry',
+      product: 'shuttle',
+      id: 'w-f0c7e31b52',
+      engine: 'claude',
+      priority: 7,
+      at: now - 25 * MIN,
+      answeredAt: now - 6 * MIN,
+      ask: 'Add Sign in with Google to the sign-in page, beside email.',
+      label: 'Sign in with Google',
+      problem: 'You wanted people to sign in to Shuttle with their Google account as well as with email.',
+      progress: [
+        'Added Sign in with Google above the email box',
+        'Signed in with 3 test Google accounts, each landed on its own moves',
+        'Someone who signed up by email keeps one account, not two',
+      ],
+      result: [
+        '**Sign in with Google is built. Turn it on for everyone?**',
+        '',
+        'designs/sign-in-with-google.png',
+        '',
+        'It sits above the email box on the sign-in page. I signed in with 3 test Google accounts and each one landed on its own moves. Someone who already signed up by email with the same address keeps one account, not two.',
+        '',
+        '## Options',
+        '1. Turn it on for everyone (recommended)',
+        '2. Trial teams first, everyone next week',
+      ].join('\n'),
+    },
+    {
+      product: 'shuttle',
       id: 'w-f1d8a20c41',
       engine: 'claude',
       priority: 7,
-      at: now - 2.2 * HR,
-      answeredAt: now - 18 * MIN,
+      at: now - 50 * MIN,
+      answeredAt: now - 14 * MIN,
       ask: 'Files older than 2019 arrive in Google Drive stamped with today\'s date. Fix it so they keep their real date.',
       label: 'Old file dates after a move',
       problem: 'You wanted files older than 2019 to keep their real date after a move. They were arriving in Google Drive stamped with today\'s date.',
@@ -123,6 +153,8 @@ function lines(now: number): DemoRow[] {
       result: [
         '**Ship the date fix now, or hold it until shared drives work too?**',
         '',
+        'designs/old-dates-before-and-after.png',
+        '',
         'Files older than 2019 now keep their real date. I moved 3,200 test files dated 2004 to 2018 and every one arrived with its date. Nothing already moved is touched.',
         '',
         'Shared drives still lose the date, because they go through the sync engine, which Theo is changing this week. I would ship this now and leave shared drives to his work.',
@@ -133,7 +165,7 @@ function lines(now: number): DemoRow[] {
       ].join('\n'),
     },
     {
-      product: 'ferry',
+      product: 'shuttle',
       id: 'w-f27c9e5b10',
       engine: 'codex',
       priority: 7,
@@ -141,32 +173,37 @@ function lines(now: number): DemoRow[] {
       answeredAt: now - 47 * MIN,
       ask: 'Add OneDrive as a place to move to, beside Google Drive.',
       label: 'OneDrive as a destination',
-      problem: 'You wanted Ferry to move teams to OneDrive as well as Google Drive. Small moves work. Large ones stall in the sync engine, which Theo owns.',
+      problem: 'You wanted Shuttle to move teams to OneDrive as well as Google Drive. Small moves work. Large ones stall in the sync engine, which Theo owns.',
       progress: [
         'Built OneDrive as a second destination',
         'Moved 9,400 files across 4 test accounts, folders and dates intact',
         'Moves over 20,000 files stall in the sync engine',
       ],
       result: [
-        '**Hand this to Theo. Large moves stall inside his sync engine.**',
+        '**Small moves to OneDrive work. Large ones stall in Theo\'s sync engine.**',
         '',
-        'OneDrive works as a destination. I moved 9,400 files across 4 test accounts and every folder and date arrived intact.',
+        'designs/onedrive-test-moves.png',
         '',
-        'Moves over 20,000 files stall in the sync engine, which Theo is rewriting this week, so a fix from me would land on top of his.',
+        'I moved 9,400 files across 4 test accounts and every folder and date arrived intact. Three larger moves, of 24,000, 31,000 and 58,000 files, each stopped at 20,000, when the engine\'s upload queue ran out of memory.',
         '',
-        'Three test moves stalled, at 24,000, 31,000 and 58,000 files. Each one stopped when the engine\'s upload queue passed 20,000 files and ran out of memory, which is the part Theo is rewriting.',
+        'Theo is rewriting that queue this week, so a fix from me would land on top of his. I would hand this to him.',
+        '',
+        '## Options',
+        '1. Hand it to Theo (recommended)',
+        '2. Ship OneDrive for moves under 20,000 files',
+        '3. Hold it until Theo\'s rewrite lands',
       ].join('\n'),
     },
     {
-      product: 'ferry',
+      product: 'shuttle',
       id: 'w-f3a04d7e62',
       engine: 'claude',
       priority: 7,
       at: now - 5 * HR,
       answeredAt: now - 1.6 * HR,
       ask: 'We need a price before the first trial team pays. Read the trial team interviews, look at what similar tools charge, and recommend one.',
-      label: 'Ferry pricing',
-      problem: 'You wanted a price for Ferry before the first trial team pays. It comes down to per seat or one flat price per team.',
+      label: 'Shuttle pricing',
+      problem: 'You wanted a price for Shuttle before the first trial team pays. It comes down to per seat or one flat price per team.',
       progress: [
         'Read the interview notes from three trial teams',
         'Compared what two similar tools charge',
@@ -174,6 +211,8 @@ function lines(now: number): DemoRow[] {
       ],
       result: [
         '**Per seat, or one flat price per team?**',
+        '',
+        'designs/what-each-team-would-pay.png',
         '',
         'All three trial teams you interviewed expected to pay per seat, and per seat grows as a team does. Both similar tools charge one flat price per team, which is easier to say out loud.',
         '',
@@ -186,31 +225,7 @@ function lines(now: number): DemoRow[] {
       ].join('\n'),
     },
     {
-      product: 'ferry',
-      id: 'w-f4b6e1c093',
-      engine: 'codex',
-      priority: 9,
-      at: now - 7 * HR,
-      answeredAt: now - 3.1 * HR,
-      status: 'blocked',
-      ask: 'Set up payments with Stripe, so a team can pay when its trial ends.',
-      label: 'Payments with Stripe',
-      problem: 'You wanted teams to be able to pay when their trial ends. Checkout is built. Stripe needs the company account verified first.',
-      progress: [
-        'Built checkout with Stripe',
-        'Passed every test with Stripe\'s test keys',
-        'Live keys refused until the account is verified',
-      ],
-      result: [
-        '**Finish Stripe\'s account check. It needs the company\'s bank details.**',
-        '',
-        'Checkout is built and passes every test with Stripe\'s test keys. The live keys are refused until the account is verified, and only you can fill in that form. It is in Stripe under Settings, then Business details.',
-        '',
-        'Once it is verified, reply here and I will switch to the live keys and make one real $1 charge to check it end to end.',
-      ].join('\n'),
-    },
-    {
-      product: 'ferry',
+      product: 'shuttle',
       id: 'w-f5c2a8d714',
       engine: 'claude',
       priority: 5,
@@ -222,7 +237,7 @@ function lines(now: number): DemoRow[] {
       label: 'Resume a stopped move',
       problem: 'You wanted a move that stops halfway to pick up where it left off, not start again from the first file.',
       progress: [
-        'Ferry now remembers the last file each move finished',
+        'Shuttle now remembers the last file each move finished',
         'Cut the connection at 10%, 50% and 90% of a 12,000 file move',
         'Each one finished with every file there once',
       ],
@@ -230,6 +245,34 @@ function lines(now: number): DemoRow[] {
         'A move that stops now picks up from the last file it finished.',
         '',
         'I cut the connection at 10%, 50% and 90% of a 12,000 file move. Each one finished with every file there once and none twice. A move that never stops works as before.',
+      ].join('\n'),
+    },
+    {
+      product: 'website',
+      id: SUBJECT_TASK,
+      engine: 'claude',
+      priority: 5,
+      at: now - 1.9 * HR,
+      answeredAt: now - 1.87 * HR,
+      status: 'done',
+      doneAt: now - 1.85 * HR,
+      askedIn: { ...LENA_THREAD, people: [DEMO_ME.id, LENA.id] },
+      ask: 'Can you write three other subject lines for this and say which reads clearest?',
+      label: 'Subject lines for the launch email',
+      problem: 'You asked in Lena\'s launch email thread for three other subject lines, and which one reads clearest.',
+      progress: [
+        'Read the launch email and its subject line',
+        'Wrote three other subject lines',
+        'Picked the clearest one',
+      ],
+      result: [
+        'Three other subject lines, and the one I would send.',
+        '',
+        '1. Move your whole team off Dropbox this week',
+        '2. Every folder, right where you left it',
+        '3. Your Dropbox, in Google Drive by lunch',
+        '',
+        'I would send the second. It names what people are most afraid of losing in a move, and it is the shortest of the four.',
       ].join('\n'),
     },
     {
@@ -280,12 +323,12 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
     const answered = Math.round(row.answeredAt);
     const out = byProduct[row.product];
     // Seen by the team: a thread made before the copy signed in is otherwise yours alone.
-    out.push({ id: row.id, ts: at, source: 'system', patch: { title: row.ask, kind: 'directive', priority: row.priority, labels: ['founder'], status: 'open', visibility: 'team' } });
+    const seen = row.askedIn ? { labels: ['founder', `asked-in:${row.askedIn.slug}/${row.askedIn.id}`], visibility: 'people', visibleTo: row.askedIn.people } : { labels: ['founder'], visibility: 'team' };
+    out.push({ id: row.id, ts: at, source: 'system', patch: { title: row.ask, kind: 'directive', priority: row.priority, status: 'open', ...seen } });
     out.push({ id: row.id, ts: at + 1, source: 'founder', patch: { title: row.ask, body: row.ask, engine: row.engine } });
     out.push({ id: row.id, ts: at + 2, source: 'agent', patch: { label: row.label } });
     out.push({ id: row.id, ts: answered - 1, source: 'agent', patch: { problem: row.problem, progress: row.progress.join('\n') } });
     out.push({ id: row.id, ts: answered, source: 'agent', patch: { result: row.result } });
-    if (row.status === 'blocked') out.push({ id: row.id, ts: answered + 1, source: 'system', patch: { status: 'blocked' } });
     if (row.status === 'done') out.push({ id: row.id, ts: Math.round(row.doneAt ?? answered + 1), source: 'founder', patch: { status: 'done' } });
   }
 
@@ -300,7 +343,19 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
 // model to sort it on a call.
 export interface DemoFile { path: string; title: string; text: string }
 /** `given`: a task they handed you. `subject`: a message about one piece of work, which gets a row of its own named by `title`. */
-export interface DemoMessage { from: DemoPerson; projectId: string; id: string; at: number; title: string; body: string; priority: number; given?: boolean; subject?: boolean; file?: DemoFile }
+/** `replies`: what was said after, in order; the last word is theirs, so it still waits on you. */
+export interface DemoMessage {
+  from: DemoPerson; projectId: string; id: string; at: number; title: string; body: string; priority: number;
+  given?: boolean; subject?: boolean; file?: DemoFile; due?: string;
+  replies?: { by: 'me' | 'them'; at: number; text: string }[];
+}
+
+// THE AGENT BROUGHT INTO LENA'S THREAD with an @-mention, written the way the
+// reply box writes one (renderer/src/team/agent-mentions.ts): the words in a
+// link whose address names the agent, the project and the task that answered.
+export const LENA_THREAD = { slug: 'direct-7c41e2d9', id: 'w-d1a7c3e590' };
+export const SUBJECT_TASK = 'w-e4a1b7c392';
+const SUBJECT_ASK = `[@Claude Code in Website](agentbox-agent:claude?project=website&task=${SUBJECT_TASK}) can you write three other subject lines for this and say which reads clearest?`;
 
 /** A message's file, linked under its words the way the reply box links one. */
 export const withFile = (m: DemoMessage) => (m.file ? `${m.body}\n\n[${m.file.path}](attachments/${m.file.path})` : m.body);
@@ -311,27 +366,70 @@ export function demoMessages(now: number = Date.now()): DemoMessage[] {
       from: LENA,
       // A conversation's folder is named from the first eight of its id.
       projectId: '7c41e2d9-3b8a-4f15-9e62-1d0a5c8b4f21',
-      id: 'w-d1a7c3e590',
-      at: now - 9 * MIN,
+      id: LENA_THREAD.id,
+      at: now - 2.1 * HR,
       title: 'Launch email',
       body: 'Can you read the launch email today? It goes to all 4,000 trial users tomorrow morning, and the subject line is the part I am least sure of.',
-      priority: 7,
+      priority: 5,
       subject: true,
       file: LAUNCH_EMAIL,
+      replies: [
+        { by: 'me', at: now - 1.9 * HR, text: SUBJECT_ASK },
+        { by: 'them', at: now - 1.1 * HR, text: 'The second one is great, going with it. Can you still read the rest before it goes out tomorrow?' },
+      ],
     },
     {
       from: PRIYA,
       projectId: 'a93f0b6e-52c7-4d18-8b3e-6f2d9c1e7a54',
       id: 'w-d2b84f6a31',
-      at: now - 34 * MIN,
+      at: now - 1.3 * HR,
       title: 'Approve the words on the sign-up screens',
       body: 'Can you read the words for the three sign-up screens and say yes, or change what you would? My agent builds the screens as soon as you do.',
-      priority: 7,
+      priority: 5,
       given: true,
+      due: dayIn(now, 0),
       file: SIGN_UP_WORDS,
     },
   ];
 }
+
+/* ------------------------- the chat with each teammate ------------------------- */
+
+// A teammate's page opens on your chat with them (a group of the two of you),
+// which was empty. One short exchange each, answered by you.
+/** `at` is a time on the day before the demo opens, so a chat never reads as said at midnight. */
+export interface DemoChat { with: DemoPerson; said: { by: 'them' | 'me'; at: [number, number]; text: string }[] }
+
+/** That moment, the day before `now`, in local time. */
+export function yesterdayAt(now: number, [h, m]: [number, number]): number {
+  const d = new Date(now);
+  d.setDate(d.getDate() - 1);
+  return d.setHours(h, m, 0, 0);
+}
+
+export const DEMO_CHATS: DemoChat[] = [
+  {
+    with: THEO,
+    said: [
+      { by: 'them', at: [10, 12], text: 'I start rewriting the sync engine tomorrow. Anything big that touches it, send my way first.' },
+      { by: 'me', at: [10, 31], text: 'Will do. The OneDrive work will hit it, so that one comes to you.' },
+    ],
+  },
+  {
+    with: LENA,
+    said: [
+      { by: 'them', at: [13, 40], text: 'The comparison page is live and linked from pricing.' },
+      { by: 'me', at: [13, 58], text: 'Read it. Clear, and fair to both of them.' },
+    ],
+  },
+  {
+    with: PRIYA,
+    said: [
+      { by: 'them', at: [16, 5], text: 'The pricing page works in dark mode now. Checked on a phone and a laptop.' },
+      { by: 'me', at: [16, 22], text: 'Looks great, thank you.' },
+    ],
+  },
+];
 
 /* ------------------------------ the team's group ------------------------------ */
 
@@ -351,7 +449,7 @@ export const DEMO_TEAM_LOOK = [
   '',
   '## Colours',
   '',
-  '- Main: #2F6FEB, the blue of the Ferry mark',
+  '- Main: #2F6FEB, the blue of the Shuttle mark',
   '- Text: #1B1F24',
   '- Background: #F7F8FA',
   '',
@@ -362,7 +460,7 @@ export const DEMO_TEAM_LOOK = [
   '',
   '## Logo',
   '',
-  'The Ferry mark sits top left on every page, never smaller than 24 pixels.',
+  'The Shuttle mark sits top left on every page, never smaller than 24 pixels.',
   '',
   '## Voice',
   '',
@@ -374,21 +472,45 @@ export const DEMO_TEAM_LOOK = [
 
 // The cards each teammate's copy would put up: what their threads are doing.
 // The Team page, their faces and the Standup are drawn from these.
-export interface DemoCard { by: DemoPerson; threadId: string; project: string; title: string; state: 'running' | 'waiting' | 'done'; updatedAt: number; progress?: string; shippedAt?: number }
+/** `task`: a task somebody gave them, due at the end of the day `dueInDays` from today. `blockedOn`: who it waits on. */
+export interface DemoCard {
+  by: DemoPerson; threadId: string; project: string; title: string; state: 'running' | 'waiting' | 'done'; updatedAt: number; progress?: string; shippedAt?: number;
+  task?: { from: DemoPerson; dueInDays: number }; blockedOn?: DemoPerson;
+}
+
+/** The end of the day `days` from today, local time, which is when a task due that day is late. */
+export function endOfDayIn(now: number, days: number): number {
+  const d = new Date(now);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days + 1).getTime();
+}
+
+/** A day `days` from today as the due field writes it. */
+export function dayIn(now: number, days: number): string {
+  const d = new Date(endOfDayIn(now, days) - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export function demoCards(now: number = Date.now()): DemoCard[] {
   const done = lastWorkingMorning(now);
   return [
-    { by: THEO, threadId: 'w-c3a1e09d42', project: 'Ferry', title: 'Sync engine rewrite for large moves', state: 'running', updatedAt: now - 12 * MIN, progress: 'Batches of 5,000 files instead of one queue\n60,000 file test finished in 41 minutes\nShared drives next' },
-    { by: THEO, threadId: 'w-c3b27f8e15', project: 'Ferry', title: 'Retries on a slow connection', state: 'done', updatedAt: done - 19 * HR, shippedAt: done - 19 * HR, progress: 'Retries three times, then says which file' },
-    { by: THEO, threadId: 'w-c3c84a1f06', project: 'Ferry', title: 'Permissions on shared drives', state: 'done', updatedAt: done - 15 * HR, progress: 'Owners, editors and viewers carry across' },
-    { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Ferry', title: 'Sign-up screens', state: 'done', updatedAt: done - 40 * MIN, progress: 'Drawn in light and dark\nWords sent to Jamie for a yes' },
-    { by: PRIYA, threadId: 'w-b2d91e6c50', project: 'Ferry', title: 'Empty states for the move list', state: 'running', updatedAt: now - 25 * MIN, progress: 'Four states drawn, two to go' },
+    { by: THEO, threadId: 'w-c3a1e09d42', project: 'Shuttle', title: 'Sync engine rewrite for large moves', state: 'running', updatedAt: now - 12 * MIN, progress: 'Batches of 5,000 files instead of one queue\n60,000 file test finished in 41 minutes\nShared drives next' },
+    { by: THEO, threadId: 'w-c3b27f8e15', project: 'Shuttle', title: 'Retries on a slow connection', state: 'done', updatedAt: done - 19 * HR, shippedAt: done - 19 * HR, progress: 'Retries three times, then says which file' },
+    { by: THEO, threadId: 'w-c3c84a1f06', project: 'Shuttle', title: 'Permissions on shared drives', state: 'done', updatedAt: done - 15 * HR, shippedAt: done - 15 * HR, progress: 'Owners, editors and viewers carry across' },
+    { by: THEO, threadId: 'w-c3d51b7e29', project: 'Shuttle', title: 'Faster listing of a Dropbox', state: 'done', updatedAt: done - 8 * HR, shippedAt: done - 8 * HR, progress: 'A 100,000 file Dropbox lists in 40 seconds, not 6 minutes' },
+    { by: PRIYA, threadId: 'w-b2c4d0a873', project: 'Shuttle', title: 'Sign-up screens', state: 'done', updatedAt: done - 40 * MIN, progress: 'Drawn in light and dark\nWords sent to Jamie for a yes' },
+    { by: PRIYA, threadId: 'w-b2d91e6c50', project: 'Shuttle', title: 'Empty states for the move list', state: 'running', updatedAt: now - 25 * MIN, progress: 'Four states drawn, two to go' },
     { by: PRIYA, threadId: 'w-b2e3f7a915', project: 'Website', title: 'Pricing page in dark mode', state: 'done', updatedAt: done - 17 * HR, shippedAt: done - 17 * HR, progress: 'Checked on a phone and a laptop' },
+    { by: PRIYA, threadId: 'w-b2f60c4d18', project: 'Shuttle', title: 'Error messages in plain words', state: 'done', updatedAt: done - 11 * HR, shippedAt: done - 11 * HR, progress: 'All 23 rewritten, each says what to do next' },
+    { by: PRIYA, threadId: 'w-b2a78e3f51', project: 'Shuttle', title: 'A progress bar for every move', state: 'done', updatedAt: done - 4 * HR, shippedAt: done - 4 * HR, progress: 'Shows files moved and time left' },
     { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email for the trial users', state: 'done', updatedAt: done - 1.3 * HR, progress: 'For all 4,000 trial users\nSent to Jamie to read' },
     { by: LENA, threadId: 'w-d4b37e0c84', project: 'Website', title: 'Welcome emails for new teams', state: 'running', updatedAt: now - 6 * MIN, progress: 'Three of the five emails written' },
+    // The team's tasks, for the Tasks page: one late, one blocked on you, one ahead.
+    { by: PRIYA, threadId: 'w-b2c07d5e94', project: 'Website', title: 'Screenshots for the launch email', state: 'running', updatedAt: now - 50 * MIN, progress: 'Two of the four taken', task: { from: LENA, dueInDays: -1 } },
+    { by: LENA, threadId: 'w-d4e61f9a03', project: 'Website', title: 'Pricing page for the per-seat plan', state: 'waiting', updatedAt: now - 1.4 * HR, progress: 'Drafted both versions\nWaiting on the price from Jamie', task: { from: DEMO_ME, dueInDays: 1 }, blockedOn: DEMO_ME },
+    { by: THEO, threadId: 'w-c3e95a2b70', project: 'Shuttle', title: 'Dates on shared drives', state: 'running', updatedAt: now - 30 * MIN, progress: 'Old dates carried through the new engine\nTesting on 40 shared drives', task: { from: DEMO_ME, dueInDays: 3 } },
     { by: LENA, threadId: 'w-d4f05c1b98', project: 'Website', title: 'Comparison page', state: 'done', updatedAt: done - 21 * HR, shippedAt: done - 21 * HR, progress: 'Live, linked from pricing' },
-    { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'A note to trial teams that never started a move', state: 'done', updatedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
+    { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'A note to trial teams that never started a move', state: 'done', updatedAt: done - 3 * HR, shippedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
+    { by: LENA, threadId: 'w-d4c19a6b02', project: 'Website', title: 'Story of the first team to move', state: 'done', updatedAt: done - 7 * HR, shippedAt: done - 7 * HR, progress: '14 people, 18,000 files, done by lunch' },
   ];
 }
 
@@ -419,7 +541,7 @@ const SIGN_UP_WORDS: DemoFile = {
     '',
     '## 1. Where are your files now?',
     '',
-    'Pick the Dropbox you are moving from. Ferry only reads it. Nothing in it',
+    'Pick the Dropbox you are moving from. Shuttle only reads it. Nothing in it',
     'changes until you say so.',
     '',
     '## 2. Where should they go?',
@@ -429,7 +551,7 @@ const SIGN_UP_WORDS: DemoFile = {
     '',
     '## 3. Start your first move',
     '',
-    'Most teams are done before lunch. You can close your laptop, and Ferry',
+    'Most teams are done before lunch. You can close your laptop, and Shuttle',
     'picks up where it left off.',
   ].join('\n'),
 };
@@ -442,24 +564,24 @@ const LAUNCH_EMAIL: DemoFile = {
     '',
     'Hi {first name},',
     '',
-    'Ferry now moves your whole team to Google Drive with every folder where',
+    'Shuttle now moves your whole team to Google Drive with every folder where',
     'you left it. Close your laptop halfway and the move picks up where it',
     'stopped.',
     '',
-    'Start a move at ferry.test/start. Most teams are done before lunch.',
+    'Start a move at shuttle.test/start. Most teams are done before lunch.',
     '',
-    'Lena, for the Ferry team',
+    'Lena, for the Shuttle team',
   ].join('\n'),
 };
 
 export const DEMO_DOCS: Record<string, DemoFile[]> = {
-  ferry: [
+  shuttle: [
     SIGN_UP_WORDS,
     {
       path: 'notes.md',
-      title: 'Ferry notes',
+      title: 'Shuttle notes',
       text: [
-        '# Ferry',
+        '# Shuttle',
         '',
         'Moves a team off Dropbox without losing a folder.',
         '',
@@ -470,7 +592,6 @@ export const DEMO_DOCS: Record<string, DemoFile[]> = {
         '',
         '- A price. Per seat or one flat price per team.',
         '- Large moves stall in the sync engine. Theo is rewriting it.',
-        '- Stripe is waiting on the company\'s bank details.',
       ].join('\n'),
     },
   ],

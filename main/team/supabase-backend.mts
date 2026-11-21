@@ -236,6 +236,11 @@ export function supabaseBackend(client: SupabaseClient) {
       return must<boolean>(await client.rpc('i_have_multiplayer'), 'asking whether this team has multiplayer') === true;
     },
 
+    async teamPays() {
+      await myId();
+      return must<boolean>(await client.rpc('my_team_pays'), 'asking whether your team has Pro') === true;
+    },
+
     async acceptInvite(teamId: string) {
       await myId();
       must(await client.rpc('accept_invite', { p_team: teamId }), 'joining the team');

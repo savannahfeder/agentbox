@@ -91,6 +91,8 @@ export interface TeamState {
   error: string | null;
   /** False only when the cloud said this person's team is not let in yet; null when it could not say. */
   multiplayer?: boolean | null;
+  /** False only when the cloud said this person's team has no Pro and no free days, so it neither invites nor shares; null when it could not say. */
+  pro?: boolean | null;
   phoneSite?: string | null;
   phoneSiteQr?: string | null;
   phoneError?: string | null;
@@ -142,6 +144,8 @@ export type TeamBackend = Omit<SyncBackend, 'me' | 'personId'> & RoomsBackend & 
   pendingInvites(): Promise<TeamInvite[]>;
   /** 20261119000000_multiplayer_is_invite_only.sql: whether this person may invite teammates. */
   hasMultiplayer?(): Promise<boolean>;
+  /** 20261121130000_team_features_need_pro.sql: whether this person's team pays for Pro or has free days. */
+  teamPays?(): Promise<boolean>;
   listInvites?(teamId: string): Promise<TeamSentInvite[]>;
   createTeam(name: string): Promise<TeamRef>;
   renameTeam(teamId: string, name: string): Promise<unknown>;
@@ -621,13 +625,17 @@ export function createTeamService({
     // The invites this team has out, so the settings page can say who has not
     // joined yet and let them be cancelled.
     const sent = team && backend!.listInvites ? await backend!.listInvites(team.id).catch(() => []) : [];
-    set(withCards(cards, { team, people, invites, sent, since: me ? kept().getSince(me) : null, multiplayer: await readMultiplayer() }));
+    set(withCards(cards, { team, people, invites, sent, since: me ? kept().getSince(me) : null, multiplayer: await readMultiplayer(), pro: team ? await readPro() : null }));
   }
 
   // An older cloud has no gate, so a failed ask is null and nothing is hidden.
   async function readMultiplayer() {
     if (!backend?.hasMultiplayer) return null;
     return backend.hasMultiplayer().catch((err) => { log(`team: multiplayer: ${err.message}`); return null; });
+  }
+  async function readPro() {
+    if (!backend?.teamPays) return null;
+    return backend.teamPays().catch((err) => { log(`team: pro: ${err.message}`); return null; });
   }
 
   // WHO HAS OPENED EACH CONVERSATION, by `${slug}/${id}` then person. An older
@@ -664,6 +672,8 @@ export function createTeamService({
         // their next sign-in. It is offered, never taken up.
         if (!state.team) await refreshTeam();
         else if (state.multiplayer === false) set({ multiplayer: await readMultiplayer() });
+        // Read before the pass, so the cards it sends follow a team that started or stopped paying.
+        if (state.team) { const pro = await readPro(); if (pro !== state.pro) set({ pro }); }
         await clearLapsedStatus();
         const report = await sync!.syncOnce();
         for (const l of linkSharedFolders(products())) log(`team: ${path.basename(l.dir)} now works in ${l.repoPath}, your own project of the same name`);
@@ -902,7 +912,8 @@ export function createTeamService({
     phoneInbox = makePhoneInbox();
     // Off, the window shows no team and no Team / Private choice, so nothing
     // goes up, and what was up comes down as a private thread's card does.
-    const listCards = (): SyncCard[] => (!sharing() ? [] : [
+    // A team without Pro shares nothing either.
+    const listCards = (): SyncCard[] => (!sharing() || state.pro === false ? [] : [
       ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
     ]);

@@ -103,7 +103,8 @@ import { ReplyLater } from './ReplyLater';
 import { effortSaid, modelShown, pickOnItsWay, pickToSend, replyOpensOn } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, paneForThread, threadToOpen } from '../team/chat-threads';
-import { heldByAPerson, isGivenTask, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
+import { heldByAPerson, isGivenTask, nameIsAPersons, taskGiver, whatWaits } from '../../../shared/team-rules.mts';
+import { handedFrom as handedFromLink } from '../../../shared/thread-link.mts';
 import { FormatBar, useMarksRow } from '../team/FormatBar';
 import { ChatSend } from '../team/ChatSend';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
@@ -785,7 +786,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
    *  when pressed is worse than no word. */
   onHandToAgent?: (item: WorkItem, message?: AgentTurn) => void;
   /** Who this thread can be handed on to, for its menu. */
-  giveTo?: readonly { id: string; name: string; detail?: string }[];
+  giveTo?: readonly { id: string; name: string; detail?: string; asked?: boolean }[];
   onGive?: (to: { id: string; name: string }, note: string) => void;
   /** Help or a review from a person, keeping the thread yours. */
   onAsk?: (to: { id: string; name: string }, kind: 'help' | 'review', note: string, step: string | null) => void;
@@ -1036,6 +1037,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const direct = teamCtx?.products.get(item.product)?.team?.direct === true;
   // A task given to a person is drawn as talk between the two of them, under its own name.
   const givenTask = isGivenTask(item, teamCtx?.products.get(item.product));
+  // Handed to you and taken back by whoever handed it: it is theirs, not yours to reopen.
+  const takenBack = givenTask && item.status === 'done' && !!item.wrote?.status?.by && item.wrote.status.by === taskGiver(item) && item.wrote.status.by !== teamCtx?.me && !!handedFromLink(item.body, taskGiver(item));
   // A conversation with a person has nothing running to stop.
   const stoppable = stoppableIn && !direct;
   // Who a conversation is with, from where you sit, for its title and reply box.
@@ -1060,6 +1063,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const audience = teamCtx ? workAudience(item, teamCtx.products.get(item.product), teamCtx.me, (id) => firstName(teamCtx.byId.get(id) ?? null)) : null;
   const handedName = handedTo(item);
   const handedTask = handedName ? taskHandedFrom(items ?? [], item.id, teamCtx?.me ?? null) : null;
+  // While they have it a reply here would reopen it for you too: the box makes way for taking it back.
+  const outWithThem = !!handedTask && handedTask.status !== 'done';
   const summarised = !agent && !made && !direct;
   // Read before the first paint, so the thread's width is right from the start.
   // Only a chat's thread panel reads it, so the sidebar sliding open does not
@@ -1962,6 +1967,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   })();
   const threadMenu = (
     <ThreadMenu
+      thread={{ product: item.product, id: item.id, name: pageTitle(item) }}
       share={share}
       onCopyLink={() => onShare!.copy(item)}
       onSendTo={(to, note) => onShare!.send(item, to, note)}
@@ -1980,9 +1986,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       terminal={direct || onPhone() ? null : terminalOpen ? 'open' : 'closed'}
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
-      onCloseTask={canFinish && givenTask ? onCloseTask ?? null : null}
+      // An ask is answered by handing it back, so it offers no second way to end it.
+      onCloseTask={canFinish && givenTask && !item.ask ? onCloseTask ?? null : null}
       onStopRepeating={repeat ? repeat.onEnd : null}
-      onReopen={!canFinish && !agent ? onReopenDone ?? null : null}
+      // A handed-on thread's row is Take it back, which ends their task too (App's onReopen).
+      onReopen={!canFinish && !agent && !takenBack ? (handedName ? onReopen : onReopenDone) ?? null : null}
       handedTo={handedName ? { name: handedName, initials: handedInitials(handedName), onOpen: handedTask ? () => onOpenItem(handedTask) : null } : null}
       onRunNow={waiting && onRunNow ? onRunNow : null}
       onLater={canFinish ? onSnooze ?? null : null}
@@ -2000,7 +2008,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       giveTo={giveTo}
       onGive={onGive}
       onAsk={onAsk}
-      shipped={shippedMark}
+      shipped={handedName ? null : shippedMark}
       onShipped={onShipped}
       waitChoices={waitChoices}
       waitsNow={!!waitNow}
@@ -2579,10 +2587,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
           <span className="focus-when">Opens the app it is running in</span></>
         )}
-        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}>Send back to agent</button>}
+        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}><ActMark d="M9.5 7 5 11.5 9.5 16M5.5 11.5H15a4 4 0 0 1 0 8h-2" />Send back to agent</button>}
         {/* Where the agent stopped is the step a teammate is asked about. */}
         {!agent && item.status === 'blocked' && onAsk && !asked && giveTo.some((p) => !p.id.startsWith('mate:')) && (
-          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}>Ask a teammate</button>
+          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}><ActMark d="M5 5.5h14v10H10l-4 3.5v-3.5H5zM10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4M12 14.2v.1" />Ask for help or a review</button>
         )}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
@@ -2622,7 +2630,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           </div>
         )}
         {!sentUp && aboveDock}
-        <div className="dock-card">
+        {outWithThem ? <div className="dock-handed"><span>{handedName!.split(/\s+/)[0]} has this now.</span>{onReopen && <button type="button" className="ts-done" onClick={onReopen}>Take it back</button>}</div> : <div className="dock-card">
           {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back.
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
@@ -2705,7 +2713,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && !answered && <ChoicesShow count={options.length} onShow={foldChoices} />}
             </button>
           )}
-        </div>
+        </div>}
       </div>
     </div>
     {!direct && <TaskTerminal key={`${item.product}:${item.id}`} product={item.product} id={item.id} onOpenChange={setTerminalOpen}/>}
@@ -2783,6 +2791,12 @@ function SlashMenu({ rows, at, onPick, onHover }: {
   );
 }
 
+const ModeMark = () => (
+  <svg className="mode-mark" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true">
+    <path d="M8 1.8 2.9 3.7v3.9c0 3.1 2.1 5.4 5.1 6.6 3-1.2 5.1-3.5 5.1-6.6V3.7z" />
+  </svg>
+);
+
 /**
  * THE MODE, AS A WORD IN THE REPLY SENTENCE.
  *
@@ -2852,7 +2866,7 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false, f
         {/* TITLE CASE, with "Mode" after it capitalised too: "In Auto Mode."
             Settled on w-86dd93ab0d. */}
         {chip
-          ? <span className="tc-chip-label">{titleCase(now?.label ?? value)}</span>
+          ? <><ModeMark /><span className="tc-chip-label">{titleCase(now?.label ?? value)}</span></>
           : titleCase(now?.label ?? value)}
       </button>
     </span>
@@ -3851,3 +3865,8 @@ function chipsOverflow(chips: HTMLElement): boolean {
 }
 
 const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
+
+/** The 15px line mark on a button in a stopped thread's action row. */
+function ActMark({ d }: { d: string }) {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
+}

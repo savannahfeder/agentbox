@@ -103,13 +103,13 @@ describe('Stripe\'s webhook', () => {
     expect((await owner('GET', '/v1/me')).body.team.owner).toBe(true);
   });
 
-  it('a cancelled team goes back to its trial while the 14 days last, then to nothing', async () => {
-    const { member, webhook, tick } = setup();
+  // Until 2026-11-21 it went back to a free trial counted from the day the team was made.
+  it('a cancelled team goes to nothing, and is offered no second free week', async () => {
+    const { member, owner, webhook } = setup();
     await webhook('sub_team', 'active', 2);
     await webhook('sub_team', 'canceled', 2);
-    expect((await member('GET', '/v1/me')).body.team).toMatchObject({ trial: true });
-    tick(14 * DAY);
     expect((await member('GET', '/v1/me')).body.team).toBeUndefined();
+    expect((await owner('GET', '/v1/me')).body.teamFreeDays).toBe(0);
   });
 
   it('a person\'s own subscription is not taken for a team\'s', async () => {

@@ -44,7 +44,7 @@ describe('every tag names it', () => {
     [pages, '.th-row-act'], // Share and Unshare at the end of a row
     [pages, '.th-urgent'],
     [summary, '.ts-more'],
-    [summary, '.ts-msgbtn'],
+    [summary, '.ts-done'], // Done, and every box beside it in a thread's corner, Message included
     [composer, '.tc-chip'], // the composer's Project, Priority and Visibility chips
     [composer, '.tc-urgent'],
   ];
