@@ -6,7 +6,7 @@
 
 .sh-send { width: 400px; text-align: left; padding: 0; gap: 0; overflow: visible; max-height: none; }
 .sh-to { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 42px; padding: 6px 14px; border-bottom: 1px solid var(--line); }
-.sh-label { flex: none; margin-right: 6px; font: 11px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.sh-label { flex: none; margin-right: 6px; font-size: 13px; line-height: 1; color: var(--text-faint); }
 .sh-find { flex: 1; min-width: 90px; font: inherit; font-size: 13.5px; color: var(--text); background: none; border: 0; padding: 4px 0; outline: none; }
 .sh-find::placeholder, .sh-note::placeholder { color: var(--text-faint); }
 .sh-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 4px; font: inherit; font-size: 13px; color: var(--text); background: var(--bg-selected); border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
