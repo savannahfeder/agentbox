@@ -231,6 +231,7 @@ import { isNew } from '../../shared/notify-rules.mts';
 import { closedByTheOther, closedOverWords, inMyInbox, isGivenTask, isShared, isTaskRow, heldByAPerson, runnerOf, iSpokeLast } from '../../shared/team-rules.mts';
 import { Face, TeamContext, firstName, teamView } from './team/people';
 import { StartTeam } from './team/StartTeam';
+import { sharingNeedsPro } from './team/multiplayer-words';
 import { inboxBadge } from './needs-count';
 import { givenStage as givenStageOf, namedCards, taskWords } from './team/company';
 import { FaceHover } from './team/status';
@@ -3113,7 +3114,7 @@ export default function App() {
       const w = linkWaiting.current;
       if (w?.personId !== personId || w.threadId !== threadId) return;
       linkWaiting.current = null;
-      showToast(`${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
+      showToast(sharingNeedsPro(team?.state) ?? `${firstName(team?.byId.get(personId) ?? null) || 'Your teammate'} hasn't shared that thread with you.`);
     }, 1500));
   }, [weekCards, openTeammateCard, team, items]);
 
@@ -4513,6 +4514,7 @@ export default function App() {
       if (one) openChatsPlace(`person:${one.people[0]}`); else roomsUi.pickGroup(key);
     },
     onTeam: homeLayout === 'chats' ? () => openChatsPlace('team') : undefined,
+    onTasks: homeLayout === 'chats' ? () => openChatsPlace('tasks') : undefined,
     persons: homeLayout === 'chats' && team ? (team.state.people ?? []).filter((p) => p.id !== team.me).map((p) => ({ id: p.id, name: p.name, url: p.avatarUrl ?? null, waits: false })) : undefined,
     onPerson: (id) => openChatsPlace(`person:${id}`),
   } : null;
@@ -7568,7 +7570,7 @@ export default function App() {
     : s.at === 'files' ? 'Files'
     : s.at === 'connections' ? 'Connections'
     : s.at === 'settings' ? 'Settings'
-    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : members.find((m) => m.key === s.place)?.name ?? 'Team')
+    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : s.place === 'tasks' ? 'Tasks' : members.find((m) => m.key === s.place)?.name ?? 'Team')
     : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
     : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
     : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
@@ -7739,6 +7741,9 @@ export default function App() {
   // Help or a review keeps the thread yours; the task they get leads back to it.
   const askOnThread = async (item: WorkItem, to: GiveTo, kind: 'help' | 'review', note: string, step: string | null) => {
     const first = to.name.split(/\s+/)[0] || to.name;
+    // Their task leads back to this thread, which they could not open.
+    const paused = sharingNeedsPro(team?.state);
+    if (paused && !to.id.startsWith('mate:')) { showToast(paused); return; }
     const out = await api.teamAsk({ product: item.product, id: item.id, to: to.id, kind, ...(note ? { note } : {}), ...(step ? { step } : {}) });
     // It leaves Needs you for In progress, so the toast says where it went and when it comes back.
     showToast(out.ok ? `Asked ${first} to ${kind === 'help' ? 'help' : 'review it'}. It waits in In progress until ${first} hands it back.` : out.error ?? 'That did not work.');
@@ -7842,6 +7847,9 @@ export default function App() {
       const item = items.find((i) => i.product === target.product && i.id === target.id);
       const link = threadLink(team?.me, target.id);
       if (!item || !link || !to.length) return;
+      // A link nobody could open is not sent.
+      const paused = sharingNeedsPro(team?.state);
+      if (paused) { showToast(paused); return; }
       const names = to.map((id) => firstName(team?.byId.get(id) ?? null) || 'them').join(' and ');
       showToast(sendingTo(names));
       const seen = seenNow(item, team?.products.get(item.product), team?.state.since ?? null);
@@ -8101,9 +8109,9 @@ export default function App() {
   // A teammate's waiting thread waits on them, not on you, so it never wears the accent.
   const CARD_WORD: Record<string, [string, PlaceRow['tone']]> = { running: ['Working', 'work'], waiting: ['Waiting', 'hold'], scheduled: ['Later', 'later'], done: ['Done', 'done'] };
   const placeMember = evOn && evPlace ? members.find((m) => m.key === evPlace) ?? null
-    : chatsPlaceShown && chatsPlace !== 'team' ? members.find((m) => m.key === chatsPlace) ?? null : null;
-  // Where Chats' list marks the open page: the team, an AI teammate, or the person's one-to-one chat.
-  const chatsListKey = !chatsPlaceShown || !chatsPlace ? null : chatsPlace === 'team' ? 'team'
+    : chatsPlaceShown && chatsPlace !== 'team' && chatsPlace !== 'tasks' ? members.find((m) => m.key === chatsPlace) ?? null : null;
+  // Where Chats' list marks the open page: the team, its tasks, an AI teammate, or the person's one-to-one chat.
+  const chatsListKey = !chatsPlaceShown || !chatsPlace ? null : chatsPlace === 'team' || chatsPlace === 'tasks' ? chatsPlace
     : chatsPlace.startsWith('mate:') ? `teammate:${chatsPlace.slice('mate:'.length)}`
       : chatsPlace;
   const backTo = 'Needs you';
@@ -8572,7 +8580,7 @@ export default function App() {
                     const task = askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null;
                     return task ? handAskBack(task, verdict, words) : Promise.resolve(false);
                   }}
-                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
+                  backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : chatsPlace === 'tasks' ? 'Tasks' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
                   onContinue={() => continueTeammateThread(openCard)}
                   onMessage={() => messageAbout(openCard.personId, openCard.title)} />
@@ -8600,7 +8608,7 @@ export default function App() {
                   team={homeTeam} progress={homeProgress} slot={setClearSlot}
                   onDoor={(d) => { if (d === 'inbox') openView('inbox'); else if (d === 'progress') { openView('inbox'); if (teamMode) goMine('progress'); else openView('progress'); } else openChatsPlace('team'); }}
                   onOpen={homeOpenRow} onMember={(key) => openChatsPlace(key)} onTeam={() => openChatsPlace('team')} />
-              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{standupPage(homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : placeEl}</ChatsFrame>
+              ) : chatsPlaceShown ? <ChatsFrame current={chatsListKey}>{chatsPlace === 'team' ? <div className="team-page">{standupPage(homeLayout === 'chats' ? (key) => openChatsPlace(key) : undefined)}</div> : chatsPlace === 'tasks' ? <div className="team-page">{tasksPage('Tasks')}</div> : placeEl}</ChatsFrame>
               : connectionsShown ? (
                 <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} cloudKeys={savedCloudKeyList} />
               ) : filesShown ? (
@@ -9625,6 +9633,7 @@ export default function App() {
              has no team in it, and this keeps the team's code in the team's
              files. No team cloud, no pane and no Team row. */
           teamPane={snap?.team?.configured ? <TeamPage team={snap?.team} inviteFocus={inviteFocus} /> : undefined}
+          teamShares={snap?.team?.pro !== false}
           roomsPane={roomsUi.settingsPane}
           // WHO SEES A PROJECT'S THREADS (w-b989839656): the button beside a
           // project's name and the Projects list's column, only while someone

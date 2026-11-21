@@ -13,7 +13,8 @@ import { Face, TeamContext, dueWords, firstName, type TeamView } from './people'
 import { agentOnTask, agentOnTaskWord } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
 import { shownTitle } from '../../../shared/thread-title.mts';
-import { askWord } from '../../../shared/thread-asks.mts';
+import { askIsOpen, askWord } from '../../../shared/thread-asks.mts';
+import { clearDraft, readDraft } from '../drafts';
 import { handedFrom } from '../../../shared/thread-link.mts';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
@@ -157,8 +158,28 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
   const [error, setError] = useState<string | null>(null);
   const choices = teamRouteChoices(item, team);
   const on = isGivenTask(item, team?.products.get(item.product)) ? agentOnTask(items, item, [...mates.values()]) : null;
-  // An ask is answered on the asker's thread, from the bar above (team/AskBar.tsx).
-  if (item.ask) return null;
+  // An ask to you is handed back from here, with what you typed in the reply box as your words.
+  if (item.ask) {
+    if (!team || item.assignee !== team.me || !askIsOpen(item as never)) return null;
+    const first = firstName(team.byId.get(item.ask.owner) ?? null) || 'them';
+    const backs: { label: string; verdict: 'done' | 'yes' | 'changes' }[] = item.ask.kind === 'review'
+      ? [{ label: `Looks good, hand back to ${first}`, verdict: 'yes' }, { label: `Needs changes, hand back to ${first}`, verdict: 'changes' }]
+      : [{ label: `Hand back to ${first}`, verdict: 'done' }];
+    const handBack = async (verdict: 'done' | 'yes' | 'changes') => {
+      const words = readDraft(item).trim();
+      if (verdict === 'changes' && !words) { setError(`Write what ${first} should change below, then pick this.`); return; }
+      setBusy(true); setError(null);
+      const out = await api.teamHandBack({ product: item.product, id: item.id, verdict, ...(words ? { words } : {}) });
+      setBusy(false);
+      if (out.ok) clearDraft(item); else setError(out.error ?? 'That did not work.');
+    };
+    return <div className="opt-strip">
+      {backs.map(({ label, verdict }, i) => <button key={verdict} className="opt-row" disabled={busy} onClick={() => void handBack(verdict)}>
+        <span className="opt-key">{i + 1}</span><span className="opt-text">{label}</span>
+      </button>)}
+      {error && <div className="opt-head"><span className="tm-error">{error}</span></div>}
+    </div>;
+  }
   if (on && item.status !== 'done') {
     return <div className="opt-strip">
       <button type="button" className="opt-row" onClick={() => onOpenItem?.(on.item)}>

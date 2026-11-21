@@ -101,6 +101,8 @@ interface DemoRow {
   answeredAt: number;
   status?: 'done' | 'blocked';
   doneAt?: number;
+  /** A task asked for in a chat: its label naming the chat, and only the chat's people see it. */
+  askedIn?: { slug: string; id: string; people: string[] };
 }
 
 function lines(now: number): DemoRow[] {
@@ -235,6 +237,34 @@ function lines(now: number): DemoRow[] {
     },
     {
       product: 'website',
+      id: SUBJECT_TASK,
+      engine: 'claude',
+      priority: 5,
+      at: now - 33 * MIN,
+      answeredAt: now - 31 * MIN,
+      status: 'done',
+      doneAt: now - 30 * MIN,
+      askedIn: { ...LENA_THREAD, people: [DEMO_ME.id, LENA.id] },
+      ask: 'Can you write three other subject lines for this and say which reads clearest?',
+      label: 'Subject lines for the launch email',
+      problem: 'You asked in Lena\'s launch email thread for three other subject lines, and which one reads clearest.',
+      progress: [
+        'Read the launch email and its subject line',
+        'Wrote three other subject lines',
+        'Picked the clearest one',
+      ],
+      result: [
+        'Three other subject lines, and the one I would send.',
+        '',
+        '1. Move your whole team off Dropbox this week',
+        '2. Every folder, right where you left it',
+        '3. Your Dropbox, in Google Drive by lunch',
+        '',
+        'I would send the second. It names what people are most afraid of losing in a move, and it is the shortest of the four.',
+      ].join('\n'),
+    },
+    {
+      product: 'website',
       id: 'w-e1d93f2a58',
       engine: 'codex',
       priority: 2,
@@ -281,7 +311,8 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
     const answered = Math.round(row.answeredAt);
     const out = byProduct[row.product];
     // Seen by the team: a thread made before the copy signed in is otherwise yours alone.
-    out.push({ id: row.id, ts: at, source: 'system', patch: { title: row.ask, kind: 'directive', priority: row.priority, labels: ['founder'], status: 'open', visibility: 'team' } });
+    const seen = row.askedIn ? { labels: ['founder', `asked-in:${row.askedIn.slug}/${row.askedIn.id}`], visibility: 'people', visibleTo: row.askedIn.people } : { labels: ['founder'], visibility: 'team' };
+    out.push({ id: row.id, ts: at, source: 'system', patch: { title: row.ask, kind: 'directive', priority: row.priority, status: 'open', ...seen } });
     out.push({ id: row.id, ts: at + 1, source: 'founder', patch: { title: row.ask, body: row.ask, engine: row.engine } });
     out.push({ id: row.id, ts: at + 2, source: 'agent', patch: { label: row.label } });
     out.push({ id: row.id, ts: answered - 1, source: 'agent', patch: { problem: row.problem, progress: row.progress.join('\n') } });
@@ -301,7 +332,19 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
 // model to sort it on a call.
 export interface DemoFile { path: string; title: string; text: string }
 /** `given`: a task they handed you. `subject`: a message about one piece of work, which gets a row of its own named by `title`. */
-export interface DemoMessage { from: DemoPerson; projectId: string; id: string; at: number; title: string; body: string; priority: number; given?: boolean; subject?: boolean; file?: DemoFile }
+/** `replies`: what was said after, in order; the last word is theirs, so it still waits on you. */
+export interface DemoMessage {
+  from: DemoPerson; projectId: string; id: string; at: number; title: string; body: string; priority: number;
+  given?: boolean; subject?: boolean; file?: DemoFile; due?: string;
+  replies?: { by: 'me' | 'them'; at: number; text: string }[];
+}
+
+// THE AGENT BROUGHT INTO LENA'S THREAD with an @-mention, written the way the
+// reply box writes one (renderer/src/team/agent-mentions.ts): the words in a
+// link whose address names the agent, the project and the task that answered.
+export const LENA_THREAD = { slug: 'direct-7c41e2d9', id: 'w-d1a7c3e590' };
+export const SUBJECT_TASK = 'w-e4a1b7c392';
+const SUBJECT_ASK = `[@Claude Code in Website](agentbox-agent:claude?project=website&task=${SUBJECT_TASK}) can you write three other subject lines for this and say which reads clearest?`;
 
 /** A message's file, linked under its words the way the reply box links one. */
 export const withFile = (m: DemoMessage) => (m.file ? `${m.body}\n\n[${m.file.path}](attachments/${m.file.path})` : m.body);
@@ -312,13 +355,17 @@ export function demoMessages(now: number = Date.now()): DemoMessage[] {
       from: LENA,
       // A conversation's folder is named from the first eight of its id.
       projectId: '7c41e2d9-3b8a-4f15-9e62-1d0a5c8b4f21',
-      id: 'w-d1a7c3e590',
-      at: now - 9 * MIN,
+      id: LENA_THREAD.id,
+      at: now - 41 * MIN,
       title: 'Launch email',
       body: 'Can you read the launch email today? It goes to all 4,000 trial users tomorrow morning, and the subject line is the part I am least sure of.',
       priority: 7,
       subject: true,
       file: LAUNCH_EMAIL,
+      replies: [
+        { by: 'me', at: now - 33 * MIN, text: SUBJECT_ASK },
+        { by: 'them', at: now - 9 * MIN, text: 'The second one is great, going with it. Can you still read the rest before it goes out tomorrow?' },
+      ],
     },
     {
       from: PRIYA,
@@ -329,6 +376,7 @@ export function demoMessages(now: number = Date.now()): DemoMessage[] {
       body: 'Can you read the words for the three sign-up screens and say yes, or change what you would? My agent builds the screens as soon as you do.',
       priority: 7,
       given: true,
+      due: dayIn(now, 0),
       file: SIGN_UP_WORDS,
     },
   ];
@@ -413,7 +461,23 @@ export const DEMO_TEAM_LOOK = [
 
 // The cards each teammate's copy would put up: what their threads are doing.
 // The Team page, their faces and the Standup are drawn from these.
-export interface DemoCard { by: DemoPerson; threadId: string; project: string; title: string; state: 'running' | 'waiting' | 'done'; updatedAt: number; progress?: string; shippedAt?: number }
+/** `task`: a task somebody gave them, due at the end of the day `dueInDays` from today. `blockedOn`: who it waits on. */
+export interface DemoCard {
+  by: DemoPerson; threadId: string; project: string; title: string; state: 'running' | 'waiting' | 'done'; updatedAt: number; progress?: string; shippedAt?: number;
+  task?: { from: DemoPerson; dueInDays: number }; blockedOn?: DemoPerson;
+}
+
+/** The end of the day `days` from today, local time, which is when a task due that day is late. */
+export function endOfDayIn(now: number, days: number): number {
+  const d = new Date(now);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days + 1).getTime();
+}
+
+/** A day `days` from today as the due field writes it. */
+export function dayIn(now: number, days: number): string {
+  const d = new Date(endOfDayIn(now, days) - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export function demoCards(now: number = Date.now()): DemoCard[] {
   const done = lastWorkingMorning(now);
@@ -429,6 +493,10 @@ export function demoCards(now: number = Date.now()): DemoCard[] {
     { by: PRIYA, threadId: 'w-b2a78e3f51', project: 'Ferry', title: 'A progress bar for every move', state: 'done', updatedAt: done - 4 * HR, shippedAt: done - 4 * HR, progress: 'Shows files moved and time left' },
     { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email for the trial users', state: 'done', updatedAt: done - 1.3 * HR, progress: 'For all 4,000 trial users\nSent to Jamie to read' },
     { by: LENA, threadId: 'w-d4b37e0c84', project: 'Website', title: 'Welcome emails for new teams', state: 'running', updatedAt: now - 6 * MIN, progress: 'Three of the five emails written' },
+    // The team's tasks, for the Tasks page: one late, one blocked on you, one ahead.
+    { by: PRIYA, threadId: 'w-b2c07d5e94', project: 'Website', title: 'Screenshots for the launch email', state: 'running', updatedAt: now - 50 * MIN, progress: 'Two of the four taken', task: { from: LENA, dueInDays: -1 } },
+    { by: LENA, threadId: 'w-d4e61f9a03', project: 'Website', title: 'Pricing page for the per-seat plan', state: 'waiting', updatedAt: now - 1.4 * HR, progress: 'Drafted both versions\nWaiting on the price from Jamie', task: { from: DEMO_ME, dueInDays: 1 }, blockedOn: DEMO_ME },
+    { by: THEO, threadId: 'w-c3e95a2b70', project: 'Ferry', title: 'Dates on shared drives', state: 'running', updatedAt: now - 30 * MIN, progress: 'Old dates carried through the new engine\nTesting on 40 shared drives', task: { from: DEMO_ME, dueInDays: 3 } },
     { by: LENA, threadId: 'w-d4f05c1b98', project: 'Website', title: 'Comparison page', state: 'done', updatedAt: done - 21 * HR, shippedAt: done - 21 * HR, progress: 'Live, linked from pricing' },
     { by: LENA, threadId: 'w-d4a96e3c27', project: 'Website', title: 'A note to trial teams that never started a move', state: 'done', updatedAt: done - 3 * HR, shippedAt: done - 3 * HR, progress: '212 teams, each sent a two line note' },
     { by: LENA, threadId: 'w-d4c19a6b02', project: 'Website', title: 'Story of the first team to move', state: 'done', updatedAt: done - 7 * HR, shippedAt: done - 7 * HR, progress: '14 people, 18,000 files, done by lunch' },
