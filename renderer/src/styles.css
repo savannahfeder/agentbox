@@ -1384,13 +1384,12 @@ body {
    width, so the wash meets the card's left edge. The hairlines either side of
    it start there too, or the wash's corners poke past them. */
 .row.recent {
-  --wash: 255 255 255;
-  background: linear-gradient(90deg, rgb(var(--wash) / 0.02), rgb(var(--wash) / 0.012) 25%, rgb(var(--wash) / 0.004) 50%, transparent 70%);
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.02), rgb(255 255 255 / 0.012) 25%, rgb(255 255 255 / 0.004) 50%, transparent 70%);
 }
-/* On white any grey read as dirt, so light mode takes the accent instead,
-   over enough stops that the fade shows no steps. */
+/* Light takes the same faint fade in its own ink; the accent this wide
+   washed the whole row orange. */
 [data-theme="light"] .row.recent {
-  background: linear-gradient(90deg, rgb(238 96 24 / 0.07), rgb(238 96 24 / 0.045) 25%, rgb(238 96 24 / 0.015) 55%, transparent 85%);
+  background: linear-gradient(90deg, rgb(18 24 42 / 0.02), rgb(18 24 42 / 0.012) 25%, rgb(18 24 42 / 0.004) 50%, transparent 70%);
 }
 .row.recent::after,
 .row.recent + .row::after { left: 0; }

@@ -443,10 +443,10 @@ export function emptyTabWords(view: View | string, starting = false, waiting = 0
     return `Nothing is running. ${waiting === 1 ? 'One thread waits' : `${waiting} threads wait`} in Needs you.`;
   }
   // A finished thread waits in Needs you until its owner closes it, which a
-  // persona read as the app losing it.
+  // persona read as the app losing it. One short line, like In progress's.
   return {
-    snoozed: 'Nothing is waiting for later. "Add it to Later" on a new thread writes one down without starting it.',
-    done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
+    snoozed: 'Nothing is waiting for later.',
+    done: 'Nothing done yet. Finished threads wait in Needs you.',
   }[view as string] ?? 'Nothing here.';
 }
 

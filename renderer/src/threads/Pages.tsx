@@ -482,6 +482,14 @@ export const INBOX_TABS: { view: TabView; label: string }[] = [
  */
 const COUNTED: TabView[] = ['inbox', 'progress', 'snoozed'];
 
+/** A tab just clicked keeps `data-clicked` until the pointer leaves it, and
+ *  pages.css hides the hint plate while it is hovered: the Tab plate is for a
+ *  resting pointer, not one that has already acted. */
+const quietOnceClicked = {
+  onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => { e.currentTarget.dataset.clicked = ''; },
+  onPointerLeave: (e: ReactPointerEvent<HTMLButtonElement>) => { delete e.currentTarget.dataset.clicked; },
+};
+
 /** With a team on the page (w-b5f23cff71): two tabs, Needs you and Everything else, and the team's faces at the end. */
 export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => void; corner?: ReactNode;
   /** On a computer: Needs you, In progress, Later and Done, each its own tab;
@@ -527,11 +535,11 @@ function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, afte
   const press = (t: TabView) => (states ? (t === 'inbox' ? team!.onNeeds() : states.onTab(t)) : team ? team.onNeeds() : onView(t));
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
-    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} {...actsOnPress(() => press(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
-    {team && !states && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} {...actsOnPress(team.onEverything)}>{EVERYTHING_ELSE}</button>}
-    {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} {...actsOnPress(team.today.onToday)}>Today</button>}
-    {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} {...actsOnPress(team.tasks.onTasks)}>Tasks</button>}
-    {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} {...actsOnPress(team.done.onDone)}>{DONE.short}</button>}
+    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} {...actsOnPress(() => press(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
+    {team && !states && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.on ? ' on' : ''}`} {...actsOnPress(team.onEverything)}>{EVERYTHING_ELSE}</button>}
+    {team?.today && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.today.on ? ' on' : ''}`} {...actsOnPress(team.today.onToday)}>Today</button>}
+    {team?.tasks && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.tasks.on ? ' on' : ''}`} {...actsOnPress(team.tasks.onTasks)}>Tasks</button>}
+    {team?.done && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.done.on ? ' on' : ''}`} {...actsOnPress(team.done.onDone)}>{DONE.short}</button>}
     {after}
   </div>{team?.corner}{onSearch && <SearchButton onSearch={onSearch} />}</div>;
 }
@@ -1137,7 +1145,6 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>
-        {count === 0 && <div className="th-col-empty">Nothing here.</div>}
         {ahead?.cards}
         {/* A card says who can see it the way a row does: the lock on what
             only you can see, the people mark on what a few chosen people
