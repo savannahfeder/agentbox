@@ -15,7 +15,8 @@ describe('handing a thread over', () => {
     expect(give).toContain("await api.answer({ product: (a.row as WorkItem).product, id: a.row.id, status: 'done' })");
   });
   it('says who no longer has the ask', () => {
-    expect(give).toContain("no longer ${asked.length === 1 ? 'has' : 'have'} the ask");
+    // Each name once, and never the person it was handed to (tests/an-ask-is-sent-once-and-ends-in-words-that-say-how).
+    expect(give).toContain("no longer ${letGo.length === 1 ? 'has' : 'have'} the ask");
   });
   it('says Handed over to an AI teammate too', () => {
     expect(give).toContain('.then(() => showToast(handedToWhom(to.name))');

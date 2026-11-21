@@ -77,3 +77,10 @@ describe('the wiring a live check caught', () => {
     expect(taskHandedFrom([task()] as never, 'w-1', 'sam')).not.toBeNull();
   });
 });
+
+describe('the giver\'s Done row', () => {
+  it('says who has it, not Done', () => {
+    const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
+    expect(pages).toContain('(handedOnName ? `Handed to ${handedOnName.split(/\\s+/)[0]}` : null)');
+  });
+});

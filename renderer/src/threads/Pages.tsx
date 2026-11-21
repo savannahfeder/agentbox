@@ -32,7 +32,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { asksForYourWords, cellUnderTab, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
+import { asksForYourWords, cellUnderTab, handedTo as handedOnTo, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -791,7 +791,9 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const backFrom = toldBy && team?.byId.has(toldBy) ? backWord(nameFirst(toldBy), asksHere.find((a) => !a.open && a.to === toldBy)?.verdict ?? null) : null;
   // Out with someone you asked: say who, not that nothing is running.
   const askedOut = team && !cell.live && !backFrom ? askedOutWord(allItems ?? [], team.me, item.id, (id) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null;
-  const shownWord = wants ?? backFrom ?? askedOut ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
+  // Handed on, it did not finish: it says who has it now.
+  const handedOnName = handedOnTo(item);
+  const shownWord = wants ?? backFrom ?? askedOut ?? (handedOnName ? `Handed to ${handedOnName.split(/\s+/)[0]}` : null) ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
   // Out with a person, it is no agent's state, so it wears no agent mark and offers no try again.
   const status = shownWord === null ? undefined : askedOut && shownWord === askedOut ? { ...worded, word: shownWord, agent: false, title: undefined } : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
