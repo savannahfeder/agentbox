@@ -106,7 +106,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
-import { filedByThePerson, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
+import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
@@ -2308,10 +2308,12 @@ export default function App() {
   const waitingOn = useCallback((i: WorkItem) => waitsThatCanEnd(i, byId), [byId]);
   // Your threads someone you asked for help or a review has right now: out of Needs you, notes and
   // comments included, until they hand it back (shared/thread-asks.mts).
+  // One that has come back and waits on you is yours again, though someone else you asked still has it.
   const askedOut = useMemo(() => new Set(items.flatMap((r) => {
     const a = askIGave(r, team?.me ?? null);
-    return a && askIsOpen(r) ? [a.thread] : [];
-  })), [items, team?.me]);
+    const thread = a ? byId.get(a.thread) : null;
+    return a && askIsOpen(r) && !(thread && heldForHer(thread)) ? [a.thread] : [];
+  })), [items, team?.me, byId]);
 
   // A comment that asks you by name is news to you (fileNewsFor).
   const myName = team?.byId.get(team.me ?? '')?.name ?? null;
