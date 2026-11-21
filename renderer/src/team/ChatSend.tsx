@@ -1,6 +1,6 @@
-// Send at the bottom right of a chat's box (w-f689c07680): an arrow, as Slack's
-// is, faint until there is something to send. Its key is in the tooltip, not in
-// the button. A reply to an agent keeps "Send ⌘↵", whose key is not Return.
+// Send in a chat's box: an arrow, faint until there is something to send, with
+// its key in the tooltip. A reply to an agent keeps "Send ⌘↵", because its key
+// is not Return.
 import { SendGlyph } from '../components/reply-glyphs';
 import { sendKeyFor } from '../reply-keys';
 

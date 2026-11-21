@@ -303,12 +303,17 @@
 .fmt-emoji-wrap { position: relative; display: inline-flex; }
 /* The address a link button asks for, on a line of its own above the bar. */
 .fmt-bar { position: relative; }
-.fmt-link-ask {
-  position: absolute; bottom: calc(100% + 6px); left: 0; width: 280px; z-index: 60;
-  padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: var(--artifact-corner); outline: none;
-  background: var(--pop); color: var(--text); font: inherit; font-size: 13px; box-shadow: var(--shadow-lg);
+.fmt-link-pop {
+  position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 60; display: flex; align-items: center; gap: 6px; width: 320px; padding: 4px 4px 4px 10px;
+  border: 1px solid var(--line-strong); border-radius: var(--artifact-corner); background: var(--pop); box-shadow: var(--shadow-lg);
 }
+.fmt-link-ask { flex: 1; min-width: 0; padding: 4px 0; border: 0; outline: none; background: none; color: var(--text); font: inherit; font-size: 13px; }
 .fmt-link-ask::placeholder { color: var(--text-faint); }
+.fmt-link-add {
+  flex: none; height: 26px; padding: 0 10px; border: 0; border-radius: var(--artifact-corner-small); cursor: pointer;
+  background: color-mix(in srgb, var(--text) 15%, transparent); color: var(--text); font: inherit; font-size: 12.5px;
+}
+.fmt-link-add:disabled { background: none; color: var(--text-faint); cursor: default; }
 
 /* ---------------- the chat's reply box, as an editor (w-0d55a2b160) --------
    ./RichReply.tsx. At rest it is the text field it replaced: the same padding,

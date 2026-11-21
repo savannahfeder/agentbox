@@ -235,19 +235,22 @@ export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNot
   }
 
   const linkAsk = asking && (
-    <input
-      className="fmt-link-ask"
-      autoFocus
-      placeholder="Paste a link, then Return"
-      aria-label="Link address"
-      value={href}
-      onChange={(e) => setHref(e.target.value)}
-      onBlur={() => setAsking(false)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.preventDefault(); linkDone(true); }
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); linkDone(false); }
-      }}
-    />
+    <span className="fmt-link-pop">
+      <input
+        className="fmt-link-ask"
+        autoFocus
+        placeholder="Paste a link"
+        aria-label="Link address"
+        value={href}
+        onChange={(e) => setHref(e.target.value)}
+        onBlur={() => setAsking(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); linkDone(true); }
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); linkDone(false); }
+        }}
+      />
+      <button type="button" className="fmt-link-add" disabled={!href.trim()} onMouseDown={hold} onClick={() => linkDone(true)}>Add link</button>
+    </span>
   );
   const markButtons = (grouped: boolean) => WRITES.flatMap(({ what, title, glyph }) => [
     ...(grouped && (what === 'bullet' || what === 'quote') ? [<span key={`gap-${what}`} className="fmt-gap" aria-hidden="true" />] : []),

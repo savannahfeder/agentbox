@@ -99,6 +99,14 @@ describe('the formatting marks', () => {
   it('show in a room’s side panel too, which used to hide them while Aa was lit', () => {
     expect(rooms).not.toMatch(/\.rm-chat \.rm-compose-bar \.fmt-mark/);
   });
+
+  // A tester who works with the mouse opened the link tool and found only
+  // "Paste a link, then Return", with nothing to press.
+  it('add a link with a button as well as with Return', () => {
+    const bar = read('renderer/src/team/FormatBar.tsx');
+    expect(bar).toMatch(/<button type="button" className="fmt-link-add" disabled=\{!href\.trim\(\)\} onMouseDown=\{hold\} onClick=\{\(\) => linkDone\(true\)\}>Add link<\/button>/);
+    expect(bar).toMatch(/if \(e\.key === 'Enter'\) \{ e\.preventDefault\(\); linkDone\(true\); \}/);
+  });
 });
 
 describe('what is attached, as tiles', () => {
@@ -177,6 +185,32 @@ describe('the bar', () => {
     expect(roomChat).toMatch(/e\.target\.value = ''; ref\.current\?\.focus\(\);/);
     expect(read('renderer/src/team/ThreadPanel.tsx')).toMatch(/e\.target\.value = '';\s*box\.current\?\.focus\(\);/);
     expect(read('renderer/src/components/Focus.tsx')).toMatch(/e\.target\.value = '';\s*ref\.current\?\.focus\(\);/);
+  });
+});
+
+// Both testers attached a file to a message, looked at another chat and came
+// back: the words were there and the file was gone, so the message would have
+// gone out without it. The box kept its words in the draft store and its files
+// only in memory.
+describe('a half-written message', () => {
+  const mem = new Map<string, string>();
+  const fake = { getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => { mem.set(k, String(v)); }, removeItem: (k: string) => { mem.delete(k); } };
+  it('keeps its files when you leave the chat and come back', async () => {
+    const { saveDraftAttachments, readDraftAttachments } = await import('../renderer/src/drafts.ts');
+    (globalThis as { localStorage?: unknown }).localStorage = fake;
+    try {
+      saveDraftAttachments({ product: 'room:with:p-l', id: 'Message Lena' }, [{ name: 'launch-plan.md', image: false, srcPath: '/x/launch-plan.md', size: 1200 }]);
+      const html = box();
+      expect(html).toMatch(/<span class="attach-head">launch-plan.md<\/span>/);
+      expect(readDraftAttachments({ product: 'room:with:p-l', id: 'Message Lena' })).toHaveLength(1);
+    } finally {
+      delete (globalThis as { localStorage?: unknown }).localStorage;
+    }
+  });
+
+  it('writes its files down as they change, beside its words', () => {
+    expect(roomChat).toMatch(/useState<PendingAttachment\[\]>\(\(\) => readDraftAttachments\(draftAt\)\.map\(staged\)\)/);
+    expect(roomChat).toMatch(/setTooBig\(saveDraftAttachments\(draftAt, next\)\.dropped\.length\);/);
   });
 });
 

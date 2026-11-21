@@ -136,11 +136,12 @@
 .rm-day .rm-label { font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-faint); }
 .rm-compose { position: relative; margin: 8px 20px 20px; flex: none; border: 1px solid var(--line-strong); background: var(--control-face); display: flex; flex-direction: column; }
 .rm-compose > .rm-picker { position: absolute; bottom: calc(100% + 6px); left: 0; }
-/* EVERY CHAT'S BOX IS SLACK'S (w-f689c07680): the words across the whole box,
-   growing to two fifths of the window and then scrolling, what is attached under
-   them, then the tools with Send at the right. A glyph's ink lines up with the words. */
+/* EVERY CHAT'S BOX IS SLACK'S: the words across the whole box, then what is
+   attached, then the tools with Send at the right. The bar's odd padding puts
+   the first glyph's ink on the words' edge. */
 .rm-compose-input { min-height: 34px; max-height: min(40vh, 360px); overflow-y: auto; padding: 11px 12px 3px; box-sizing: border-box; color: var(--text); font-size: 13.5px; line-height: 20px; }
 .rm-compose .attach-row { padding: 6px 12px 4px; }
+.rm-compose .compose-note { padding: 2px 12px; }
 .rm-compose .fmt-marks { padding: 6px 8px 0 3px; }
 .rm-compose-bar { display: flex; align-items: center; gap: 8px; padding: 4px 8px 8px 4px; }
 .rm-compose-bar .fmt-bar { margin-right: auto; min-width: 0; }
@@ -515,6 +516,7 @@
 
 /* A page's box, at the page's type size. */
 .gr-page .rm-compose .attach-row { padding: 8px 14px 4px; }
+.gr-page .rm-compose .compose-note { padding: 2px 14px; }
 .gr-page .rm-compose .fmt-marks { padding: 8px 8px 0 5px; }
 .gr-page .rm-compose-bar { padding: 4px 8px 8px 6px; }
 .gr-page .gr-pt, .gr-page .gr-l1 { font-size: 14.5px; line-height: 19px; }

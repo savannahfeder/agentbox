@@ -3338,9 +3338,8 @@ body {
 }
 .attach-remove:hover { color: var(--text); border-color: var(--text-faint); }
 
-/* A CHAT'S BOX DRAWS WHAT IS ATTACHED AS TILES OF ONE HEIGHT (AttachRow's
-   `tiles`): a picture as a square, any other file as a card with its kind, name
-   and size, each with its own ×, so pressing a file never takes it out. */
+/* A chat's box draws what is attached as tiles of one height (AttachRow's
+   `tiles`), each with its own ×, so pressing a file never takes it out. */
 .attach-tiles { gap: 8px; max-height: 192px; overflow-y: auto; }
 .dock-card .attach-tiles { padding: 4px 16px 12px; }
 .attach-tile { position: relative; flex: none; height: 56px; max-width: 100%; box-sizing: border-box; }

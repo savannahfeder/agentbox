@@ -6,7 +6,7 @@
 // Every message carries what a direct chat's does: reactions, the bar on
 // pointing with its more menu (edit, copy, mark unread, delete), an edited
 // mark, and voice notes and files. The box is the direct chat's too.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from 'react';
 import { MessageMarkdown } from '../../components/MessageMarkdown';
 import { ConnectionLink } from '../../connections/ConnectionsPlace';
 import { connectionLinkOf, keepConnectionLinks } from '../../connections/connections-shown';
@@ -36,7 +36,7 @@ import { holdAtBottom } from '../../thread-bottom';
 import { I } from './icons';
 import type { MessageMarks } from '../decisions';
 import { LINE_MISSING } from '../../reveal-line';
-import { readDraft, saveDraft } from '../../drafts';
+import { readDraft, readDraftAttachments, saveDraft, saveDraftAttachments } from '../../drafts';
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { clockOf } from '../../teammates/chat-lines';
@@ -505,7 +505,16 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   const [text, setText] = useState(() => readDraft(draftAt));
   const [plain, setPlain] = useState('');
   const [caret, setCaret] = useState(0);
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  // Its files are kept beside its words, so leaving the chat does not lose them.
+  const [attachments, setAttachmentsState] = useState<PendingAttachment[]>(() => readDraftAttachments(draftAt).map(staged));
+  const attachedNow = useRef(attachments);
+  const [tooBig, setTooBig] = useState(0);
+  const setAttachments = (change: SetStateAction<PendingAttachment[]>) => {
+    const next = typeof change === 'function' ? change(attachedNow.current) : change;
+    attachedNow.current = next;
+    setTooBig(saveDraftAttachments(draftAt, next).dropped.length);
+    setAttachmentsState(next);
+  };
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pick, setPick] = useState(0);
@@ -639,6 +648,9 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
           return false;
         }} />
       <AttachRow look="tiles" attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+      {tooBig > 0 && <div className="compose-note attach-problem" role="alert">{tooBig === 1
+        ? 'One pasted image is too big to keep. Leaving this chat loses it.'
+        : `${tooBig} pasted images are too big to keep. Leaving this chat loses them.`}</div>}
       <input ref={filePicker} type="file" multiple style={{ display: 'none' }}
         onChange={async (e) => { add(await collectFiles(e.target.files ?? [])); e.target.value = ''; ref.current?.focus(); }} />
       <div className="rm-compose-bar">

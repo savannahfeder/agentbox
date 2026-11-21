@@ -129,12 +129,11 @@ export const CHAT_KEYS: Record<string, Exclude<Format, 'link'>> = {
 };
 
 /**
- * SHIFT+RETURN, SLACK'S WAY. Return sends a chat message, so this is the only
- * new line there is, and each line is a block of its own: a list button then
- * makes a list of the line it is on, not of every line above it too. In a list
- * it starts the next point, in a quote the next line of the quote, and on an
- * empty one it ends the list or the quote. In a code block it is a new line of
- * code. A message still goes out as lines one newline apart (`lineJoin`).
+ * SHIFT+RETURN, SLACK'S WAY. Return sends, so this is the only new line, and
+ * each line is a block of its own so a list button lists only the line it is
+ * on. In a list or a quote it starts the next point or line, and on an empty
+ * one it leaves the list or quote; in code it is a new line of code. The lines
+ * still go out one newline apart (`lineJoin`).
  */
 export function shiftReturn(schema: Schema): Command {
   const { nodes } = schema;
