@@ -15,7 +15,7 @@ const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx
 
 describe("a teammate's thread page", () => {
   it('builds its link components once per project and folder', () => {
-    expect(page).toMatch(/return \(text: string\) => <ReactMarkdown[^\n]*\n\s*\}, \[product, dir\]\);/);
+    expect(page).toMatch(/return \(text: string\) => <MessageMarkdown[^\n]*\n\s*\}, \[product, dir\]\);/);
   });
   it('reads the lines and the app\'s callbacks through refs, not as dependencies', () => {
     expect(page).toMatch(/const linesHere = useRef<LedgerLine\[\]>\(\[\]\);/);
