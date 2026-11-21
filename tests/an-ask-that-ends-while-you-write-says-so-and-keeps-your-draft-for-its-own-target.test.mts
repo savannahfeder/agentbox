@@ -87,7 +87,7 @@ describe('the line that says the ask ended', () => {
 describe('the page', () => {
   const src = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
   it('notices the ask going while the page is open, unless you handed it back yourself', () => {
-    expect(src).toMatch(/if \(was && !handedBack\.current\) setEnded\(\{ target: boxTarget\(was\.ask\?\.kind \?\? null\) \}\);/);
+    expect(src).toMatch(/if \(was && !handedBack\.current\) setEnded\(\{ target: boxTarget\(was\.ask\?\.kind \?\? null\), note: /);
     expect(src).toMatch(/handedBack\.current = true;\n\s*const ok = await onHandBack\(verdict, draft\.trim\(\)\);\n\s*if \(!ok\) handedBack\.current = false;/);
   });
   it('a hand-back clears the draft it sent, not the one the box moved on to', () => {
