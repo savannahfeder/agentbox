@@ -51,7 +51,11 @@ export const boxTarget = (kind: 'help' | 'review' | null | undefined): BoxTarget
 /** One draft per target, so words never change whom they go to on their own. */
 export const draftAtFor = (personId: string, threadId: string, target: BoxTarget) => ({ product: `teammate:${personId}`, id: target === 'comment' ? threadId : `${threadId}:${target}` });
 
-export const askEndedWords = (owner: string, handedToYou: boolean) => (handedToYou ? `${owner} handed this thread to you.` : `${owner} took the ask back.`);
+/** Whether this task is the ask the open teammate's thread page carries, so L and E on the page act on it. */
+export const isTheAskOn = (item: { ask?: { owner: string; thread: string } | null }, card: { personId: string; threadId: string } | null): boolean =>
+  !!card && !!item.ask && item.ask.owner === card.personId && item.ask.thread === card.threadId;
+
+export const askEndedWords =(owner: string, handedToYou: boolean) => (handedToYou ? `${owner} handed this thread to you.` : `${owner} took the ask back.`);
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 

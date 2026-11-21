@@ -17,7 +17,7 @@
 // WHAT THIS FILE HOLDS. One press flips the view and keeps every filter; it
 // works where the list or the board is on the screen and nowhere else; ⌘B is
 // not taken by it; V no longer does it; and the three places that teach keys
-// (the shortcuts page, ⌘K and the tutorial's board card) all name B.
+// (the shortcuts page, ⌘K and the List and Board buttons) all name B.
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -25,7 +25,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flipView } from '../renderer/src/threads/page-rules.ts';
 import { SHORTCUTS } from '../renderer/src/shortcuts.ts';
-import { coach, wrongPress } from '../renderer/src/onboarding.ts';
 import { opensATextField } from '../renderer/src/keys.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -124,24 +123,5 @@ describe('everywhere that teaches keys names it', () => {
     const pages = read('renderer/src/threads/Pages.tsx');
     expect(pages).toContain('title="List (B)"');
     expect(pages).toContain('title="Board (B)"');
-  });
-
-  it('is named on the tutorial’s board card, beside the click', () => {
-    const say = coach('board', 0);
-    expect(say.key).toBe('B');
-    const line = `${say.lead}${say.key}${say.tail}`.toLowerCase();
-    expect(line).toContain('view and filters');
-    expect(line).toContain('board');
-  });
-
-  it('is the one key the board card lets through', () => {
-    // The walk swallows any key that is not the card's own. B must reach the
-    // app on this card, and a neighbouring letter, V among them, must still be
-    // held.
-    expect(wrongPress('B', { key: 'b' })).toBe(false);
-    expect(wrongPress('B', { key: 'B' })).toBe(false);
-    expect(wrongPress('B', { key: 'v' })).toBe(true);
-    // ⌘B is not an answer to the walk at all, right or wrong.
-    expect(wrongPress('B', { key: 'b', metaKey: true })).toBe(false);
   });
 });

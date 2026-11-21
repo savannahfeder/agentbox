@@ -33,7 +33,7 @@ import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
-import { readCodexThreadsOffThread } from './codex-threads.mts';
+import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';

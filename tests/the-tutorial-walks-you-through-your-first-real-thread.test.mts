@@ -264,15 +264,12 @@ describe('the practice tutorial does not offer itself on top', () => {
   // "It just strangely opened this modal layered on top. I don't think we
   // should ask people for permission." The practice round's offer on a new
   // project is for people who came through the old first run.
-  it('is never offered to someone the new first run took through', async () => {
-    const { offerOnNewProject } = await import('../renderer/src/tutorial.ts');
-    expect(offerOnNewProject({ made: true, walking: false, offered: false, touring: true })).toBe(false);
-    expect(offerOnNewProject({ made: true, walking: false, offered: false, touring: false })).toBe(true);
-  });
-  it('and the app says which people those are', async () => {
+  // Since 2026-11-21 there is no offer on a new project at all: the old walk it
+  // offered is gone, and ⌘K's Take the tutorial is this walkthrough.
+  it('is never offered on a new project, to anybody', async () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toContain('touring: tourRef.current !== null,');
+    expect(app).not.toMatch(/TutorialOffer|offerOnNewProject|setOffer\(/);
   });
 });
 

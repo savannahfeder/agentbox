@@ -30,7 +30,6 @@
 import { describe, expect, it } from 'vitest';
 import os from 'node:os';
 import { proposeParent, checkProjectFolder } from '../shared/project-folder-check.mts';
-import { shortPath } from '../renderer/src/onboarding.ts';
 import { NAME } from '../shared/product-name.mjs';
 
 /**
@@ -105,8 +104,4 @@ describe('what the wrong home was costing', () => {
     expect(proposeParent(only, { home: HOME })).toBe('/Users/esther/dev');
   });
 
-  it('never shortened a path to ~ on the folder screen', () => {
-    expect(shortPath('/Users/esther/code/apollo', guessed(STORE))).toBe('/Users/esther/code/apollo');
-    expect(shortPath('/Users/esther/code/apollo', HOME)).toBe('~/code/apollo');
-  });
 });

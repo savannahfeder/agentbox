@@ -34,9 +34,6 @@ describe('when the inbox asks whether a plan can run agents', () => {
     expect(effect).toMatch(/\[[^\]]*\bfresh\b[^\]]*\]/);
   });
 
-  it('still waits for the walk, as it did', () => {
-    expect(effect).toMatch(/!run/);
-  });
 
   it('asks again when the window comes back while the bar is up', () => {
     const focus = app.match(/useEffect\(\(\) => \{\s*if \(!planWords\) return[\s\S]{0,400}?\}, \[planWords, checkPlan\]\);/)?.[0] ?? '';
