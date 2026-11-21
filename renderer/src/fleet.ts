@@ -8,6 +8,7 @@
 import { createContext } from 'react';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 import { DEFAULT_ENGINE } from '../../shared/engines.mts';
+import { CODEX_LABELS } from './box-filter';
 
 export interface Fleet {
   /** The run on each thread an agent is on right now, by thread id. */
@@ -43,12 +44,9 @@ export interface Fleet {
   engines?: { workspace: string; byItem: Record<string, string> };
 }
 
-// The labels that make a thread a conversation brought in from Codex (box-filter.ts CODEX_LABELS).
-const FROM_CODEX = new Set(['codex', 'codex-import', 'not-imported']);
-
 /** The harness a thread is on, read as the row's byline reads it (List.tsx `agentRest`, byline.ts `agentAtWork`). */
 export function harnessOn(item: Pick<WorkItem, 'id' | 'labels'>, fleet: Fleet): string {
-  if ((item.labels ?? []).some((l) => FROM_CODEX.has(l))) return 'codex';
+  if ((item.labels ?? []).some((l) => CODEX_LABELS.has(l))) return 'codex';
   return fleet.sessions?.get(item.id)?.engine ?? fleet.engines?.byItem[item.id] ?? fleet.engines?.workspace ?? DEFAULT_ENGINE;
 }
 
