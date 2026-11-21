@@ -34,6 +34,12 @@ import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
 
 const PICTURE = /\.(png|jpe?g|gif|webp|svg)$/i;
+const glyph = (paths: ReactNode) => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths}</svg>
+);
+const BellGlyph = () => glyph(<><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5h4" /></>);
+const InfoGlyph = () => glyph(<><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5.5" /><path d="M12 7.6h.01" strokeWidth="2" /></>);
+const OnwardGlyph = () => glyph(<><path d="M5 6v5a3 3 0 0 0 3 3h11" /><path d="m15 10 4 4-4 4" /></>);
 const COPY = /^attachments\//;
 
 interface Work { shared: boolean; lines: LedgerLine[]; earlier: number; product: string | null; dir: string | null }
@@ -153,18 +159,29 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const numbered = useMemo(() => lineAsThread(line), [line]);
   const viewLines = useMemo(() => (numbered.lines.length ? [...(work?.lines ?? []), ...numbered.lines as LedgerLine[]] : work?.lines ?? []), [work?.lines, numbered]);
   const [big, setBig] = useState<ArtifactOpen | null>(null);
-  // Asked onto it, you land where the ask and the box to write in are, once per thread.
+  // Asked onto it, you land where the ask and the box to write in are, once per thread,
+  // unless the page is short enough that the end is already in reach from the title.
   const pageEl = useRef<HTMLDivElement>(null);
   const landed = useRef<string | null>(null);
   useEffect(() => {
     if (!ask || !work || landed.current === threadId) return;
     landed.current = threadId;
     const pane = pageEl.current?.closest('.th-pane');
-    if (pane) pane.scrollTop = pane.scrollHeight;
+    if (pane) pane.scrollTop = pane.scrollHeight > pane.clientHeight * 1.5 ? pane.scrollHeight : 0;
   }, [ask, work, threadId]);
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
 
+  // An open review on you is answered from the box below, not commented on.
+  const reviewing = ask?.ask?.kind === 'review' && !!onHandBack;
+  const [handing, setHanding] = useState(false);
+  const handBack = async (verdict: 'done' | 'yes' | 'changes') => {
+    if (!onHandBack || handing) return;
+    setHanding(true);
+    const ok = await onHandBack(verdict, draft.trim());
+    setHanding(false);
+    if (ok) setDraft('');
+  };
   const send = async () => {
     const text = draft.trim();
     if (!text || sending) return;
@@ -177,6 +194,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     following?.follow(card);
   };
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // A review's Enter is a new line: which verdict it meant is not the key's to guess.
+    if (reviewing) return;
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); }
   };
   const owner = firstName(person) || 'Someone';
@@ -191,16 +210,16 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     <div className="tp-acts">
       {following && card.state !== 'done' && !ask && <button type="button" className={`th-follow${followed ? ' on' : ''}`} aria-pressed={followed}
         onClick={() => (followed ? following.unfollow(card) : following.follow(card))}>
-        {followed ? 'You will be told when it is done' : 'Tell me when it is done'}
+        <BellGlyph />{followed ? 'You will be told when it is done' : 'Tell me when it is done'}
       </button>}
       {onContinue && !ask && canContinue(work, card, team?.me ?? null) && (
         <button type="button" className="th-follow" onClick={onContinue}
           title={`Start a thread of your own with ${owner}'s conversation and files.`}>
-          Continue it yourself
+          <OnwardGlyph />Continue it yourself
         </button>
       )}
       <MessagePerson person={person} onMessage={onMessage} />
-      <button type="button" className={`th-follow tp-about${about ? ' on' : ''}`} aria-pressed={about} onClick={() => setAbout(!about)}>About</button>
+      <button type="button" className={`th-follow tp-about${about ? ' on' : ''}`} aria-pressed={about} onClick={() => setAbout(!about)}><InfoGlyph />About</button>
     </div>
   );
 
@@ -266,18 +285,29 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             </div>
           )}
           {/* The ask is the newest thing said here, so it comes last, as a message. */}
-          {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={onHandBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
-          <form className="th-comment" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+          {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={onHandBack} answeredBelow onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+          <form className="th-comment" onSubmit={(e) => { e.preventDefault(); if (!reviewing) void send(); }}>
             <div className="tp-comment-box">
               <Face person={team?.me ? team.byId.get(team.me) : null} me />
-              {helping
-                ? <textarea value={draft} rows={2} placeholder={`Write to ${owner}'s agent`} aria-label={`Write to ${owner}'s agent`}
+              {reviewing
+                ? <textarea value={draft} rows={2} placeholder={`Your review for ${owner}`} aria-label={`Your review for ${owner}`}
                   onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
-                : <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
-                  onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />}
-              {helping
-                ? <button type="submit" disabled={!draft.trim() || sending}>Send to the agent</button>
-                : <button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>}
+                : helping
+                  ? <textarea value={draft} rows={2} placeholder={`Write to ${owner}'s agent`} aria-label={`Write to ${owner}'s agent`}
+                    onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />
+                  : <textarea value={draft} rows={2} placeholder={`Comment to ${owner}`} aria-label={`Comment to ${owner}`}
+                    onChange={(e) => setDraft(e.target.value)} onKeyDown={onKey} />}
+              {reviewing
+                ? <span className="tp-answer">
+                  <button type="button" disabled={handing} onClick={() => { void handBack('yes'); }}>Looks good</button>
+                  <button type="button" disabled={!draft.trim() || handing} onClick={() => { void handBack('changes'); }}>Send changes to {owner}</button>
+                </span>
+                : helping
+                  ? <span className="tp-answer">
+                    <button type="submit" disabled={!draft.trim() || sending}>Send to the agent</button>
+                    {onHandBack && <button type="button" disabled={handing} onClick={() => { void handBack('done'); }}>Hand back to {owner}</button>}
+                  </span>
+                  : <button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>}
             </div>
           </form>
         </section>

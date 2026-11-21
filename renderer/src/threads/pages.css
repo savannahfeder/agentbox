@@ -454,6 +454,7 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
 }
 .tp-grid.tp-with-about { grid-template-columns: minmax(0, var(--tp-measure)) 300px; padding-left: max(32px, calc((100cqi - var(--tp-measure) - 348px) * 0.35)); }
 .tp-col :is(.msg-body, .appendix) { font-size: var(--tp-type); }
+.tp-col :is(.msg-body, .appendix) :not(pre) > code { font-size: .87em; background: var(--work-chip); padding: 1px 5px; border-radius: var(--radius); }
 .tp-side { position: sticky; top: 0; }
 .tp-side .ts-ticket { max-width: none; margin: 0; padding: 20px 22px 18px; border-radius: 10px; }
 .tp-side .ts-tk-part { padding: 0 0 18px; margin: 0 0 18px; border-bottom: 1px solid var(--line); }
@@ -546,14 +547,18 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
 .th-work .msg-body p, .th-work .appendix p { margin: 0 0 10px; }
 /* The numbers sit inside the column, as they do on an opened thread of your own. */
 .th-work .msg-body ul, .th-work .msg-body ol, .th-work .appendix ul, .th-work .appendix ol { margin: 0 0 10px 22px; padding: 0; }
-.th-follow { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
-.th-follow:hover { color: var(--text); border-color: var(--text-faint); background: var(--wash); }
+.th-follow { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); background: none; color: var(--text); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.th-follow svg { flex: none; color: var(--text-dim); }
+.th-follow:hover { background: var(--wash-strong); }
 .th-follow.on { border-color: var(--line); color: var(--text-faint); }
+.th-follow.on svg { color: var(--text-faint); }
 .th-work-note { margin: 0 0 18px; font-size: 13px; color: var(--text-dim); }
 .th-comment { margin: 28px 0 0; }
 .tp-comment-box { display: flex; align-items: flex-start; gap: 10px; padding: 10px 10px 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--wash); }
 .tp-comment-box:focus-within { border-color: var(--text-faint); }
 .tp-comment-box > .tm-av { margin-top: 5px; }
+.tp-answer { display: flex; flex: none; gap: 8px; }
+.tp-answer button { white-space: nowrap; }
 .th-comment textarea { flex: 1; min-width: 0; padding: 6px 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 14px; line-height: 20px; resize: none; field-sizing: content; min-height: 40px; max-height: 240px; overflow-y: auto; }
 .th-comment textarea:focus { outline: none; }
 .th-comment button { height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
@@ -567,6 +572,9 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
   .tp-bar { flex-wrap: wrap; }
   .tp-acts { flex-wrap: wrap; }
   .tp-acts > * { white-space: nowrap; }
+  .tp-comment-box:has(.tp-answer) { flex-wrap: wrap; }
+  .tp-comment-box:has(.tp-answer) textarea { flex-basis: calc(100% - 40px); }
+  .tp-answer { margin-left: auto; }
 }
 /* Collapsed, the Inbox still says something is waiting: a dot where the
    number was (a persona lost the count when the sidebar was shut). */

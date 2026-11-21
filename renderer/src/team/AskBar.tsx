@@ -15,8 +15,10 @@ export function askChange(task: Pick<WorkItem, 'body'>): string | null {
   return /\]\((attachments\/[^)\s]+\.change)\)/.exec(String(task.body ?? ''))?.[1] ?? null;
 }
 
-export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, under = false }: {
+export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, under = false, answeredBelow = false }: {
   task: WorkItem;
+  /** The page's own box below answers it, so the bar keeps only its links. */
+  answeredBelow?: boolean;
   /** Only the answer, under the message that asked, which already names the thread and the change. */
   under?: boolean;
   owner: Person | null;
@@ -66,11 +68,11 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
             <button type="button" className="quiet" onClick={() => { setGiving(null); setWords(''); }}>Cancel</button>
           </div>
         </div>
-      ) : (
+      ) : (onOpenThread || (change && !under) || !answeredBelow) && (
         <div className="ask-bar-acts">
           {onOpenThread && <button type="button" onClick={onOpenThread}>Open {first}'s thread</button>}
           {change && !under && <button type="button" onClick={() => onOpenChange?.(change)}>View the change</button>}
-          {ask.kind === 'review'
+          {answeredBelow ? null : ask.kind === 'review'
             ? <>
               <button type="button" onClick={() => setGiving('yes')}>Looks good</button>
               <button type="button" onClick={() => setGiving('changes')}>Needs changes</button>
