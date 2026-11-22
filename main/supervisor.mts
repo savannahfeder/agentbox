@@ -163,7 +163,7 @@ import { effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mts
 import {
   engineFor, engineLabel, engineChoiceSince, engineChoiceOnRowIsStale,
   availableEngines, isEngine, modelForEngine, homeEngine,
-  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS,
+  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS, ENGINES,
 } from '../shared/engines.mts';
 import { createCodexAppServer } from './codex-app-server.mts';
 import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
@@ -6642,7 +6642,7 @@ export class Supervisor {
    */
   _capacityFor(engine: string) {
     const which = engineOf(engine);
-    if (!this.engineChoices().some((e) => e.id === which)) return 0;
+    if (!this.enginesHere().some((e) => e.id === which)) return 0;
     const perLogin = this._slotsPerAccount(which) * this._liveProfilesFor(which).length;
     // A NUMBER FOR THE WHOLE COMPUTER IS RUN EXACTLY (w-ec27ff1a51). Shared out
     // a login at a time it rounds up, so 7 on two logins is four and four, and
@@ -7655,7 +7655,7 @@ export class Supervisor {
   _whyNoRoom(engine: string, item: WorkItem) {
     const which = engineOf(engine);
     if (this._localSlotFor(which)) return this._waitsForCloud(item, which) ? 'cloud' : 'memory';
-    if (!this.engineChoices().some((e) => e.id === which)) return 'engine';
+    if (!this.enginesHere().some((e) => e.id === which)) return 'engine';
     if (!this._liveProfilesFor(which).length) return 'login';
     if (which === DEFAULT_ENGINE && this._spawnBraked()) return 'brake';
     return 'slot';
@@ -11194,6 +11194,15 @@ export class Supervisor {
    * no second boolean anywhere that could disagree with it.
    */
   engineChoices() {
+    // Claude Code and Codex only. Everything drawn off this list (Settings, the
+    // usage corner, the cloud menu, small calls) was written for those two; a
+    // further harness is in `enginesHere` and reaches the screens as its own
+    // list (`engineFacts().further`).
+    return this.enginesHere().filter((e) => e.id === 'claude' || e.id === 'codex');
+  }
+
+  /** Every harness a thread may run on here: the two above, and any further one on offer whose binary was found. */
+  enginesHere() {
     // A Mac with only Codex is offered Codex whether or not the gate is open:
     // one engine is not a choice, so there is nothing for the gate to hold.
     if (this._homeEngine() !== DEFAULT_ENGINE) return availableEngines(this._enginesFound());
@@ -11215,7 +11224,12 @@ export class Supervisor {
     // come from the sign-in check (main/engine-setup.mts); until it has
     // answered, nothing moves.
     const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true && !this._addedClaudeSignedIn();
-    return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
+    // Any further harness on offer is here when its binary was found (main/config.mts).
+    const others: Record<string, boolean> = {};
+    for (const { id } of ENGINES) {
+      if (id !== 'claude' && id !== 'codex') others[id] = !!harnessFor(id).binary(this.config);
+    }
+    return { ...others, claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
   }
 
   /** The launch check only asks the default login, so a signed-in added account must be counted here. */
@@ -11277,15 +11291,21 @@ export class Supervisor {
    */
   engineFacts(items: WorkItem[] = []) {
     const choices = this.engineChoices();
+    // A further harness, with its model list, which only it knows. Its own
+    // list, so nothing written for the two above meets a third.
+    const further = this.enginesHere()
+      .filter((e) => !choices.some((c) => c.id === e.id))
+      .map((e) => ({ ...e, models: harnessFor(e.id).models({ sup: this }) as { id: string; label: string }[] }));
     const workspace = this._engineFor(null);
     const byItem: Record<string, string> = {};
-    if (choices.length > 1) {
+    if (choices.length + further.length > 1) {
       for (const item of items) {
         const engine = this._engineFor(item);
         if (engine !== workspace) byItem[item.id] = engine;
       }
     }
-    return { choices, workspace, byItem };
+    // Absent rather than empty, so a computer with no further harness is told exactly what it always was.
+    return { choices, ...(further.length ? { further } : {}), workspace, byItem };
   }
 
   /**
@@ -11363,7 +11383,7 @@ export class Supervisor {
    */
   engineOffered(engine: unknown): string | null {
     if (!isEngine(engine)) return null;
-    if (!this.engineChoices().some((e) => e.id === engine)) return null;
+    if (!this.enginesHere().some((e) => e.id === engine)) return null;
     return engine === this._engineFor(null) ? null : engine as string;
   }
 
@@ -12241,6 +12261,27 @@ export class Supervisor {
    */
   codexCardChanged(id: string, shown: unknown) {
     return this._codexCards?.changed(id, shown) ?? false;
+  }
+
+  /**
+   * ONE WORKER'S CARDS, for an engine whose approval requests arrive inside
+   * this process (main/harnesses/acp.mts). They are the same in-process cards
+   * Codex's are, so the one answering door settles them and nothing new reads
+   * an answer off the disk. The adapter closes them when its worker exits.
+   */
+  approvalCardsFor(item: Pick<WorkItem, 'id' | 'product'>, say: (line: string) => unknown) {
+    const scope = this._codexApprovals().scope({ product: item.product, item: item.id, say });
+    let changes = 0;
+    return {
+      command: async (command: string, cwd: string | null) => await scope.handle('item/commandExecution/requestApproval', { command, cwd }) === 'accept',
+      // The card for a file change is drawn from the change itself, which this vocabulary sends first.
+      edit: async (files: { path: string; kind: 'add' | 'update' | 'delete'; diff: string }[]) => {
+        const itemId = `change-${changes += 1}`;
+        scope.remember('item/started', { item: { type: 'fileChange', id: itemId, changes: files.map((file) => ({ path: file.path, kind: { type: file.kind }, diff: file.diff })) } });
+        return await scope.handle('item/fileChange/requestApproval', { itemId }) === 'accept';
+      },
+      close: (why?: string) => scope.close(why),
+    };
   }
 
   // A loaded app-server thread holds Codex's writer lock even after its turn

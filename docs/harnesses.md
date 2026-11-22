@@ -85,24 +85,72 @@ tool is on the other end. Decided while building it, with Codex reviewing:
   waits. The failure to design against first is a denial that is not enforced:
   a well-formed refusal on the wire proves nothing about what the tool then did.
 
+### What is built on it
+
+Three files make any ACP agent a harness, and none of them names a tool:
+
+- `main/acp-worker.mts` runs one turn of one thread: start the agent, open or
+  load the conversation, send the prompt, pass the agent's notifications on,
+  and exit once. A tool call's command arrives on a later update than the call
+  and its completion carries neither, so the worker joins them and sends one
+  event per finished tool call, finished message and finished turn. A start
+  that cannot happen (signed out, another protocol version, a model the agent
+  does not offer, a conversation it cannot load) says why on stderr and exits 1
+  with no result, so it counts as a run that never began.
+- `main/acp-readers.mts` is the capture, live text, summary and trace readers
+  over those events; the activity reader is beside the others in
+  `main/agent-activity.mts`.
+- `main/harnesses/acp.mts` is the adapter: it hands the worker the store's
+  tools and the person's connections as MCP servers, puts each permission
+  request to the person as one of the app's own cards (`approvalCardsFor`, the
+  same in-process cards Codex's are, with no clock on them), and keeps a record
+  of each conversation under the app's own folder. That record is what lets a
+  reply carry a conversation on: the supervisor resumes only a session whose
+  transcript is on disk, and ACP keeps none.
+
+A tool is then a definition with `acp: { bin, args }` and one hook, `prepare`,
+for the two things no protocol carries: how this tool is made to ask before it
+acts, and where it reads standing instructions. Both have to be read off the
+running tool. Speaking ACP does not answer either: OpenCode and Codex each ran
+a command the check had refused, because by default neither asked.
+
+A PROMPT HAS NO DEADLINE. Every other request ends after two minutes; a prompt
+stays open for the whole turn, and what ends it is the connection closing or
+the supervisor's own check for a run gone quiet.
+
+ITS MODELS ARE WHAT THE TOOL SAYS THEY ARE. Which models an ACP tool offers
+depends on what its owner connected, so only the tool knows. Every conversation
+states the list when it opens; the adapter keeps the last one under the app's
+own folder (`harnesses/<id>/models.json`) and tells the screens when it
+changes. A tool that has never run is asked once per run of the app, by opening
+one empty conversation in the app's own folder.
+
+A FURTHER HARNESS REACHES THE SCREENS IN A LIST OF ITS OWN. `engineChoices()`
+names Claude Code and Codex only, because Settings, the usage corner and the
+cloud menu were written for those two. `enginesHere()` is every harness a
+thread may run on, and `engineFacts().further` carries the rest to the screens
+with their models. The key is absent on a computer with no further harness, so
+that computer is told exactly what it always was.
+
 ## Standing instructions, on an engine with no system prompt
 
 Claude Code takes them on `--append-system-prompt`; Codex takes them as a
-thread's `developerInstructions`. ACP has no system prompt in the protocol and
-OpenCode's server takes none, so for anything else they go into the file the
-tool itself reads, named in the definition — `instructions: { file, in }`,
-AGENTS.md for most and GEMINI.md for Gemini CLI. `instructions()` answers how
-this engine carries them and throws for an engine that carries them neither
-way, because that engine would answer against rules it was never given and
-nothing on screen would say so. It is on the required list for offering a tool.
+thread's `developerInstructions`. ACP has no system prompt in the protocol, so
+for anything else they go into a file the tool itself reads. An ACP harness's
+`prepare` hook writes that file into the thread's own folder under the app's
+folder and points the tool at it: for OpenCode, a per-thread config whose
+`instructions` list names it (measured on 2.3.2: a rule in that file was
+followed). A tool with no such hook gets them at the top of the first prompt
+of a conversation instead. `instructions()` answers how an engine carries them
+and throws for one that carries them neither way, because that engine would
+answer against rules it was never given and nothing on screen would say so. It
+is on the required list for offering a tool.
 
-The file goes in the tool's own config directory, which is per task and ours.
-A definition may ask for the working folder instead, but a path the person's
-repository tracks is refused rather than written: a task folder is a worktree
-of their repo, AGENTS.md is often committed in one, and this codebase has
-already paid once for writing a tracked file. What is in the file stays; only
-the block between our two markers is rewritten, however many times a thread
-resumes.
+Nothing is written into the working folder: a task folder is a worktree of the
+person's repository, AGENTS.md is often committed in one, and this codebase has
+already paid once for writing a tracked file. `main/harnesses/instructions-file.mts`
+is the older route, a block between two markers in a file the definition names,
+for a tool that can only be reached that way.
 
 ## Credentials: the line, decided
 
@@ -134,6 +182,39 @@ command menus and automatic updates. Unknown usage is never zero usage, and a
 tool without compaction is acceptable only if running out of context is a
 recoverable outcome someone can understand.
 
+## The real check: `npm run check:harnesses`
+
+The unit tests drive stand-ins of each tool, and a stand-in keeps passing after
+the tool or a sign-in has moved. So one list runs against the real tool of
+every harness on offer, through a copy of the app on a store of its own, driven
+by the calls the screen makes:
+
+- a new thread gets its answer, on the harness it named;
+- a reply carries on the same conversation;
+- a reply after the app restarts still carries it on;
+- a running thread stops when told to, and still answers afterwards;
+- a command that needs a yes waits for the card, then runs;
+- a command that was refused did not run.
+
+`npm run check:harnesses` checks them all, `npm run check:harnesses -- codex`
+one, and `--json` prints the verdicts. It exits 0 only when every scenario of
+every harness passed, 1 when one failed, and 2 when one could not be checked:
+not installed, not signed in, or out of usage. A plan at its limit is "could not
+check", never a pass, and no run is started on it: Codex carries on past a spent
+week on paid credits. Each run spends a few one-word turns of each plan.
+
+The list is in `scripts/lib/harness-check.mts`. A harness on offer is in it by
+being on offer, and its two command scenarios fail until `ASKS_FIRST` names the
+permission mode that makes it ask, because no protocol carries that. This is
+the "Required before a tool is offered" list above as something that runs: a
+harness is offered only while it passes.
+
+A harness nobody is offered yet is checked as a candidate:
+`npm run check:harnesses -- --candidate opencode`. The check starts its copy of
+the app with that harness named in `AGENTBOX_HARNESSES_IN_TESTING`, which puts
+a registered harness on offer in that one process and nowhere else. The screens
+never read it, so nothing new is drawn for anybody.
+
 ## Hermes integration direction
 
 The proposed first integration is an optional local task session over Hermes'
@@ -153,11 +234,18 @@ requires the corresponding product policy review before admission.
 
 ## OpenCode: what was measured, and what billing turned out to be
 
-Measured against a real OpenCode 1.18.35 on 2026-10-07. The code is
-`main/harnesses/opencode.mts`, `main/opencode.mts` and
-`main/opencode-server.mts`; it is registered and **not admitted**, so no row
-can choose it and no picker draws it (`admitted: false`,
-shared/harness-definitions.mts, filtered in shared/engines.mts).
+Measured against a real OpenCode 1.18.35 on 2026-10-07 and again against 2.3.2
+on 2026-11-22. It runs over ACP (`opencode acp`) through the shared adapter;
+`main/harnesses/opencode.mts` is only its permission policy and its
+instructions file. It is registered and **not admitted**, so no row can choose
+it and no picker draws it (`admitted: false`, shared/harness-definitions.mts,
+filtered in shared/engines.mts).
+
+**Why it moved to ACP.** The first connection drove `opencode serve` over HTTP.
+Six weeks later OpenCode 2.3.2 answered 405 to its first call, `POST /session`:
+the server's addresses had moved under `/api` and wanted a password. Its 37
+tests were green throughout, because they drove a stand-in of 1.18.35. The
+same 2.3.2 over ACP passed every scenario of the real check through the app.
 
 **Billing needs no key from us, and needs no sign-in at all.** Credentials live
 in OpenCode's own `~/.local/share/opencode/auth.json`, written by
@@ -189,53 +277,83 @@ at provider token rates. Herdr and OpenScout do not touch billing. Nobody
 resells, and nobody injects a key the user did not place themselves. Our
 position is the strictest of these and costs us nothing.
 
-**The CLI cannot carry an approval, so the harness drives the server.**
-`opencode run` with `permission: { bash: "ask" }` printed
+**The one-shot CLI cannot carry an approval.** `opencode run` with
+`permission: { bash: "ask" }` printed
 `! permission requested: bash (echo probe-run-mode); auto-rejecting` and handed
 the model "The user rejected permission to use this specific tool call."; with
 no permission config it ran the command with no card. `--auto` approves
 everything not explicitly denied. Approve-everything or refuse-everything are
-the only two CLI settings, and neither is a card, so `--auto` must never appear
-in anything here — a test checks for it.
+its only two settings, and neither is a card, so `--auto` must never appear in
+anything here; a test checks for it. `opencode run --format json` is used only
+for small one-off questions, which run no tools, and always with
+`--standalone`: without it, `run` and `models` start OpenCode's background
+service and leave it running (277 MB, measured after the command had ended).
+`opencode acp` and `run --standalone` leave nothing behind.
 
-The HTTP server does carry one. `opencode serve` raises `permission.asked` on
-`/event` with `metadata.command` for a shell call and `metadata.filepath` plus
-a whole unified `metadata.diff` for a write. `POST
-/session/:id/permissions/:id` with `{ response: "once" }` returned 200 and the
-tool then ran; `{ response: "reject" }` returned 200 and the tool came back
-refused. Both verified end to end. An `edit` approval therefore arrives with
-more than a Codex patch approval does, and the card can show the change itself.
+**ACP does carry one**, read off 2.3.2. `session/request_permission` arrives
+with the tool call (`rawInput.command` and `cwd` for a shell call; a `diff`
+with the old and new text for an edit; `rawInput.path` and `content` for a new
+file) and three options, `once`, `always` and `reject`. The answer is always
+`once` or `reject`, never `always`. A refusal ends the turn with
+`stopReason: "cancelled"`, so the thread says what was refused.
 
-**What makes it ask** is a permission config, which Agentbox writes per task
-folder and points `OPENCODE_CONFIG` at. The server reports back what it loaded
-at `GET /config`. A per-session `permission` ruleset also exists on
-`POST /session` and would be cleaner, but in testing it did not produce an ask
-and the tool ran instead — **not a verified path**, and worth revisiting.
+**What makes it ask** is a permission config, and how it is handed over
+matters as much as what it says. With none, it runs shell commands and writes
+files without asking: over ACP the command the check had refused ran. Measured
+on 2.3.2 with a command that would be refused:
 
-**The rest of the checklist, verified:** session resume keeps context across
-turns on the same session id; `POST /session/:id/fork` works;
-`POST /session/:id/summarize` is compaction and returned true; `GET /command`
-lists slash commands and `POST /session/:id/command` runs one;
-`GET /config/providers` is the model list, provider-qualified as
-`provider/model`; `opencode upgrade` is its own updater;
-`OPENCODE_SERVER_PASSWORD` really protects the port (401 without, 200 with),
-and it is a loopback basic-auth secret, not a provider credential.
+- As a file `OPENCODE_CONFIG` names: a project's own `opencode.json` saying
+  `bash: allow` is loaded after it, and the command ran with nothing asked.
+- Inline, in `OPENCODE_CONFIG_CONTENT`, which loads last: the top-level policy
+  held against that file. A rule for one agent (`agent.build.permission`) still
+  beat it, written in the project or in the person's global config.
+- With the project's config switched off (`OPENCODE_DISABLE_PROJECT_CONFIG`
+  and `OPENCODE_CONFIG_PROJECT_DISABLE`, both names in the binary), and the
+  policy inline at the top level and for both built-in agents: it asked in
+  every case, and the refused command did not run.
 
-**Declared missing rather than faked:** plan and usage limits — there is no
-endpoint and no command that reports what is left, because OpenCode bills
-through whichever provider the user connected and does not know. Per-run tokens
-and cost do arrive on `step-finish` and are read. Input streaming into a live
-run is also missing: `/tui/append-prompt` drives the terminal UI, not a
-headless run, so `remoteControl` is false.
+So that last form is what a thread starts with, and a project's own
+`opencode.json` and `.opencode` folder are not read inside Agentbox. The
+person's global config still is, for their providers and models.
 
-**Still ahead before admission:** MCP isolation for an OpenCode worker has not
-been worked through, the approval handler is not yet joined to the inbox's own
-card spool (`sup._openCodeApprovals`), and the QA campaign that the Codex
-harness got (w-36c51443df) has not been run against this one.
+OpenCode has no sandbox and no reviewer of its own, so a shell
+command, a page fetch and a search always ask, unless the person chose a mode
+that asks for nothing. Edits inside the thread's folder go ahead, as on the
+other two harnesses' default modes, and `external_directory: "ask"` still asks
+for a file outside it (measured: the inside file was written unasked, the
+outside one raised a request and was not written when refused). The modes that
+ask before any change (`default`, `plan`, `read-only`) ask for edits too.
+
+**The rest of the list, measured on 2.3.2 over ACP:** a conversation is carried
+on by `session/load` in a new process after the first was killed, and its
+replayed history is not passed off as the new turn; `session/cancel` ends a
+running turn; the model is one of the session's config options and
+`session/set_config_option` sets it; MCP servers handed to `session/new` are
+started with the variables they were given, and their tools are called. After a
+turn was stopped, OpenCode picked the stopped command back up on the next
+reply, which is its own behaviour and why the check tells it not to.
+
+**Declared missing rather than faked:** plan and usage limits, because OpenCode
+bills through whichever provider the user connected and does not know. ACP's
+usage update carries the context used and a cost per run, and those are kept.
+Its slash commands and its fork are advertised over ACP and not wired, so both
+say no. Typing into a live run is not wired either, so `remoteControl` is false.
+
+**On the screens, behind the same switch:** the model menu has a column for a
+further harness, in the new-thread card and in the reply box; a thread on one
+wears its mark in the list; its reply box names the model in the tool's own
+words and offers none of Claude Code's or Codex's permission words or commands,
+which mean nothing to it. `?fixtures=1&engines=claude&further=opencode` is the
+stand-in world that photographs all of it.
+
+**Still ahead before it is offered:** its sign-in has no row in Settings; any
+list drawn straight from the shared list of harnesses, rather than from what is
+on offer on this computer, would name it everywhere the day it is admitted; the
+phone app knows two harnesses; and nobody has used it for a working day.
 
 Sources: [OpenCode providers](https://opencode.ai/docs/providers/),
 [OpenCode CLI](https://opencode.ai/docs/cli/),
-[OpenCode server](https://opencode.ai/docs/server/),
+[OpenCode ACP](https://opencode.ai/docs/acp/),
 [Conductor's OpenCode harness](https://www.conductor.build/docs/reference/harnesses/opencode),
 [Conductor providers](https://www.conductor.build/docs/guides/providers).
 

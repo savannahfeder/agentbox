@@ -3,7 +3,6 @@ import type { ChildProcess } from 'node:child_process';
 import { instructionsFor } from './instructions-file.mts';
 import { windowsRoot } from '../shell-path.mts';
 import type { InstructionsContext, InstructionsAnswer } from './instructions-file.mts';
-import type { OpenCodeProperties } from '../opencode.mts';
 import type { ToolingResult } from '../account-tooling.mts';
 import type { CodexFrame } from '../codex.mts';
 
@@ -58,6 +57,7 @@ export interface HarnessDefinition {
   scrubPatterns: readonly string[];
   minVersion?: string;
   run?: HarnessRun;
+  acp?: { bin: string; args: readonly string[] };
   instructions?: { file?: string; in?: string };
   capabilities: HarnessCapabilities;
   imageInstruction: string;
@@ -113,6 +113,12 @@ export interface HarnessPlan {
   args: string[];
   answerMode?: string | null;
   resumeId?: string | null;
+  /** What an engine with no command line reads the turn from. */
+  prompt?: string | null;
+  system?: string | null;
+  model?: string | null;
+  /** The person's connections this run may use, by server name. */
+  connectionServers?: Record<string, HarnessToolServer> | null;
 }
 
 export interface HarnessSpawnContext {
@@ -134,8 +140,18 @@ export interface HarnessRecord {
 
 export interface HarnessSession {
   codexChange?: CodexFrame[];
-  opencodeChange?: string[];
+  acpChange?: string[];
   [key: string]: unknown;
+}
+
+/** A tool server a worker is handed: the store's, or one of the person's connections. */
+export interface HarnessToolServer { name?: string; command: string; args?: string[]; env?: Record<string, string | null | undefined> }
+
+/** One worker's approval cards, for an engine whose requests reach the app in this process. Each answers true for a yes. */
+export interface HarnessApprovalCards {
+  command(command: string, cwd: string | null): Promise<boolean>;
+  edit(files: { path: string; kind: 'add' | 'update' | 'delete'; diff: string }[]): Promise<boolean>;
+  close(why?: string): unknown;
 }
 
 export interface HarnessSupervisor {
@@ -158,8 +174,12 @@ export interface HarnessSupervisor {
   codexCardChanged(...args: unknown[]): unknown;
   codexMemoryGateEnv(): Env;
   _releaseIdleCodex(profile: string): unknown;
-  _openCodePassword?(): string | null;
-  _openCodeApprovals?(item: HarnessItem): ((type: string, properties: OpenCodeProperties) => unknown) | null;
+  /** The app's own folder, which no worker is granted. */
+  userDir?: string;
+  /** Tells the screens something they draw has changed. */
+  onChange?: (() => void) | null;
+  _codexStoreServer(item: HarnessItem): HarnessToolServer | null;
+  approvalCardsFor(item: HarnessItem, say: (line: string) => unknown): HarnessApprovalCards;
 }
 
 export interface CodexClient {
