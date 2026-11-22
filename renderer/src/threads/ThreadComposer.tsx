@@ -292,9 +292,10 @@ export function ThreadComposer({
   useEffect(() => { if (!person) { setSendAs('message'); setDue(null); } setBlockedBy(null); }, [person]);
   const kindIdea = inline && person ? readPersonKind() : null;
   // 'date': a message that becomes a to-do once it has a day. 'work': Home only gives to-dos.
-  useEffect(() => { if (kindIdea === 'date') setSendAs(due ? 'task' : 'message'); if (kindIdea === 'work' && person) setSendAs('task'); }, [kindIdea, due, person]);
+  // A deadline means it needs doing, so it ticks To-do as well.
+  useEffect(() => { if (kindIdea === 'date' && due) setSendAs('task'); if (kindIdea === 'work' && person) setSendAs('task'); }, [kindIdea, due, person]);
   const [assignPage, setAssignPage] = useState<'list' | 'due' | 'blocked' | 'sees'>('list');
-  const rows = mate ? [] : kindIdea === 'date' ? ['to', 'subject', 'dueOn'] as ReturnType<typeof headRows>
+  const rows = mate ? [] : kindIdea === 'date' ? (sendAs === 'task' ? ['to', 'dueOn', 'blockedBy'] : ['to', 'subject', 'dueOn']) as ReturnType<typeof headRows>
     : kindIdea === 'work' ? ['to', 'dueOn', 'blockedBy'] as ReturnType<typeof headRows> : headRows({ person: !!person, kind: sendAs });
 
   /* ------------------------------ words --------------------------------- */
@@ -1499,8 +1500,19 @@ export function ThreadComposer({
       {open === 'assign' && assignMenu}
     </span>
   );
+  // A message unless you tick it as a to-do; unticking takes its deadline and blocker away.
+  const todoMark = (
+    <button type="button" className={`tc-chip tc-todo${sendAs === 'task' ? ' on' : ' tc-at-rest'}`} role="checkbox" aria-checked={sendAs === 'task'}
+      title={sendAs === 'task' ? `It stays in ${who}'s inbox until ${who} marks it done` : 'Make it a to-do'}
+      onClick={() => { const next: SendAs = sendAs === 'task' ? 'message' : 'task'; setSendAs(next); if (next === 'message') { setDue(null); setBlockedBy(null); } textRef.current?.focus(); }}>
+      <span className="tc-box" aria-hidden="true">{sendAs === 'task' && <CheckIcon />}</span>
+      <span className="tc-chip-text">To-do</span>
+    </button>
+  );
   const personLeft = kindIdea === 'switch' ? doesItSwitch : kindIdea === 'work' ? chatButton : kindIdea === 'date' || kindIdea === 'assign' ? null : sendAsChoice;
-  const personMarks = kindIdea === 'date' ? (<>{fieldNode('Subject')}{fieldNode('Due On')}</>)
+  const personMarks = kindIdea === 'date' ? (sendAs === 'task'
+    ? (<>{todoMark}{fieldNode('Due On')}{fieldNode('Blocked By')}{seesChip(taskSees)}</>)
+    : (<>{todoMark}{fieldNode('Subject')}{fieldNode('Due On')}</>))
     : sendAs === 'task' && kindIdea !== 'assign' ? (<>{fieldNode('Due On')}{fieldNode('Blocked By')}{seesChip(taskSees)}</>) : fieldNode('Subject');
 
   // Who sees it sits before the level here, as in the approved picture.
@@ -1594,7 +1606,7 @@ export function ThreadComposer({
             e.preventDefault();
             ideaList.current?.querySelector<HTMLButtonElement>('button')?.focus();
           }}
-          placeholder={mate === 'new' ? 'What should they do?' : mateRow ? `What should ${mateRow.name} do?` : person ? (sendAs === 'task' && !extra.length && kindIdea !== 'date' ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
+          placeholder={mate === 'new' ? 'What should they do?' : mateRow ? `What should ${mateRow.name} do?` : person ? (sendAs === 'task' && !extra.length ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
           onPaste={async (e) => {
             const pasted = await fromPaste(e);
             if (pasted.length) { e.preventDefault(); setAttachments((a) => [...a, ...pasted]); }

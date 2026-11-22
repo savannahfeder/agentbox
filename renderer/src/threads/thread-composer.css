@@ -458,6 +458,15 @@
 }
 .tc-does.on { color: var(--text); border-color: var(--line-strong); }
 .tc-does.on .tc-box { background: var(--text); border-color: var(--text); }
+/* "To-do": the same box as a mark, drawn in the marks' ink until it is ticked. */
+.tc-todo { gap: 8px; }
+.tc-todo .tc-box {
+  width: 14px; height: 14px; box-sizing: border-box; display: inline-grid; place-items: center; flex: none;
+  border: 1.5px solid var(--text-faint); border-radius: 4px; color: var(--bg);
+}
+.tc-todo.tc-at-rest:hover .tc-box, .tc-todo.tc-at-rest:focus-visible .tc-box { border-color: var(--text); }
+.tc-todo.on { color: var(--text); border-color: var(--line-strong); }
+.tc-todo.on .tc-box { background: var(--text); border-color: var(--text); }
 /* "Assign to Priya": the second way to send, with its details on the caret. */
 .tc-assign { display: inline-flex; height: 28px; position: relative; flex: none; }
 .tc-assign > button {
