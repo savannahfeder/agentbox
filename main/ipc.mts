@@ -578,6 +578,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     }
     return codexHomes.dirs;
   };
+  // The snapshot is built many times a second when things move; Codex's folders are read at most every two seconds.
+  let codexLive: { at: number; agents: ReturnType<typeof readCodexLive> } = { at: 0, agents: [] };
+  const codexLiveNow = () => {
+    if (Date.now() - codexLive.at > 2_000) codexLive = { at: Date.now(), agents: readCodexLive({ products: store.listProducts(), codexDirs: codexHomesNow() }) };
+    return codexLive.agents;
+  };
   const liveAgents = () => {
     try {
       const claude = agents.listAgents({
@@ -588,7 +594,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       });
       let codexRead: typeof claude = [];
       let codexOk = true;
-      try { codexRead = readCodexLive({ products: store.listProducts(), codexDirs: codexHomesNow() }); } catch { codexRead = []; codexOk = false; }
+      try { codexRead = codexLiveNow(); } catch { codexRead = []; codexOk = false; }
       // One list, decorated once, and swept only on real readings of both:
       // the schedule forgets a key it is not shown, which would reopen closed rows.
       const live = agentSchedule.decorate([...claude, ...codexRead], Date.now(), { sweep: agents.measured() && codexOk });
