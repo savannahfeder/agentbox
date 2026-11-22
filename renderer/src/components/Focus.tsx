@@ -346,7 +346,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     if (broken && direct) return <CarriedNote src={file} always />;
     // The finder may know where it really is (a project folder left out of the path).
     if (broken && found === undefined && find) return <span className="inline-image arriving" aria-hidden="true" />;
-    if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
+    if (broken) return <button type="button" className="missing-artifact" title={`${file} could not be found. Press to look again.`} onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {shownName(file)}</button>;
     return door(file, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={again(pictureUrl(file))} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
   }
   const rel = src.replace(/^\.\//, '');

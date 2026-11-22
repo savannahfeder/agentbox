@@ -11,7 +11,8 @@
 // Now a picture or a page written in full under the account's documents is
 // drawn as one. The window asks the app's finder for it, and the finder already
 // retries a path with the project's folder left out, so the path from that
-// thread draws its screenshot, and one that names no file says it is missing.
+// thread draws its screenshot, and one that names no file says it is missing,
+// by its name: the whole path ran to two lines of a dashed box.
 import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -130,5 +131,10 @@ describe('a whole-path picture the window is still asking about', () => {
     expect(asking).toBeGreaterThan(-1);
     expect(asking).toBeLessThan(whole.indexOf('missing image'));
     expect(whole.slice(asking, whole.indexOf('missing image'))).toContain('inline-image arriving');
+  });
+
+  it('once nothing has it, says which picture by its name, with the whole path left to the hover', () => {
+    expect(whole).toContain('missing image: {shownName(file)}');
+    expect(whole).toMatch(/title=\{`\$\{file\} could not be found/);
   });
 });
