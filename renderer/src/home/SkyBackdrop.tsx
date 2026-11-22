@@ -42,7 +42,7 @@ export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?:
     }, { folds });
     let land = () => {};
     if (art.birds) {
-      const birds = document.createElement('canvas');
+      const birds = document.createElement('div');
       birds.className = 'home-birds';
       wrap.appendChild(birds);
       land = flyBirds(birds, { ink: art.birds, sky: (_W, H) => ({ top: H * 0.06, bottom: H * 0.42, avoid: homeWords(wrap) }) });

@@ -196,9 +196,9 @@ export function tabStop(count: number, at: number, back: boolean): number {
   return (at + (back ? count - 1 : 1)) % count;
 }
 
-/** The look the setup ticks: the sky picked, Light or Dark once one of those was picked, and otherwise Match my system. */
-export function setupLook({ skies, picked, worn, light }: { skies: boolean; picked: boolean; worn: string | null; light: boolean }): string {
-  if (skies && picked && worn) return worn;
+/** The look the setup ticks: the sky worn, Match my system when the window follows the computer, and plain Light or Dark once one of those was picked. */
+export function setupLook({ skies, picked, worn, light, follows = true }: { skies: boolean; picked: boolean; worn: string | null; light: boolean; follows?: boolean }): string {
+  if (skies && worn && (picked || !follows)) return worn;
   if (skies && worn) return MATCH_SKY;
   return light ? 'light' : 'dark';
 }

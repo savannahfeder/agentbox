@@ -1215,7 +1215,7 @@ export default function App() {
     // through to whatever the Mac preferred and a light Mac turned the walk
     // white after the third screen.
     //
-    // WHAT IT SEEDS IS PLAIN DARK, NOT A PICTURE. The `else` branch that used
+    // WHAT IT SEEDS IS LIGHT, NOT A PICTURE. The `else` branch that used
     // to sit under this line put Gouache Valley on any Mac that had chosen no
     // picture, every time the walk ran, and that is how a look nobody
     // picked reached the window. It is deleted, and so is the function behind
@@ -8864,7 +8864,7 @@ export default function App() {
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
-        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light' })} skies={homeOn}
+        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light', follows: theme === 'match' })} skies={homeOn}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
         onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
         onSetup={() => {

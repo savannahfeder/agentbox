@@ -1,10 +1,10 @@
-// A NEW INSTALL FOLLOWS THE MAC UNTIL A LOOK IS PICKED (w-fbe5e95dea, 2026-11-10).
+// A NEW INSTALL FOLLOWS THE MAC ONLY ONCE MATCH MY SYSTEM IS PICKED (w-fbe5e95dea, 2026-11-10).
 //
 // The founder switched macOS to light during the first run, and Agentbox
 // stayed dark. A new install saved "dark" the moment it opened, and the setup
 // then pinned the dark orange sky, so neither followed the Mac again. A new
-// install now saves "match" and no sky, which wears dark orange on a dark Mac
-// and light green on a light one, until somebody picks a look of their own.
+// install then saved "match" and no sky. Since w-9687db6270 (2026-11-22) it
+// opens light for everybody, and following the Mac is a look to pick.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { normalizeSavedLook, seedFirstRunLook, SKIN_KEY } from '../renderer/src/skins.ts';
@@ -13,21 +13,11 @@ import { PLAIN, shownSkyId } from '../renderer/src/home/sky.ts';
 const memory = (seed: Record<string, string> = {}) => { const m = new Map(Object.entries(seed)); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); }, m }; };
 
 describe('the first look', () => {
-  it('is saved as following the Mac, on a dark Mac and a light one', () => {
-    for (const machine of ['dark', 'light'] as const) {
-      const s = memory();
-      expect(seedFirstRunLook(s, 'zero.theme', machine)).toEqual({ theme: 'match', skin: 'none' });
-      expect(s.m.get('zero.theme')).toBe('match');
-      expect(s.m.get(SKIN_KEY)).toBe('none');
-    }
-  });
-  it('is what the app saves when it first starts, before the setup runs', () => {
-    for (const machine of ['dark', 'light'] as const) {
-      const s = memory();
-      normalizeSavedLook(s, machine);
-      expect(s.m.get('zero.theme')).toBe('match');
-      expect(s.m.get(SKIN_KEY)).toBe('none');
-    }
+  // It followed the Mac until 2026-11-22: tests/a-new-install-opens-in-the-light-mountains-on-every-computer.
+  it('follows the Mac only once Match my system is picked', () => {
+    const s = memory({ 'zero.theme': 'match', [SKIN_KEY]: 'none' });
+    normalizeSavedLook(s, 'dark');
+    expect(s.m.get('zero.theme')).toBe('match');
   });
   it('leaves a look somebody already picked alone', () => {
     expect(seedFirstRunLook(memory({ 'zero.theme': 'light' }), 'zero.theme', 'dark')).toBeNull();

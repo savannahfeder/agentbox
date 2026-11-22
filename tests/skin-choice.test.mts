@@ -441,12 +441,12 @@ describe('seedFirstRunLook', () => {
     };
   };
 
-  // Match since w-fbe5e95dea (2026-11-10), so a new install follows the Mac
-  // until somebody picks a look (tests/a-new-install-follows-the-mac-until-a-look-is-picked).
-  it('writes Match my system into an empty store, both keys', () => {
+  // Light since w-9687db6270 (2026-11-22), so a new install opens in the light
+  // mountains on every computer (tests/a-new-install-opens-in-the-light-mountains-on-every-computer).
+  it('writes Light into an empty store, both keys', () => {
     const s = store();
-    expect(seedFirstRunLook(s, THEME_KEY)).toEqual({ theme: 'match', skin: 'none' });
-    expect(s.getItem(THEME_KEY)).toBe('match');
+    expect(seedFirstRunLook(s, THEME_KEY)).toEqual({ theme: 'light', skin: 'none' });
+    expect(s.getItem(THEME_KEY)).toBe('light');
     expect(s.getItem(SKIN_KEY)).toBe('none');
   });
 

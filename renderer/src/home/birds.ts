@@ -103,64 +103,175 @@ export function boxIn(el: Element | null, frame: HTMLElement, pad = 0): Box | nu
   return { x: (r.left - f.left) * k - pad, y: (r.top - f.top) * k - pad, w: r.width * k + pad * 2, h: r.height * k + pad * 2 };
 }
 
-const FRAME_MS = 33;
+/** The most that fly at once. */
+export const MAX_BIRDS = 4;
+/** How often the flock moves. Each update is a step of a dot or two, so nothing is animated in between:
+ *  a picture sliding 60 times a second would redraw the window that often. */
+const TICK_MS = 80;
+/** A tick this much later than planned is the computer struggling, not a bird. */
+const SLOW_GAP = 2.5;
+/** This many late ticks, not made up since, and the flock rests. */
+const SLOW_TICKS = 20;
+const REST_MS = 30_000;
+/** Re-read where the words are, and the card's size, this often. */
+const LOOK_MS = 500;
+/** Typing or scrolling, and the flock waits this long after the last of it. */
+const BUSY_MS = 1500;
+/** Nobody at the computer for this long, and it rests until they are back. */
+const IDLE_MS = 90_000;
+const CELL_W = 48, CELL_H = 36, CELL_S = 14;
+
+/** One more tick that came `gap` ms after the last; a late one counts up, a good one counts back down. */
+export function lateness(late: number, gap: number): number {
+  return gap > TICK_MS * SLOW_GAP ? late + 1 : Math.max(0, late - 0.5);
+}
+
+/** Why the flock is not moving at `now`, if it is not. */
+export function flockWaits(now: number, { busyUntil, lastInput, late }: { busyUntil: number; lastInput: number; late: number }): 'busy' | 'idle' | 'slow' | null {
+  if (late >= SLOW_TICKS) return 'slow';
+  if (now < busyUntil) return 'busy';
+  return now - lastInput > IDLE_MS ? 'idle' : null;
+}
+
+const sprites = new Map<string, string>();
+/** The bird's three wing positions, one under the other, drawn once per ink. */
+function sprite(ink: Rgb, pitch: number): string {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const key = `${ink.join(',')}@${dpr}@${pitch}`;
+  const had = sprites.get(key);
+  if (had !== undefined) return had;
+  const c = document.createElement('canvas');
+  c.width = CELL_W * dpr; c.height = CELL_H * 3 * dpr;
+  const g = c.getContext('2d');
+  if (!g) { sprites.set(key, ''); return ''; }
+  g.scale(dpr, dpr);
+  g.fillStyle = `rgb(${ink.join(',')})`;
+  // Wings down, level, up: where sin(ph) sits at each end and in the middle.
+  [-Math.PI / 2, 0, Math.PI / 2].forEach((ph, frame) => {
+    const b: Bird = { x: CELL_W / 2, y: CELL_H / 2, vx: 0, vy: 0, h: 0, ph, fear: 0, s: CELL_S };
+    for (const [cx, cy] of birdCells(b, pitch)) {
+      const y = cy * pitch;
+      if (y >= 0 && y < CELL_H) g.fillRect(cx * pitch, frame * CELL_H + y, pitch - 0.2, pitch - 0.2);
+    }
+  });
+  const url = c.toDataURL();
+  sprites.set(key, url);
+  return url;
+}
+
+const FRAMES = [-Math.PI / 2, 0, Math.PI / 2];
+/** Which of the sprite's wing positions a bird shows now. */
+export const wingFrame = (b: Bird): number => (Math.sin(b.ph) > 0.35 ? 2 : Math.sin(b.ph) < -0.35 ? 0 : 1);
 
 /**
- * Flies `n` birds on `canvas`, which lies over the card, until the returned
- * function is called. `sky` is asked each frame where the birds may go, so a
- * box that moves is kept clear. Only the birds are cleared and drawn again.
+ * Flies up to MAX_BIRDS birds over `layer`, which lies over the card, until the
+ * returned function is called. Each bird is a small picture moved by transform,
+ * so nothing is repainted and the whole flock costs almost nothing. `sky` says
+ * where they may go, and is asked twice a second.
  */
-export function flyBirds(canvas: HTMLCanvasElement, { ink, n = 7, pitch = 3, sky }: { ink: Rgb; n?: number; pitch?: number; sky: (W: number, H: number) => Omit<BirdSky, 'W' | 'H' | 'pointer'> }): () => void {
-  const g = canvas.getContext('2d', { willReadFrequently: true });
-  if (!g) return () => {};
+export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sky }: { ink: Rgb; n?: number; pitch?: number; sky: (W: number, H: number) => Omit<BirdSky, 'W' | 'H' | 'pointer'> }): () => void {
   const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let W = 0, H = 0, birds: Bird[] = [], pointer: { x: number; y: number } | null = null, timer = 0, last = 0;
-  let drawn: Box[] = [];
-  const size = () => {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (!w || !h) return false;
-    if (w !== W || h !== H) {
-      if (W && H) for (const b of birds) { b.x *= w / W; b.y *= h / H; }
-      W = w; H = h;
-      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawn = [];
-    }
+  Object.assign(layer.style, { position: 'absolute', inset: '0', overflow: 'hidden', pointerEvents: 'none' });
+  let W = 0, H = 0, k = 1, left = 0, top = 0, birds: Bird[] = [], els: { wrap: HTMLElement; wing: HTMLElement }[] = [];
+  let area: Omit<BirdSky, 'W' | 'H' | 'pointer'> = { top: 0, bottom: 0, avoid: null };
+  let pointer: { x: number; y: number } | null = null, raw: { x: number; y: number } | null = null;
+  let timer = 0, last = 0, looked = 0, late = 0, resting = false, gone = false;
+  let busyUntil = 0, lastInput = performance.now();
+
+  const look = () => {
+    W = layer.clientWidth; H = layer.clientHeight;
+    if (!W || !H) return false;
+    const r = layer.getBoundingClientRect();
+    k = r.width ? W / r.width : 1; left = r.left; top = r.top;
+    area = sky(W, H);
     return true;
   };
-  const world = (): BirdSky => ({ W, H, pointer, ...sky(W, H) });
-  // Clearing only where the birds were keeps a full-window canvas cheap at 30 frames a second.
-  const draw = (all = false) => {
-    if (all) g.clearRect(0, 0, W, H);
-    else for (const r of drawn) g.clearRect(r.x, r.y, r.w, r.h);
-    g.fillStyle = `rgb(${ink.join(',')})`;
-    drawn = birds.map((b) => {
-      for (const [cx, cy] of birdCells(b, pitch)) g.fillRect(cx * pitch, cy * pitch, pitch - 0.2, pitch - 0.2);
-      return { x: b.x - b.s * 1.3 - pitch * 2, y: b.y - b.s - pitch * 2, w: b.s * 2.6 + pitch * 4, h: b.s * 2 + pitch * 4 };
+  const world = (): BirdSky => ({ W, H, pointer, ...area });
+
+  const hatch = () => {
+    if (!look()) return false;
+    const url = sprite(ink, pitch);
+    birds = seedBirds(Math.min(n, MAX_BIRDS), world());
+    els = birds.map(() => {
+      const wrap = document.createElement('div'), wing = document.createElement('i');
+      Object.assign(wrap.style, { position: 'absolute', left: '0', top: '0', width: `${CELL_W}px`, height: `${CELL_H}px`, overflow: 'hidden', willChange: 'transform' });
+      Object.assign(wing.style, { display: 'block', width: `${CELL_W}px`, height: `${CELL_H * FRAMES.length}px`, background: `url(${url}) 0 0 / ${CELL_W}px ${CELL_H * FRAMES.length}px no-repeat` });
+      wrap.appendChild(wing);
+      layer.appendChild(wrap);
+      return { wrap, wing };
+    });
+    return true;
+  };
+  // On the mountains' dot grid, so the birds look drawn in the same dots.
+  const put = () => {
+    birds.forEach((b, i) => {
+      const x = Math.round((b.x - CELL_W / 2) / pitch) * pitch, y = Math.round((b.y - CELL_H / 2) / pitch) * pitch;
+      els[i].wrap.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      els[i].wing.style.transform = `translateY(${-wingFrame(b) * CELL_H}px)`;
     });
   };
-  const onMove = (e: PointerEvent) => {
-    const r = canvas.getBoundingClientRect();
-    const k = r.width ? canvas.offsetWidth / r.width : 1;
-    const x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k;
-    pointer = x >= 0 && y >= 0 && x <= W && y <= H ? { x, y } : null;
+  const move = () => {
+    for (let s = 0; s < 3; s++) stepBirds(birds, TICK_MS / 1000 / 3, world());
+    put();
+  };
+  const rest = () => {
+    resting = true;
+    layer.replaceChildren();
+    els = []; birds = [];
+    timer = window.setTimeout(() => { resting = false; late = 0; start(); }, REST_MS);
   };
   const tick = () => {
+    timer = 0;
+    if (gone || document.hidden || !document.hasFocus()) { last = 0; return; }
     const now = performance.now();
-    if (!document.hidden && size()) {
-      stepBirds(birds, Math.min(0.1, (now - last) / 1000), world());
-      draw();
-    }
+    if (last) late = lateness(late, now - last);
     last = now;
-    timer = window.setTimeout(tick, FRAME_MS);
+    const waits = flockWaits(now, { busyUntil, lastInput, late });
+    if (waits === 'slow') { rest(); return; }
+    if (waits === 'idle') { last = 0; return; }
+    if (waits === 'busy') { last = 0; timer = window.setTimeout(tick, busyUntil - now + 20); return; }
+    if (now - looked > LOOK_MS) { looked = now; look(); pointer = raw ? { x: (raw.x - left) * k, y: (raw.y - top) * k } : null; }
+    move();
+    timer = window.setTimeout(tick, TICK_MS);
   };
-  if (!size()) return () => {};
-  birds = seedBirds(n, world());
-  draw(true);
-  if (still) return () => {};
-  window.addEventListener('pointermove', onMove);
-  last = performance.now();
-  timer = window.setTimeout(tick, FRAME_MS);
-  return () => { clearTimeout(timer); window.removeEventListener('pointermove', onMove); };
+  const go = () => { if (!timer && !resting && !gone) { last = 0; timer = window.setTimeout(tick, TICK_MS); } };
+  const start = () => {
+    if (gone || resting || document.hidden) return;
+    if (!birds.length && !hatch()) return;
+    put();
+    if (!still) go();
+  };
+  const halt = () => { if (timer && !resting) { clearTimeout(timer); timer = 0; } last = 0; };
+  const onVisible = () => { if (document.hidden) halt(); else start(); };
+  const onBlur = () => { halt(); raw = null; pointer = null; };
+  const onFocus = () => start();
+  const onMove = (e: PointerEvent) => {
+    raw = { x: e.clientX, y: e.clientY };
+    lastInput = performance.now();
+    if (!timer && !resting && !gone && birds.length) go();
+  };
+  const onBusy = () => { lastInput = performance.now(); busyUntil = lastInput + BUSY_MS; if (!timer) start(); };
+  const onResize = () => { looked = 0; };
+
+  const ready = window.setTimeout(() => {
+    start();
+    if (still) return;
+    window.addEventListener('blur', onBlur); window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('keydown', onBusy, { passive: true, capture: true });
+    window.addEventListener('wheel', onBusy, { passive: true, capture: true });
+    window.addEventListener('resize', onResize);
+  }, 600);
+  return () => {
+    gone = true;
+    clearTimeout(ready); clearTimeout(timer);
+    window.removeEventListener('blur', onBlur); window.removeEventListener('focus', onFocus);
+    document.removeEventListener('visibilitychange', onVisible);
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('keydown', onBusy, true);
+    window.removeEventListener('wheel', onBusy, true);
+    window.removeEventListener('resize', onResize);
+    layer.replaceChildren();
+  };
 }

@@ -5,8 +5,8 @@
 // Its sky walked all ~16,000 dots of a full-window grid and redrew the canvas
 // every frame, on a GPU-backed canvas, in a headless browser with no GPU on a
 // busy Mac. Since w-9687db6270 (2026-11-22) the sky is the website's mountains:
-// drawn once per size, with only the birds above them moving, on a canvas kept
-// off the GPU, cleared only where they were, and not while the window is hidden.
+// drawn once per size, with only the birds above them moving, as small pictures
+// the compositor slides, and not while the window is hidden.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { mountainDots } from '../renderer/src/home/mountains.ts';
@@ -25,10 +25,9 @@ describe("the first page's sky", () => {
     expect(sky).toMatch(/addEventListener\('resize', resized\)/);
     expect(sky).not.toMatch(/setTimeout\(tick/);
   });
-  it('moves only the birds, on a canvas kept off the GPU, a few times a second, and not while hidden', () => {
-    expect(birds).toMatch(/willReadFrequently: true/);
-    expect(birds).toMatch(/FRAME_MS = \d{2,3}/);
+  it('moves only the birds, as small pictures, and not while the window is hidden', () => {
+    expect(birds).toMatch(/translate3d\(/);
     expect(birds).toMatch(/document\.hidden/);
-    expect(birds).toMatch(/for \(const r of drawn\) g\.clearRect/);
+    expect(sky).toMatch(/<div ref=\{air\} \/>/);
   });
 });

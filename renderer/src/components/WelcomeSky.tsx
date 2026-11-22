@@ -14,7 +14,7 @@ const STILL_MS = 150;
 
 export function WelcomeSky({ dark }: { dark: boolean }) {
   const land = useRef<HTMLCanvasElement>(null);
-  const air = useRef<HTMLCanvasElement>(null);
+  const air = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ground = land.current, sky = air.current;
@@ -28,5 +28,5 @@ export function WelcomeSky({ dark }: { dark: boolean }) {
     return () => { stop(); clearTimeout(wait); removeEventListener('resize', resized); };
   }, [dark]);
 
-  return <div className="ob-sky" aria-hidden="true"><canvas ref={land} /><canvas ref={air} /></div>;
+  return <div className="ob-sky" aria-hidden="true"><canvas ref={land} /><div ref={air} /></div>;
 }

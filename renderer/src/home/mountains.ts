@@ -34,6 +34,8 @@ function ridge(x: number, s: number, n: number) {
 }
 const b2 = (x: number, y: number) => fr(Math.floor(x) / 2 + Math.floor(y) * Math.floor(y) * 0.75);
 const b8 = (x: number, y: number) => (b2(0.25 * x, 0.25 * y) * 0.25 + b2(0.5 * x, 0.5 * y)) * 0.25 + b2(x, y);
+/** The Bayer threshold repeats every eight dots, so it is worked out once. */
+const BAYER = Float64Array.from({ length: 64 }, (_, i) => b8(i % 8, i >> 3));
 
 /** base height, height, frequency, drift: nearest range first. */
 const RANGES: [number, number, number, number][] = [[-0.03, 0.26, 1.9, 0.011], [0.05, 0.36, 1.3, 0.006], [0.12, 0.44, 0.95, 0.003], [0.18, 0.5, 0.75, 0.0015]];
@@ -62,7 +64,7 @@ export function mountainDots(W: number, H: number, m: Mountains, pitch = 3): Mou
       }
       v *= ss(0, 0.24, y);
       if (q) v *= ss(0.5, 1.4, ((ux - q.x) / q.rx) ** 2 + ((y - q.y) / q.ry) ** 2);
-      if (v <= 0 || Math.min(1, v) < b8(cx, cy) + 0.004) continue;
+      if (v <= 0 || Math.min(1, v) < BAYER[(cy & 7) * 8 + (cx & 7)] + 0.004) continue;
       out.push({ x: cx * pitch, y: H - (cy + 1) * pitch, range });
     }
   }
