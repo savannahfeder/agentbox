@@ -1,4 +1,4 @@
-// Agents wrote "committed as f635059 on agentbox/w-fdc2e3614b" in answers and options, because
+// Agents wrote "committed as f635059 on agentbox/w-…" in answers and options, because
 // nothing in the coding brief told them not to; teammates read the raw ids. Checked on the brief both engines get.
 import { it, expect } from 'vitest';
 import { workerGitBrief } from '../main/worker-git.mts';
