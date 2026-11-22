@@ -1,4 +1,5 @@
 import { HARNESS_DEFINITIONS } from './harness-definitions.mts';
+import { envName } from './product-name.mjs';
 // Which coding agent a task is handed to.
 //
 // Claude Code is the default. Codex measured slower on median and wandered on
@@ -23,6 +24,8 @@ export interface Engine {
   id: string;
   label: string;
   word: string;
+  /** A further harness's own models, as it named them; Claude Code's and Codex's lists travel their own way. */
+  models?: { id: string; label: string }[];
 }
 
 /** A row as the fold hands it over: the engine, the model chosen for it, and when the engine field was set. */
@@ -46,8 +49,18 @@ export interface EngineWorkspace {
 /** Which engine binaries the finders found, by engine id. */
 export type EnginesFound = Record<string, boolean | undefined>;
 
+/**
+ * A harness nobody is offered yet can be put on offer on ONE copy of the app, by
+ * naming it in this variable when the copy starts. `npm run check:harnesses --
+ * --candidate <id>` does that to the copy it drives, which is how a harness
+ * passes the real check before it is admitted. The screens never see it: a
+ * browser has no environment, so nothing new is drawn.
+ */
+export const HARNESSES_IN_TESTING_ENV = envName('HARNESSES_IN_TESTING');
+const inTesting = new Set(String((typeof process !== 'undefined' && process.env?.[HARNESSES_IN_TESTING_ENV]) || '').split(',').map((id) => id.trim()).filter(Boolean));
+
 export const ENGINES: Engine[] = HARNESS_DEFINITIONS
-  .filter(({ admitted }) => admitted !== false)
+  .filter(({ id, admitted }) => admitted !== false || inTesting.has(id))
   .map(({ id, label, word }) => ({ id, label, word }));
 
 export const ENGINE_IDS: string[] = ENGINES.map((e) => e.id);
@@ -191,7 +204,11 @@ export function engineFor(
   item: EngineRow | null | undefined,
   { config = {}, found = {}, enabled }: { config?: EngineWorkspace | null; found?: EnginesFound; enabled?: typeof ENGINE_CHOICE_ENABLED } = {},
 ): string {
-  if (homeEngine(found) !== DEFAULT_ENGINE) return homeEngine(found);
+  const home = homeEngine(found);
+  if (home !== DEFAULT_ENGINE) {
+    // Without Claude Code, a row still runs on a further harness it names, when that one is here.
+    return isEngine(item?.engine) && item.engine !== DEFAULT_ENGINE && found[item.engine] ? item.engine : home;
+  }
   if (enabled !== ENGINE_CHOICE_ENABLED) return DEFAULT_ENGINE;
   const wanted = isEngine(item?.engine)
     ? (engineChoiceOnRowIsStale(item, config) ? null : item.engine)
