@@ -121,6 +121,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
 import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson, wakesItselfAt } from '../shared/answers.mts';
+import { handBackWaits } from '../shared/thread-asks.mts';
 import { saveConfig } from './config.mts';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
 import type { AccountIdentity } from './account-tooling.mts';
@@ -769,7 +770,7 @@ export interface SupervisorStore {
   isDue(item: WorkItem, now?: number): boolean;
   answerItem(slug: string, id: string, patch: { answer?: string; status?: WorkItemStatus | null; [field: string]: unknown }): StoredRow | null | undefined;
   tellItem(slug: string, id: string, opts: { text: string; from?: { teammate: string | null; name: string }; hold?: boolean; hop?: number | null; fromNotes?: unknown[] | null }): ReplyItem | null | undefined;
-  recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
+  recordSessionResult(slug: string, id: string, opts: { result?: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
   /** Who is signed in on this computer; absent on a store with no team. */
@@ -9553,7 +9554,7 @@ export class Supervisor {
     // inbox. Her stop is the newest thing she said; a later reply wakes it.
     if (stoppedByHer(item)) return false;
     // A teammate's hand-off held for her yes waits for her reply the same way.
-    if (heldForHer(item)) return false;
+    if (heldForHer(item) || handBackWaits(item)) return false;
     return true;
   }
 
@@ -10277,6 +10278,8 @@ export class Supervisor {
       if (current.answer === '(withdrawn)') return; // a cancel, not a reply
       // A teammate's hand-back held for her yes, or a row she stopped, waits for her reply, as the queue does.
       if (heldForHer(current) || stoppedByHer(current)) return;
+      // The run's own status replaced the hold, written before it knew of the hand-back.
+      if (handBackWaits(current)) { this.store.recordSessionResult(current.product, current.id, { status: 'blocked' }); return; }
       // A reply set for later waits for its time, and the tick carries it then.
       // A row the run closed meanwhile is opened again, or nothing would.
       if (!this.store.isDue(current, Date.now())) {

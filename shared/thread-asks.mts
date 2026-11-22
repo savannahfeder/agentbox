@@ -9,6 +9,7 @@
 // Handing back is closing the task with words and a verdict. The thread stays
 // the owner's throughout: their computer runs it, and it comes back to their
 // Needs you saying what was said.
+import { toldBy } from './answers.mts';
 import { isTaskRow, taskGiver } from './team-rules.mts';
 import { handedFrom } from './thread-link.mts';
 import type { AskPatch, Verdict } from './work-items.mts';
@@ -216,6 +217,10 @@ const HANDED_BACK = /^\S+ (?:handed this back|reviewed this(?: and it looks good
 
 /** Whether words on a thread are a hand-back `handedBackWords` wrote. */
 export const isHandBack = (text: string | null | undefined): boolean => HANDED_BACK.test(String(text ?? ''));
+
+// Nothing runs on a teammate's hand-back until the owner replies, even once a
+// run's own status has replaced the hold (`heldForHer`).
+export const handBackWaits = (item: Parameters<typeof toldBy>[0] & { answer?: string | null }): boolean => !!toldBy(item) && isHandBack(item?.answer);
 
 /**
  * A hand-back as one reader sees it: the stored words name both people, so the
