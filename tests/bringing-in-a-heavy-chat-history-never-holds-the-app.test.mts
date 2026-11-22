@@ -198,15 +198,15 @@ describe('an import cut off part way', () => {
 
 describe('a running session seen for the first time', () => {
   afterEach(() => { vi.restoreAllMocks(); });
-
-  it('reads its start and its end, not the whole transcript', async () => {
-    const home = aHome('live-session-');
-    vi.spyOn(os, 'homedir').mockReturnValue(home);
-    const cwd = path.join(home, 'code', 'agents');
-    const dir = path.join(home, '.claude', 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'));
+  let home = '';
+  let cwd = '';
+  let dir = '';
+  beforeAll(() => {
+    home = aHome('live-session-');
+    cwd = path.join(home, 'code', 'agents');
+    dir = path.join(home, '.claude', 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'));
     fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, 'live-1.jsonl');
-    const fd = fs.openSync(file, 'w');
+    const fd = fs.openSync(path.join(dir, 'live-1.jsonl'), 'w');
     const ts = new Date().toISOString();
     fs.writeSync(fd, rows([{ type: 'user', cwd, timestamp: ts, message: { role: 'user', content: 'Run all 750 subagents' } }]));
     const progress = rows(Array.from({ length: 256 }, () => ({ type: 'progress', cwd, timestamp: ts, data: { message: filler(4000) } })));
@@ -216,6 +216,12 @@ describe('a running session seen for the first time', () => {
       { type: 'assistant', cwd, timestamp: ts, message: { content: [{ type: 'text', text: 'All 750 finished.' }] } },
     ]));
     fs.closeSync(fd);
+    // Six more sessions with the same transcript, linked rather than copied.
+    for (let i = 2; i <= 7; i += 1) fs.linkSync(path.join(dir, 'live-1.jsonl'), path.join(dir, `live-${i}.jsonl`));
+  }, 60_000);
+
+  it('reads its start and its end, not the whole transcript', async () => {
+    vi.spyOn(os, 'homedir').mockReturnValue(home);
     const agents = await import('../main/agents.mts');
     let asked = 0;
     const real = fs.readSync;
@@ -226,4 +232,28 @@ describe('a running session seen for the first time', () => {
     expect(facts.about).toBe('The eval sweep');
     expect(asked).toBeLessThan(32 * 1024 * 1024);
   }, 60_000);
+
+  it('is read off the main process, and says what the main process would', async () => {
+    vi.spyOn(os, 'homedir').mockReturnValue(home);
+    const agents = await import('../main/agents.mts');
+    const ids = ['live-2', 'live-3', 'live-4', 'live-5', 'live-6', 'live-7'];
+    const { value, longest, took } = await longestHold(() => Promise.all(ids.map((id) => agents.readHistoryOffThread(id, cwd))));
+    const here = agents.__readHistory('live-1', cwd);
+    for (const facts of value) {
+      expect(facts).toMatchObject({ lastSaid: here.lastSaid, about: here.about, asked: here.asked, touched: here.touched });
+      expect(facts.transcript).toMatch(/live-\d\.jsonl$/);
+    }
+    expect(longest).toBeLessThan(Math.max(100, took / 4));
+    // Asked again with nothing new written, it answers from what it kept.
+    const again = await longestHold(() => agents.readHistoryOffThread('live-2', cwd));
+    expect(again.value.lastSaid).toBe('All 750 finished.');
+    expect(again.took).toBeLessThan(50);
+  }, 60_000);
+
+  it('is how the app reads every session it lists', () => {
+    const src = read('main/agents.mts');
+    const measure = src.slice(src.indexOf('async function measure('), src.indexOf('async function measure(') + 2500);
+    expect(measure).toMatch(/readHistoryOffThread\(/);
+    expect(measure).not.toMatch(/[^.\w]readHistory\(/);
+  });
 });

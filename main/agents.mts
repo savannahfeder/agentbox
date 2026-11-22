@@ -13,6 +13,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { findTranscript, transcriptSearch } from './transcript-search.mts';
+import { foldHistoryOffThread } from './chat-reader.mts';
 import {
   WORK_CHARS, agentKey, changedFile, commandWork, fullSubject, isBookkeeping, saidCount, sameInstant, threadWindow, workSubject, workVerb,
 } from '../shared/agents.mts';
@@ -372,14 +373,31 @@ function fold(file: string, acc: Facts, from: number, size: number) {
   return at - Buffer.byteLength(rest);
 }
 
-function readHistory(sessionId: string, cwd: string | undefined) {
+/** What a fold is asked to read: the transcript from `from`, into the facts so far. */
+export interface HistoryFold { file: string; size: number; from: number; first: boolean; acc: Facts }
+
+/** Reads a transcript's facts from `from` to `size`; a first read of a large one takes its start and its end. */
+export function foldHistory({ file, size, from, first, acc }: HistoryFold): { offset: number; acc: Facts } {
+  if (first && size > FIRST_HEAD_BYTES + FIRST_TAIL_BYTES) {
+    fold(file, acc, 0, FIRST_HEAD_BYTES);
+    // What the end says is the session now; a reply or a file from the start is not.
+    Object.assign(acc, { lastSaid: '', saidAt: 0, saidOpen: false, touched: [] });
+    from = size - FIRST_TAIL_BYTES;
+  }
+  return { offset: fold(file, acc, from, size), acc };
+}
+
+type HistoryRead = Facts & { transcript: string | null };
+
+/** The answer already known for a session, or the fold that would bring it up to date. */
+function historyAsk(sessionId: string, cwd: string | undefined): { known: HistoryRead } | { stat: fs.Stats; ask: HistoryFold } {
   const file = transcriptPath(sessionId, cwd);
-  if (!file) return { ...NOTHING, transcript: null };
+  if (!file) return { known: { ...NOTHING, transcript: null } };
   let stat: fs.Stats;
-  try { stat = fs.statSync(file); } catch { return { ...NOTHING, transcript: null }; }
+  try { stat = fs.statSync(file); } catch { return { known: { ...NOTHING, transcript: null } }; }
   const hit = historyCache.get(sessionId);
   if (hit && hit.file === file && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) {
-    return { ...hit, transcript: file };
+    return { known: { ...hit, transcript: file } };
   }
 
   // Carry on from the last read unless the file shrank. A smaller file was
@@ -400,18 +418,26 @@ function readHistory(sessionId: string, cwd: string | undefined) {
       asked: [...hit.asked],
     }
     : { ...NOTHING, touched: [], asked: [] };
-  let from = resume ? hit.offset : 0;
-  if (!resume && stat.size > FIRST_HEAD_BYTES + FIRST_TAIL_BYTES) {
-    fold(file, acc, 0, FIRST_HEAD_BYTES);
-    // What the end says is the session now; a reply or a file from the start is not.
-    Object.assign(acc, { lastSaid: '', saidAt: 0, saidOpen: false, touched: [] });
-    from = stat.size - FIRST_TAIL_BYTES;
-  }
-  const offset = fold(file, acc, from, stat.size);
+  return { stat, ask: { file, size: stat.size, from: resume ? hit.offset : 0, first: !resume, acc } };
+}
 
-  const entry = { file, size: stat.size, mtimeMs: stat.mtimeMs, offset, ...acc };
+function historyKept(sessionId: string, stat: fs.Stats, ask: HistoryFold, { offset, acc }: { offset: number; acc: Facts }): HistoryRead {
+  const entry = { file: ask.file, size: stat.size, mtimeMs: stat.mtimeMs, offset, ...acc };
   historyCache.set(sessionId, entry);
-  return { ...entry, transcript: file };
+  return { ...entry, transcript: ask.file };
+}
+
+function readHistory(sessionId: string, cwd: string | undefined): HistoryRead {
+  const got = historyAsk(sessionId, cwd);
+  return 'known' in got ? got.known : historyKept(sessionId, got.stat, got.ask, foldHistory(got.ask));
+}
+
+/** The same read with the transcript folded in the chat reader's thread
+ *  (main/chat-reader.mts): every running session on the Mac is read, and a
+ *  heavy user's first reads are hundreds of MB. */
+export async function readHistoryOffThread(sessionId: string, cwd: string | undefined): Promise<HistoryRead> {
+  const got = historyAsk(sessionId, cwd);
+  return 'known' in got ? got.known : historyKept(sessionId, got.stat, got.ask, await foldHistoryOffThread(got.ask));
 }
 
 // Exported for tests/one-inbox-no-agents-tab.test.mts. The fields it reads are
@@ -498,10 +524,12 @@ async function measure({ zeroPid, sessionIds, products, claudeBin }: Required<Re
   for (const rec of cliRecords) add(rec, 'cli');
 
   const agents: Agent[] = [];
-  for (const rec of byPid.values()) {
-    const { lastActiveAt, lastSaid, saidAt, about, lastAsked, touched, asked, transcript } = rec.sessionId
-      ? readHistory(rec.sessionId, rec.cwd)
-      : { ...NOTHING, transcript: null };
+  const records = [...byPid.values()];
+  const histories = await Promise.all(records.map((rec) => (rec.sessionId
+    ? readHistoryOffThread(rec.sessionId, rec.cwd)
+    : { ...NOTHING, transcript: null })));
+  for (const [i, rec] of records.entries()) {
+    const { lastActiveAt, lastSaid, saidAt, about, lastAsked, touched, asked, transcript } = histories[i];
     const owner = owners.get(path.resolve(rec.cwd ?? '/')) ?? null;
     agents.push({
       pid: rec.pid!,
