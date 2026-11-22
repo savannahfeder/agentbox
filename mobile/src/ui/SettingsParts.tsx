@@ -41,10 +41,12 @@ export function Page({ title, lede, back = 'Settings', right, head, children }: 
   );
 }
 
-export function Group({ label, children }: { label?: string; children: ReactNode }) {
+/** `note` is the line under the heading (settings.css `.acct-place-line`). */
+export function Group({ label, note, children }: { label?: string; note?: string | null; children: ReactNode }) {
   return (
     <View style={{ marginTop: 32 }}>
       {label ? <T style={{ fontSize: 14, fontFamily: font.medium, letterSpacing: -0.07, paddingBottom: 12 }}>{label}</T> : null}
+      {note ? <T style={{ marginTop: -4, paddingBottom: 12, fontSize: 12.5, lineHeight: 19, color: color.dim }}>{note}</T> : null}
       <View style={{ backgroundColor: color.fill, borderWidth: 1, borderColor: color.line, borderRadius: 10, paddingHorizontal: 18 }}>{children}</View>
     </View>
   );

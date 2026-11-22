@@ -95,6 +95,7 @@ export async function listProcesses(): Promise<ProcessSample[]> {
 // The process an agent IS: Claude Code's `claude`, or Codex's app-server.
 // Used only to find whose command a hook was, never to decide anything.
 const AGENT = /(^|\/)(claude|codex)(\s|$)/;
+const CLAUDE_AGENT = /(^|\/)claude(\s|$)/;
 
 // A hook asking for a later command runs under the same agent but is no
 // command's work. Only its exact launch matches, so a command that merely
@@ -135,6 +136,8 @@ export interface Grant {
   wallStart: number;
   startedAt: number;
   ambiguous: boolean;
+  sharedNow?: boolean;
+  soloPeakMb?: number;
   emptySince: number | null;
 }
 
@@ -633,8 +636,15 @@ export class MemoryGateServer {
       const since = Math.min(...grants.map((g) => g.wallStart)) - 1_000;
       const baseline = grants.reduce<Set<number> | null>((acc, g) => (acc && g.baseline.size < acc.size ? g.baseline : acc ?? g.baseline), null);
       const ours = (p: ProcessSample) => (typeof p.startedAt === 'number' ? p.startedAt >= since : !baseline!.has(p.pid));
+      // Under Claude Code each command is a new shell the agent starts, so what
+      // the agent started before these grants (an MCP server, an earlier
+      // command sent to the background) is not their work, and nor is anything
+      // it starts later, however new. Codex's own tree is unmeasured, so it
+      // keeps the old reading.
+      const claude = CLAUDE_AGENT.test(byPid.get(anchorPid)?.args ?? '');
+      const older = (p: ProcessSample) => claude && typeof p.startedAt === 'number' && p.startedAt < since;
       let mb = 0;
-      const stack = [...(children.get(anchorPid) ?? [])];
+      const stack = (children.get(anchorPid) ?? []).filter((p) => !older(p));
       while (stack.length) {
         const p = stack.pop()!;
         if (HOOK.test(p.args)) continue;
@@ -644,9 +654,20 @@ export class MemoryGateServer {
       for (const g of grants) {
         if (grants.length > 1) {
           g.ambiguous = true;
+          if (claude) g.sharedNow = true;
           this.gate.share(g.id, anchorPid);
+          this.gate.observe(g.id, Math.round(mb));
+        } else {
+          g.soloPeakMb = Math.max(g.soloPeakMb ?? 0, Math.round(mb));
+          if (g.sharedNow) {
+            // The others it was measured with are gone, so their peak goes
+            // too, and what it reached on its own stays.
+            g.sharedNow = false;
+            this.gate.restartPeak(g.id, g.soloPeakMb);
+          } else {
+            this.gate.observe(g.id, Math.round(mb));
+          }
         }
-        this.gate.observe(g.id, Math.round(mb));
         // NOTHING RUNNING UNDER IT FOR A WHILE: its "after" report was lost
         // (the hook was killed, the agent crashed mid-call). Every running
         // command has at least the shell it runs in, so an empty reading that

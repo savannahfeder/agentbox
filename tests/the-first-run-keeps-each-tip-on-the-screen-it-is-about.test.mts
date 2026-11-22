@@ -3,19 +3,15 @@
 // Fourth-round synthetic testers on fresh installs:
 // - the walkthrough said "Press R to answer this agent" on a thread still
 //   queued, because it counted an agent as busy only once its words shimmered;
-// - with Home now on by default, the practice tutorial ran with Home drawn
-//   over the inbox, so tips about tabs, the board and an open thread pointed
-//   at a screen that was not there, and N and Tab moved nothing it watched.
+// (The second fault, Home drawn over the old practice tutorial, went with that
+// tutorial on 2026-11-21.)
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
 const read = (f: string) => fs.readFileSync(new URL(`../renderer/src/${f}`, import.meta.url), 'utf8');
 
-describe('the walkthrough and the practice tutorial', () => {
+describe('the walkthrough', () => {
   it('counts a queued agent as busy', () => {
     expect(read('components/Tour.tsx')).toMatch(/busy: thread && !!document\.querySelector\('\.live-word\.is-shimmering, \.live-brief\.live-queued'\)/);
-  });
-  it('puts Home away while the practice tutorial runs', () => {
-    expect(read('App.tsx')).toMatch(/const homeShown = homeOn && homeOpen && !run && /);
   });
 });

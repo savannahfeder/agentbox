@@ -78,7 +78,7 @@ export const PARITY = {
   'palette:theme-sky-*': { missing: 'the sky themes behind the desktop\'s Home and Inbox (an Alpha feature); the phone has neither the skies nor Home' },
 
   // A thread
-  'thread:done': { phone: MENU, find: 'label="Close this thread"' },
+  'thread:done': { phone: THREAD, find: 'accessibilityLabel="Mark done"' },
   'thread:snooze': { phone: MENU, find: 'onLater(row.ts, row.label)' },
   'thread:unsnooze': { phone: MENU, find: 'if (row.now) onBack()' },
   'thread:read': { phone: 'mobile/src/lib/unread.ts', find: 'export function markSeen' },
@@ -107,7 +107,7 @@ export const PARITY = {
   'thread:see-private': { missing: 'the computer takes it; the phone copy of a thread does not say who can see it' },
   'thread:pin': { phone: MENU, find: "'Pin thread'" },
   'thread:rename': { phone: MENU, find: 'label="Rename"' },
-  'thread:code': { missing: 'the code change carried in the phone copy' },
+  'thread:code': { phone: 'mobile/src/ui/ThreadParts.tsx', find: "pathname: '/change'" },
   'thread:place': { phone: OFFERS, find: "'Keep on your computer'" },
   'thread:end-repeat': { phone: MENU, find: 'label="Stop repeating"' },
   'thread:add-people': { missing: 'adding people to a thread' },
@@ -180,4 +180,4 @@ export const PARITY = {
 };
 
 // 26 from 25 once, on 2026-11-09: the skies reached the desktop on main before this check did.
-export const STILL_TO_DO = 26;
+export const STILL_TO_DO = 25;

@@ -6,7 +6,7 @@ import { api } from '../../api';
 import type { ArtifactMark, Person, Room, RoomCard, RoomMention, RoomMessage, RoomsState, TeamMessageFile } from '../../types';
 import { listedIn, oneConversation, pairRooms } from '../../../../shared/pair-room.mts';
 import './rooms.css';
-import { boardPeople, boardPicked, chatPeople, groupInTab, mentionRows, noticeShown, personOpens, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
+import { boardPeople, boardPicked, cardName, chatPeople, groupInTab, mentionRows, noticeShown, personOpens, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
 import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
@@ -26,6 +26,7 @@ import { GroupFinder, GroupsColumn, GroupsHead } from './GroupsColumn';
 import { directPeople } from './direct-people';
 import { decisionsOf, decisionRows } from '../decisions';
 import { DecisionsList } from '../TeamLists';
+import { ThreadCrumb } from '../../threads/Summary';
 
 type Direct = Conversation & { people: string[] };
 
@@ -55,6 +56,8 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const all = live ? rooms!.rooms : [];
   const list = all.filter((r) => r.kind !== 'group');
   const [openId, setOpenId] = useState<string | null>(null);
+  // Opened from Needs you, so drawn where the inbox's list was rather than as the Team page.
+  const [inInbox, setInInbox] = useState(false);
   const [pane, setPane] = useState<RoomPane>('wall');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [boardPicks, setBoardPicks] = useState<Record<string, string[]>>(() => readBoardPicks());
@@ -91,9 +94,10 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   }, []);
 
   const [openingFile, setOpeningFile] = useState<(RoomFileOpening & { roomId: string }) | null>(null);
-  // Every group opens as the Groups page, which then holds it.
-  const openRoom = (id: string) => {
+  // Every group opens as the Groups page, which then holds it, or in the inbox.
+  const openRoom = (id: string, from: 'inbox' | null = null) => {
     onLeavePage(); setEmpty(false); setFinderOpen(false); setOpenId(id); setPane('wall'); setBoardOn(false);
+    setInInbox(from === 'inbox');
     setLastId(id); writeRoomTab(id);
   };
   // One step back: from everyone's threads or a person's page to the group; from the group out.
@@ -296,6 +300,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       const res = await call('leave', r.id);
       toast(res.ok ? `You left ${nameOf(r)}` : res.error ?? 'Could not leave');
       if (!res.ok) return;
+      if (inInbox) { setOpenId(null); return; }
       const next = groupInTab(all.filter((x) => x.id !== r.id), null);
       if (next) openRoom(next.id); else { setOpenId(null); setEmpty(true); }
     }
@@ -341,7 +346,8 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     heading = { title: <h1 className="workspace-title">Groups</h1> };
     page = <div className="rm-empty gr-none"><span className="t">You are not in any groups yet.</span></div>;
   } else if (open && rooms && onChat) {
-    page = <GroupPage key={open.id} inline={inline}
+    const bare = inline || inInbox;
+    page = <GroupPage key={open.id} inline={bare}
       notice={<><GroupWaits row={rooms.mentions.find((m) => m.roomId === open.id) ?? null} onDone={() => void call('markDone', open.id).then((res) => { if (!res.ok) toast(res.error ?? 'Not marked done'); })} />
         {rooms.me && noticeShown(open, answered) ? <OpenGroupNotice me={rooms.me}
           onLeave={() => void groupAction(open, 'leave', new DOMRect())}
@@ -351,11 +357,19 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
         return <RoomChat room={c.room} messages={c.messages} people={withMe(chatPeople(c.room, meId), meInChat)} meId={meId} now={now}
           full hang head={<></>} {...c.calls} />;
       })()}
-      people={inline && (open.teamId || open.members <= 2) ? null : <PeoplePanel room={open} onPerson={(id) => openPerson(id, open.wall, () => setPane(`person:${id}`))} threadOf={threadOf} />}      list={<GroupsColumn rows={rows} current={`room:${open.id}`} now={now} onOpen={pickGroup} />} />;
+      people={bare && (open.teamId || open.members <= 2) ? null : <PeoplePanel room={open} onPerson={(id) => openPerson(id, open.wall, () => setPane(`person:${id}`))} threadOf={threadOf} />}      list={<GroupsColumn rows={rows} current={`room:${open.id}`} now={now} onOpen={pickGroup} />} />;
     heading = { title: <GroupsHead current={currentRow} onFind={() => setFinderOpen(true)} /> };
     if (inline) heading = null;
+    // The bar a thread opened from the inbox has, so Back and Esc go to the list.
+    if (inInbox) heading = { title: <div className="workspace-task-header"><ThreadCrumb from="Inbox" name={nameOf(open)} onBack={close} /></div> };
   } else if (open && rooms) {
     heading = { title: backTitle(nameOf(open)) };
+    // One step in from a chat in the inbox, its bar stays the thread's, and Back goes to the chat.
+    if (inInbox) {
+      const person = pane.startsWith('person:') ? open.wall.find((c) => c.id === pane.slice('person:'.length)) ?? null : null;
+      const here = person ? cardName(person) : pane === 'ranks' ? 'Agent hours' : 'Everyone’s threads';
+      heading = { title: <div className="workspace-task-header"><ThreadCrumb from={nameOf(open)} name={here} onBack={close} /></div> };
+    }
     page = <RoomPage room={open} rooms={list} ranks={rooms.ranks ?? {}} me={rooms.me} now={now}
       pane={pane} onPane={setPane} chat={null} board={board}
       picked={picked} onPick={(ids) => setPicked(new Set(ids))} onMessage={(ids) => void message(ids, open)}
@@ -371,7 +385,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       onTakeBack={(d) => { void decide(listing.roomId, { messageId: d.messageId, kind: d.kind, on: false }); }} />}
     {finderOpen && <GroupFinder rows={rows} current={open ? `room:${open.id}` : null} now={now} onOpen={pickGroup} onClose={() => setFinderOpen(false)} />}
     {membersRoom && members && <MembersMenu room={membersRoom} at={members.at} onClose={() => setMembers(null)}
-      onPerson={(id) => { setMembers(null); openRoom(membersRoom.id); setPane(`person:${id}`); }} />}
+      onPerson={(id) => { setMembers(null); openRoom(membersRoom.id, inInbox && membersRoom.id === openId ? 'inbox' : null); setPane(`person:${id}`); }} />}
   </>;
 
   const invisible = live && rooms?.me ? {
@@ -391,9 +405,9 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   // Needs you counts these rows too, so a group counts once.
   const mentions: RoomMention[] = live ? mentionRows(rooms!.mentions, rooms!) : [];
   const faces = new Map(all.flatMap((r) => r.wall.map((c) => [c.id, c.avatarUrl] as const)));
-  const openMention = (m: RoomMention) => {
+  const openMention = (m: RoomMention, from: 'inbox' | null = null) => {
     if (m.note || m.file) setOpeningFile({ roomId: m.roomId, note: m.note, file: m.file, at: Date.now() });
-    openRoom(m.roomId);
+    openRoom(m.roomId, from);
   };
 
   // A chat drawn somewhere other than Groups: a person's place on the home.
@@ -444,7 +458,9 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   return {
     chatIn, startChat, firstChat,
     live, openId: !live ? null : open ? openId : empty ? 'groups' : null,
-    open: (id: string) => openRoom(id), close, leave, page, dialogs, join, invisible, settingsPane,
+    /** The open group was opened from Needs you, and is drawn in the inbox. */
+    inInbox: live && !!open && inInbox,
+    open: (id: string, from: 'inbox' | null = null) => openRoom(id, from), close, leave, page, dialogs, join, invisible, settingsPane,
     /** The sidebar's Groups: the group open last, or none. */
     openTab,
     mentions, openMention, faces, heading,

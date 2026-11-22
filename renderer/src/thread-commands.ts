@@ -183,7 +183,8 @@ export function threadCommands(f: ThreadFacts): ThreadCommand[] {
         id: 'see-people',
         label: 'Share with chosen people…',
         ...(f.seen === 'people' && f.chosen ? { hint: `shared with ${f.chosen} now` } : {}),
-        keywords: `${SEES} share shared chosen people person someone pick few`,
+        // Add people on a thread of your own is this row now.
+        keywords: `${SEES} share shared chosen people person someone pick few add people invite`,
         does: { act: 'people' },
       });
     }

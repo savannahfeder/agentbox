@@ -13,7 +13,7 @@ import {
   worthLookingAgain,
   type AskRow, type BarWords, type Engine, type EngineSetupState, type Plan, type StepRow,
 } from '../plan-setup';
-import { Cap } from './Onboarding';
+import { Cap } from './Cap';
 import { hoverLit } from '../onboarding';
 
 const Mark = ({ letter }: { letter: string }) => <span className="ps-mark" aria-hidden="true">{letter}</span>;

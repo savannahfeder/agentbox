@@ -37,7 +37,7 @@ const read = (f: string) => fs.readFileSync(new URL(`../renderer/src/components/
 
 describe('every setup screen that takes Enter on the window', () => {
   it('lets a focused button have it', () => {
-    for (const f of ['PlanSetup.tsx', 'Onboarding.tsx']) {
+    for (const f of ['PlanSetup.tsx', 'FirstRun.tsx']) {
       const src = read(f);
       const handlers = src.split(/addEventListener\('keydown'/).length - 1;
       const enterOnWindow = [...src.matchAll(/const on = \(e: KeyboardEvent\) => \{([\s\S]*?)\n {4}\};/g)]

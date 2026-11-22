@@ -50,7 +50,7 @@ describe('the pages that keep the keyboard let the toast’s O through', () => {
   const answered = handler.indexOf('const goesTo = opensTheToast(e.key, toast,');
 
   it('is worked out once, before the pages', () => {
-    expect(handler).toContain('const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now());');
+    expect(handler).toContain('const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now(), lastToast.current);');
     expect(handler.indexOf('const toastsO =')).toBeLessThan(handler.indexOf('if (teammatesShown &&'));
   });
 

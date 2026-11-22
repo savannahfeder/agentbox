@@ -24,7 +24,7 @@
 // team or not. Their keychain is now made only where there is a team cloud,
 // like the team's own.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,9 +33,9 @@ import { loadCloudConfig, teamConfigOnThisMac } from '../main/team/session.mts';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const KEY = { url: 'https://hers.test', anonKey: 'k' };
-const was = process.env.AGENTBOX_TEAM_CONFIG;
-beforeEach(() => { delete process.env.AGENTBOX_TEAM_CONFIG; });
-afterEach(() => { if (was === undefined) delete process.env.AGENTBOX_TEAM_CONFIG; else process.env.AGENTBOX_TEAM_CONFIG = was; });
+// Each lookup gets its own empty environment: a worker started as a fresh user
+// or a demo carries markers that would otherwise decide the answer.
+const env = {};
 
 function aMac({ inHome, inFolder } = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'single-home-'));
@@ -54,24 +54,24 @@ function aMac({ inHome, inFolder } = {}) {
 describe('an installed Agentbox', () => {
   it('is the single-person app even when the Mac keeps a team key (the reported case)', () => {
     const { home, appDir } = aMac({ inHome: KEY });
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
   });
 
   it('is the single-person app even with a team key packed beside it', () => {
     const { home, appDir } = aMac({ inFolder: KEY });
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
   });
 
   it('is the single-person app with no key anywhere, as before', () => {
     const { home, appDir } = aMac();
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
   });
 });
 
 describe('a checkout, run with npm run app', () => {
   it('still runs the team version when the Mac has the key', () => {
     const { home, appDir } = aMac({ inHome: KEY });
-    expect(loadCloudConfig(appDir, { packaged: false, home })?.url).toBe('https://hers.test');
+    expect(loadCloudConfig(appDir, { packaged: false, home, env })?.url).toBe('https://hers.test');
   });
 });
 

@@ -30,9 +30,11 @@ describe('command K finds chats', () => {
     expect(find('sofia').some((r) => r.kind === 'group' && r.key === 'room:r2')).toBe(true);
   });
 
-  it('finds an AI teammate by its name or its job', () => {
+  // Not by its job: "demo" listed four teammates whose jobs said it
+  // (tests/command-k-lists-people-and-groups-by-name-without-burying-threads).
+  it('finds an AI teammate by its name, not its job', () => {
     expect(find('chief').find((r) => r.kind === 'teammate')).toMatchObject({ key: 't-aaa111', label: 'Chief of staff' });
-    expect(find('clinics').some((r) => r.kind === 'teammate' && r.key === 't-bbb222')).toBe(true);
+    expect(find('clinics')).toEqual([]);
   });
 
   it('finds nothing for nothing typed, and nothing that is not there', () => {
