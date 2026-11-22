@@ -1,9 +1,11 @@
 // The pieces every screen is made of, sized from the phone site as it draws
 // (renderer/src/phone.css and the styles under it).
-import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextProps, type ViewStyle } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextProps, type ViewStyle } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { feel } from '../lib/feel';
+import { sheetLetGo, sheetPull } from '../lib/sheet-drag';
 import { useCloud } from '../state/cloud';
 import { color, corner, font, size } from './theme';
 
@@ -80,25 +82,69 @@ export function Ghost({ title, onPress, disabled }: { title: string; onPress: ()
 
 /** Every picker is a sheet from the bottom, a row per choice in words (phone.css `.tc-menu`). */
 export function Sheet({ open, close, onGone, children }: { open: boolean; close: () => void; /** iOS: the sheet has finished leaving. */ onGone?: () => void; children: ReactNode }) {
-  const body = <SheetBody close={close}>{children}</SheetBody>;
+  const [shown, setShown] = useState(open);
+  const slide = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (open) {
+      setShown(true);
+      Animated.spring(slide, { toValue: 1, damping: 28, stiffness: 320, mass: 1, useNativeDriver: true }).start();
+    } else if (shown) {
+      Animated.timing(slide, { toValue: 0, duration: 190, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => setShown(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const body = <SheetBody close={close} slide={slide}>{children}</SheetBody>;
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={close} onDismiss={onGone}>
+    <Modal visible={shown} transparent animationType="none" onRequestClose={close} onDismiss={onGone} statusBarTranslucent>
       {/* Android draws a modal as its own window under the navigation bar; the app's insets are not that window's. */}
       {Platform.OS === 'android' ? <SafeAreaProvider>{body}</SafeAreaProvider> : body}
     </Modal>
   );
 }
-function SheetBody({ close, children }: { close: () => void; children: ReactNode }) {
+function SheetBody({ close, slide, children }: { close: () => void; slide: Animated.Value; children: ReactNode }) {
   const inset = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const room = height * 0.72;
+  const drag = useRef(new Animated.Value(0)).current;
+  const tall = useRef(room);
+  const atTop = useRef(true);
+  const [box, setBox] = useState(0);
+  const [inner, setInner] = useState(0);
+  const over = inner > box + 1;
+  const pan = useMemo(() => {
+    const claims = (dy: number, dx: number) => atTop.current && dy > 6 && dy > Math.abs(dx) * 1.2;
+    return PanResponder.create({
+      onMoveShouldSetPanResponderCapture: (_, g) => claims(g.dy, g.dx),
+      onMoveShouldSetPanResponder: (_, g) => claims(g.dy, g.dx),
+      onPanResponderMove: (_, g) => drag.setValue(sheetPull(g.dy)),
+      onPanResponderRelease: (_, g) => {
+        if (sheetLetGo(g.dy, g.vy, tall.current) === 'away') {
+          feel.tap();
+          close();
+          Animated.timing(drag, { toValue: 0, duration: 0, delay: 220, useNativeDriver: true }).start();
+        } else Animated.spring(drag, { toValue: 0, damping: 24, stiffness: 340, useNativeDriver: true }).start();
+      },
+      onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
+    });
+  }, [close, drag]);
+  const rise = slide.interpolate({ inputRange: [0, 1], outputRange: [room + 40, 0] });
   return (
     <>
-      <Pressable style={{ flex: 1, backgroundColor: color.scrim }} onPress={close} accessibilityLabel="Close" />
-      <View style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden' }}>
-        <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color.scrim, opacity: slide }]}>
+        <Pressable style={{ flex: 1 }} onPress={close} accessibilityLabel="Close" />
+      </Animated.View>
+      <View style={{ flex: 1 }} pointerEvents="none" />
+      <Animated.View {...pan.panHandlers} onLayout={(e) => { tall.current = e.nativeEvent.layout.height; }}
+        style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden', transform: [{ translateY: Animated.add(rise, drag) }] }}>
+        <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 2 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: color.lineStrong }} />
+        </View>
+        <ScrollView style={{ flexGrow: 0 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}
+          onLayout={(e) => setBox(e.nativeEvent.layout.height)} onContentSizeChange={(_, h) => setInner(h)}
+          scrollEventThrottle={16} onScroll={(e) => { atTop.current = e.nativeEvent.contentOffset.y <= 0; }}>
           {children}
         </ScrollView>
-      </View>
+      </Animated.View>
     </>
   );
 }
@@ -108,12 +154,26 @@ export const SheetHead = ({ children }: { children: string }) => (
 export const SheetSep = () => <View style={{ height: 1, backgroundColor: color.line, marginVertical: 4, marginHorizontal: 6 }} />;
 export function SheetRow({ label, on, aside, lead, onPress }: { label: string; on?: boolean; aside?: string; lead?: ReactNode; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!on }}
-      style={({ pressed }) => ({ minHeight: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: on || pressed ? color.picked : 'transparent' })}>
+    <Pressable onPress={() => { feel.pick(); onPress(); }} accessibilityRole="button" accessibilityState={{ selected: !!on }}
+      style={({ pressed }) => ({ minHeight: 48, borderRadius: corner.card, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: on || pressed ? color.picked : 'transparent' })}>
       {lead}
       <T style={{ flex: 1, fontSize: 16, color: on ? color.text : color.dim, fontFamily: on ? font.semibold : font.regular }}>{label}</T>
       {aside ? <T style={{ fontSize: 12, color: color.faint, paddingLeft: 18 }}>{aside}</T> : null}
     </Pressable>
+  );
+}
+
+/** A press that sinks a little under the finger and springs back. */
+export function Squish({ onPress, style, children, accessibilityLabel }: { onPress: () => void; style: ViewStyle; children: ReactNode; accessibilityLabel: string }) {
+  const sink = useRef(new Animated.Value(1)).current;
+  const to = (v: number) => Animated.spring(sink, { toValue: v, damping: 15, stiffness: 400, useNativeDriver: true }).start();
+  return (
+    <Animated.View style={[style, { transform: [{ scale: sink }] }]}>
+      <Pressable onPress={() => { feel.tap(); onPress(); }} onPressIn={() => to(0.92)} onPressOut={() => to(1)} accessibilityRole="button" accessibilityLabel={accessibilityLabel}
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        {children}
+      </Pressable>
+    </Animated.View>
   );
 }
 

@@ -3,6 +3,7 @@
 // message under them, and attaching a file or picture at the foot. The New
 // thread page wears it whole; the empty inbox draws it open on the page, as
 // the web app does (Pages.tsx `InboxClear`).
+import { feel } from '../lib/feel';
 import { router } from '../lib/router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
@@ -157,7 +158,7 @@ export function useNewThread(sent: () => void, reopen?: () => void) {
     },
   });
   useEffect(() => { if (offline.said) setError(offline.said); }, []);
-  const send = (later?: Choices) => { offline.clear(); lastLater.current = later; return sendOnce(later); };
+  const send = (later?: Choices) => { feel.thud(); offline.clear(); lastLater.current = later; return sendOnce(later); };
   const talk = useDictation(draft, () => void send());
   return {
     draft, box, product, projectName, projects, groups, model, effort, sheet, setSheet, busy, error, setError, canSend, send, talk,

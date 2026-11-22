@@ -2,6 +2,7 @@
 // last word, the threads it filed, the options it still offers, and the reply
 // box that opens into the desktop's sentence. A press leaves a command for the
 // Mac and shows at once as waiting for it.
+import { feel } from '../../../lib/feel';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { router } from '../../../lib/router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
@@ -181,7 +182,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
     },
   });
   useEffect(() => { if (offline.said) setFailed(offline.said); }, []);
-  const sendByHand = () => { offline.clear(); void send(picked); };
+  const sendByHand = () => { feel.thud(); offline.clear(); void send(picked); };
   const talk = useDictation(draft, sendByHand);
   const typing = useRef<ComponentRef<typeof TextInput>>(null);
   // A tap on the box's own buttons blurs the field before it lands; the box must not fold under it.

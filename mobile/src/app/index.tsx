@@ -34,7 +34,7 @@ import { Waiting } from '../ui/LogoOrbit';
 import { repeatRow, repeatTag } from '../../../renderer/src/repeat-words';
 import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
 import { barsFor, PriorityRows } from '../ui/Pickers';
-import { footRoom, IconButton, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
+import { footRoom, IconButton, Squish, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
 import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
@@ -43,10 +43,13 @@ import { skipWait, waitNotice, waitSkipped } from '../lib/computer-wait';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
 import { PEN } from '../lib/overlays';
+import { Swiped } from '../ui/Swiped';
+import { feel } from '../lib/feel';
 
 const open = (product: string, id: string) => router.push({ pathname: '/thread/[product]/[id]', params: { product, id } });
 
 // Picking threads to close together: long-press a row, or Select threads in View.
+const RowActs = createContext<{ close: (i: WorkItem) => void; later: (i: WorkItem) => void }>({ close: () => {}, later: () => {} });
 const Picking = createContext<{ picked: Set<string> | null; toggle: (key: string) => void; start: (key: string) => void }>({ picked: null, toggle: () => {}, start: () => {} });
 
 function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unread: boolean; mate: Teammate | null }) {
@@ -56,7 +59,9 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
   // "not started" or "2 tasks to approve", faint after the title (Pages.tsx `RowCells`).
   const aside = row.held ? 'not started' : row.toApprove;
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  const acts = useContext(RowActs);
   return (
+    <Swiped off={picking} onClose={() => acts.close(row.item)} onLater={() => acts.later(row.item)}>
     <Pressable onPress={() => (picking ? pick.toggle(row.key) : open(row.product, row.id))} onLongPress={() => pick.start(row.key)} delayLongPress={350}
       accessibilityLabel={picking ? `${row.title}, ${on ? 'selected' : 'not selected'}` : unread ? `${row.title}, unread` : undefined} accessibilityState={picking ? { checked: on } : undefined}
       style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
@@ -87,6 +92,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
         <T style={small}>{row.when}</T>
       </View>
     </Pressable>
+    </Swiped>
   );
 }
 
@@ -191,7 +197,7 @@ function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId,
         onContentSizeChange={(content) => setSpan((s) => ({ ...s, content }))}
         onScroll={(e) => { const x = e.nativeEvent.contentOffset.x; setSpan((s) => ({ ...s, x })); }} scrollEventThrottle={32}>
         {tabs.map((t) => (
-          <Pressable key={t.id} onPress={() => pick(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on === t.id }}
+          <Pressable key={t.id} onPress={() => { if (on !== t.id) feel.pick(); pick(t.id); }} accessibilityRole="tab" accessibilityState={{ selected: on === t.id }}
             style={{ height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t.id ? color.accent : 'transparent' }}>
             <T style={{ fontSize: words.fontSize, lineHeight: 30, color: on === t.id ? color.text : color.dim }}>{t.label}</T>
             {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: words.count, lineHeight: 30, fontFamily: font.medium, marginLeft: tight ? COUNT_GAP.tight : COUNT_GAP.loose, color: color.faint }}>{counts[t.id]}</T>}
@@ -362,6 +368,8 @@ export default function Threads() {
   const [pickedMenu, setPickedMenu] = useState(false);
   const [pickingLevel, setPickingLevel] = useState(false);
   useEffect(() => { setPicked(null); }, [place, tab]);
+  const [laterOne, setLaterOne] = useState<WorkItem | null>(null);
+  const rowActs = useMemo(() => ({ close: (i: WorkItem) => { void c.closeAll([i]); }, later: (i: WorkItem) => setLaterOne(i) }), [c.closeAll]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
   if (!c.signedIn) return <Redirect href="/sign-in" />;
   // Under your own card, your threads without your AI teammates' runs, which their cards hold.
@@ -468,6 +476,7 @@ export default function Threads() {
   ) : undefined;
   return (
     <Picking.Provider value={picking}>
+    <RowActs.Provider value={rowActs}>
     <Wall>
       <TopBar title="Inbox" right={<>
         <IconButton label="Search threads" onPress={() => router.push('/search')}><Magnifier size={18} /></IconButton>
@@ -504,17 +513,20 @@ export default function Threads() {
         {acts.includes('read') && <SheetRow label="Mark read" onPress={() => { pickedItems.forEach((i) => c.markSeen(i)); pickedDone(); }} />}
         {acts.includes('unread') && <SheetRow label="Mark unread" onPress={() => { pickedItems.forEach((i) => c.markUnseen(i)); pickedDone(); }} />}
       </LaterSheet>
-      {!picked && !penUp && !(inboxEmpty && !board) && <Pressable accessibilityLabel="New thread" accessibilityRole="button" onPress={() => router.push('/new')}
-        style={({ pressed }) => ({
+      {!picked && !penUp && !(inboxEmpty && !board) && <Squish accessibilityLabel="New thread" onPress={() => router.push('/new')}
+        style={{
           position: 'absolute', right: PEN.right, bottom: foot + PEN.lift, width: PEN.size, height: PEN.size, borderRadius: PEN.size / 2,
-          alignItems: 'center', justifyContent: 'center', backgroundColor: color.graphite, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-          shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, opacity: pressed ? 0.85 : 1,
-        })}>
+          backgroundColor: color.graphite, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
+          shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+        }}>
         <Pen />
-      </Pressable>}
+      </Squish>}
       {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} agent={agent} agents={agents} onAgent={setAgent} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
         onSelect={rows.length && !board ? () => { setMenu(false); setPicked(new Set()); } : undefined} />}
+      <LaterSheet visible={!!laterOne} onClose={() => setLaterOne(null)} onPick={(until, label) => { const i = laterOne; setLaterOne(null); if (i) void c.laterAll([i], until, label); }}
+        onNow={laterOne && inLater([laterOne], c.now) ? () => { const i = laterOne; setLaterOne(null); void c.laterAll([i], 0); } : undefined} />
     </Wall>
+    </RowActs.Provider>
     </Picking.Provider>
   );
 }
