@@ -38,8 +38,8 @@ export interface MessageFiles {
 // The thread's reading type (`.focus-body .markdown`): 16px on 25.6px; a
 // document opened on its own reads at 15 on 24 (`.doc-card .markdown`).
 // The colour is a getter so it is read as the text draws, in the look worn then.
-const BODY: TextStyle = { fontSize: 16, lineHeight: 25.6, get color() { return color.text; } };
-const DOC_BODY: TextStyle = { fontSize: 15, lineHeight: 24, get color() { return color.text; } };
+const BODY: TextStyle = { fontSize: 16, lineHeight: 25.6 };
+const DOC_BODY: TextStyle = { fontSize: 15, lineHeight: 24 };
 // A picture's box and a code span sit on the theme's `--bg-raised`, `color.raised`.
 const WEB = /^https?:/i;
 
@@ -218,7 +218,7 @@ function Media({ src, label }: { src: string; label: string }) {
   const film = FILM.test(src);
   return (
     <View>
-      <Text onPress={() => open(src, files)} onLongPress={() => hold(src, files)} accessibilityRole="link" style={[BODY, { alignSelf: 'flex-start', marginBottom: 6, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
+      <Text onPress={() => open(src, files)} onLongPress={() => hold(src, files)} accessibilityRole="link" style={[BODY, { color: color.text, alignSelf: 'flex-start', marginBottom: 6, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }]}>
         <MentionIcon kind="media" tint={color.faint} />{label}
       </Text>
       {link && (film
@@ -432,7 +432,7 @@ export function Markdown({ text, dir, files, doc = false }: { text: string; dir?
   const media = files?.media;
   const blocks = useMemo(() => messageBlocks(text, { dir, playable: media ? (src) => !!media(src) : undefined }), [text, dir, media]);
   const drawing = useMemo(() => ({
-    files, italics, doc, body: doc ? DOC_BODY : BODY, pictures: picturesIn(blocks),
+    files, italics, doc, body: { ...(doc ? DOC_BODY : BODY), color: color.text }, pictures: picturesIn(blocks),
     quiet: referencedFiles(text, { dir: dir ?? null }).some(isImagePath),
   }), [files, italics, doc, blocks, text, dir]);
   return (
@@ -447,7 +447,7 @@ export function InlineMarkdown({ text, style, numberOfLines, dir, files }: { tex
   const italics = useItalics();
   const spans = useMemo(() => inlineSpans(text, { dir }), [text, dir]);
   return (
-    <Draw.Provider value={{ files, italics, body: BODY, doc: false, pictures: [], quiet: false }}>
+    <Draw.Provider value={{ files, italics, body: { ...BODY, color: color.text }, doc: false, pictures: [], quiet: false }}>
       <T style={style} numberOfLines={numberOfLines}><Words spans={spans} /></T>
     </Draw.Provider>
   );

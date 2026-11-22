@@ -15,7 +15,7 @@ import { Markdown } from '../../../ui/Markdown';
 import { IconButton, Sheet, SheetHead, SheetRow, SheetSep, T, TopBar, Wall } from '../../../ui/parts';
 import { color, corner, font, size } from '../../../ui/theme';
 
-const label = { fontFamily: font.semibold, fontSize: 13, get color() { return color.faint; } };
+const label = () => ({ fontFamily: font.semibold, fontSize: 13, color: color.faint });
 
 export default function RepeatPage() {
   const c = useCloud();
@@ -57,10 +57,10 @@ export default function RepeatPage() {
         </T>
         {rule.waiting && <T style={{ fontSize: 13, lineHeight: 20, color: color.faint, marginTop: 6 }}>Waiting for your computer to take this change.</T>}
 
-        <T style={{ ...label, marginTop: 28, marginBottom: 8 }}>Every run reads</T>
+        <T style={{ ...label(), marginTop: 28, marginBottom: 8 }}>Every run reads</T>
         <Markdown text={rule.body || rule.title} />
 
-        <T style={{ ...label, marginTop: 28, marginBottom: 4 }}>Runs</T>
+        <T style={{ ...label(), marginTop: 28, marginBottom: 4 }}>Runs</T>
         {runs.length === 0 && <T style={{ fontSize: 14, lineHeight: 21, color: color.dim, paddingVertical: 8 }}>It has not run yet.</T>}
         {runs.map((run, i) => {
           const live = run.status === 'open' || run.status === 'claimed';
