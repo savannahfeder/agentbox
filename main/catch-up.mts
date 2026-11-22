@@ -6,6 +6,7 @@
 
 import { askSmallModel, NAME_MODEL } from './row-label.mts';
 import type { SmallModelOptions } from './row-label.mts';
+import { saysItStopped } from '../shared/carried-on-outside.mts';
 
 /** A rewrite writes more than a name, so it gets longer than the namer's 90s. */
 export const CATCH_UP_TIMEOUT_MS = 150_000;
@@ -13,16 +14,42 @@ export const CATCH_UP_TIMEOUT_MS = 150_000;
 const cut = (s: unknown, n: number) => String(s ?? '').replace(/\r/g, '').trim().slice(0, n);
 
 /** `saidOutside` is what the person last typed where the chat started
- *  (main/chat-follow.mts). Without it and the project, the model guessed the
- *  folder from the person's own Claude Code settings. */
-export interface CatchUpItem { body?: string | null; title?: string | null; result?: string | null; saidOutside?: string | null; project?: string | null }
+ *  (main/chat-follow.mts), and `earlier` the turns before it. Without the
+ *  project the model guessed the folder from the person's own Claude Code settings. */
+export interface CatchUpItem { body?: string | null; title?: string | null; result?: string | null; saidOutside?: string | null; project?: string | null; earlier?: string[] }
+
+export const EARLIER_MOST = 6;
+const TURN_CHARS = 700;
+// Its end is where a turn asks, and the gap is said: a draft cut short was
+// taken for one its agent never finished.
+const shortTurn = (s: unknown) => {
+  const text = cut(s, Infinity);
+  return text.length <= TURN_CHARS ? text : `${text.slice(0, 300)} [left out here] ${text.slice(-380)}`;
+};
+
+/** The turns of a chat carried on where it started, after its opening and
+ *  before the last thing typed there, off the row's history. A write-up is
+ *  never a turn. */
+export function turnsBefore(lines: readonly { source?: unknown; patch?: Record<string, unknown> | null }[]): string[] {
+  const turns: string[] = [];
+  let lastYours = 0;
+  for (const { source, patch } of lines) {
+    if (source === 'founder' && typeof patch?.saidOutside === 'string') {
+      lastYours = turns.length;
+      turns.push(`Person: ${shortTurn(patch.saidOutside)}`);
+    } else if (source === 'agent' && typeof patch?.result === 'string' && !patch.problem && !saysItStopped(patch.result)) {
+      turns.push(`Agent: ${shortTurn(patch.result)}`);
+    }
+  }
+  return turns.slice(0, lastYours).slice(-EARLIER_MOST);
+}
 
 export interface CatchUpCard { title: string; context: string; ask: string; said: string; options: string[] }
 
 export function catchUpPrompt(item: CatchUpItem | null | undefined) {
   return [
     'A conversation between a person and a coding agent has been brought into an inbox',
-    'that shows each thread as a short card, not as a chat. Rewrite where it stands as',
+    'that shows each thread as a short card, not as a chat. Rewrite where it stands now as',
     'that card, written as the agent speaking to the person ("I found", "Should I").',
     'Plain words, no markdown, no code, no file paths unless one is the point.',
     '',
@@ -38,6 +65,7 @@ export function catchUpPrompt(item: CatchUpItem | null | undefined) {
     ...(cut(item?.project, 120) ? ['--- the project ---', cut(item?.project, 120)] : []),
     '--- the person opened with ---',
     cut(item?.body || item?.title, 1500),
+    ...(item?.earlier?.length ? ['--- then, oldest first ---', ...item.earlier] : []),
     ...(cut(item?.saidOutside, 1500) ? ['--- the person then said ---', cut(item?.saidOutside, 1500)] : []),
     '--- the agent last said ---',
     cut(item?.result, 5000) || '(nothing)',
@@ -60,7 +88,7 @@ export function cleanCatchUp(text: unknown): CatchUpCard | '' {
     context: line(got?.context),
     ask: line(got?.ask),
     said: line(got?.said),
-    options: (Array.isArray(got?.options) ? got.options : []).map(line).filter(Boolean).slice(0, 3),
+    options: (Array.isArray(got?.options) ? got.options : []).map((o) => line(o).replace(/\s*\(recommended\)$/i, '')).filter(Boolean).slice(0, 3),
   };
   if (!card.title || card.title.length > 64 || !card.context || !card.ask || !card.said || card.options.length < 2) return '';
   return card;

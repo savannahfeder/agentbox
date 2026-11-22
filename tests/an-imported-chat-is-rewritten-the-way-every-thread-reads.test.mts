@@ -10,7 +10,7 @@
 // one small-model call, asked on any account or engine with room, and it
 // writes the name, the context and the answer with three options.
 import { describe, it, expect } from 'vitest';
-import { catchUpPrompt, cleanCatchUp, catchUpResult } from '../main/catch-up.mts';
+import { catchUpPrompt, cleanCatchUp, catchUpResult, EARLIER_MOST, turnsBefore } from '../main/catch-up.mts';
 
 const chat = {
   title: 'can you look at the notes store and tell me whats wrong with it',
@@ -58,6 +58,48 @@ describe('a chat carried on where it started', () => {
     expect(p.indexOf('A list of products')).toBeGreaterThan(p.indexOf('Look at this folder'));
     expect(p.indexOf('A list of products')).toBeLessThan(p.indexOf('The wait is running'));
   });
+  // Measured 2026-11-21 on a real chat five replies into its terminal: "Include
+  // tax. Reply with the word ok only." was answered "ok", and the rewrite, shown
+  // only the opening and that, asked whether to write the README summary that
+  // had been written 24 minutes before.
+  const line = (source, patch) => ({ ts: 1, source, patch });
+  const history = [
+    line('agent', { title: 'README project summary', status: 'open', labels: ['thread-import'] }),
+    line('founder', { body: 'Tell me what this project does.' }),
+    line('agent', { result: 'It is a throwaway project.', chatAt: 1 }),
+    line('agent', { label: 'Kestrel', problem: 'What it does.', result: '**Next?**' }),
+    line('founder', { saidOutside: 'Name the checkout module.' }),
+    line('system', { chatAt: 2 }),
+    line('agent', { result: '**Claude Code stopped to ask you a question. Answer it there.**' }),
+    line('agent', { result: 'I would name it cart. Include tax?', chatAt: 3 }),
+    line('founder', { saidOutside: 'Include tax. Reply with the word ok only.' }),
+    line('agent', { result: 'ok', chatAt: 4 }),
+  ];
+  it('carries the turns between the opening and what was said last', () => {
+    expect(turnsBefore(history)).toEqual(['Agent: It is a throwaway project.', 'Person: Name the checkout module.', 'Agent: I would name it cart. Include tax?']);
+    const p = catchUpPrompt({ body: 'Tell me what this project does.', saidOutside: 'Include tax. Reply with the word ok only.', result: 'ok', earlier: turnsBefore(history) });
+    const at = (words) => p.indexOf(words);
+    expect(at('Tell me what this project does.')).toBeLessThan(at('Agent: It is a throwaway project.'));
+    expect(at('Agent: I would name it cart. Include tax?')).toBeLessThan(at('Include tax. Reply with the word ok only.'));
+    expect(p).toContain('where it stands now');
+  });
+  it('carries the newest few of a long one, each cut short', () => {
+    const long = Array.from({ length: 20 }, (_, i) => [line('founder', { saidOutside: `ask ${i}` }), line('agent', { result: `answer ${i} ${'x'.repeat(5000)}` })]).flat();
+    const turns = turnsBefore(long);
+    expect(turns).toHaveLength(EARLIER_MOST);
+    expect(turns.at(-1)).toMatch(/^Agent: answer 18 /);
+    expect(Math.max(...turns.map((t) => t.length))).toBeLessThan(800);
+    // Both ends, with the gap marked: a draft cut short was taken for one its agent never finished.
+    const [one] = turnsBefore([line('agent', { result: `Here is the plan. ${'x'.repeat(5000)} Shall I start?` }), line('founder', { saidOutside: 'Yes.' })]);
+    expect(one).toMatch(/^Agent: Here is the plan\. .* \[left out here\] .*Shall I start\?$/);
+    expect(turnsBefore([line('agent', { result: 'y'.repeat(700) }), line('founder', { saidOutside: 'Yes.' })])).toEqual([`Agent: ${'y'.repeat(700)}`]);
+  });
+  it('has none for a chat only brought in, and takes nothing an agent wrote as yours', () => {
+    expect(turnsBefore(history.slice(0, 4))).toEqual([]);
+    expect(turnsBefore([])).toEqual([]);
+    expect(turnsBefore([line('agent', { saidOutside: 'Ship it.' }), line('agent', { result: 'Done.' })])).toEqual([]);
+  });
+
   it('a chat that was only brought in reads as it did, with no empty parts', () => {
     const p = catchUpPrompt(chat);
     expect(p).not.toContain('--- the project ---');
@@ -77,6 +119,12 @@ describe('what comes back', () => {
     expect(cleanCatchUp('not json')).toBe('');
     expect(cleanCatchUp(JSON.stringify({ ...JSON.parse(reply), ask: '' }))).toBe('');
     expect(cleanCatchUp(JSON.stringify({ ...JSON.parse(reply), options: ['one'] }))).toBe('');
+  });
+  // Seen on a real chat whose agent had marked its own: "One per type (recommended) recommended".
+  it('marks the recommended one once, when the agent had marked it too', () => {
+    const card = cleanCatchUp(JSON.stringify({ ...JSON.parse(reply), options: ['One per type (Recommended)', 'One per cart', 'Keep (recommended) as a word'] }));
+    expect(card.options).toEqual(['One per type', 'One per cart', 'Keep (recommended) as a word']);
+    expect(catchUpResult(card)).toContain('1. One per type (recommended)\n2. One per cart\n');
   });
   it('keeps at most three options', () => {
     const many = JSON.stringify({ ...JSON.parse(reply), options: ['a', 'b', 'c', 'd'] });
