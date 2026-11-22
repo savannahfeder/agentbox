@@ -80,13 +80,32 @@ async function commitsIn(changeFile: string): Promise<HandedCommits | null> {
   return { ref: c.ref, tip: c.tip, bundle: c.bundle };
 }
 
+// What a coding agent loads and starts as its run begins. Commits from someone
+// else that change these could run their commands as the person, so they come as
+// the .change for the agent to judge instead.
+const STARTS_SOMETHING = ['.mcp.json', '.claude', '.codex', '.gitmodules'];
+
+/** The commits a bundle says it builds on, read from its header (`-<sha>` lines). */
+function basesOf(bundle: Buffer): string[] {
+  const end = bundle.indexOf('\n\n');
+  const header = bundle.subarray(0, end < 0 ? Math.min(bundle.length, 64 * 1024) : end).toString('utf8');
+  return header.split('\n').filter((l) => l.startsWith('-')).map((l) => l.slice(1).split(' ')[0]);
+}
+
 function branchFrom(root: string, branch: string, carried: HandedCommits): Promise<boolean> {
   return inScratch(async (file) => {
-    await fs.promises.writeFile(file, Buffer.from(carried.bundle, 'base64'));
-    // Verify fails when this repository lacks the commits the bundle builds on: another project.
+    const bytes = Buffer.from(carried.bundle, 'base64');
+    await fs.promises.writeFile(file, bytes);
+    // A bundle that builds on nothing of this main verifies in any repository, so it is another project's.
+    const main = await mainOf(root);
+    const bases = basesOf(bytes);
+    if (!bases.length || bases.some((b) => !SHA.test(b))) return false;
+    for (const b of bases) if (await git(root, ['merge-base', '--is-ancestor', b, main]) === null) return false;
     if (await git(root, ['bundle', 'verify', '-q', file]) === null) return false;
     if (await git(root, ['fetch', '-q', '--no-tags', file, `${carried.ref}:${branch}`]) === null) return false;
-    if (await git(root, ['rev-parse', '--verify', '-q', `${branch}^{commit}`]) === carried.tip) return true;
+    const kept = await git(root, ['rev-parse', '--verify', '-q', `${branch}^{commit}`]) === carried.tip
+      && await git(root, ['diff', '--name-only', `${main}...${branch}`, '--', ...STARTS_SOMETHING]) === '';
+    if (kept) return true;
     await git(root, ['update-ref', '-d', branch]);
     return false;
   });
