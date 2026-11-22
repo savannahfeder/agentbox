@@ -161,8 +161,8 @@ export function FilesHome({ title, home, projects, found, query, onQuery, findRe
             <button type="button" className="fh-open" onClick={() => onProject(p.name)} aria-label={`Open ${p.name}`}>
               <GlyphMark glyph="folder" />
               <span className="fh-name"><span>{p.name}</span></span>
-              <span className="fh-line">{p.kept === 1 ? '1 file kept' : `${p.kept} files kept`}{p.loose ? `, ${p.loose} not in a folder` : ''}</span>
-              <span className="fh-meta">{p.at ? whenWords(p.at, shared.now) : 'Nothing yet'}</span>
+              <span className="fh-line">{!p.kept ? 'Nothing kept yet' : p.kept === 1 ? '1 file kept' : `${p.kept} files kept`}{p.loose ? `, ${p.loose} not in a folder` : ''}</span>
+              <span className="fh-meta">{p.at ? whenWords(p.at, shared.now) : ''}</span>
             </button>
           </div>)}</div>
         </section>}

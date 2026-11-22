@@ -29,7 +29,7 @@ describe('the sections', () => {
     folder('other', 'Launch', { project: 'Lantern' }),
   ];
   const files = [
-    file({ name: 'capout.md', folder: 'cus', at: 50 }),
+    file({ name: 'northwind.md', folder: 'cus', at: 50 }),
     file({ name: 'call-notes.md', folder: 'calls', at: 90 }),
     file({ name: 'positioning.md', folder: 'pin', at: 10 }),
     file({ name: 'pricing.md', folder: 'pin', at: 20 }),
@@ -44,7 +44,7 @@ describe('the sections', () => {
     expect(home.kept.map((s) => s.folder.name)).toEqual(['Pinned', 'Customers']);
   });
   it('holds a subfolder\'s files in its folder\'s section, newest first', () => {
-    expect(home.kept[1].files.map((f) => f.name)).toEqual(['call-notes.md', 'capout.md']);
+    expect(home.kept[1].files.map((f) => f.name)).toEqual(['call-notes.md', 'northwind.md']);
     expect(home.kept[0].files.map((f) => f.name)).toEqual(['pricing.md', 'positioning.md']);
   });
   it('lists an empty folder apart, not as a section of nothing', () => {
@@ -83,7 +83,7 @@ describe('Pinned', () => {
 describe('what a tile says', () => {
   it('is a document\'s first sentence under its title', () => {
     expect(firstLine('# Pricing\n\n$40 a seat a month. The first 7 days are **free**.\n\n## Rules')).toBe('$40 a seat a month. The first 7 days are free.');
-    expect(firstLine('# Capout\n\n- Two founders\n- Calls every day')).toBe('Two founders');
+    expect(firstLine('# Northwind\n\n- Two founders\n- Calls every day')).toBe('Two founders');
     expect(firstLine('Notes straight away, no title.')).toBe('Notes straight away, no title.');
   });
   it('is nothing for a document with only a title, or none at all', () => {
@@ -123,7 +123,7 @@ describe('a tile\'s icon', () => {
     expect(glyphFor(file({ name: 'cloud-costs.md' }))).toBe('cloud');
   });
   it('takes its folder\'s word when its own name has none, but never Pinned\'s', () => {
-    expect(glyphFor(file({ name: 'capout.md' }), 'Customers')).toBe('people');
+    expect(glyphFor(file({ name: 'northwind.md' }), 'Customers')).toBe('people');
     expect(glyphFor(file({ name: 'pricing.md' }), 'Customers')).toBe('tag');
     expect(glyphFor(file({ name: 'notes.md' }), 'Pinned')).toBe('page');
   });
