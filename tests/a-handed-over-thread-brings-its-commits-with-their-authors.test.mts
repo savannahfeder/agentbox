@@ -94,7 +94,7 @@ async function lenaCarriesOn() {
   const body = [brief.body, attachmentMarkdown(saved)].join('\n\n');
   const made = lena.store.composeItem('api', { title: brief.title, body, labels: [`handed-from:${task.product}:${task.id}`] });
   const product = lena.store.listProducts().find((p) => p.slug === 'api');
-  const started = startFromHandedCommits({ repoPath: product.repoPath, dir: product.dir, id: made.id, body, labels: made.labels });
+  const started = await startFromHandedCommits({ repoPath: product.repoPath, dir: product.dir, id: made.id, body, labels: made.labels });
   const folder = ensureTaskFolder(lena.repo, made.id, { dependencies: false });
   return { brief, started, folder: folder.path, change: brief.files.find((f) => f.name.endsWith('.change')) };
 }
@@ -160,17 +160,17 @@ describe('when the commits cannot be used, the receiver starts as before', () =>
     fs.writeFileSync(path.join(lena.dir, 'attachments', 'damaged.change'), JSON.stringify({ ...saved, commits: { ...saved.commits, bundle: bytes.toString('base64') } }));
     const body = '[x.change](attachments/damaged.change)';
     const made = lena.store.composeItem('api', { title: 'x', body, labels: [`handed-from:${task.product}:${task.id}`] });
-    expect(startFromHandedCommits({ repoPath: lena.repo, dir: lena.dir, id: made.id, body, labels: made.labels })).toBe(false);
+    expect(await startFromHandedCommits({ repoPath: lena.repo, dir: lena.dir, id: made.id, body, labels: made.labels })).toBe(false);
     expect(git(lena.repo, 'branch', '--list', taskBranch(made.id))).toBe('');
   });
 
-  it('when they would make the .change too big to carry', () => {
+  it('when they would make the .change too big to carry', async () => {
     const { id } = theosThread(1);
     const file = machineryPath(theo.dir, changePath(id));
-    const fits = changeWithCommits(file, theo.repo, id, 10 * 1024 * 1024);
+    const fits = await changeWithCommits(file, theo.repo, id, 10 * 1024 * 1024);
     expect(JSON.parse(fits.toString()).commits.tip).toBe(git(theo.repo, 'rev-parse', taskBranch(id)));
-    expect(changeWithCommits(file, theo.repo, id, fits.length)).not.toBeNull();
-    expect(changeWithCommits(file, theo.repo, id, fits.length - 1)).toBeNull();
+    expect(await changeWithCommits(file, theo.repo, id, fits.length)).not.toBeNull();
+    expect(await changeWithCommits(file, theo.repo, id, fits.length - 1)).toBeNull();
   });
 
   it('on a thread that was not handed over, or one whose branch is there already', async () => {
@@ -181,21 +181,31 @@ describe('when the commits cannot be used, the receiver starts as before', () =>
     const brief = lena.service.taskBrief(task.product, task.id);
     const body = attachmentMarkdown(saveAttachments(lena.dir, brief.files));
     const own = lena.store.composeItem('api', { title: 'Mine', body });
-    expect(startFromHandedCommits({ repoPath: lena.repo, dir: lena.dir, id: own.id, body, labels: own.labels })).toBe(false);
+    expect(await startFromHandedCommits({ repoPath: lena.repo, dir: lena.dir, id: own.id, body, labels: own.labels })).toBe(false);
     const again = lena.store.composeItem('api', { title: 'Again', body, labels: [`handed-from:${task.product}:${task.id}`] });
     git(lena.repo, 'branch', taskBranch(again.id), 'main');
     const before = git(lena.repo, 'rev-parse', taskBranch(again.id));
-    expect(startFromHandedCommits({ repoPath: lena.repo, dir: lena.dir, id: again.id, body, labels: again.labels })).toBe(false);
+    expect(await startFromHandedCommits({ repoPath: lena.repo, dir: lena.dir, id: again.id, body, labels: again.labels })).toBe(false);
     expect(git(lena.repo, 'rev-parse', taskBranch(again.id))).toBe(before);
   });
 });
 
 describe('the wiring', () => {
-  it('a new thread is put on the carried branch before anything can start it', () => {
+  const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+  it('a new thread is put on the carried branch before its row exists, under the id the row then gets', () => {
     const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
     const compose = ipc.slice(ipc.indexOf("ipcMain.handle('zero:compose',"), ipc.indexOf("ipcMain.handle('zero:route-thread'"));
-    expect(compose.indexOf('startFromHandedCommits(')).toBeGreaterThan(compose.indexOf('store.composeItem('));
-    expect(compose.indexOf('startFromHandedCommits(')).toBeLessThan(compose.indexOf('supervisor.wake()'));
+    expect(compose).toContain('await startFromHandedCommits({ repoPath: into?.repoPath, dir: into?.dir, id: handedId, body, labels });');
+    expect(compose.indexOf('await startFromHandedCommits(')).toBeLessThan(compose.indexOf('store.composeItem('));
+    expect(compose).toMatch(/store\.composeItem\(product, \{\n\s*\.\.\.\(handedId \? \{ id: handedId \} : \{\}\),/);
+    expect(read('main/team/index.mts')).toContain('await changeWithCommits(');
+  });
+
+  it("runs git off the window's thread, so Send and Hand over never freeze it", () => {
+    const code = read('main/handed-commits.mts');
+    expect(code).not.toMatch(/execFileSync|spawnSync|execSync/);
+    expect(code).not.toMatch(/from '\.\/task-folders\.mts'[^\n]*\b(repoRoot|baseRef)\b|\{[^}]*\b(repoRoot|baseRef)\b[^}]*\} from '\.\/task-folders\.mts'/);
+    expect(code).toContain("killSignal: 'SIGKILL'");
   });
 });
 

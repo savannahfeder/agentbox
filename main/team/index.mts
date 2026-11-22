@@ -1424,7 +1424,7 @@ export function createTeamService({
       const { words, files, tooBig } = await briefOfThread(row, product);
       const title = shownTitle(row);
       const change = changeOfThread(product, id, title);
-      const withCommits = change.files.length ? changeWithCommits(change.files[0].srcPath, product.repoPath, id, MAX_MESSAGE_FILE_BYTES) : null;
+      const withCommits = change.files.length ? await changeWithCommits(change.files[0].srcPath, product.repoPath, id, MAX_MESSAGE_FILE_BYTES) : null;
       const changeFiles: AttachmentFile[] = withCommits ? [{ name: change.name, dataBase64: withCommits.toString('base64') }] : change.files;
       const giver = state.me.name?.split(/\s+/)[0] || 'the giver';
       const loose = change.loose ? `Not committed yet: this work is only on ${giver}'s computer. The file below holds every edit the agent made.` : '';
