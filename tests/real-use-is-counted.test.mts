@@ -104,7 +104,8 @@ describe('used today', () => {
 
   it('is wired to launch and to the window coming forward', () => {
     const main = read('main/main.mts');
-    expect(main).toMatch(/const usedToday = createDailyCount\(\(name\) => analytics\.track\(name\)\)/);
+    // With it goes how heavy the app was (tests/each-install-says-once-a-day-how-heavy-the-app-was).
+    expect(main).toMatch(/const usedToday = createDailyCount\(\(name\) => \{\s*analytics\.track\(name\);\s*try \{ sendLastDaysHealth\(/);
     expect(main).toMatch(/window\.on\('focus', \(\) => usedToday\(Date\.now\(\)\)\)/);
   });
 });

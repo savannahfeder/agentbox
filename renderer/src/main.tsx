@@ -20,6 +20,7 @@ import { theDoorNeedsItsKey } from './browser-bridge';
 import { comeBackFromABlankScreen, writeHeldBeforeReload } from './after-a-crash';
 import { installStrayLetters } from './stray-letters';
 import { installFullScreenEscape } from './full-screen-escape';
+import { installWindowHolds } from './window-holds';
 import { onASharedFilePage } from './shared-file/route';
 import { bootSharedFile } from './shared-file/boot';
 import { bootSharedThread } from './shared-thread/boot';
@@ -107,6 +108,7 @@ const boot = () => {
   installPictureWatch();
   installStrayLetters();
   installFullScreenEscape();
+  installWindowHolds();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <ScreenCrash><AgentUpdates><App /></AgentUpdates></ScreenCrash>
