@@ -136,6 +136,20 @@ describe.each(['MentionRow', 'QuestionRow'])('a message in %s', (kind) => {
   });
 });
 
+// On an iPhone "Next 9:00 AM tomorrow" at the end of the first line squeezed
+// the schedule and the project to "weekdays at 9… · Agent…".
+describe('a repeating task\'s row', () => {
+  const row = fn('RepeatRows');
+  it('says when it runs next under its title, where the words have the whole width', () => {
+    expect(row).toMatch(/<T numberOfLines=\{1\} style=\{\{ \.\.\.rowWords\(\), flex: 1 \}\}>\{`Next \$\{words\.when\}`\}<\/T>/);
+    expect(row).not.toMatch(/ when=\{/);
+    expect(row).toMatch(/<T numberOfLines=\{1\} style=\{rowHead\}>\{r\.title\}<\/T>/);
+  });
+  it('leaves the end of the first line empty rather than draw a time it does not have', () => {
+    expect(fn('Shape')).toMatch(/\{!!when && <T style=\{meta\}>\{when\}<\/T>\}/);
+  });
+});
+
 describe('an agent\'s mark', () => {
   const icons = fs.readFileSync('mobile/src/ui/icons.tsx', 'utf8');
   it('is drawn from the same shapes the desktop draws', () => {

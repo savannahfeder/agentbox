@@ -34,24 +34,13 @@ describe('Light on the phone', () => {
   });
 });
 
+// Dark was Ember Grid here until the same evening, when its brown and its
+// orange glow were turned down: tests/the-phones-dark-look-is-a-plain-neutral-grey.
 describe('Dark on the phone', () => {
-  it('is Ember Grid: its ground, its ink and its lines', () => {
+  it('is no longer the desktop\'s Ember Grid, and keeps Agentbox\'s orange', () => {
     expect(css).toMatch(/\.look-swatch\.ember-grid \{[^}]*#1a1817/);
-    expect(DARK.bg).toBe('#1a1817');
-    expect(DARK.text).toBe('#efebe7');
-    expect(DARK.line).toBe('#464443');
-    expect(DARK.card).toBe('#2d2b29');
-  });
-  it('keeps the dot grid and the orange glow behind every screen, and Light keeps a plain page', () => {
-    expect(DARK.dots).toBeGreaterThan(0);
-    expect(DARK.glow).toBeGreaterThan(0);
-    expect(LIGHT.dots).toBe(0);
-    expect(LIGHT.glow).toBe(0);
-    const parts = read('mobile/src/ui/parts.tsx');
-    const wall = parts.slice(parts.indexOf('export function Wall('), parts.indexOf('\n}\n', parts.indexOf('export function Wall(')));
-    expect(wall).toMatch(/color\.glow > 0 && \(/);
-    expect(wall).toMatch(/fillOpacity=\{color\.dots\}/);
-    expect(wall).toMatch(/stopOpacity=\{color\.glow\}/);
+    expect(DARK.bg).not.toBe('#1a1817');
+    expect(DARK.accent).toBe(LIGHT.accent);
   });
 });
 

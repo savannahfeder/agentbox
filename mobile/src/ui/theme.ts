@@ -1,6 +1,7 @@
-// Agentbox's two looks, as the desktop names them (renderer/src/styles.css):
-// Light is the plain light theme's cool page and ink, Dark is Ember Grid. One
-// accent, the brand orange, and it is only for what is live or needs you.
+// The phone's two looks. Light is the desktop's plain light theme
+// (renderer/src/styles.css): its cool page and ink. Dark is the phone's own, a
+// neutral grey with no tint. One accent, the brand orange, and it is only for
+// what is live or needs you.
 //
 // Every screen reads `color` while it draws, so wearing the other palette is
 // one change to this object and a redraw (state/look.tsx). A colour copied into
@@ -37,9 +38,6 @@ export const LIGHT = {
   minusBed: 'rgba(192, 80, 60, 0.09)',
   // How dark a floating card's shadow is.
   shade: 0.1,
-  // Ember Grid's wall: how strong its dots and its orange glow are.
-  dots: 0,
-  glow: 0,
   // The website's orange halftone, in the page's top corner.
   halftone: 0.34,
 };
@@ -47,34 +45,32 @@ export const LIGHT = {
 export type Palette = typeof LIGHT;
 
 export const DARK: Palette = {
-  bg: '#1a1817',
-  text: '#efebe7',
-  dim: '#c4bdb8',
-  faint: '#a09994',
+  bg: '#191919',
+  text: '#ececec',
+  dim: '#b8b8b8',
+  faint: '#8f8f8f',
   accent: '#ee6018',
-  line: '#464443',
-  lineStrong: '#52504f',
-  rowLine: 'rgba(70, 68, 67, 0.375)',
-  fill: 'rgba(255, 255, 255, 0.04)',
-  round: '#232120',
-  picked: 'rgba(255, 255, 255, 0.08)',
+  line: '#333333',
+  lineStrong: '#444444',
+  rowLine: 'rgba(255, 255, 255, 0.07)',
+  fill: 'rgba(255, 255, 255, 0.05)',
+  round: '#252525',
+  picked: 'rgba(255, 255, 255, 0.09)',
   film: 'rgba(255, 255, 255, 0.07)',
-  pop: '#363431',
-  card: '#2d2b29',
-  raised: '#2f2d2c',
-  sunk: '#272524',
+  pop: '#2c2c2c',
+  card: '#232323',
+  raised: '#292929',
+  sunk: '#202020',
   field: 'rgba(0, 0, 0, 0.18)',
-  // A dark key would be lost on Ember Grid's cards, so what is filled is light here.
-  graphite: '#efebe7',
-  ink: '#1a1817',
+  // A dark key would be lost on a dark card, so what is filled is light here.
+  graphite: '#ececec',
+  ink: '#191919',
   scrim: 'rgba(0, 0, 0, 0.55)',
   plus: '#7bc98e',
   minus: '#e28f82',
   plusBed: 'rgba(123, 201, 142, 0.13)',
   minusBed: 'rgba(226, 143, 130, 0.12)',
   shade: 0.5,
-  dots: 0.055,
-  glow: 0.075,
   halftone: 0,
 };
 

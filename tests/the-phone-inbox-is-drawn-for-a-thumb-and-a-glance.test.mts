@@ -30,7 +30,7 @@ describe('the tabs', () => {
 describe('a row', () => {
   it.each(['ThreadRow', 'MentionRow', 'QuestionRow', 'RepeatRows'])('%s says its project and age in plain small words', (name) => {
     expect(fn(name)).not.toMatch(/uppercase|font\.mono/);
-    expect(fn(name)).toMatch(/<Shape [^\n]* when=\{/);
+    expect(fn(name)).toMatch(name === 'RepeatRows' ? /`Next \$\{words\.when\}`/ : /<Shape [^\n]* when=\{/);
     expect(fn('Shape')).toMatch(/const meta = metaWords\(\)/);
   });
   it('is parted from the next by a line that stops short of both edges', () => {

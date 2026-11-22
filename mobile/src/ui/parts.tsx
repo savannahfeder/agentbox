@@ -10,21 +10,11 @@ import { useCloud } from '../state/cloud';
 import { Tick } from './icons';
 import { color, corner, font, lift, size } from './theme';
 
-/** The page behind every screen, the status bar included. Dark is Ember Grid's wall, the dot grid and the orange glow; Light carries the website's orange halftone in its top corner. */
+/** The page behind every screen, the status bar included. Light carries the website's orange halftone in its top corner; Dark is plain. */
 export function Wall({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   const inset = useSafeAreaInsets();
   return (
     <View style={[{ flex: 1, backgroundColor: color.bg }, style]}>
-      {color.glow > 0 && (
-        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
-          <Defs>
-            <Pattern id="d" width={32} height={32} patternUnits="userSpaceOnUse"><Circle cx={16} cy={16} r={1.15} fill="white" fillOpacity={color.dots} /></Pattern>
-            <RadialGradient id="g" cx="0.72" cy="0.28" r="0.7"><Stop offset="0" stopColor={color.accent} stopOpacity={color.glow} /><Stop offset="1" stopColor={color.accent} stopOpacity={0} /></RadialGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#g)" />
-          <Rect width="100%" height="100%" fill="url(#d)" />
-        </Svg>
-      )}
       {color.halftone > 0 && (
         <Svg style={{ position: 'absolute', top: 0, right: 0 }} width={HALFTONE} height={inset.top + size.topBar} pointerEvents="none">
           <Defs>
@@ -71,8 +61,9 @@ export function TopBar({ left, title, right, below, noReview = false }: { left?:
         </View>
         {aside && (
           <Pressable onPress={() => setMinimizedApproval(null)} accessibilityRole="button" accessibilityLabel="Review permission" hitSlop={4}
-            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.text : color.graphite })}>
-            <T style={{ fontSize: 13.5, fontFamily: font.medium, color: color.ink }}>{`Review (${view.approvals.length})`}</T>
+            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.picked : color.round })}>
+            <View style={{ position: 'absolute', top: 0, right: 2, width: 11, height: 11, borderRadius: 6, borderWidth: 1.5, borderColor: color.bg, backgroundColor: color.accent }} />
+            <T style={{ fontSize: 13.5, fontFamily: font.medium }}>{`Review (${view.approvals.length})`}</T>
           </Pressable>
         )}
         {right}

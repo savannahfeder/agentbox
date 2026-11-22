@@ -69,7 +69,7 @@ const Chip = ({ children, mine = false }: { children: string; mine?: boolean }) 
 const Unread = () => <View style={{ position: 'absolute', left: 7, top: 21, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />;
 
 /** Every row of the inbox: who and when on one line, then room for two lines of words, so no row is taller than the next. */
-function Shape({ mark, who, where, when, ends, children }: { mark: ReactNode; who: string; where?: string; when: string; ends?: ReactNode; children: ReactNode }) {
+function Shape({ mark, who, where, when, ends, children }: { mark: ReactNode; who: string; where?: string; when?: string; ends?: ReactNode; children: ReactNode }) {
   const meta = metaWords();
   return (
     <View style={{ flex: 1 }}>
@@ -79,7 +79,7 @@ function Shape({ mark, who, where, when, ends, children }: { mark: ReactNode; wh
         {!!where && <><Dot /><T numberOfLines={1} style={{ ...meta, flexShrink: 2 }}>{where}</T></>}
         <View style={{ flex: 1, minWidth: 4 }} />
         {ends}
-        <T style={meta}>{when}</T>
+        {!!when && <T style={meta}>{when}</T>}
       </View>
       <View style={{ minHeight: LINE * 2, marginTop: 4 }}>{children}</View>
     </View>
@@ -166,9 +166,12 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: Wo
           <Pressable key={`${r.product}/${r.id}`} onPress={() => router.push({ pathname: '/repeat/[product]/[id]', params: { product: r.product, id: r.id } })}
             style={({ pressed }) => rowBox(pressed)}>
             <Parted first={i === 0} />
-            <Shape mark={<View style={{ width: FACE, height: FACE, alignItems: 'center', justifyContent: 'center' }}><Repeat /></View>} who={repeatTag(r)} where={r.productName} when={`Next ${words.when}`}>
-              <T numberOfLines={r.waiting ? 1 : 2} style={rowHead}>{r.title}</T>
-              {r.waiting && <View style={{ minHeight: LINE, justifyContent: 'center' }}><Chip>Queued</Chip></View>}
+            <Shape mark={<View style={{ width: FACE, height: FACE, alignItems: 'center', justifyContent: 'center' }}><Repeat /></View>} who={repeatTag(r)} where={r.productName}>
+              <T numberOfLines={1} style={rowHead}>{r.title}</T>
+              <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: LINE, gap: 8 }}>
+                {r.waiting && <Chip>Queued</Chip>}
+                <T numberOfLines={1} style={{ ...rowWords(), flex: 1 }}>{`Next ${words.when}`}</T>
+              </View>
             </Shape>
           </Pressable>
         );

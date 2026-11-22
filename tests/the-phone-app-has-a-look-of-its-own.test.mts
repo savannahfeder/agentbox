@@ -59,12 +59,9 @@ describe('the phone app\'s type', () => {
 
 describe('the page behind every screen', () => {
   const wall = parts.slice(parts.indexOf('export function Wall('), parts.indexOf('\n}\n', parts.indexOf('export function Wall(')));
-  it('is plain in Light; the dot grid and the glow are Dark\'s alone', () => {
+  it('is the look\'s own ground, with no dot grid or glow over it', () => {
     expect(wall).toMatch(/backgroundColor: color\.bg/);
-    expect(wall).toMatch(/color\.glow > 0 && \(\s*<Svg/);
-    expect(LIGHT.glow).toBe(0);
-    expect(LIGHT.dots).toBe(0);
-    expect(DARK.glow).toBeGreaterThan(0);
+    expect(wall).not.toMatch(/color\.glow|color\.dots/);
   });
 });
 

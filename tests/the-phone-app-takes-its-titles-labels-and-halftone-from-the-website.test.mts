@@ -104,9 +104,7 @@ describe('the page behind every screen', () => {
     expect(cut(parts, 'export function IconButton(')).toMatch(/backgroundColor: bare \? 'transparent' : pressed \? color\.picked : color\.round/);
     expect(cut(parts, 'export function IconButton(')).not.toMatch(/color\.fill/);
   });
-  it('keeps Dark its grid and glow', () => {
-    expect(DARK.dots).toBeGreaterThan(0);
-    expect(DARK.glow).toBeGreaterThan(0);
-    expect(LIGHT.dots).toBe(0);
+  it('draws nothing else behind a screen: Dark is plain', () => {
+    expect(wall.match(/<Svg /g)).toHaveLength(1);
   });
 });
