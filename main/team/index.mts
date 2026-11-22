@@ -950,7 +950,7 @@ export function createTeamService({
       onChange,
       log,
       now,
-      relay: (c, thread) => asks.relay(c, thread),
+      relay: (c, thread, orElse) => asks.relay(c, thread, orElse),
     });
     sync = createTeamSync({
       backend,
