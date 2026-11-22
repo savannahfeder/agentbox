@@ -42,6 +42,13 @@ describe('off the walkthrough’s pages', () => {
     expect(awayFromWalk(sent, at({ home: true }))).toBe(true);
     expect(awayFromWalk(closed, at({ home: true }))).toBe(false);
   });
+  // Round four, 2026-11-22: Esc off the practice thread at 4 of 5 left a list with no tip and no way back.
+  it('is anywhere but the practice thread once it has been opened, until it is closed', () => {
+    const opened = finishLesson(sent, 'open');
+    expect(awayFromWalk(opened, at({}))).toBe(true);
+    expect(awayFromWalk(opened, at({ thread: true, practiceThread: true }))).toBe(false);
+    expect(awayFromWalk(closed, at({}))).toBe(false);
+  });
   it('is a real thread while the walkthrough is still about its practice one', () => {
     expect(awayFromWalk(sent, at({ thread: true }))).toBe(true);
   });

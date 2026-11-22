@@ -152,12 +152,13 @@ export const replyTeaches = (t: Tour | null, item: { product: string; id: string
   tourLive(t) && (!t!.practice || isTourPractice(t, item));
 
 /** Off the walkthrough's pages: on one it has no tip for (`elsewhere`), or, while its tips are about the
- *  practice thread, on a real thread or on Home, whose tips are only the first and the last. */
+ *  practice thread, on a real thread or on Home, whose tips are only the first and the last, or anywhere
+ *  but that thread once it has been opened. */
 export function awayFromWalk(t: Tour | null, at: { elsewhere: boolean; home: boolean; thread: boolean; practiceThread: boolean }): boolean {
   if (!tourLive(t) || !t) return false;
   if (at.elsewhere) return true;
   const onPractice = !!t.practice?.item && !t.done.includes('close');
-  return onPractice && (at.home || (at.thread && !at.practiceThread));
+  return onPractice && !at.practiceThread && (at.home || at.thread || t.done.includes('open'));
 }
 
 /** The suggestions, in every New thread box until the tutorial is over or skipped. */
