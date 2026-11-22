@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Animated, Easing, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type PanResponderGestureState, type TextProps, type ViewStyle } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { feel } from '../lib/feel';
 import { sheetLetGo, sheetPull } from '../lib/sheet-drag';
 import { useCloud } from '../state/cloud';
@@ -136,6 +136,7 @@ function SheetBody({ close, slide, children }: { close: () => void; slide: Anima
   const [box, setBox] = useState(0);
   const [inner, setInner] = useState(0);
   const over = inner > box + 1;
+  const [end, setEnd] = useState(false);
   const rows = useRef<ComponentRef<typeof ScrollView>>(null);
   useEffect(() => { if (over) rows.current?.flashScrollIndicators(); }, [over]);
   const follow = useMemo(() => ({
@@ -175,15 +176,22 @@ function SheetBody({ close, slide, children }: { close: () => void; slide: Anima
             </View>
             <ScrollView ref={rows} style={{ flexGrow: 0, flexShrink: 1 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 10, paddingBottom: Platform.OS === 'android' ? 14 : Math.max(14, inset.bottom - 8), gap: 2 }}
               onLayout={(e) => setBox(e.nativeEvent.layout.height)} onContentSizeChange={(_, h) => setInner(h)}
-              scrollEventThrottle={16} onScroll={(e) => { atTop.current = e.nativeEvent.contentOffset.y <= 0; }}>
+              scrollEventThrottle={16} onScroll={(e) => { const n = e.nativeEvent; atTop.current = n.contentOffset.y <= 0; setEnd(n.contentOffset.y + n.layoutMeasurement.height >= n.contentSize.height - 1); }}>
               {children}
             </ScrollView>
+            {over && !end && (
+              <Svg style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} width="100%" height={FADE} pointerEvents="none">
+                <Defs><LinearGradient id="more" x1="0" y1="0" x2="0" y2="1"><Stop offset="0" stopColor={color.pop} stopOpacity={0} /><Stop offset="1" stopColor={color.pop} stopOpacity={1} /></LinearGradient></Defs>
+                <Rect width="100%" height="100%" fill="url(#more)" />
+              </Svg>
+            )}
           </View>
         </Animated.View>
       </KeyboardAvoidingView>
     </>
   );
 }
+const FADE = 48;
 export const SheetHead = ({ children }: { children: string }) => (
   <Caps style={{ paddingTop: 8, paddingHorizontal: 14, paddingBottom: 6 }}>{children}</Caps>
 );
