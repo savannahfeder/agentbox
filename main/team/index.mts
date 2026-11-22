@@ -366,6 +366,8 @@ interface TaskInput {
   title?: unknown; body?: unknown; priority?: number | null; due?: unknown; files?: TaskFile[]; voice?: unknown;
   visibility?: unknown; visibleTo?: unknown[]; blockedBy?: unknown;
   ask?: { kind: AskKind; owner: string; thread: string; product: string; step?: string; note?: string };
+  /** The title is a thread's name as its owner sees it, so it is not cut again. */
+  keepTitle?: boolean;
 }
 
 /** What rides along with a message: a voice note, the agent it is for, a subject that makes it its own thread. */
@@ -1343,7 +1345,7 @@ export function createTeamService({
      * (shared/team-rules.mts). A file with a `rel` is one the words name: its
      * links are pointed at the copy.
      */
-    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy, ask }: TaskInput = {}) {
+    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy, ask, keepTitle }: TaskInput = {}) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const me = state.me.id;
       const list = [...new Set(([] as string[]).concat(toIn ?? []).filter(Boolean))];
@@ -1354,7 +1356,7 @@ export function createTeamService({
       const words = String(body ?? '').trim();
       const carried = (Array.isArray(files) ? files : []).filter((f) => f && (f.dataBase64 || f.srcPath));
       const names = state.people.filter((p) => p.id !== me).map((p) => p.name ?? '');
-      const named = taskTitle(String(title ?? ''), names, words)
+      const named = (keepTitle ? String(title ?? '').trim() : '') || taskTitle(String(title ?? ''), names, words)
         || (carried.length === 1 ? String(carried[0].name ?? 'A file') : `${carried.length} files`);
       if (!words && !carried.length && !String(title ?? '').trim()) throw new Error('a task needs some words');
       const product = await recordWith(me, [to]);
@@ -1400,7 +1402,8 @@ export function createTeamService({
       if (!person) throw new Error('that person is not on your team');
       if (to === state.me.id) throw new Error('that thread is yours already');
       const { words, files, tooBig } = briefOfThread(row, product);
-      const change = changeOfThread(product, id, String(row.label || row.title || ''));
+      const title = shownTitle(row);
+      const change = changeOfThread(product, id, title);
       const giver = state.me.name?.split(/\s+/)[0] || 'the giver';
       const loose = change.loose ? `Not committed yet: this work is only on ${giver}'s computer. The file below holds every edit the agent made.` : '';
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
@@ -1411,8 +1414,9 @@ export function createTeamService({
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const link = threadLink(state.me.id, id);
       const made = await this.giveTask(to, {
-        title: row.label || row.title,
+        title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
+        keepTitle: true,
         priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...change.files, ...files],
       });
       // The asks on it end with it: what they say back would come to a thread you no longer hold.
@@ -1445,15 +1449,16 @@ export function createTeamService({
       if (to === state.me.id) throw new Error('that thread is yours already');
       const seen = seenNow(row, product, kept().getSince(state.me.id));
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
-      const title = String(row.label || row.title || 'A thread');
+      const title = shownTitle(row) || 'A thread';
       const link = threadLink(state.me.id, id);
       const files = [...changeOfThread(product, id, title).files, ...briefOfThread(row, product).files];
       const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', helper: person.name?.split(/\s+/)[0] || null, note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,
-        body: link ? sentWords(title, link, brief) : brief,
+        body: link ? sentWords(String(row.label || row.title || 'A thread'), link, brief) : brief,
         priority: row.priority,
         files,
+        keepTitle: true,
         ask: {
           kind, owner: state.me.id, thread: id, product: slug,
           ...(String(step).trim() ? { step: String(step).trim().slice(0, 1200) } : {}),
