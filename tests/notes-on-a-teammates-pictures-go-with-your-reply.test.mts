@@ -18,6 +18,7 @@ import { notesWithYourReply } from '../renderer/src/threads/teammate-thread';
 import { noteSentWords } from '../renderer/src/artifact-pins';
 import { threadEvents } from '../renderer/src/thread-history';
 import { CommentBox } from '../renderer/src/threads/TeammateThread.tsx';
+import { FileNoteCard } from '../renderer/src/components/FileNoteCard.tsx';
 import type { FileNote } from '../shared/artifact-marks.mts';
 
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -85,6 +86,27 @@ describe('the thread', () => {
   it('keeps counting a held note\'s pin, so the pins after it keep their numbers', () => {
     const shown = noteEvents([opening, mark('mark-1', 'nora', { wait: true }), mark('mark-2', 'nora', { mentions: ['theo'] })] as never[]);
     expect(shown[0].fileMark?.place).toBe('Pin 2');
+  });
+});
+
+// The power test after it: Lena opened Priya's note on her picture and read "Sent to the agent" under
+// it, though it came to her inside Priya's reply, and could not tell whether her agent had it.
+describe('a note that went with a teammate\'s reply', () => {
+  const card = (n: Partial<FileNote>, me: string) => renderToStaticMarkup(React.createElement(FileNoteCard, {
+    note: note({ sent: true, ...n }), wordsGone: false, active: false, settling: false, person: () => null, me, onGo() {}, onSettle() {},
+    nameOf: (id: string | null) => (id === 'priya' ? 'Priya' : 'Someone'), replying: false, onReplying() {}, onReply: async () => true, canReply: true, held: null, product: 'web',
+  } as never));
+
+  it('says it came with their reply, to the person it reached', () => {
+    const html = card({ by: 'priya', uid: 'mark-1' }, 'lena');
+    expect(html).toMatch(/Came with Priya(&#x27;|')s reply/);
+    expect(html).not.toContain('Sent to the agent');
+  });
+  it('says it went with your reply, to the person who wrote it', () => {
+    expect(card({ by: 'priya', uid: 'mark-1' }, 'priya')).toContain('Went with your reply');
+  });
+  it('still says Sent to the agent for a note of the owner\'s own', () => {
+    expect(card({ by: 'lena', uid: 'l-1' }, 'lena')).toContain('Sent to the agent');
   });
 });
 

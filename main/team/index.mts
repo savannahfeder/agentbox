@@ -566,10 +566,15 @@ export function createTeamService({
       if (branch) return name ? `the branch for ${name}` : 'another branch';
       return name || 'another thread';
     });
+    // A teammate's review or help that came back is the newest word on it, and the one the giver's note often points at.
+    const answered = row as { answer?: string; wrote?: Record<string, { teammate?: string } | undefined> };
+    const backFrom = answered.wrote?.answer?.teammate;
+    const backName = backFrom ? state.people.find((p) => p.id === backFrom)?.name?.split(/\s+/)[0] || 'A teammate' : '';
     const words = titled([
       brief,
       tried.length ? `What the agent already tried:\n\n${tried.map((t) => `- ${unbold(t)}`).join('\n')}` : '',
       row.result ? `Where it got to:\n\n${unbold(row.result)}` : '',
+      backFrom && answered.answer ? `What ${backName} said back:\n\n${unbold(String(answered.answer))}` : '',
     ].filter(Boolean).join('\n\n'));
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];

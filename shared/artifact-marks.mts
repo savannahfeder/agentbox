@@ -341,6 +341,10 @@ const clock = (s: number): string => {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 };
 
+/** How a mark a teammate's copy made is named on the thread (main/team/thread-share.mts `asLine`). */
+export const TEAMMATE_MARK = 'mark-';
+export const fromATeammatesCopy = (uid: string | null | undefined): boolean => String(uid ?? '').startsWith(TEAMMATE_MARK);
+
 /** "Pin 2", "0:12", "Slide 3", the quote, "Whole file". */
 export function placeWords(note: { place?: NotePlace | null; pin?: number | string } | null | undefined): string {
   const place = note?.place;

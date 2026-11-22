@@ -67,6 +67,27 @@ describe('the task a hand-over makes', () => {
     const task = await handed('Reproduced it with two POSTs 50ms apart\n- Tried a lock on the row, which **deadlocked** under load\nFound the retry path skips the key check');
     expect(task.body).toContain('What the agent already tried:\n\n- Reproduced it with two POSTs 50ms apart\n- Tried a lock on the row, which deadlocked under load\n- Found the retry path skips the key check\n\nWhere it got to:\n\nThe retry path skips the key check.');
   });
+  // 2026-11-22, a power test: Dana asked Priya to review her thread, Priya's review came back, and Dana
+  // handed the thread to Lena. Lena's task showed the old draft and not a word of Priya's review, so
+  // Dana's note ("use Priya's copy") pointed at words Lena could not see.
+  it('carries the review that came back, after where it got to', async () => {
+    const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Drafted: "Your payment failed."' });
+    theo.store.tellItem('api', t.id, { text: 'Lena reviewed this.\n\nUse "Your payment didn\'t go through" as the heading.', from: { teammate: lena.personId, name: 'Lena Fischer' }, hold: true });
+    await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
+    for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
+    const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
+    expect(task.body).toContain('Where it got to:\n\nDrafted: "Your payment failed."\n\nWhat Lena said back:\n\nLena reviewed this.\n\nUse "Your payment didn\'t go through" as the heading.');
+  });
+  it('carries no review when the newest words are the giver\'s own', async () => {
+    const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Drafted it.' });
+    theo.store.answerItem('api', t.id, { answer: 'Make it shorter.' });
+    await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
+    for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
+    const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
+    expect(task.body).not.toContain('said back');
+  });
   it('says nothing about it when the agent kept no list', async () => {
     const task = await handed();
     expect(task.body).not.toContain('already tried');
