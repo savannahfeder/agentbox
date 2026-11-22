@@ -161,7 +161,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // opens the corner's filter menu with the keyboard in it.
     { id: 'filter', label: 'Filter…', hint: 'project, priority or agent', run: onOpenFilter },
     ...(filtering ? [{ id: 'clear-filter', label: 'Clear filter', run: onClearFilter }] : []),
-    ...(onEndTutorial ? [{ id: 'end-tutorial', label: 'End the tutorial', keywords: 'skip stop hide tips', run: onEndTutorial }] : []),
+    ...(onEndTutorial ? [{ id: 'end-tutorial', label: 'Skip walkthrough', keywords: 'end the tutorial skip stop hide tips', run: onEndTutorial }] : []),
     // Per project, only "rank first" is offered. The whole order is set on the
     // Projects page, which the next row opens.
     ...(onOpenProjects ? [{
@@ -369,14 +369,12 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'import agents claude code codex conversations threads sessions subagents existing mine bring across add my recent older chat find search by name title past old',
       run: onImportAgents,
     },
-    // The tutorial practises and keeps nothing; the onboarding row below sets
-    // up and leaves a project. The walk's last card says "type tutorial", so
-    // this label must contain that word
-    // (tests/the-tutorial-and-the-onboarding-are-two-things.test.mts). The
-    // keywords are split so each word finds only one of the two rows.
+    // The walkthrough practises and keeps nothing; the onboarding row below sets
+    // up and leaves a project. The keywords are split so each word finds only
+    // one of the two rows.
     {
       id: 'tutorial',
-      label: 'Take the tutorial',
+      label: 'Start the walkthrough',
       hint: 'nothing is kept',
       keywords: 'tutorial practice practise walkthrough walk tour again show me around teach learn training how does this work sandbox lesson',
       run: onTutorial,

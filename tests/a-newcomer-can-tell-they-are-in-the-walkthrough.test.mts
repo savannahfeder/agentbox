@@ -82,6 +82,21 @@ describe('the column beside the app', () => {
   });
 });
 
+describe('its name in the command bar', () => {
+  // A synthetic first-day user, power test 2026-11-22: the column said Walkthrough
+  // and ⌘K said "End the tutorial" and "Take the tutorial", and End read as finishing.
+  const palette = read('renderer/src/components/Palette.tsx');
+  it('is the walkthrough, as the column and the setup call it', () => {
+    expect(palette).toContain("label: 'Skip walkthrough'");
+    expect(palette).toContain("label: 'Start the walkthrough'");
+    expect(palette).not.toMatch(/label: '[^']*tutorial/i);
+  });
+  it('is still found by the old word', () => {
+    expect(palette).toMatch(/id: 'end-tutorial', label: 'Skip walkthrough', keywords: '[^']*tutorial/);
+    expect(palette).toMatch(/id: 'tutorial',\s+label: 'Start the walkthrough',\s+hint: '[^']*',\s+keywords: 'tutorial /);
+  });
+});
+
 describe('the way back', () => {
   const app = read('renderer/src/App.tsx');
   it('is offered from the pages the walkthrough has no tip on', () => {

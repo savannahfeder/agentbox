@@ -38,7 +38,7 @@ describe('⌘K', () => {
 
   it('still offers the tutorial and setting the app up again', () => {
     const html = drawn();
-    expect(html).toContain('Take the tutorial');
+    expect(html).toContain('Start the walkthrough');
     expect(html).toMatch(/Set \w+ up again/);
   });
 
