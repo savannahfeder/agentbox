@@ -7,8 +7,11 @@
 // shown next, they picked a tick on finished threads, and said the speech
 // bubble every other thread wore was not obvious. The "Go to" rows' tray,
 // circled play and clock came next and were turned down as large and round
-// beside the tick's few thin lines. So the other lists are drawn as lightly as
-// the tick: a dot for Needs you, three dots for In progress, a dash for Later.
+// beside the tick's few thin lines. Of the line-only sets after that, they
+// asked for three kinds only: done, live (Needs you or In progress alike) and
+// Later, which is rare enough to go unmarked. And the mark sat too high: it
+// hugged the title of a two-line row. So a live thread wears one thin pulse
+// line, Later nothing, and the mark sits in the middle of its row.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { threadResult } from '../renderer/src/palette-rows';
@@ -32,11 +35,18 @@ const arcs = (paths: readonly string[]) => paths.flatMap((d) => [...d.matchAll(/
 describe('a thread found by search wears its list’s mark', () => {
   it('Done wears Go to Done’s tick', () => expect(rowIcon('done')).toBe(goTo('view-done')));
 
-  it('no two lists share a mark, and none is the speech bubble', () => {
-    const icons = LISTS.map(rowIcon);
-    expect(new Set(icons).size).toBe(4);
-    expect(icons).not.toContain('thread');
+  it('Needs you and In progress share the one live mark, which is not the tick', () => {
+    expect(rowIcon('waiting')).toBe(rowIcon('running'));
+    expect(rowIcon('running')).not.toBe(rowIcon('done'));
+    expect(ICONS[rowIcon('running')].length).toBeGreaterThan(0);
   });
+
+  it('Later draws nothing, and still keeps the space so titles line up', () => {
+    expect(ICONS[rowIcon('scheduled')]).toEqual([]);
+    expect(rowIcon('scheduled')).not.toBe('thread');
+  });
+
+  it('none is the speech bubble', () => expect(LISTS.map(rowIcon)).not.toContain('thread'));
 
   it('the other lists are not the Go to rows’ tray, circled play or clock', () => {
     expect(rowIcon('waiting')).not.toBe(goTo('view-inbox'));
@@ -89,6 +99,10 @@ describe('⌘K draws every row in the same ink', () => {
   it('gives a finished row no class or rule of its own', () => {
     expect(palette.includes('palette-done')).toBe(false);
     for (const sheet of [css, phone]) expect(sheet.includes('palette-done')).toBe(false);
+  });
+
+  it('sits the mark of a two-line row in the middle of the row, not up by its title', () => {
+    expect(css).toMatch(/\.palette-k :is\(\.palette-found, \.palette-two\) \.palette-glyph \{[^}]*align-self: center/);
   });
 
   it('hands your threads the tabs’ state, and a teammate’s its card’s', () => {
