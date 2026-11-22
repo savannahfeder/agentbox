@@ -1448,7 +1448,7 @@ export function ThreadComposer({
     </button>
   );
   const assignMenu = (
-    <div className="tc-menu tc-drop tc-right tc-give-menu" role="menu" aria-label={`Assign to ${who}`} onKeyDown={menuKeys}>
+    <div className="tc-menu tc-drop tc-right tc-assign-menu" role="menu" aria-label={`Assign to ${who}`} onKeyDown={menuKeys}>
       {assignPage === 'list' ? (<>
         <span className="tc-menu-head">Assigned to {who}</span>
         <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setAssignPage('due')}>
@@ -1486,12 +1486,12 @@ export function ThreadComposer({
     </div>
   );
   const assignButton = (
-    <span className="tc-give" ref={anchor('assign')}>
-      <button type="button" className="tc-give-main" disabled={!canSend || extra.length > 0} onClick={() => void sendMessage(true)}
+    <span className="tc-assign" ref={anchor('assign')}>
+      <button type="button" className="tc-assign-main" disabled={!canSend || extra.length > 0} onClick={() => void sendMessage(true)}
         title={extra.length ? 'A to-do goes to one person' : `It goes on ${who}'s list until ${who} marks it done`}>
         Assign to {who}
       </button>
-      <button type="button" data-trigger className={`tc-give-caret${due ? ' set' : ''}`} aria-label="Due date, what it waits on, who sees it" title="Due date, what it waits on, who sees it"
+      <button type="button" data-trigger className={`tc-assign-caret${due ? ' set' : ''}`} aria-label="Due date, what it waits on, who sees it" title="Due date, what it waits on, who sees it"
         aria-haspopup="menu" aria-expanded={open === 'assign'} onClick={() => toggle('assign')} onKeyDown={triggerKeys('assign')}>
         {due && <span className="tc-send-when">{dueWords(due)}</span>}
         <CaretIcon />

@@ -459,18 +459,18 @@
 .tc-does.on { color: var(--text); border-color: var(--line-strong); }
 .tc-does.on .tc-box { background: var(--text); border-color: var(--text); }
 /* "Assign to Priya": the second way to send, with its details on the caret. */
-.tc-give { display: inline-flex; height: 28px; position: relative; flex: none; }
-.tc-give > button {
+.tc-assign { display: inline-flex; height: 28px; position: relative; flex: none; }
+.tc-assign > button {
   display: inline-flex; align-items: center; gap: 6px; height: 28px; box-sizing: border-box;
   border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: rgba(255, 255, 255, 0.03); color: var(--text); cursor: pointer;
   font: inherit; font-size: 13.5px; font-weight: 500; padding: 0 12px;
 }
-.tc-give > .tc-give-main { border-radius: var(--tag-radius) 0 0 var(--tag-radius); }
-.tc-give > .tc-give-caret { padding: 0 8px; border-left: 0; border-radius: 0 var(--tag-radius) var(--tag-radius) 0; color: var(--text-dim); }
-.tc-give > .tc-give-caret.set { padding-left: 10px; color: var(--text); }
-.tc-give > button:hover:not(:disabled), .tc-give > .tc-give-caret[aria-expanded='true'] { background: var(--wash); }
-.tc-give > button:disabled { opacity: 0.45; cursor: default; }
-.tc-give:has(> .tc-give-main:disabled) > .tc-give-caret { opacity: 0.45; }
-.tc-give-menu { min-width: 260px; }
-.tc-give-menu .tc-row small { color: var(--text-dim); }
-.tc-quiet .tc-bar > .tc-give + .tc-send { margin-left: 2px; }
+.tc-assign > .tc-assign-main { border-radius: var(--tag-radius) 0 0 var(--tag-radius); }
+.tc-assign > .tc-assign-caret { padding: 0 8px; border-left: 0; border-radius: 0 var(--tag-radius) var(--tag-radius) 0; color: var(--text-dim); }
+.tc-assign > .tc-assign-caret.set { padding-left: 10px; color: var(--text); }
+.tc-assign > button:hover:not(:disabled), .tc-assign > .tc-assign-caret[aria-expanded='true'] { background: var(--wash); }
+.tc-assign > button:disabled { opacity: 0.45; cursor: default; }
+.tc-assign:has(> .tc-assign-main:disabled) > .tc-assign-caret { opacity: 0.45; }
+.tc-assign-menu { min-width: 260px; }
+.tc-assign-menu .tc-row small { color: var(--text-dim); }
+.tc-quiet .tc-bar > .tc-assign + .tc-send { margin-left: 2px; }
