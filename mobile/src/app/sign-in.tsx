@@ -7,7 +7,7 @@
 import { Redirect } from 'expo-router';
 import { router } from '../lib/router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, View } from 'react-native';
 import { appleAvailable, appleSignIn, googleSignIn } from '../platform/sign-in';
 import { useCloud } from '../state/cloud';
 import { AppleMark, AppMark, GoogleMark } from '../ui/icons';
@@ -46,7 +46,7 @@ export default function SignIn() {
   const signIn = run('email', () => c.cloud!.signInWithPassword(email.trim(), password));
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <Screen top={24} foot={<>
         <Btn kind="primary" label={busy === 'email' ? 'Signing in…' : 'Sign in'} disabled={!canSubmit} onPress={signIn} />
         {error && <T accessibilityRole="alert" style={{ fontSize: 14, lineHeight: 20, color: color.dim, textAlign: 'center' }}>{error}</T>}

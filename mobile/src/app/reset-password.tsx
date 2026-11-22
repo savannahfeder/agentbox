@@ -3,7 +3,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { router } from '../lib/router';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, View } from 'react-native';
 import { googleReturn } from '../lib/google-return';
 import { plainAuthError, resetEmailProblem } from '../lib/sign-in-words';
 import { useCloud } from '../state/cloud';
@@ -42,7 +42,7 @@ export default function ResetPassword() {
       : <Btn kind="primary" label={busy ? 'Saving…' : 'Save password'} disabled={!password || busy} onPress={save} />;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <Screen top={24} back={at === 'new' ? undefined : toSignIn} foot={foot}>
         <Head style={{ marginTop: 28 }}>{at === 'ask' ? 'Reset your password' : at === 'sent' ? 'Check your email' : 'Choose a new password'}</Head>
         <Lede>{at === 'ask' ? 'We will email you a link to open on this phone.'

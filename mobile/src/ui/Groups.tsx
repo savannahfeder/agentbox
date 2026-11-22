@@ -494,7 +494,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
     <>
       <TopBar left={root ? <IconButton label="Back to the chat" onPress={() => setThread(null)}><Back size={18} /></IconButton> : back} title={title}
         right={<IconButton label="People" onPress={() => setSheet('people')}><PeopleGlyph /></IconButton>} below={root ? undefined : tabs} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 16 }} keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           {!root && held.length >= 200 && earlier !== 'none' && (

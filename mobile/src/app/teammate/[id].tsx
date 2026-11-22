@@ -5,7 +5,7 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { router } from '../../lib/router';
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { answersMessage } from '../../../../renderer/src/teammates/chat-lines';
 import type { TeamChatLine, TeamRunLine } from '../../../../renderer/src/types';
 import type { Row, TabId } from '../../lib/tabs';
@@ -175,7 +175,7 @@ export default function TeammateChat() {
     <Wall>
       <TopBar left={<IconButton label="Back" onPress={back}><Back size={18} /></IconButton>} title={name}
         right={<IconButton label={`About ${t.name}`} onPress={() => setAbout(true)}><More /></IconButton>} />
-      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom ? Math.max(0, c.approvalRoom + 6 - footRoom(inset)) : 0 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, paddingBottom: c.approvalRoom ? Math.max(0, c.approvalRoom + 6 - footRoom(inset)) : 0 }} behavior="padding">
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 16 }} keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
           {rows.length ? rows.map(draw) : <T style={{ paddingTop: 24, fontSize: 14.5, lineHeight: 21, color: color.faint }}>{`Nothing yet. Say hello to ${t.name}.`}</T>}

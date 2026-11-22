@@ -3,7 +3,7 @@
 // the form (ui/NewThreadForm.tsx) under them.
 import { Redirect } from 'expo-router';
 import { router } from '../lib/router';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { screenGate } from '../lib/thread-gate';
 import { useCloud } from '../state/cloud';
@@ -28,7 +28,7 @@ export default function NewThread() {
         title={<T style={{ fontFamily: font.medium, fontSize: 19, letterSpacing: -0.19, paddingLeft: 4 }}>New thread</T>}
         right={<View style={{ marginRight: 12 }}><SendButtons form={form} /></View>}
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <NewThreadFields form={form} />
         </ScrollView>

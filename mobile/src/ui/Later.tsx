@@ -13,7 +13,7 @@ import { color, corner, font } from './theme';
 export function TypingSheet({ open, close, children }: { open: boolean; close: () => void; children: React.ReactNode }) {
   return (
     <Sheet open={open} close={close}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ gap: 1 }}>{children}</KeyboardAvoidingView>
+      <KeyboardAvoidingView behavior="padding" style={{ gap: 1 }}>{children}</KeyboardAvoidingView>
     </Sheet>
   );
 }

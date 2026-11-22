@@ -5,7 +5,7 @@
 import { Redirect } from 'expo-router';
 import { router } from '../../lib/router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, View } from 'react-native';
 import { splitSlug } from '../../../../renderer/src/phone-rows';
 import { GREETING, starterAsks } from '../../../../shared/teammates.mts';
 import { dayOf } from '../../../../renderer/src/teammates/chat-lines';
@@ -52,7 +52,7 @@ export default function NewTeammate() {
   return (
     <Wall>
       <TopBar left={<IconButton label="Back" onPress={back}><Back size={18} /></IconButton>} title="New teammate" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: size.inset, paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
           <DayRule label={dayOf(c.now, c.now)} />
           <View style={{ flexDirection: 'row', gap: 12, paddingTop: 16 }}>
