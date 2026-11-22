@@ -26,7 +26,7 @@ import { readySkin, swapLook } from './look-switch';
 import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
-import { setClaudeModels, setCodexFreePlan } from './models';
+import { setClaudeModels, setCodexFreePlan, setFurtherHarnesses } from './models';
 import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
 import { arrowRows, pageTitle, spotIn, stepIn } from './one-thing-at-a-time';
@@ -1464,6 +1464,8 @@ export default function App() {
     if (isCarrying()) { setTimeout(() => refreshAgain.current(), 300); return next; }
     const worn = next ? wearJustMade(next.items, justMade.current, Date.now()) : null;
     if (worn) justMade.current = worn.held;
+    // A module value, like the model names: set before the repaint the next line causes.
+    setFurtherHarnesses(next?.engines?.further);
     setSnap(next && { ...next, items: overlayPins(overlayPlaces(worn!.items, unsavedPlaces.current), unsavedPins.current) });
     return next;
   }, []);
@@ -8228,6 +8230,7 @@ export default function App() {
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
+          furtherEngines={snap.engines?.further}
           workspaceEngine={snap.engines?.workspace}
           outOfUsage={snap.supervisor.outOfUsage}
           codexModels={codexModels}
