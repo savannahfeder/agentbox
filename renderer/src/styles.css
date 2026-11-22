@@ -4206,8 +4206,6 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
 .palette-k :is(.palette-found, .palette-two) .hit { color: var(--text); font-weight: 600; }
 .palette-k .palette-two .palette-hint { padding-top: 2px; }
-/* Finished threads step back; the highlight behind a selected one does not. */
-.palette-k .palette-done > * { opacity: .5; }
 
 /* A found line, landed on from the results: marked for a moment. */
 [data-line] { transition: background-color .5s ease, box-shadow .5s ease; }

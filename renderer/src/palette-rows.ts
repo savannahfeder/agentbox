@@ -34,16 +34,17 @@ import { localDate } from './local-dates';
 
 /* ------------------------------- threads --------------------------------- */
 
-export type ThreadResult = { sub: string; hint: string; done: boolean };
+export type ThreadResult = { sub: string; hint: string };
 
-/** A thread ⌘K found: the line it was found by, where it is and how old, and whether it is finished. */
+/** A thread ⌘K found: the line it was found by, and where it is, whether it is finished and how old. */
 export function threadResult(
   item: { status: string; updatedAt?: number; createdAt: number },
   { summary, project, now }: { summary: string; project: string; now: number },
 ): ThreadResult {
   const at = item.updatedAt ?? item.createdAt;
   const age = now - at < 86_400_000 ? agoShort(at, now) : localDate(at, { month: 'short', day: 'numeric' });
-  return { sub: summary, hint: `${project} · ${age}`, done: item.status === 'done' };
+  // Said in words, as the @ thread picker does, because a greyed row confused people.
+  return { sub: summary, hint: [project, item.status === 'done' ? DONE.short : '', age].filter(Boolean).join(' · ') };
 }
 
 /* ------------------------------- matching -------------------------------- */
