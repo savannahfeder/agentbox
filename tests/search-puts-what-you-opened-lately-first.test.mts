@@ -13,6 +13,7 @@ import { searchThreads } from '../renderer/src/threads/search.ts';
 import fs from 'node:fs';
 import { keptPick, titleFirst } from '../renderer/src/palette-pick.ts';
 import { insideGroups } from '../renderer/src/found-inside.ts';
+import { cursorIndex, firstRowStaysFirst } from '../renderer/src/cursor-follows.ts';
 import { createFinder } from '../main/everything-found.mts';
 import { openedBand, openedLately, openedOf, LATELY_FIRST_MS, LATELY_MS } from '../shared/opened-lately.mts';
 
@@ -129,6 +130,26 @@ describe('Command K keeps them first when it puts titles first', () => {
   it('a pick nobody made is the top row, whatever lands there', () => {
     expect(keptPick(null, ['thread-found-inside', 'thread-was-first'])).toBe(0);
     expect(keptPick('thread-was-first', ['thread-found-inside', 'thread-was-first'])).toBe(1);
+  });
+
+  // The search page had the same fault: its cursor follows its thread, so it
+  // followed the old first row down when the thread main found landed above.
+  it('on the search page, a cursor on the first row stays on the first row when results land above it', () => {
+    const list = [{ id: 'w-found', product: 'p' }, { id: 'w-was-first', product: 'p' }];
+    const last = { index: 0, key: 'p:w-was-first' };
+    expect(cursorIndex({ list, selected: 0, last: firstRowStaysFirst(last) })).toBe(0);
+    expect(cursorIndex({ list, selected: 0, last })).toBe(1);
+  });
+
+  it('a cursor you moved down still follows its thread', () => {
+    const list = [{ id: 'w-found', product: 'p' }, { id: 'a', product: 'p' }, { id: 'b', product: 'p' }];
+    const last = { index: 1, key: 'p:b' };
+    expect(cursorIndex({ list, selected: 1, last: firstRowStaysFirst(last) })).toBe(2);
+  });
+
+  it('the search page applies it where those results land', () => {
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    expect(app).toMatch(/drawnAt\.current = firstRowStaysFirst\(drawnAt\.current\); setPageInside\(got\)/);
   });
 
   it('only a key or the pointer makes a pick', () => {

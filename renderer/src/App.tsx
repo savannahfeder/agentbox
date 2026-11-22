@@ -20,7 +20,7 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // followed by a refetch.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
+import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, firstRowStaysFirst, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
 import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
@@ -3863,7 +3863,7 @@ export default function App() {
     const q = search?.trim();
     if (!q || !searchOpened) { setPageInside(NOTHING_INSIDE); return; }
     let live = true;
-    const timer = setTimeout(() => { void insideForRef.current(q, { lines: 10, files: 6, comments: 6, decisions: 6 }, searchOpened).then((got) => { if (live) setPageInside(got); }).catch(() => {}); }, 90);
+    const timer = setTimeout(() => { void insideForRef.current(q, { lines: 10, files: 6, comments: 6, decisions: 6 }, searchOpened).then((got) => { if (live) { drawnAt.current = firstRowStaysFirst(drawnAt.current); setPageInside(got); } }).catch(() => {}); }, 90);
     return () => { live = false; clearTimeout(timer); };
   }, [search, searchOpened, items.length]);
   // Read the threads ahead when a search opens, so the first words typed are answered at once.
