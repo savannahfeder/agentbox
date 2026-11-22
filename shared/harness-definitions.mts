@@ -41,6 +41,8 @@ export interface HarnessDefinition {
   readonly credentialFiles: readonly string[];
   readonly minVersion?: string;
   readonly run?: HarnessRunFlags;
+  /** A tool driven over the Agent Client Protocol: its command, and the arguments that switch ACP on. */
+  readonly acp?: { readonly bin: string; readonly args: readonly string[] };
   readonly scrubPatterns: readonly string[];
   readonly capabilities: HarnessCapabilities;
   readonly imageInstruction: string;
@@ -133,6 +135,7 @@ export const HARNESS_DEFINITIONS: readonly HarnessDefinition[] = freeze([
     id: 'opencode', label: 'OpenCode', word: 'OpenCode', binKey: 'opencodeBin',
     homeEnv: 'OPENCODE_CONFIG', accountPrefix: 'opencode:', package: 'opencode-ai',
     commandMenu: 'opencode', commandRoute: 'opencode',
+    acp: { bin: 'opencode', args: ['acp'] },
     casks: ['opencode', 'sst/tap/opencode'],
     installer: { shell: '/bin/bash', url: 'https://opencode.ai/install', pipe: 'bash' },
     // Its docs give Windows a zip or the desktop app, and no script.
@@ -146,20 +149,20 @@ export const HARNESS_DEFINITIONS: readonly HarnessDefinition[] = freeze([
       '^TOGETHER_', '^FIREWORKS_', '^DEEPINFRA_', '^BASETEN_', '^NVIDIA_', '^GITLAB_TOKEN$',
       '_API_KEY$', '_ACCESS_TOKEN$',
     ],
-    // NO USAGE AND NO PLAN. There is no endpoint on the server and no command
-    // on the CLI that reports what is left of anything, because OpenCode bills
-    // through whichever provider the user connected and does not know. Per-run
-    // tokens and cost DO arrive (`step-finish`), and the adapter reports those;
-    // a plan limit is declared missing rather than faked as zero.
-    capabilities: { nativeCommands: true, fork: true, nativeReview: false, remoteControl: false, inlineImages: false, claudeEffort: false, planLimits: false },
+    // NO USAGE AND NO PLAN. Nothing reports what is left of anything, because
+    // OpenCode bills through whichever provider the user connected and does not
+    // know. ACP's usage update carries the context window and a cost per run; a
+    // plan limit is declared missing rather than faked as zero. Its commands
+    // and its fork are advertised over ACP and not wired yet, so they say no.
+    capabilities: { nativeCommands: false, fork: false, nativeReview: false, remoteControl: false, inlineImages: false, claudeEffort: false, planLimits: false },
     imageInstruction: 'Open each one with the read tool, at the absolute path below.',
     // ADMISSION IS A SEPARATE DECISION FROM INTEGRATION, and it is not ours.
     // docs/harnesses.md: "A provider is not offered until that path works", and
     // "a new provider's networking or permission scope requires the
-    // corresponding product policy review before admission." The transport is
-    // verified (see main/opencode-server.mts for what was measured and how);
-    // whether OpenCode appears in the picker is a product call, so this stays
-    // false until somebody turns it on deliberately.
+    // corresponding product policy review before admission." It runs over ACP
+    // and passes `npm run check:harnesses -- --candidate opencode`; whether it
+    // appears in the picker is a product call, so this stays false until
+    // somebody turns it on deliberately.
     admitted: false,
   },
 ]);

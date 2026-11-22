@@ -118,6 +118,9 @@ export function filesFoldersBrief(
     `Files is where this team keeps its files, and it has its own folders, which are not folders on disk. ${list ? `${project}'s folders: ${list}.` : `${project} has no folders yet.`}`,
     'When someone names a folder they mean one of these, unless they say it is in the code. To save a document into one, pass folder to write_document. To put any other file in one, code, a page or a table included, use team_file. A folder may be in another project: name it as they did, such as Company > Launch. To see everything in one, use team_read with folder: a directory of the same name on disk holds something else.',
     'Say a file is in a folder only after the tool\'s answer names that folder. If it did not, say where the file really is.',
+    'A file in a folder is one the team kept, and Files shows those first. Put in one only what the team will want again, such as decisions, research and what people said, plans, positioning and finished work. Drafts, check pictures and one-off images stay with their thread, where Files still finds them.',
+    'Use the folder a file belongs in, and make a new folder only when none fits, named for what it holds in the team\'s own words, such as Customers or Pricing. A document you keep starts with its title and then one sentence saying what it is, which is what Files shows under its name.',
+    'A folder called Pinned is shown first and holds the few documents everyone should know, such as positioning and pricing. Read what is in Pinned before writing anything that says what the product is or costs.',
   ].join(' ');
 }
 
