@@ -364,6 +364,12 @@ export interface TeamServiceOptions {
 /** A file handed to a task; one with a `rel` is a file the words name. */
 interface TaskFile extends AttachmentFile { rel?: string }
 
+// "View the change" opens the first .change, so a thread's own goes before one it was handed.
+function sentInOrder(files: readonly TaskFile[], own: readonly TaskFile[]): TaskFile[] {
+  const isChange = (f: TaskFile) => String(f.name ?? '').toLowerCase().endsWith('.change');
+  return [...files.filter((f) => !isChange(f)), ...own, ...files.filter(isChange)];
+}
+
 interface TaskInput {
   title?: unknown; body?: unknown; priority?: number | null; due?: unknown; files?: TaskFile[]; voice?: unknown;
   visibility?: unknown; visibleTo?: unknown[]; blockedBy?: unknown;
@@ -1439,7 +1445,7 @@ export function createTeamService({
         title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         keepTitle: true,
-        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...files, ...changeFiles],
+        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: sentInOrder(files, changeFiles),
       });
       // The asks on it end with it: what they say back would come to a thread you no longer hold.
       for (const r of store.listItems()) {
@@ -1473,7 +1479,7 @@ export function createTeamService({
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const title = shownTitle(row) || 'A thread';
       const link = threadLink(state.me.id, id);
-      const files = [...(await briefOfThread(row, product)).files, ...changeOfThread(product, id, title).files];
+      const files = sentInOrder((await briefOfThread(row, product)).files, changeOfThread(product, id, title).files);
       const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', helper: person.name?.split(/\s+/)[0] || null, note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,

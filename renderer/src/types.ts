@@ -29,6 +29,8 @@ export interface WorkItem {
   // PINNED TO THE TOP OF THE LIST (w-20323283e6). Kept by the supervisor, on
   // this Mac, like the place; absent on every row nobody has pinned.
   pinned?: boolean;
+  /** The level a row a teammate sent you has for you. Never stored: the window works it out (`levelForYou`). */
+  levelForYou?: number;
   /** Kept on this Mac whatever the cloud is set to (Supervisor#setThreadOnMac). */
   onMac?: boolean;
   /** What the cloud handed this thread back for, in the run's own words ("your Stripe key"). */
@@ -996,6 +998,8 @@ export interface SupervisorStatus {
   queued?: string[];
   // Of those, the ones being set up or asked for by name, which count as In progress.
   starting?: string[];
+  // Of those, only the ones whose folder is being made now.
+  settingUp?: string[];
   // Sessions this app holds open between Remote Control turns, which `running` leaves out.
   remoteHeld?: string[];
   // With the cloud on Everything, why a thread runs locally or waits (Supervisor#status).
@@ -1781,6 +1785,8 @@ declare global {
       // The thread on screen, or null anywhere that is not one thread. Optional:
       // a preload from before this channel existed simply never says.
       looking?(p: { product: string | null; id: string | null }): Promise<boolean>;
+      // How long this window's own thread held (./window-holds.ts).
+      windowHeld?(ms: number): Promise<boolean>;
       refreshUsage?(p?: { engine?: 'claude' | 'codex'; ask?: boolean }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
       accountUsage?(p: { refresh?: boolean; engine?: 'claude' | 'codex' }): Promise<{ readings: AccountUsageReading[] }>;
       // Whether a screen reader is running, which is what decides xterm's
