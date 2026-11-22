@@ -949,7 +949,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const { offAfterDays } = keeper!.status();
     if (offAfterDays <= 0) return [];
     const before = Date.now() - offAfterDays * DAY_MS;
-    const working = new Set(store.listAllWorkItems().filter((i) => OPEN_STATUSES.has(i.status)).map((i) => `${i.product}/${i.id}`));
+    const working = new Set(store.listAllWorkItems().filter((i) => OPEN_STATUSES.has(i.status ?? '')).map((i) => `${i.product}/${i.id}`));
     const claimed = new Set(named.flatMap((v) => v.paths.map(realOr)));
     const places = [
       ...store.listProducts().filter((p) => p.dir).map((p) => ({ dir: p.dir, slug: p.slug as string | null, skip: p.repoPath ? [p.repoPath] : [] })),
@@ -969,11 +969,14 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   const CONSIDER_EVERY_MS = 10 * 60_000;
   let consideredAt = 0;
   let considering: Promise<void> | null = null;
+  let shared = false;
   function consider(force = false): Promise<void> {
     if (!keeper || considering || (!force && Date.now() - consideredAt < CONSIDER_EVERY_MS)) return considering ?? Promise.resolve();
     consideredAt = Date.now();
+    // Before the first pass, so a kept copy is never made again while the pass takes it off.
+    const sharing = shared ? Promise.resolve() : lineNow().shareKeptCopies().then(() => { shared = true; }, (err: Error) => { console.warn(`files: kept copies were not shared: ${err.message}`); });
     // Without a plan for files a pass needs no versions: it only brings back what an ended plan kept.
-    considering = keeper.wantsVersions().then(async (want) => keeper.pass(want ? await keptVersions() : []))
+    considering = sharing.then(() => keeper.wantsVersions()).then(async (want) => keeper.pass(want ? await keptVersions() : []))
       .catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); })
       .finally(() => { considering = null; });
     return considering;

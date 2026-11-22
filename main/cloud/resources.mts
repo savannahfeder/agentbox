@@ -5,6 +5,7 @@ import os from 'node:os';
 import { readPortableFile, snapshotSkills, filesInFolder, SKILL_LIMITS } from './skills.mts';
 import { run } from './exec.mts';
 import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
+import { bringBackAt } from '../files-come-back.mts';
 
 export interface ResourceAnswer {
   status: string;
@@ -204,6 +205,8 @@ export function createResourceRequests({ cwd, docs, account = null, engine, home
           if (!reserve(bytes)) return { status: 'too_large', message: 'This run has reached its resource byte limit.' };
           content = await run('tar', ['-czf', '-', '-C', bundle.dir, '.'], { encoding: null, env: { ...process.env, COPYFILE_DISABLE: '1' } }) as Buffer;
         } else {
+          // An old picture or film may be kept in the cloud and off this computer; a folder's come back as far as one sending holds.
+          await bringBackAt(named.full!, { max: 300 }).catch(() => null);
           const real = await fs.promises.realpath(named.full!);
           if (!inside(real, await fs.promises.realpath(named.root!))) return { status: 'denied', message: 'symlink escape from the resource folder' };
           if ((await fs.promises.stat(real)).isDirectory()) {
