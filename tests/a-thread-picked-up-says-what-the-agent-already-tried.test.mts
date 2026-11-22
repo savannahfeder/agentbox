@@ -79,7 +79,7 @@ describe('the task a hand-over makes', () => {
     const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
     expect(task.body).toContain('Where it got to:\n\nDrafted: "Your payment failed."\n\nWhat Lena said back:\n\nLena reviewed this.\n\nUse "Your payment didn\'t go through" as the heading.');
   });
-  it('carries no review when the newest words are the giver\'s own', async () => {
+  it('carries no review when nobody handed one back', async () => {
     const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
     theo.store.recordSessionResult('api', t.id, { result: 'Drafted it.' });
     theo.store.answerItem('api', t.id, { answer: 'Make it shorter.' });
@@ -87,6 +87,19 @@ describe('the task a hand-over makes', () => {
     for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
     const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
     expect(task.body).not.toContain('said back');
+  });
+  // The second round: Priya asked her agent for v3 with Dana's changes after Dana's review came back,
+  // then handed the thread to Lena, whose task had no word of the review.
+  it('carries the newest review even when the giver has written since', async () => {
+    const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Drafted it.' });
+    theo.store.tellItem('api', t.id, { text: 'Lena reviewed this.\n\nKeep the amount in the button.', from: { teammate: lena.personId, name: 'Lena Fischer' }, hold: true });
+    theo.store.answerItem('api', t.id, { answer: 'Make v3 with Lena\'s change.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Made v3.' });
+    await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
+    for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
+    const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
+    expect(task.body).toContain('Where it got to:\n\nMade v3.\n\nWhat Lena said back:\n\nLena reviewed this.\n\nKeep the amount in the button.');
   });
   it('says nothing about it when the agent kept no list', async () => {
     const task = await handed();

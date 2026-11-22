@@ -566,15 +566,16 @@ export function createTeamService({
       if (branch) return name ? `the branch for ${name}` : 'another branch';
       return name || 'another thread';
     });
-    // A teammate's review or help that came back is the newest word on it, and the one the giver's note often points at.
-    const answered = row as { answer?: string; wrote?: Record<string, { teammate?: string } | undefined> };
-    const backFrom = answered.wrote?.answer?.teammate;
-    const backName = backFrom ? state.people.find((p) => p.id === backFrom)?.name?.split(/\s+/)[0] || 'A teammate' : '';
+    const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
+    // The newest review or help a teammate handed back, which the giver's note often points at, though they wrote since.
+    const back = [...lines].reverse().find((l) => typeof l.patch?.answer === 'string' && (l.patch.from as { teammate?: unknown } | undefined)?.teammate);
+    const backWho = (back?.patch?.from as { teammate?: string; name?: string } | undefined);
+    const backName = backWho ? state.people.find((p) => p.id === backWho.teammate)?.name?.split(/\s+/)[0] || backWho.name?.split(/\s+/)[0] || 'A teammate' : '';
     const words = titled([
       brief,
       tried.length ? `What the agent already tried:\n\n${tried.map((t) => `- ${unbold(t)}`).join('\n')}` : '',
       row.result ? `Where it got to:\n\n${unbold(row.result)}` : '',
-      backFrom && answered.answer ? `What ${backName} said back:\n\n${unbold(String(answered.answer))}` : '',
+      back ? `What ${backName} said back:\n\n${unbold(String(back.patch!.answer))}` : '',
     ].filter(Boolean).join('\n\n'));
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];
@@ -587,8 +588,8 @@ export function createTeamService({
       else files.push({ rel, name: shownName(rel), srcPath: real });
     };
     const roots = artifactRoots(product).flatMap((r) => { try { return [fs.realpathSync(r)]; } catch { return []; } });
-    const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
-    const named = [...filesInLines(lines), ...otherFilesInLines(lines).filter((f) => viewKind(f.path) === 'table')];
+    // A page or table the agent made is something to see, as a picture is; code it names is not.
+    const named = [...filesInLines(lines), ...otherFilesInLines(lines).filter((f) => viewKind(f.path) === 'table' || viewKind(f.path) === 'page')];
     for (const family of threadFiles(named)) {
       const rel = family.versions[family.versions.length - 1].path;
       if (looksSecret(rel)) continue;

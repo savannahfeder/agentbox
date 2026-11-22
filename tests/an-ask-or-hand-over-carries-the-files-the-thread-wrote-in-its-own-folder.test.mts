@@ -83,6 +83,19 @@ describe('a doc the agent wrote in the thread\'s own checkout', () => {
     expect(carried(theTask(), files[0])).toBe('For developers only.\n');
   });
 
+  // A power test, 2026-11-22: Priya handed her reviewed checkout thread to Lena, and the newest
+  // page the agent made, clinic-checkout-v3.html, reached her as words she could not open.
+  it('goes with a hand-over when it is a page the agent made', async () => {
+    const t = aThread(() => 'The prototype is [clinic-checkout-v3.html](clinic-checkout-v3.html).');
+    write(checkout(t.id, 'clinic-checkout-v3.html'), '<h1>Visit checkout</h1>\n');
+    await sam.service.syncNow();
+    await sam.service.handOn({ product: 'api', id: t.id, to: priya.personId });
+    await both();
+    const files = linked(theTask().body);
+    expect(files.some((f) => /clinic-checkout-v3\.html$/.test(f))).toBe(true);
+    expect(carried(theTask(), files.find((f) => /clinic-checkout-v3\.html$/.test(f))!)).toBe('<h1>Visit checkout</h1>\n');
+  });
+
   it('is said to be left behind when it is over the size a message carries', async () => {
     const t = aThread(() => 'Wrote [amount-errors.md](amount-errors.md).');
     write(checkout(t.id, 'amount-errors.md'), '');
