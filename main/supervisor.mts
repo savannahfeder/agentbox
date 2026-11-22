@@ -9193,6 +9193,8 @@ export class Supervisor {
       stalled,
       queued,
       starting,
+      // Of those, the ones whose folder is being made now, which wait for nothing.
+      settingUp: queued.filter(settingUp),
       // Left out of `running`, but their claim is ours, not an agent elsewhere
       // (renderer/src/live-line.ts).
       remoteHeld: [...this.sessions.values()].filter((s) => s.remoteIdle).map((s) => s.itemId),
