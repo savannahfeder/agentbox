@@ -125,6 +125,21 @@ describe('a record written through a crash or a full disk', () => {
     expect(w.make().off(film.hash)).toMatchObject({ name: 'cut.mp4' });
   });
 
+  it('a line cut short that cannot be mended on a full disk loses none of the changes before it', async () => {
+    const w = world({ days: 1 });
+    const film = w.file('designs/w-a/cut.mp4', 'film bytes');
+    const keeper = w.make();
+    await keeper.pass([film]);
+    w.later(2 * DAY);
+    await keeper.pass([film]);
+    const log = path.join(w.dir, 'files-cloud.jsonl');
+    fs.appendFileSync(log, '{"up":"abc","si');
+    const was = fs.appendFileSync;
+    (fs as { appendFileSync: typeof fs.appendFileSync }).appendFileSync = (p, ...rest) => { if (String(p) === log) throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' }); return was(p, ...rest); };
+    try { expect(w.make().off(film.hash)).toMatchObject({ name: 'cut.mp4' }); } finally { (fs as { appendFileSync: typeof fs.appendFileSync }).appendFileSync = was; }
+    expect(w.make().off(film.hash)).toMatchObject({ name: 'cut.mp4' });
+  });
+
   it('a record that cannot be rewritten does not stop a file leaving, and its place is still known', async () => {
     const w = world({ days: 1 });
     fs.mkdirSync(w.dir, { recursive: true });

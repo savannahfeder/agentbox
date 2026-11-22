@@ -130,17 +130,15 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
   let ledger: Ledger = { up: {}, off: {}, opened: {} };
   try { ledger = { ...ledger, ...JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Ledger> }; } catch { /* none yet */ }
   let changes = 0;
-  let leftover = false;
-  try {
-    const text = fs.readFileSync(changesFile, 'utf8');
-    leftover = text.length > 0;
-    // A line cut short by a crash would swallow the next change written after it.
-    if (leftover && !text.endsWith('\n')) fs.appendFileSync(changesFile, '\n');
-    for (const line of text.split('\n')) {
-      if (!line) continue;
-      try { apply(ledger, JSON.parse(line) as Change); changes += 1; } catch { /* cut short */ }
-    }
-  } catch { /* none yet */ }
+  let text = '';
+  try { text = fs.readFileSync(changesFile, 'utf8'); } catch { /* none yet */ }
+  for (const line of text.split('\n')) {
+    if (!line) continue;
+    try { apply(ledger, JSON.parse(line) as Change); changes += 1; } catch { /* cut short */ }
+  }
+  const leftover = text.length > 0;
+  // A line cut short by a crash would swallow the next change written after it.
+  if (leftover && !text.endsWith('\n')) try { fs.appendFileSync(changesFile, '\n'); } catch { /* the fold below empties it */ }
   let last: { cap: number | null; bytes: number; full: boolean } = { cap: null, bytes: 0, full: false };
   let passing: Promise<void> | null = null;
   const coming = new Map<string, Promise<boolean>>();
