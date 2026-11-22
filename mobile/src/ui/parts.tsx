@@ -118,7 +118,8 @@ export function SheetRow({ label, on, aside, lead, onPress }: { label: string; o
 }
 
 /** A priority as the desktop draws it (`.prio-bars`): three bars, four for Urgent. */
-export function PriorityBars({ level }: { level: 1 | 2 | 3 | 4 }) {
+/** `level` 0 is Agent decides: three bars, none filled (components/Priority.tsx `PriorityIcon`). */
+export function PriorityBars({ level }: { level: 0 | 1 | 2 | 3 | 4 }) {
   const heights = level === 4 ? [4, 7, 10, 13] : [4, 7.5, 11];
   const inked = (i: number) => (level >= 3 ? color.text : i < level ? color.dim : color.lineStrong);
   return (

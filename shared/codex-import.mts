@@ -26,7 +26,7 @@
 
 /** On the row while it is asking. */
 import { Name } from '../shared/product-name.mjs';
-import { CATCH_UP_LABEL } from './agent-import.mts';
+import { CATCH_UP_LABEL, firstPart, lastPart } from './agent-import.mts';
 
 export interface CodexThreadLike {
   id?: string;
@@ -92,12 +92,23 @@ export function whenPhrase(when: number | null | undefined, now = Date.now()): s
  *  a line that was nothing but such a link goes entirely, since "Open the
  *  interactive preview." with nothing to open is the confusing part. */
 const isWebLink = (target: string) => /^https?:\/\//i.test(target) && !/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/]|$)/i.test(target);
+// Each part has a length limit and no two parts can take the same characters.
+// The patterns these replaced backtracked on links left open, which made a
+// pasted line of them cost the cube of its length.
+const IMAGE = /!\[[^\]]{0,1000}\]\([^)]{0,2000}\)/g;
+const LINK = /\[([^\]]{1,1000})\]\(([^)]{0,2000})\)/g;
+const ONLY_LINK = /^\[([^\]]{1,1000})\]\(([^)]{0,2000})\)[.!]?$/;
+// The address is the first word inside the brackets; a title may follow it.
+const targetOf = (inside: string) => inside.trim().split(/\s/)[0] ?? '';
 export function plainQuote(text: unknown): string {
   const lines = String(text ?? '').split('\n').map((raw) => {
-    const line = raw.replace(/!\[[^\]]*\]\([^)]*\)/g, '');
-    const only = line.trim().match(/^\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)[.!]?$/);
-    if (only && !isWebLink(only[2])) return null;
-    return line.replace(/\[([^\]]+)\]\(\s*([^)\s]+)[^)]*\)/g, (whole: string, words: string, target: string) => (isWebLink(target) ? whole : words));
+    const line = raw.replace(IMAGE, '');
+    const only = line.trim().match(ONLY_LINK);
+    if (only && targetOf(only[2]) && !isWebLink(targetOf(only[2]))) return null;
+    return line.replace(LINK, (whole: string, words: string, inside: string) => {
+      const target = targetOf(inside);
+      return !target || isWebLink(target) ? whole : words;
+    });
   });
   return lines.filter((l) => l !== null).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -152,7 +163,7 @@ export function importFirstLine(thread: CodexThreadLike | null | undefined, { pr
   const name = String(projectName || '').trim() || 'this project';
   // One line of plain words: a web link keeps its words here and loses its
   // address, because the inbox line draws text and not markdown.
-  const asked = plainQuote(thread?.prompt).replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\s+/g, ' ').trim().replace(/[.!?…]+$/, '');
+  const asked = plainQuote(firstPart(thread?.prompt)).replace(LINK, '$1').replace(/\s+/g, ' ').trim().replace(/[.!?…]+$/, '');
   if (!asked) {
     const when = whenPhrase(thread?.when, now);
     return `Import into ${name}? A Codex conversation${when ? ` from ${when}` : ''}.`;
@@ -174,8 +185,8 @@ export function codexImportRow(thread: CodexThreadLike | null | undefined, { pro
   const name = String(projectName || '').trim() || 'this project';
   const first = importFirstLine(thread, { projectName: name, now });
   const facts = threadFactsLine(thread, now);
-  const prompt = clip(thread?.prompt, 700);
-  const last = clip(thread?.last, 700);
+  const prompt = clip(firstPart(thread?.prompt), 700);
+  const last = clip(lastPart(thread?.last), 700);
   const body = [
     `**${first}**`,
     ...(facts ? [facts] : []),
@@ -198,8 +209,8 @@ export function codexImportRow(thread: CodexThreadLike | null | undefined, { pro
  *  is the result, so the thread reads You, then Codex, the way it did over
  *  there. A reply on it carries the work on here. */
 export function codexMirrorPatch(thread: CodexThreadLike | null | undefined): { body: string; result: string; kind: string; labels: string[]; engine: string } {
-  const prompt = plainQuote(thread?.prompt);
-  const last = plainQuote(thread?.last);
+  const prompt = plainQuote(firstPart(thread?.prompt));
+  const last = plainQuote(lastPart(thread?.last));
   return {
     body: prompt || String(thread?.title ?? '').trim(),
     result: last || 'Codex has not answered yet.',

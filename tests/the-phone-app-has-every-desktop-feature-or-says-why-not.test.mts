@@ -47,6 +47,7 @@ const READS_ON_THE_PHONE = [
   'mobile/src/ui/SettingsPages.tsx',
   'mobile/src/ui/TeamPage.tsx',
   'mobile/src/ui/ThreadMenu.tsx',
+  'mobile/src/ui/ThreadParts.tsx',
 ];
 
 describe('the desktop and the phone', () => {

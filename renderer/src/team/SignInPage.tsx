@@ -13,6 +13,7 @@ import { Name } from '../../../shared/product-name.mjs';
 import { AppMark } from '../components/AppMark';
 import { onCloudPhone } from '../phone-screen';
 import { agreedHere, rememberAgreed } from './cloud-agreed';
+import { TermsLinks } from '../terms-links';
 import { whatIsMissing, type Missing } from './what-is-missing';
 import { nextSignUpPart, goesToPassword, partMissing, partReady, type SignUpPart } from './sign-up-parts';
 import './sign-in.css';
@@ -49,8 +50,6 @@ type Mode = 'sign-in' | 'sign-up' | 'check-email' | 'agree' | 'reset' | 'reset-s
 // screen while it is typed, so the one that reaches the cloud is the one you
 // meant; Forgot password emails a link back to this app, and the new password
 // is typed here (tests/a-locked-out-cloud-account-can-reset-its-password).
-const TERMS_URL = 'https://agentbox.ac/terms';
-const PRIVACY_URL = 'https://agentbox.ac/privacy';
 // WHAT THE CONFIRMATION LINK IS FOR (F-99, w-aaedc8f711). It used to say the
 // link signed you in, right after you had chosen a password, which reads like
 // a passwordless link. It confirms the address; the link comes back to this
@@ -61,7 +60,6 @@ export const linkFailed = (why?: string) => (/invalid or has expired|otp_expired
   ? 'That link has expired or was already used. Resend the email for a new one.'
   : /earlier email/i.test(why ?? '') ? 'That link was from an earlier email. Open the newest one, or resend the email.'
   : why || 'That link did not work. Resend the email for a new one.');
-const TermsLinks = () => <>the <a href={TERMS_URL} onClick={(e) => { e.preventDefault(); window.open(TERMS_URL, '_blank'); }}>Terms</a> and the <a href={PRIVACY_URL} onClick={(e) => { e.preventDefault(); window.open(PRIVACY_URL, '_blank'); }}>Privacy policy</a></>;
 
 export function SignInPage({ onSkip, signedOut = false, error: startError = null, waitingUrl = null, purpose = 'team', startOn = 'sign-in', inSetup = false, onBack, primaryRef, termsAt = null, onClose, onSignedIn }: {
   onSkip?: () => void; signedOut?: boolean; error?: string | null; waitingUrl?: string | null;

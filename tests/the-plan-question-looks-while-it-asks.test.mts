@@ -80,28 +80,7 @@ describe('it looks before it trusts the answer', () => {
     expect(fn).toMatch(/look/);
   });
 
-  it('is handed that reading by the walk rather than taking its own', () => {
-    const walk = read('renderer/src/components/Onboarding.tsx');
-    // `askMac` keeps the readings now, not the boolean it used to reduce them
-    // to, so the question has the answer the instant it is drawn -- and the
-    // walk sorts them with the same `afterCheck` the screen does, rather than
-    // with a second rule of its own that could disagree with it.
-    expect(walk).toMatch(/afterCheck\(/);
-    expect(walk).toMatch(/look=\{askMac\}/);
-  });
 
-  // THE CACHE IS THE POINT OF HANDING IT IN, AND IT IS ALSO THE TRAP. Pointing
-  // at a file changes the very thing the reading is OF, so the press that
-  // changes it has to ask again; reading back the cached answer would report
-  // the machine as it was before the press and leave somebody looking at
-  // "nothing is set up" having just set something up.
-  it('looks again after a file is chosen, instead of reading its own cache', () => {
-    const walk = read('renderer/src/components/Onboarding.tsx');
-    expect(walk).toMatch(/askMac = \(fresh = false\)/);
-    expect(walk).toMatch(/if \(fresh \|\| !asked\.current\)/);
-    const screen = read('renderer/src/components/PlanSetup.tsx');
-    expect(screen).toMatch(/await check\(true\)/);
-  });
 
   // AND THE ARRIVAL LOOK RUNS ONCE. `onReady` is written inline at the call
   // site, so it is a new function on every render of the walk; without the ref

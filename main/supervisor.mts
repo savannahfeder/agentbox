@@ -7,13 +7,13 @@ import { NO_METERED_KEY } from './harnesses/claude.mts';
 export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mts';
 import { taskRemoteControl } from './task-remote-control.mts';
 import type { BridgeStateEvent } from './task-remote-control.mts';
-import { taskFolderPath, real, restoreTaskFolder } from './task-folders.mts';
+import { taskFolderPath, real, restoreTaskFolder, spareFolderPath } from './task-folders.mts';
 import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot, stopShips } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
 import { SecurityScan } from './the-security-scan-went-red.mts';
 import { CloudServerWatch, serverError } from './cloud-server-down.mts';
-import { folderJob } from './task-folders-offthread.mts';
-import { gitJob } from './git-change-offthread.mts';
+import { folderJob, warmFolderThread } from './task-folders-offthread.mts';
+import { gitJob, warmGitThread } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes } from './notes-wake.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
@@ -1038,6 +1038,14 @@ const LEVEL_TRIES = 3;
 const CATCH_UP_AT_ONCE = 3;
 /** Someone is looking at these rows, so a miss is tried again far sooner than a name is. */
 const CATCH_UP_RETRY_MS = 60_000;
+/** How long after its start a local agent without a session id still counts as booting (`_anAgentIsStarting`). */
+const AGENT_BOOT_MS = 20_000;
+/** The longest tidying waits on agents that are starting. */
+const TIDYING_WAITS_MS = 60_000;
+/** How often the folder made ahead is checked again, so one main has moved past is made again before it is wanted. */
+const SPARE_RECHECK_MS = 10 * 60_000;
+/** What `makeSpareFolder` answers when there is nothing to say. */
+const SPARE_QUIET = new Set(['ready', 'not a repository', 'no commit yet', 'building', 'held', 'not the top of its repository', 'not clean at the commit a thread starts from']);
 // How long one account gets to say who takes a thread sent to Auto. A person is
 // waiting on this one, unlike a name, and a miss sends the thread to an agent.
 const ROUTE_TIMEOUT_MS = 60_000;
@@ -1335,6 +1343,9 @@ export class Supervisor {
   declare stalls: { take(): Record<string, unknown> | undefined; longestNow?(): number } | undefined;
   declare hostRuns: boolean | undefined;
   declare shareTools: boolean | undefined;
+  declare spareFolders: boolean | undefined;
+  declare _spare: { base: string; at: number } | undefined;
+  declare _sparesSwept: boolean | undefined;
   declare terminalOpen: ((id: string) => boolean) | undefined;
   declare runLedger: string | undefined;
   declare _remoteControls: Map<string, RemoteControlState> | undefined;
@@ -1442,6 +1453,8 @@ export class Supervisor {
   declare _catchingUp: Set<string>;
   declare _nameMisses: Map<string, number>;
   declare _naming: boolean | undefined;
+  declare _tidyingWaitedSince: number | undefined;
+  declare _tidyingHeld: boolean | undefined;
   declare _routing: boolean | undefined;
   declare _sortedMessages: Set<string>;
   declare _sortingMessages: boolean | undefined;
@@ -3690,6 +3703,53 @@ export class Supervisor {
    * A folder already on disk is not parked: reusing one is three short git
    * calls, and a remote-control spawn is read back the moment it returns.
    */
+  /**
+   * THE NEXT THREAD'S FOLDER, MADE BEFORE IT IS ASKED FOR (w-9993530556). A
+   * new user's first thread waited 19.7 s before Claude Code started, and
+   * making its copy of the project is the step that says nothing. One copy is
+   * kept (main/task-folders.mts `makeSpareFolder`), in `_nextFolderBase`, and
+   * made while nothing is starting.
+   */
+  _readyTheNextFolder(items: WorkItem[], now = Date.now()) {
+    if (!this.spareFolders || this._anAgentIsStarting(now)) return;
+    const products = this.store.listProducts();
+    const base = this._nextFolderBase(items, products);
+    if (!base) return;
+    if (this._spare?.base === base && now - this._spare.at < SPARE_RECHECK_MS) return;
+    const was = this._spare?.base;
+    this._spare = { base, at: now };
+    const warn = (e: Error) => console.warn(`${nameSlug}: the next thread's folder:`, e.message);
+    // One left by an earlier launch in a project not chosen now goes, once per launch.
+    if (!this._sparesSwept) {
+      this._sparesSwept = true;
+      for (const p of products) {
+        const folder = p.repoPath && this.productFolder(p) === p.repoPath ? p.repoPath : null;
+        if (folder && folder !== base && fs.existsSync(spareFolderPath(folder))) folderJob('dropSpareFolder', folder).catch(warn);
+      }
+    } else if (was && was !== base) folderJob('dropSpareFolder', was).catch(warn);
+    folderJob('makeSpareFolder', base)
+      .then((out) => { if (out && !out.made && out.why && !SPARE_QUIET.has(out.why)) console.warn(`${nameSlug}: no folder was made ahead in ${base}: ${out.why}`); })
+      .catch(warn);
+  }
+
+  /** The project folder of the person's newest thread, or before any, the newest project with a repository. */
+  _nextFolderBase(items: WorkItem[], products: Product[]) {
+    const usable = (p: Product | undefined): p is Product => !!p && this.worksHere(p) && !p.archived && this._folderRow({ id: 'next' } as WorkItem, p);
+    const bySlug = new Map(products.map((p) => [p.slug, p]));
+    let newest: WorkItem | null = null;
+    for (const i of items) {
+      if (!filedByThePerson(i) || !usable(bySlug.get(i.product))) continue;
+      if (!newest || (i.createdAt ?? 0) > (newest.createdAt ?? 0)) newest = i;
+    }
+    const chosen = newest ? bySlug.get(newest.product) : products.filter(usable).sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))[0];
+    return chosen ? this.productFolder(chosen) : null;
+  }
+
+  /** A thread's folder was made in `base`, from the folder made ahead or not, so the next one is made at the next quiet pass. */
+  _aFolderWasTaken(base: string) {
+    if (this._spare?.base === base) this._spare.at = 0;
+  }
+
   _folderFirst(item: WorkItem, product: Product, engine: string, opts: SpawnOptions) {
     if (opts.remoteOnly || !this._folderRow(item, product)) return false;
     this._preparing ??= new Map();
@@ -3733,10 +3793,11 @@ export class Supervisor {
         (made) => ({
           cwd: made?.path ?? null,
           failed: made?.taken === false ? Error(`no folder could be made for ${item.id}${whoHasIt(made)}`) : null,
+          created: made?.taken === true && made.created,
         }),
-        (error: Error) => ({ cwd: null, failed: error }),
+        (error: Error) => ({ cwd: null, failed: error, created: false }),
       )
-      .then(({ cwd, failed }) => {
+      .then(({ cwd, failed, created }) => {
         // Stopped, or the app quit, while the folder was being made.
         if (this._preparing.get(item.id) !== entry) return;
         this._preparing.delete(item.id);
@@ -3774,6 +3835,7 @@ export class Supervisor {
         // anybody having just checked asks for itself.
         if (this.sessions.has(item.id)) { this.onChange?.(); return; }
         this._gotAFolderAfterAll(item.id);
+        if (created) this._aFolderWasTaken(base);
         this._madeFolders.set(item.id, cwd);
         try { this.spawnWorker(entry.item, entry.opts); }
         catch (error) {
@@ -5107,7 +5169,7 @@ export class Supervisor {
    *   row behind it waited for good (tests/a-row-is-named-on-an-account-that-has-room).
    */
   nameTheRows(items: WorkItem[], now = Date.now()) {
-    if (this._naming || this._memoryCritical(now)) return undefined;
+    if (this._naming || this._memoryCritical(now) || this._tidyingWaits(now)) return undefined;
     this._nameMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
     const next = items
@@ -5132,7 +5194,7 @@ export class Supervisor {
    * agent's own last message.
    */
   catchUpTheImports(items: WorkItem[], now = Date.now()) {
-    if (this._memoryCritical(now)) return Promise.resolve([]);
+    if (this._memoryCritical(now) || this._tidyingWaits(now)) return Promise.resolve([]);
     this._catchingUp ??= new Set();
     this._catchUpMisses ??= new Map();
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
@@ -5202,6 +5264,36 @@ export class Supervisor {
     return pressureFrom(r) === 'critical';
   }
 
+  /** A local agent between being asked for and having booted: its folder being made, or its process up without its session id. */
+  _anAgentIsStarting(now = Date.now()) {
+    if (this._preparing?.size) return true;
+    for (const s of this.sessions?.values() ?? []) {
+      if (!s.cloud && !s.command && !s.sessionId && now - (s.startedAt ?? 0) < AGENT_BOOT_MS) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Whether tidying waits for an agent that is starting: each of these is a
+   * Claude Code process of its own, and booting beside the worker's slowed its
+   * first model request from about 0.9 to 1.8 s (w-9993530556). Never longer
+   * than TIDYING_WAITS_MS, so a run of starts cannot hold it for good.
+   */
+  _tidyingWaits(now = Date.now()) {
+    if (!this._anAgentIsStarting(now)) { this._tidyingWaitedSince = 0; return false; }
+    this._tidyingWaitedSince ||= now;
+    if (now - this._tidyingWaitedSince >= TIDYING_WAITS_MS) return false;
+    this._tidyingHeld = true;
+    return true;
+  }
+
+  /** The pass that held the tidying runs again the moment the agent has booted, not at the next fifteen-second tick. */
+  _tidyingCanGo() {
+    if (!this._tidyingHeld || this._anAgentIsStarting()) return;
+    this._tidyingHeld = false;
+    this.wake?.();
+  }
+
   async _askSmall<T>(ask: (opts: SmallModelAsk) => Promise<T> | T, { product = null }: { product?: string | null } = {}): Promise<T | ''> {
     const home = this._homeEngine();
     const engines = this._projectProfile(product)
@@ -5242,7 +5334,7 @@ export class Supervisor {
    * every fifteen seconds.
    */
   sortTheMessages(items: WorkItem[], me: string | null | undefined) {
-    if (this._sortingMessages || !me || this._memoryCritical()) return undefined;
+    if (this._sortingMessages || !me || this._memoryCritical() || this._tidyingWaits()) return undefined;
     this._sortedMessages ??= new Set();
     const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const next = items
@@ -5271,7 +5363,7 @@ export class Supervisor {
    * the tick. A miss waits ten minutes, and after three the task stays Medium.
    */
   levelTheTasks(items: WorkItem[], me: string | null | undefined, now = Date.now()) {
-    if (this._leveling || this._memoryCritical(now)) return undefined;
+    if (this._leveling || this._memoryCritical(now) || this._tidyingWaits(now)) return undefined;
     this._levelMisses ??= new Map();
     const products = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const key = (i: WorkItem) => `${i.product}:${i.id}`;
@@ -7832,6 +7924,21 @@ export class Supervisor {
   // code's is running. It outlives the app, so a quit leaves its runs going.
   // A host that lost a run before it started is not used again for ten
   // minutes: runs start directly, as they did before there was one.
+  /**
+   * The threads a local start uses, started with the app rather than by the
+   * first thread that needs them (w-9993530556). Not the run host: it leaves
+   * after a minute with nothing to run.
+   */
+  warmTheStartPath() {
+    try { warmFolderThread(); warmGitThread(); } catch (error) { console.warn(`${nameSlug}: could not start the folder threads early:`, (error as Error).message); }
+  }
+
+  /** The same at the top of a start, with the run host, so each boots while the folder is being made rather than after it. */
+  _warmTheStartPath() {
+    this.warmTheStartPath();
+    if (this.hostRuns) this._runHost();
+  }
+
   _runHost() {
     if (Date.now() - (this._runHostBroken ?? 0) < 10 * 60_000) return null;
     this._runHostSock ??= runHostSocket();
@@ -9592,15 +9699,6 @@ export class Supervisor {
     // day back within reach of the fresh-work pass in this same tick.
     this.sayItOnEveryStrandedRow(items, now);
 
-    // And is there a row still wearing the first line of what she dictated?
-    // One a tick, never awaited, silent on every failure (nameTheRows above).
-    try { this.nameTheRows(items); } catch (e) { console.warn('zero: could not name a row:', (e as Error).message); }
-    // And is there a chat just brought in still reading as the end of a terminal session?
-    try { this.catchUpTheImports(items, now); } catch (e) { console.warn('zero: could not catch up a chat:', (e as Error).message); }
-    // And has a teammate written something that needs sorting by urgency?
-    try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', (e as Error).message); }
-    // And is there a task left on Agent decides that has no level yet?
-    try { this.levelTheTasks(items, process.env.AGENTBOX_PERSON_ID, now); } catch (e) { console.warn('zero: could not rank a task:', (e as Error).message); }
     // And is there a thread sent to Auto still waiting to be given to someone?
     try { this.routeTheThreads(items); } catch (e) { console.warn('zero: could not route a thread:', (e as Error).message); }
 
@@ -9886,6 +9984,20 @@ export class Supervisor {
     // would leave a slot standing empty for fifteen seconds.
     this._settleRunNow(items);
     this._settlePreemptions(items, now);
+
+    // THE TIDYING, AFTER THE STARTS, so an agent this pass started is starting
+    // when they ask and they wait for it (`_tidyingWaits`).
+    // Is there a row still wearing the first line of what she dictated?
+    // One a tick, never awaited, silent on every failure (nameTheRows above).
+    try { this.nameTheRows(items); } catch (e) { console.warn('zero: could not name a row:', (e as Error).message); }
+    // And is there a chat just brought in still reading as the end of a terminal session?
+    try { this.catchUpTheImports(items, now); } catch (e) { console.warn('zero: could not catch up a chat:', (e as Error).message); }
+    // And has a teammate written something that needs sorting by urgency?
+    try { this.sortTheMessages(items, process.env.AGENTBOX_PERSON_ID); } catch (e) { console.warn('zero: could not sort a message:', (e as Error).message); }
+    // And is there a task left on Agent decides that has no level yet?
+    try { this.levelTheTasks(items, process.env.AGENTBOX_PERSON_ID, now); } catch (e) { console.warn('zero: could not rank a task:', (e as Error).message); }
+    // And is the next thread's folder made?
+    if (!asleep) try { this._readyTheNextFolder(items, now); } catch (e) { console.warn('zero: could not make the next thread\'s folder:', (e as Error).message); }
 
     // The digest: NOT a schedule, an INVARIANT. So
     // nothing fires on a clock. Every tick asks whether the invariant holds
@@ -12290,6 +12402,7 @@ export class Supervisor {
       return;
     }
     const startAgain = { continuation, resumeSessionId, profile: forcedProfile, engine: forcedEngine, remoteOnly, shipFailure, asked, switched };
+    if (!remoteOnly) this._warmTheStartPath();
     if (this._folderFirst(item, product, engine, startAgain)) return;
     if (this._photoFirst(item, product, engine, startAgain)) return;
 
@@ -12752,6 +12865,7 @@ export class Supervisor {
         this.rememberRowSession(item, { sessionId: session.sessionId, cwd, profile, engine, startedAt: session.startedAt });
         this._stoppedSessionTakenUp(item, session);
         this._saveState();
+        this._tidyingCanGo();
       }
       // THE SENTENCE BEING TYPED, WHILE IT IS BEING TYPED. This is the only
       // reader of the partial frames and it writes nothing to disk; a push

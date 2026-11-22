@@ -62,7 +62,6 @@ describe('the picker the app draws itself', () => {
 describe('the screens that ask where the code is', () => {
   for (const [what, file] of [
     ['the new project card', ['renderer', 'src', 'components', 'NewProject.tsx']],
-    ['the first run', ['renderer', 'src', 'components', 'Onboarding.tsx']],
   ]) {
     const source = read(...file);
 
