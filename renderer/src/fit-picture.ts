@@ -13,10 +13,17 @@ import { fetchableFileUrl } from './phone-files';
 /** Points the picture is shown in. `cover` fills the box and crops, as a Files cover does. */
 export interface Box { width: number; height?: number; cover?: boolean }
 
+type Decode = (from: Blob | ImageBitmap, resize?: { resizeWidth: number; resizeHeight: number; resizeQuality: 'high' }) => Promise<ImageBitmap>;
+type Encode = (picture: ImageBitmap) => Promise<Blob>;
+type Copy = { blob: Blob; shrunk: boolean };
+type Shrink = (blob: Blob, box: Box, pixels: number) => Promise<Copy>;
+
 export interface FitTools {
   fetch: (url: string, signal?: AbortSignal) => Promise<{ ok: boolean; status?: number; blob: () => Promise<Blob> }>;
-  decode: (from: Blob | ImageBitmap, resize?: { resizeWidth: number; resizeHeight: number; resizeQuality: 'high' }) => Promise<ImageBitmap>;
-  encode: (picture: ImageBitmap) => Promise<Blob>;
+  decode: Decode;
+  encode: Encode;
+  /** Does decode, resize and encode all at once, somewhere other than here. */
+  shrink?: Shrink;
   link: (blob: Blob) => string;
   scale: () => number;
   /** Copies already made, so a picture seen before is not shrunk again. */
@@ -24,8 +31,6 @@ export interface FitTools {
   /** The same copies on disk, so they outlive a restart. */
   stored?: StoredCopies;
 }
-
-type Copy = { blob: Blob; shrunk: boolean };
 
 export interface StoredCopies {
   get(key: string): Promise<Copy | undefined>;
@@ -125,15 +130,94 @@ async function keyOf(blob: Blob, box: Box, pixels: number): Promise<string | nul
   return `${hex} ${box.width}x${box.height ?? ''}${box.cover ? ' cover' : ''} @${pixels}`;
 }
 
+// THESE THREE ALSO RUN IN THE WORKER, FROM THEIR OWN SOURCE (workerSource), so
+// they may name nothing outside themselves but their arguments and globals.
+const decodeHere: Decode = (from, resize) => (resize ? createImageBitmap(from, resize) : createImageBitmap(from));
+const encodeHere: Encode = async (picture) => {
+  const canvas = new OffscreenCanvas(picture.width, picture.height);
+  canvas.getContext('2d')!.drawImage(picture, 0, 0);
+  return canvas.convertToBlob({ type: 'image/png' });
+};
+/** The copy `box` needs at `pixels` per point, or the file itself when it is near that already. */
+export async function shrinkPicture(blob: Blob, box: Box, pixels: number, decode: Decode, encode: Encode): Promise<Copy> {
+  const whole = await decode(blob);
+  const across = box.width / whole.width;
+  const down = (box.height ?? Infinity) / whole.height;
+  const fit = (box.cover && Number.isFinite(down) ? Math.max(across, down) : Math.min(across, down)) * pixels;
+  if (!(fit < 0.9)) { whole.close(); return { blob, shrunk: false }; }
+  const width = Math.max(1, Math.round(whole.width * fit));
+  const height = Math.max(1, Math.round(whole.height * fit));
+  let small: ImageBitmap;
+  try { small = await decode(whole, { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' }); } finally { whole.close(); }
+  try { return { blob: await encode(small), shrunk: true }; } finally { small.close(); }
+}
+
+// A SHRINK HELD THE WINDOW'S THREAD, so a thread stalled while its pictures
+// loaded: resizing one 2880x1800 screenshot there took 68 ms, in a worker 9 ms
+// of the window's time (tests/a-picture-is-shrunk-off-the-windows-thread).
+// Made from a string, so it loads the same from a file, a tab or the phone.
+export function workerSource(): string {
+  return `const decode = ${decodeHere};
+const encode = ${encodeHere};
+const shrink = ${shrinkPicture};
+onmessage = async ({ data }) => {
+  if (typeof createImageBitmap === 'undefined' || typeof OffscreenCanvas === 'undefined') { postMessage({ id: data.id, unable: true }); return; }
+  try { postMessage({ id: data.id, copy: await shrink(data.blob, data.box, data.pixels, decode, encode) }); }
+  catch (err) { postMessage({ id: data.id, error: String((err && err.message) || err) }); }
+};`;
+}
+
+type Reply = { copy?: Copy; unable?: boolean; error?: string };
+
+/**
+ * A shrink done in the worker `make` starts. It is done `here` instead when no
+ * worker starts, when the worker cannot shrink or dies (for good), and when it
+ * fails on a picture or says nothing for `deadline` ms (for that picture).
+ */
+export function offTheWindow(make: () => Worker, here: Shrink, deadline = 20_000): Shrink {
+  let worker: Worker | null = null;
+  let gaveUp = false;
+  let next = 0;
+  const waiting = new Map<number, (reply: Reply) => void>();
+  const giveUp = () => {
+    gaveUp = true;
+    worker?.terminate();
+    worker = null;
+    for (const answer of waiting.values()) answer({ unable: true });
+    waiting.clear();
+  };
+  const ask = (blob: Blob, box: Box, pixels: number) => new Promise<Reply>((answer) => {
+    if (!worker) {
+      try {
+        worker = make();
+        worker.onmessage = (e: MessageEvent<Reply & { id: number }>) => { const a = waiting.get(e.data.id); waiting.delete(e.data.id); a?.(e.data); };
+        worker.onerror = giveUp;
+      } catch { giveUp(); answer({ unable: true }); return; }
+    }
+    const id = next++;
+    const timer = setTimeout(() => { waiting.delete(id); answer({ error: 'no answer' }); }, deadline);
+    waiting.set(id, (reply) => { clearTimeout(timer); answer(reply); });
+    worker.postMessage({ id, blob, box, pixels });
+  });
+  return async (blob, box, pixels) => {
+    if (!gaveUp) {
+      const reply = await ask(blob, box, pixels);
+      if (reply.copy) return reply.copy;
+      if (reply.unable) giveUp();
+    }
+    return here(blob, box, pixels);
+  };
+}
+
 const browser: FitTools = {
   // The phone and browser copies reach the app's picture scheme over http.
   fetch: (url, signal) => fetch(fetchableFileUrl(url), { signal }),
-  decode: (from, resize) => (resize ? createImageBitmap(from, resize) : createImageBitmap(from)),
-  encode: async (picture) => {
-    const canvas = new OffscreenCanvas(picture.width, picture.height);
-    canvas.getContext('2d')!.drawImage(picture, 0, 0);
-    return canvas.convertToBlob({ type: 'image/png' });
-  },
+  decode: decodeHere,
+  encode: encodeHere,
+  shrink: typeof Worker === 'undefined' ? undefined : offTheWindow(
+    () => new Worker(URL.createObjectURL(new Blob([workerSource()], { type: 'text/javascript' }))),
+    (blob, box, pixels) => shrinkPicture(blob, box, pixels, decodeHere, encodeHere),
+  ),
   link: (blob) => URL.createObjectURL(blob),
   scale: () => (typeof window !== 'undefined' && window.devicePixelRatio) || 1,
   kept: keptCopies(48 * 2 ** 20),
@@ -200,18 +284,9 @@ export async function fitPicture(url: string, box: Box, tools: FitTools = browse
     tools.kept?.put(key!, had);
     return { url: tools.link(had.blob), shrunk: had.shrunk };
   }
-  const copy = await inTurn(async () => {
-    const whole = await tools.decode(blob);
-    const across = box.width / whole.width;
-    const down = (box.height ?? Infinity) / whole.height;
-    const fit = (box.cover && Number.isFinite(down) ? Math.max(across, down) : Math.min(across, down)) * pixels;
-    if (!(fit < 0.9)) { whole.close(); return { blob, shrunk: false }; }
-    const width = Math.max(1, Math.round(whole.width * fit));
-    const height = Math.max(1, Math.round(whole.height * fit));
-    let small: ImageBitmap;
-    try { small = await tools.decode(whole, { resizeWidth: width, resizeHeight: height, resizeQuality: 'high' }); } finally { whole.close(); }
-    try { return { blob: await tools.encode(small), shrunk: true }; } finally { small.close(); }
-  }, signal);
+  const copy = await inTurn(() => (tools.shrink
+    ? tools.shrink(blob, box, pixels)
+    : shrinkPicture(blob, box, pixels, tools.decode, tools.encode)), signal);
   if (key !== null) {
     tools.kept?.put(key, copy);
     if (copy.shrunk) tools.stored?.put(key, copy).catch(() => {});
