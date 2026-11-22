@@ -249,7 +249,8 @@ import type { ArtifactOpen } from './components/ArtifactView';
 import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
 import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
-import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
+import { insideGroups, NOTHING_INSIDE, type InsideFound, type InsideGroupKey, type InsideRow } from './found-inside';
+import { openedLately } from '../../shared/opened-lately.mts';
 import { revealLine } from './reveal-line';
 import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
@@ -2090,9 +2091,16 @@ export default function App() {
   const searchContext = useMemo(() => ({
     products: snap?.products ?? [], people: snap?.team?.people ?? [], me: team?.me ?? null,
   }), [snap?.products, snap?.team?.people, team?.me]);
+  // What you opened lately leads (../../shared/opened-lately). Taken once per
+  // query: J and K open each result in turn, which must not re-sort them.
+  const searchOpened = useMemo(() => {
+    const at = Date.now();
+    return search === null ? null : { opened: openedLately(seenAt, at, focused?.id), now: at };
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [pageInside, setPageInside] = useState<InsideFound>(NOTHING_INSIDE);
   const hits = useMemo(
-    () => (search === null ? null : searchThreads(items, search, searchContext)),
-    [items, search, searchContext],
+    () => (search === null ? null : searchThreads(items, search, searchContext, searchOpened ? { ...searchOpened, inside: pageInside.threads } : undefined)),
+    [items, search, searchContext, searchOpened, pageInside.threads],
   );
   const searchDetails = useMemo(
     () => search === null ? undefined : new Map((hits ?? []).map(h => [h.item.id, threadSearchDetails(h.item, searchContext)])),
@@ -3267,7 +3275,7 @@ export default function App() {
     return () => window.removeEventListener('focus', back);
   }, [focused?.product, focused?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // ⌘K finds threads with the same search as the list's own field.
-  const findThreads = useCallback((q: string) => {
+  const findThreads = useCallback((q: string, inside?: ReadonlyMap<string, string>) => {
     const ruled = repeatsFound(repeats, q);
     return [
     ...ruled.map((rule) => ({
@@ -3277,13 +3285,15 @@ export default function App() {
       run: () => { setModal(null); if (search !== null) closeSearch(); openRepeatRef.current?.(rule); },
     })),
     ...(() => {
-      const found = searchThreads(items, q, searchContext);
-      const summaries = new Map(found.map(({ item, summary }) => [item, summary]));
       const now = Date.now();
+      const found = searchThreads(items, q, searchContext, { opened: openedLately(seenAtNow.current, now, focused?.id), now, inside });
+      const summaries = new Map(found.map(({ item, summary }) => [item, summary]));
+      const leads = new Map(found.map(({ item, lead }) => [item, lead]));
       return withoutRunsOf(found.map(({ item }) => item), ruled).map((item) => ({
       id: `thread-${item.product}-${item.id}`,
       label: threadSearchDetails(item, searchContext).title,
       ...threadResult(item, { summary: summaries.get(item) ?? '', project: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product, now }),
+      lead: leads.get(item),
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); },
       }));
     })(),
@@ -3294,7 +3304,7 @@ export default function App() {
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(null); openTeammateCard(card); },
     })),
     ];
-  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard]);
+  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard, focused?.id]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
@@ -3793,14 +3803,18 @@ export default function App() {
   // and teammates' shared threads are searched in main; groups and decisions are
   // already on screen.
   const roomNames = useMemo(() => new Map((roomsUi.live ? roomsUi.groups : []).filter((g) => g.key.startsWith('room:')).map((g) => [g.key.slice('room:'.length), g.name])), [roomsUi.live, roomsUi.groups]);
-  const insideFor = useCallback(async (q: string, limit: Record<InsideGroupKey, number>) => {
-    const found = await api.findInThreads({ query: q, limit: { lines: limit.lines + 3, files: limit.files + 2, comments: limit.comments + 2 } });
-    return insideGroups({
-      query: q, found, items, cards: weekCards, rooms: roomNames,
-      messages: snap?.team?.rooms?.messages ?? {}, decisions: snap?.team?.rooms?.decisions ?? {},
-      me: team?.me ?? null, nameOf: (id) => firstName(team?.byId.get(id) ?? null),
-      titleOf: (item) => threadSearchDetails(item, searchContext).title, limit,
-    });
+  const insideFor = useCallback(async (q: string, limit: Record<InsideGroupKey, number>, lately: { opened: Record<string, number>; now: number }): Promise<InsideFound> => {
+    const found = await api.findInThreads({ query: q, limit: { lines: limit.lines + 3, files: limit.files + 2, comments: limit.comments + 2 }, opened: lately.opened });
+    return {
+      groups: insideGroups({
+        query: q, found, items, cards: weekCards, rooms: roomNames,
+        messages: snap?.team?.rooms?.messages ?? {}, decisions: snap?.team?.rooms?.decisions ?? {},
+        me: team?.me ?? null, nameOf: (id) => firstName(team?.byId.get(id) ?? null),
+        titleOf: (item) => threadSearchDetails(item, searchContext).title, limit,
+        opened: { at: lately.opened, now: lately.now },
+      }),
+      threads: new Map((found.threads ?? []).map((t) => [t.id, t.text])),
+    };
   }, [items, weekCards, roomNames, snap?.team?.rooms?.messages, snap?.team?.rooms?.decisions, team, searchContext]);
   // The file a found row asked to open big belongs to that one thread and to that visit.
   const [foundOpenAt, setFoundOpenAt] = useState<{ key: string; open: ArtifactOpen } | null>(null);
@@ -3830,22 +3844,28 @@ export default function App() {
     openTeammateCard(o.card, big);
     if (o.line) revealLine(o.line);
   }, [search, closeSearch, roomsUi, markSeen, openTeammateCard]);
-  const insideForPalette = useCallback(async (q: string) => (await insideFor(q, { lines: 3, files: 3, comments: 2, decisions: 2 })).map((g) => ({
-    key: g.key, label: g.label,
-    rows: g.rows.map((r) => ({
-      id: r.id, label: r.text, found: { text: r.text, file: r.group === 'comments' || r.group === 'files' ? r.file : undefined, who: r.who, at: r.at, where: r.where }, run: () => openInside(r, false),
-    })),
-  })), [insideFor, openInside]);
-  const [pageInside, setPageInside] = useState<InsideGroup[]>([]);
+  const insideForPalette = useCallback(async (q: string) => {
+    const now = Date.now();
+    const got = await insideFor(q, { lines: 3, files: 3, comments: 2, decisions: 2 }, { opened: openedLately(seenAtNow.current, now, focused?.id), now });
+    return {
+      sections: got.groups.map((g) => ({
+        key: g.key, label: g.label,
+        rows: g.rows.map((r) => ({
+          id: r.id, label: r.text, found: { text: r.text, file: r.group === 'comments' || r.group === 'files' ? r.file : undefined, who: r.who, at: r.at, where: r.where }, run: () => openInside(r, false),
+        })),
+      })),
+      threads: got.threads,
+    };
+  }, [insideFor, openInside, focused?.id]);
   const insideForRef = useRef(insideFor);
   insideForRef.current = insideFor;
   useEffect(() => {
     const q = search?.trim();
-    if (!q) { setPageInside([]); return; }
+    if (!q || !searchOpened) { setPageInside(NOTHING_INSIDE); return; }
     let live = true;
-    const timer = setTimeout(() => { void insideForRef.current(q, { lines: 10, files: 6, comments: 6, decisions: 6 }).then((got) => { if (live) setPageInside(got); }).catch(() => {}); }, 90);
+    const timer = setTimeout(() => { void insideForRef.current(q, { lines: 10, files: 6, comments: 6, decisions: 6 }, searchOpened).then((got) => { if (live) setPageInside(got); }).catch(() => {}); }, 90);
     return () => { live = false; clearTimeout(timer); };
-  }, [search, items.length]);
+  }, [search, searchOpened, items.length]);
   // Read the threads ahead when a search opens, so the first words typed are answered at once.
   useEffect(() => { if (search !== null || modal === 'palette') api.warmFindInThreads(); }, [search === null, modal === 'palette']); // eslint-disable-line react-hooks/exhaustive-deps
   const openChats = () => {
@@ -8073,7 +8093,7 @@ export default function App() {
                       {leadRowsDrawn(heldLeads.rows.slice(0, heldLeads.rows.length - heldLeads.late))}
                     </> : null}
                   foot={search !== null
-                    ? pageInside.length ? <FoundInside groups={pageInside} query={search} now={now} onOpen={(row) => openInside(row, true)} /> : null
+                    ? pageInside.groups.length ? <FoundInside groups={pageInside.groups} query={search} now={now} onOpen={(row) => openInside(row, true)} /> : null
                     : view === 'inbox' && heldLeads.late ? leadRowsDrawn(heldLeads.rows.slice(-heldLeads.late)) : null}
                   pointer={listPointer}
                   table={search === null}

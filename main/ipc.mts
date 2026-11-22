@@ -86,6 +86,7 @@ import { agentKey } from '../shared/agents.mts';
 import { machineryPath } from './store/home.mts';
 import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mts';
+import { openedOf } from '../shared/opened-lately.mts';
 import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
 import { ghToken, setUpGit, startGhLogin } from './github-browser-sign-in.mts';
@@ -2664,9 +2665,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // first ask, read ahead when the search opens.
   let finder: ReturnType<typeof appFinder> | null = null;
   const finderNow = () => (finder ??= appFinder({ store, team, readableProducts, accountRoot: config.accountRoot, storeRoot: config.storeRoot }));
-  ipcMain.handle('zero:find-in-threads', async (_e, { query, limit }: { query?: unknown; limit?: { lines?: number; files?: number; comments?: number } } = {}) => {
-    try { return { ok: true, ...(await finderNow().search(String(query ?? '').slice(0, 200), limit)) }; }
-    catch (err) { return { ok: false, error: String((err as Error)?.message ?? err), lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } }; }
+  ipcMain.handle('zero:find-in-threads', async (_e, { query, limit, opened }: { query?: unknown; limit?: { lines?: number; files?: number; comments?: number }; opened?: unknown } = {}) => {
+    try { return { ok: true, ...(await finderNow().search(String(query ?? '').slice(0, 200), { ...limit, opened: openedOf(opened) })) }; }
+    catch (err) { return { ok: false, error: String((err as Error)?.message ?? err), lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 }, threads: [] }; }
   });
   ipcMain.handle('zero:warm-find-in-threads', () => { finderNow().warm().catch(() => {}); return true; });
   const cloudHome = () => ({ home: supervisor.config.home || os.homedir() });

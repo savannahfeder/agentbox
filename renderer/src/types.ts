@@ -494,6 +494,8 @@ export interface FoundInThreads {
   files: FoundFile[];
   comments: FoundComment[];
   total: { lines: number; files: number; comments: number };
+  /** The threads you opened lately that the words are inside, each with the first line found. */
+  threads?: { product: string; id: string; text: string }[];
 }
 
 export type ThreadStateWord ='waiting' | 'running' | 'scheduled' | 'done';
@@ -1844,7 +1846,7 @@ declare global {
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
       teamThreadWork(p: { personId: string; threadId: string }): Promise<TeammateThreadWork>;
-      findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads>;
+      findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number }; opened?: Record<string, number> }): Promise<FoundInThreads>;
       warmFindInThreads(): Promise<boolean>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
       fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
