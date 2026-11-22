@@ -246,7 +246,7 @@ import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mts';
 import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mts';
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
-import { fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
+import { familyOfName, fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
 import { commentsToHand, withComments, type HandedComment } from './threads/comments-to-hand';
 import { notesOnThread } from './threads/thread-notes';
 import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
@@ -2472,11 +2472,15 @@ export default function App() {
     setFocused(null);
     openTeammateCard(card);
   }, [weekCards, openTeammateCard]);
-  const continueTeammateThread = useCallback((card: ThreadCard, comments: HandedComment[] = []) => {
+  // `files`: from one file's notes, which carries that file's newest version and no other.
+  const continueTeammateThread = useCallback((card: ThreadCard, comments: HandedComment[] = [], files?: string[]) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
       .then((b) => {
         const start = continueStart(b, card, snap?.products ?? []);
-        setComposeInitial({ ...start, ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
+        const families = new Set((files ?? []).map((f) => familyOfName(f)));
+        const ofTheFile = start.attachments.filter((a) => families.has(familyOfName(a.name)));
+        const attachments = files?.length && ofTheFile.length ? { attachments: ofTheFile.slice(-1) } : {};
+        setComposeInitial({ ...start, ...attachments, ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
         setModal('compose');
       })
       .catch((err) => showToast(String(err?.message ?? err)));
@@ -7795,7 +7799,7 @@ export default function App() {
                   }}
                   backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
-                  onContinue={(comments) => continueTeammateThread(openCard, comments)}
+                  onContinue={(comments, files) => continueTeammateThread(openCard, comments, files)}
                   onMessage={() => messageAbout(openCard.personId, openCard.title)} />
               </div>
             ) : (

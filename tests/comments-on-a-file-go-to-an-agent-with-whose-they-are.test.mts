@@ -121,7 +121,9 @@ describe('every way to an agent carries them', () => {
     const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
     expect(page).toMatch(/onHandToAgent=\{onContinue \? \(files\) => \{[^}]*commentsToHand\(marks\.notes, \{ me: team\?\.me \?\? null, files \}\)/);
     expect(page).toMatch(/onContinue\(commentsToHand\(marks\.notes, \{ me: team\?\.me \?\? null \}\)\)/);
-    expect(app).toMatch(/continueTeammateThread = useCallback\(\(card: ThreadCard, comments: HandedComment\[\] = \[\]\)/);
+    expect(app).toMatch(/continueTeammateThread = useCallback\(\(card: ThreadCard, comments: HandedComment\[\] = \[\], files\?: string\[\]\)/);
+    // Rerun 3: from one file's notes the card carried every version of the file.
+    expect(app).toContain('attachments: ofTheFile.slice(-1)');
   });
   it("a file's notes hand over its newest version by path, so the card can attach it", () => {
     const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');

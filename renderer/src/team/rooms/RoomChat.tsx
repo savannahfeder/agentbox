@@ -28,6 +28,8 @@ import { FileSheet } from '../../components/FileSheet';
 import { FileCover } from '../../components/FileCover';
 import { reviewKind, shownName } from '../../../../shared/artifact-marks.mts';
 import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
+import { commentsInChat, type ChatComment } from './chat-comments';
+import { CommentOn, CommentQuote, FileMarkOpener } from '../../components/FileMarkLine';
 import { AttachRow } from '../../components/AttachRow';
 import { ChatLink } from '../../threads/ContinuedFrom';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
@@ -195,11 +197,15 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   const who = (id: string | null) => (id ? byId.get(id) : undefined);
   const nameOf = (id: string | null) => { const p = who(id); return p ? cardName(p) : 'Someone'; };
   const listRef = useStick([room.id, thread]);
-  type Drawn = { m: RoomMessage; a?: undefined } | { a: ChatAlongRow; m?: undefined };
+  // A comment on one of the chat's files is a row of the chat, as it is of a thread.
+  type Drawn = { m: RoomMessage; a?: undefined; c?: undefined } | { a: ChatAlongRow; m?: undefined; c?: undefined } | { c: ChatComment; m?: undefined; a?: undefined };
   const asMessages = shown.map((m): Drawn => ({ m }));
-  const drawn: Drawn[] = root || !along?.rows.length ? asMessages
-    : [...asMessages, ...along.rows.map((a): Drawn => ({ a }))].sort((x, y) => (x.m ?? x.a).at - (y.m ?? y.a).at);
-  const slots = chatLayout(drawn.map((d) => ({ at: (d.m ?? d.a).at, by: d.m ? d.m.by ?? '' : d.a.by })), now);
+  const comments = root ? [] : commentsInChat(calls.files?.marks).map((c): Drawn => ({ c }));
+  const atOf = (d: Drawn) => (d.m ?? d.a ?? d.c).at;
+  const drawn: Drawn[] = root || (!along?.rows.length && !comments.length) ? asMessages
+    : [...asMessages, ...(along?.rows ?? []).map((a): Drawn => ({ a })), ...comments].sort((x, y) => atOf(x) - atOf(y));
+  const slots = chatLayout(drawn.map((d) => ({ at: atOf(d), by: d.m ? d.m.by ?? '' : (d.a ?? d.c).by ?? '', ...(d.c ? { fileMark: d.c.link } : {}) })), now);
+  const openComment = useCallback((link: { id?: string; file: string }) => setViewing({ ...(link.id ? { note: link.id } : {}), file: link.file, at: Date.now() }), []);
   const myNames = useMemo(() => {
     const name = people.find((p) => p.me)?.name;
     if (!name) return [];
@@ -235,6 +241,22 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
         if (d.a) {
           const p = who(d.a.by);
           return <AlongRow key={d.a.key} a={d.a} day={slot.day} head={slot.head} face={p} name={nameOf(d.a.by)} size={hang ? 28 : 16} />;
+        }
+        if (d.c) {
+          const p = who(d.c.by);
+          return <div key={`c:${d.c.id}`} data-line={d.c.id}>
+            {slot.day && <div className="rm-day"><span className="rm-label">{slot.day}</span></div>}
+            <div className="rm-cm">
+              <div className="h">
+                <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 28 : 16} />
+                <span>{nameOf(d.c.by)}</span>
+                <FileMarkOpener.Provider value={calls.files ? openComment : null}><CommentOn e={{ fileMark: d.c.link }} /></FileMarkOpener.Provider>
+                <em>{clockOf(d.c.at)}</em>
+              </div>
+              <CommentQuote e={{ fileMark: d.c.link }} />
+              <div className="tx">{d.c.text}</div>
+            </div>
+          </div>;
         }
         const m = d.m;
         const where = root ? undefined : along?.on.get(m.id);

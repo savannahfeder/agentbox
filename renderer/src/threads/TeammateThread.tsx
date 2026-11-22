@@ -136,7 +136,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   handedToYou?: WorkItem | null;
   onOpenTask?: (task: WorkItem) => void;
   /** Carry it on in a thread of your own, with the comments on its files to tick. */
-  onContinue?: (comments: HandedComment[]) => void;
+  onContinue?: (comments: HandedComment[], files?: string[]) => void;
   /** Where the back button goes: Threads, or the group it was opened from. */
   backLabel: string;
   onBack: () => void;
@@ -382,7 +382,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             return out?.ok ? null : out?.error ?? 'That did not save.';
           }}
           editGoes={`Sent to ${owner}.`}
-          onHandToAgent={onContinue ? (files) => { setBig(null); onContinue(commentsToHand(marks.notes, { me: team?.me ?? null, files })); } : undefined}
+          onHandToAgent={onContinue ? (files) => { setBig(null); onContinue(commentsToHand(marks.notes, { me: team?.me ?? null, files }), files); } : undefined}
           onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}
