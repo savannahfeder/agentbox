@@ -58,7 +58,7 @@ export function AgentThread({ agent, title, movedAt, md, onPick }: {
   const choices = choicesArePressed(agent) ? layout.choices.map((text, i) => ({ n: i + 1, text, recommended: false })) : [];
   const working = answeredWhereItRuns(agent);
   const head = (laidOut || working) && (
-    <QueueSummary title={title} context={agentContext(agent, theirWords(agent.lastAsked))} earlier={0}
+    <QueueSummary title={title} context={agentContext(agent, theirWords(agent.lastAsked || agent.asked?.at(-1)?.text))} earlier={0}
       open={full} onToggle={() => setFull((f) => !f)} fold={laidOut ? FOLD : undefined} />
   );
 

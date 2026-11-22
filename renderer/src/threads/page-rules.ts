@@ -22,6 +22,7 @@ import { taskWords } from '../team/company';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { localDate } from '../local-dates';
 import { isCause, waitingOn, causeWhere } from '../../../shared/causes.mts';
+import { agentLayout } from '../../../shared/agents.mts';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -695,7 +696,9 @@ export function cellUnderTab(word: string, tab: string | undefined, { fromPeople
 }
 
 /** The agent's newest word is a question with no options to pick, so only your words answer it. */
-export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined> }): boolean {
+export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined>; agent?: WorkItem['agent'] }): boolean {
+  // A session started outside Agentbox asks in its own words, laid out by its own rules.
+  if (item.agent) return agentLayout(item.agent).kind === 'asks';
   if (itemOptions(item).length) return false;
   const said = (item.wrote?.note?.ts ?? 0) > (item.wrote?.result?.ts ?? 0) ? item.note : item.result;
   return asksSomething(said);

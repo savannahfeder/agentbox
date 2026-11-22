@@ -1581,7 +1581,7 @@ export default function App() {
         // else is scored by, because inventing a second ordering is how the top
         // of the inbox stops meaning what it says. This is also what keeps the
         // thirteen she is sweeping underneath the one that is actually asking.
-        priority: asksSomething(a) ? 9 : 1,
+        priority: asksSomething(a) ? 9 : agentLayout(a).kind === 'asks' ? 5 : 1,
         epoch: 0,
         claim: null,
         createdAt: a.startedAt,
