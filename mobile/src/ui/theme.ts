@@ -70,8 +70,8 @@ export const LIGHT: Palette = {
   lift: 0.14,
 };
 
-/** The colours every screen reads. Dark until a look is worn. */
-export const color: Palette = { ...DARK };
+/** The colours every screen reads. Light until a look is worn. */
+export const color: Palette = { ...LIGHT };
 
 /** Put on a palette. Screens see it on their next draw. */
 export function wear(worn: 'light' | 'dark') {

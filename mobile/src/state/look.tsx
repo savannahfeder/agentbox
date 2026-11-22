@@ -8,7 +8,7 @@ import { appStore } from '../platform/persist';
 import { wear } from '../ui/theme';
 
 type LookState = { look: PhoneLook; worn: Worn; pick: (look: PhoneLook) => void };
-const Ctx = createContext<LookState>({ look: 'dark', worn: 'dark', pick: () => {} });
+const Ctx = createContext<LookState>({ look: 'light', worn: 'light', pick: () => {} });
 
 export function LookProvider({ children }: { children: ReactNode }) {
   const [look, setLook] = useState<PhoneLook>(() => lookOf(appStore.getItem(LOOK_KEY)));

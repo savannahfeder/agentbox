@@ -26,20 +26,21 @@ describe('the look you pick', () => {
     expect(PHONE_LOOKS.map((l) => l.name)).toEqual(LOOKS.map((l) => l.name));
   });
 
-  it('is Dark when nothing was picked, or the store holds something it does not know', () => {
-    expect(lookOf(null)).toBe('dark');
-    expect(lookOf(undefined)).toBe('dark');
-    expect(lookOf('ember-grid')).toBe('dark');
-    expect(lookOf('Light')).toBe('dark');
-    expect(lookOf('light')).toBe('light');
+  // Light since 2026-11-22 (tests/the-phone-app-opens-in-light-until-you-pick-a-look).
+  it('is Light when nothing was picked, or the store holds something it does not know', () => {
+    expect(lookOf(null)).toBe('light');
+    expect(lookOf(undefined)).toBe('light');
+    expect(lookOf('ember-grid')).toBe('light');
+    expect(lookOf('Light')).toBe('light');
+    expect(lookOf('dark')).toBe('dark');
     expect(lookOf('match')).toBe('match');
   });
 
   it('follows the phone only when Match system is the pick', () => {
     expect(wornOf('match', 'light')).toBe('light');
     expect(wornOf('match', 'dark')).toBe('dark');
-    // A phone that has no answer is dark, like the desktop with no media engine.
-    expect(wornOf('match', null)).toBe('dark');
+    // A phone that has no answer wears what nothing picked wears.
+    expect(wornOf('match', null)).toBe('light');
     expect(wornOf('dark', 'light')).toBe('dark');
     expect(wornOf('light', 'dark')).toBe('light');
   });
