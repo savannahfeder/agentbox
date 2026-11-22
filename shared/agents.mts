@@ -194,6 +194,11 @@ export function putOff(agent: AgentLike, now: number = Date.now()): boolean {
 // something; it is not compared against later activity. `doneThrough` is a
 // timestamp, not a boolean, so `close(key, 0)` can undo it (`closeAgentRow` in
 // App.tsx).
+/** In Later: put off to a moment still ahead, and not closed since. A close takes it out of every list. */
+export function inLater(agent: AgentLike, now: number = Date.now()): boolean {
+  return putOff(agent, now) && !putAway(agent);
+}
+
 export function putAway(agent: AgentLike): boolean {
   const through = agent?.doneThrough ?? 0;
   if (through <= 0) return false;
