@@ -23,11 +23,10 @@ import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { DONE_FOLLOWED_MOST, DONE_FOLLOWED_MS, followClaudeChats, followCodexChats, noteCodexWords, whereTheChatIs } from '../main/chat-follow.mts';
 import { claudeSessionState, claudeSessionStatus } from '../main/claude-session-open.mts';
-import { readChatTurn } from '../main/agent-sessions.mts';
 import { readRollout } from '../main/codex-threads.mts';
-import { scanNewChats, QUIET_MS } from '../main/new-chats-watch.mts';
+import { scanNewChats, QUIET_MS, STOPPED_QUIET_MS } from '../main/new-chats-watch.mts';
 import { slugFor, transcriptSearch } from '../main/transcript-search.mts';
-import { saysItStopped, stoppedThere } from '../shared/carried-on-outside.mts';
+import { CUT_THERE, saysItStopped, stoppedThere } from '../shared/carried-on-outside.mts';
 import { CATCH_UP_LABEL, catchUpDue } from '../shared/agent-import.mts';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules.ts';
 import { threadEvents } from '../renderer/src/thread-history.ts';
@@ -49,14 +48,14 @@ const typed = (ms: number, text: string) => ({ type: 'user', timestamp: at(ms), 
 const says = (ms: number, text: string, stop = 'end_turn') => ({ type: 'assistant', timestamp: at(ms), message: { role: 'assistant', content: [{ type: 'text', text }], stop_reason: stop } });
 // The two rows Claude Code 2.1.330 writes once a picker is answered.
 const asked = (ms: number, question: string) => ({ type: 'assistant', timestamp: at(ms), message: { role: 'assistant', content: [{ type: 'tool_use', id: 'q1', name: 'AskUserQuestion', input: { questions: [{ question, options: [] }] } }], stop_reason: 'tool_use' } });
-const picked = (ms: number, answers: Record<string, string>) => ({ type: 'user', timestamp: at(ms), toolUseResult: { questions: [], answers, annotations: {} }, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'q1', content: 'Your questions have been answered' }] } });
+const picked = (ms: number, answers: Record<string, string>) => ({ type: 'user', timestamp: at(ms), toolUseResult: { questions: Object.keys(answers).map((question) => ({ question, options: [{ label: 'One way (Recommended)' }, { label: 'Another' }] })), answers, annotations: {} }, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'q1', content: 'Your questions have been answered' }] } });
 const write = (...rows: unknown[]) => fs.appendFileSync(file, rows.map((r) => `${JSON.stringify(r)}\n`).join(''));
-const session = (status: string | null, waitingFor?: string) => {
+const session = (status: string | null, waitingFor?: string, cwd?: string) => {
   const dir = path.join(home, 'sessions');
   fs.mkdirSync(dir, { recursive: true });
   const f = path.join(dir, `${process.pid}.json`);
   if (status === null) fs.rmSync(f, { force: true });
-  else fs.writeFileSync(f, JSON.stringify({ pid: process.pid, sessionId: SID, status, ...(waitingFor ? { waitingFor } : {}) }));
+  else fs.writeFileSync(f, JSON.stringify({ pid: process.pid, sessionId: SID, status, ...(waitingFor ? { waitingFor } : {}), ...(cwd ? { cwd } : {}) }));
 };
 const row = () => s.listItems().find((i) => i.product === slug && (i.labels ?? []).includes(`thread:${SID}`));
 const follow = async (now = Date.now()) => followClaudeChats({ store: s, dirs: [home], now });
@@ -162,7 +161,7 @@ describe('a followed chat whose agent stops on you in the terminal', () => {
     expect(row().status).toBe('open');
     expect(said().slice(-4)).toEqual([
       ['you', 'Mock the clock.'],
-      ['agent', ASKED],
+      ['agent', '**Which clock?**\n- One way\n- Another'],
       ['you', 'The test clock'],
       ['agent', 'Mocked the test clock. It passes now.'],
     ]);
@@ -177,15 +176,15 @@ describe('a followed chat whose agent stops on you in the terminal', () => {
     write(asked(t, 'Which clock?'), picked(t + 10, { 'Which clock?': 'The test clock' }));
     session('waiting', 'input needed');
     await follow(t + 1_000);
-    expect(said().slice(-3)).toEqual([['agent', ASKED], ['you', 'The test clock'], ['agent', ASKED]]);
+    expect(said().slice(-3)).toEqual([['agent', '**Which clock?**\n- One way\n- Another'], ['you', 'The test clock'], ['agent', ASKED]]);
   });
 
   // The cases that must not match.
-  it('says nothing of the kind when its agent was interrupted and is idle', async () => {
+  it('says you stopped it, and nothing of a question, when you interrupted it there', async () => {
     write(typed(Date.now() - 20_000, 'Mock the clock.'), typed(Date.now() - 10_000, '[Request interrupted by user]'));
     session('idle');
     await follow();
-    expect(row().result).toBe('It races the clock. Which one?');
+    expect(row().result).toBe(CUT_THERE);
     expect(inbox()).toBe(true);
   });
 
@@ -267,13 +266,23 @@ describe('a chat in Done, carried on in the terminal', () => {
     expect(row().status).toBe('done');
   });
 
-  it('stays in Done once you have replied to it here', async () => {
+  it('comes back though a reply typed here went with the close, and that reply is not sent', async () => {
     s.answerItem(slug, row().id, { answer: 'Try it.' });
     s.answerItem(slug, row().id, { status: 'done' });
     const t = Date.now() + 1_000;
     write(typed(t, 'Now the flaky login test.'), says(t + 100, 'Stub the mailer?'));
     session('idle');
     await follow(t + 1_000);
+    expect(row().status).toBe('open');
+    expect(belongsInInbox(row(), { now: t + 2_000 })).toBe(true);
+    expect(row().answeredThrough).toBe(row().wrote.answer.ts);
+  });
+
+  it('stays in Done once a run here has taken it up', async () => {
+    const t = Date.now() + 1_000;
+    write(typed(t, 'Now the flaky login test.'), says(t + 100, 'Stub the mailer?'));
+    session('idle');
+    await followClaudeChats({ store: s, dirs: [home], now: t + 1_000, ours: (id) => id === row().id });
     expect(row().status).toBe('done');
   });
 
@@ -349,7 +358,7 @@ describe('a new chat, brought in while its agent waits in the terminal', () => {
     id: SID, source: 'terminal', folder: path.join(root, 'kestrel'), folderName: 'kestrel', path: file, title: 'Fix the flaky checkout test',
     startedAt: NOW - 3600e3, when: NOW - QUIET_MS - 60e3, firstSaid: 'Fix it.', lastSaid: '', waiting: false, ask: '', ...over,
   });
-  const scan = (t: ReturnType<typeof chat>, state: { status: string; waitingFor: string } | null) => scanNewChats({
+  const scan = (t: ReturnType<typeof chat>, state: { status: string; waitingFor: string; folder?: string } | null) => scanNewChats({
     store: s, config: { importNew: true, importNewSince: NOW - 2 * 3600e3 }, now: NOW,
     readThreads: async () => [t], isOpen: () => !!state, stateOf: () => state,
   } as never);
@@ -373,6 +382,14 @@ describe('a new chat, brought in while its agent waits in the terminal', () => {
     expect(row().result).toBe(`${LEAVE}\n\nThe migration is written.`);
   });
 
+  it('comes in two minutes after it stopped, and any other not for ten', async () => {
+    const stopped = { status: 'waiting', waitingFor: 'input needed' };
+    expect((await scan(chat({ when: NOW - STOPPED_QUIET_MS + 1_000 }), stopped)).brought).toBe(0);
+    expect((await scan(chat({ when: NOW - STOPPED_QUIET_MS - 1_000 }), { status: 'idle', waitingFor: '' })).brought).toBe(0);
+    expect((await scan(chat({ when: NOW - STOPPED_QUIET_MS - 1_000 }), { ...stopped, folder: 'kestrel' })).brought).toBe(1);
+    expect(row().result).toBe('**Claude Code stopped to ask you a question. Answer it in its kestrel window.**');
+  });
+
   it('waits while its agent is at work, however long that writes nothing', async () => {
     for (const status of ['busy', 'shell']) {
       expect((await scan(chat(), { status, waitingFor: '' })).brought).toBe(0);
@@ -391,9 +408,9 @@ describe('a new chat, brought in while its agent waits in the terminal', () => {
 describe('what the session file says', () => {
   it('names the status and what it waits for, and null once nothing holds it', () => {
     session('waiting', 'permission prompt');
-    expect(claudeSessionState(SID, [home])).toEqual({ status: 'waiting', waitingFor: 'permission prompt' });
-    session('busy');
-    expect(claudeSessionState(SID, [home])).toEqual({ status: 'busy', waitingFor: '' });
+    expect(claudeSessionState(SID, [home])).toEqual({ status: 'waiting', waitingFor: 'permission prompt', folder: '', pid: process.pid });
+    session('busy', undefined, '/w/payments-api');
+    expect(claudeSessionState(SID, [home])).toEqual({ status: 'busy', waitingFor: '', folder: 'payments-api', pid: process.pid });
     expect(claudeSessionStatus(SID, [home])).toBe('busy');
     session(null);
     expect(claudeSessionState(SID, [home])).toBeNull();
@@ -404,6 +421,7 @@ describe('what the session file says', () => {
     expect(stoppedThere('input needed')).toBe(ASKED);
     expect(stoppedThere('permission prompt')).toBe(LEAVE);
     expect(stoppedThere('')).toBe(ASKED);
+    expect(stoppedThere('input needed', 'payments-api')).toBe('**Claude Code stopped to ask you a question. Answer it in its payments-api window.**');
   });
 
   // On a real picker the list said Answered beside it.
@@ -416,18 +434,9 @@ describe('what the session file says', () => {
   });
 
   it('decides a wait only on a turn that has not ended', () => {
-    const turn = { heard: 'x', heardAt: 10, said: '', saidAt: 0, ended: false };
-    expect(whereTheChatIs(turn, { running: false, waitingFor: 'input needed', knownAt: 0 })).toEqual({ move: 'stopped', stop: ASKED, news: '' });
-    expect(whereTheChatIs(turn, { running: false, waitingFor: null, knownAt: 0 })).toEqual({ move: 'stays' });
-    expect(whereTheChatIs({ ...turn, said: 'Older.', saidAt: 5 }, { running: false, waitingFor: '', knownAt: 5 })).toEqual({ move: 'stopped', stop: ASKED, news: '' });
-    expect(whereTheChatIs({ ...turn, said: 'Newer.', saidAt: 6 }, { running: false, waitingFor: '', knownAt: 5 })).toEqual({ move: 'stopped', stop: ASKED, news: 'Newer.' });
-  });
-
-  it('reads several picks with their questions, and none from any other tool', () => {
-    write(asked(T0 + 200_000, 'Which clock?'), picked(T0 + 201_000, { 'Which clock?': 'The test clock', 'How often?': 'Every run (Recommended)' }));
-    expect(readChatTurn(file)).toMatchObject({ heard: 'Which clock?\nThe test clock\n\nHow often?\nEvery run', heardAt: T0 + 201_000, ended: false });
-    write({ type: 'user', timestamp: at(T0 + 300_000), toolUseResult: { stdout: 'ok', answers: 'no' }, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't2', content: 'ok' }] } });
-    expect(readChatTurn(file)!.heardAt).toBe(T0 + 201_000);
+    expect(whereTheChatIs({ ended: false }, { running: false, stop: ASKED, news: false })).toEqual({ move: 'stopped', stop: ASKED });
+    expect(whereTheChatIs({ ended: false }, { running: false, stop: null, news: false })).toEqual({ move: 'stays' });
+    expect(whereTheChatIs({ ended: true }, { running: false, stop: ASKED, news: true })).toEqual({ move: 'answered' });
   });
 });
 

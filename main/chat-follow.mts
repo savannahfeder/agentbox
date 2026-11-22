@@ -3,22 +3,25 @@
 //   - typed to there, its agent at work: In progress, claimed under `HELD_IN`
 //     (shared/carried-on-outside.mts);
 //   - answered there: the answer is the row's, and it is back in Needs you;
-//   - stopped there on a question or a permission prompt: the row says so, and
-//     it is back in Needs you;
-//   - stopped there without a word, or no longer watched: the claim is let go,
-//     or its lease runs out, and it is in Needs you again;
+//   - stopped there on a question or a permission prompt: the row says so and
+//     where, and it is back in Needs you;
+//   - stopped there by you, or no longer watched: the claim is let go, or its
+//     lease runs out, and it is in Needs you again;
 //   - in Done, and typed to there since: back in Needs you once its agent waits
 //     on an answer, as a chat coming in is filed.
-// A reply here makes it this app's thread, and the follow lets go of it.
+// What was said there goes on the thread in order, each once, by the chat's own
+// times. A reply here makes it this app's thread once a run of ours takes it up;
+// until then the terminal is still the only agent it has.
 // Codex answers already reach the row (`refreshCodexMirrors`); for Codex this
 // adds the move out of Needs you and back from Done, off what
 // main/codex-watch.mts reads.
-// Pinned by tests/a-chat-you-answer-in-the-terminal-leaves-your-inbox and
-// tests/an-agent-waiting-in-the-terminal-is-in-needs-you.
+// Pinned by tests/a-chat-you-answer-in-the-terminal-leaves-your-inbox,
+// tests/an-agent-waiting-in-the-terminal-is-in-needs-you and
+// tests/what-is-said-in-the-terminal-is-on-the-thread-in-order.
 import path from 'node:path';
 import fs from 'node:fs';
 import { readChatTurn } from './agent-sessions.mts';
-import type { ChatTurn } from './agent-sessions.mts';
+import type { ChatEntry, ChatTurn } from './agent-sessions.mts';
 import { claudeSessionState } from './claude-session-open.mts';
 import type { ClaudeSessionState } from './claude-session-open.mts';
 import { findTranscript } from './transcript-search.mts';
@@ -27,7 +30,9 @@ import type { HomesSupervisor } from './agent-homes.mts';
 import { HELD_IN, stoppedThere } from '../shared/carried-on-outside.mts';
 import { howTheChatEnded } from '../shared/agent-import.mts';
 
-export const FOLLOW_EVERY_MS = 30_000;
+export const FOLLOW_EVERY_MS = 10_000;
+/** After a followed chat's session file changes, so its transcript is written too. */
+const SOON_MS = 700;
 const PASS_DEADLINE_MS = 60_000;
 /** How recently a chat with no session file must have been written to count as
  *  running: Claude Code's desktop app and older CLIs publish no status. */
@@ -43,27 +48,48 @@ export const DONE_FOLLOWED_MOST = 200;
 export const atWork = (state: ClaudeSessionState | null | undefined) => !!state && RUNNING.has(state.status);
 /** What it stopped on in its own window, or null. */
 export const stoppedOn = (state: ClaudeSessionState | null | undefined) => (state?.status === 'waiting' ? state.waitingFor : null);
+const stopLine = (state: ClaudeSessionState | null | undefined) => {
+  const on = stoppedOn(state);
+  return on === null ? null : stoppedThere(on, state?.folder);
+};
 
-export type ChatMove = { move: 'working' } | { move: 'answered'; said: string } | { move: 'stopped'; stop: string; news: string } | { move: 'stays' };
+/** How far each side of the chat has been read onto the row. */
+export interface ReadTo { heardThrough: number; knownAt: number }
 
-/** `knownAt` is how far the agent's side of the chat has been read onto the row. */
+/** What the row has not had yet, in the order it was said: your messages one by
+ *  one, the agent's between them as one. */
+export function notYetRead(turn: ChatTurn | null, { heardThrough, knownAt }: ReadTo): ChatEntry[] {
+  const out: ChatEntry[] = [];
+  for (const e of turn?.entries ?? []) {
+    if (e.at <= (e.who === 'you' ? heardThrough : knownAt)) continue;
+    const last = out.at(-1);
+    if (last && last.who === 'agent' && e.who === 'agent') Object.assign(last, { text: `${last.text}\n\n${e.text}`, at: e.at });
+    else out.push({ ...e });
+  }
+  return out;
+}
+
+export type ChatMove = { move: 'working' } | { move: 'answered' } | { move: 'stopped'; stop: string } | { move: 'cut' } | { move: 'stays' };
+
+/** `news` is that the agent has said something the row has not had; `cut` that
+ *  you stopped it there since. */
 export function whereTheChatIs(
-  turn: ChatTurn | null,
-  { running, waitingFor = null, knownAt }: { running: boolean; waitingFor?: string | null; knownAt: number },
+  turn: Pick<ChatTurn, 'ended'> | null,
+  { running, stop = null, news, cut = false }: { running: boolean; stop?: string | null; news: boolean; cut?: boolean },
 ): ChatMove {
   if (!turn) return { move: 'stays' };
-  const news = turn.said && turn.saidAt > knownAt ? turn.said : '';
-  if (turn.ended) return news ? { move: 'answered', said: news } : { move: 'stays' };
-  if (waitingFor !== null) return { move: 'stopped', stop: stoppedThere(waitingFor), news };
+  if (cut) return { move: 'cut' };
+  if (turn.ended) return news ? { move: 'answered' } : { move: 'stays' };
+  if (stop !== null) return { move: 'stopped', stop };
   return running ? { move: 'working' } : { move: 'stays' };
 }
 
-/** What a chat in Done now asks, or null: its agent ended on a question, or
- *  stopped on one only its own window shows. */
-export function asksNow(turn: ChatTurn, state: ClaudeSessionState | null): { said: string; stopped: boolean } | null {
-  if (turn.ended) return howTheChatEnded(turn.said).waiting ? { said: turn.said, stopped: false } : null;
-  const on = stoppedOn(state);
-  return on === null ? null : { said: [stoppedThere(on), turn.said].filter(Boolean).join('\n\n'), stopped: true };
+/** What a chat in Done now waits on: an answer its agent ended on a question
+ *  for, or the line for one only its own window shows. Null for neither. */
+export function asksNow(turn: ChatTurn, state: ClaudeSessionState | null): { stop: string | null } | null {
+  if (turn.ended) return howTheChatEnded(turn.said).waiting ? { stop: null } : null;
+  const stop = stopLine(state);
+  return stop === null ? null : { stop };
 }
 
 /** What you typed there since the row last heard from the chat, or ''. */
@@ -71,32 +97,36 @@ export function newWords(turn: { heard?: string; heardAt?: number } | null | und
   return turn?.heard && (turn.heardAt ?? 0) > heardThrough ? turn.heard : '';
 }
 
-export interface FollowedChat {
+export interface FollowedChat extends ReadTo {
   product: string;
   id: string;
   engine: 'claude' | 'codex';
   chat: string;
-  knownAt: number;
-  /** How far the chat's own words have been read onto the row. */
-  heardThrough: number;
   /** Its project's own folder, where its transcript usually is. */
   folder: string | null;
   /** When it went to Done, 0 for one that is not there. */
   doneAt: number;
+  /** A reply typed here waits for a run of ours. */
+  replied: boolean;
   /** The follow holds it now. */
   held: boolean;
-  /** Still the follow's to move: open or held, not answered here, not shared. */
+  /** Still the follow's to move: open, held or lately in Done, not taken up by a run here, not shared. */
   follow: boolean;
 }
 
+/** `ours` is that a run of this app has taken the row's chat up. */
+export type Ours = (id: string) => boolean;
+
 export interface FollowStore {
-  chatsToFollow(now?: number): FollowedChat[];
+  chatsToFollow(now?: number, ours?: Ours): FollowedChat[];
   // `at` is the newest of the chat's own times this puts on the row.
   chatSaidOutside(slug: string, id: string, words: string, opts: { at: number; now?: number }): unknown;
+  chatAgentSaid(slug: string, id: string, said: string, opts: { at: number; now?: number }): unknown;
   holdChatOutside(slug: string, id: string, holder: string, opts?: { now?: number }): Promise<unknown>;
   chatAnsweredOutside(slug: string, id: string, said: string, opts: { at: number; now?: number }): unknown;
   chatStoppedOutside(slug: string, id: string, stop: string, news: string, opts: { at: number; now?: number }): unknown;
-  chatAsksAgain(slug: string, id: string, asks: { words: string; said: string; stopped: boolean }, opts: { at: number; now?: number }): unknown;
+  chatLeftOutside(slug: string, id: string, how: 'cut' | 'closed', news: string, opts: { at: number; now?: number }): unknown;
+  chatAsksAgain(slug: string, id: string, since: ChatEntry[], stop: string | null, opts?: { now?: number }): unknown;
   letGoOfChat(slug: string, id: string, opts?: { now?: number }): unknown;
 }
 
@@ -148,34 +178,14 @@ function claudeChatFile(c: FollowedChat, dirs: string[]): string | null {
   return null;
 }
 
-const newestIn = (turn: ChatTurn) => Math.max(turn.heardAt, turn.saidAt);
-
-async function move(store: FollowStore, c: FollowedChat, where: ChatMove, holder: string, { at, now }: { at: number; now: number }) {
-  if (where.move === 'working') {
-    const got = await store.holdChatOutside(c.product, c.id, holder, { now });
-    return got && !c.held ? 1 : 0;
-  }
-  if (where.move === 'answered') {
-    store.chatAnsweredOutside(c.product, c.id, where.said, { at, now });
-    return 1;
-  }
-  if (where.move === 'stopped') {
-    store.chatStoppedOutside(c.product, c.id, where.stop, where.news, { at, now });
-    return c.held ? 1 : 0;
-  }
-  if (c.held) {
-    store.letGoOfChat(c.product, c.id, { now });
-    return 1;
-  }
-  return 0;
-}
-
 export async function followClaudeChats(
-  { store, dirs, now = Date.now(), stateOf = claudeSessionState }: { store: FollowStore; dirs: string[]; now?: number; stateOf?: StateOf },
+  { store, dirs, now = Date.now(), stateOf = claudeSessionState, ours, seen }:
+    { store: FollowStore; dirs: string[]; now?: number; stateOf?: StateOf; ours?: Ours; seen?: Set<string> },
 ) {
   let moved = 0;
-  for (const c of store.chatsToFollow(now)) {
+  for (const c of store.chatsToFollow(now, ours)) {
     if (c.engine !== 'claude') continue;
+    seen?.add(c.chat);
     if (!c.follow) {
       if (c.held) { store.letGoOfChat(c.product, c.id, { now }); moved += 1; }
       continue;
@@ -185,30 +195,69 @@ export async function followClaudeChats(
     const file = claudeChatFile(c, dirs);
     if (!file) continue;
     const { turn, mtimeMs } = turnOf(file);
-    if (c.doneAt) {
-      if (!turn || turn.heardAt <= c.doneAt) continue;
-      const asks = asksNow(turn, turn.ended ? null : stateOf(c.chat, dirs));
-      if (asks) { store.chatAsksAgain(c.product, c.id, { words: turn.heard, ...asks }, { at: newestIn(turn), now }); moved += 1; }
+    if (!turn) continue;
+    const state = turn.ended ? null : stateOf(c.chat, dirs);
+    if (c.doneAt) { moved += comeBack(store, c, turn, state, now); continue; }
+    const fresh = notYetRead(turn, c);
+    // The agent's words after your last are its turn's, written when that ends or stops.
+    const tail = fresh.at(-1)?.who === 'agent' ? fresh.pop()! : null;
+    for (const e of fresh) {
+      if (e.who === 'you') store.chatSaidOutside(c.product, c.id, e.text, { at: e.at, now });
+      else store.chatAgentSaid(c.product, c.id, e.text, { at: e.at, now });
+    }
+    // Your reply here is on its way to a run of ours, which takes the row up.
+    if (c.replied) {
+      if (tail && turn.ended) store.chatAgentSaid(c.product, c.id, tail.text, { at: tail.at, now });
       continue;
     }
-    const words = newWords(turn, c.heardThrough);
-    if (words) store.chatSaidOutside(c.product, c.id, words, { at: turn!.heardAt, now });
-    const state = turn && !turn.ended ? stateOf(c.chat, dirs) : null;
     const running = state?.status ? atWork(state) : now - mtimeMs < FRESH_MS;
-    moved += await move(store, c, whereTheChatIs(turn, { running, waitingFor: stoppedOn(state), knownAt: c.knownAt }), HELD_IN.claude, { at: turn ? newestIn(turn) : 0, now });
+    const cut = turn.ended && turn.cutAt > Math.max(c.knownAt, c.heardThrough, ...turn.entries.map((e) => e.at));
+    const where = whereTheChatIs(turn, { running, stop: stopLine(state), news: !!tail, cut });
+    if (where.move === 'working') {
+      const got = await store.holdChatOutside(c.product, c.id, HELD_IN.claude, { now });
+      if (got && !c.held) moved += 1;
+    } else if (where.move === 'answered') {
+      store.chatAnsweredOutside(c.product, c.id, tail!.text, { at: tail!.at, now });
+      moved += 1;
+    } else if (where.move === 'stopped') {
+      store.chatStoppedOutside(c.product, c.id, where.stop, tail?.text ?? '', { at: tail?.at ?? 0, now });
+      if (c.held) moved += 1;
+    } else if (where.move === 'cut') {
+      store.chatLeftOutside(c.product, c.id, 'cut', tail?.text ?? '', { at: turn.cutAt, now });
+      moved += 1;
+    } else if (c.held && !turn.ended && state === null) {
+      store.chatLeftOutside(c.product, c.id, 'closed', tail?.text ?? '', { at: tail?.at ?? 0, now });
+      moved += 1;
+    } else if (c.held) {
+      store.letGoOfChat(c.product, c.id, { now });
+      moved += 1;
+    }
   }
   return { moved };
+}
+
+/** A chat in Done that you carried on there: back once its agent waits on you,
+ *  with everything said there since. */
+function comeBack(store: FollowStore, c: FollowedChat, turn: ChatTurn, state: ClaudeSessionState | null, now: number) {
+  if (turn.heardAt <= c.doneAt) return 0;
+  const asks = asksNow(turn, state);
+  if (!asks) return 0;
+  const since = notYetRead(turn, { heardThrough: Math.max(c.heardThrough, c.doneAt), knownAt: Math.max(c.knownAt, c.doneAt) });
+  const first = since.findIndex((e) => e.who === 'you');
+  if (first < 0) return 0;
+  store.chatAsksAgain(c.product, c.id, since.slice(first), asks.stop, { now });
+  return 1;
 }
 
 /** Your words from Codex, written before `refreshCodexMirrors` writes its
  *  answer to them, so the thread reads in the order it happened. */
 export function noteCodexWords(
-  { store, threads, now = Date.now() }: { store: FollowStore; threads: readonly CodexChatLike[]; now?: number },
+  { store, threads, now = Date.now(), ours }: { store: FollowStore; threads: readonly CodexChatLike[]; now?: number; ours?: Ours },
 ) {
   const byId = new Map(threads.map((t) => [String(t?.id ?? ''), t]));
   let noted = 0;
-  for (const c of store.chatsToFollow(now)) {
-    if (c.engine !== 'codex' || !c.follow || c.doneAt) continue;
+  for (const c of store.chatsToFollow(now, ours)) {
+    if (c.engine !== 'codex' || !c.follow || c.doneAt || c.replied) continue;
     const t = byId.get(c.chat);
     const words = newWords({ heard: t?.herLast, heardAt: t?.herLastAt }, c.heardThrough);
     if (words) { store.chatSaidOutside(c.product, c.id, words, { at: t!.herLastAt!, now }); noted += 1; }
@@ -218,25 +267,49 @@ export function noteCodexWords(
 
 /** Runs after `refreshCodexMirrors` has given each row Codex's latest answer. */
 export async function followCodexChats(
-  { store, threads, now = Date.now() }: { store: FollowStore; threads: readonly CodexChatLike[]; now?: number },
+  { store, threads, now = Date.now(), ours }: { store: FollowStore; threads: readonly CodexChatLike[]; now?: number; ours?: Ours },
 ) {
   const byId = new Map(threads.map((t) => [String(t?.id ?? ''), t]));
   let moved = 0;
-  for (const c of store.chatsToFollow(now)) {
+  for (const c of store.chatsToFollow(now, ours)) {
     if (c.engine !== 'codex') continue;
+    const t = byId.get(c.chat);
     if (c.doneAt) {
-      const t = byId.get(c.chat);
       // A rollout that marks no turns is at rest once it is no longer written.
       const ended = t?.turnOpen === false || (t?.turnOpen == null && !t?.live);
       if (!t?.waiting || !t.last || !ended || !((t.herLastAt ?? 0) > c.doneAt)) continue;
-      store.chatAsksAgain(c.product, c.id, { words: t.herLast ?? '', said: t.last, stopped: false }, { at: Math.max(t.herLastAt ?? 0, t.saidAt ?? 0), now });
+      const said = Math.max(t.saidAt ?? 0, t.herLastAt ?? 0);
+      store.chatAsksAgain(c.product, c.id, [{ who: 'you', at: t.herLastAt ?? 0, text: t.herLast ?? '' }, { who: 'agent', at: said, text: t.last }], null, { now });
       moved += 1;
       continue;
     }
-    const working = c.follow && codexWorking(byId.get(c.chat), now);
-    moved += await move(store, c, working ? { move: 'working' } : { move: 'stays' }, HELD_IN.codex, { at: 0, now });
+    if (c.follow && !c.replied && codexWorking(t, now)) {
+      const got = await store.holdChatOutside(c.product, c.id, HELD_IN.codex, { now });
+      if (got && !c.held) moved += 1;
+    } else if (c.held) {
+      store.letGoOfChat(c.product, c.id, { now });
+      moved += 1;
+    }
   }
   return { moved };
+}
+
+/** Claude Code rewrites a session's file as its agent starts, stops or asks, so
+ *  a followed chat's is looked at then. A folder that cannot be watched is left
+ *  to the timer. */
+function watchSessions(homes: string[], watching: Map<string, fs.FSWatcher>, changed: (sessionId: string) => void) {
+  for (const home of homes) {
+    const dir = path.join(home, 'sessions');
+    if (watching.has(dir)) continue;
+    try {
+      const watcher = fs.watch(dir, (_event, name) => {
+        if (!String(name ?? '').endsWith('.json')) return;
+        try { changed(String(JSON.parse(fs.readFileSync(path.join(dir, String(name)), 'utf8'))?.sessionId ?? '')); } catch { /* gone, or being written */ }
+      });
+      watcher.on('error', () => { watcher.close(); watching.delete(dir); });
+      watching.set(dir, watcher);
+    } catch { /* no such folder yet */ }
+  }
 }
 
 export interface ChatFollowTiming {
@@ -250,11 +323,14 @@ export interface ChatFollowTiming {
  *  read, so two never claim the same row at once. A pass that never answers is
  *  given up on and the next one runs. */
 export function startChatFollow(
-  { store, dirs, stateOf, everyMs = FOLLOW_EVERY_MS, firstDelayMs = 20_000, deadlineMs = PASS_DEADLINE_MS, log = console.warn }:
-    { store: FollowStore; dirs: () => string[]; stateOf?: StateOf } & ChatFollowTiming,
+  { store, dirs, stateOf, ours, everyMs = FOLLOW_EVERY_MS, firstDelayMs = 20_000, deadlineMs = PASS_DEADLINE_MS, log = console.warn }:
+    { store: FollowStore; dirs: () => string[]; stateOf?: StateOf; ours?: Ours } & ChatFollowTiming,
 ) {
   let chain: Promise<unknown> = Promise.resolve();
   let claudeQueued = false;
+  let followed = new Set<string>();
+  let soon: ReturnType<typeof setTimeout> | null = null;
+  const watching = new Map<string, fs.FSWatcher>();
   const queue = (what: string, job: () => Promise<unknown>) => {
     chain = chain.then(() => {
       let timer: ReturnType<typeof setTimeout> | null = null;
@@ -272,7 +348,10 @@ export function startChatFollow(
     claudeQueued = true;
     return queue('claude', () => {
       claudeQueued = false;
-      return followClaudeChats({ store, dirs: dirs(), ...(stateOf ? { stateOf } : {}) });
+      const homes = dirs();
+      watchSessions(homes, watching, (id) => { if (followed.has(id)) soon ??= setTimeout(() => { soon = null; void claude(); }, SOON_MS); });
+      const seen = new Set<string>();
+      return followClaudeChats({ store, dirs: homes, ours, seen, ...(stateOf ? { stateOf } : {}) }).finally(() => { followed = seen; });
     });
   };
   const first = setTimeout(claude, firstDelayMs);
@@ -282,17 +361,26 @@ export function startChatFollow(
     // Called before the Codex watch writes this read's answers: the words go
     // down now, and the moves after those answers.
     followCodex: (threads: readonly CodexChatLike[]) => {
-      try { noteCodexWords({ store, threads }); } catch (e) { log('chat follow (codex words):', (e as Error)?.message ?? e); }
-      return queue('codex', () => followCodexChats({ store, threads }));
+      try { noteCodexWords({ store, threads, ours }); } catch (e) { log('chat follow (codex words):', (e as Error)?.message ?? e); }
+      return queue('codex', () => followCodexChats({ store, threads, ours }));
     },
-    stop: () => { clearTimeout(first); clearInterval(timer); },
+    stop: () => {
+      clearTimeout(first); clearInterval(timer);
+      if (soon) clearTimeout(soon);
+      for (const w of watching.values()) w.close();
+      watching.clear();
+    },
   };
 }
+
+type RunsHere = HomesSupervisor & { _rowSessions?: Record<string, { sessionId?: unknown } | undefined> };
 
 /** The follow as the app runs it, on the desktop (main/main.mts) and in the browser copy (bin/agentbox.mjs). */
 export function followChatsFor(
   { store, config, supervisor, ...timing }:
-    { store: FollowStore; config: { authProfiles?: string[] | string | null } | null | undefined; supervisor: HomesSupervisor | null | undefined } & ChatFollowTiming,
+    { store: FollowStore; config: { authProfiles?: string[] | string | null } | null | undefined; supervisor: RunsHere | null | undefined } & ChatFollowTiming,
 ) {
-  return startChatFollow({ store, dirs: () => appSessionFolders({ config, supervisor }).dirs, ...timing });
+  // The same mark that keeps a brought-in chat from being carried on here twice (Supervisor#importedThreadFor).
+  const ours = (id: string) => !!supervisor?._rowSessions?.[id]?.sessionId;
+  return startChatFollow({ store, dirs: () => appSessionFolders({ config, supervisor }).dirs, ours, ...timing });
 }

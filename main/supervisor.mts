@@ -133,7 +133,11 @@ import { noteAgentWrites } from './store/written-elsewhere.mts';
 import { snapshotRepo } from './git-change.mts';
 import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
 import { readTranscriptHead } from './agent-sessions.mts';
-import { claudeSessionOpen } from './claude-session-open.mts';
+import { claudeSessionOpen, claudeSessionState } from './claude-session-open.mts';
+import { carriedOnFromTheApp, reply as replyToSession } from './agents.mts';
+import { HELD_IN, heldThere } from '../shared/carried-on-outside.mts';
+import { isShared } from '../shared/team-rules.mts';
+import { appSessionFolders } from './agent-homes.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
 import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown, modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
@@ -779,6 +783,7 @@ export interface SupervisorStore {
   prioritizeItem(slug: string, id: string, value: unknown): unknown;
   touchAnswerMode(slug: string, id: string, used: unknown): unknown;
   settleAnswer?(slug: string, id: string, answerTs: number): unknown;
+  holdChatOutside?(slug: string, id: string, holder: string): Promise<unknown>;
   composeItem(slug: string, fields: Record<string, unknown>): WorkItem | null | undefined;
   fileItem(slug: string, fields: Record<string, unknown>): { id: string };
   noteItem(slug: string, id: string, note: string): unknown;
@@ -1376,6 +1381,7 @@ export class Supervisor {
   declare _heardAnswers: Record<string, string>;
   declare _liveSessions: Record<string, LiveSessionRecord>;
   declare _rowSessions: Record<string, RowSessionRecord>;
+  declare _toTerminal: { going: Set<string>; refused: Set<string> } | undefined;
   declare _stoppedSessions: Record<string, StoppedSessionRecord>;
   declare _compactions: Record<string, CompactionRecord>;
   declare _nativeCommands: Record<string, string[]>;
@@ -3491,6 +3497,54 @@ export class Supervisor {
     try { fresh = Date.now() - fs.statSync(file!).mtimeMs < 2 * 60_000; } catch { fresh = false; }
     const open = fresh || claudeSessionOpen(sessionId, [home, path.join(this.config.home || os.homedir(), '.claude')]);
     return { sessionId, profile, imported: true, folder, open };
+  }
+
+  /**
+   * A REPLY TO A CHAT STILL OPEN IN A TERMINAL GOES TO THAT TERMINAL, so it stays
+   * one conversation; the follow brings its answer back (main/chat-follow.mts).
+   * A copy run here beside it put two agents on one job in two folders. True
+   * while it is on its way or gone there. False for a chat that is closed, or
+   * whose terminal would not take it: the reply then starts a run here as ever.
+   */
+  _goesToItsTerminal(item: WorkItem): boolean {
+    this._toTerminal ??= { going: new Set(), refused: new Set() };
+    const { going, refused } = this._toTerminal;
+    const key = this._answerKey(item);
+    if (going.has(key)) return true;
+    if (refused.has(key) || answerSettled(item) || this._answerDelivered(item)) return false;
+    const open = this._openTerminalFor(item);
+    if (!open) return false;
+    going.add(key);
+    const text = String(item.answer);
+    void Promise.resolve()
+      .then(() => this._sayInTerminal(open.pid, text))
+      .then(async (r) => {
+        if (!r.ok && !r.held) { refused.add(key); return; }
+        this._handledAnswers.add(key);
+        this._saveState();
+        this.store.settleAnswer?.(item.product, item.id, answerTs(item));
+        if (r.held) this.store.modules.workItemsDisk.updateWorkItem(this.store.productDir(item.product), item.id, { result: heldThere(open.folder) }, { source: 'agent' });
+        else await this.store.holdChatOutside?.(item.product, item.id, HELD_IN.claude);
+      })
+      .catch((e) => { refused.add(key); console.warn(`zero: ${item.id} could not reach its terminal:`, e?.message ?? e); })
+      .finally(() => { going.delete(key); this.onChange?.(); this.wake(); });
+    return true;
+  }
+
+  _sayInTerminal(pid: number, text: string): Promise<{ ok: boolean; held?: boolean; reason?: string }> {
+    return replyToSession(pid, text, { wrap: carriedOnFromTheApp });
+  }
+
+  /** The live Claude Code process holding this row's chat, for a plain reply no run here has taken up. */
+  _openTerminalFor(item: WorkItem): { pid: number; folder?: string } | null {
+    const words = String(item.answer ?? '');
+    if (!words.trim() || words === '(withdrawn)' || /^\s*\//.test(words) || words.includes('attachments/')) return null;
+    const label = (item.labels ?? []).includes(THREAD_LABEL) ? (item.labels ?? []).find((l) => typeof l === 'string' && l.startsWith('thread:')) : null;
+    if (!label || this._rowSessions?.[item.id]?.sessionId || engineOf(this._engineFor(item)) !== 'claude') return null;
+    const product = this.store.listProducts?.().find((p) => p.slug === item.product);
+    if (!product || isShared(product as Parameters<typeof isShared>[0])) return null;
+    const state = claudeSessionState(label.slice(7).trim(), appSessionFolders({ config: this.config, supervisor: this, home: this.config.home || os.homedir() }).dirs);
+    return state?.pid ? { pid: state.pid, folder: state.folder } : null;
   }
 
   /**
@@ -9908,7 +9962,10 @@ export class Supervisor {
     this._asleepQueue = asleep ? queue.filter((r) => !r.command).map(({ item, continuation }) => ({ item, continuation })) : [];
     if (asleep) for (const { item } of queue) this._noteNotStarting(item, 'asleep', this._engineFor(item));
 
+    // Ahead of the room and memory asked about below: a message to a terminal that is open needs neither.
+    for (const { item, continuation, command } of queue) if (continuation && !command) this._goesToItsTerminal(item);
     for (const { item, continuation, command } of asleep ? [] : queue) {
+      if (continuation && !command && this._goesToItsTerminal(item)) continue;
       // The cap is real for both kinds. Uncapped, one restart's respawn wave
       // put ten workers into one tick, which split the founder's rate limit
       // ten ways and slow-motioned everything, twice, before two agents

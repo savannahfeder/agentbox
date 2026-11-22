@@ -28,9 +28,11 @@ import { readRecentThreads } from './importable-threads.mts';
 export const NEW_CHATS_POLL_MS = 60_000;
 /** How long a chat has to have been still before it comes in. */
 export const QUIET_MS = 10 * 60_000;
+/** And one stopped on a question or a permission prompt, which nobody is at. */
+export const STOPPED_QUIET_MS = 2 * 60_000;
 const PASS_DEADLINE_MS = 90_000;
 
-export interface NewChatThread extends CodexThreadLike { source?: string; waiting?: boolean; stoppedOn?: string }
+export interface NewChatThread extends CodexThreadLike { source?: string; waiting?: boolean; stoppedOn?: string; openIn?: string }
 
 type StateOf = (t: NewChatThread) => ClaudeSessionState | null;
 
@@ -82,15 +84,17 @@ export function newChatsToBring(
     const id = String(t?.id ?? '').trim();
     if (!id || had.has(id)) continue;
     if (!(Number(t.startedAt) > since)) continue;
-    if (now - Number(t.when ?? 0) < QUIET_MS) continue;
+    const quiet = now - Number(t.when ?? 0);
+    if (quiet < STOPPED_QUIET_MS) continue;
     if (t.source === 'codex' ? t.live : openShownLive && isOpen(t)) continue;
     const slug = productsForThread(t, products)[0]?.slug;
     if (!slug) continue;
     const state = t.source === 'codex' ? null : stateOf(t);
     if (atWork(state)) continue;
     const on = stoppedOn(state);
+    if (on === null && quiet < QUIET_MS) continue;
     if (!bySlug.has(slug)) bySlug.set(slug, []);
-    bySlug.get(slug)!.push(on === null ? t : { ...t, waiting: true, stoppedOn: on });
+    bySlug.get(slug)!.push(on === null ? t : { ...t, waiting: true, stoppedOn: on, openIn: state?.folder });
     had.add(id);
   }
   return bySlug;

@@ -499,7 +499,7 @@ export function ItemThread({ askAbout = false, onOpenFileMark, item, engine, eng
     </div>
   );
   // A chat just brought in is being written up as a thread (main/catch-up.mts). Its raw end stays readable until then.
-  if (queue && catchUpDue(item)) {
+  if (queue && catchUpDue(item) && !earlierOpen) {
     return (
       <>
         {queueHead}

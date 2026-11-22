@@ -24,10 +24,18 @@ export function heldOutside(item: Held | null | undefined): boolean {
 
 /** An agent stopped on its own window, whose question is nowhere else: Claude
  *  Code writes nothing to the chat while one is open. `waitingFor` is its
- *  session file's word. */
+ *  session file's word, and `folder` the one it is open in. */
 const STOPPED = '**Claude Code stopped to ';
-export function stoppedThere(waitingFor: string): string {
+export function stoppedThere(waitingFor: string, folder?: string | null): string {
   const why = waitingFor === 'permission prompt' ? 'ask for your OK' : 'ask you a question';
-  return `${STOPPED}${why}. Answer it there.**`;
+  return `${STOPPED}${why}. Answer it ${folder ? `in its ${folder} window` : 'there'}.**`;
 }
 export const saysItStopped = (text: unknown): boolean => String(text ?? '').startsWith(STOPPED);
+/** What its agent had said before it stopped, '' for nothing. */
+export const saidBeforeTheStop = (text: string): string => text.split('\n\n').slice(1).join('\n\n');
+/** You stopped it there: Esc, on a question or in the middle of its work. */
+export const CUT_THERE = '**You stopped Claude Code there.**';
+/** Its window went before its agent answered. */
+export const CLOSED_THERE = '**Claude Code closed before it answered.**';
+/** It keeps a reply from here until you allow it in its own window. */
+export const heldThere = (folder?: string | null): string => `**Claude Code is holding your reply. Allow it ${folder ? `in its ${folder} window` : 'there'}.**`;

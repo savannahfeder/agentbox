@@ -14,9 +14,9 @@ export function claudeSessionOpen(sessionId: unknown, homes: (string | null | un
 }
 
 /** What the open session says: its status (busy, shell, idle or waiting; ''
- *  from a CLI that says nothing) and what it waits for, or null when no live
- *  process holds it. */
-export interface ClaudeSessionState { status: string; waitingFor: string }
+ *  from a CLI that says nothing), what it waits for and the name of the folder
+ *  it is open in, or null when no live process holds it. */
+export interface ClaudeSessionState { status: string; waitingFor: string; folder?: string; pid?: number }
 
 export function claudeSessionState(sessionId: unknown, homes: (string | null | undefined)[] = []): ClaudeSessionState | null {
   const id = String(sessionId ?? '').trim();
@@ -27,12 +27,12 @@ export function claudeSessionState(sessionId: unknown, homes: (string | null | u
     try { names = fs.readdirSync(dir); } catch { continue; }
     for (const name of names) {
       if (!name.endsWith('.json')) continue;
-      let rec: { pid?: unknown; sessionId?: unknown; status?: unknown; waitingFor?: unknown } | null = null;
+      let rec: { pid?: unknown; sessionId?: unknown; status?: unknown; waitingFor?: unknown; cwd?: unknown } | null = null;
       try { rec = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8')); } catch { continue; }
       const pid = Number(rec?.pid);
       if (rec?.sessionId !== id || !(pid > 0) || !alive(pid)) continue;
       const word = (v: unknown) => (typeof v === 'string' ? v : '');
-      return { status: word(rec.status), waitingFor: word(rec.waitingFor) };
+      return { status: word(rec.status), waitingFor: word(rec.waitingFor), folder: path.basename(word(rec.cwd)), pid };
     }
   }
   return null;

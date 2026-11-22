@@ -613,6 +613,19 @@ export function fromTheApp(message: string) {
   ].join('\n');
 }
 
+// The same for a thread brought in from that session, which the reply carries on
+// (Supervisor#_goesToItsTerminal).
+export function carriedOnFromTheApp(message: string) {
+  return [
+    `${RELAY_MARK} the inbox your user reads, where this conversation is one of their threads.`,
+    'They typed this there, as their reply to you; it is not from an agent. Carry on from',
+    'it as if it had been typed here.',
+    '',
+    'They said:',
+    message,
+  ].join('\n');
+}
+
 // The one write. A Claude Code session listens on a Unix socket for
 // newline-delimited JSON, in the shape the CLI prints when it binds one. An
 // auth line is needed only when the session published a key file,
@@ -622,7 +635,7 @@ export function fromTheApp(message: string) {
 // The socket does not acknowledge, so a result of ok means the message was
 // handed to a live, listening process, and `working` says the session was then
 // seen going to work. The movement check is best effort and never a gate.
-export async function reply(pid: number, text: unknown, { timeoutMs = 3000 }: { timeoutMs?: number } = {}) {
+export async function reply(pid: number, text: unknown, { timeoutMs = 3000, wrap = fromTheApp }: { timeoutMs?: number; wrap?: (message: string) => string } = {}) {
   const message = String(text ?? '').trim();
   if (!message) return { ok: false, reason: 'There was nothing to send.' };
 
@@ -637,7 +650,7 @@ export async function reply(pid: number, text: unknown, { timeoutMs = 3000 }: { 
     // The wire carries the wrapped message. Matching and recording below use
     // the user's own words, so `heldNotice` does not match on the shared
     // preamble.
-    await writeToSocket(agent.socket, fromTheApp(message), tokenFor(pid));
+    await writeToSocket(agent.socket, wrap(message), tokenFor(pid));
   } catch (err) {
     return { ok: false, reason: reasonFor(err as ErrnoLike) };
   }

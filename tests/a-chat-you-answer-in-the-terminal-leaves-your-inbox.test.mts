@@ -222,7 +222,7 @@ describe('a Claude Code chat brought in, answered in the terminal', () => {
     s.answerItem(slug, row().id, { answer: 'Retry once instead.' });
     expect(row().claim).toBeNull();
     expect(row().status).toBe('open');
-    // And followed no more: a reply here makes it this app's thread.
+    // And not taken back while the reply waits for its run.
     await follow();
     expect(row().claim).toBeNull();
   });
@@ -390,7 +390,7 @@ describe('a Codex chat brought in, answered in Codex', () => {
 describe('reading where a chat stands', () => {
   it('reads your last message, the answer since, and whether that turn is over', () => {
     write(typed(T0 + 200_000, 'Mock the clock.'), runs(T0 + 210_000), ran(T0 + 220_000), says(T0 + 230_000, 'Mocked.'));
-    expect(readChatTurn(file)).toEqual({ heard: 'Mock the clock.', heardAt: T0 + 200_000, said: 'Mocked.', saidAt: T0 + 230_000, ended: true });
+    expect(readChatTurn(file)).toMatchObject({ heard: 'Mock the clock.', heardAt: T0 + 200_000, said: 'Mocked.', saidAt: T0 + 230_000, ended: true });
   });
 
   it('does not take a tool result, an interruption or a reminder for something you typed', () => {
@@ -415,7 +415,7 @@ describe('reading where a chat stands', () => {
   it('finds what you typed behind a turn of request records longer than the tail', () => {
     write(says(T0 + 100_000, 'Earlier.'), typed(T0 + 200_000, 'Mock the clock.'), ...records(T0 + 201_000, 320), runs(T0 + 210_000), ran(T0 + 220_000), ...records(T0 + 221_000, 96), says(T0 + 230_000, 'Mocked.'));
     expect(fs.statSync(file).size).toBeGreaterThan(400 * 1024);
-    expect(readChatTurn(file)).toEqual({ heard: 'Mock the clock.', heardAt: T0 + 200_000, said: 'Mocked.', saidAt: T0 + 230_000, ended: true });
+    expect(readChatTurn(file)).toMatchObject({ heard: 'Mock the clock.', heardAt: T0 + 200_000, said: 'Mocked.', saidAt: T0 + 230_000, ended: true });
   });
 
   it('reads no further back than it must when the tail already holds what you typed', () => {
@@ -439,14 +439,14 @@ describe('reading where a chat stands', () => {
     expect(readChatTurn(file)).toMatchObject({ heard: 'Mock the clock.', heardAt: T0 + 200_000, said: 'Started it in the background.\n\nMocked.' });
   });
 
-  it('decides each case, and only a newer finished answer is news', () => {
-    const turn = { heardAt: 10, said: 'Done.', saidAt: 20, ended: true };
-    expect(whereTheChatIs(null, { running: true, knownAt: 0 })).toEqual({ move: 'stays' });
-    expect(whereTheChatIs({ ...turn, ended: false }, { running: true, knownAt: 0 })).toEqual({ move: 'working' });
-    expect(whereTheChatIs({ ...turn, ended: false }, { running: false, knownAt: 0 })).toEqual({ move: 'stays' });
-    expect(whereTheChatIs(turn, { running: false, knownAt: 19 })).toEqual({ move: 'answered', said: 'Done.' });
-    expect(whereTheChatIs(turn, { running: false, knownAt: 20 })).toEqual({ move: 'stays' });
-    expect(whereTheChatIs({ ...turn, said: '' }, { running: false, knownAt: 0 })).toEqual({ move: 'stays' });
+  it('decides each case, and only an answer the row has not had is news', () => {
+    const turn = { ended: true };
+    expect(whereTheChatIs(null, { running: true, news: true })).toEqual({ move: 'stays' });
+    expect(whereTheChatIs({ ended: false }, { running: true, news: true })).toEqual({ move: 'working' });
+    expect(whereTheChatIs({ ended: false }, { running: false, news: true })).toEqual({ move: 'stays' });
+    expect(whereTheChatIs(turn, { running: false, news: true })).toEqual({ move: 'answered' });
+    expect(whereTheChatIs(turn, { running: false, news: false })).toEqual({ move: 'stays' });
+    expect(whereTheChatIs(turn, { running: false, news: true, cut: true })).toEqual({ move: 'cut' });
   });
 
   it('reads a Codex turn the way Codex 0.171 writes one: open until task_complete, your words kept', () => {
