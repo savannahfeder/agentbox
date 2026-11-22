@@ -30,8 +30,11 @@ export function AgentThread({ agent, title, movedAt, md, onPick }: {
   const laidOut = !answeredWhereItRuns(agent) && !!(agent.lastSaid || agent.question?.length || agent.approval);
   const [full, setFull] = useState(!laidOut);
   const [whole, setWhole] = useState(false);
+  // Opened by her hand, the conversation stays open when the session moves on (a power tester saw it fold shut).
+  const opened = useRef(false);
   useEffect(() => { setWhole(false); }, [pid, sessionId, cwd]);
-  useEffect(() => { setFull(!laidOut); }, [pid, sessionId, cwd, laidOut]);
+  useEffect(() => { opened.current = false; setFull(!laidOut); }, [pid, sessionId, cwd]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!opened.current) setFull(!laidOut); }, [laidOut]);
 
   const [state, setState] = useState<{ events: AgentEvent[]; omitted: number; total: number; error?: string } | null>(null);
   // Re-reading the same conversation must not blank it and throw away where she was.
@@ -59,7 +62,7 @@ export function AgentThread({ agent, title, movedAt, md, onPick }: {
   const working = answeredWhereItRuns(agent);
   const head = (laidOut || working) && (
     <QueueSummary title={title} context={agentContext(agent, theirWords(agent.lastAsked || agent.asked?.at(-1)?.text))} earlier={0}
-      open={full} onToggle={() => setFull((f) => !f)} fold={laidOut ? FOLD : undefined} />
+      open={full} onToggle={() => { opened.current = !full; setFull((f) => !f); }} fold={laidOut ? FOLD : undefined} />
   );
 
   if (!full) {
