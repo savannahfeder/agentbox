@@ -7822,7 +7822,6 @@ export default function App() {
                   giveTo={giveToFor(focused)}
                   onGive={(to, note) => { void giveThread(focused, to, note); }}
                   onAsk={team ? (to, kind, note, step) => { void askOnThread(focused, to, kind, note, step); } : undefined}
-                  asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
                   asksCorner={team && !focused.ask ? <AsksChip item={focused} items={items} now={now} onTakeBack={(task) => { void takeAskBack(task); }} onMessage={(personId) => messageAbout(personId, rowTitle(focused))} /> : null}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}
