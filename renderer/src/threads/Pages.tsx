@@ -763,7 +763,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // this row is drawn under: the words about agents waiting their turn are
   // only ever true there, which is the gate live-line has always had.
   const fleet = useContext(FleetContext);
-  const facts = { ...factsFor(fleet, item.id), inProgress: tab === 'progress', now, practice: !!product?.practice };
+  // A session started outside Agentbox in In progress is working there; nothing of it is waiting.
+  const facts = { ...factsFor(fleet, item.id), inProgress: tab === 'progress', now, practice: !!product?.practice, ...(item.agent && tab === 'progress' ? { state: 'running' as const } : {}) };
   const cell = tab === 'snoozed' ? laterCell(item, facts) : statusCell(item, facts);
   const tryAgain = useContext(TryAgainContext);
   const retry = tryAgain && offersTryAgain(item, facts) ? <TryAgainButton onPress={() => tryAgain(item)} /> : undefined;
