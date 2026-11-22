@@ -81,8 +81,10 @@ describe('the ask is found and laid out', () => {
     expect(l.choices).toEqual(['**A: Inside the conversation**, recommended.', '**B: The approval card.**']);
   });
 
-  it('the tool\'s own question and choices win, exactly as the tool gave them', () => {
-    const l = sessionLayout('I looked at both libraries.', [{ question: 'Which date library should I use?', options: ['date-fns', 'Luxon'] }]);
+  it('the tool\'s own question and choices win, exactly as the tool gave them, led by the words of its own turn', () => {
+    const l = sessionLayout('An answer from an earlier turn.', [{ question: 'Which date library should I use?', options: ['date-fns', 'Luxon'], lead: 'I looked at both libraries.' }]);
+    expect(l.context).toBe('I looked at both libraries.');
+    expect(sessionLayout('An answer from an earlier turn.', [{ question: 'Which?', options: ['a', 'b'] }]).context).toBeNull();
     expect(l.kind).toBe('asks');
     expect(l.from).toBe('tool');
     expect(l.bold).toBe('Which date library should I use?');

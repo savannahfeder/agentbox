@@ -34,13 +34,17 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 describe("Claude Code's own question", () => {
   it('a pending question is read with its choices, and the page leads with it', () => {
     const f = read([user(0, 'add dates to the receipts'), said(5, 'I looked at both libraries.'), asks(6, 'q1')]);
-    expect(f.question).toEqual([{ question: 'Which date library should I use?', options: ['date-fns', 'Luxon'] }]);
+    expect(f.question).toEqual([{ question: 'Which date library should I use?', options: ['date-fns', 'Luxon'], lead: 'I looked at both libraries.' }]);
     const l = agentLayout({ lastSaid: f.lastSaid, question: f.question });
     expect(l.bold).toBe('Which date library should I use?');
     expect(l.choices).toEqual(['date-fns', 'Luxon']);
   });
+  it('a question asked in a later turn is not led by the answer before it', () => {
+    const f = read([user(0, 'x'), said(5, 'Done with the first part.'), user(10, 'now pick a date library'), asks(12, 'q1')]);
+    expect(f.question[0].lead).toBeUndefined();
+  });
   it('its choices are read, not pressed: a typed reply answering the tool is not measured yet', () => {
-    const agent = { lastSaid: 'I looked at both.', question: [{ question: 'Which date library should I use?', options: ['date-fns', 'Luxon'] }], waitingFor: 'input needed', status: 'waiting' };
+    const agent = { lastSaid: 'I looked at both.', question: [{ question: 'Which date library should I use?', options: ['date-fns', 'Luxon'], lead: 'I looked at both.' }], waitingFor: 'input needed', status: 'waiting' };
     expect(choicesArePressed(agent)).toBe(false);
     expect(agentAnswer(agent)).toBe('**Which date library should I use?**\n\nI looked at both.\n\n1. date-fns\n2. Luxon');
   });

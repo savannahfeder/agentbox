@@ -363,7 +363,9 @@ function remember(acc: Facts, line: string) {
     }
     for (const c of obj.message.content) {
       if (c.type === 'tool_use' && c.name === 'AskUserQuestion') {
-        acc.question = toolQuestions(c.input);
+        const qs = toolQuestions(c.input);
+        // Only what it said in this same answer leads into the question.
+        acc.question = qs.length && acc.saidOpen && acc.lastSaid ? [{ ...qs[0], lead: acc.lastSaid }, ...qs.slice(1)] : qs;
         acc.questionId = String(c.id ?? '');
       }
       if (c.type !== 'tool_use' || !TOUCH_TOOLS.has(c.name)) continue;

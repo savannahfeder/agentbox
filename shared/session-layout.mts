@@ -9,6 +9,8 @@
 export interface ToolQuestion {
   question: string;
   options: string[];
+  /** What the agent wrote just before asking, in the same turn. */
+  lead?: string;
 }
 
 export interface SessionLayout {
@@ -132,11 +134,12 @@ export function sessionLayout(message: string, questions: ToolQuestion[] = []): 
   const bs = blocks(message ?? '');
   const asked = questions.filter((q) => plain(q.question ?? ''));
   if (asked.length) {
-    const lastP = [...bs].reverse().find((b) => b.type === 'p');
+    // The message may be from an earlier turn; only words from the asking turn lead into the question.
+    const lead = asked[0].lead?.trim() ? [...blocks(asked[0].lead)].reverse().find((b) => b.type === 'p')?.raw ?? null : null;
     return {
       ...PLAIN, kind: 'asks', from: 'tool',
       bold: plain(asked[0].question), more: asked.slice(1).map((q) => plain(q.question)),
-      context: lastP?.raw ?? null, choices: (asked[0].options ?? []).filter((o) => o && o.trim()),
+      context: lead, choices: (asked[0].options ?? []).filter((o) => o && o.trim()),
     };
   }
 

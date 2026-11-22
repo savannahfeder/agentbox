@@ -169,7 +169,9 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
     let args: unknown = null;
     try { args = JSON.parse(p.arguments ?? 'null'); } catch { args = null; }
     const qs = questionsOf(args);
-    if (qs.length) { acc.question = qs; acc.pendingCall = String(p.call_id ?? 'pending'); }
+    const last = acc.events[acc.events.length - 1];
+    const lead = last && last.who === 'it' && last.at >= acc.turnStartedAt ? last.text : '';
+    if (qs.length) { acc.question = lead ? [{ ...qs[0], lead }, ...qs.slice(1)] : qs; acc.pendingCall = String(p.call_id ?? 'pending'); }
   } else if (p.type === 'function_call_output' && acc.pendingCall && p.call_id === acc.pendingCall) {
     acc.pendingCall = ''; acc.question = [];
   }
