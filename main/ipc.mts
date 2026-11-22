@@ -72,6 +72,7 @@ import { usageEngine } from '../shared/usage.mts';
 import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mts';
 import { routedPatch, PICKED_WHY } from '../shared/auto-route.mts';
 import * as agents from './agents.mts';
+import { readCodexLive, codexConversation, revealCodex } from './codex-live.mts';
 import { findAgentFolders, readAgentFiles, readFolderAgents } from './agent-files.mts';
 import { readChatEndsOffThread, readClaudeThreadsOffThread, readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
@@ -82,7 +83,7 @@ import { checkProjectFolder, chooserStartsIn, folderFromChooser } from '../share
 import { openFreshUser } from './fresh-user.mts';
 import { openDemo } from './demo.mts';
 import { AgentSchedule } from './agent-schedule.mts';
-import { agentKey } from '../shared/agents.mts';
+import { agentKey, agentRowId } from '../shared/agents.mts';
 import { machineryPath } from './store/home.mts';
 import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mts';
@@ -570,12 +571,18 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
 
   const liveAgents = () => {
     try {
-      const live = agentSchedule.decorate(agents.listAgents({
+      const claude = agents.listAgents({
         zeroPid: process.pid,
         sessionIds: Object.values(supervisor._liveSessions ?? {}).map((s) => s?.sessionId),
         products: store.listProducts(),
         claudeBin: config.claudeBin,
-      }));
+      });
+      let codexRead: typeof claude = [];
+      let codexOk = true;
+      try { codexRead = readCodexLive({ products: store.listProducts() }); } catch { codexRead = []; codexOk = false; }
+      // One list, decorated once, and swept only on real readings of both:
+      // the schedule forgets a key it is not shown, which would reopen closed rows.
+      const live = agentSchedule.decorate([...claude, ...codexRead], Date.now(), { sweep: agents.measured() && codexOk });
       // "An agent was seen", ONCE per agent per run of the app. This list is
       // rebuilt every few seconds, so counting it here without the set would
       // send one event per agent per tick, all day. The keys are only ever
@@ -591,6 +598,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
         const key = agentKey(agent);
         if (!key || seenAgents.has(key)) continue;
         seenAgents.add(key);
+        if (agent.engine === 'codex') continue;
         analytics.track('agent_seen', { engine: 'claude' });
       }
       return live;
@@ -627,7 +635,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return taskPlace(product,id);
   }});
   const taskPlace=(product: string,id: string)=>{
-    const agent=id.startsWith('agent:')?liveAgents().find(a=>'agent:'+a.pid===id && (a.product??'')===product):null;
+    const agent=id.startsWith('agent:')?liveAgents().find(a=>agentRowId(a)===id && (a.product??'')===product):null;
     return terminalPlace({store,supervisor,product,id,agent});
   };
   /*
@@ -828,7 +836,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // anywhere outside its own store, and it writes into a socket rather than to
   // disk. The reader refuses a send to an agent frozen on a permission box, and
   // reports back whether the agent actually moved rather than assuming it did.
-  ipcMain.handle('zero:agent-reply', async (_e, { pid, text }: { pid: unknown; text: string }) => {
+  ipcMain.handle('zero:agent-reply', async (_e, { pid, text, engine }: { pid: unknown; text: string; engine?: unknown }) => {
+    if (engine === 'codex') return { ok: false, reason: 'Answer this one in Codex.' };
     try {
       const out = await agents.reply(Number(pid), text);
       // AND THE ROW REMEMBERS THAT THE USER SPOKE. Only on a delivered message: a
@@ -872,8 +881,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
 
   // For the agent a reply cannot reach: bring the app it is running inside to
   // the front. Named honestly, because it is the app and not the pane.
-  ipcMain.handle('zero:agent-reveal', async (_e, { pid }: { pid: unknown }) => {
+  ipcMain.handle('zero:agent-reveal', async (_e, { pid, engine, sessionId }: { pid: unknown; engine?: unknown; sessionId?: unknown }) => {
     try {
+      if (engine === 'codex') return await revealCodex(liveAgents().find((a) => a.engine === 'codex' && a.sessionId === sessionId) ?? null);
       return await agents.reveal(Number(pid));
     } catch {
       return { ok: false, reason: `${Name} cannot tell which window it is running in.` };
@@ -892,6 +902,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // agent is a rule with one copy of it (shared/agents.mts) and the
       // renderer already hands over both halves it needs.
       const key = agentKey({ sessionId: payload?.sessionId as string | undefined, pid: Number(payload?.pid), startedAt: payload?.startedAt });
+      // The file is looked up here, never taken from the window.
+      if ((payload as { engine?: unknown } | undefined)?.engine === 'codex') {
+        const found = liveAgents().find((a) => a.engine === 'codex' && a.sessionId === payload?.sessionId);
+        return found?.transcript ? codexConversation(found.transcript) : { ok: false, reason: 'That Codex conversation could not be found.' };
+      }
       return await agents.conversation({ ...(payload ?? {}), spoke: agentSchedule.spoke(key) });
     } catch {
       return { ok: false, reason: 'That conversation could not be read.' };

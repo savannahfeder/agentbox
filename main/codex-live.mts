@@ -9,6 +9,7 @@
 // writes to Codex.
 
 import fs from 'node:fs';
+import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { cleanAnswer, cleanPrompt, isInjected, listRolloutFiles, readCodexIndex } from './codex-threads.mts';
@@ -263,4 +264,18 @@ export function codexConversation(file: string): { ok: true; turns: ThreadEvent[
   if (!read) return { ok: false, reason: 'That Codex conversation could not be read.' };
   const turns = read.fold.events;
   return { ok: true, turns, omitted: 0, total: turns.length };
+}
+
+/** "Take me to it" for a Codex session: the Codex app when it runs there. A terminal or editor cannot be found from here. */
+export async function revealCodex(agent: Pick<Agent, 'app'> | null, { platform = process.platform, open = openApp }: { platform?: NodeJS.Platform; open?: (name: string) => Promise<boolean> } = {}): Promise<{ ok: true; name: string } | { ok: false; reason: string }> {
+  if (!agent) return { ok: false, reason: 'That Codex session has closed.' };
+  if (agent.app !== 'Codex app') return { ok: false, reason: `It is running in ${agent.app === 'Codex in your editor' ? 'your editor' : 'a terminal'}. Switch to it there.` };
+  if (platform !== 'darwin') return { ok: false, reason: 'Open the Codex app to answer it.' };
+  return (await open('Codex')) ? { ok: true, name: 'Codex' } : { ok: false, reason: 'The Codex app could not be opened.' };
+}
+
+function openApp(name: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile('/usr/bin/open', ['-a', name], { timeout: 5000 }, (err) => resolve(!err));
+  });
 }

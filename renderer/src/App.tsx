@@ -107,7 +107,7 @@ import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
-import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
+import { agentKey, agentLayout, agentRow, agentRowId, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyIsSwallowed, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
@@ -1568,7 +1568,7 @@ export default function App() {
     return [...live].sort(byRecency).map((a) => {
       const { title, body } = agentRow(a, now);
       return {
-        id: `agent:${a.pid}`,
+        id: agentRowId(a),
         product: a.product ?? '',
         productName: a.productName ?? whereItRuns(a),
         status: 'open' as const,
@@ -3485,8 +3485,8 @@ export default function App() {
   // out of the app. A session with no row left (she closed it, or put it off)
   // simply does not answer the click; the panel is not a way back into a list
   // she has already cleared.
-  const openAgent = useCallback((pid: number) => {
-    const row = agentRows.find((r) => r.id === `agent:${pid}`);
+  const openAgent = useCallback((id: string) => {
+    const row = agentRows.find((r) => r.id === id);
     if (!row) return;
     setFocused(row);
     markSeen(row);
@@ -3553,10 +3553,10 @@ export default function App() {
     const sessions = (snap?.agents ?? [])
       .filter((a) => a.product === slug && onTheRail(a, now))
       .map((a) => ({
-        key: `agent:${a.pid}`,
+        key: agentRowId(a),
         line: railLine(a),
         at: a.lastActiveAt || a.startedAt,
-        open: () => openAgent(a.pid),
+        open: () => openAgent(agentRowId(a)),
       }));
     return [...tasks, ...sessions].sort((x, y) => y.at - x.at);
   }, [railItem?.product, items, snap?.agents, pendingIds, deliveredThrough, hiddenAt, dueAt, now, markSeen, openAgent, liveIds, shippingIds, stalledIds, waitingOn]);
@@ -4879,7 +4879,7 @@ export default function App() {
     // exactly as closing one does, and this used to drop her at the top of the
     // list instead.
     leaveResolved(item);
-    const out = await api.agentReply({ pid: agent.pid, text });
+    const out = await api.agentReply({ pid: agent.pid, text, engine: agent.engine });
     // Two true sentences, never one hopeful one. A failed hand-over says so; a
     // send says Sent, which is what it says everywhere else in this app; and a
     // session seen going back to work says the better thing.
@@ -4915,7 +4915,7 @@ export default function App() {
   const revealAgent = useCallback(async (item: WorkItem) => {
     const agent = item.agent;
     if (!agent) return;
-    const out = await api.agentReveal({ pid: agent.pid });
+    const out = await api.agentReveal({ pid: agent.pid, engine: agent.engine, sessionId: agent.sessionId });
     if (!out?.ok) showToast(out?.reason ?? `${Name} cannot tell which window it is running in.`);
   }, [showToast]);
 
@@ -4954,7 +4954,13 @@ export default function App() {
     // anywhere has a row called `trouble` or `update` in it, so every one of
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
-    if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
+    // AN AGENT'S OWN CHOICES ARE ANSWERED BY SENDING THE CHOICE, word for word, into the session.
+    if (item.agent) {
+      const choice = agentLayout(item.agent).choices[n - 1];
+      if (choice && !replyIsSwallowed(item.agent)) await replyToAgent(item, choice);
+      return;
+    }
+    if (isTroubleRow(item) || isUpdateRow(item)) return;
     // The agent's own offer, and whether it is still live is format.ts's to
     // say; else the one the app asked for a finished run (./ship-offer.ts).
     const option = liveOption(item, n) ?? offerNow(item).find((o) => o.n === n) ?? null;
@@ -5027,7 +5033,7 @@ export default function App() {
     }, pickSentWords(option.text, rowTitle(item)), takeBack, isTourPractice(tourRef.current, item) || !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid,
     // Nothing real is sent from the practice thread, so nothing is held back for an undo: its agent answers at once.
     isTourPractice(tourRef.current, item) ? 0 : undefined);
-  }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds]);
+  }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds, replyToAgent]);
   // The discard question is raised inside `pickOption` and answered by
   // `answerCloseAsk`, which is made above it.
   useEffect(() => { pickRef.current = pickOption; }, [pickOption]);

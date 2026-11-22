@@ -2278,12 +2278,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
          */}
         {agent && (
           <AgentThread
-            pid={agent.pid}
-            sessionId={agent.sessionId}
-            cwd={agent.cwd}
-            name={agent.name}
+            agent={agent}
+            title={agent.about?.trim() || item.title}
             movedAt={agent.lastActiveAt ?? 0}
             md={md}
+            onPick={onPick}
           />
         )}
 
@@ -2673,7 +2672,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                is sitting at its prompt and it is listening. w-9348b8d148. */
             <div className="dock-pill dock-pill-static">
               <span className="dock-pill-text">
-                Answer this one in its own window. A message from here would wait behind the box it is stuck on.
+                {agent?.engine === 'codex'
+                  ? agent.app === 'Codex app' ? 'Answer this one in the Codex app.' : agent.app === 'Codex in your editor' ? 'Answer this one in Codex, in your editor.' : 'Answer this one in the terminal Codex is running in.'
+                  : 'Answer this one in its own window. A message from here would wait behind the box it is stuck on.'}
               </span>
             </div>
           ) : replyOpen ? (

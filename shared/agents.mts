@@ -173,6 +173,11 @@ export function stoppedSince(agent: AgentLike, since: number): boolean {
 
 // The key a deferral or close is stored under. Pids get reused, so it is the
 // sessionId when there is one, otherwise the pid plus its start time.
+/** The inbox row's id. A Codex session has no process of its own, so it is named by its thread. */
+export function agentRowId(agent: AgentLike): string {
+  return isCodex(agent) ? `agent:codex:${agent.sessionId ?? ''}` : `agent:${agent.pid ?? 0}`;
+}
+
 export function agentKey(agent: AgentLike): string {
   if (agent?.sessionId) return `session:${agent.sessionId}`;
   return `pid:${agent?.pid ?? 0}:${agent?.startedAt ?? 0}`;
@@ -382,6 +387,12 @@ function list(names: string[]): string {
 }
 
 export function agentRow(agent: AgentLike, now: number = Date.now()): { title: string; body: string } {
+  if (isCodex(agent)) {
+    const title = agentTitle(agent, now);
+    if (answeredWhereItRuns(agent)) return { title, body: `**You answered it in Codex, and it is working on it.**\n\nIt comes back to your inbox when it stops.` };
+    if (agent.lastSaid || agent.question?.length) return { title, body: agentAnswer(agent) };
+    return { title, body: '**Codex has not answered yet.**' };
+  }
   const waited = howLong(now - (agent.lastActiveAt ?? agent.startedAt ?? now));
   const title = agentTitle(agent, now);
   const rest = context(agent, now);

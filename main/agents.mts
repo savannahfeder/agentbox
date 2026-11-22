@@ -492,6 +492,9 @@ const TTL_MS = 4000;
 
 // Called only when the list changes, so a ticking `lastActiveAt` does not
 // re-render the window.
+/** Whether a real reading has been taken yet. Until then `listAgents` answers []. */
+export const measured = () => cache.at > 0;
+
 export let onChange: (() => void) | null = null;
 export function setOnChange(fn: (() => void) | null) { onChange = fn; }
 

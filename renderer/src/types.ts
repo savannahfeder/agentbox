@@ -1141,6 +1141,14 @@ export interface AgentSession {
   repliedAt?: number;
   /** The session's own stamp on its own status. */
   statusAt?: number;
+  /** When its newest answer began, which tells her later words from earlier ones. */
+  saidAt?: number;
+  /** Claude Code when absent. A Codex session has no process here (`pid` is 0). */
+  engine?: 'claude' | 'codex';
+  /** The tool's own question it is stopped on, with its choices. */
+  question?: { question: string; options: string[] }[];
+  /** Where it runs, in words: "Codex app", "Codex in a terminal". */
+  app?: string | null;
   // the app's own workers, folded out of everything she sees: they are already in
   // her inbox as work items, and a second row about the same agent is a
   // rejected duplicate picture.
@@ -1794,9 +1802,9 @@ declare global {
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
       track?(name: string, count?: number): Promise<boolean>;
-      agentReply(p: { pid: number; text: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string }>;
-      agentReveal(p: { pid: number }): Promise<{ ok: boolean; name?: string; reason?: string }>;
-      agentConversation(p: { pid: number; sessionId: string | null; cwd: string }): Promise<AgentConversation>;
+      agentReply(p: { pid: number; text: string; engine?: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string }>;
+      agentReveal(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<{ ok: boolean; name?: string; reason?: string }>;
+      agentConversation(p: { pid: number; sessionId: string | null; cwd: string; engine?: string }): Promise<AgentConversation>;
       dashboard(slug: string): Promise<ProductDashboard | null>;
       terminal<A extends TerminalAction>(p: TerminalAsk<A>): Promise<TerminalAnswer<A>>;
       // Null from the phone's own site, which has no coding agents to update.
