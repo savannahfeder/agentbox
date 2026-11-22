@@ -4,6 +4,7 @@
 import type { TeamBackend, TeamSession } from './index.mts';
 import type { RoomEvent } from './rooms.mts';
 import type { CloudConfig } from './session.mts';
+import crypto from 'node:crypto';
 
 const CALL_MS = 120_000;
 const WAIT_MS = 35_000;
@@ -75,6 +76,8 @@ export function standinBackend(url: string, { token, personId, kind, methods }: 
 export function standinSession({ cloudConfig, testLogin }: { cloudConfig: CloudConfig; testLogin?: string | null }): TeamSession {
   const url = String(cloudConfig.url).replace(/\/+$/, '');
   let signedIn: TeamBackend | null = null;
+  // Made up, and its own in each copy, so two copies that press Google are two people.
+  const googleEmail = `alex-${crypto.randomBytes(3).toString('hex')}@example.test`;
   const signIn = async (email: string, password: string, name?: string) => {
     signedIn = standinBackend(url, await post<StandinSignIn>(url, 'signin', { email, password, name }));
     return signedIn;
@@ -87,7 +90,7 @@ export function standinSession({ cloudConfig, testLogin }: { cloudConfig: CloudC
       const at = testLogin.indexOf(':');
       return signIn(testLogin.slice(0, at), testLogin.slice(at + 1));
     },
-    async signIn() { throw new Error('the stand-in cloud has no Google sign-in'); },
+    signIn: () => signIn(googleEmail, '', 'Alex Kim'),
     signInWithPassword: (email, password) => signIn(String(email ?? '').trim(), password),
     async signUp({ email, password, name }) { return { backend: await signIn(String(email ?? '').trim(), password, name) }; },
     cancelSignIn: () => {},
