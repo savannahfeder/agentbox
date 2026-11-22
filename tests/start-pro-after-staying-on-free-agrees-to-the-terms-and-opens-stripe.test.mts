@@ -67,7 +67,7 @@ afterAll(async () => { await browser?.close(); });
 let home: string; let server: ReturnType<typeof gatewayServer>; let gateway: string;
 let objects: ReturnType<typeof memoryObjects>;
 let team: { id: string; members: string[]; owners: string[] } | null;
-let checkouts: { plan: string; team: string | null; trialEnd: number | null }[];
+let checkouts: { plan: string; team: string | null; trialDays: number | null }[];
 let opened: string[]; let sent: Record<string, unknown>[];
 const env = {};
 beforeEach(async () => {
@@ -76,8 +76,9 @@ beforeEach(async () => {
   team = { id: 'team-1', members: [P], owners: [P] };
   checkouts = []; opened = []; sent = [];
   const stripe = {
-    async checkout(o: { plan: string; team?: string | null; trialEnd?: number | null }) {
-      checkouts.push({ plan: o.plan, team: o.team ?? null, trialEnd: o.trialEnd ?? null });
+    // Stripe is told whole free days (cloud/gateway/stripe.mjs), and words its page from them.
+    async checkout(o: { plan: string; team?: string | null; trialDays?: number | null }) {
+      checkouts.push({ plan: o.plan, team: o.team ?? null, trialDays: o.trialDays ?? null });
       return { id: `cs_${checkouts.length}`, url: `https://checkout.stripe.com/c/pay/cs_${checkouts.length}` };
     },
     async session(id: string) { return { id, status: 'open', url: `https://checkout.stripe.com/c/pay/${id}` }; },
@@ -123,7 +124,6 @@ const agreed = async () => {
   const rec = await objects.get(`ledger/people/${P}.json`);
   return rec ? JSON.parse(String(rec.body)).terms?.version ?? null : null;
 };
-const days = (ms: number | null) => (ms ? Math.round((ms - Date.now()) / 86_400_000) : 0);
 
 describe.skipIf(!browserAvailable)('Start Pro on the Team page, for someone who stayed on Free', () => {
   it('names the terms under the button, and one press agrees, makes the key and opens the team’s checkout with its free week', async () => {
@@ -137,7 +137,7 @@ describe.skipIf(!browserAvailable)('Start Pro on the Team page, for someone who 
     expect(opened).toEqual(['https://checkout.stripe.com/c/pay/cs_1']);
     expect(checkouts).toHaveLength(1);
     expect(checkouts[0]).toMatchObject({ plan: 'team', team: 'team-1' });
-    expect(days(checkouts[0].trialEnd)).toBe(7);
+    expect(checkouts[0].trialDays).toBe(7);
     expect(await page.textContent('body')).not.toMatch(/accept the terms/);
     expect(await page.locator('.st-terms').count()).toBe(0);
     await page.close();

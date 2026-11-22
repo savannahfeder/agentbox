@@ -65,14 +65,14 @@ export interface StartDecisionInput {
 
 /** One reading, synchronously, for the moment before a restart brings the
  *  fleet back. Nulls (so no hold) when it cannot be read. */
-export function readMacPressureNow(): PressureSample {
+export function readMacPressureNow(platform: NodeJS.Platform = process.platform): PressureSample {
   let level: number | null = null;
   let freePct: number | null = null;
-  try {
+  if (platform === 'darwin') try {
     const out = execFileSync('/usr/sbin/sysctl', ['-n', 'kern.memorystatus_vm_pressure_level', 'kern.memorystatus_level'],
       { timeout: 2_000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
     [level, freePct] = out.trim().split(/\s+/).map(Number);
-  } catch { /* not a Mac, or sysctl did not answer */ }
+  } catch { /* sysctl did not answer */ }
   return { level: Number.isFinite(level) ? level : null, freePct: Number.isFinite(freePct) ? freePct : null, at: Date.now() };
 }
 
