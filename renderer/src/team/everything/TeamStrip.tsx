@@ -169,7 +169,7 @@ const CARD_MARK: Record<ThreadCard['state'], StatusCell['mark']> = { waiting: 'n
 function CardRow({ c, who, now, onOpen, items = [], products = [] }: { c: ThreadCard; who?: { name: string; url: string | null }; now: number; onOpen: (card: ThreadCard) => void; items?: readonly WorkItem[]; products?: readonly Product[] }) {
   const team = useContext(TeamContext);
   const waits = c.state !== 'done' ? linkWords(c.blockedBy, team?.byId) : null;
-  // A task says what the Tasks tab says of it.
+  // A task says what its own row says of it.
   const task = cardTaskWord(c, { items, products, cards: team?.state.cards ?? [], me: team?.me ?? null, nameOf: (id) => (team?.byId.get(id)?.name ?? 'Someone').split(/\s+/)[0] });
   // The Status column's word for a running thread, as on the inbox's own rows beside it.
   const status: StatusCell = { word: c.shippedAt ? 'Shipped' : task ? task : waits ? `Waits on ${waits}` : c.state === 'running' ? 'Working' : c.state === 'waiting' && who ? `Waiting on ${who.name.split(/\s+/)[0]}` : STATE_WORD[c.state], mark: CARD_MARK[c.state], agent: c.state === 'running', live: c.state === 'running', cloud: false };

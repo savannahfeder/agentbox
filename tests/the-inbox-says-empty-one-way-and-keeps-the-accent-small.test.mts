@@ -81,7 +81,7 @@ describe('the accent stays small', () => {
 describe('a tab just clicked', () => {
   it('marks itself on the press and clears the mark when the pointer leaves', () => {
     const tabs = pages.match(/data-hint="state-tab"[^>]*>/g) ?? [];
-    expect(tabs.length).toBeGreaterThanOrEqual(5);
+    expect(tabs.length).toBeGreaterThanOrEqual(4);
     for (const t of tabs) expect(t).toContain('{...quietOnceClicked}');
     expect(pages).toMatch(/onPointerDown: [^\n]*dataset\.clicked = ''/);
     expect(pages).toMatch(/onPointerLeave: [^\n]*delete [^\n]*dataset\.clicked/);

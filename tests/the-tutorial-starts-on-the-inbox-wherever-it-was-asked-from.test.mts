@@ -14,7 +14,7 @@ const fn = body('startTutorial');
 
 describe('starting the tutorial', () => {
   it('leaves Team, Today, the board of a person and the Chats page for the inbox', () => {
-    expect(fn).toMatch(/setTeamOpen\(false\); setChatsPlace\(null\); setEvPick\(null\); setTodayOn\(false\); setTasksOn\(false\);/);
+    expect(fn).toMatch(/setTeamOpen\(false\); setChatsPlace\(null\); setEvPick\(null\); setTodayOn\(false\);/);
     expect(fn).toMatch(/beginWalkthrough\(\)/);
     expect(body('beginWalkthrough')).toMatch(/setView\('inbox'\)/);
   });

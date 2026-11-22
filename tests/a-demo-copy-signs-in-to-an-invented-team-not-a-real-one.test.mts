@@ -124,9 +124,7 @@ describe('the team a demo copy is signed in to', () => {
     }
   });
 
-  // The call script's beats (2026-11-21): Tasks, late and blocked first, and an
-  // agent @-mentioned in a chat beside people.
-  it('gives the Tasks page one late task, one blocked on you and more ahead', async () => {
+  it('gives the team one late task, one blocked on you and more ahead', async () => {
     const now = Date.now();
     const cards = (await (await signedIn()).listCards() as { task?: { dueAt: number }; blockedBy: { id: string }[] }[]).filter((c) => c.task);
     expect(cards.some((c) => c.task!.dueAt < now)).toBe(true);
