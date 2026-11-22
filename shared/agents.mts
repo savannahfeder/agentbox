@@ -463,7 +463,11 @@ export function agentContext(agent: AgentLike, theirAsk: string): string {
 
 /** The row's preview and the page's answer: the ask in bold and the agent's own words, or the message as it is. */
 export function agentAnswer(agent: AgentLike): string {
-  return layoutMarkdown(agentLayout(agent), agent.lastSaid ?? '');
+  const l = agentLayout(agent);
+  const md = layoutMarkdown(l, agent.lastSaid ?? '');
+  // Choices nothing here can send stay in the words, where she reads them before answering in the tool.
+  if (l.choices.length && replyIsSwallowed(agent)) return `${md}\n\n${l.choices.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
+  return md;
 }
 
 export function listed(agent: AgentLike): boolean {

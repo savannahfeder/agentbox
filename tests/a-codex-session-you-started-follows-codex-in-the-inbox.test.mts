@@ -77,7 +77,8 @@ describe('the round trip she asked for', () => {
     expect(a.app).toBe('Codex app');
     expect(reachesInbox(a, NOW, 'all')).toBe(true);
     expect(progressAfterReply(a, NOW, 'all')).toBe(false);
-    expect(agentAnswer(a)).toBe('**Three customer apps still set TAX_MODE.**\n\nWhich do you want?');
+    // Answered in Codex, so the choices stay in the words rather than on a strip nothing can send.
+    expect(agentAnswer(a)).toBe('**Three customer apps still set TAX_MODE.**\n\nWhich do you want?\n\n1. Read both names for one release\n2. Switch now');
     expect(agentContext(a, theirWords(a.lastAsked))).toBe(`Codex app · You asked: ${ASK}`);
   });
 
