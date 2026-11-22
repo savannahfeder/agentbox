@@ -7,7 +7,7 @@ import type { LedgerLine } from './thread-history';
 // The engine ids, labels and the default are read off the one file that holds
 // them rather than typed again here. A fixture that spelled "Claude Code" for
 // itself is a fixture that could go on saying it after the app had stopped.
-import { DEFAULT_ENGINE, ENGINES } from '../../shared/engines.mts';
+import { DEFAULT_ENGINE, ENGINES, type Engine } from '../../shared/engines.mts';
 import { BUILT_MODELS } from './models';
 import { CODEX_DEFAULT_MODE } from './codex-modes';
 
@@ -1265,6 +1265,41 @@ export function fixtureEngineSettings(world: FixtureEngineWorld | null): Partial
  * there to mark, which is what keeps `mock` and `empty` honest rather than
  * carrying facts about rows they do not have.
  */
+/**
+ * WHAT OPENCODE CALLS ITS MODELS, read off `opencode acp` 2.3.2 on 2026-11-22
+ * with nobody signed in: its ten free ones, in its own order and words.
+ */
+export const fixtureOpenCodeModels: NonNullable<Engine['models']> = [
+  { id: 'opencode/beam-free', label: 'Beam Free' },
+  { id: 'opencode/big-pickle', label: 'Big Pickle' },
+  { id: 'opencode/deepseek-v4.1-flash-free', label: 'DeepSeek V4.1 Flash Free' },
+  { id: 'opencode/flint-40b-free', label: 'Flint 40B Free' },
+  { id: 'opencode/hy4-flash-free', label: 'Hy4 flash Free' },
+  { id: 'opencode/iceman-free', label: 'Iceman Free' },
+  { id: 'opencode/mimo-v2.6-flash-free', label: 'MiMo-V2.6-Flash Free' },
+  { id: 'opencode/nemotron-3.5-lightning-free', label: 'Nemotron 3.5 Lightning Free' },
+  { id: 'opencode/nemotron-3.5-super-vl-free', label: 'Nemotron 3.5 Super VL Free' },
+  { id: 'opencode/tidepool-alpha-free', label: 'Tidepool Alpha Free' },
+];
+
+/**
+ * A FURTHER HARNESS ON OFFER, layered over whichever world is up (`?further=opencode`).
+ * One resting thread is put on it, so a row of its own can be seen in the list.
+ */
+export function fixtureFurtherHarness(snap: Snapshot, asked: string | null): Snapshot {
+  if (asked !== 'opencode' || !snap.engines) return snap;
+  const row = 'w-d4';
+  return {
+    ...snap,
+    engines: {
+      ...snap.engines,
+      further: [{ id: 'opencode', label: 'OpenCode', word: 'OpenCode', models: fixtureOpenCodeModels }],
+      byItem: { ...snap.engines.byItem, [row]: 'opencode' },
+    },
+    items: snap.items.map((item) => (item.id === row ? { ...item, engine: 'opencode', model: 'opencode/big-pickle' } : item)),
+  };
+}
+
 export function fixtureSecondEngine(snap: Snapshot, world: FixtureEngineWorld | null): Snapshot {
   // `missing` is one coding agent, so the snapshot is the one she already has.
   // Everything it changes is in Settings.

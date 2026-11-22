@@ -262,7 +262,7 @@ export const LAST_MODEL_KEY = 'zero.lastModel';
  * change untouched.
  */
 export function lastModelKey(engine: string | null = null): string {
-  return engine === 'codex' ? `${LAST_MODEL_KEY}.codex` : LAST_MODEL_KEY;
+  return engine && engine !== 'claude' ? `${LAST_MODEL_KEY}.${engine}` : LAST_MODEL_KEY;
 }
 
 // Remembered the moment she picks, exactly like the project and the level: a

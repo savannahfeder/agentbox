@@ -24,6 +24,8 @@ export interface Engine {
   id: string;
   label: string;
   word: string;
+  /** A further harness's own models, as it named them; Claude Code's and Codex's lists travel their own way. */
+  models?: { id: string; label: string }[];
 }
 
 /** A row as the fold hands it over: the engine, the model chosen for it, and when the engine field was set. */

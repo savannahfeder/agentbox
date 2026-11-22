@@ -8227,6 +8227,7 @@ export default function App() {
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
+          furtherEngines={snap.engines?.further}
           workspaceEngine={snap.engines?.workspace}
           outOfUsage={snap.supervisor.outOfUsage}
           codexModels={codexModels}

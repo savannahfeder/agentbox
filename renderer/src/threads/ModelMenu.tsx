@@ -8,7 +8,7 @@
 // what a pick does belong to the box: the card drops its menu from the top of
 // the window, the reply box raises its own from the sentence at the bottom.
 
-import type { ModelPick } from './composer-rules';
+import type { AllModels, ModelPick } from './composer-rules';
 import type { EffortChoice } from '../effort';
 import { codexFreePlan } from '../models';
 import { useAgentUpdates } from '../components/AgentUpdates';
@@ -25,7 +25,7 @@ export function ModelMenu({
   page: 'recent' | 'all';
   onPage: (page: 'recent' | 'all') => void;
   recent: readonly ModelPick[];
-  every: { claude: readonly ModelPick[]; codex: readonly ModelPick[] };
+  every: AllModels;
   more: number;
   pick: ModelPick;
   onPick: (p: ModelPick) => void;
@@ -117,6 +117,13 @@ export function ModelMenu({
               {every.codex.map((p) => row(p))}
             </div>
           )}
+          {/* One more column for each further harness, headed by its name like the two above. */}
+          {(every.others ?? []).map((column) => (
+            <div className="tc-col" key={column.engine}>
+              <span className="tc-menu-head">{column.label}</span>
+              {column.models.map((p) => row(p))}
+            </div>
+          ))}
         </div>
       </>)}
       {effortRows.length > 0 && (<>

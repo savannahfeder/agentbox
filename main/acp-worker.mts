@@ -77,8 +77,9 @@ const STOP_GRACE_MS = 2_000;
 const STDERR_TAIL = 600;
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
+// A change to a file is the part of a tool call's content that carries a path and the new text.
 const changesIn = (content: ToolUpdate['content']) => (Array.isArray(content) ? content : [])
-  .filter((part) => part?.type === 'diff' && text(part.path))
+  .filter((part) => typeof part?.newText === 'string' && text(part.path))
   .map((part) => ({ path: text(part!.path), oldText: typeof part!.oldText === 'string' ? part!.oldText : null, newText: text(part!.newText) }));
 
 /** The command for a shell call, the file for anything on a file, else the tool's own title. */
