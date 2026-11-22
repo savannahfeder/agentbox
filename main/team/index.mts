@@ -17,7 +17,7 @@ import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mt
 import { createThreadShare } from './thread-share.mts';
 import { createAsks, type TellThread } from './asks.mts';
 import { changePath, readChangeSummary } from '../code-change.mts';
-import { askBody, askIsOpen, askOf, type AskKind } from '../../shared/thread-asks.mts';
+import { askBody, askIsOpen, askOf, withoutAskLead, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
 import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
@@ -1499,7 +1499,8 @@ export function createTeamService({
         if (fs.existsSync(srcPath)) files.push({ name: name || path.basename(file), srcPath });
         return '';
       }).trim();
-      return { title: row.label || row.title, body, files };
+      // The line the ask says to its helper is not for an agent.
+      return { title: row.label || row.title, body: askOf(row as never) ? withoutAskLead(body) : body, files };
     },
 
     /** A teammate's shared thread as this copy holds it: its messages, comments and folder. */

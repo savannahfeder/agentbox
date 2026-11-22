@@ -229,11 +229,18 @@ export function handBackReadBy(text: string, reader: 'asker' | 'helper' | 'other
 }
 
 /** The first lines of the task the helper gets: who asked, for what, and the step if one was picked. */
+const REVIEW_LEAD = 'Say whether it looks good or what to change.';
+const helpLead = (owner: string, helper: string | null) => `${helper ? `${helper}, write` : 'Write'} to ${owner}'s agent on ${owner}'s thread. A reply here goes to ${owner}.`;
+const LEAD = /(^|\n\n)(?:Say whether it looks good or what to change\.|(?:\S+, write|Write) to (\S+)'s agent on \2's thread\. A reply here goes to \2\.)(?=\n\n|$)/g;
+
 export function askBody({ kind, owner, helper = null, note, step }: { kind: AskKind; owner: string; helper?: string | null; note: string; step?: string | null }): string {
   // The line over the message says who asked and what for; this says only what it means.
-  const lead = kind === 'help'
-    ? `${helper ? `${helper}, write` : 'Write'} to ${owner}'s agent on ${owner}'s thread. A reply here goes to ${owner}.`
-    : 'Say whether it looks good or what to change.';
+  const lead = kind === 'help' ? helpLead(owner, helper) : REVIEW_LEAD;
   const quoted = step?.trim() ? step.trim().split('\n').map((l) => `> ${l}`).join('\n') : '';
   return [note.trim(), quoted, lead].filter(Boolean).join('\n\n');
+}
+
+/** An ask's words without the line `askBody` says only to the person asked: what an agent is handed. */
+export function withoutAskLead(text: string): string {
+  return text.replace(LEAD, '').replace(/^\n\n/, '');
 }
