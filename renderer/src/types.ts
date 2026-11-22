@@ -29,6 +29,8 @@ export interface WorkItem {
   // PINNED TO THE TOP OF THE LIST (w-20323283e6). Kept by the supervisor, on
   // this Mac, like the place; absent on every row nobody has pinned.
   pinned?: boolean;
+  /** The level a row a teammate sent you has for you. Never stored: the window works it out (`levelForYou`). */
+  levelForYou?: number;
   /** Kept on this Mac whatever the cloud is set to (Supervisor#setThreadOnMac). */
   onMac?: boolean;
   /** What the cloud handed this thread back for, in the run's own words ("your Stripe key"). */
