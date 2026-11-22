@@ -297,10 +297,26 @@ file) and three options, `once`, `always` and `reject`. The answer is always
 `once` or `reject`, never `always`. A refusal ends the turn with
 `stopReason: "cancelled"`, so the thread says what was refused.
 
-**What makes it ask** is a permission config, written per thread into the
-app's own folder, which `OPENCODE_CONFIG` points at. With none, it runs shell
-commands and writes files without asking: over ACP the command the check had
-refused ran. OpenCode has no sandbox and no reviewer of its own, so a shell
+**What makes it ask** is a permission config, and how it is handed over
+matters as much as what it says. With none, it runs shell commands and writes
+files without asking: over ACP the command the check had refused ran. Measured
+on 2.3.2 with a command that would be refused:
+
+- As a file `OPENCODE_CONFIG` names: a project's own `opencode.json` saying
+  `bash: allow` is loaded after it, and the command ran with nothing asked.
+- Inline, in `OPENCODE_CONFIG_CONTENT`, which loads last: the top-level policy
+  held against that file. A rule for one agent (`agent.build.permission`) still
+  beat it, written in the project or in the person's global config.
+- With the project's config switched off (`OPENCODE_DISABLE_PROJECT_CONFIG`
+  and `OPENCODE_CONFIG_PROJECT_DISABLE`, both names in the binary), and the
+  policy inline at the top level and for both built-in agents: it asked in
+  every case, and the refused command did not run.
+
+So that last form is what a thread starts with, and a project's own
+`opencode.json` and `.opencode` folder are not read inside Agentbox. The
+person's global config still is, for their providers and models.
+
+OpenCode has no sandbox and no reviewer of its own, so a shell
 command, a page fetch and a search always ask, unless the person chose a mode
 that asks for nothing. Edits inside the thread's folder go ahead, as on the
 other two harnesses' default modes, and `external_directory: "ask"` still asks
