@@ -13,7 +13,7 @@ import { voiceName } from '../../../shared/agent-voice.mts';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
 import { dayAndTime, firstRealLine, itemOptions } from '../format';
 import { asksSomething } from '../../../shared/teammates.mts';
-import { saysItStopped } from '../../../shared/carried-on-outside.mts';
+import { followsWord } from '../../../shared/carried-on-outside.mts';
 import { threadState } from '../../../shared/thread-cards.mts';
 import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
@@ -699,7 +699,7 @@ export function cellUnderTab(word: string, tab: string | undefined, { fromPeople
 export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined> }): boolean {
   if (itemOptions(item).length) return false;
   const said = (item.wrote?.note?.ts ?? 0) > (item.wrote?.result?.ts ?? 0) ? item.note : item.result;
-  return asksSomething(said) || saysItStopped(said);
+  return asksSomething(said) || followsWord(said);
 }
 
 /**

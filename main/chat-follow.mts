@@ -238,16 +238,14 @@ export async function followClaudeChats(
   return { moved };
 }
 
-/** A chat in Done that you carried on there: back once its agent waits on you,
- *  with everything said there since. */
+/** A chat in Done, back once its agent waits on you, with everything said there
+ *  since: after you carried it on there, or stopped in its window since you
+ *  closed it here. Not one you closed while it was already stopped. */
 function comeBack(store: FollowStore, c: FollowedChat, turn: ChatTurn, state: ClaudeSessionState | null, now: number) {
-  if (turn.heardAt <= c.doneAt) return 0;
   const asks = asksNow(turn, state);
-  if (!asks) return 0;
+  if (!asks || !(turn.heardAt > c.doneAt || (asks.stop !== null && (state?.since ?? 0) > c.doneAt))) return 0;
   const since = notYetRead(turn, { heardThrough: Math.max(c.heardThrough, c.doneAt), knownAt: Math.max(c.knownAt, c.doneAt) });
-  const first = since.findIndex((e) => e.who === 'you');
-  if (first < 0) return 0;
-  store.chatAsksAgain(c.product, c.id, since.slice(first), asks.stop, { now });
+  store.chatAsksAgain(c.product, c.id, since, asks.stop, { now });
   return 1;
 }
 

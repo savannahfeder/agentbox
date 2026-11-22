@@ -2128,13 +2128,16 @@ export class Store {
     // A reply typed here that no run took up went with the close.
     if (item.answer && item.answer !== '(withdrawn)') this.settleAnswer(slug, id, item.wrote?.answer?.ts);
     const tail = since.at(-1)?.who === 'agent' ? since.at(-1)! : null;
-    for (const [i, e] of (tail ? since.slice(0, -1) : since).entries()) {
-      // The first with the status, so the thread reads as your reply there and not as one you sent back.
-      if (i === 0) workItemsDisk.updateWorkItem(dir, id, { saidOutside: e.text, status: 'open' }, { source: 'founder', now });
-      else if (e.who === 'you') workItemsDisk.updateWorkItem(dir, id, { saidOutside: e.text }, { source: 'founder', now });
-      else { this.chatAgentSaid(slug, id, e.text, { at: e.at, now }); continue; }
+    const before = tail ? since.slice(0, -1) : [...since];
+    // With your first words there, or just ahead of the line saying it stopped, so it reads as neither's sending back.
+    let opened = false;
+    for (const e of before) {
+      if (e.who === 'agent') { this.chatAgentSaid(slug, id, e.text, { at: e.at, now }); continue; }
+      workItemsDisk.updateWorkItem(dir, id, { saidOutside: e.text, ...(opened ? {} : { status: 'open' }) }, { source: 'founder', now });
       workItemsDisk.updateWorkItem(dir, id, { chatAt: e.at }, { source: 'system', now });
+      opened = true;
     }
+    if (!opened) workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: 'founder', now });
     const said = [stop, tail?.text].filter(Boolean).join('\n\n');
     const open = said ? workItemsDisk.updateWorkItem(dir, id, { result: said, ...(tail ? { chatAt: tail.at } : {}) }, { source: 'agent', now: now + 1 }) : null;
     this.owesWriteUp(slug, item, !stop, now + 1);

@@ -211,10 +211,23 @@ export function howTheChatEnded(said: unknown): { waiting: boolean; ask: string 
   const lines = String(said ?? '').replace(/\r/g, '').split('\n').map((l) => l.trim()).filter(Boolean);
   let i = lines.length - 1;
   while (i >= 0 && CHOICE.test(lines[i])) i -= 1;
-  if (i < 0) return { ...NOT_WAITING };
-  const line = plainLine(lines[i].replace(CHOICE, ''));
-  if (!line.endsWith('?')) return { ...NOT_WAITING };
-  return { waiting: true, ask: shortAsk(line) };
+  if (i < 0) return lines.length ? lastAsks(lines) : { ...NOT_WAITING };
+  const asked = questionIn(lines[i]);
+  return asked ? { waiting: true, ask: shortAsk(asked) } : lastAsks(lines);
+}
+
+/** A line that ends on a question, or on one with a single sentence after it. */
+function questionIn(raw: string): string {
+  const line = plainLine(raw.replace(CHOICE, ''));
+  if (line.endsWith('?')) return line;
+  const sentences = line.split(/(?<=[.!?])\s+/);
+  return sentences.length > 1 && sentences.at(-2)!.endsWith('?') ? sentences.slice(0, -1).join(' ') : '';
+}
+
+// "3. Center it and drop the to-do. Should I do it?" ends a list as its last point.
+function lastAsks(lines: string[]) {
+  const last = plainLine(lines.at(-1)!.replace(CHOICE, ''));
+  return last.endsWith('?') ? { waiting: true, ask: shortAsk(last) } : { ...NOT_WAITING };
 }
 
 /**

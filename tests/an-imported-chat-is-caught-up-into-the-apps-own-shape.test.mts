@@ -97,19 +97,26 @@ describe('the rewrite', () => {
     fs.writeFileSync(fake, `#!/bin/sh\nprintf '%s' "$2" > '${asked}'\necho '${JSON.stringify(card)}'\n`, { mode: 0o755 });
     sup.store = { listProducts: () => [{ slug: 'p', name: 'Shop' }], catchUpItem: () => {}, routeItem: () => {} };
     sup._askSmall = async (ask) => ask({ claudeBin: fake, engine: 'claude', timeoutMs: 20_000 });
-    await sup.catchUpTheImports([imported({ saidOutside: 'Mock the clock.' })]);
+    sup.store.readHistory = () => [{ source: 'agent', patch: { result: 'Mock or retry?' } }, { source: 'founder', patch: { saidOutside: 'Mock the clock.' } }];
+    await sup.catchUpTheImports([imported()]);
     const prompt = fs.readFileSync(asked, 'utf8');
     expect(prompt).toContain('--- the project ---\nShop\n');
     expect(prompt).toContain('Mock the clock.');
   });
 
-  // Measured 2026-11-21 on a real chat carried on in its terminal: each answer
-  // there is written up again, and the second one renamed the thread.
-  it('keeps the name a thread already has when a later answer is written up', async () => {
+  // Measured on real chats carried on in their terminals: each answer there was
+  // written up again. The second one renamed the thread (2026-11-21), and one
+  // made up an apology and a first option to undo approved work (2026-11-22).
+  it('keeps the name a thread already has', async () => {
     const { sup, writes } = watching(card);
     await sup.catchUpTheImports([imported({ label: 'Naming the checkout module' })]);
     expect(writes[0][1]).not.toHaveProperty('label');
     expect(writes[0][1].result).toMatch(/^\*\*Should I merge it\?\*\*/);
+  });
+  it('leaves a later answer in its agent\'s own words, and renews only what the thread is about', async () => {
+    const { sup, writes } = watching(card);
+    await sup.catchUpTheImports([imported({ label: 'Naming it', wrote: { ...imported().wrote, problem: { ts: 5, source: 'agent' } } })]);
+    expect(writes).toEqual([['catchUp', { problem: 'The agent fixed a flaky test.' }], ['route', { labels: [THREAD_LABEL, 'thread:abc'] }]]);
   });
 
   // The model takes about 20 s, and a chat carried on in its terminal moves in that time.

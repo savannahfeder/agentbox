@@ -659,6 +659,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
 function stopsAnswered(events: ThreadEvent[]): ThreadEvent[] {
   const lastMessage = events.findLastIndex((e) => e.message);
   return events.flatMap((e, i) => {
+    const next = events[i + 1];
+    // Back from Done as it stopped (store.chatAsksAgain): the line says why, and nobody sent it.
+    if (e.said === 'You sent it back' && next?.field === 'result' && saysItStopped(next.words) && next.at - e.at <= 5) return [];
     if (i >= lastMessage || e.field !== 'result' || !saysItStopped(e.words)) return [e];
     const before = saidBeforeTheStop(e.words ?? '');
     return before ? [{ ...e, words: before }] : [];

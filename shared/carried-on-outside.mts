@@ -31,6 +31,8 @@ export function stoppedThere(waitingFor: string, folder?: string | null, { reply
   return `${STOPPED}${why}. Answer it ${folder ? `in its ${folder} window` : 'there'}${replyWaits ? ', and it gets your reply next' : ''}.**`;
 }
 export const saysItStopped = (text: unknown): boolean => String(text ?? '').startsWith(STOPPED);
+/** Any of the lines the follow writes where an answer would be: your move, not an answer. */
+export const followsWord = (text: unknown): boolean => [STOPPED, CUT_THERE, CLOSED_THERE, HELD].some((l) => String(text ?? '').startsWith(l));
 /** What its agent had said before it stopped, '' for nothing. */
 export const saidBeforeTheStop = (text: string): string => text.split('\n\n').slice(1).join('\n\n');
 /** You stopped it there: Esc, on a question or in the middle of its work. */
@@ -38,4 +40,5 @@ export const CUT_THERE = '**You stopped Claude Code there.**';
 /** Its window went before its agent answered. */
 export const CLOSED_THERE = '**Claude Code closed before it answered.**';
 /** It keeps a reply from here until you allow it in its own window. */
-export const heldThere = (folder?: string | null): string => `**Claude Code is holding your reply. Allow it ${folder ? `in its ${folder} window` : 'there'}.**`;
+const HELD = '**Claude Code is holding your reply.';
+export const heldThere = (folder?: string | null): string => `${HELD} Allow it ${folder ? `in its ${folder} window` : 'there'}.**`;

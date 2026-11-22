@@ -10,7 +10,7 @@
 // one small-model call, asked on any account or engine with room, and it
 // writes the name, the context and the answer with three options.
 import { describe, it, expect } from 'vitest';
-import { catchUpPrompt, cleanCatchUp, catchUpResult, EARLIER_MOST, turnsBefore } from '../main/catch-up.mts';
+import { catchUpPrompt, cleanCatchUp, catchUpResult, TURNS_MOST, turnsSaid } from '../main/catch-up.mts';
 
 const chat = {
   title: 'can you look at the notes store and tell me whats wrong with it',
@@ -46,22 +46,25 @@ describe('what the model is asked', () => {
 describe('a chat carried on where it started', () => {
   const carried = {
     body: 'Look at this folder, then ask me one short question about what to build here first.',
-    saidOutside: 'A list of products. Then a three-bullet plan for that page.',
+    turns: ['Agent: What first?', 'Person: A list of products. Then a three-bullet plan for that page.'],
     result: 'The wait is running in the background. I will send the plan when it finishes.',
     project: 'Shop',
   };
   it('names the project the chat is in', () => {
     expect(catchUpPrompt(carried)).toContain('--- the project ---\nShop\n');
   });
-  it('carries what the person said last, between the opening and the answer', () => {
+  it('carries what was said since, between the opening and the answer', () => {
     const p = catchUpPrompt(carried);
     expect(p.indexOf('A list of products')).toBeGreaterThan(p.indexOf('Look at this folder'));
     expect(p.indexOf('A list of products')).toBeLessThan(p.indexOf('The wait is running'));
   });
+
   // Measured 2026-11-21 on a real chat five replies into its terminal: "Include
   // tax. Reply with the word ok only." was answered "ok", and the rewrite, shown
   // only the opening and that, asked whether to write the README summary that
-  // had been written 24 minutes before.
+  // had been written 24 minutes before. And 2026-11-22: not shown the "yes do it"
+  // replied here, it apologised for the agent ("That was my mistake") and
+  // recommended undoing the commit that reply had approved.
   const line = (source, patch) => ({ ts: 1, source, patch });
   const history = [
     line('agent', { title: 'README project summary', status: 'open', labels: ['thread-import'] }),
@@ -70,34 +73,38 @@ describe('a chat carried on where it started', () => {
     line('agent', { label: 'Kestrel', problem: 'What it does.', result: '**Next?**' }),
     line('founder', { saidOutside: 'Name the checkout module.' }),
     line('system', { chatAt: 2 }),
-    line('agent', { result: '**Claude Code stopped to ask you a question. Answer it there.**' }),
+    line('agent', { result: '**Claude Code stopped to ask you a question. Answer it in its kestrel window.**' }),
     line('agent', { result: 'I would name it cart. Include tax?', chatAt: 3 }),
-    line('founder', { saidOutside: 'Include tax. Reply with the word ok only.' }),
+    line('founder', { answer: 'Include tax. Reply with the word ok only.' }),
+    line('system', { answeredThrough: 4 }),
     line('agent', { result: 'ok', chatAt: 4 }),
   ];
-  it('carries the turns between the opening and what was said last', () => {
-    expect(turnsBefore(history)).toEqual(['Agent: It is a throwaway project.', 'Person: Name the checkout module.', 'Agent: I would name it cart. Include tax?']);
-    const p = catchUpPrompt({ body: 'Tell me what this project does.', saidOutside: 'Include tax. Reply with the word ok only.', result: 'ok', earlier: turnsBefore(history) });
+  it('carries every turn after the opening, the replies typed here among them', () => {
+    const turns = turnsSaid(history);
+    expect(turns).toEqual(['Agent: It is a throwaway project.', 'Person: Name the checkout module.', 'Agent: I would name it cart. Include tax?', 'Person: Include tax. Reply with the word ok only.']);
+    const p = catchUpPrompt({ body: 'Tell me what this project does.', result: 'ok', turns });
     const at = (words) => p.indexOf(words);
     expect(at('Tell me what this project does.')).toBeLessThan(at('Agent: It is a throwaway project.'));
-    expect(at('Agent: I would name it cart. Include tax?')).toBeLessThan(at('Include tax. Reply with the word ok only.'));
+    expect(at('Person: Include tax.')).toBeLessThan(at('--- the agent last said ---'));
     expect(p).toContain('where it stands now');
+    expect(p).toMatch(/never add a mistake, an apology/i);
   });
   it('carries the newest few of a long one, each cut short', () => {
     const long = Array.from({ length: 20 }, (_, i) => [line('founder', { saidOutside: `ask ${i}` }), line('agent', { result: `answer ${i} ${'x'.repeat(5000)}` })]).flat();
-    const turns = turnsBefore(long);
-    expect(turns).toHaveLength(EARLIER_MOST);
-    expect(turns.at(-1)).toMatch(/^Agent: answer 18 /);
+    const turns = turnsSaid(long);
+    expect(turns).toHaveLength(TURNS_MOST);
+    expect(turns.at(-1)).toBe('Person: ask 19');
     expect(Math.max(...turns.map((t) => t.length))).toBeLessThan(800);
     // Both ends, with the gap marked: a draft cut short was taken for one its agent never finished.
-    const [one] = turnsBefore([line('agent', { result: `Here is the plan. ${'x'.repeat(5000)} Shall I start?` }), line('founder', { saidOutside: 'Yes.' })]);
+    const [one] = turnsSaid([line('agent', { result: `Here is the plan. ${'x'.repeat(5000)} Shall I start?` }), line('founder', { saidOutside: 'Yes.' })]);
     expect(one).toMatch(/^Agent: Here is the plan\. .* \[left out here\] .*Shall I start\?$/);
-    expect(turnsBefore([line('agent', { result: 'y'.repeat(700) }), line('founder', { saidOutside: 'Yes.' })])).toEqual([`Agent: ${'y'.repeat(700)}`]);
+    expect(turnsSaid([line('agent', { result: 'y'.repeat(700) }), line('founder', { saidOutside: 'Yes.' })])).toEqual([`Agent: ${'y'.repeat(700)}`, 'Person: Yes.']);
   });
-  it('has none for a chat only brought in, and takes nothing an agent wrote as yours', () => {
-    expect(turnsBefore(history.slice(0, 4))).toEqual([]);
-    expect(turnsBefore([])).toEqual([]);
-    expect(turnsBefore([line('agent', { saidOutside: 'Ship it.' }), line('agent', { result: 'Done.' })])).toEqual([]);
+  it('has none for a chat only brought in, a reply taken back, or words an agent wrote as yours', () => {
+    expect(turnsSaid(history.slice(0, 4))).toEqual([]);
+    expect(turnsSaid([])).toEqual([]);
+    expect(turnsSaid([line('agent', { saidOutside: 'Ship it.' }), line('agent', { result: 'Done.' })])).toEqual([]);
+    expect(turnsSaid([line('founder', { answer: 'Ship it.' }), line('founder', { answer: '(withdrawn)' })])).not.toContain('Person: Ship it.');
   });
 
   it('a chat that was only brought in reads as it did, with no empty parts', () => {

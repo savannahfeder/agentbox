@@ -408,9 +408,9 @@ describe('a new chat, brought in while its agent waits in the terminal', () => {
 describe('what the session file says', () => {
   it('names the status and what it waits for, and null once nothing holds it', () => {
     session('waiting', 'permission prompt');
-    expect(claudeSessionState(SID, [home])).toEqual({ status: 'waiting', waitingFor: 'permission prompt', folder: '', pid: process.pid });
+    expect(claudeSessionState(SID, [home])).toEqual({ status: 'waiting', waitingFor: 'permission prompt', folder: '', pid: process.pid, since: 0 });
     session('busy', undefined, '/w/payments-api');
-    expect(claudeSessionState(SID, [home])).toEqual({ status: 'busy', waitingFor: '', folder: 'payments-api', pid: process.pid });
+    expect(claudeSessionState(SID, [home])).toEqual({ status: 'busy', waitingFor: '', folder: 'payments-api', pid: process.pid, since: 0 });
     expect(claudeSessionStatus(SID, [home])).toBe('busy');
     session(null);
     expect(claudeSessionState(SID, [home])).toBeNull();

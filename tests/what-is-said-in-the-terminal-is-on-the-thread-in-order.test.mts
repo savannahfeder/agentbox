@@ -239,7 +239,47 @@ describe('an answer given there', () => {
   });
 });
 
+describe('a chat closed here while its agent works on there', () => {
+  beforeEach(() => bringIn());
+  const closed = async () => {
+    write(typed(Date.now() - 60_000, 'Plan it.'));
+    session('busy');
+    await follow();
+    s.answerItem(slug, row().id, { status: 'done' });
+    return row().wrote.status.ts;
+  };
+  const waits = (since, on = 'permission prompt') => ({ stateOf: () => ({ status: 'waiting', waitingFor: on, folder: 'kestrel', since }) });
+
+  it('is back when its agent stops on you in its window after that, and stays gone when it had stopped before', async () => {
+    const doneAt = await closed();
+    await follow(doneAt + 1_000, waits(doneAt - 1));
+    expect(row().status).toBe('done');
+    await follow(doneAt + 5_000, waits(doneAt + 2_000));
+    expect(row().status).toBe('open');
+    expect(row().result).toBe('**Claude Code stopped to ask for your OK. Answer it in its kestrel window.**');
+    expect(belongsInInbox(row(), { now: doneAt + 6_000 })).toBe(true);
+    // Not drawn as one you sent back, nor as words of yours.
+    expect(events().map((e) => e.said)).not.toContain('You sent it back');
+    expect(said().filter(([who]) => who === 'you')).toEqual([['you', 'Plan it.']]);
+  });
+
+  it('has the plan you then approve there, though it was put up before you closed it', async () => {
+    const doneAt = await closed();
+    write(calls(doneAt - 5_000, 'ExitPlanMode', 'p'), result(doneAt + 5_000, { plan: '# The plan' }, 'p'), says(doneAt + 9_000, 'Built. Commit it?'));
+    session('idle');
+    await follow(doneAt + 10_000);
+    expect(row().status).toBe('open');
+    expect(said().slice(-3)).toEqual([['agent', '# The plan'], ['you', 'Approved the plan'], ['agent', 'Built. Commit it?']]);
+  });
+});
+
 describe('who said what', () => {
+  it('leaves out what Claude Code writes over an interrupted turn, which no model said', () => {
+    write(typed(T0 + 200_000, 'Go on.'), { ...says(T0 + 201_000, 'No response requested.'), message: { role: 'assistant', model: '<synthetic>', stop_reason: 'stop_sequence', content: [{ type: 'text', text: 'No response requested.' }] } });
+    expect(readChatTurn(file).entries.at(-1)).toMatchObject({ who: 'you', text: 'Go on.' });
+  });
+
+
   it('draws no reply of yours from a claim alone, as when you approve a command there', async () => {
     bringIn();
     write(typed(T0 + 200_000, 'Push it.'));

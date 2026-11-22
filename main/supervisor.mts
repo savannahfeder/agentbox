@@ -185,7 +185,7 @@ import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexM
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mts';
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel, smallModelPictures } from './row-label.mts';
-import { catchUpRow, catchUpResult, turnsBefore } from './catch-up.mts';
+import { catchUpRow, catchUpResult, turnsSaid } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orAgent, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
@@ -5245,8 +5245,8 @@ export class Supervisor {
   }
 
   /**
-   * A CHAT BROUGHT IN, REWRITTEN AS A THREAD (main/catch-up.mts): its name the
-   * first time, its context and its answer with options. Never awaited, like the namer, and
+   * A CHAT BROUGHT IN, REWRITTEN AS A THREAD (main/catch-up.mts): its name, its
+   * answer with options and its context, and after the first time only that. Never awaited, like the namer, and
    * a few at once: the person is looking at these rows the moment setup ends. A miss waits a minute; after three the row keeps the
    * agent's own last message.
    */
@@ -5264,8 +5264,8 @@ export class Supervisor {
       this._catchingUp.add(key(next));
       const labels = (next.labels ?? []).filter((l) => l !== CATCH_UP_LABEL);
       const project = this.store.listProducts?.().find((p) => p.slug === next.product)?.name ?? null;
-      const earlier = turnsBefore(this.store.readHistory?.(next.product, next.id) ?? []);
-      return this._askSmall((opts) => catchUpRow({ ...next, project, earlier }, opts) as Promise<CatchUpCard | ''>, { product: next.product })
+      const turns = turnsSaid(this.store.readHistory?.(next.product, next.id) ?? []);
+      return this._askSmall((opts) => catchUpRow({ ...next, project, turns }, opts) as Promise<CatchUpCard | ''>, { product: next.product })
         .then((card) => {
           if (!card) {
             const misses = (this._catchUpMisses.get(key(next))?.count ?? 0) + 1;
@@ -5277,7 +5277,9 @@ export class Supervisor {
           // Carried on in its terminal while this was written: its newer answer is owed its own.
           const row = this.store.readItem?.(next.product, next.id);
           if (row && (row.result !== next.result || row.wrote?.saidOutside?.ts !== next.wrote?.saidOutside?.ts || row.status !== next.status)) return;
-          this.store.catchUpItem(next.product, next.id, { ...(next.label ? {} : { label: card.title }), problem: card.context, result: catchUpResult(card) });
+          // A later answer stays in its agent's own words: what was made up over one was acted on.
+          const first = !next.wrote?.problem;
+          this.store.catchUpItem(next.product, next.id, { ...(next.label ? {} : { label: card.title }), problem: card.context, ...(first ? { result: catchUpResult(card) } : {}) });
           this.store.routeItem?.(next.product, next.id, { labels });
           this.onChange?.();
         })

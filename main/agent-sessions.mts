@@ -442,8 +442,8 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
   const lines = buf.slice(0, n).toString('utf8').split('\n');
   if (from > 0) lines.shift();
   const turn: ChatTurn = { heard: '', heardAt: 0, said: '', saidAt: 0, ended: false, cutAt: 0, entries: [] };
-  // Each tool call, so a question is dated by when it was put up, and one you cancelled is known at all.
-  const called = new Map<unknown, { at: number; asked: string }>();
+  // Each tool call's question, so one you cancelled is known at all.
+  const called = new Map<unknown, string>();
   for (const line of lines) {
     if (!line.trim()) continue;
     let row: TranscriptRow & { isSidechain?: boolean; attachment?: unknown; message?: { content?: unknown; stop_reason?: unknown } };
@@ -466,8 +466,9 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
     if (row.type === 'user') {
       const pick = pickedIn(row.toolUseResult);
       const call = called.get(blocks.find((b) => b?.type === 'tool_result')?.tool_use_id);
-      const asked = pick?.asked || call?.asked;
-      if (asked) turn.entries.push({ who: 'agent', at: Math.min(call?.at ?? at, at - 1), text: asked });
+      const asked = pick?.asked || call;
+      // Dated just before your answer: the row may have gone to Done while it was up.
+      if (asked) turn.entries.push({ who: 'agent', at: at - 1, text: asked });
       if (pick) turn.entries.push({ who: 'you', at, text: pick.picked });
       turn.ended = CUT_SHORT.test(messageText(row).trim());
       if (turn.ended) turn.cutAt = at;
@@ -475,7 +476,9 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
     }
     // Claude Code refusing the turn, a usage limit: the agent has stopped.
     if (row.isApiErrorMessage) { turn.ended = true; continue; }
-    for (const b of blocks) if (b?.type === 'tool_use') called.set(b.id, { at, asked: b.name === 'AskUserQuestion' ? questionsAsked(b.input?.questions) : '' });
+    // Its own filler over an interrupted turn, which no model wrote.
+    if ((row.message as { model?: unknown } | undefined)?.model === '<synthetic>') continue;
+    for (const b of blocks) if (b?.type === 'tool_use') called.set(b.id, b.name === 'AskUserQuestion' ? questionsAsked(b.input?.questions) : '');
     const text = messageText(row).trim();
     if (text) {
       turn.entries.push({ who: 'agent', at, text: text.slice(-SAID_CHARS) });

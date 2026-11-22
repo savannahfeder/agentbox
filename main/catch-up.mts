@@ -6,19 +6,19 @@
 
 import { askSmallModel, NAME_MODEL } from './row-label.mts';
 import type { SmallModelOptions } from './row-label.mts';
-import { saysItStopped } from '../shared/carried-on-outside.mts';
+import { followsWord } from '../shared/carried-on-outside.mts';
 
 /** A rewrite writes more than a name, so it gets longer than the namer's 90s. */
 export const CATCH_UP_TIMEOUT_MS = 150_000;
 
 const cut = (s: unknown, n: number) => String(s ?? '').replace(/\r/g, '').trim().slice(0, n);
 
-/** `saidOutside` is what the person last typed where the chat started
- *  (main/chat-follow.mts), and `earlier` the turns before it. Without the
- *  project the model guessed the folder from the person's own Claude Code settings. */
-export interface CatchUpItem { body?: string | null; title?: string | null; result?: string | null; saidOutside?: string | null; project?: string | null; earlier?: string[] }
+/** `turns` is what was said between the opening and the agent's last answer.
+ *  Without the project the model guessed the folder from the person's own Claude
+ *  Code settings. */
+export interface CatchUpItem { body?: string | null; title?: string | null; result?: string | null; project?: string | null; turns?: string[] }
 
-export const EARLIER_MOST = 6;
+export const TURNS_MOST = 10;
 const TURN_CHARS = 700;
 // Its end is where a turn asks, and the gap is said: a draft cut short was
 // taken for one its agent never finished.
@@ -27,21 +27,23 @@ const shortTurn = (s: unknown) => {
   return text.length <= TURN_CHARS ? text : `${text.slice(0, 300)} [left out here] ${text.slice(-380)}`;
 };
 
-/** The turns of a chat carried on where it started, after its opening and
- *  before the last thing typed there, off the row's history. A write-up is
- *  never a turn. */
-export function turnsBefore(lines: readonly { source?: unknown; patch?: Record<string, unknown> | null }[]): string[] {
+/** What was said after a chat's opening and before its agent's last answer, off
+ *  the row's history: typed where it started or replied here. A write-up is
+ *  never a turn, nor a reply taken back. */
+export function turnsSaid(lines: readonly { source?: unknown; patch?: Record<string, unknown> | null }[]): string[] {
   const turns: string[] = [];
-  let lastYours = 0;
+  let lastYours = -1;
   for (const { source, patch } of lines) {
-    if (source === 'founder' && typeof patch?.saidOutside === 'string') {
+    const yours = source === 'founder' ? patch?.saidOutside || patch?.answer : null;
+    if (yours === '(withdrawn)') { if (turns.at(-1)?.startsWith('Person: ')) turns.pop(); continue; }
+    if (typeof yours === 'string' && yours) {
       lastYours = turns.length;
-      turns.push(`Person: ${shortTurn(patch.saidOutside)}`);
-    } else if (source === 'agent' && typeof patch?.result === 'string' && !patch.problem && !saysItStopped(patch.result)) {
+      turns.push(`Person: ${shortTurn(yours)}`);
+    } else if (source === 'agent' && typeof patch?.result === 'string' && !patch.problem && !followsWord(patch.result)) {
       turns.push(`Agent: ${shortTurn(patch.result)}`);
     }
   }
-  return turns.slice(0, lastYours).slice(-EARLIER_MOST);
+  return turns.slice(0, lastYours + 1).slice(-TURNS_MOST);
 }
 
 export interface CatchUpCard { title: string; context: string; ask: string; said: string; options: string[] }
@@ -52,6 +54,8 @@ export function catchUpPrompt(item: CatchUpItem | null | undefined) {
     'that shows each thread as a short card, not as a chat. Rewrite where it stands now as',
     'that card, written as the agent speaking to the person ("I found", "Should I").',
     'Plain words, no markdown, no code, no file paths unless one is the point.',
+    'Say only what is written below. Never add a mistake, an apology, an offer or a',
+    'result the agent did not write. When the agent offered choices, the options are those.',
     '',
     'Reply with one JSON object and nothing else:',
     '{',
@@ -65,8 +69,7 @@ export function catchUpPrompt(item: CatchUpItem | null | undefined) {
     ...(cut(item?.project, 120) ? ['--- the project ---', cut(item?.project, 120)] : []),
     '--- the person opened with ---',
     cut(item?.body || item?.title, 1500),
-    ...(item?.earlier?.length ? ['--- then, oldest first ---', ...item.earlier] : []),
-    ...(cut(item?.saidOutside, 1500) ? ['--- the person then said ---', cut(item?.saidOutside, 1500)] : []),
+    ...(item?.turns?.length ? ['--- then, oldest first ---', ...item.turns] : []),
     '--- the agent last said ---',
     cut(item?.result, 5000) || '(nothing)',
     '---',
