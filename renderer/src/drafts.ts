@@ -47,8 +47,10 @@ export interface DraftStore {
   key?(index: number): string | null;
 }
 
+// A page drawn with no window (a test, the server) keeps nothing rather than failing.
+const NOWHERE: DraftStore = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 const backing = (store?: DraftStore): DraftStore =>
-  store ?? ((globalThis as unknown as { localStorage: DraftStore }).localStorage);
+  store ?? (globalThis as unknown as { localStorage?: DraftStore }).localStorage ?? NOWHERE;
 
 /** One draft per thread, and the composer opens whatever it finds here. */
 export function draftKey(item: ItemRef): string {
@@ -148,6 +150,45 @@ export function saveDraftPick(item: ItemRef, pick: DraftPick | null, store?: Dra
     if (!pick) s.removeItem(draftPickKey(item));
     else s.setItem(draftPickKey(item), JSON.stringify({ model: pick.model ?? null, effort: pick.effort ?? null, ...(pick.engine ? { engine: pick.engine } : {}) }));
   } catch { /* a refused store is not a reason to lose the send */ }
+}
+
+/** The ask or hand-over sheet as it was left on a thread. */
+export interface AskDraft {
+  /** Each person's note, kept until it is sent to them. */
+  notes: Record<string, string>;
+  /** Whose sheet a close left, and on which choice, for Ask a teammate to open again. */
+  last: { to: { id: string; name: string }; mode: 'help' | 'review' | 'give' } | null;
+}
+
+export function askDraftKey(item: ItemRef): string {
+  return `zero.askdraft.${item.product}:${item.id}`;
+}
+
+export function readAskDraft(item: ItemRef, store?: DraftStore): AskDraft {
+  const none: AskDraft = { notes: {}, last: null };
+  try {
+    const d = JSON.parse(backing(store).getItem(askDraftKey(item)) ?? 'null');
+    if (!d || typeof d !== 'object') return none;
+    const notes = d.notes && typeof d.notes === 'object' && !Array.isArray(d.notes)
+      ? Object.fromEntries(Object.entries(d.notes).filter((e): e is [string, string] => typeof e[1] === 'string' && !!e[1]))
+      : {};
+    const l = d.last;
+    const last = l && typeof l.to?.id === 'string' && typeof l.to?.name === 'string' && ['help', 'review', 'give'].includes(l.mode)
+      ? { to: { id: l.to.id, name: l.to.name }, mode: l.mode } : null;
+    return { notes, last };
+  } catch {
+    return none;
+  }
+}
+
+/** Nothing to keep removes it. */
+export function saveAskDraft(item: ItemRef, draft: AskDraft, store?: DraftStore): void {
+  const s = backing(store);
+  const notes = Object.fromEntries(Object.entries(draft.notes).filter(([, n]) => n));
+  try {
+    if (Object.keys(notes).length || draft.last) s.setItem(askDraftKey(item), JSON.stringify({ notes, last: draft.last }));
+    else s.removeItem(askDraftKey(item));
+  } catch { /* kept for as long as the sheet is open */ }
 }
 
 /* ------------------------------ the images ------------------------------- */
@@ -400,6 +441,37 @@ export function bringBackUnsent(item: ItemRef, replies: InFlightReply[], lines: 
   return back;
 }
 
+type History = { ok: boolean; lines: Parameters<typeof landedIn>[1] };
+
+/** Waits before each look after the first; a reply still not in its thread after the last is put back. */
+export const UNSENT_CHECKS_MS = [0, 30_000, 90_000];
+
+/**
+ * bringBackUnsent, after looking more than once: just after a restart a sent
+ * reply's write can still be on its way, or the history unreadable, and one
+ * look put such a reply back in the box while it reached the agent too.
+ */
+export async function bringBackWhenSure(
+  item: ItemRef,
+  replies: InFlightReply[],
+  read: () => Promise<History>,
+  waiting: () => string[],
+  { checks = UNSENT_CHECKS_MS, wait = (ms: number) => new Promise<void>((r) => { setTimeout(r, ms); }), store }: { checks?: number[]; wait?: (ms: number) => Promise<void>; store?: DraftStore } = {},
+): Promise<number> {
+  let left = replies;
+  for (let i = 0; i < checks.length; i++) {
+    if (checks[i] > 0) await wait(checks[i]);
+    const still = new Set(readInFlight(item, backing(store)).map((r) => r.at));
+    left = left.filter((r) => still.has(r.at));
+    if (!left.length) return 0;
+    const history = await read().catch((): History => ({ ok: false, lines: [] }));
+    if (i === checks.length - 1) return bringBackUnsent(item, left, history.ok ? history.lines : [], waiting(), store);
+    if (!history.ok) continue;
+    for (const r of left) if (landedIn(r, history.lines, waiting())) replyLanded(item, r.at, store);
+  }
+  return 0;
+}
+
 // ---------------------------------------------------------------------------
 // THE NEW TASK CARD'S DRAFT
 //
@@ -447,6 +519,13 @@ export interface ComposeDraft {
   dropped: number;
   /** When Send was pressed on these words, while that send has not landed. */
   sendingAt?: number;
+  /** The agent and model picked on this card, so Undo gives back the card it sent. */
+  pick?: { engine: string; model: string };
+}
+
+/** The draft's own pick, where this Mac still offers its engine. */
+export function cardPick(d: ComposeDraft, offered: readonly string[]): { engine: string; model: string } | null {
+  return d.pick && offered.includes(d.pick.engine) ? d.pick : null;
 }
 
 export const COMPOSE_DRAFT_KEY = 'zero.draft.compose';
@@ -490,6 +569,7 @@ export function readComposeDraft(store?: DraftStore, place?: string): ComposeDra
   if (!parsed || typeof parsed !== 'object') return { ...EMPTY_COMPOSE_DRAFT };
   const d = parsed as Record<string, unknown>;
   const when = (d.when && typeof d.when === 'object' ? d.when : {}) as Record<string, unknown>;
+  const pick = (d.pick && typeof d.pick === 'object' ? d.pick : {}) as Record<string, unknown>;
   return {
     text: typeof d.text === 'string' ? d.text : '',
     attachments: (Array.isArray(d.attachments) ? d.attachments : []).map(attachmentOf).filter((a): a is DraftAttachment => !!a),
@@ -497,6 +577,7 @@ export function readComposeDraft(store?: DraftStore, place?: string): ComposeDra
     when: { runAt: typeof when.runAt === 'number' ? when.runAt : 0, repeat: when.repeat ?? null, ...(when.later === true ? { later: true } : {}) },
     dropped: typeof d.dropped === 'number' && d.dropped > 0 ? d.dropped : 0,
     ...(typeof d.sendingAt === 'number' ? { sendingAt: d.sendingAt } : {}),
+    ...(typeof pick.engine === 'string' && typeof pick.model === 'string' ? { pick: { engine: pick.engine, model: pick.model } } : {}),
   };
 }
 

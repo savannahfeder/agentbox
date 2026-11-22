@@ -174,7 +174,7 @@ describe('the app keeps the words until the write lands, and asks on load', () =
 
   it('looks for replies left in flight once the screen has loaded', () => {
     expect(app).toMatch(/repliesInFlight\(\)/);
-    expect(app).toMatch(/bringBackUnsent\(/);
+    expect(app).toMatch(/bringBackWhenSure\(/);
   });
 
   it('a write from the browser copy outlives a reload that starts while it is on its way', () => {

@@ -16,7 +16,8 @@ export type NotePlace =
   | { kind: 'whole'; x?: undefined; y?: undefined };
 
 export type Mark =
-  | { do: 'note'; id: string; file: string; place: NotePlace; text: string; mentions?: string[]; owner?: string; wait?: boolean }
+  /** `v`: the version number on screen when it was written; `file` alone does not always say it. */
+  | { do: 'note'; id: string; file: string; v?: number; place: NotePlace; text: string; mentions?: string[]; owner?: string; wait?: boolean }
   | { do: 'reply'; id: string; on: string; file: string; text: string }
   | { do: 'resolve' | 'reopen'; on: string; in?: string }
   | { do: 'approve' | 'unapprove'; file: string; owner?: string }
@@ -56,6 +57,8 @@ export interface FileReply { id: string; text: string; by: string | null; ts: nu
 export interface FileNote {
   id: string;
   file: string;
+  /** The version number it was made on, where the note says. */
+  v?: number;
   place: NotePlace;
   text: string;
   by: string | null;
@@ -211,8 +214,9 @@ export function cleanMark(raw: unknown): Mark | undefined {
       const text = typeof value.text === 'string' ? value.text.trim().slice(0, MAX_NOTE_CHARS) : '';
       if (!id || !file || !place || !text) return undefined;
       const mentions = Array.isArray(value.mentions) ? [...new Set(value.mentions.map(shortId).filter(Boolean) as string[])].slice(0, MAX_NAMED) : [];
+      const v = Number.isInteger(value.v) && (value.v as number) >= 1 && (value.v as number) <= 9999 ? value.v as number : null;
       // `wait`: held for Send rather than told to the agent as it is added.
-      return { do: 'note', id, file, place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}), ...(value.wait === true ? { wait: true } : {}) };
+      return { do: 'note', id, file, ...(v ? { v } : {}), place, text, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}), ...(value.wait === true ? { wait: true } : {}) };
     }
     case 'reply': {
       const id = shortId(value.id);
@@ -285,7 +289,7 @@ export function marksOf(entries: readonly MarkEntry[] | null | undefined): FileM
     if (e.do === 'edit' && e.path) {
       edits.push({ file: e.file, path: e.path, by: e.by ?? null, ts: e.ts });
     } else if (e.do === 'note' && !notes.has(e.id)) {
-      const note: FileNote = { id: e.id, file: e.file, place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null, ...(e.wait ? { wait: true } : {}) };
+      const note: FileNote = { id: e.id, file: e.file, ...(e.v ? { v: e.v } : {}), place: e.place, text: e.text, by: e.by ?? null, ts: e.ts, mentions: e.mentions ?? [], owner: e.owner ?? null, uid: e.uid ?? null, ...(e.wait ? { wait: true } : {}) };
       if (e.place.kind === 'pin' || ((e.place.kind === 'time' || e.place.kind === 'page') && unit(e.place.x))) {
         const n = (pins.get(e.file) ?? 0) + 1;
         pins.set(e.file, n);
@@ -353,7 +357,8 @@ export function placeWords(note: { place?: NotePlace | null; pin?: number | stri
 
 // `<sha12>-name`, how a shared thread names its copy, and `<time>-<random>-name`,
 // how a saved attachment is named: main/team/thread-share.mts, main/save-attachments.mts.
-const COPY_PREFIX = /^[0-9a-f]{12}-/;
+// One or more: a teammate's copy of a file sent to a thread carries a prefix of its own in front.
+const COPY_PREFIX = /^(?:[0-9a-f]{12}-)+/;
 const SAVED_PREFIX = /^([a-z0-9]{8})-[a-z0-9]{1,6}-/;
 // The stamp is Date.now() in base 36, so it must read as a moment the app could
 // have saved at: "payments-auth-" and "bookings-empty-" fit the shape and are words.
@@ -658,7 +663,7 @@ export function versionForPath(families: readonly FileFamily[] | null | undefine
 const EXT = 'png|jpe?g|gif|webp|svg|mp4|mov|m4v|webm|pdf|md|markdown|pptx';
 const PATHISH = String.raw`(?:\.?\/)?[\w.-]+(?:\/[\w.-]+)*\.(?:${EXT})`;
 const NAMED = new RegExp(
-  String.raw`\]\(<?((?:\.?\/)?[^()\s>:]+\.(?:${EXT}))>?\)`
+  String.raw`\]\(<?((?:\.?\/|[A-Za-z]:\/)?[^()\s>:]+\.(?:${EXT}))>?\)`
   + '|`(' + PATHISH + ')`'
   + String.raw`|(?<![\w./:@~(\[-])(${PATHISH})(?![\w/-])`,
   'gi',
@@ -822,6 +827,19 @@ export function sharedByWords(v: Pick<FileVersion, 'by' | 'agent' | 'edited' | '
   return whose ? `Shared by ${whose}'s agent` : 'Shared by your agent';
 }
 
+/**
+ * The agent that hears notes on version `id`: its own, or on a person's edit,
+ * the agent whose file it was. Null on a file no agent made.
+ */
+export function agentOfVersion(versions: ReadonlyArray<Pick<FileVersion, 'id' | 'agent' | 'edited'>>, id: string): string | null {
+  for (let i = versions.findIndex((v) => v.id === id); i >= 0; i--) {
+    const v = versions[i];
+    if (typeof v.agent === 'string') return v.agent;
+    if (!v.edited) return null;
+  }
+  return null;
+}
+
 /** "Resolved by your agent in v15": a comment the version `v` answered. */
 export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, { me, nameOf }: { me: string | null; nameOf: (id: string) => string }): string {
   const whose = !v?.by || v.by === me ? null : nameOf(v.by);
@@ -837,9 +855,12 @@ export function resolvedInWords(v: Pick<FileVersion, 'by' | 'agent' | 'n'>, { me
  * the same comment, not a copy, so resolving it here resolves it everywhere.
  * `from` names the version it was made on ("v1").
  */
-export function carriedNotes<N extends Pick<FileNote, 'file' | 'resolved'>>(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly N[] | null | undefined, { resolved = false }: { resolved?: boolean } = {}): Array<N & { from: string }> {
+export function carriedNotes<N extends Pick<FileNote, 'file' | 'resolved' | 'v'>>(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: readonly N[] | null | undefined, { resolved = false }: { resolved?: boolean } = {}): Array<N & { from: string }> {
   const earlier = new Map((family?.versions ?? []).slice(0, Math.max(0, index)).map((v) => [v.id, v]));
-  return (notes ?? []).filter((n) => earlier.has(n.file) && (resolved || !n.resolved)).map((n) => ({ ...n, from: `v${earlier.get(n.file)!.n}` }));
+  // A file edited in place keeps one id across versions, so the note's own number decides.
+  const here = family?.versions?.[index]?.n;
+  const madeHereOrLater = (n: N) => typeof n.v === 'number' && typeof here === 'number' && n.v >= here;
+  return (notes ?? []).filter((n) => earlier.has(n.file) && !madeHereOrLater(n) && (resolved || !n.resolved)).map((n) => ({ ...n, from: `v${n.v ?? earlier.get(n.file)!.n}` }));
 }
 
 /** What to tell someone editing version `baseN` when somebody else has saved since, or null. */
@@ -873,7 +894,7 @@ export function approvalSince(family: Pick<FileFamily, 'versions'> | null | unde
  * comments still open on it. A version in `offered` (offeredTogether) is a
  * choice still on the table, so a newer one beside it is not asked about.
  */
-export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: ReadonlyArray<Pick<FileNote, 'file' | 'resolved'>> | null | undefined, offered: ReadonlySet<string> | null = null): { text: string; newest: FileVersion | null } | null {
+export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefined, index: number, notes: ReadonlyArray<Pick<FileNote, 'file' | 'resolved'>> | null | undefined, offered: ReadonlySet<string> | null = null): { text: string; newest: FileVersion | null; yes: string } | null {
   const versions = family?.versions ?? [];
   const here = versions[index];
   if (!here) return null;
@@ -883,7 +904,9 @@ export function approveAsk(family: Pick<FileFamily, 'versions'> | null | undefin
   const said = [`Approve v${here.n}?`];
   if (newest) said.push(`v${newest.n} is newer.`);
   if (open) said.push(open > 1 ? `${open} comments are still open.` : '1 comment is still open.');
-  return { text: said.join(' '), newest };
+  const left = `${open} ${open === 1 ? 'comment' : 'comments'} open`;
+  const yes = !open ? `Approve v${here.n}, not v${newest!.n}` : newest ? `Approve v${here.n} with ${left}` : `Approve with ${left}`;
+  return { text: said.join(' '), newest, yes };
 }
 
 /** The newest edited copy of the file at `path`, or `path` when nobody has edited it. */
@@ -995,7 +1018,10 @@ export function nextVersionName(name: string, count: number): string {
 const spotWords = (n: Pick<FileNote, 'place' | 'pin'>): string => (unit(n.place.x)
   ? `${placeWords(n)}, ${Math.round(n.place.x * 100)}% across and ${Math.round(n.place.y! * 100)}% down`
   : placeWords(n));
-const saveAsNext = (version: Pick<FileVersion, 'name'>, count: number): string => `save the result as ${nextVersionName(version.name, count)} beside the original, keeping the original as it is. Name the new file in your reply so it opens as the next version of ${baseName(version.name)}. The app gives every version its number, the same for everyone, so call it the next version, not a number of your own.`;
+// A second copy of a file the repository tracks would sit beside it in the code
+// (a test file run twice), and the app already shows new bytes at an old path
+// as the next version.
+const saveAsNext = (version: Pick<FileVersion, 'name'>, count: number): string => `If ${version.name} is tracked in your repository, change it where it is and commit it. Otherwise save the result as ${nextVersionName(version.name, count)} beside the original, keeping the original as it is. Name the new file in your reply so it opens as the next version of ${baseName(version.name)}. The app gives every version its number, the same for everyone, so call it the next version, not a number of your own.`;
 
 /** The open notes on this version not yet sent to the agent, as the words that send them. */
 export function notesForTheAgent(marks: Pick<FileMarks, 'notes'> | null | undefined, version: Pick<FileVersion, 'id' | 'path' | 'name'>, count: number, { nameOf = () => 'Someone' }: { nameOf?: NameOf } = {}): { text: string; ids: string[] } {
@@ -1004,7 +1030,7 @@ export function notesForTheAgent(marks: Pick<FileMarks, 'notes'> | null | undefi
     `Notes on ${version.path}:`,
     ...open.map((n) => [`- ${spotWords(n)}: ${n.text} (${nameOf(n.by)})`, ...(n.replies ?? []).map((r) => `  - ${r.text} (${nameOf(r.by)})`)].join('\n')),
     '',
-    `Make these changes and ${saveAsNext(version, count)}`,
+    `Make these changes. ${saveAsNext(version, count)}`,
   ].join('\n');
   return { text, ids: open.map((n) => n.id) };
 }
@@ -1020,7 +1046,7 @@ export function repliesForTheAgent(note: Pick<FileNote, 'place' | 'pin' | 'text'
     `${replies.length === 1 ? 'A reply' : 'Replies'} on the note at ${spotWords(note)} on ${version.path}, "${note.text}":`,
     ...replies.map((r) => `- ${r.text} (${nameOf(r.by)})`),
     '',
-    `If this asks for changes, make them and ${saveAsNext(version, count)}`,
+    `If this asks for changes, make them. ${saveAsNext(version, count)}`,
   ].join('\n');
 }
 

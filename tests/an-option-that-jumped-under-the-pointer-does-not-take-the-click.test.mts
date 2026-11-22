@@ -57,11 +57,12 @@ describe('what the strip has to watch for it', () => {
 
   it('measures where the strip is drawn, after every render', () => {
     expect(focus).toContain('stripRef.current?.getBoundingClientRect().top');
-    expect(focus).toContain('Math.abs(top - was) >= MOVED_PX');
+    expect(focus).toContain('if (strip.jumped(stripTopNow())) setStripMovedAt(Date.now());');
   });
 
   it('only counts a jump the pointer was standing on', () => {
-    expect(focus).toContain('overStrip.current');
+    expect(focus).toContain('if (over) strip.enter(stripTopNow()); else strip.leave();');
+    expect(focus).toContain('onOver={onStripOver}');
   });
 
   it('puts the refusal on the click and not on the keys', () => {

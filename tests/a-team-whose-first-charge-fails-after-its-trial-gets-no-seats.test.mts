@@ -4,7 +4,7 @@
 // subscription can reach `past_due` without ever having been paid: the card
 // passes Stripe's setup check, the first charge at the trial's end fails, and
 // Stripe retries it for weeks. `past_due` counted as paying, so the team kept
-// 400 hours and 10 agents a member through every retry and was never charged.
+// 400 hours a member through every retry and was never charged.
 // Measured on stand-ins against the real gateway: trialing then past_due gave
 // `seats: 2, hours: 400` a day after the trial ended. `past_due` now pays only
 // for a subscription that was once `active`, which is what a renewal's retry is.
@@ -34,7 +34,7 @@ function setup({ ledger = null }: { ledger?: unknown } = {}) {
     if (m) return subs.has(m[1]) ? json(200, subs.get(m[1])) : json(404, { error: { message: 'No such subscription' } });
     return json(404, { error: { message: 'not faked' } });
   };
-  const team = { id: 'team-1', createdAt: MADE, members: [A, B], owners: [A] };
+  const team: { id: string; createdAt: number; freeUntil?: number; members: string[]; owners: string[] } = { id: 'team-1', createdAt: MADE, members: [A, B], owners: [A] };
   const gw = createGateway({
     agentcore: { async invoke() { return { ok: true }; }, async stop() {} },
     links: { get: async (k: string) => `https://b/${k}`, put: async (k: string) => `https://b/${k}`, head: async (k: string) => `https://b/${k}` },
@@ -61,7 +61,7 @@ function setup({ ledger = null }: { ledger?: unknown } = {}) {
     const sig = `t=${t},v1=${crypto.createHmac('sha256', SECRET).update(`${t}.${raw}`).digest('hex')}`;
     return gw.handle({ method: 'POST', path: '/v1/stripe', headers: { 'stripe-signature': sig }, body: raw });
   };
-  return { teamOfMember, webhook, tick: (ms: number) => { clock += ms; } };
+  return { teamOfMember, webhook, team, tick: (ms: number) => { clock += ms; } };
 }
 
 describe('a team subscription that was never paid', () => {
@@ -73,9 +73,12 @@ describe('a team subscription that was never paid', () => {
     expect(await teamOfMember()).toBeUndefined();
   });
 
-  it('is still the trial while the free days last', async () => {
-    const { teamOfMember, webhook } = setup();
+  // Until 2026-11-21 a team had free days from the day it was made, card or not; now only given ones.
+  it('is no team at all, unless it has free days given by hand', async () => {
+    const { teamOfMember, webhook, team } = setup();
     await webhook('sub_team', 'past_due');
+    expect(await teamOfMember()).toBeUndefined();
+    team.freeUntil = MADE + TEAM.trialDays * DAY;
     expect(await teamOfMember()).toMatchObject({ trial: true, seats: 0, hours: TEAM.trialHoursPerMember });
   });
 });
@@ -119,10 +122,12 @@ describe('a team subscription that was paid', () => {
   });
 });
 
+// Since 2026-11-13 a trialing team keeps the trial's hours until it is charged
+// (tests/a-team-runs-any-number-at-once-and-a-card-trial-runs-on-trial-hours).
 describe('a trialing team', () => {
-  it('is on its seats, as the setup’s "Try Pro free" offers', async () => {
+  it("has its card in and the trial's hours, not yet a seat's", async () => {
     const { teamOfMember, webhook } = setup();
     await webhook('sub_team', 'trialing');
-    expect(await teamOfMember()).toMatchObject({ trial: false, seats: 2, hours: TEAM.hoursPerSeat });
+    expect(await teamOfMember()).toMatchObject({ trial: true, seats: 2, hours: TEAM.trialHoursPerMember });
   });
 });

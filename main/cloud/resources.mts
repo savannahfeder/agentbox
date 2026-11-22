@@ -1,6 +1,7 @@
 import path from 'node:path';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import { readPortableFile, snapshotSkills, filesInFolder, SKILL_LIMITS } from './skills.mts';
 import { run } from './exec.mts';
 import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
@@ -29,6 +30,8 @@ export interface ResourceFile {
   url: string;
   untar?: string;
   mode?: number;
+  // A saved key's name: the sandbox places it as a key (./key-asks.mts), not as a file.
+  key?: string;
 }
 
 export interface ResourceContext {
@@ -61,6 +64,8 @@ export interface ResourceRequestOptions {
   deliver: (files: ResourceFile[], signal: AbortSignal) => Promise<boolean>;
   stopped?: () => boolean;
   capable?: () => boolean;
+  /** Whether the cloud machine unpacks a folder sent as one archive. */
+  folders?: () => boolean;
   log?: (line: string) => void;
   timeoutMs?: number;
   limits?: Partial<{ file: number; total: number; requests: number; inFlight: number }>;
@@ -131,8 +136,20 @@ function normalized(args: ResourceAsk | null | undefined, { cwd, docs, account, 
   return { kind: 'file', root, full };
 }
 
+async function tarOfFiles(files: { rel: string; body: Buffer; mode: number }[]): Promise<Buffer> {
+  const stage = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'agentbox-folder-'));
+  try {
+    for (const f of files) {
+      const to = path.join(stage, f.rel);
+      await fs.promises.mkdir(path.dirname(to), { recursive: true });
+      await fs.promises.writeFile(to, f.body, { mode: f.mode });
+    }
+    return await run('tar', ['-czf', '-', '-C', stage, '.'], { encoding: null, env: { ...process.env, COPYFILE_DISABLE: '1' } }) as Buffer;
+  } finally { await fs.promises.rm(stage, { recursive: true, force: true }); }
+}
+
 /** A run-bound resolver. Its durable state belongs to that run's marker, never the caller. */
-export function createResourceRequests({ cwd, docs, account = null, engine, homeDir, configDir, codexHome, skillsAvailable = true, runId, state, save, upload, deliver, stopped = () => false, capable = () => true, log = () => {}, timeoutMs = 45_000, limits: overrides = {} }: ResourceRequestOptions) {
+export function createResourceRequests({ cwd, docs, account = null, engine, homeDir, configDir, codexHome, skillsAvailable = true, runId, state, save, upload, deliver, stopped = () => false, capable = () => true, folders = () => false, log = () => {}, timeoutMs = 45_000, limits: overrides = {} }: ResourceRequestOptions) {
   const limits = { file: SKILL_LIMITS.file, total: SKILL_LIMITS.total, requests: 40, inFlight: 5, ...overrides };
   state.requests ??= {};
   // An interrupted in-flight attempt is retriable; completed deliveries remain pinned.
@@ -190,9 +207,35 @@ export function createResourceRequests({ cwd, docs, account = null, engine, home
           const real = await fs.promises.realpath(named.full!);
           if (!inside(real, await fs.promises.realpath(named.root!))) return { status: 'denied', message: 'symlink escape from the resource folder' };
           if ((await fs.promises.stat(real)).isDirectory()) {
-            const { files, over } = filesInFolder(named.full!, { files: 300, bytes: Infinity, file: Infinity });
-            return { status: 'folder', path: named.full, files: files.map((f) => ({ path: f.path, bytes: f.bytes })),
-              message: `This is a folder. Ask for the files you need by these paths${over ? '; it holds more than the 300 listed' : ''}.` };
+            const listing = (why: string): ResourceAnswer => {
+              const { files, over } = filesInFolder(named.full!, { files: 300, bytes: Infinity, file: Infinity });
+              return { status: 'folder', path: named.full, files: files.map((f) => ({ path: f.path, bytes: f.bytes })),
+                message: `This is a folder${why}. Ask for the files you need by these paths${over ? '; it holds more than the 300 listed' : ''}.` };
+            };
+            if (!folders()) return listing('');
+            const found = filesInFolder(named.full!, { files: 300, bytes: limits.total - used(), file: limits.file });
+            if (found.over || !found.files.length) return listing(found.files.length ? ', too big to send at once' : '');
+            const read: { rel: string; body: Buffer; mode: number }[] = []; const left = [...found.skipped];
+            for (const f of found.files) {
+              try { const got = await readPortableFile(f.path, named.root!, limits.file, { allowHidden: false }); read.push({ rel: path.relative(named.full!, f.path), ...got }); } catch { left.push(f.path); }
+            }
+            if (!live()) return unavailable('this cloud run is ending');
+            bytes = read.reduce((sum, f) => sum + f.body.length, 0);
+            if (!reserve(bytes)) return listing(', too big to send at once');
+            hash = digest(read.map((f) => `${f.rel}\0${f.mode}\0${digest(f.body)}`).join('\n'));
+            content = await tarOfFiles(read);
+            if (!live()) return unavailable('this cloud run is ending');
+            const at = path.posix.join('/tmp/agentbox-resources', digest(runId), digest(`${id}:${hash}`));
+            const target = path.posix.join(at, path.basename(named.full!));
+            transferring = true;
+            let url: string;
+            try { url = await upload(`folder-${hash}.tgz`, content); } catch (err) { return unavailable(`the upload failed: ${(err as Error).message}`); }
+            if (!live()) return unavailable('this cloud run is ending');
+            const ok = await deliver([{ path: path.posix.join(at, `.folder-${hash}.tgz`), url, untar: target }], controller.signal);
+            if (!live()) return unavailable('this cloud run is ending');
+            if (!ok) return unavailable('the cloud machine did not take the delivery');
+            return { status: 'delivered', path: target, bytes, files: read.map((f) => ({ path: path.posix.join(target, f.rel.split(path.sep).join('/')), bytes: f.body.length })),
+              ...(left.length ? { message: `Left out, because they are private or over 25 MB: ${left.map((p) => path.relative(named.full!, p)).join(', ')}.` } : {}) };
           }
           const file = await readPortableFile(named.full!, named.root!, limits.file, { allowHidden: false });
           if (!live()) return unavailable('this cloud run is ending');

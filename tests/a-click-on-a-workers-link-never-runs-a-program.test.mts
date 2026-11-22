@@ -20,7 +20,8 @@ const folder = (name: string) => { const p = path.join(dir, name); fs.mkdirSync(
 
 describe('a file that runs a program', () => {
   it('is any of the kinds macOS runs or launches on a double-click', () => {
-    for (const name of ['notes.command', 'notes.tool', 'notes.terminal', 'x.fileloc', 'x.webloc', 'x.inetloc', 'x.scpt', 'x.applescript', 'x.pkg', 'x.jar', 'NOTES.COMMAND']) {
+    // .term is a Terminal session file Terminal.app claims (weekly audit, 2026-11-16).
+    for (const name of ['notes.command', 'notes.tool', 'notes.terminal', 'x.term', 'X.TERM', 'x.fileloc', 'x.webloc', 'x.inetloc', 'x.scpt', 'x.applescript', 'x.pkg', 'x.jar', 'NOTES.COMMAND']) {
       expect(opensAProgram(file(name)), name).toBe(true);
     }
     for (const name of ['Tool.app', 'Flow.workflow', 'Thing.prefPane']) expect(opensAProgram(folder(name)), name).toBe(true);

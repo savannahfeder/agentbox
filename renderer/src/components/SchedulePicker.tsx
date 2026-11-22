@@ -19,6 +19,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { enterMeans } from '../format';
+import { closesOnPress } from '../press';
 
 export interface PickerOption<T> {
   label: string;
@@ -79,7 +80,7 @@ export function SchedulePicker<T>({
     // Stop the click here: this can open from inside another modal, and the
     // backdrop underneath would take a click meant for this one as a dismissal
     // of both.
-    <div className="modal-backdrop" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+    <div className="modal-backdrop" {...closesOnPress(onClose, { stop: true })}>
       <div className="modal snooze" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{title}</div>
         {subtitle && <div className="modal-subtitle">{subtitle}</div>}
@@ -105,7 +106,7 @@ export function SchedulePicker<T>({
             </span>
           )}
         </div>
-        <div className="palette-list">
+        <div className="palette-list" role="listbox" aria-label={title}>
           {options.map((option, i) => (
             /* Hover follows the MOUSE MOVING, not the modal arriving. This
                opens under wherever the cursor already was, so onMouseEnter
@@ -115,6 +116,8 @@ export function SchedulePicker<T>({
             <div
               key={option.label}
               className={`palette-item ${!text && i === selected ? 'selected' : ''}`}
+              role="option"
+              aria-selected={!text && i === selected}
               onClick={() => onChoose(option.value, option.label.toLowerCase())}
               onMouseMove={() => setSelected(i)}
             >

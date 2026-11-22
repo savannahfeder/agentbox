@@ -77,11 +77,13 @@ describe('a cloud sign-in that worked', () => {
     expect((await signedIn('Vercel')).out.keep).toEqual({ name: 'VERCEL_TOKEN' });
   });
 
-  it('still says to keep it for a service not on the list, without naming a variable', async () => {
+  // sign_in keeps nothing for a service off the list (tests/a-cloud-agent-keeps-only-the-key-of-the-sign-in-it-asked-for).
+  it('sends a service not on the list to a key card instead of keep', async () => {
     const { out } = await signedIn('Acme');
     expect(out.keep).toBeUndefined();
-    expect(out.message).toMatch(/keep/);
-    // A tool server's own sign-in cannot become a variable, so it goes to Connections, which every thread uses.
+    expect(out.message).not.toMatch(/call sign_in/);
+    expect(out.message).toMatch(/AGENTBOX-NEEDS: key/);
+    // A tool server's own sign-in has no key to ask for, so it goes to Connections, which every thread uses.
     expect(out.message).toMatch(/agentbox:\/\/connections/);
     expect((await signedIn('Supabase')).out.message).not.toMatch(/agentbox:\/\/connections/);
   });

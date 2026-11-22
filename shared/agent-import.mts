@@ -20,6 +20,14 @@
  *  first run can tell which agents already have a row and file nothing twice. */
 import { NAME } from '../shared/product-name.mjs';
 
+/** The most of a chat an imported row keeps, Claude Code's and Codex's alike:
+ *  the first message from its start, and the last reply from its end, which is
+ *  where the answer is. */
+export const FIRST_CHARS = 4000;
+export const SAID_CHARS = 8000;
+export const firstPart = (text: unknown) => String(text ?? '').slice(0, FIRST_CHARS);
+export const lastPart = (text: unknown) => String(text ?? '').slice(-SAID_CHARS);
+
 export interface ImportableAgent {
   name?: string;
   title?: string;

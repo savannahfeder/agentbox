@@ -91,6 +91,11 @@ const ORG_BLOCKED = [
   /ask your admin/i,
 ];
 
+// Claude Code 2.1.330 on a subscription whose payment lapsed: "Claude Code
+// can't use your Claude subscription, usually because a payment is past due".
+// The login's file still says it pays, so these words are the only sign.
+const SUBSCRIPTION_ENDED = [/can['’]?t use your claude subscription/i];
+
 // A CODEX SIGNED IN WITH AN API KEY. Our own line, said before the worker
 // starts (main/codex-account.mts `codexKeyRefusal`), because Codex reads the
 // key out of auth.json past the worker scrub and bills every call to it.
@@ -292,6 +297,7 @@ export function troubleCause(raw: unknown): string {
   // FIRST, because an organization's refusal mentions the subscription and
   // reads as a signed-out login to the list below.
   if (ORG_BLOCKED.some((re) => re.test(text))) return 'org-blocked';
+  if (SUBSCRIPTION_ENDED.some((re) => re.test(text))) return 'subscription-ended';
   // BEFORE SIGNED-OUT, because Codex's sentence says "ChatGPT account".
   if (MODEL_NOT_ON_PLAN.some((re) => re.test(text))) return 'model-not-on-plan';
   if (LEVEL_NOT_OFFERED.some((re) => re.test(text))) return 'level-not-offered';
@@ -317,13 +323,14 @@ export function troubleCause(raw: unknown): string {
 // Claude subscription access for Claude Code" (2026-10-11), the same line a
 // workspace policy prints, so the text alone cannot tell them apart. The
 // login's own file can: `plan` is main/claude-plan.mts's reading of it, and
-// `ended` is its billing gone to "none". Anything else keeps its cause.
+// `ended` is its billing gone to "none"; a refusal nobody could name on such a
+// login is the same fact. Anything else keeps its cause.
 // A LOGIN THAT RAN OUT AND ONE NOBODY EVER MADE REFUSE IN THE SAME WORDS, and
 // the second is what somebody who skipped setup meets: "Sign that account back
 // in" about an account they never had. `everSignedIn` is the caller's reading
 // of the login's own files; false only where that reading is proof.
 export function refineCause(cause: string, plan: { ended?: unknown } | null | undefined, { everSignedIn = true }: { everSignedIn?: boolean } = {}): string {
-  if (cause === 'org-blocked' && plan?.ended) return 'subscription-ended';
+  if ((cause === 'org-blocked' || cause === 'unknown') && plan?.ended) return 'subscription-ended';
   if (cause === 'signed-out' && !everSignedIn) return 'no-plan';
   return cause;
 }
@@ -342,7 +349,7 @@ export function refineCause(cause: string, plan: { ended?: unknown } | null | un
 // Both wordings are real: the CLI's own line is "resets 6pm" and the API's is
 // "Your weekly limit resets at 4pm", so the "at" is optional.
 function resetClock(raw: unknown): { h: number; min: number; offset: number | null } | null {
-  const m = /resets\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*(?:\(\s*(?:UTC|GMT)\s*(?:([+-])(\d{1,2})(?::?(\d{2}))?)?\s*\))?/i
+  const m = /(?:resets|try again)\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*(?:\(\s*(?:UTC|GMT)\s*(?:([+-])(\d{1,2})(?::?(\d{2}))?)?\s*\))?/i
     .exec(String(raw ?? ''));
   if (!m) return null;
   const zoned = /\(\s*(?:UTC|GMT)/i.test(m[0]);
@@ -750,6 +757,7 @@ const RUN_STOPPED: Record<string, string> = {
   // Same refusal text for an admin's block and an ended subscription, and this
   // line has only the text, so it says what is true of both.
   'org-blocked': 'This run stopped because Claude Code will not run on that account.',
+  'subscription-ended': "This run stopped because that account's Claude subscription has ended.",
   'at-limit': 'This run stopped because the account hit its usage limit.',
   workspace: "This run stopped because it would not start in this project's folder.",
   interrupted: 'This run was cut off in the middle.',
@@ -995,10 +1003,19 @@ const DEAD_RUN_HALVES: Record<string, string[]> = {
   'at-limit': ['is at its usage limit', 'so nothing has been done on this task.'],
 };
 
+// A THREAD WHOSE MODEL IS FOR THE OTHER AGENT (`_sayTheModelIsForAnotherEngine`
+// in main/supervisor.mts): nothing starts it until its model changes.
+export function modelForAnotherEngineSentence({ asked, model, running }: { asked: string; model: string; running: string }): string {
+  return `This task chose ${asked} model "${model}", but this computer would run it with ${running}. Nothing has been done. Pick a ${running} model to continue, or use a computer with ${asked}.`;
+}
+export function saysTheModelIsForAnotherEngine(text: string | null | undefined): boolean {
+  return /^This task chose .+ model ".*", but this computer would run it with .+\. Nothing has been done\./.test(String(text ?? ''));
+}
+
 export function saysARunGotNowhere(text: string | null | undefined): boolean {
   const s = String(text ?? '');
   if (!s.trim()) return false;
-  if (deadRunCause(s)) return true;
+  if (deadRunCause(s) || saysTheModelIsForAnotherEngine(s)) return true;
   if (Object.values(WORKED_OPENERS).some((opener) => s.includes(opener))) return true;
   return s.startsWith(UNDELIVERED) || s.startsWith(STOPPED_STARTING);
 }

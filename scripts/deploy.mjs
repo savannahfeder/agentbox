@@ -3,6 +3,7 @@
 //
 //   cd ~/Desktop/dev/agentbox-team && npm run deploy
 //   npm run deploy -- --check     checks everything and changes nothing
+//   npm run deploy -- --npm       puts the last release on npm when it missed it
 //
 // It brings this folder to the tip of main, picks a version nobody has used,
 // signs you in to whatever has signed out, and then puts out every place
@@ -33,6 +34,7 @@ import { RELEASE_REPO } from './lib/live-download.mjs';
 
 const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const checkOnly = process.argv.includes('--check');
+const npmOnly = process.argv.includes('--npm');
 const startedAt = Date.now();
 const NOTARY_PROFILE = 'agentbox-notary';
 // notarytool's default store is closed while the screen is locked, and the
@@ -54,19 +56,27 @@ function restorePackageJson() {
 
 function stop(...lines) {
   restorePackageJson();
+  callBack('The deploy stopped. Terminal says why.');
   console.error(`\nNot finished.\n\n${lines.join('\n')}\n`);
   process.exit(1);
 }
 
 function say(line) { console.log(`\n→ ${line}`); }
 
+// The build is long enough to walk away from, so a step that needs the person
+// puts up a notification with a sound.
+function callBack(text) {
+  if (process.platform !== 'darwin') return;
+  quiet('osascript', ['-e', `display notification ${JSON.stringify(text)} with title "Agentbox deploy" sound name "Glass"`], 10_000);
+}
+
 function quiet(cmd, args, timeout = 30_000) {
   const r = spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', timeout, env: { ...process.env, AWS_PAGER: '' } });
   return { ok: r.status === 0, out: (r.stdout ?? '').trim(), err: (r.stderr ?? '').trim() };
 }
 
-function live(cmd, args, env = {}, timeout = undefined) {
-  return spawnSync(cmd, args, { cwd: repo, stdio: 'inherit', env: { ...process.env, ...env }, timeout }).status === 0;
+function live(cmd, args, env = {}, timeout = undefined, cwd = repo) {
+  return spawnSync(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env }, timeout }).status === 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,26 +100,124 @@ if (!quiet('git', ['merge-base', '--is-ancestor', 'HEAD', 'refs/remotes/origin/m
     'Deploy from ~/Desktop/dev/agentbox-team, which only ever follows main.');
 }
 const behind = Number(quiet('git', ['rev-list', '--count', 'HEAD..refs/remotes/origin/main']).out) || 0;
+const before = quiet('git', ['rev-parse', 'HEAD']).out;
 if (!checkOnly && behind > 0 && !quiet('git', ['merge', '--ff-only', '--quiet', 'refs/remotes/origin/main']).ok) {
   stop('Could not bring this folder up to main. Run: git merge --ff-only refs/remotes/origin/main');
 }
+// This file was read before the merge above, so a fix to the deploy that just
+// arrived would otherwise wait a release (0.1.26 ran the one before).
+if (!checkOnly && behind > 0 && !process.env.AGENTBOX_DEPLOY_RESTARTED
+  && !quiet('git', ['diff', '--quiet', before, 'HEAD', '--', 'scripts/']).ok) {
+  say('the deploy itself changed on main, so the new one takes over');
+  const restarted = spawnSync('node', ['scripts/run.mjs', 'scripts/deploy.mjs', ...process.argv.slice(2)],
+    { cwd: repo, stdio: 'inherit', env: { ...process.env, AGENTBOX_DEPLOY_RESTARTED: '1' } });
+  process.exit(restarted.status ?? 1);
+}
 let commit = checkOnly ? quiet('git', ['rev-parse', 'refs/remotes/origin/main']).out : quiet('git', ['rev-parse', 'HEAD']).out;
-console.log(`  main is at ${commit.slice(0, 8)}${checkOnly && behind ? ` (this folder is ${behind} behind; a real run catches it up)` : ''}`);
+console.log(`  main is at ${commit.slice(0, 8)}, newest change: ${quiet('git', ['log', '-1', '--no-merges', '--format=%s', commit]).out}${checkOnly && behind ? ` (this folder is ${behind} behind; a real run catches it up)` : ''}`);
 
 // ---------------------------------------------------------------------------
 // 2. A VERSION NOBODY HAS USED. Both lists have to be readable: a guess here
 // is how the same number went out twice.
-say('picking the version');
+say(npmOnly ? 'reading which versions are out' : 'picking the version');
 const tags = quiet('git', ['ls-remote', '--tags', `https://github.com/${RELEASE_REPO}.git`], 30_000);
 // --prefer-online on every `npm view`: npm's cache of the package can be
 // minutes old, and on 0.1.20 it called a finished release unfinished.
 const onNpm = quiet('npm', ['view', PACKAGE, 'versions', '--json', '--prefer-online', '--fetch-timeout=20000'], 40_000);
 if (!tags.ok || !onNpm.ok) stop('Could not read which versions are already out, from GitHub and npm. Check the internet connection.');
-const taken = [
-  ...tags.out.split('\n').flatMap((l) => l.match(/refs\/tags\/v([\d.]+)$/)?.[1] ?? []),
-  ...[JSON.parse(onNpm.out || '[]')].flat(),
-];
+const released = tags.out.split('\n').flatMap((l) => l.match(/refs\/tags\/v([\d.]+)$/)?.[1] ?? []);
+const npmVersions = [JSON.parse(onNpm.out || '[]')].flat();
+const taken = [...released, ...npmVersions];
 const mainVersion = JSON.parse(execFileSync('git', ['show', 'refs/remotes/origin/main:package.json'], { cwd: repo, encoding: 'utf8' })).version;
+
+// The environment first, as scripts/release.mjs reads it for the Mac build.
+let posthog = process.env.AGENTBOX_POSTHOG_KEY?.trim() || null;
+try { posthog ||= JSON.parse(fs.readFileSync(path.join(repo, 'zero.config.json'), 'utf8')).posthogKey?.trim() || null; } catch {}
+
+// The key is what lets `npx agentbox-app` count, as extraMetadata does for the Mac app.
+function bakeTheKey(file) {
+  fs.writeFileSync(file, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), bakedPosthogKey: posthog }, null, 2)}\n`);
+}
+
+const npmSignIn = {
+  name: 'npm, to publish the package',
+  ok: () => quiet('npm', ['whoami', '--fetch-timeout=20000'], 30_000).ok,
+  // By the time it asks, the build has run for a quarter of an hour and the
+  // person may have walked away; everything else is already out.
+  fix: () => live('npm', ['login'], {}, NPM_LOGIN_MS),
+};
+const signedOut = [];
+function signIn(s, { required = true } = {}) {
+  if (s.ok()) { console.log(`  ✓ ${s.name}`); return true; }
+  if (checkOnly) { console.log(`  ✗ ${s.name}: signed out; a real run signs you in here`); signedOut.push(s.name); return false; }
+  say(`signing in to ${s.name}`);
+  if (s.fix() && s.ok()) { console.log(`  ✓ ${s.name}`); return true; }
+  if (required) stop(`Still not signed in to ${s.name}. Run npm run deploy again to retry.`);
+  console.log(`  ✗ ${s.name}: still signed out, so it is skipped`);
+  return false;
+}
+
+// npm's browser approval runs out when nobody is there (0.1.25: a 404 after
+// half an hour), so a failed publish waits for Enter and tries again.
+const NPM_TRIES = 3;
+function publishToNpm(v, cwd = repo) {
+  callBack(`npm needs you to approve publishing ${v}.`);
+  for (let attempt = 1; ; attempt++) {
+    if (live('npm', ['publish'], { AGENTBOX_PUBLISH_ANYWAY: '1' }, undefined, cwd)) return true;
+    if (attempt === NPM_TRIES) return false;
+    callBack(`npm did not publish ${v}. Press Enter in Terminal to try again.`);
+    console.log(`\n  npm did not publish; the reason is just above. Press Enter to try again (${NPM_TRIES - attempt} left), or wait 15 minutes to leave npm for later.`);
+    if (spawnSync('bash', ['-c', `read -r -t ${NPM_LOGIN_MS / 1000}`], { stdio: 'inherit' }).status !== 0) return false;
+  }
+}
+
+// What npm serves as latest. Just after a publish npm says "being processed",
+// and on 0.1.26 it served the old version for under a minute, so it is read
+// again for up to five minutes before it counts as missing.
+function npmVersionNow(expected = null) {
+  const until = Date.now() + (expected ? 5 * 60_000 : 0);
+  for (;;) {
+    const r = quiet('npm', ['view', PACKAGE, 'version', '--prefer-online', '--fetch-timeout=20000'], 30_000);
+    if ((r.ok && r.out === expected) || Date.now() >= until) return r;
+    spawnSync('sleep', ['15']);
+  }
+}
+
+// A RELEASE THAT MISSED NPM. Running the whole deploy again would put out the
+// next version instead, so this publishes the one main says, from the commit
+// its release page says the Mac app was built from.
+if (npmOnly) {
+  if (npmVersions.includes(mainVersion)) {
+    console.log(`  ${mainVersion} is already on npm, so there is nothing to do.`);
+    process.exit(0);
+  }
+  if (!released.includes(mainVersion)) stop(`${mainVersion} has not been released yet, so it has no place on npm. Run npm run deploy.`);
+  const page = quiet('curl', ['-sL', '-m', '20', `https://api.github.com/repos/${RELEASE_REPO}/releases/tags/v${mainVersion}`], 30_000);
+  let built = null;
+  try { built = JSON.parse(page.out).body?.match(/\/commit\/([0-9a-f]{40})/)?.[1] ?? null; } catch {}
+  if (!built) stop(`Could not read which commit ${mainVersion} was built from off its release page, so there is nothing safe to publish.`);
+  let builtVersion = null;
+  try { builtVersion = JSON.parse(quiet('git', ['show', `${built}:package.json`]).out).version; } catch {}
+  if (builtVersion !== mainVersion) stop(`The release page says ${mainVersion} was built from ${built.slice(0, 8)}, which says ${builtVersion ?? 'no version'}.`);
+  if (!posthog) stop('No "posthogKey" in zero.config.json in this folder, so npx agentbox-app would count nobody.');
+  signIn(npmSignIn);
+  say(`publishing ${PACKAGE}@${mainVersion} from ${built.slice(0, 8)}, the commit its Mac app was built from`);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `agentbox-npm-${mainVersion}-`));
+  let published = false;
+  if (quiet('git', ['worktree', 'add', '-q', '--detach', dir, built]).ok) {
+    fs.symlinkSync(path.join(repo, 'node_modules'), path.join(dir, 'node_modules'));
+    bakeTheKey(path.join(dir, 'package.json'));
+    published = publishToNpm(mainVersion, dir);
+  }
+  quiet('git', ['worktree', 'remove', '--force', dir]);
+  const now = npmVersionNow(published ? mainVersion : null).out;
+  if (!published || now !== mainVersion) {
+    stop(`npm still has ${now || 'an older version'}; the reason is just above.`, 'To try again, run: npm run deploy -- --npm');
+  }
+  console.log(`\n  ✓ npm  ${mainVersion}\n`);
+  process.exit(0);
+}
+
 const version = nextVersion(mainVersion, taken);
 console.log(`  ${version}${version === mainVersion ? '' : ` (main says ${mainVersion}, which is already out)`}`);
 
@@ -122,9 +230,6 @@ const identity = quiet('security', ['find-identity', '-v', '-p', 'codesigning'])
 if (!identity) missing.push('No Developer ID certificate in the Keychain, so nothing can be signed (Xcode → Settings → Accounts → Manage Certificates).');
 const team = identity?.[1];
 
-// The environment first, as scripts/release.mjs reads it for the Mac build.
-let posthog = process.env.AGENTBOX_POSTHOG_KEY?.trim() || null;
-try { posthog ||= JSON.parse(fs.readFileSync(path.join(repo, 'zero.config.json'), 'utf8')).posthogKey?.trim() || null; } catch {}
 if (!posthog) missing.push('No "posthogKey" in zero.config.json in this folder, so the app would count nobody.');
 
 const home = path.join(os.homedir(), '.agentbox');
@@ -164,24 +269,23 @@ const signIns = [
     },
   },
 ];
-const npmSignIn = {
-  name: 'npm, to publish the package',
-  ok: () => quiet('npm', ['whoami', '--fetch-timeout=20000'], 30_000).ok,
-  // By the time it asks, the build has run for a quarter of an hour and the
-  // person may have walked away; everything else is already out.
-  fix: () => live('npm', ['login'], {}, NPM_LOGIN_MS),
-};
-const signedOut = [];
-function signIn(s, { required = true } = {}) {
-  if (s.ok()) { console.log(`  ✓ ${s.name}`); return true; }
-  if (checkOnly) { console.log(`  ✗ ${s.name}: signed out; a real run signs you in here`); signedOut.push(s.name); return false; }
-  say(`signing in to ${s.name}`);
-  if (s.fix() && s.ok()) { console.log(`  ✓ ${s.name}`); return true; }
-  if (required) stop(`Still not signed in to ${s.name}. Run npm run deploy again to retry.`);
-  console.log(`  ✗ ${s.name}: still signed out, so it is skipped`);
-  return false;
-}
 signIns.forEach(signIn);
+
+// THE LIVE DATABASE HAS EVERY MIGRATION. Nothing applies them on merge, and on
+// 2026-11-12 fourteen were missing, so the shipped app called functions the
+// cloud did not have.
+say('checking the live database has every migration on main');
+const onLive = quiet('node', ['scripts/run.mjs', 'scripts/migrations-on-live.mjs'], 90_000);
+const notOnLive = onLive.out.split('\n').filter(Boolean);
+if (onLive.ok) console.log('  ✓ all of them');
+else if (checkOnly) console.log(`  ✗ ${notOnLive.join('\n  ✗ ')}`);
+else if (notOnLive.length && /\.sql$/.test(notOnLive[0])) {
+  stop('The live database is missing these migrations, so the app would call what is not there:',
+    ...notOnLive.map((f) => `- ${f}`), '',
+    `Apply them, then run npm run deploy again: node scripts/run.mjs scripts/apply-migration.mjs ${notOnLive.map((f) => `cloud/supabase/migrations/${f}`).join(' ')}`);
+} else {
+  stop(`Could not read the live database to check its migrations: ${onLive.out || onLive.err || 'no answer'}`);
+}
 
 if (checkOnly) {
   signIn(npmSignIn);
@@ -271,19 +375,20 @@ const serverOk = live('node', ['scripts/cloud-gateway-setup.mjs'], { AGENTBOX_CL
 // the commit this run pinned; main has moved on since, which is not a reason
 // to publish something else.
 // npm sessions expire, and publishing can require its own approval after login.
+let npmPublished = false;
 if (signIn(npmSignIn, { required: false })) {
-  // The key is what lets `npx agentbox-app` count, as extraMetadata does for the Mac app.
-  fs.writeFileSync(pkgPath, `${JSON.stringify({ ...JSON.parse(fs.readFileSync(pkgPath, 'utf8')), bakedPosthogKey: posthog }, null, 2)}\n`);
+  bakeTheKey(pkgPath);
   packageWritten = true;
   say(`publishing ${PACKAGE}@${version} to npm (it may ask for a one-time code)`);
-  if (!live('npm', ['publish'], { AGENTBOX_PUBLISH_ANYWAY: '1' })) console.log('  ✗ npm did not publish; the reason is just above');
+  npmPublished = publishToNpm(version);
+  if (!npmPublished) console.log('  ✗ npm did not publish; the reason is just above');
 }
 restorePackageJson();
 
 // ---------------------------------------------------------------------------
 // 8. EACH PLACE, READ BACK.
 say('reading back what is live');
-const npmNow = quiet('npm', ['view', PACKAGE, 'version', '--prefer-online', '--fetch-timeout=20000'], 30_000);
+const npmNow = npmVersionNow(npmPublished ? version : null);
 const tagNow = quiet('gh', ['release', 'view', '--repo', RELEASE_REPO, '--json', 'tagName', '--jq', '.tagName']);
 const feedNow = quiet('curl', ['-sL', '-m', '20', `https://github.com/${RELEASE_REPO}/releases/latest/download/latest-mac.yml`]);
 const serverNow = quiet('aws', ['lambda', 'get-function-configuration', '--region', REGION, '--function-name', SERVER,
@@ -301,10 +406,11 @@ for (const l of lines) console.log(`  ${l.ok ? '✓' : '✗'} ${l.part.padEnd(17
 console.log(`  ${imageOk ? '✓' : '✗'} ${'cloud machine'.padEnd(17)} ${imageOk ? 'up to date' : 'not rebuilt'}`);
 if (lines.every((l) => l.ok) && imageOk) {
   console.log(`\nAgentbox ${version} is out everywhere. Restart Agentbox to run it yourself.`);
+  callBack(`Agentbox ${version} is out everywhere.`);
   console.log('');
 } else {
   stop('Not every place has the new version yet; the ✗ lines above say which.',
-    lines.find((l) => l.part === 'npm' && !l.ok) ? 'npm gets the next release. Run npm login before then.' : '',
+    lines.find((l) => l.part === 'npm' && !l.ok) ? `To put ${version} on npm, run: npm run deploy -- --npm` : '',
     imageOk ? '' : `For the cloud machine, run: AGENTBOX_CLOUD_CONFIG=${serverFile} node scripts/cloud-setup.mjs`,
     lines.find((l) => l.part === 'cloud server' && !l.ok) ? `For the cloud server, run: AGENTBOX_CLOUD_CONFIG=${serverFile} node scripts/cloud-gateway-setup.mjs` : '');
 }

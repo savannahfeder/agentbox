@@ -61,7 +61,7 @@ export function terminalShell(env: NodeJS.ProcessEnv = process.env, exists: (p: 
 const MARKER = '\0agentbox-path\0';
 function runShell(file: string, args: string[], options: ExecFileOptionsWithStringEncoding): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile(file, args, options, (error, stdout) => error ? reject(error) : resolve(stdout));
+    const child = execFile(file, args, { ...options, windowsHide: true }, (error, stdout) => error ? reject(error) : resolve(stdout));
     child.stdin?.end();
   });
 }

@@ -50,27 +50,20 @@ function aMac({ inHome = null, inFolder = null } = {}) {
   return { home, appDir };
 }
 
-// THIS MAC'S OWN SETTINGS ARE CLEARED, NOT READ. Any session the app starts
-// carries AGENTBOX_TEAM_CONFIG and AGENTBOX_HOME pointing at the real team and
-// the real store, so a test that left them alone would measure her cloud
-// instead of its own fixture, and would pass or fail depending on whose Mac ran
-// it (tests/no-test-reads-this-macs-sign-in.test.mts is the rule).
-const was = process.env.AGENTBOX_TEAM_CONFIG;
+// THIS MAC'S OWN SETTINGS ARE NOT READ. Any session the app starts carries
+// AGENTBOX_TEAM_CONFIG, AGENTBOX_HOME and sometimes AGENTBOX_FRESH_USER, so a
+// lookup on the process's environment would measure the worker it ran in
+// instead of its own fixture. Each lookup gets its own environment.
+const env = {};
 const wasHome = process.env.AGENTBOX_HOME;
-beforeEach(() => {
-  delete process.env.AGENTBOX_TEAM_CONFIG;
-  delete process.env.AGENTBOX_HOME;
-});
-afterEach(() => {
-  if (was === undefined) delete process.env.AGENTBOX_TEAM_CONFIG; else process.env.AGENTBOX_TEAM_CONFIG = was;
-  if (wasHome === undefined) delete process.env.AGENTBOX_HOME; else process.env.AGENTBOX_HOME = wasHome;
-});
+beforeEach(() => { delete process.env.AGENTBOX_HOME; });
+afterEach(() => { if (wasHome === undefined) delete process.env.AGENTBOX_HOME; else process.env.AGENTBOX_HOME = wasHome; });
 
 describe('a folder with no key of its own', () => {
   // THE CASE THAT WAS HIT: the folder the app is launched from has no cloud/.
   it('still runs the team version when the Mac has the key', () => {
     const { home, appDir } = aMac({ inHome: KEY });
-    expect(loadCloudConfig(appDir, { packaged: false, home })?.url).toBe('https://hers.test');
+    expect(loadCloudConfig(appDir, { packaged: false, home, env })?.url).toBe('https://hers.test');
   });
 
   // REVERSED 2026-10-06: an installed app is always the single-person app, key
@@ -79,21 +72,21 @@ describe('a folder with no key of its own', () => {
   // holds the full rule; the team version runs from a checkout.
   it('does not run the team version in an installed app, even with the Mac\'s key', () => {
     const { home, appDir } = aMac({ inHome: KEY });
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
   });
 
   // THE CASE EITHER SIDE: no key anywhere is still the single-person app, which
   // is what a public checkout must stay.
   it('is the single-person app when the Mac has no key either', () => {
     const { home, appDir } = aMac();
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
-    expect(loadCloudConfig(appDir, { packaged: false, home })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: false, home, env })).toBeNull();
   });
 
   // A file that is there but says nothing usable is no key.
   it('is the single-person app when the Mac\'s key is missing its address or its anon key', () => {
     const { home, appDir } = aMac({ inHome: { url: 'https://hers.test' } });
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
   });
 });
 
@@ -104,8 +97,8 @@ describe('a folder that has its own key', () => {
   it('runs on its own, not the Mac\'s', () => {
     const { home, appDir } = aMac({ inHome: KEY, inFolder: { url: 'https://this-folder.test', anonKey: 'k' } });
     // An installed app reads no key at all since 2026-10-06.
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
-    expect(loadCloudConfig(appDir, { packaged: false, home }).url).toBe('https://this-folder.test');
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: false, home, env }).url).toBe('https://this-folder.test');
   });
 });
 
@@ -117,11 +110,11 @@ describe('an installed build', () => {
     const { home, appDir } = aMac({ inHome: KEY });
     const other = path.join(tmp('other'), 'other.json');
     fs.writeFileSync(other, JSON.stringify({ url: 'https://theirs.test', anonKey: 'k' }));
-    process.env.AGENTBOX_TEAM_CONFIG = other;
+    const env = { AGENTBOX_TEAM_CONFIG: other };
     // It ignores every team config since 2026-10-06, this one included.
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
     // From a checkout it is still honoured, which is what tests run on.
-    expect(loadCloudConfig(appDir, { packaged: false, home }).url).toBe('https://theirs.test');
+    expect(loadCloudConfig(appDir, { packaged: false, home, env }).url).toBe('https://theirs.test');
   });
 
   it('does not let AGENTBOX_HOME say where the Mac\'s key is', () => {

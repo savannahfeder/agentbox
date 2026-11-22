@@ -14,11 +14,11 @@
 // The model you picked in the box stays the model the thread runs on, whoever
 // takes it.
 import { teammateLabel, teammateIdOf, activeRunOf, TEAMMATE_LABEL_PREFIX, type Labelled, type RunItem } from './teammates.mts';
-import type { Routed as RouteRecord } from './work-items.mts';
+import type { Routed as RouteRecord, RouteOffer } from './work-items.mts';
 
-export type { Routed as RouteRecord } from './work-items.mts';
+export type { Routed as RouteRecord, RouteOffer } from './work-items.mts';
 
-export interface RouteDecision { to?: string; ask?: string[]; why: string }
+export interface RouteDecision { to?: string; ask?: string[]; why: string; offer?: RouteOffer }
 export interface RouteMate {
   id: string;
   name: string;
@@ -51,8 +51,7 @@ export const NOBODY_WHY = 'You have no AI teammates working, so an agent took it
 export const FAILED_WHY = 'Auto could not decide, so an agent took it.';
 export const PICKED_WHY = 'You picked it.';
 // Read after "<primary> took this." on the thread.
-export const PRIMARY_WHY = 'Auto was not sure who should.';
-export const PRIMARY_TIE_WHY = 'Two teammates fit, so it decides who does the work.';
+export const PRIMARY_WHY = 'It needs several of your teammates.';
 
 /**
  * The teammates a thread can go to by their job: set up, not paused, not
@@ -63,20 +62,34 @@ export function routeCandidates<T extends RouteMate>(teammates: readonly T[] = [
 }
 
 /**
- * PURE. What Auto could not place goes to the primary when there is one: two
- * that fit, or no usable answer. A clear answer is left as it was.
+ * PURE. What Auto could not place goes to an ordinary agent, never to a
+ * general teammate, which did one-off work worse (w-bb45118b10). Two that fit
+ * still ask you.
  */
-export function orPrimary(decision: RouteDecision | null | undefined, primary: { id: string } | null | undefined): RouteDecision {
-  if (!primary) return decision ?? { to: 'agent', why: FAILED_WHY };
-  if (!decision) return { to: `mate:${primary.id}`, why: PRIMARY_WHY };
-  if (decision.ask) return { to: `mate:${primary.id}`, why: PRIMARY_TIE_WHY };
-  return decision;
+export function orAgent(decision: RouteDecision | null | undefined): RouteDecision {
+  return decision ?? { to: 'agent', why: FAILED_WHY };
 }
 
 const cut = (s: string | null | undefined, n: number) => {
   const t = String(s ?? '').replace(/\s+/g, ' ').trim();
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
+
+export const ROUTE_READS_WHOLE = 3000;
+const ROUTE_READS_END = 1200;
+
+/**
+ * PURE. A task's body as the router reads it: whole up to ROUTE_READS_WHOLE,
+ * and past that its start and its end, because a dictated task often gives
+ * its background first and its ask last.
+ */
+export function taskForRouting(body: string | null | undefined): string {
+  const t = String(body ?? '').replace(/\s+/g, ' ').trim();
+  if (t.length <= ROUTE_READS_WHOLE) return t;
+  const head = t.slice(0, ROUTE_READS_WHOLE - ROUTE_READS_END - 3).replace(/\s+\S*$/, '');
+  const tail = t.slice(-ROUTE_READS_END).replace(/^\S*\s+/, '');
+  return `${head} … ${tail}`;
+}
 
 // Handed a picture's file name, the small model guessed what the picture
 // showed and matched a teammate on that.
@@ -98,8 +111,9 @@ export function routePrompt(
   item: { title?: string; body?: string } | null | undefined,
   candidates: readonly RouteMate[],
   items: readonly RouteItem[] = [],
-  { primary = null, pictures = false }: { primary?: RouteMate | null; pictures?: boolean } = {},
+  { primary = null, declined = [], pictures = false }: { primary?: RouteMate | null; declined?: readonly string[]; pictures?: boolean } = {},
 ): string {
+  const never = [...new Set([...candidates, ...(primary ? [primary] : [])].flatMap((t) => [t.name, t.role ?? '']).concat(declined).map((r) => r.trim()).filter(Boolean))];
   const who = candidates.map((t, n) => {
     const parts = [`[${n + 1}] ${t.name}${t.role && t.role.toLowerCase() !== t.name.toLowerCase() ? `, ${t.role}` : ''}.`];
     if (t.job) parts.push(`Job: ${cut(t.job, 300)}`);
@@ -118,9 +132,9 @@ export function routePrompt(
     'Their AI teammates:',
     ...who,
     '[0] None of them: an ordinary coding agent does it.',
-    ...(primary ? [`[P] ${primary.name}, their primary teammate: only when the task needs several of the teammates above, or is about the team's work as a whole.`] : []),
+    ...(primary ? [`[P] ${primary.name}, their primary teammate: only when the person asks for work from several of the teammates above, or asks about the team's work as a whole. Background that mentions what the teammates do is not a reason.`] : []),
     '',
-    'Reply with exactly one line and nothing else, in one of these forms:',
+    'Reply with two lines and nothing else. The first, in one of these forms:',
     '  2 | It made the last four clips and runs the clip engine.',
     '  0 | -',
     '  1,2 | Both have worked on the captions.',
@@ -130,6 +144,8 @@ export function routePrompt(
     'Name two numbers only when two teammates fit equally well and you cannot',
     'tell which; the person will be asked. When unsure between a teammate and',
     'none, answer 0.',
+    'Decide by what the person asks for, which a long task often puts last;',
+    'the rest is background.',
     'A teammate fits only when the task asks for the work its job describes.',
     'A word the task shares with a job is not a fit: "status" is not a',
     'teammate\'s status board, and "plan" is not its plan.',
@@ -143,9 +159,22 @@ export function routePrompt(
     'A job of watching or fixing a part of the app is not building something',
     'new in that part: answer 0.',
     '',
+    'The second line says whether this is work an AI teammate of its own would',
+    'do better than a one-off agent, because none of the teammates above covers',
+    'it and it is one of these:',
+    '  - it repeats: every week, each new customer, a regular report',
+    '  - it is a long project that runs for weeks or has several parts, where',
+    '    what is learned carries over: the person\'s taste, what they approved',
+    '  - it is an ongoing role, such as support, marketing or hiring',
+    'A one-off fix, a question, or a single change is not. When unsure, it is not.',
+    'Write it in one of these forms, the role in one to three words:',
+    '  Teammate: Marketer | It is a post every week, and it would learn your voice.',
+    '  Teammate: -',
+    ...(never.length ? [`Never offer one of these, which they have or turned down: ${never.join(', ')}.`] : []),
+    '',
     '--- the task ---',
     cut(named(item?.title, pictures), 400),
-    cut(named(item?.body && item.body !== item.title ? item.body : '', pictures), 1500),
+    taskForRouting(named(item?.body && item.body !== item.title ? item.body : '', pictures)),
     '---',
   ].filter((l, i, all) => !(l === '' && all[i - 1] === '')).join('\n');
 }
@@ -184,6 +213,50 @@ export function readRoute(text: string, candidates: readonly { id: string }[], p
   return a === 0 ? { to: 'agent', why: AGENT_WHY } : { to: key(a), why };
 }
 
+/** PURE. The offer in the model's reply, or null: no line, "-", or a role that is not a short one. */
+export function readOffer(text: string, { taken = [] }: { taken?: readonly string[] } = {}): RouteOffer | null {
+  const line = String(text ?? '').split('\n').map((l) => l.trim()).find((l) => /^teammate\s*:/i.test(l));
+  const m = line ? /^teammate\s*:\s*([^|]*?)\s*(?:\|\s*(.*))?$/i.exec(line) : null;
+  if (!m) return null;
+  const role = m[1].replace(/^["'`“”‘’]+|["'`“”‘’.]+$/g, '').trim();
+  if (!role || role === '-' || !/^[\p{L}][\p{L}&/' -]{0,29}$/u.test(role) || role.split(/\s+/).length > 3) return null;
+  if (taken.some((t) => t.trim().toLowerCase() === role.toLowerCase())) return null;
+  return { role: role[0].toUpperCase() + role.slice(1), why: cleanWhy(m[2]) };
+}
+
+/**
+ * PURE. The second, short question asked only once Auto has offered a role:
+ *  the three reasons the card shows. Asked apart from the routing question
+ *  because asking both at once made the small model offer less often (7 of 12
+ *  recurring tasks against 11 of 12, measured on Haiku 2026-11-12).
+ */
+export function offerPrompt(item: { title?: string | null; body?: string | null } | null | undefined, offer: { role: string }): string {
+  return [
+    `A person asked for the task below. An AI teammate, a ${offer.role}, could take on work like it from now on.`,
+    'Write three lines, each under ten words, about this task, saying what the',
+    'teammate would learn, what it would carry on from, and what it would then do.',
+    'Promise nothing it would send or post without asking first. Reply with the',
+    'three lines and nothing else, in this form:',
+    '- Learns your voice from every post you approve or change',
+    '- Carries on where this post left off, not from nothing',
+    '- Writes it every Monday, and asks you before it posts',
+    '',
+    '--- the task ---',
+    cut(named(item?.title, false), 400),
+    taskForRouting(named(item?.body && item.body !== item.title ? item.body : '', false)),
+    '---',
+  ].join('\n');
+}
+
+/** PURE. The three lines, bullets or not, or null unless there are exactly three short ones. */
+export function readGains(text: string): string[] | null {
+  const lines = String(text ?? '').split('\n').map((l) => l.trim().replace(/^(?:[-*•]|\d+[.)])\s+/, '')).filter(Boolean);
+  if (lines.length !== 3) return null;
+  const gains = lines.map((l) => l.replace(/^["'`“”‘’]+|["'`“”‘’.]+$/g, '').replace(/\s+/g, ' ').trim());
+  if (gains.some((g) => !g || g.includes('|') || /^teammate\s*:/i.test(g))) return null;
+  return gains.map((g) => (g.length > 90 ? `${g.slice(0, 89).replace(/\s+\S*$/, '')}…` : g));
+}
+
 /**
  * PURE. What the thread's row becomes once it is decided: its labels and the
  *  `routed` note the thread draws as one line. Never its words.
@@ -202,7 +275,7 @@ export function routedPatch(
     return { labels: [...others, AUTO_LABEL], routed: { ask: decision.ask, why: decision.why, at: now, by } };
   }
   const mate = decision.to?.startsWith('mate:') ? decision.to.slice('mate:'.length) : null;
-  const routed = { to: decision.to, why: decision.why ?? '', at: now, by };
+  const routed = { to: decision.to, why: decision.why ?? '', at: now, by, ...(decision.offer ? { offer: decision.offer } : {}) };
   if (!mate) return { labels: others, routed };
   const busy = activeRunOf(mate, (items ?? []).filter((i) => i.id !== item?.id));
   return { labels: [...others, teammateLabel(mate)], routed, ...(busy ? { start: 'later' } : {}) };

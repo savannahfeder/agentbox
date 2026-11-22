@@ -33,6 +33,31 @@ const link = (v: unknown): string | null => {
 const record = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : null);
 const whole = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : 0);
 
+// Each service's own sign-in addresses. The agent names the service, so the
+// card trusts the name, and draws its logo, only for one of these.
+const SERVICE_HOSTS: Record<string, readonly string[]> = {
+  github: ['github.com'], vercel: ['vercel.com'], supabase: ['supabase.com'], stripe: ['stripe.com'],
+  sentry: ['sentry.io'], expo: ['expo.dev'], aws: ['amazon.com', 'amazonaws.com', 'awsapps.com'],
+  npm: ['npmjs.com'], netlify: ['netlify.com'], cloudflare: ['cloudflare.com'], fly: ['fly.io'],
+  linear: ['linear.app'], notion: ['notion.so', 'notion.com'], slack: ['slack.com'], figma: ['figma.com'],
+  airtable: ['airtable.com'], asana: ['asana.com'], atlassian: ['atlassian.com', 'atlassian.net'],
+  clickup: ['clickup.com'], hubspot: ['hubspot.com'], intercom: ['intercom.com'], monday: ['monday.com'],
+  salesforce: ['salesforce.com'], google: ['google.com'], gmail: ['google.com'],
+  'google-drive': ['google.com'], 'google-calendar': ['google.com'],
+};
+export const serviceId = (service: string): string => String(service ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/** The host a browser opens for `url`, or ''. */
+export function linkHost(url: string): string {
+  try { return new URL(url).hostname.toLowerCase(); } catch { return ''; }
+}
+
+/** Whether `url` is one of `service`'s own addresses. */
+export function linkIsTheService(service: string, url: string): boolean {
+  const host = linkHost(url);
+  return !!host && (SERVICE_HOSTS[serviceId(service)] ?? []).some((h) => host === h || host.endsWith(`.${h}`));
+}
+
 /** The `signIn` field as it is kept, or undefined. */
 export function cleanSignIn(value: unknown): SignInAsk | undefined {
   const v = record(value);

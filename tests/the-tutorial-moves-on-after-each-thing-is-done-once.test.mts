@@ -90,19 +90,16 @@ describe('the command bar', () => {
 
 describe('the Later tab', () => {
   it('is hidden while nothing is in Later', () => {
-    expect(laterTabShown({ count: 0, view: 'inbox', walking: false })).toBe(false);
+    expect(laterTabShown({ count: 0, view: 'inbox' })).toBe(false);
   });
   it('shows once one thread is in it', () => {
-    expect(laterTabShown({ count: 1, view: 'inbox', walking: false })).toBe(true);
+    expect(laterTabShown({ count: 1, view: 'inbox' })).toBe(true);
   });
   it('stays while you are on it, so it never vanishes under you', () => {
-    expect(laterTabShown({ count: 0, view: 'snoozed', walking: false })).toBe(true);
-  });
-  it('stays for the walk, which teaches it', () => {
-    expect(laterTabShown({ count: 0, view: 'inbox', walking: true })).toBe(true);
+    expect(laterTabShown({ count: 0, view: 'snoozed' })).toBe(true);
   });
   it('is left out of the strip and of what Tab walks along', () => {
-    expect(read('renderer/src/threads/Pages.tsx')).toContain("(t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater })");
-    expect(read('renderer/src/App.tsx')).toContain("INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: scheduledCount, view, walking: !!run }))");
+    expect(read('renderer/src/threads/Pages.tsx')).toContain("(t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view })");
+    expect(read('renderer/src/App.tsx')).toContain("INBOX_TABS.map((t) => t.view).filter((v) => v !== 'snoozed' || laterTabShown({ count: scheduledCount, view }))");
   });
 });

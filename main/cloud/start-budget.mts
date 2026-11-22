@@ -8,10 +8,25 @@
 // has been measured at this rate: a stand-in with tiny files proved nothing about
 // a 278 MB transcript.
 
+import { pressureFrom } from '../memory-gate.mts';
 import type { Pressure } from '../memory-gate.mts';
+import { STALE_MS, withoutWarnOrLightSwap } from '../start-hold.mts';
+import type { PressureSample } from '../start-hold.mts';
 
 const STALL_LIMIT_MS = 500;
 const COOL_MS = 30_000;
+
+/**
+ * The Mac's memory as a cloud start is judged by it. The kernel's warn and
+ * light swapping are set aside at any agent count: a 16 GB Mac reports them
+ * most of the day at 30-50% free, and a packed run leaves no agent here. A
+ * reading that is missing, undated or stale says nothing.
+ */
+export function cloudStartPressure(reading: PressureSample | null | undefined, now: number): Pressure | undefined {
+  if (!reading || !(Math.abs(now - Number(reading.at)) <= STALE_MS)) return undefined;
+  if (!Number.isFinite(reading.level) && !Number.isFinite(reading.freePct) && !Number.isFinite(reading.swapInMbps)) return undefined;
+  return pressureFrom(withoutWarnOrLightSwap(reading));
+}
 
 export interface StartBudgetOptions {
   start?: number;

@@ -18,17 +18,20 @@ import { listProducts, getProduct, createProduct, updateProduct, type ProductPat
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mts';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mts';
 import { listWorkItems, updateItem, createClaimRegistry, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
-import { createRepeatingTask, readStandingInstruction, setStandingInstruction, type NewRepeatingTask } from './core/repeats.mts';
+import { createRepeatingTask, readStandingInstruction, setStandingInstruction, stopRepeatingTask, type NewRepeatingTask, type StopRepeatingTask } from './core/repeats.mts';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mts';
 import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mts';
 import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-files.mts';
 import { legacyRoot } from '../main/store/project.mts';
 import { listProductChats, readProductChat } from './core/chat.mts';
 import { lookAtPage } from './core/page.mts';
-import { askToSignIn, keepAfterSignIn, notToBeSaved, NOT_SAVED, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
+import { askToSignIn, keepAfterSignIn, keyNamesFor, notToBeSaved, NOT_SAVED, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
+import { joinCause } from './core/causes.mts';
+import { addRuleToProduct } from './core/project-rules.mts';
+import { joinedWords } from '../shared/causes.mts';
 // The descriptions below are read by every agent on every run, so the app is
 // named in them from the one place it is named. They said "the app" while this
 // server lived in that product's repo, which told every worker the wrong name
@@ -73,6 +76,7 @@ export interface StoreTool {
 }
 
 export interface CloudResourceAsk { kind: 'file' | 'skill'; path: string; scope?: 'task' | 'documents' | 'account' }
+export interface CloudKeyAsk { name: string; what: string; place: 'keychain' | 'file' | 'shell'; from: string; entry?: string }
 
 type DocumentStatus = 'current' | 'history' | 'exploration';
 interface DocumentFilter { kind?: string; status?: DocumentStatus; pathPrefix?: string; query?: string; catalogedOnly?: boolean }
@@ -116,6 +120,7 @@ export interface BuildToolsOptions {
   ownItem?: string | null;
   ownProduct?: string | null;
   requestCloudResource?: ((ask: CloudResourceAsk) => unknown) | null;
+  requestCloudKey?: ((ask: CloudKeyAsk) => unknown) | null;
   /** Saves a token a cloud run's login made, so every later cloud run has it. */
   keepCloudKey?: ((name: string, value: string) => unknown) | null;
 }
@@ -132,7 +137,7 @@ const guard = (fn: StoreTool['run']) => async (args: object | undefined): Promis
 
 // `ownItem` is the row this server's session was started for, if any, and
 // `ownProduct` its project.
-export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null, keepCloudKey = null }: BuildToolsOptions = {}) {
+export function buildTools({ holder, ownItem: givenItem, ownProduct = process.env.ZERO_PRODUCT || null, requestCloudResource = null, requestCloudKey = null, keepCloudKey = null }: BuildToolsOptions = {}) {
   const ownItem = givenItem === undefined ? process.env.ZERO_ITEM || null : givenItem;
   const account = resolveAccount();
   // Cloud runs share one process, whose own ZERO_ITEM belongs to no run or to
@@ -171,15 +176,27 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'update_product',
-      description: 'Change a product\'s name, one-liner, repo path, or archived flag.',
+      description: 'Change a product\'s name, one-liner, repo path, or archived flag. On a thread, a new repo path needs the person\'s own words there naming or agreeing to it, quoted in askedBecause.',
       schema: {
         product: z.string(),
         name: z.string().optional(),
         oneLiner: z.string().optional(),
         repoPath: z.string().optional(),
         archived: z.boolean().optional(),
+        askedBecause: z.string().optional().describe('for a new repoPath on a thread: the person\'s own words on it naming or agreeing to the folder, quoted exactly'),
       },
-      run: ({ product, ...patch }: { product: string } & ProductPatch) => json(updateProduct(product, patch)),
+      run: ({ product, askedBecause, ...patch }: { product: string; askedBecause?: string } & ProductPatch) => json(updateProduct(product, patch, askedBecause, thisRun())),
+    },
+
+    {
+      name: 'add_project_rule',
+      description: 'Keep a rule the person gave for one project (when its work ships, what needs their yes, how it is done) in that project\'s instructions, which every agent working there reads from its next run. Only once they have agreed to keep it, and one rule per call, in their words. On a thread it needs the person\'s own words there giving or agreeing to the rule, quoted in askedBecause.',
+      schema: {
+        product: z.string(),
+        rule: z.string().describe('one rule, a sentence or two'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it giving or agreeing to this rule, quoted exactly, such as "Yes, keep that for this project". Without them nothing is added'),
+      },
+      run: ({ product, rule, askedBecause }: { product: string; rule: string; askedBecause?: string }) => json(addRuleToProduct(product, rule, askedBecause, thisRun())),
     },
 
     /* ------------------------------ documents ------------------------------ */
@@ -337,6 +354,29 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       },
     },
     {
+      name: 'wait_on_cause',
+      description: 'When this thread is stuck on something outside its own work that other threads could hit too (a sign-in or key missing, git or GitHub refusing, the computer offline or out of memory, main broken, a service down), wait on that cause instead of asking the person. Every thread stuck on one cause waits behind one row, whose lead clears it or asks the person once for all of them, and each thread carries on by itself once it is cleared. Pass cause (what is wrong, in a few plain words the person would use, such as "Your Mac can\'t push to GitHub") and ask (what you would otherwise have told them). If causes are already open you are shown them: call again with causeId when yours is one of them, or with new: true when it is not. Never use it for a question about this thread\'s own work, which is still yours to ask.',
+      schema: {
+        cause: z.string().optional(),
+        ask: z.string().optional(),
+        causeId: z.string().optional().describe('an open cause this thread is stuck on too'),
+        new: z.boolean().optional().describe('true when none of the open causes is this one'),
+        id: z.string().optional().describe('the stuck thread; defaults to the one this session runs'),
+      },
+      run: async ({ id, cause, ask, causeId, new: isNew }: { id?: string; cause?: string; ask?: string; causeId?: string; new?: boolean }) => {
+        const threadId = id ?? ownItem;
+        if (!threadId) throw new Error('name the stuck thread with id');
+        const thread = listWorkItems({ includeDone: true }).find((i) => i.id === threadId);
+        if (!thread) throw new Error(`no thread ${threadId}`);
+        const joined = joinCause({ thread, cause, ask, causeId, isNew });
+        if (joined.choose) return json({ open: joined.choose, next: 'If one of these is what this thread is stuck on, call again with its causeId. If none is, call again with new: true.' });
+        await claims.update(threadId, { status: 'blocked', blockedBy: [joined.causeId] });
+        // A lead that already answered is started again, so its answer names everyone waiting.
+        if (!joined.opened) noteToAnotherThread(joined.causeId, { note: joinedWords(thread) }, { ownItem: threadId });
+        return json({ waitingOn: joined.causeId, opened: joined.opened, next: 'End your turn now with one line saying what this thread is waiting on. It carries on by itself when the cause is cleared, and you will be started again then.' });
+      },
+    },
+    {
       name: 'release_work_item',
       description: 'Hand an item back unfinished so another session can take it. Worth doing when you find it is not what you thought, or belongs to work you are not equipped for; otherwise it stays held until this session ends.',
       schema: { id: z.string() },
@@ -376,6 +416,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       },
       run: (ask: NewRepeatingTask) => json(createRepeatingTask(ask, thisRun())),
     },
+    {
+      name: 'stop_repeating_task',
+      description: 'Stop a repeating task for good, as Stop repeating on the person\'s own screen does: no more runs start, and runs already made are left as they are. Use it when the person asks for one to stop, be switched off or cancelled, rather than telling them to find it and stop it by hand. Name it as it is listed (such as "Daily security review") or by its id; a name not in this thread\'s product is looked for in every product, and a name two running tasks share is refused with both ids. On a thread it needs the person\'s own words there asking for it to stop and naming it, quoted in askedBecause; on one of the task\'s own runs, words like "Switch it off" are enough.',
+      schema: {
+        which: z.string().describe('the task\'s name as it is listed, or its id (r-…)'),
+        product: z.string().optional().describe('which product it is in, when you know; otherwise every product is searched'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to stop, quoted exactly, such as "Stop the daily security review". Without them nothing is stopped'),
+      },
+      run: (ask: StopRepeatingTask) => json(stopRepeatingTask(ask, thisRun())),
+    },
 
     /* ------------------------------- teammates ------------------------------ */
     // On a teammate's run, the teammate speaks; on any other thread, the person
@@ -404,8 +454,8 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_remember',
-      description: 'Keep a standing preference the person stated ("from now on", "always", "never", "I prefer") in a few words, in their terms. The person sees it in the team chat and can undo it. If you have a method file, put it there too: your method is what every later run reads.',
-      schema: { text: z.string().describe('the preference, in a few words') },
+      description: 'Note what the person taught you: a correction, approval, turn-down, decision or standing preference, in one line, in their words, with the date. Every later run reads your notes beside your method, and your look-back folds them into it, so a working run notes rather than rewriting its method. The person sees it in the team chat and can undo it.',
+      schema: { text: z.string().describe('the lesson, in one line') },
       run: ({ text: words }: { text: string }) => json(teamRemember({ text: words }, thisRun())),
     },
     {
@@ -428,7 +478,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_method',
-      description: 'Write your method, the one file every run of yours reads whole: send text to write all of it, or old (one passage exactly as it reads now) and new (what replaces it) to change one part. Always use this rather than editing the file: a run in the cloud edits a copy that never comes back. The version it replaces is kept.',
+      description: 'Write your method, the one file every run of yours reads whole: send text to write all of it, or old (one passage exactly as it reads now) and new (what replaces it) to change one part. Use it when you set yourself up, in a look-back, or when the person asks you to change it; in a run doing work, note lessons with team_remember instead. Always use this rather than editing the file: a run in the cloud edits a copy that never comes back. The version it replaces is kept.',
       schema: {
         text: z.string().optional().describe('your whole method'),
         old: z.string().optional().describe('one passage of it, exactly as it reads now'),
@@ -592,6 +642,12 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         if (!ask) throw new Error('keep goes with the ask of a sign-in that worked');
         if (typeof keepCloudKey !== 'function') return json({ status: 'kept_here', message: 'On this computer the login keeps its own sign-in, so there is nothing to keep.' });
         if (notToBeSaved(id, ask, { product })) return json({ status: 'not_saved', message: NOT_SAVED });
+        const said = (await waitForSignIn(id, asked.id, { product, waitMs: 0 })).status;
+        if (said === 'skipped' || said === 'replied') return json({ status: 'denied', message: 'They did not sign in here, so there is nothing to keep.' });
+        const names = keyNamesFor(asked.service);
+        // Off the list, the name would be the agent's own choice, and a blocklist of names keeps missing some.
+        if (!names) return json({ status: 'denied', message: `A ${asked.service} sign-in is not one ${Name} keeps. If later cloud runs need its key, ask for it with an AGENTBOX-NEEDS: key line, which they answer on a card.` });
+        if (!names.includes(keep.name)) return json({ status: 'denied', message: `A ${asked.service} sign-in is kept as ${names.join(' or ')}, not ${keep.name}.` });
         await keepCloudKey(keep.name, keep.value);
         return json({ status: 'kept', message: `Kept as ${keep.name} for every later cloud run.` });
       }
@@ -610,13 +666,26 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
 
   if (typeof requestCloudResource === 'function') tools.push({
     name: 'request_cloud_resource',
-    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. Returns delivered, folder (its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names or needs what could not be delivered, by its path or by what it is, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
+    description: 'Fetch a missing file, folder or installed skill from this thread’s computer without moving the conversation there. A file or folder is any path under this task checkout or the account’s documents, other products’ folders included: relative with a scope, or written out in full (`~/…` or absolute) with no scope. Skills use their installed name. Delivered resources get a separate scratch path, preserving cloud edits. A folder is delivered whole in one request, with its files listed; ask for the folder rather than each file. Returns delivered, folder (a folder too big to send whole: its files, to ask for one by one), denied, not_found, too_large, or unavailable, with the reason. A delivered skill includes its scripts and references; read its returned SKILL.md. If the request names or needs what could not be delivered, by its path or by what it is, end the turn with the hand-back line rather than building around a guess; otherwise continue and explain what is missing.',
     schema: {
       kind: z.enum(['file', 'skill']),
       path: z.string().describe('file or folder path (relative, ~/…, or absolute), or installed skill name'),
       scope: z.enum(['task', 'documents', 'account']).optional().describe('for a relative file path: this task, this product\'s documents, or the account\'s documents; omitted for a full path or a skill'),
     },
     run: async (args: CloudResourceAsk) => json(await requestCloudResource(args)),
+  });
+
+  if (typeof requestCloudKey === 'function') tools.push({
+    name: 'request_cloud_key',
+    description: 'Ask this thread’s computer for a key the run needs when you know where it is kept there: their instructions, notes or memory name a Keychain item, a file under their home folder, or a variable in their shell. They get a card to allow it; once allowed it is saved for every cloud run and handed to this one. The call waits up to 15 minutes for their answer. Returns saved (with the file this run reads it from), already, denied, replied (their words instead of a yes), not_found, no_answer or unavailable, each with what to do next. When you do not know where the key is, do not guess: ask for it with the key line at the end of your turn.',
+    schema: {
+      name: z.string().describe('the environment variable its tools read, such as POSTHOG_PERSONAL_KEY'),
+      what: z.string().describe('what it is, in plain words, such as "the PostHog personal API key the daily report reads"'),
+      place: z.enum(['keychain', 'file', 'shell']),
+      from: z.string().describe('the Keychain item\'s name, the file\'s path (~/… or absolute), or the shell variable\'s name'),
+      entry: z.string().optional().describe('for an .env-style file, the variable inside it'),
+    },
+    run: async (args: CloudKeyAsk) => json(await requestCloudKey(args)),
   });
 
   // Teammates are an alpha feature: their tools are offered once there is a

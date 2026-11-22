@@ -28,21 +28,17 @@ describe('which threads were brought in', () => {
 });
 
 describe('the page it opens on', () => {
-  it('folds a brought-in chat however short it is', () => {
-    expect(drawnWhole(1, true)).toBe(false);
-    expect(drawnWhole(2, true)).toBe(false);
-  });
-  it('still draws a short thread of your own whole', () => {
-    expect(drawnWhole(1)).toBe(true);
-    expect(drawnWhole(2, false)).toBe(true);
+  it('folds a brought-in chat however short it is, even in the view from an answer followed up', () => {
+    expect(drawnWhole(1, { imported: true })).toBe(false);
+    expect(drawnWhole(2, { imported: true })).toBe(false);
   });
   it('folds a long one either way', () => {
     expect(drawnWhole(3)).toBe(false);
-    expect(drawnWhole(3, true)).toBe(false);
+    expect(drawnWhole(3, { imported: true })).toBe(false);
   });
   it('is what the thread page asks', () => {
     const page = fs.readFileSync(new URL('../renderer/src/components/ItemThread.tsx', import.meta.url), 'utf8');
-    expect(page).toContain('const short = !earlierOpen && drawnWhole(behind, broughtIn(item));');
+    expect(page).toContain('imported: broughtIn(item) });');
   });
 });
 

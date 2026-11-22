@@ -5,20 +5,23 @@
 // the rows are ordered, how "Updated" is said, and what goes in each board
 // column for the Team, where your own threads come from this Mac and your
 // teammates' from the cards their Macs publish.
-import { shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mts';
+import { handedOn, shownToPeople, shownToTeam, visibilityOf } from '../../../shared/thread-cards.mts';
 import type { Seen } from './summary-rules';
 import { hiddenUntil, placedAt } from '../list-rules';
 import type { AgentVoice, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
 import { voiceName } from '../../../shared/agent-voice.mts';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
-import { dayAndTime, firstRealLine } from '../format';
+import { dayAndTime, firstRealLine, itemOptions } from '../format';
+import { asksSomething } from '../../../shared/teammates.mts';
 import { threadState } from '../../../shared/thread-cards.mts';
 import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
-import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, whatWaits } from '../../../shared/team-rules.mts';
+import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, taskGiver, whatWaits, type TeamRow } from '../../../shared/team-rules.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 import { taskWords } from '../team/company';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { localDate } from '../local-dates';
+import { isCause, waitingOn, causeWhere } from '../../../shared/causes.mts';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -440,10 +443,10 @@ export function emptyTabWords(view: View | string, starting = false, waiting = 0
     return `Nothing is running. ${waiting === 1 ? 'One thread waits' : `${waiting} threads wait`} in Needs you.`;
   }
   // A finished thread waits in Needs you until its owner closes it, which a
-  // persona read as the app losing it.
+  // persona read as the app losing it. One short line, like In progress's.
   return {
-    snoozed: 'Nothing is waiting for later. "Add it to Later" on a new thread writes one down without starting it.',
-    done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
+    snoozed: 'Nothing is waiting for later.',
+    done: 'Nothing done yet. Finished threads wait in Needs you.',
   }[view as string] ?? 'Nothing here.';
 }
 
@@ -534,13 +537,13 @@ export function peopleInConversation(
   return { to: ids[0], also: ids.slice(1) };
 }
 
-/** Who the small menu on an agent thread offers. */
+/** Who the small menu on an agent thread offers. Nobody on a thread of your own, where Share is the one door to people. */
 export function peopleToAdd<P extends { id: string }>({ item, me, company }: {
-  item: { visibleTo?: string[] };
+  item: { visibleTo?: string[]; createdBy?: string | null };
   me: string | null;
   company: readonly P[];
 }): P[] {
-  if (!me) return [];
+  if (!me || (item.createdBy ?? me) === me) return [];
   const on = new Set(item.visibleTo ?? []);
   return company.filter((p) => p.id !== me && !on.has(p.id));
 }
@@ -684,13 +687,25 @@ export const repeatsTheTab = (word: string, tab?: string): boolean => !!tab && !
  * agent thread waiting on you says Answered rather than nothing, so the row says
  * why it is there; a teammate waiting on you keeps their words.
  */
-export function cellUnderTab(word: string, tab: string | undefined, { fromPeople }: { fromPeople: boolean }): string | null {
+export function cellUnderTab(word: string, tab: string | undefined, { fromPeople, asks = false }: { fromPeople: boolean; asks?: boolean }): string | null {
   if (tab === 'inbox' && fromPeople) return word;
   if (!repeatsTheTab(word, tab)) return word;
-  return tab === 'inbox' ? 'Answered' : null;
+  if (tab !== 'inbox') return null;
+  return asks ? 'Waiting on you' : 'Answered';
 }
 
-/** The level a row names: none at Medium, which is what an unset thread runs at. */
+/** The agent's newest word is a question with no options to pick, so only your words answer it. */
+export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined> }): boolean {
+  if (itemOptions(item).length) return false;
+  const said = (item.wrote?.note?.ts ?? 0) > (item.wrote?.result?.ts ?? 0) ? item.note : item.result;
+  return asksSomething(said);
+}
+
+/**
+ * The level a small mark beside other words names, on a board card or a Home
+ * row: none at Medium, which is what an unset thread runs at. The table's
+ * Priority column names every level (RowCells).
+ */
 export function rowPriorityId(priority: number | null): PriorityId | null {
   if (priority === null) return null;
   const id = priorityIdOf(priority);
@@ -785,7 +800,8 @@ export function teamEntries({ items, products, cards, me, now, since = null, sta
     const state = stateOf?.(item) ?? threadState(item, now);
     if (state === 'done' && !(item.updatedAt >= today)) continue;
     out.push({
-      key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item), project: product.name,
+      key: `mine/${item.product}/${item.id}`, ownerId: me, state, title: shownTitle(item),
+      project: isCause(item) && item.status !== 'done' ? causeWhere(item, waitingOn(item, items), (slug) => bySlug.get(slug)?.name ?? slug) : product.name,
       projectSlug: product.slug, priority: shownPriority(item), updatedAt: item.updatedAt, item, card: null,
       live: !!live?.has(item.id),
     });
@@ -987,6 +1003,24 @@ export function workAudience(item: WorkItem, product: Product | undefined | null
   if (!isDirect(product) || !isWorkThread(item)) return null;
   const ids = othersIn(item, product!, me);
   return ids.length ? `with ${ids.map(nameOf).join(', ')}` : null;
+}
+
+/** Whom a thread was handed to: it is closed, but it did not finish. */
+export function handedTo(item: { status?: string; answer?: string | null }): string | null {
+  // The giver's note, when there was one, follows on the next lines.
+  return handedOn(item) ? String(item.answer).split('\n')[0].slice('Given to '.length).replace(/\.$/, '') : null;
+}
+
+export { initialsOf as handedInitials } from '../team/rooms/room-rules';
+
+/** The task a thread became when it was handed on: its link leads back here, from the one who gave it. */
+export function taskHandedFrom<T extends TeamRow & { id: string; body?: string | null }>(items: readonly T[], threadId: string, me: string | null = null): T | null {
+  return items.find((t) => {
+    // An ask links back to the thread too, and is not a hand-over.
+    if (!isTaskRow(t) || (t as { ask?: unknown }).ask) return false;
+    const giver = taskGiver(t);
+    return (!me || giver === me) && handedFrom(t.body, giver)?.id === threadId;
+  }) ?? null;
 }
 
 /** "Dev, Maya": the conversation itself is named for who is in it, unless someone renamed it. */

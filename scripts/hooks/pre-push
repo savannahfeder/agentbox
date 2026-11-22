@@ -183,10 +183,16 @@ else
       full_because="what this push changes cannot be told from here"
       break
     fi
-    if [ -n "$(git diff --name-only --diff-filter=D "$base" "$local_sha" | grep -E '\.(mjs|mts|cjs|js|jsx|ts|tsx)$')" ]; then
+    deleted=$(git diff --name-only --diff-filter=D "$base" "$local_sha" | grep -E '\.(mjs|mts|cjs|js|jsx|ts|tsx)$' || true)
+    # Nothing imports a test file, so deleting one only needs the tests that name it.
+    if printf '%s\n' "$deleted" | sed '/^$/d' | grep -vqE '\.test\.(mjs|mts|cjs|js|jsx|ts|tsx)$'; then
       full_because="it deletes code something else may import"
       break
     fi
+    for gone in $deleted; do
+      changed="$changed
+$(grep -rlF -- "$(basename "$gone")" tests 2>/dev/null || true)"
+    done
     # A release's own commit moves the version number and nothing a test reads.
     if node scripts/lib/only-the-version-moved.mjs "$base" "$local_sha"; then
       continue

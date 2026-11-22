@@ -1,6 +1,76 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
-import type { LinkCommentWaiting, ThreadCard } from '../types';
+import type { AgentEvent, LinkCommentWaiting, ThreadCard } from '../types';
+import { askIsOpen, askOf, handBackReadBy, isHandBack, type AskRow } from '../../../shared/thread-asks.mts';
 import { filesInLines, threadFiles, versionForPath, type ThreadLine } from '../../../shared/artifact-marks.mts';
+
+/**
+ * The owner's thread as you read it: what you wrote to their agent is yours and
+ * says so, both your comment before their copy passes it on and the line it
+ * writes once it has (`from` you on an answer), which outlives the ask.
+ */
+export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping, owner = '' }: { me: string | null; helping: boolean | ((at: number) => boolean); owner?: string }): AgentEvent[] {
+  const helped = typeof helping === 'function' ? helping : () => helping;
+  return events.map((e) => {
+    if (e.kind || !me) return e;
+    // The owner's copy wrote "You asked" for its owner; here the reader is the helper.
+    if (isHandBack(e.text)) return { ...e, text: handBackReadBy(e.text ?? '', e.fromId === me ? 'helper' : 'other', owner) };
+    if (e.fromId === me && !isHandBack(e.text)) {
+      const { from: _from, fromId: _fromId, ...rest } = e;
+      return { ...rest, who: 'you' as const, by: me, says: 'to-agent' as const };
+    }
+    return e.says === 'comment' && e.by === me && helped(e.at) ? { ...e, says: 'to-agent' as const } : e;
+  });
+}
+
+/**
+ * Whether a help ask on you covered words you wrote on this thread at `at`, so
+ * the owner's copy passes them to its agent (`helpAskCovering` on that side).
+ */
+export function helpedWhen(rows: readonly AskRow[], me: string | null, owner: string, thread: string, at: number): boolean {
+  return rows.some((r) => {
+    const a = askOf(r);
+    if (!a || a.kind !== 'help' || a.owner !== owner || a.thread !== thread || !me || r.assignee !== me) return false;
+    if (at < (r.wrote?.ask?.ts ?? r.createdAt ?? 0)) return false;
+    if (r.status !== 'done' && r.wrote?.status?.by === me) return false;
+    return askIsOpen(r) || at <= (r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? r.updatedAt ?? 0);
+  });
+}
+
+/**
+ * What a key in the box under a teammate's thread presses. A review's Enter is
+ * a new line, and Ctrl or ⌘ Enter sends its words as changes, the one verdict
+ * that needs them.
+ */
+export function keyInTheBox(e: { key: string; ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean; isComposing?: boolean }, { reviewing, words }: { reviewing: boolean; words: string }): 'send' | 'changes' | null {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return null;
+  if (!reviewing) return 'send';
+  return (e.ctrlKey || e.metaKey) && words.trim() ? 'changes' : null;
+}
+
+/**
+ * Where an ask on you goes among the owner's messages: after the message `after`
+ * (an index into `events`), above them all, or at the foot under the outcome.
+ */
+export function whereTheAskGoes(events: readonly { at: number }[], outcome: { at: number } | null, askAt: number | null): { after: number } | 'top' | 'foot' {
+  if (askAt == null) return 'foot';
+  const later = events.findIndex((e) => e.at > askAt);
+  if (later === -1) return outcome && outcome.at > askAt ? (events.length ? { after: events.length - 1 } : 'top') : 'foot';
+  return later === 0 ? 'top' : { after: later - 1 };
+}
+
+/** Whom the box under a teammate's thread writes to. */
+export type BoxTarget = 'comment' | 'review' | 'agent';
+
+export const boxTarget = (kind: 'help' | 'review' | null | undefined): BoxTarget => (kind === 'review' ? 'review' : kind === 'help' ? 'agent' : 'comment');
+
+/** One draft per target, so words never change whom they go to on their own. */
+export const draftAtFor = (personId: string, threadId: string, target: BoxTarget) => ({ product: `teammate:${personId}`, id: target === 'comment' ? threadId : `${threadId}:${target}` });
+
+/** Whether this task is the ask the open teammate's thread page carries, so L and E on the page act on it. */
+export const isTheAskOn = (item: { ask?: { owner: string; thread: string } | null }, card: { personId: string; threadId: string } | null): boolean =>
+  !!card && !!item.ask && item.ask.owner === card.personId && item.ask.thread === card.threadId;
+
+export const askEndedWords =(owner: string, handedToYou: boolean) => (handedToYou ? `${owner} handed this thread to you.` : `${owner} took the ask back.`);
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -39,6 +109,15 @@ export function teammateThreadsFound(cards: ThreadCard[], me: string | null | un
     const title = c.title.toLowerCase();
     return words.every((w) => title.includes(w));
   });
+}
+
+/**
+ * Whether the conversation's end was in view before the box under it grew by
+ * `by` px. The scroll is already that much shorter when this is asked, so the
+ * end counts as in view if it was within 8px of the old bottom.
+ */
+export function endWasInView(scroll: { scrollHeight: number; scrollTop: number; clientHeight: number }, by: number): boolean {
+  return by > 0 && scroll.scrollHeight - scroll.scrollTop - (scroll.clientHeight + by) < 8;
 }
 
 /** Under the "Waiting on Dev" at the top of a teammate's thread: what that means, in one line. */

@@ -33,7 +33,7 @@ export function pageOf(item: WorkItem, events: AgentEvent[], outcome: ItemOutcom
   const newest = newestAnswer(events, lead);
   const stands = newest && !earlierOpen ? standsAt(events, newest) : -1;
   const behind = stands >= 0 ? earlierThan(events, stands) : newest ? earlierCount(events, lead) : 0;
-  const short = !earlierOpen && drawnWhole(behind);
+  const short = !earlierOpen && drawnWhole(behind, { leads: !!newest && stands < 0 });
   const from = short ? -1 : stands;
   const earlier = short ? 0 : behind;
   const steps = !short && !!newest && (events.some((e) => e.kind === 'work') || after.length > 0);

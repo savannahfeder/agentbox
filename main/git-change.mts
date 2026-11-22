@@ -29,6 +29,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ChangedFile, Hunk, Row, RowNums } from './code-change.mts';
+import { HOOK_FREE } from './hook-free-git.mts';
+import { taskBranch } from './task-folders.mts';
+
+const TASK_BRANCHES = `${path.posix.dirname(taskBranch('w-0'))}/`;
 
 export interface RepoSnapshot { root: string; head: string | null; before: Map<string, string | null>; at: number }
 
@@ -62,11 +66,12 @@ function git(cwd: string, args: readonly string[], { maxBuffer = 64 * 1024 * 102
   // A user's `diff.mnemonicPrefix` rewrites a/ and b/ into c/ i/ o/ w/.
   // The reader below only knows one prefix. Turn the setting off for this
   // process so a checkout reads the same on every machine.
-  return execFileSync('git', ['--no-pager', '-c', 'diff.mnemonicPrefix=false', ...args], {
+  return execFileSync('git', ['--no-pager', '-c', 'diff.mnemonicPrefix=false', ...HOOK_FREE, ...args], {
     cwd,
     encoding: 'utf8',
     maxBuffer,
     stdio: ['ignore', 'pipe', 'ignore'],
+    windowsHide: true,
   });
 }
 
@@ -150,6 +155,17 @@ function cutFrom(root: string): string | null {
     if (base) return base;
   }
   return null;
+}
+
+/** Where a thread's own task branch left main, or null on any other branch
+ *  and once main already holds the branch, where the run's own change is the
+ *  only thing left worth showing. */
+function wholeBranchBase(root: string): string | null {
+  const here = tryGit(root, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
+  if (!here?.startsWith(TASK_BRANCHES)) return null;
+  const base = cutFrom(root);
+  const now = tryGit(root, ['rev-parse', 'HEAD'])?.trim();
+  return base && base !== now ? base : null;
 }
 
 function isAncestor(root: string, older: string, newer: string): boolean {
@@ -397,7 +413,12 @@ export function changeFromRepo(snapshot: RepoSnapshot | null | undefined): RepoC
     const root = snapshot?.root ?? null;
     return { files: [], plus: 0, minus: 0, root, stands: whereTheWorkStands(root), knowsYou: gitKnowsYou(root) };
   }
-  const { root, head, before } = snapshot;
+  const { root, head } = snapshot;
+  // A thread's own branch holds only that thread's work, so its change is what
+  // Ship it lands: everything since the branch left main, earlier rounds and
+  // loose files included, not just this round.
+  const branchBase = head ? wholeBranchBase(root) : null;
+  const before = branchBase ? new Map<string, string | null>() : snapshot.before;
   const files = new Map<string, ChangedFile>();
   const add = (file: ChangedFile): void => {
     if (!file.hunks.length) return;
@@ -420,7 +441,7 @@ export function changeFromRepo(snapshot: RepoSnapshot | null | undefined): RepoC
   // 1. Everything tracked, against the commit the run started on. The files
   //    we kept a copy of are cut out here and done properly below.
   if (head) {
-    const { base, only } = startOfThisRun(root, head);
+    const { base, only } = branchBase ? { base: branchBase, only: null } : startOfThisRun(root, head);
     const excludes = [...before.keys()].map((rel) => `:(exclude,literal)${rel}`);
     const patch = tryGit(root, [
       'diff', '--no-color', '--no-ext-diff', '-U3', '-M', base, '--', '.', ...excludes,

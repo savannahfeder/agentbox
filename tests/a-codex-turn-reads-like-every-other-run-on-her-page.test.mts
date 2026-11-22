@@ -936,7 +936,7 @@ describe('Codex readers stay behind the engine and approval boundary', () => {
     expect(block).toBeTruthy();
     const named = block[1].split(',').map((n) => n.trim()).filter(Boolean);
     expect(named.sort()).toEqual([
-      'captureCodexEvent', 'changeFromCodexTurn', 'codexStreamingText',
+      'captureCodexEvent', 'changeFromCodexTurn', 'codexStreamingText', 'codexTookTheWords',
       'rememberCodexChange', 'summarizeCodexEvent', 'traceCodexEvent',
     ]);
   });

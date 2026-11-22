@@ -4,7 +4,7 @@
 import {
   planWakes, teammateLabel, FROM_LABEL_PREFIX, HOP_LABEL_PREFIX, hopOf, teammateIdOf, YOU, mentionsIn,
   letterFor, statusOf, runLines, STARTERS, CHAT_TAIL, isWorks, DEFAULT_LIMIT, MAX_HOPS,
-  offerFrom, offerAnswer, OFFER_LABEL, OFFER_MAKE, OFFER_NOT_NOW, TEAMMATE_EFFORT, GREETING, starterAsks,
+  offerAnswer, OFFER_LABEL, TEAMMATE_EFFORT, GREETING, starterAsks,
   dutyWhen, dutyOf, DUTY_LABEL_PREFIX, CHAT_LABEL, yesFirst, WORK_LABEL_PREFIX, isActiveRun, isQueued, STOPPED_NOTE,
   METHOD_CAP, recordOf, sourceText, pausedNow, WEEK_MS, workOf, UNREAD_HOLD, cleanDuty, dutyStart, howYouWrite, VOICES,
   replyMessageId, projectNamedIn, LOOK_BACK_LABEL, lookBackEffort, lookBackThreads, isLookBack,
@@ -13,6 +13,7 @@ import { reachTick } from './teammate-reach.mts';
 import { filesFoldersBrief } from '../shared/file-folders.mts';
 import { audienceWords } from '../shared/teammate-reach.mts';
 import { isShippedNote } from '../shared/shipped-note.mts';
+import { offerFace } from '../shared/teammate-face.mts';
 import { ruleLabel, periodKey } from '../shared/repeats.mts';
 import {
   teamDir, readTeammates, readChat, writeTeammate, writeChat, newTeammateId, newMemoryId, readPlaybooks,
@@ -22,11 +23,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RepeatShape } from '../shared/repeats.mts';
 import type { RouteRecord } from '../shared/auto-route.mts';
-import type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction, ChatLine, Playbook, TeamChat, Written } from '../shared/teammates.mts';
+import type { ItemRef, TeammateStatus, WakeTrigger, WakeAction, ChatLine, Playbook, TeamChat, Written } from '../shared/teammates.mts';
 import type { OutboxEntry, TeamView, ViewCard } from '../shared/teammate-reach.mts';
 import type { ReachTeam } from './teammate-reach.mts';
 
-export type { ItemRef, TeammateStatus, Offer, WakeTrigger, WakeAction };
+export type { ItemRef, TeammateStatus, WakeTrigger, WakeAction };
 
 export type Works = RepeatShape;
 
@@ -38,6 +39,8 @@ export interface Teammate {
   id: string;
   name: string;
   letter?: string | null;
+  /** The face picked for it; absent, its face follows its id (shared/teammate-face.mts). */
+  face?: string | null;
   role?: string | null;
   job?: string | null;
   goal?: string | null;
@@ -180,6 +183,8 @@ export interface TickInput {
   tell?: (product: string | null, item: string, hand: { text: string; from: { teammate: string; name: string }; hold: boolean; hop: number }) => unknown;
   /** Whether the plan this engine bills has room for a look-back. Without it none runs. */
   room?: (engine: string | null) => boolean;
+  /** Make the default Chief of staff when there is none yet (the running app's tick). */
+  chief?: boolean;
 }
 
 export interface OfferInput { items?: TeamItem[]; chat?: Chat; now?: number }
@@ -192,7 +197,7 @@ interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', due: 'bring its duty to its thread', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
 
 // When each project last shipped, from the note the ship queue leaves.
 function shippedByProduct(items?: TeamItem[] | null) {
@@ -325,7 +330,7 @@ export class Teammates {
   update(id: string, patch: Record<string, unknown> = {}, now = Date.now()) {
     const t = this.get(id, now);
     if (!t) throw new Error('No such teammate.');
-    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary', 'readsMessages', 'openToTeam', 'voice', 'voiceText'];
+    const allowed = ['name', 'role', 'job', 'goal', 'counted', 'asksFirst', 'works', 'product', 'engine', 'model', 'effort', 'limit', 'paused', 'letter', 'handoffsNeedYes', 'primary', 'readsMessages', 'openToTeam', 'voice', 'voiceText', 'face'];
     const clean: Record<string, unknown> = {};
     for (const k of allowed) if (k in patch) clean[k] = patch[k];
     if ('name' in clean) {
@@ -532,7 +537,7 @@ export class Teammates {
   // Carries out what `planWakes` decided. Each action is written so a crash
   // between two of them redoes nothing twice: runs are created if absent under
   // the project lock, and the seen marker comes after the run it records.
-  async tick({ items, now = Date.now(), deliver, tell, room }: TickInput = {}) {
+  async tick({ items, now = Date.now(), deliver, tell, room, chief = false }: TickInput = {}) {
     let team: Teammate[];
     let chat: Chat;
     try {
@@ -547,10 +552,18 @@ export class Teammates {
     } catch (err) {
       this.noteTrouble(`The offer of a teammate failed: ${(err as Error).message}`, now);
     }
+    if (chief) team = this._pauseTheChiefOnce(team, now);
     if (!team.length) return [];
     team = this._namedByRole(team, now);
     const mine = (items ?? []).filter((i) => teammateIdOf(i));
-    const lookBack = room ? { ok: (t: { id: string; engine?: string | null }) => { try { return !!readMethod(this.dir(), t.id) && room(t.engine ?? null); } catch { return false; } } } : null;
+    const lookBack = room ? {
+      ok: (t: { id: string; engine?: string | null }) => { try { return !!readMethod(this.dir(), t.id) && room(t.engine ?? null); } catch { return false; } },
+      notes: (t: { id: string }) => {
+        const method = (() => { try { return readMethod(this.dir(), t.id); } catch { return null; } })();
+        const memory = team.find((x) => x.id === t.id)?.memory ?? [];
+        return method ? memory.filter((m) => laterThan(m.at, method.changedAt)).map((m) => m.at) : [];
+      },
+    } : null;
     const actions: WakeAction[] = planWakes({ teammates: team, chat, items: mine, now, shipped: shippedByProduct(items), lookBack });
     const byId = new Map(team.map((t) => [t.id, t]));
     const done: WakeAction[] = [];
@@ -608,6 +621,9 @@ export class Teammates {
           // An answer is made from a message, and a message always carries its words.
           await deliver?.(a.product, a.item, a.text as string);
           if (a.priority) workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { priority: a.priority }, { source: 'founder', now });
+        } else if (a.type === 'due') {
+          if (!tell) throw new Error('nothing here can wake a thread');
+          await tell(a.product, a.item, { text: a.text, from: { teammate: t.id, name: t.name }, hold: false, hop: 0 });
         } else if (a.type === 'tell') {
           if (!tell) throw new Error('nothing here can hand work to a thread');
           await tell(a.product, a.item, { text: a.text, from: a.from, hold: a.hold, hop: a.hop });
@@ -629,6 +645,7 @@ export class Teammates {
         done.push(a);
       } catch (err) {
         if (a.msg) failed.add(a.msg);
+        if (a.type === 'due') failed.add(`${a.teammate}#${a.duty}@${a.key}`);
         if (a.trigger?.msg) failed.add(a.trigger.msg);
         if (a.trigger?.key) failed.add(a.trigger.kind === 'duty' ? `${a.teammate}#${a.trigger.duty}@${a.trigger.key}` : `${a.teammate}@${a.trigger.key}`);
         this.noteTrouble(`${t?.name ?? 'A teammate'} could not ${TROUBLE_VERB[a.type] ?? 'carry on'}: ${(err as Error).message}`, now);
@@ -638,10 +655,10 @@ export class Teammates {
     return done;
   }
 
-  // The offer of a teammate for asks you keep making: acts on a tap on an
-  // open one, then makes a new one if your threads call for it.
+  // Taps on offer rows made before Auto offered a teammate on the thread
+  // itself. No new rows are made: counting alike titles offered the wrong ones.
   async offer({ items = [], chat = this.chat(), now = Date.now() }: OfferInput = {}) {
-    const { workItemsDisk, lock } = this.store.modules;
+    const { workItemsDisk } = this.store.modules;
     for (const row of items.filter((i) => (i.labels ?? []).includes(OFFER_LABEL) && i.status !== 'done')) {
       const tap: { kind: 'make' | 'dismiss'; words?: string } | null = offerAnswer(row.answer);
       if (!tap) continue;
@@ -666,27 +683,48 @@ export class Teammates {
         note: tap.kind === 'make' ? 'A new teammate is setting itself up in the team chat.' : 'Not now. This one will not be offered again.',
       }, { source: 'system', now });
     }
-    const offered = new Set(chat.messages.filter((m) => m.kind === 'act' && m.verb === 'offered').map((m) => m.ref));
-    const offer: Offer | null = offerFrom({ items, offered, now });
-    if (!offer) return null;
-    const dir = this.store.productDir(offer.product);
-    if (!dir) return null;
-    const body = offer.said;
-    const result = [
-      '**Make a teammate for these?**', '', `${offer.said} Like these:`, '', ...offer.asked.map(({ title, n }) => `- ${title}${n > 1 ? ` (${n} times)` : ''}`), '',
-      'A teammate would take this kind of work on. It does it on its own, on a schedule if you like, and comes to you only when it needs you. It reads these threads first, with everything you said in them, then asks you only what they leave open.',
-      '', '## Options', `1. ${OFFER_MAKE} (recommended)`, `2. ${OFFER_NOT_NOW}`,
-    ].join('\n');
-    // Recorded first, so a crash after it can never offer the same job twice.
-    writeChat(this.dir(), { kind: 'act', from: YOU, verb: 'offered', ref: offer.key, text: offer.title, threads: offer.threads }, now);
-    await lock.withProjectLock(dir, async () => {
-      const made = workItemsDisk.createWorkItem(dir, {
-        title: offer.title, body, kind: 'question', priority: 5, labels: [OFFER_LABEL],
-        problem: 'A teammate could do this kind of work on its own.', progress: `Found ${offer.count} asks like these this month`,
-      }, { source: 'system', now });
-      workItemsDisk.updateWorkItem(dir, made.id, { result }, { source: 'agent', now });
-    });
-    return offer;
+    return null;
+  }
+
+  // Roles turned down on a thread's offer (shared/auto-route.mts readOffer),
+  // which Auto never offers again.
+  declinedRoles(): string[] {
+    return this.chat().messages.filter((m) => m.kind === 'act' && m.verb === 'declined-role' && m.ref).map((m) => String(m.ref));
+  }
+
+  // A tap on the teammate Auto offered on a thread. Make sets one up from this
+  // thread, which it reads first; Not now means never this role again.
+  answerOffer(item: TeamItem, make: boolean, now = Date.now()) {
+    const offer = item.routed?.offer;
+    if (!item.routed || !offer || offer.answered) throw new Error('That offer was already answered.');
+    const dir = this.store.productDir(item.product);
+    if (!dir) throw new Error('That project is gone.');
+    let made: string | null = null;
+    if (make) {
+      const threads = [{ product: item.product, id: item.id, title: String(item.label || item.title).trim() }];
+      // The card's reasons are what the person said yes to, so they are the job.
+      const gains = offer.gains?.length ? ` ${offer.gains.map((g) => (/[.!?…]$/.test(g) ? g : `${g}.`)).join(' ')}` : '';
+      const text = `${offer.role}. Take on work like this thread from now on, and learn how I like it done.${offer.why ? ` ${offer.why}` : ''}${gains}`;
+      made = this.describe({ text, product: item.product, threads }, now).teammate?.id ?? null;
+      // The face the card showed is the one it keeps.
+      if (made) writeTeammate(this.dir(), made, { face: offerFace(item.id) }, now);
+    } else {
+      writeChat(this.dir(), { kind: 'act', from: YOU, verb: 'declined-role', ref: offer.role.toLowerCase(), text: offer.role }, now);
+    }
+    const answered = make ? 'made' : 'no';
+    this.store.modules.workItemsDisk.updateWorkItem(dir, item.id, { routed: { ...item.routed, offer: { ...offer, answered } } }, { source: 'system', now });
+    // One answer covers the same offer waiting on your other threads.
+    const role = offer.role.trim().toLowerCase();
+    let everything: TeamItem[] = [];
+    try { everything = this.store.listItems(now); } catch { everything = []; }
+    for (const other of everything) {
+      const theirs = other.routed?.offer;
+      if (!other.routed || !theirs || theirs.answered || theirs.role.trim().toLowerCase() !== role) continue;
+      if (other.product === item.product && other.id === item.id) continue;
+      const otherDir = this.store.productDir(other.product);
+      if (otherDir) this.store.modules.workItemsDisk.updateWorkItem(otherDir, other.id, { routed: { ...other.routed, offer: { ...theirs, answered } } }, { source: 'system', now });
+    }
+    return { made };
   }
 
   // The threads an answered offer came from. An offer made before it kept
@@ -709,6 +747,22 @@ export class Teammates {
     const day = new Date(now).toDateString();
     const already = this.chat().messages.some((m) => m.kind === 'act' && m.from === teammateId && m.verb === verb && new Date(m.ts).toDateString() === day);
     if (!already) writeChat(this.dir(), { kind: 'act', from: teammateId, verb, text }, now);
+  }
+
+  // No Chief of staff is made any more. The one the app made for you (at the
+  // time it wrote in `chief-made`) is paused once, keeping its history; one you
+  // made, or started again after this, is yours.
+  _pauseTheChiefOnce(team: Teammate[], now: number): Teammate[] {
+    const dir = this.dir();
+    const paused = path.join(dir, 'chief-paused');
+    if (fs.existsSync(paused)) return team;
+    let madeAt = NaN;
+    try { madeAt = Number(fs.readFileSync(path.join(dir, 'chief-made'), 'utf8').trim()); } catch { /* never made one */ }
+    const chief = Number.isFinite(madeAt) ? team.find((t) => t.starter === 'chief' && t.createdAt === madeAt && !t.endedAt) : null;
+    if (chief && !chief.paused) this.update(chief.id, { paused: true }, now);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(paused, `${now}\n`);
+    return chief ? this.list(now) : team;
   }
 
   // Teammates go by their role. Ones made with a person's name are renamed
@@ -763,10 +817,10 @@ export class Teammates {
     }
     if (trigger.kind === 'look-back') {
       return { body: [
-        'Time to learn from what the person said on your recent work. The threads they replied on are written out whole in your brief, under "Threads named in what woke you".',
+        'Time to learn from what the person said on your recent work. The threads they replied on are written out whole in your brief, under "Threads named in what woke you", and the notes your runs kept since your method last changed are under "Learned since your method was last tidied".',
         '',
-        '1. Read each one whole.',
-        '2. Check your method against them. Fix any rule their words since contradict or have moved past, merge rules that say the same thing, and add any correction, approval or turn-down it is missing, quoted with its date and thread.',
+        '1. Read each thread whole.',
+        '2. Check your method against them and the notes. Fold every note in. Fix any rule their words since contradict or have moved past, merge rules that say the same thing, and add any correction, approval or turn-down it is missing, quoted with its date and thread.',
         '3. Keep it tight. The newest word wins, a remark about one piece of work is not a rule for all of it, and the whole method stays under the cap.',
         '',
         'Do no other work in this run. If the method changed, save it with team_method and post one line in the team chat saying what changed. If nothing needed changing, post nothing. Either way, close this run yourself.',
@@ -863,7 +917,8 @@ export class Teammates {
     const notRead = books.filter((b) => !b.readers.includes(t.id));
     const told = this._toldInTheChat(item, t, chat);
     // What you said in the chat lately, to anyone: a stop, a change of plan.
-    const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
+    // A line a thread wrote for you (`via`) is that thread's word, not yours.
+    const yours = chat.messages.filter((m) => m.kind === 'msg' && m.from === YOU && !m.via && now - m.ts < WEEK_MS).slice(-YOUR_CHAT_LINES)
       .map((m) => `- [${when(m.ts)}]${(m.to ?? []).length ? ` to ${(m.to as string[]).map((x) => this.nameOf(x, team)).join(', ')}` : ''}: ${cut(String(m.text ?? '').replace(/\s+/g, ' ').trim(), 400)}`);
     const lastSeen = Math.max(0, ...earlier.map((i) => (i.wrote?.answer?.source === 'founder' ? i.wrote.answer.ts ?? 0 : 0)));
     const untried = method && laterThan(method.changedAt, lastSeen);
@@ -891,7 +946,7 @@ export class Teammates {
         untried ? '**Your method has changed since the person last saw your work.** Whatever this run makes, show it to them rather than closing quietly, so they can tell you if the change was right.' : null,
         '',
         method.text.length > METHOD_CAP
-          ? `${method.text.slice(0, METHOD_CAP)}\n\n… (your method is longer than ${METHOD_CAP} characters and is cut here: tighten it this run, keeping every rule the person gave)`
+          ? `${method.text.slice(0, METHOD_CAP)}\n\n… (your method is longer than ${METHOD_CAP} characters and is cut here: ${isLookBack(item) ? 'tighten it in this look-back' : 'your next look-back tightens it'}, keeping every rule the person gave)`
           : method.text.trim(),
         '',
       ] : this._buildMethodFirst(t, file, sources, origin.length > 0)),
@@ -904,7 +959,11 @@ export class Teammates {
       ...(record ? ['## Your recent work, from the record', 'Each of your recent runs, what the person said on it in their words, and the first line of what you answered. Read it before you start: it is how you know what was already tried, approved and turned down.', record, ''] : []),
       ...(t.duties?.length ? ['## What you do on your own', ...t.duties.map((d) => `- ${d.what} (${dutyWhen(d).toLowerCase()})${d.tell ? `. Bring the person in only when ${d.tell}` : ''}`), 'You also wake when someone writes to you or passes you work.', ''] : []),
       ...(!method && t.memory.length ? ['## What you know about the person (put these in your method)', ...t.memory.map((m) => `- ${m.text}`), ''] : []),
-      ...(method && t.memory.some((m) => laterThan(m.at, method.changedAt)) ? ['## Noted since your method last changed (put these in it)', ...t.memory.filter((m) => laterThan(m.at, method.changedAt)).map((m) => `- ${m.text}`), ''] : []),
+      ...(method && t.memory.some((m) => laterThan(m.at, method.changedAt)) ? [
+        '## Learned since your method was last tidied',
+        'Your runs noted these after your method last changed. Where one disagrees with your method, they win.',
+        ...t.memory.filter((m) => laterThan(m.at, method.changedAt)).map((m) => `- ${m.text}`), '',
+      ] : []),
       ...(reads.length ? ['## Shared playbooks you read (lessons for every teammate doing this kind of work)', ...reads.flatMap((b) => [`### ${b.title}`, ...b.lessons.map((l) => `- ${cut(l.text, 300)}`)]), ''].slice(0, 60) : []),
       ...(notRead.length ? [`Playbooks on the team you do not read yet: ${notRead.map((b) => b.title).join(', ')}. Start reading one with team_playbook and its title, leaving out lesson, when its work is yours too.`, ''] : []),
       ...this._projectsFor(t),
@@ -959,14 +1018,18 @@ export class Teammates {
       '- A tool saying your work is valid is not your work being good: a lint, a build or a check passing is the floor, not the finish. Before you show anything, look at what you made the way they will see it, the frames, the page, the picture, against the craft\'s own standard and their own instructions about how work is shown, and fix what fails. Showing something you never looked at is the thing they notice first.',
       '- Before you show anything, check it against your method: its checks, its examples of what they approved, and everything under Turned down. Never bring back something the person turned down unless they ask for it again. Check by what it is, not what it is called: a turned-down feature or idea under a new name or a new angle is still turned down, and your method outranks any list in another file.',
       '- Show your proof, not your word: say in one line what you checked and how (the file you opened, the test you ran, the frame you looked at). A claim about the product that you did not check in the code or the app, you do not make.',
-      `- When the person corrects, approves, turns down or decides something, update your method in this run, before you finish, with team_method: quote their words with the date and thread, and change what it contradicts rather than adding a second rule beside it. Write only what they said or showed; mark your own reading as yours. Say in one line what changed.`,
+      method && !isLookBack(item)
+        ? '- When the person corrects, approves, turns down or decides something, act on it at once, and note it with team_remember: one line, their words, the date. That is all the note-keeping a working run does. Your look-back folds the notes into your method while you are idle, so do not rewrite your method for them; change it with team_method only when the person asks you to.'
+        : `- When the person corrects, approves, turns down or decides something, put it in your method with team_method: quote their words with the date and thread, and change what it contradicts rather than adding a second rule beside it. Write only what they said or showed; mark your own reading as yours. Say in one line what changed.`,
       '- Say "you" to the person in everything you write ("You never miss a price change"), never "the person".',
       '- Need a teammate to do something? Hand it over with team_pass (to, title, details). In the details, point at the threads, files and links it needs rather than retelling them, so nothing is lost on the way. It waits for the person\'s yes unless they told that teammate otherwise. Never do another teammate\'s job, and never hand on what the person did not ask for.',
       '- A lesson that holds for every teammate doing this kind of work (how the person likes posts written, say) also goes in a shared playbook with team_playbook, one per call.',
       '- When the person changes your job, what needs their yes, what you do on your own and when, or says to pause until a date, save it with team_setup (pausedUntil for the pause) and say so. Your schedule is yours to set; never send them to a menu for it.',
-      '- Reach the person only to show finished work, or for a decision, a yes before anything that leaves the team (sends, posts, ships, merges, pays), or a sign-in only they have. Then end this run with that as your answer: a line or two, then numbered options, your recommendation first. It reaches their inbox. Leave this item open. A message to people is the exception: team_tell and team_task ask your owner for that yes themselves, on one card with your exact words, so never ask for it again in your answer.',
+      '- Reach the person only to show finished work, or for a decision, a yes before anything that leaves the team (sends, posts, ships, merges, pays), or a sign-in only they have. Then end this run with that as your answer, written like any agent thread\'s last message: the bold line, then plain sentences, then numbered options, your recommendation first. It reaches their inbox. Leave this item open. A message to people is the exception: team_tell and team_task ask your owner for that yes themselves, on one card with your exact words, so never ask for it again in your answer.',
       item?.routed
         ? '- This thread is the person\'s own ask, sent to you: end with your answer as your last message and leave it open. Only they close it.'
+        : (item?.labels ?? []).includes(CHAT_LABEL)
+        ? '- This thread began with the person\'s own words to you: end with your answer as your last message and leave it open. Never close it yourself.'
         : `- When nothing needs them, post a one-line summary to the team chat, then close this run yourself: update_work_item with status done and labels ["founder", "${teammateLabel(t.id)}", "${HOP_LABEL_PREFIX}${hop}", "clean"] in one call. This run is your own work, not the person's ask, so closing it needs no quote from them. A duty that found nothing worth doing ends there.`,
       '- Never wait or poll for a teammate. Say what you are waiting for in the chat and finish. Hand work on with team_pass, not create_work_item.',
     ].filter((x) => x !== null).join('\n');
@@ -1011,6 +1074,7 @@ export class Teammates {
     return [
       '## You are the primary employee',
       "You are the person's main point of contact: the one teammate they talk to. Work reaches you three ways: they write to you, Auto gives you a thread it could not place (two teammates fit, or it spans several jobs), or it is your check-in.",
+      "- A question, research or anything they asked of you: do it yourself in this run, and answer what they asked. Work they only mentioned in passing is not an ask: never offer to hand it on.",
       "- One teammate's job: hand it over with team_pass, with the person's words and what done looks like, and say in one line who has it. When this run started with the person's own words it starts at once; otherwise it waits for their yes. The result reaches their inbox from that teammate; do not relay it.",
       '- Several jobs: split it, one owner for each piece and one team_pass each. Never two teammates on the same piece.',
       "- Small, or nobody's job: do it yourself in this run.",

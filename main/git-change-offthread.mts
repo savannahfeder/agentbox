@@ -12,6 +12,7 @@ import { Worker } from 'node:worker_threads';
 import * as git from './git-change.mts';
 import { saveRunChange } from './run-change.mts';
 import { stripTypesFlags } from './strip-types.mts';
+import { noteThread } from './thread-heaps.mts';
 
 type Job = (...args: unknown[]) => unknown;
 
@@ -23,7 +24,7 @@ interface GitJobRequest {
 }
 
 const change = { ...git, saveRunChange } as unknown as Record<string, Job>;
-const JOBS = new Set(['snapshotRepo', 'saveRunChange']);
+const JOBS = new Set(['snapshotRepo', 'saveRunChange', 'whereTheWorkStands']);
 
 let worker: Worker | null = null;
 let broken = false;
@@ -51,6 +52,7 @@ function thread(): Worker | null {
     broken = true;
     return null;
   }
+  noteThread('git', worker);
   worker.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
     const job = waiting.get(id);
     if (!job) return;
@@ -70,6 +72,11 @@ function thread(): Worker | null {
 /** Settles once no job is waiting on the thread. */
 export async function __gitJobsIdle() {
   while (waiting.size) await new Promise((resolve) => { setTimeout(resolve, 10); });
+}
+
+/** The thread started before its first job needs it. False when none can start. */
+export function warmGitThread(): boolean {
+  return !!thread();
 }
 
 /** Run one of git-change.mts's exports without blocking this thread. */

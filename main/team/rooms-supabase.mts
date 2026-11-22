@@ -147,6 +147,16 @@ export function roomsSupabase(client: SupabaseClient, myId: () => Promise<string
       }, 'reading your mentions')).map(messageOut);
     },
 
+    // My own newest words in every room I am in, so an answer older than the messages held still counts.
+    async myRoomMessages({ limit = 50 } = {}) {
+      const me = await myId();
+      return (await reading<MessageDbRow[]>((cols, old) => {
+        let q = client.from('room_messages').select(cols).eq('by_person', me);
+        if (!old) q = q.is('deleted_at', null);
+        return q.order('created_at', { ascending: false }).limit(limit);
+      }, 'reading your messages')).map(messageOut);
+    },
+
     async sendRoomMessage(roomId, { body, inReplyTo = null, mentions = [] }) {
       const me = await myId();
       const row = await reading<MessageDbRow>((cols) => client.from('room_messages').insert({ room_id: roomId, by_person: me, body, in_reply_to: inReplyTo, mentions }).select(cols).single(), 'sending your message');

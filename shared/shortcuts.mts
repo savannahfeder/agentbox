@@ -187,11 +187,6 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // (w-ef92663cb1). It landed after this list last changed, so it was
       // missing here at first.
       { keys: ['⌘J'], what: 'Show or hide this task’s terminal.' },
-      // threads/Summary.tsx, `useSummaryShortcut`: it listens in the capture
-      // phase and stops the key there, so S belongs to the summary on a thread
-      // that has one. It is under THIS heading and not the one below because it
-      // is the one key in the app that works only inside an open thread.
-      { keys: ['S'], what: 'Show or hide the summary.' },
     ],
   },
   {
@@ -208,16 +203,16 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // the summary inside a thread and still meant the schedule picker in the
       // list, so this page taught one letter for two different things and an
       // office manager testing the app met both inside a minute. One meaning
-      // per letter: S is the summary, L is later. And the page says the word
+      // per letter. And the page says the word
       // the key stands for, because that word is the action's name now
       // (w-66e3ece93d): the ⌘K row, the picker and the toast all say Later.
       { keys: ['L'], what: 'Later: put the task off until a time you pick.' },
       // focused branch and list switch: 'z' → undo
       { keys: ['Z'], what: 'Undo the last thing you did.' },
-      // opensTheToast(e.key, toast) above the focused branch → openToastRow.
+      // opensTheToast(e.key, toast) above the focused branch → openToastRow,
+      // and opensTheLastToast once the toast has gone (O_STILL_OPENS_MS).
       // Z's other half: Z takes back what the toast announced, O goes into it.
-      // Only while a toast with somewhere to go is up (w-f0bfe32859).
-      { keys: ['O'], what: 'Open the task you just sent or answered, while its note is on screen.' },
+      { keys: ['O'], what: 'Open the task you sent or answered in the last two minutes.' },
       // (meta||ctrl) && 'a' && !inInput && !modal → tick the whole list
       { keys: ['⌘A'], what: 'Tick every task in the list. Press it again to untick.' },
     ],
@@ -237,6 +232,8 @@ export const SHORTCUTS: ShortcutGroup[] = [
       // the card prints them inside Allow and Deny. Under this heading because
       // it is answered from anywhere at all.
       { keys: ['⌘1', '⌘2'], join: 'or', what: 'Allow or deny a card asking to run something.' },
+      // SelectionBar.tsx, a window keydown in capture, so an editor cannot keep it.
+      { keys: ['⌘/'], what: 'Comment on the words you selected.' },
     ],
   },
 ];

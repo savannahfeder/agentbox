@@ -1,7 +1,7 @@
 // View and filters, search and the board's marks, as the phone site draws them
 // (threads/Pages.tsx `HeaderActions`, `DisplayMenu`, `StateGlyph`; phone.css).
-import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { BackHandler, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { PRIORITIES } from '../../../renderer/src/priority';
@@ -84,6 +84,11 @@ export function ViewMenu({ display, onDisplay, agent = null, agents = [], onAgen
   const inset = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const [all, setAll] = useState(false);
+  // A view over the list rather than a Modal, so nothing else answers Back on Android.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { close(); return true; });
+    return () => sub.remove();
+  }, [close]);
   const set = (patch: Partial<Display>) => onDisplay({ ...display, ...patch });
   // The eight used most recently, the rest behind one button (`projectChoices`).
   const { shown: top, rest } = projectChoices(products, items, { picked: display.projects });

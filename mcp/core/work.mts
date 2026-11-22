@@ -26,11 +26,12 @@ import {
 } from '../../main/store/work-items.mts';
 import { matchesFilter, type PatchInput, type WorkItem, type WorkItemField, type WorkItemFilter, type WorkItemSource, type WorkItemStatus } from '../../shared/work-items.mts';
 import { unleaked } from '../../shared/agents.mts';
-import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS, doneSteps, wordsIn } from '../../shared/thread-cards.mts';
+import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS, asWordList, doneSteps, wordsIn } from '../../shared/thread-cards.mts';
 import {
   parkPendingWrite, readPendingWrites, collectPendingWrites,
 } from '../../main/store/pending-writes.mts';
 import { resolveProduct } from './account.mts';
+import { isCause } from '../../shared/causes.mts';
 import { nameSlug } from '../../shared/product-name.mjs';
 import { PICKED_WHY, routedPatch, type RoutedPatch } from '../../shared/auto-route.mts';
 import { TEAMMATE_LABEL_PREFIX } from '../../shared/teammates.mts';
@@ -245,6 +246,8 @@ const plainly = (s: unknown) => String(s ?? '')
 export function herRow(item: Pick<WorkItem, 'labels' | 'routed'> | null | undefined): boolean {
   const labels = item?.labels ?? [];
   if (!labels.includes('founder')) return false;
+  // A cause row is the app's, and its lead closes it once the cause is cleared.
+  if (isCause(item)) return false;
   return !!item!.routed || !labels.some((l) => String(l).startsWith('repeat:') || String(l).startsWith('teammate:'));
 }
 
@@ -326,6 +329,7 @@ function takeOverLong(patch: { problem?: unknown; progress?: unknown; solution?:
     if (steps.length > DONE_STEPS) said.push(`done, the progress field (${steps.length} steps; ${DONE_STEPS} at most, so keep the ones that matter)`);
     else if (longest > DONE_STEP_WORDS) said.push(`done, the progress field (a step of ${longest} words; ${DONE_STEP_WORDS} at most each)`);
     if (steps.length > DONE_STEPS || longest > DONE_STEP_WORDS) delete patch.progress;
+    else if (asWordList(patch.progress)) patch.progress = steps.join('\n');
   }
   if (typeof patch.solution === 'string' && wordsIn(patch.solution) > SUMMARY_WORDS) {
     said.push(`solution (${wordsIn(patch.solution)} words; ${SUMMARY_WORDS} at most)`);

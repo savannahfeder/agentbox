@@ -45,7 +45,7 @@ describe('a two-person chat', () => {
   it('still names the sender as the sender', () => {
     const [row] = mentionRows([said()], state([room({ wall: asTheo(both) })], 'u-theo'));
     expect(row.byName).toBe('Maya C.');
-    expect(draw([row])).toContain('<b class="th-msg-who">Maya C.</b>');
+    expect(draw([row])).toContain('<span class="th-who-name">Maya C.</span>');
   });
 
   it('names the other person when they are off the wall but in the room', () => {

@@ -137,6 +137,15 @@ export function wakesItselfAt(item: (AnsweredItem & { runAt?: number; kind?: str
     const at = item.runAt ?? 0;
     return at > (item.wrote?.result?.ts ?? 0) ? at : 0;
 }
+// What a word of hers takes off a Later thread for good (main/store.mts
+// answerItem): a time she set it to run and a time she put it away until. A
+// moment an agent set stays; `wordWaits` runs her word past it.
+export function laterHerWordLifts(item: (Item & { runAt?: number; snoozedUntil?: number }) | null | undefined, now = Date.now()): { runAt: boolean; snoozedUntil: boolean } {
+    return {
+        runAt: (item?.runAt ?? 0) > now && item?.wrote?.runAt?.source === 'founder',
+        snoozedUntil: (item?.snoozedUntil ?? 0) > now,
+    };
+}
 // A PERSON'S WORD WRITTEN AFTER THE MOMENT WAS SET, AND NOT YET ACTED ON, RUNS
 // NOW. The moment is for the run it was set for, not for everything said on
 // the thread, and it stays on the row for that run.

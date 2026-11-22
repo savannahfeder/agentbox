@@ -6,7 +6,9 @@ import { clickZoom, isDoubleTap, lowestZoom, panLimits, panToKeep, pictureFit, p
 import { doubleTapScale, onPhone } from '../phone-screen';
 import { CrossIcon } from './CrossIcon';
 import { focusTheReplyBox } from '../focus-at-end';
+import { pressedInThePalette } from '../palette-rows';
 import { opening, seenAt } from '../picture';
+import { fetchableFileUrl } from '../phone-files';
 
 export type { Picture };
 
@@ -50,7 +52,8 @@ function decoded(url: string): Promise<Ready> {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.decoding = 'async';
-  img.src = url;
+  // An Image() is in no page, so the browser app's rewriting of the desktop's picture address never reaches it.
+  img.src = fetchableFileUrl(url);
   let timer: number | undefined;
   const late = new Promise<never>((_, no) => { timer = window.setTimeout(() => no(new Error('slow')), PICTURE_WAIT_MS); });
   return Promise.race([img.decode(), late])
@@ -76,8 +79,9 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
   start: number;
   resolve: (path: string) => Promise<string | null>;
   onClose: () => void;
-  onBeside: (path: string) => void;
-  onPreview: (path: string) => void;
+  /** Left out for a picture that is not yet a file in the product, such as one waiting to be sent. */
+  onBeside?: (path: string) => void;
+  onPreview?: (path: string) => void;
 }) {
   const [index, setIndex] = useState(start);
   const shown = pictures[index];
@@ -162,7 +166,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
   useEffect(() => {
     dialog.current?.focus();
     const key = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey) return;
+      if (e.metaKey || e.ctrlKey || pressedInThePalette(e.target)) return;
       e.stopImmediatePropagation();
       wake();
       if (e.key === 'Escape') { e.preventDefault(); onClose(); requestAnimationFrame(() => focusTheReplyBox()); }
@@ -359,10 +363,10 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
           {many && <span className="pv-count">{index + 1} / {pictures.length}</span>}
         </span>
         <span className="pv-tools">
-          <button type="button" className="pv-icon" onClick={() => onBeside(shown.path)} title="Open beside the thread" aria-label="Open beside the thread"><Glyph d={BESIDE} /></button>
+          {onBeside && <button type="button" className="pv-icon" onClick={() => onBeside(shown.path)} title="Open beside the thread" aria-label="Open beside the thread"><Glyph d={BESIDE} /></button>}
           {/* Preview is on the computer, so on a phone the press showed nothing. */}
-          {!onPhone() && <button type="button" className="pv-icon" onClick={() => onPreview(shown.path)} title="Open in Preview" aria-label="Open in Preview"><Glyph d={OUTSIDE} /></button>}
-          <span className="pv-rule" aria-hidden="true" />
+          {onPreview && !onPhone() && <button type="button" className="pv-icon" onClick={() => onPreview(shown.path)} title="Open in Preview" aria-label="Open in Preview"><Glyph d={OUTSIDE} /></button>}
+          {(onBeside || onPreview) && <span className="pv-rule" aria-hidden="true" />}
           <button type="button" className="pv-icon pv-close" onClick={onClose} title="Close (esc)" aria-label="Close"><CrossIcon /></button>
         </span>
       </header>

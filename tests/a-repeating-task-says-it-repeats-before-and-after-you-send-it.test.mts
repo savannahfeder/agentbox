@@ -48,6 +48,6 @@ describe('on the run’s page while it works', () => {
   });
   it('is handed the rule by the page', () => {
     expect(read('renderer/src/components/Focus.tsx')).toContain('queue={page ? { context: item.problem ?? null, repeats: repeat ? repeatsLine(repeat.rule) : null } : undefined}');
-    expect(read('renderer/src/components/ItemThread.tsx')).toContain("context={working && !queue.context ? workingContext(item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}");
+    expect(read('renderer/src/components/ItemThread.tsx')).toContain("context={working && !queue.context ? workingContext(isCause(item) ? '' : item.body ?? item.title ?? '', pageTitle(item), queue.repeats ?? null) : queue.context}");
   });
 });

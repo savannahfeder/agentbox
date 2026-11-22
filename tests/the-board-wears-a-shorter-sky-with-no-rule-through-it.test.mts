@@ -37,8 +37,9 @@ describe('on the board', () => {
     expect(board).toMatch(/mask-image: linear-gradient\(to top, #000 0, #000 105px, transparent 150px\)/);
   });
 
-  it('the list keeps the approved sky (design 86)', () => {
-    expect(rule('.inbox-sky-head')).toMatch(/mask-image: linear-gradient\(to top, #000 0, #000 70px, transparent 150px\)/);
+  // Design 86's band, ended above the tab row for F-208 (tests/the-inbox-tabs-sit-below-the-sky).
+  it('the list keeps the approved sky, clear of the tabs', () => {
+    expect(rule('.inbox-sky-head')).toMatch(/mask-image: linear-gradient\(to top, #000 0, #000 46px, transparent 90px\)/);
     expect(app).toContain('<InboxSky art={sky.art} />');
   });
 });

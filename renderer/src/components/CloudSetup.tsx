@@ -15,7 +15,7 @@ import { api } from '../api';
 import { AppMark } from './AppMark';
 import { EngineLogo } from './EngineLogos';
 import { AskList } from './PlanSetup';
-import { Cap } from './Onboarding';
+import { Cap } from './Cap';
 import { NAME } from '../../../shared/product-name.mjs';
 import { accountLabel, engineWord, pageToOpen, type CloudAccount, type CloudMode, type CloudSignIn, type CloudStatus } from '../cloud-menu';
 import { SETUP, WHERE_ROWS, activeSignIn, addingRows, doneAsksWhere, mayFinish, signInView } from '../cloud-setup';
@@ -172,7 +172,7 @@ export function CloudSetup({ cloud, onMode, onClose, signInAs = null, plan = nul
   } else if (step === 'pay') {
     body = <div className="fr-stack fr-stack-folders">
       <h1 className="fr-page">{SETUP.payHead}</h1>
-      <p className="fr-lede">{waiting ? <><Busy />{SETUP.payWaitLede}</> : SETUP.payLede}</p>
+      <p className="fr-lede">{waiting ? <><Busy />{SETUP.payWaitLede}</> : planNow?.trialOffer ? SETUP.trialLede : SETUP.payLede}</p>
       <div className="cs-plans"><CloudPlanCards plan={planNow} opening={opening} waiting={waiting} onChoose={(id) => void pay(id)} /></div>
       {payErr && <p className="cs-pay-err" role="alert">{payErr}</p>}
     </div>;

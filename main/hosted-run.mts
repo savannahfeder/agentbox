@@ -8,6 +8,7 @@ import { PassThrough, Writable } from 'node:stream';
 import type { ClaudeInput } from './claude-input.mts';
 import type { RunHostInput, RunHostOutput, RunHostRequest, RunStart } from './run-host.mts';
 import type { BridgeStateEvent } from './task-remote-control.mts';
+import { streamLines } from './stream-lines.mts';
 import type { RemoteUserEvent, RunExitHow } from './supervisor.mts';
 
 // The host went away without saying how the run ended.
@@ -103,18 +104,11 @@ export class HostedRun extends EventEmitter<HostedRunEvents> {
       for (const line of this._queued ?? []) sock.write(line);
       this._queued = null;
     });
-    let buf = '';
-    sock.on('data', (d: string) => {
-      buf += d;
-      let n;
-      while ((n = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, n);
-        buf = buf.slice(n + 1);
-        let msg: RunHostOutput;
-        try { msg = JSON.parse(line); } catch { continue; }
-        this._hear(msg);
-      }
-    });
+    sock.on('data', streamLines((line) => {
+      let msg: RunHostOutput;
+      try { msg = JSON.parse(line); } catch { return; }
+      this._hear(msg);
+    }));
     sock.on('error', () => {});
     sock.on('close', () => {
       if (this._over || this._detached) return;

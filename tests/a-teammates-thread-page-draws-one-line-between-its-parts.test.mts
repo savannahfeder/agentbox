@@ -2,17 +2,25 @@
 //
 // Two testers opened Dev's "Seat picker for group bookings" from his page and
 // saw two lines stacked between ABOUT and DONE in the card on the right. On
-// that page every part draws the line under itself (pages.css .tp-side
-// .ts-tk-part), and the Done part also drew one over itself (summary.css).
+// that page every part drew the line under itself, and the Done part also drew
+// one over itself (summary.css). 2026-11-21 (w-8a8eac7620): the card became
+// the summary at the top of the page, whose parts are set apart by space and
+// their labels, with no line between them at all.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { TeammateSummary } from '../renderer/src/threads/Summary.tsx';
 
 const pages = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/threads/pages.css'), 'utf8');
 
-describe('the card beside a teammate’s thread', () => {
-  it('lets Done lean on the line About already drew', () => {
-    expect(pages).toMatch(/\.tp-side \.ts-tk-part \{ padding: 0 0 18px; margin: 0 0 18px; border-bottom: 1px solid var\(--line\); \}/);
-    expect(pages).toMatch(/\.tp-side \.ts-tk-done \{ padding-top: 0; border-top: 0; \}/);
+describe('the summary at the top of a teammate’s thread', () => {
+  it('draws no line between its parts', () => {
+    const card = { personId: 'dev', threadId: 't', visible: true, title: 'Seat picker', project: null, state: 'waiting', priority: null, problem: 'Group bookings need seats side by side.', progress: 'Drew the picker\nTests pass', solution: null, blockedBy: [], blocks: [{ id: 'w-x', title: 'Checkout' }], people: null, updatedAt: 1 };
+    const html = renderToStaticMarkup(React.createElement(TeammateSummary, { card: card as never, owner: 'Dev' }));
+    expect(html).toContain('ts-tk-part');
+    expect(html).not.toMatch(/ts-tk-done|ts-tk-grid|ts-tk-next/);
+    for (const m of pages.matchAll(/^\.tp-summary [^{]*\{([^}]*)\}/gm)) expect(m[1]).not.toMatch(/border/);
   });
 });

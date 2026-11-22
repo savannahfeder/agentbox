@@ -14,29 +14,27 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  setupSteps, stepLabel, typingInSetup, setupLook, tourCount, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
+  setupSteps, stepLabel, typingInSetup, setupLook, tourCount, lookChoices, starterChoices, setUpLines, tourChecklist,
 } from '../renderer/src/setup-split.ts';
+import { SKY_THEMES } from '../renderer/src/home/sky.ts';
 
 describe('which steps the setup shows', () => {
   // The founder (2026-11-09): "we are making login required so this is not a
   // logical flow, anything that requires login should come after that step".
-  it('signs in as a step of its own, after the first one, before inviting', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'pay', 'teammates', 'look']);
+  it('signs in as a step of its own, after the first one, before the plan', () => {
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'teammates', 'look']);
   });
   it('skips the sign-in step for someone already signed in', () => {
-    expect(setupSteps({ chats: 0, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' })).toEqual(['folder', 'plan', 'invite', 'pay', 'look']);
+    expect(setupSteps({ chats: 0, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' })).toEqual(['folder', 'plan', 'look']);
   });
   it('has no sign-in step on a build with no account to sign in to', () => {
     expect(setupSteps({ chats: 0, team: false, teammates: false, project: true, signedIn: false })).toEqual(['folder', 'look']);
   });
   it('shows every step on a team build with chats and teammates on', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: true, plan: 'pro' })).toEqual(['chats', 'plan', 'invite', 'pay', 'teammates', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: true, plan: 'pro' })).toEqual(['chats', 'plan', 'teammates', 'look']);
   });
   it('asks for a folder instead of chats when this computer has none', () => {
     expect(setupSteps({ chats: 0, team: true, teammates: true, project: true })[0]).toBe('folder');
-  });
-  it('leaves out inviting on a build with no team cloud', () => {
-    expect(setupSteps({ chats: 2, team: false, teammates: true, project: true })).not.toContain('invite');
   });
   it('leaves out AI teammates while they are off', () => {
     expect(setupSteps({ chats: 2, team: true, teammates: false, project: true, plan: 'pro' })).not.toContain('teammates');
@@ -61,8 +59,10 @@ describe('the looks offered', () => {
   it('puts the look you have first, then Match my system, then the dark orange sky', () => {
     expect(lookChoices('sage', true).slice(0, 3)).toEqual(['sage', 'match', 'ember']);
   });
-  it('does not offer the light pink sky unless you already wear it', () => {
-    expect(lookChoices('light', true)).not.toContain('dusk-light');
+  // F-207 (QA session 41, Nov 9 2026): setup left out Light purple sky, which
+  // Settings offers, so the two lists disagreed.
+  it('offers every sky Settings offers, the light purple one too', () => {
+    for (const sky of SKY_THEMES) expect(lookChoices('light', true)).toContain(sky.id);
     expect(lookChoices('dusk-light', true)[0]).toBe('dusk-light');
   });
   it('lists each look once', () => {
@@ -86,30 +86,25 @@ describe('the AI teammates offered', () => {
     { starter: 'maintainer', name: 'Maintainer', ask: 'Fix what gets filed' },
     { starter: 'marketing', name: 'Marketing lead', ask: 'Post about what we build' },
   ];
+  // The Chief of staff is no longer offered (tests/no-chief-of-staff-is-made-for-you).
   it('offers the engineering jobs first and only real starters', () => {
-    expect(starterChoices(starters).map((s) => s.starter)).toEqual(['quality', 'maintainer', 'chief']);
+    expect(starterChoices(starters).map((s) => s.starter)).toEqual(['quality', 'maintainer']);
   });
   it('offers nothing when every starter is already on the team', () => {
     expect(starterChoices([])).toEqual([]);
   });
 });
 
-describe('the people invited', () => {
-  it('keeps each address once and drops what is not an address', () => {
-    expect(inviteList(['maya@northwind.dev', 'Maya@Northwind.dev ', 'theo', ''])).toEqual(['maya@northwind.dev']);
-  });
-});
-
 describe('what the last screen says was set up', () => {
   it('says only what happened, in counts', () => {
-    expect(setUpLines({ chats: 4, project: null, invited: 3, teammates: ['Quality lead'] }))
-      .toEqual(['4 chats brought in', '3 teammates invited', 'Quality lead added']);
+    expect(setUpLines({ chats: 4, project: null, teammates: ['Quality lead'] }))
+      .toEqual(['4 chats brought in', 'Quality lead added']);
   });
   it('names the project made from a folder, and says nothing of steps skipped', () => {
-    expect(setUpLines({ chats: 0, project: 'storefront', invited: 0, teammates: [] })).toEqual(['storefront is ready']);
+    expect(setUpLines({ chats: 0, project: 'storefront', teammates: [] })).toEqual(['storefront is ready']);
   });
   it('uses the singular for one', () => {
-    expect(setUpLines({ chats: 1, project: null, invited: 1, teammates: [] })).toEqual(['1 chat brought in', '1 teammate invited']);
+    expect(setUpLines({ chats: 1, project: null, teammates: [] })).toEqual(['1 chat brought in']);
   });
 });
 
@@ -285,8 +280,9 @@ describe('the walkthrough on Home', () => {
   // like our home screen". The suggestions stay in the New thread dialog and
   // the empty inbox; Home keeps its own look and the tip asks for words.
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+  // Nor anywhere else since 2026-11-16: "We don't need suggestions anymore."
   it('offers no suggestions in the box on Home', () => {
-    expect(app).toMatch(/ideas=\{[^}]*!\(homeShown && modal !== 'compose'\)[^}]*\? FIRST_IDEAS : null\}/);
+    expect(app).not.toMatch(/ideas=\{/);
   });
 });
 

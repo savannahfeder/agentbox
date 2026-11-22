@@ -11,6 +11,8 @@ import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
 import { withRunsSaid } from '../runs-said';
 import type { TraceSession } from '../notes';
 
+const FOLLOW_MS = 3000;
+
 /** This thread's marks with those from the other copies, every pin numbered in the order it was made. */
 export function withElsewhere(own: FileMarks, elsewhere: FileElsewhere[]): FileMarks {
   // Every copy of one file answers with all of that file's notes.
@@ -77,8 +79,8 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
   }, [item.product, item.id, copiesKey]);
   const marks = useMemo(() => withElsewhere(item.artifacts ?? NO_MARKS, elsewhere), [item.artifacts, elsewhere]);
   // Every version the files' lines hold, made here or anywhere else, numbered as Files numbers them.
-  // Only when this thread says more: asking on every change in the app rebuilt Files each time.
-  const numbered = useFileLine(item.product, item.id, lines.length, false);
+  // A cloud run's files land after its answer, so the open file asks again, though not on every change in the app.
+  const numbered = useFileLine(item.product, item.id, lines.length, FOLLOW_MS);
   const allLines = useMemo(() => (numbered.lines.length ? [...lines, ...numbered.lines as LedgerLine[]] : lines), [lines, numbered]);
   const people: Person[] = team ? [...team.byId.values()].filter((p) => !item.people?.length || item.people.includes(p.id)) : [];
   return <ArtifactView

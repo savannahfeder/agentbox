@@ -160,18 +160,50 @@ export function columnWidths(table: Table, cap: number, only?: number, wrapHead 
   return { px, wide: wide >= 0 ? table.columns[wide].name : null };
 }
 
-// In a message, no column may be wider than 60% of the message (`cqi`, the
-// `.tbl-inline` container), so beside an open file the next column still shows.
-function tracks(table: Table, natural: ReturnType<typeof columnWidths>, sized: Record<string, number>, inline = false): string {
+function tracks(table: Table, natural: ReturnType<typeof columnWidths>, sized: Record<string, number>): string {
   const shown = table.columns.filter((_, i) => !(table.ranked && i === 0));
   const fills = natural.wide && !sized[natural.wide] && shown.some((c) => c.name === natural.wide) ? natural.wide : null;
-  const px = (w: number) => (inline ? `min(${w}px, 60cqi)` : `${w}px`);
   return shown.map((c, i) => {
     if (sized[c.name]) return `${sized[c.name]}px`;
     const w = natural.px.get(c.name) ?? 160;
-    if (c.name === fills) return `minmax(${px(Math.min(w, 180))}, ${w}fr)`;
-    if (!fills && i === shown.length - 1) return `minmax(${px(w)}, 1fr)`;
-    return px(w);
+    if (c.name === fills) return `minmax(${Math.min(w, 180)}px, ${w}fr)`;
+    if (!fills && i === shown.length - 1) return `minmax(${w}px, 1fr)`;
+    return `${w}px`;
+  }).join(' ');
+}
+
+// Below this a column of words wraps rather than pushing the table sideways.
+const INLINE_NARROWEST = 140;
+
+// A cell's padding and border either side of its words.
+const CELL_EDGE = 34;
+// One character of a header: 10.5px mono, upper case, spaced out.
+const HEAD_CHAR = 8;
+
+/** In a message every cell wraps, so the columns share the message's width by
+ *  how many words each holds. A column narrows to its widest cell or
+ *  INLINE_NARROWEST, whichever is less, but never below its longest word or
+ *  its header's; only past that does the table scroll. */
+export function inlineTracks(table: Table): string {
+  const natural = columnWidths(table, 1200, undefined, true).px;
+  const family = typeof document === 'undefined' ? null : getComputedStyle(document.body).fontFamily;
+  const canvas = family ? document.createElement('canvas').getContext('2d') : null;
+  if (canvas) canvas.font = `14px ${family}`;
+  const width = (s: string) => (canvas ? canvas.measureText(s).width : s.length * 7.5);
+  return table.columns.flatMap((c, i) => {
+    if (table.ranked && i === 0) return [];
+    const w = natural.get(c.name) ?? 160;
+    const head = Math.max(0, ...c.name.split(/\s+/).map((s) => s.length)) * HEAD_CHAR + CELL_EDGE;
+    let cell = 0;
+    let word = 0;
+    for (const row of table.rows) {
+      const v = shownText(row[i] ?? '');
+      cell = Math.max(cell, width(v) + CELL_EDGE);
+      for (const s of v.split(/\s+/)) word = Math.max(word, width(s) + CELL_EDGE);
+    }
+    // A tag is one chip that never wraps.
+    const least = c.kind === 'tag' ? w : Math.max(Math.min(cell, INLINE_NARROWEST), word, head);
+    return [`minmax(${Math.ceil(least)}px, ${Math.round(w)}fr)`];
   }).join(' ');
 }
 
@@ -761,7 +793,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
   useEffect(() => { setPick(null); setEditing(null); setSheet(null); setFloat(null); setRenaming(null); setProblem(null); }, [base]);
 
   const natural = useMemo(() => columnWidths(seed.table, mode === 'full' || inline ? 300 : 220, undefined, inline), [seed, mode, inline]);
-  const template = useMemo(() => tracks(table, natural, sized, inline), [table, natural, sized, inline]);
+  const template = useMemo(() => (inline ? inlineTracks(table) : tracks(table, natural, sized)), [table, natural, sized, inline]);
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const keys = useRef<HTMLTextAreaElement>(null);
@@ -1722,7 +1754,7 @@ export function TableView({ text, path, mode, onShowAll, grid, onSave, onReload,
             </div>
             : <div className="tbl-edit" data-row={order[editing.r] + 1} data-col={table.columns[editing.c].name} style={{ left: place.left, top: place.top, width: place.w }}>
               <GrowingText className="tbl-edit-box" value={editing.draft} autoFocus caretAtEnd readOnly={!editable} label={table.columns[editing.c].name}
-                onChange={(v) => setEditing((x) => (x ? { ...x, draft: v } : x))}
+                onChange={(v) => { if (open.current) open.current = { ...open.current, draft: v }; setEditing((x) => (x ? { ...x, draft: v } : x)); }}
                 // Rows copied from a spreadsheet into an empty cell go across the table, not into the one cell.
                 onPaste={(e) => {
                   const text = e.clipboardData.getData('text/plain');

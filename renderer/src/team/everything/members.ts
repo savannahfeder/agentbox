@@ -1,6 +1,7 @@
 // Everything else's cards: you, the team chat, the people on your team, your AI
 // teammates and your other chats, in the order you dragged them into.
 import { voiceName } from '../../../../shared/agent-voice.mts';
+import { faceSeed } from '../../../../shared/teammate-face.mts';
 
 export type MemberKind = 'me' | 'person' | 'mate' | 'chat';
 
@@ -14,6 +15,8 @@ export interface Member {
   avatarUrl?: string | null;
   /** An AI teammate's letter. */
   letter?: string;
+  /** An AI teammate's face (shared/teammate-face.mts faceSeed). */
+  face?: string;
   role?: string | null;
   /** Agents running now; null when they keep it to themselves. */
   agents: number | null;
@@ -43,7 +46,7 @@ export interface Member {
 
 type PersonIn = { id: string; name: string; avatarUrl: string | null };
 type CardIn = { id: string; name: string; me: boolean; avatarUrl: string | null; agents: number | null; workingOn: string | null; workingPrivate: boolean; status: string | null; away?: boolean };
-type MateIn = { id: string; name: string; letter: string; role: string | null; now: string | null; status: string; paused: boolean; running?: { id: string } | null; waiting?: readonly unknown[] };
+type MateIn = { id: string; name: string; letter: string; face?: string | null; role: string | null; now: string | null; status: string; paused: boolean; running?: { id: string } | null; waiting?: readonly unknown[] };
 type ChatIn = { key: string; name: string; faces: { name: string; url: string | null }[]; last: string; at: number; unread: boolean; open?: boolean };
 type ThreadIn = { personId: string; state: string; title: string | null; updatedAt: number };
 
@@ -109,11 +112,11 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
     // A run under way outranks Paused, which stops nothing already going.
     const paused = t.paused && !t.running;
     const now = t.status === 'draft' && !t.waiting?.length ? 'Setting up' : paused ? 'Paused' : t.now;
-    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
+    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), face: faceSeed(t), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
   }
   for (const t of theirMates) {
     const owner = people.find((p) => p.id === t.owner)?.name ?? '';
-    out.push({ key: `theirmate:${t.owner}:${t.id}`, kind: 'mate', name: voiceName(t, owner), letter: t.name.slice(0, 1), role: null, agents: null, now: t.now, running: !!t.running });
+    out.push({ key: `theirmate:${t.owner}:${t.id}`, kind: 'mate', name: voiceName(t, owner), letter: t.name.slice(0, 1), face: faceSeed({ id: t.id }), role: null, agents: null, now: t.now, running: !!t.running });
   }
   const teamCard = out.find((m) => m.team);
   // Yours too: the Team's board is everybody's work.

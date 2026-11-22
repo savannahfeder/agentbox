@@ -282,7 +282,13 @@ const hours = (n: number) => String(Math.round(n * 10) / 10);
 
 // USE, NEVER A PRICE (2026-10-16): each person is on their own plan and pays
 // nothing like the estimate, so the hours are said and the cost is not.
-export function cloudMonthLine(month: CloudMonth): string {
+// Agentbox Cloud's own count, once its server has said it, is the one the plan
+// spends and Plan and Billing shows. This Mac's ledger sees only its own runs,
+// and only once they are home, so it stands in only where no server counts.
+export function cloudMonthLine(month: CloudMonth, plan?: { signedIn?: boolean; usedSeconds?: number } | null): string {
+  if (plan?.signedIn && typeof plan.usedSeconds === 'number') {
+    return plan.usedSeconds > 0 ? `${hours(plan.usedSeconds / 3600)} agent-hours` : 'Nothing in the cloud yet this month';
+  }
   if (!month.runs) return 'Nothing in the cloud yet this month';
   return `${hours(month.agentHours)} agent-hours`;
 }

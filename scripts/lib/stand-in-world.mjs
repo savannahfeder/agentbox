@@ -10,6 +10,7 @@
 //   hang     share of tasks that never answer
 //   die      share that start work and die with no answer
 //   options  share of answers that end with an Options list
+//   stuck    { cause, ask, share }: that share of tasks get stuck on one cause outside their work
 //   edits    a task asking for a code change commits one small file
 //
 // Node's own modules only: live.mjs copies this beside the stand-in it runs.
@@ -56,6 +57,7 @@ export function worldTurn(world, login, rand = Math.random) {
     die: share(world.die),
     delayMs: Math.round(minMs + (maxMs - minMs) * rand()),
     options: share(world.options),
+    stuck: world.stuck?.cause && share(world.stuck.share) ? { cause: world.stuck.cause, ask: world.stuck.ask ?? '' } : null,
   };
 }
 

@@ -87,6 +87,7 @@ export const PRIVATE_PATHS = [
   ['the operator\'s standing instructions', /(^|\/)briefs\/founder\.md$/],
   ['an inbox ledger', /(^|\/)work-items\.jsonl$/],
   ['a product\'s private notes', /(^|\/)(decisions|STATE)\.md$/],
+  ['part of the private repository (.agentbox/private.json)', /^\.claude\/skills\/|^docs\/(cloud|mobile|team)\/[^/]*plan[^/]*\.md$/i],
   ['local Claude Code settings or history', /(^|\/)\.claude\/(settings\.local\.json|projects\/|todos\/|history)/],
   ['a key or certificate', /\.(pem|p12|p8|pfx|key|mobileprovision)$|(^|\/)id_(rsa|ed25519|ecdsa)$/],
   ['a screen or audio recording', /\.(mov|mp4|m4v|webm|m4a|wav|cast)$/i],
@@ -153,9 +154,17 @@ export function checkLine(file, text, { words = [], soft = false } = {}) {
   return out;
 }
 
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
 /** A recording of a real Claude Code session carries its machine's setup. */
 export function checkRecording(file, content) {
   if (!/\.jsonl$/.test(file)) return [];
+  // A thinking block's signature decodes to bytes that include the account's organisation id.
+  for (const [, sig] of content.matchAll(/"signature"\s*:\s*"([A-Za-z0-9+/=_-]{16,})"/g)) {
+    if (UUID.test(Buffer.from(sig, 'base64').toString('latin1'))) {
+      return [{ severity: 'block', why: 'a recorded session whose thinking signature carries an account id; blank the signature' }];
+    }
+  }
   for (const line of content.split('\n')) {
     if (!line.includes('"init"')) continue;
     let d;
@@ -176,20 +185,27 @@ export function checkPath(file) {
 // ---------------------------------------------------------------------------
 // What a push adds.
 
-/** Added lines per file between two commits, from a zero-context diff. */
+/** Added lines per file between two commits, from zero-context diffs: the net
+ * change, and every commit's own, because a line one commit adds and a later
+ * one removes is gone from the net change but still public in history. */
 function addedLines(base, head) {
-  const diff = git(['diff', '--no-color', '--no-ext-diff', '--no-renames', '-U0', base, head]);
+  const flags = ['--no-color', '--no-ext-diff', '--no-renames', '-U0'];
+  const net = git(['diff', ...flags, base, head]);
+  const each = git(['log', '-p', '--no-merges', '--format=', ...flags, `${base}..${head}`]);
   const files = new Map();
+  const seen = new Map();
   let file = null;
   let lineNo = 0;
-  for (const line of diff.split('\n')) {
+  for (const line of `${net}\n${each}`.split('\n')) {
     if (line.startsWith('+++ ')) {
       file = line === '+++ /dev/null' ? null : line.slice(6);
-      if (file && !files.has(file)) files.set(file, []);
+      if (file && !files.has(file)) { files.set(file, []); seen.set(file, new Set()); }
     } else if (line.startsWith('@@')) {
       lineNo = Number(/\+(\d+)/.exec(line)?.[1] ?? 0);
     } else if (file && line.startsWith('+')) {
-      files.get(file).push([lineNo++, line.slice(1)]);
+      const text = line.slice(1);
+      if (!seen.get(file).has(text)) { seen.get(file).add(text); files.get(file).push([lineNo, text]); }
+      lineNo++;
     }
   }
   return files;
@@ -259,6 +275,8 @@ material leaks into it easily. Flag ONLY things that should not be public:
 - pasted conversations or chat logs that carry private details (quoting a person's
   feedback or design notes is fine and allowed, unless it names them)
 - names, emails, phone numbers, addresses, or account ids of real people or customers
+- names of real companies or people being sold to, pitched or contacted (leads,
+  prospects), and the person's own sales, outreach or other work that is not this app
 - descriptions of someone's private data, finances, health, or private business
 - credentials, keys, tokens, passwords, internal URLs with secrets
 - paths or identifiers from a specific person's machine
@@ -272,17 +290,23 @@ Use "block" only when you are confident it is private or a real secret. Empty li
 Lines follow, as "path:line: text".
 `;
 
+// The push runs this from the branch's own folder, with the push token among
+// the GIT_* variables, and `claude -p` would load that branch's
+// .claude/settings.json hooks. So it starts in an empty folder of its own.
 function runModel(input) {
   return new Promise((resolve) => {
-    const child = spawn('claude', ['-p', '--model', 'sonnet', '--output-format', 'text'], {
-      stdio: ['pipe', 'pipe', 'ignore'],
+    const away = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-public-check-'));
+    const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+    const child = spawn('claude', ['-p', '--model', 'sonnet', '--output-format', 'text', '--setting-sources', 'user'], {
+      cwd: away, env, stdio: ['pipe', 'pipe', 'ignore'],
     });
     let out = '';
     const timer = setTimeout(() => child.kill('SIGTERM'), 5 * 60 * 1000);
+    const done = () => { clearTimeout(timer); fs.rmSync(away, { recursive: true, force: true }); };
     child.stdout.on('data', (d) => { out += d; });
-    child.on('error', () => { clearTimeout(timer); resolve(null); });
+    child.on('error', () => { done(); resolve(null); });
     child.on('close', (code) => {
-      clearTimeout(timer);
+      done();
       if (code !== 0) return resolve(null);
       const json = out.slice(out.indexOf('{'), out.lastIndexOf('}') + 1);
       try { resolve(JSON.parse(json).findings ?? []); } catch { resolve(null); }
@@ -291,23 +315,29 @@ function runModel(input) {
   });
 }
 
-export async function reviewByModel(files, maxChunks = 8) {
+export function linesForTheModel(files) {
   const CHUNK = 120 * 1024;
   const chunks = [''];
   for (const [file, lines] of files) {
     for (const [n, text] of lines) {
+      if (ALLOW.test(text)) continue;
       const row = `${file}:${n}: ${text.slice(0, 400)}\n`;
       if (chunks.at(-1).length + row.length > CHUNK) chunks.push('');
       chunks[chunks.length - 1] += row;
     }
   }
-  const work = chunks.filter(Boolean).slice(0, maxChunks);
+  return chunks.filter(Boolean);
+}
+
+export async function reviewByModel(files, maxChunks = 8) {
+  const chunks = linesForTheModel(files);
+  const work = chunks.slice(0, maxChunks);
   if (!work.length) return { findings: [], ran: true, skipped: 0 };
   // Eight at a time, so a whole-tree read does not start eighty sessions at once.
   const results = [];
   for (let i = 0; i < work.length; i += 8) results.push(...await Promise.all(work.slice(i, i + 8).map(runModel)));
   if (results.some((r) => r === null)) return { findings: results.flat().filter(Boolean), ran: false, skipped: 0 };
-  return { findings: results.flat(), ran: true, skipped: Math.max(0, chunks.filter(Boolean).length - work.length) };
+  return { findings: results.flat(), ran: true, skipped: Math.max(0, chunks.length - work.length) };
 }
 
 // ---------------------------------------------------------------------------

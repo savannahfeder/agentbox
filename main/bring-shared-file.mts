@@ -11,6 +11,10 @@ import { placeWords, type NotePlace } from '../shared/artifact-marks.mts';
 
 const TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
 
+// The agent reads the thread's first message as the person's own words, so a
+// line break in a stranger's name or quote would start a heading of their own.
+const oneLine = (s: string): string => s.replace(/\s+/g, ' ').trim();
+
 /** The token in a shared file's web address or its app link (agentbox://f/<token>); null for anything else. */
 export function fileLinkToken(text: unknown): string | null {
   const s = String(text ?? '').trim();
@@ -71,13 +75,13 @@ export async function bringSharedFile({ token, product, read, productDir, compos
     fs.rmSync(tmp, { recursive: true, force: true });
   }
   if (!saved) throw new Error('This file could not be saved.');
-  const who = file.ownerName?.trim() || 'Someone';
+  const who = oneLine(file.ownerName ?? '') || 'Someone';
   const shown = saved.image ? `![${saved.name}](${saved.rel})` : `[${saved.name}](${saved.rel})`;
   // The link stays off the message: a person's own message draws no markdown link, and a raw one fills it.
-  const said = comments.map((c) => `- ${c.byName}${whereSaid(c.place)}: ${c.text.replace(/\s+/g, ' ').trim()}`);
+  const said = comments.map((c) => `- ${oneLine(`${c.byName}${whereSaid(c.place)}`)}: ${oneLine(c.text)}`);
   const body = [`${who} shared this with me.`, '', shown, ...(said.length ? ['', 'Comments on the link:', ...said] : [])].join('\n');
   // Written down and not begun, so no agent starts on it until they write.
-  const made = compose({ title: sharedFileTitle(file), body, start: 'later' });
+  const made = compose({ title: oneLine(sharedFileTitle(file)), body, start: 'later' });
   if (!made?.id) throw new Error('The thread for this file could not be made.');
   return { product, id: made.id, src: saved.rel };
 }

@@ -200,7 +200,7 @@ export function ShareLink({ product, thread, src, signedIn, icon = false }: {
     const words = answer.trim();
     if (!words || !link) return;
     setBusy(true); setProblem(null);
-    const out = await api.fileLinkComment({ token: link.token, text: words });
+    const out = await api.fileLinkComment({ token: link.token, text: words, ...ask });
     setBusy(false);
     if (!out.ok) { setProblem(out.error ?? 'That did not send.'); return; }
     setAnswer('');

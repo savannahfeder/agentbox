@@ -2,10 +2,11 @@
 .st-seats { display: flex; gap: 10px; }
 .st-seat { width: 40px; height: 40px; box-sizing: border-box; border-radius: 50%; border: 1px dashed var(--line-strong); display: inline-flex; align-items: center; justify-content: center; color: var(--text-faint); }
 .st-title { margin: 0; }
-.st-card { width: 560px; }
-.st-invite { flex-wrap: wrap; gap: 6px; height: auto; min-height: 42px; padding-top: 6px; padding-bottom: 6px; }
-.st-invite .tc-subject { min-width: 140px; }
-.st-chip { padding: 0 10px; }
-.st-bar { justify-content: flex-end; }
 .st-problem { margin-right: auto; font-size: 12.5px; color: var(--text-dim); }
-.st-invite .tc-label { margin-right: -6px; }
+.st-empty .st-problem { margin-right: 0; }
+.st-terms { font-size: 12.5px; line-height: 18px; color: var(--text-dim); }
+.st-terms a { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
+.tm-field-row > .st-problem { align-self: center; }
+/* On the Team page's invite row the line takes a row of its own, under the button. */
+.tm-field-row:has(> .st-terms) { flex-wrap: wrap; row-gap: 10px; }
+.tm-field-row > .st-terms { flex-basis: 100%; }

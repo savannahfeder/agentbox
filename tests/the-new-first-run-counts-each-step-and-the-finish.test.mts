@@ -22,7 +22,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FIRST_RUN_STEP } from '../renderer/src/first-run.ts';
-import { BEAT } from '../renderer/src/onboarding.ts';
 import { WRAPPED_ARGS } from '../shared/bridge-map.mts';
 import { sanitize } from '../shared/analytics-events.mts';
 
@@ -36,8 +35,8 @@ describe('the new first run counts each step', () => {
   });
 
   it('uses no number the old walk used', () => {
-    const old = new Set(Object.values(BEAT));
-    for (const n of Object.values(FIRST_RUN_STEP)) expect(old.has(n), String(n)).toBe(false);
+    // The old walk counted its beats 1 to 17, and those counts are still in the analytics.
+    for (const n of Object.values(FIRST_RUN_STEP)) expect(n, String(n)).toBeGreaterThan(17);
   });
 
   it('keeps the number through the approved list', () => {

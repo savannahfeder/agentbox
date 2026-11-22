@@ -36,10 +36,10 @@ describe('a thread as one page', () => {
     expect(p.from).toBe(0);
     expect(p.toggle).toBe('Hide earlier messages');
   });
-  it('draws the conversation whole when only a message or two would be folded', () => {
+  it('leads with the answer even when only a message would be folded', () => {
     const p = pageOf(item(), [said(1, 'you', 'Ask')], outcome('Done.'), [], false);
-    expect(p.answer).toBeNull();
-    expect(p.toggle).toBeNull();
+    expect(p.answer).not.toBeNull();
+    expect(p.toggle).toBe('Show 1 earlier message');
   });
   it('with no answer yet draws the conversation, with nothing to fold', () => {
     expect(pageOf(item(), [said(1, 'you', 'Ask')], null, [], false)).toMatchObject({ answer: null, toggle: null, from: 0 });
@@ -117,7 +117,7 @@ describe('Everything else', () => {
 describe('the magnifier runs commands', () => {
   const all = phoneCommands({ team: true, mates: [{ id: 't-a', name: 'Chief of staff' }], groups: [{ id: 'r', name: 'Launch week' }], looks: [{ id: 'dark', name: 'Dark' }], pages: [{ id: 'team', label: 'Team' }] });
   it('offers the phone\'s places, teammates, groups, looks and Settings pages', () => {
-    expect(all.map((c) => c.label)).toEqual(expect.arrayContaining(['New thread', 'Needs you', 'Everything else', 'Chats', 'In progress', 'View and filters', 'New teammate', 'Chief of staff', 'Launch week', 'Dark', 'Team']));
+    expect(all.map((c) => c.label)).toEqual(expect.arrayContaining(['New thread', 'Go to Inbox', 'Go to Everything else', 'Go to Chats', 'Go to In progress', 'Filter…', 'New teammate', 'Chief of staff', 'Launch week', 'Dark', 'Team']));
   });
   it('offers no team places, teammate or group with no team', () => {
     const none = phoneCommands({ team: false }).map((c) => c.id);
@@ -129,7 +129,7 @@ describe('the magnifier runs commands', () => {
   it('finds by its words, and a word nothing has finds nothing', () => {
     // Rows one per teammate, project or cloud mode wait to be typed for.
     expect(commandsFor('', all)).toEqual(all.filter((c) => !c.typed));
-    expect(commandsFor('later', all)[0].label).toBe('Later');
+    expect(commandsFor('later', all)[0].label).toBe('Go to Later');
     // Its chat first, then pausing it, as ⌘K offers both.
     expect(commandsFor('chief', all).map((c) => c.label)).toEqual(['Chief of staff', 'Pause Chief of staff']);
     expect(commandsFor('zzz', all)).toEqual([]);

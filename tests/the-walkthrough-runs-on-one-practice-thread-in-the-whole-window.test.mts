@@ -6,9 +6,13 @@
 // like real work; writing back took her to Home with nothing left to mark
 // done; and the app's sidebar was folded to icons. Handing over to the old
 // practice tutorial instead was rejected: "we used the gold components". Now
-// the gold tips run on Home with no list beside them and the sidebar open,
-// on one practice thread that nothing real is behind, which stays open after
-// a reply and goes away when the walkthrough ends.
+// the gold tips run on Home with no list beside them, on one practice thread
+// that nothing real is behind, which stays open after a reply and goes away
+// when the walkthrough ends.
+//
+// 2026-11-12: the sidebar was then pinned open for the walkthrough, and the
+// founder, walking it, said "that's not how the app works". It folds as the
+// app folds it (tests/the-walkthrough-shows-the-inbox-before-the-thread).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { readTour, startTour, withPractice, practiceReplied, isTourPractice } from '../renderer/src/tour.ts';
@@ -39,11 +43,11 @@ describe("the walkthrough's practice thread", () => {
 
 describe('the end of the setup', () => {
   it('starts the gold walkthrough on Home with a practice project of its own', () => {
-    const fn = body('finishFresh');
+    expect(body('finishFresh')).toMatch(/beginWalkthrough\(\)/);
+    const fn = body('beginWalkthrough');
     expect(fn).toMatch(/setTour\(startTour\(\)\)/);
     expect(fn).toMatch(/setHomeOpen\(homeOn\)/);
     expect(fn).toMatch(/api\.firstRunPractice\(\{ bare: true \}\)/);
-    expect(fn).not.toMatch(/startTutorial/);
   });
 });
 
@@ -51,16 +55,18 @@ describe('the window during the walkthrough', () => {
   it('has no step list beside the app', () => {
     expect(app).not.toMatch(/<TourList /);
   });
-  it('keeps the sidebar open, so every place shows its name', () => {
-    expect(app).toMatch(/sidebarFolded\(\{ phone: onPhone\(\), shrinks: sidebarShrinks && !tourLive\(tour\), pointedAt: railOpen \}\)/);
+  // "It's never supposed to be open like that except when you're hovering over it."
+  it('folds the sidebar as the app does', () => {
+    expect(app).toMatch(/sidebarFolded\(\{ phone: onPhone\(\), shrinks: sidebarShrinks, pointedAt: railOpen \}\)/);
+    expect(app).not.toMatch(/shrinks: sidebarShrinks && !tourLive/);
   });
 });
 
 describe("Home's box before the first send", () => {
   it('holds the practice task, addressed to the practice project', () => {
     expect(app).toMatch(/const tourTask = tourLive\(tour\) && !tour!\.sent && tour!\.practice && !tour!\.practice\.item \? tour!\.practice\.slug : null;/);
-    expect(app).toMatch(/initial=\{walkCard \? \{ body: `\$\{TASK_TITLE\}\\n\\n\$\{TASK_BODY\}` \} : tourTask \? \{ body: `\$\{TASK_TITLE\}\\n\\n\$\{TASK_BODY\}`, product: tourTask \} : composeInitial\}/);
-    expect(app).toMatch(/scripted=\{walkCard \|\| tourTask \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
+    expect(app).toMatch(/initial=\{tourTask \? \{ body: `\$\{TASK_TITLE\}\\n\\n\$\{TASK_BODY\}`, product: tourTask \} : composeInitial\}/);
+    expect(app).toMatch(/scripted=\{tourTask \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
   });
 });
 
@@ -80,7 +86,10 @@ describe('the practice project', () => {
     expect(ipc).toMatch(/if \(opts\?\.bare\) return \{ \.\.\.made, examples: \[\], backdrop: \[\] \};/);
   });
   it('goes when the walkthrough ends or is skipped', () => {
-    expect(app).toMatch(/if \(tourGone && tour\?\.practice\) void api\.firstRunPracticeEnd\(\)/);
+    const at = app.indexOf('const tourGone =');
+    const effect = app.slice(at, app.indexOf('}, [tourGone]);', at));
+    expect(effect).toContain('if (!tourGone || !tour?.practice) return;');
+    expect(effect).toContain('void api.firstRunPracticeEnd()');
   });
 });
 
@@ -96,7 +105,7 @@ describe('marking the practice thread done', () => {
   // Walking it in a copy: E on the practice thread opened the next thread in
   // Needs you, a real chat brought in from the computer, with the next tip over it.
   it('goes back to where it was opened from, not on to a real thread', () => {
-    expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: !!focused && !isTourPractice\(tourRef\.current, item\), index, id: item\.id \}\);/);
+    expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: \(!!focused \|\| isTheAskOn\(item, openCard\)\) && !isTourPractice\(tourRef\.current, item\), index, id: item\.id \}\);/);
   });
 });
 

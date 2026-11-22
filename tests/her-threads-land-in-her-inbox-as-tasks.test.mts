@@ -367,7 +367,7 @@ describe('the wiring the card needs is really there', () => {
     // The renderer sends ids. A row that names a conversation should name one
     // the main process read, not one a card has been holding since this morning.
     // And it reads the end of any it holds without one (w-62228098e6).
-    expect(ipc).toContain('const chosen = readChatEnds(lastThreads.filter((t) => want.has(String(t?.id ?? \'\'))));');
+    expect(ipc).toContain('const chosen = await readChatEndsOffThread(lastThreads.filter((t) => want.has(String(t?.id ?? \'\'))));');
     expect(card).not.toMatch(/importThreads\(\{ product: slug, threads: \[\{/);
   });
 });

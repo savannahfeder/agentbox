@@ -46,10 +46,9 @@ export function keepAfterSignIn(service: string, { finishing = false }: { finish
   const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
   const when = finishing ? 'Once the login finishes, keep' : 'First, keep';
   const why = 'this sign-in for every later cloud thread: a cloud machine forgets its logins when the run ends.';
-  if (!svc || svc.keys.length !== 1) {
-    const names = svc ? ` under ${svc.keys.map((k) => k.name).join(' and ')}, one call each` : ', under the variable its tools read, if they read one from the environment';
-    const server = svc ? '' : ` A tool server's own sign-in (its authenticate tool, \`codex mcp login\`) cannot be kept that way: if they will want that tool again, give them its link in Connections (agentbox://connections), which every thread can use.`;
-    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep${names}.${server}` };
+  if (!svc) return { message: 'A cloud machine forgets its logins when the run ends. If later cloud runs need this one, ask for its key with an AGENTBOX-NEEDS: key line, which they answer on a card. A tool server\'s own sign-in (its authenticate tool, `codex mcp login`) has no key to ask for: if they will want that tool again, give them its link in Connections (agentbox://connections), which every thread can use.' };
+  if (svc.keys.length !== 1) {
+    return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep under ${svc.keys.map((k) => k.name).join(' and ')}, one call each.` };
   }
   const name = svc.keys[0].name;
   const read = READ_TOKEN[svc.id];
@@ -64,6 +63,13 @@ export function notToBeSaved(id: string, askId: string, { product = null }: { pr
 }
 
 export const NOT_SAVED = 'They chose not to save this sign-in for other threads, so do not keep it.';
+
+/** The keys a known service's sign-in may be kept under, or null for one not on the list. */
+export function keyNamesFor(service: string): string[] | null {
+  const n = plain(service);
+  const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
+  return svc ? svc.keys.map((k) => k.name) : null;
+}
 
 export interface SignInRequest { service?: string; url?: string; code?: string; why?: string; asksForCode?: boolean; ask?: string; finished?: boolean }
 export interface SignInWait { status: 'closed' | 'waiting' | 'signed_in' | 'landed' | 'code' | 'skipped' | 'replied'; ask: string; url?: string; code?: string; message: string }

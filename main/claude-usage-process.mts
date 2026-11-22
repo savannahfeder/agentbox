@@ -30,7 +30,7 @@ export function runClaudeUsage(bin: string, args: string[], opts: UsageRunOption
     done(error, report);
   };
   try {
-    child = attachClaudeInput(spawn(bin, args, { cwd: opts.cwd, env: opts.env, stdio: ['pipe', 'pipe', 'ignore'] }));
+    child = attachClaudeInput(spawn(bin, args, { cwd: opts.cwd, env: opts.env, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true }));
     child.holdInput(true);
     child.once('error', error => finish(error));
     child.once('exit', () => {

@@ -11,14 +11,14 @@ import { meterPair } from '../../../renderer/src/account-words';
 import { cloudRunsLine, cloudToggleTarget, type CloudMode } from '../../../renderer/src/cloud-menu';
 import { CODEX_CLOUD_WHAT, sameAsHere } from '../../../renderer/src/cloud-permission-words';
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../../../renderer/src/codex-modes';
-import { MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/modes';
+import { CUSTOM_MODE_FROM_PHONE, MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/modes';
 import { runningFigures } from '../../../renderer/src/running-reading';
 import type { UsageLimit } from '../../../renderer/src/types';
 import { publicLinkLine, shareWords } from '../../../renderer/src/public-link-words';
 import { inRunningOrder } from '../lib/palette';
 import { linksShown, type PhoneLink } from '../lib/public-links';
 import { share } from './LinkMenu';
-import { cloudInUseName, cloudOnlyAccounts, newerUsage, placesOf, withPlaces } from '../lib/cloud-accounts';
+import { cloudInUseName, cloudOnlyAccounts, computerAccounts, loginLabel, newerUsage, placesOf, withPlaces } from '../lib/cloud-accounts';
 import { readMyRoomCard, roomCardGroups, roomCardPatch, roomsPageShown, saveMyRoomCard } from '../lib/rooms-settings';
 import { NAME } from '../../../shared/product-name.mjs';
 import { deleteAccount } from '../../../renderer/src/phone-account';
@@ -35,7 +35,8 @@ import { Tick } from './icons';
 import { Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
 import { Aside, Button, Chip, Choice, Group, Meters, NavRow, Row, Stepper, Switch } from './SettingsParts';
 import { TeamPage } from './TeamPage';
-import { color, DARK, font, LIGHT, type Palette } from './theme';
+import Svg, { Path } from 'react-native-svg';
+import { color, corner, DARK, font, LIGHT, type Palette } from './theme';
 
 const MODES = MODE_ORDER.filter((m) => m !== 'custom').map((m) => ({ value: m as string, label: MODE_WORDS[m] }));
 const CODEX = CODEX_MODE_ORDER.map((m) => ({ value: m as string, label: CODEX_MODES[m].label }));
@@ -43,7 +44,7 @@ const AGENT_OPTIONS = [{ value: 'all', label: 'All of them' }, { value: 'waiting
 const AGENT_SENTENCE: Record<string, string> = {
   all: 'Each one is a row in your inbox. Closing it only takes it out of the inbox.',
   waiting: 'Only the ones waiting for you to type. The rest run without interrupting you.',
-  off: 'None reach your inbox. Each is still in its project’s sidebar.',
+  off: 'Each is still in its project’s sidebar.',
 };
 const NOT_YET = 'Your computer has not sent its settings yet.';
 
@@ -133,6 +134,15 @@ function General() {
 }
 
 /** A small drawing of the app in one palette: its wall, a row of words and the orange. */
+/** The picked theme's tick (styles.css `.look-tick`). */
+function LookTick() {
+  return (
+    <View style={{ position: 'absolute', top: 7, right: 7, width: 18, height: 18, borderRadius: 9, backgroundColor: color.accent, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={11} height={11} viewBox="0 0 11 11" fill="none"><Path d="M1.6 5.7 4.2 8.3 9.4 2.7" stroke={color.bg} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" /></Svg>
+    </View>
+  );
+}
+
 function Swatch({ p }: { p: Palette }) {
   const bar = (w: `${number}%`, c: string) => <View style={{ height: 4, width: w, backgroundColor: c, opacity: 0.85 }} />;
   return (
@@ -161,8 +171,9 @@ function Appearance() {
             const on = look === l.id;
             return (
               <Pressable key={l.id} onPress={() => pick(l.id)} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={l.name} style={{ flex: 1, gap: 9 }}>
-                <View style={{ height: 96, flexDirection: 'row', overflow: 'hidden', borderWidth: on ? 2 : 1, borderColor: on ? color.accent : color.lineStrong }}>
+                <View style={{ height: 96, flexDirection: 'row', overflow: 'hidden', borderRadius: corner.small, borderWidth: 1, borderColor: on ? color.accent : color.line }}>
                   {l.id === 'match' ? <><Swatch p={LIGHT} /><Swatch p={DARK} /></> : <Swatch p={l.id === 'light' ? LIGHT : DARK} />}
+                  {on && <LookTick />}
                 </View>
                 <T style={{ fontSize: 13, textAlign: 'center', fontFamily: on ? font.medium : font.regular, color: on ? color.text : color.dim }}>{l.name}</T>
               </Pressable>
@@ -250,15 +261,15 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
   return (
     <>
       {list.map((a, i) => {
-        const live = picked && chosen(a);
         const signingIn = a.signedIn === false;
+        const live = picked && chosen(a) && !signingIn;
         const line = backAt(a.resetsAt, c.now) ?? a.note ?? (signingIn ? 'Finish signing in to use it' : a.plan ?? 'Signed in');
         return (
-          <Row key={a.id} first={i === 0} label={a.email ?? a.name ?? 'Not signed in'} badge={live ? 'In use' : undefined}
+          <Row key={a.id} first={i === 0} label={loginLabel(a, engine, i, list.length)} badge={live ? 'In use' : undefined}
             desc={signingIn ? line : withPlaces(line, placesOf(w, engine, a.id))}
             below={<Meters meters={meterPair(newerUsage(w, engine, a.id, a.usage ?? null)?.limits, c.now)} />}
             reading={mine && live ? r : undefined}
-            control={!live && list.length > 1 ? <Button title={picked ? 'Use this one' : 'Use only this one'} onPress={() => void s.change({ scope: 'workspace', key: 'activeAccount', value: { engine, account: a.id } })} /> : undefined} />
+            control={!live && !signingIn && list.length > 1 ? <Button title="Switch" onPress={() => void s.change({ scope: 'workspace', key: 'activeAccount', value: { engine, account: a.id } })} /> : undefined} />
         );
       })}
       {inCloud.map((a, i) => (
@@ -297,20 +308,36 @@ function InTheCloud({ k, copy, options, says }: { k: 'cloudPermission' | 'cloudC
   );
 }
 
+/** An agent the computer does not have: said once, with the cloud's own logins if it has any. */
+function Missing({ engine }: { engine: 'claude' | 'codex' }) {
+  const w = useSettings().settings!.workspace;
+  const cloud = cloudHere(w, engine);
+  return (
+    <>
+      <Group label="Status"><Row first label={`${engine === 'claude' ? 'Claude Code' : 'Codex'} is not on your computer`} /></Group>
+      {cloudOnlyAccounts(w, engine).length ? <Group label="Signed in"><Accounts engine={engine} list={[]} /></Group> : null}
+      {cloud ? <CloudGroup engine={engine} /> : null}
+    </>
+  );
+}
+
+const oneAtATime = (w: Parameters<typeof computerAccounts>[0], engine: 'claude' | 'codex') =>
+  computerAccounts(w, engine).length > 1 ? 'Your agents run on one account at a time.' : null;
+
 function Claude() {
   const s = useSettings();
   const w = s.settings?.workspace;
   if (!w) return <Aside>{NOT_YET}</Aside>;
   const r = s.reading('workspace', 'permission', w.permission);
   const cloud = cloudHere(w, 'claude');
+  if (!w.claude.found) return <Missing engine="claude" />;
   return (
     <>
-      {!w.claude.found ? <Group label="Status"><Row first label="Claude Code is not on your computer" /></Group> : null}
-      <Group label="Signed in"><Accounts engine="claude" list={w.accounts} /></Group>
+      <Group label="Signed in" note={oneAtATime(w, 'claude')}><Accounts engine="claude" list={computerAccounts(w, 'claude')} /></Group>
       {cloud ? <CloudGroup engine="claude" /> : null}
       <Group label="Permissions">
         {w.permission === 'custom'
-          ? <Row first label="Permission mode" desc={MODE_SENTENCE.custom} />
+          ? <Row first label="Permission mode" desc={CUSTOM_MODE_FROM_PHONE} />
           : <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={MODE_SENTENCE[r.value as keyof typeof MODE_SENTENCE]} reading={r}
             control={<Choice label="Permission mode" value={r.value as string} options={MODES} onChange={(v) => void s.change({ scope: 'workspace', key: 'permission', value: v })} />} />}
         {cloud ? <InTheCloud k="cloudPermission" copy={w.cloudPermission ?? null}options={MODES} says={(m) => MODE_SENTENCE[m as keyof typeof MODE_SENTENCE]} /> : null}
@@ -325,10 +352,10 @@ function Codex() {
   if (!w) return <Aside>{NOT_YET}</Aside>;
   const r = s.reading('workspace', 'codexMode', w.codexMode ?? 'auto');
   const cloud = cloudHere(w, 'codex');
+  if (!w.codex.found) return <Missing engine="codex" />;
   return (
     <>
-      {!w.codex.found ? <Group label="Status"><Row first label="Codex is not on your computer" /></Group> : null}
-      <Group label="Signed in"><Accounts engine="codex" list={w.codexAccounts} /></Group>
+      <Group label="Signed in" note={oneAtATime(w, 'codex')}><Accounts engine="codex" list={computerAccounts(w, 'codex')} /></Group>
       {cloud ? <CloudGroup engine="codex" /> : null}
       <Group label="Permissions">
         <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={CODEX_MODES[r.value as keyof typeof CODEX_MODES]?.what} reading={r}
@@ -346,7 +373,7 @@ function AgentsAtOnce() {
   const count = s.reading('workspace', 'sessionsAtOnce', w.sessionsAtOnce);
   const isAuto = isAutoNow(s, w);
   const say = (n: number | undefined) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
-  const options = [{ value: 'auto', label: `Automatic (${say(w.agentsTotal)})` }, ...Array.from({ length: w.slotsMax ?? 12 }, (_, i) => ({ value: String(i + 1), label: say(i + 1) }))];
+  const options = [{ value: 'auto', label: `Automatic (${say((isAuto ? undefined : w.agentsAutoTotal) ?? w.agentsTotal)})` }, ...Array.from({ length: w.slotsMax ?? 12 }, (_, i) => ({ value: String(i + 1), label: say(i + 1) }))];
   return (
     <Row first stack label="How many run at once" reading={auto.waiting || auto.refused ? auto : count}
       desc={isAuto ? 'From your computer’s memory, kept there as you add accounts or turn the memory check on.' : `You set this. Automatic would run ${w.agentsAutoTotal ?? w.sessionsAtOnce} on your computer.`}
@@ -363,7 +390,7 @@ const isAutoNow = (s: SettingsState, w: Pick<NonNullable<SettingsState['settings
 /** What the computer measured, first, as the desktop's Running page leads with it (`Reading`). */
 function Measured() {
   const w = useSettings().settings!.workspace;
-  const f = runningFigures({ running: w.running, capacity: w.agentsTotal, gate: w.memoryGate });
+  const f = runningFigures({ running: w.running, capacity: w.agentsTotal, gate: w.memoryGate ?? undefined });
   if (!f) return null;
   const line = (text: string) => <T key={text} style={{ fontSize: 12.5, lineHeight: 18.75, color: color.dim, paddingVertical: 12, borderTopWidth: 1, borderTopColor: color.line }}>{text}</T>;
   return (
@@ -396,39 +423,39 @@ function Running() {
   const w = s.settings?.workspace;
   if (!w) return <Aside>{NOT_YET}</Aside>;
   const two = w.engines.length > 1;
-  const gate = s.reading('workspace', 'memoryGate', w.memoryGate.on);
-  const slots = s.reading('workspace', 'memoryGateSlots', w.memoryGate.slots);
+  const memory = w.memoryGate;
+  const gate = s.reading('workspace', 'memoryGate', memory?.on ?? false);
+  const slots = s.reading('workspace', 'memoryGateSlots', memory?.slots ?? null);
   const slow = s.reading('workspace', 'agentsFeltSlow', null);
   const outside = s.reading('workspace', 'outsideAgents', w.outsideAgents);
-  const paused = s.reading('workspace', 'paused', !!w.paused);
-  const resume = s.reading('workspace', 'resumeStopped', null);
-  const p = !!paused.value;
   return (
     <>
       <Measured />
       <Group label="Agents">
         <AgentsAtOnce />
-        <Row label="Hold heavy work when memory is short" reading={gate}
-          desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}
-          control={<Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGate', value: v })} />} />
-        {gate.value && !isAutoNow(s, w) ? (
-          <Row label="Heavy commands at once" reading={slots}
-            desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on your computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on your computer.`}
-            control={<Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}
-              onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGateSlots', value: v === w.memoryGate.slotsAuto ? null : v })} />} />
+        {memory ? (
+          <>
+            <Row label="Hold heavy work when memory is short" reading={gate}
+              desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}
+              control={<Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGate', value: v })} />} />
+            {gate.value && !isAutoNow(s, w) ? (
+              <Row label="Heavy commands at once" reading={slots}
+                desc={slots.value === null ? `Auto: ${memory.slotsAuto} on your computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${memory.slotsAuto} on your computer.`}
+                control={<Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? memory.slotsAuto} min={1} max={memory.slotsMax ?? 8}
+                  onChange={(v) => void s.change({ scope: 'workspace', key: 'memoryGateSlots', value: v === memory.slotsAuto ? null : v })} />} />
+            ) : null}
+          </>
         ) : null}
         <SettingSwitch label="Stop programs agents leave behind" k="cleanupLeftovers" copy={w.leftovers.on}
-          desc={`Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on your computer are never stopped.${two ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`} />
-        <Row label="Something felt slow" reading={slow}
-          desc={w.agentsNudge ? `${NAME} is running ${w.agentsNudge} fewer than your computer suggests.` : `${NAME} runs one fewer from now on, and remembers that it did.`}
-          control={<View style={{ flexDirection: 'row', gap: 8 }}>
-            {w.agentsNudge ? <Button title="Undo" onPress={() => void s.change({ scope: 'workspace', key: 'agentsFeltSlow', value: 'reset' })} /> : null}
-            <Button title="Tell it" onPress={() => void s.change({ scope: 'workspace', key: 'agentsFeltSlow', value: 'more' })} />
-          </View>} />
-        <Row label={p ? 'Unpause agents' : 'Pause agents'} desc={p ? 'Sessions will spawn again.' : 'No new sessions spawn.'} reading={paused}
-          control={<Button title={p ? 'Unpause' : 'Pause'} onPress={() => void s.change({ scope: 'workspace', key: 'paused', value: !p })} />} />
-        <Row label="Resume interrupted agents" desc="Respawn work stranded by a usage limit or crash." reading={resume}
-          control={<Button title="Resume" onPress={() => void s.change({ scope: 'workspace', key: 'resumeStopped', value: true })} />} />
+          desc={`Dev servers and test runs an agent started stop when you close its task or memory runs short. Your own apps never do.${two ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`} />
+        {isAutoNow(s, w) ? (
+          <Row label="Something felt slow" reading={slow}
+            desc={w.agentsNudge ? `${NAME} is running ${w.agentsNudge} fewer than your computer suggests.` : `${NAME} runs one fewer from now on, and remembers that it did.`}
+            control={<View style={{ flexDirection: 'row', gap: 8 }}>
+              {w.agentsNudge ? <Button title="Undo" onPress={() => void s.change({ scope: 'workspace', key: 'agentsFeltSlow', value: 'reset' })} /> : null}
+              <Button title="Tell it" onPress={() => void s.change({ scope: 'workspace', key: 'agentsFeltSlow', value: 'more' })} />
+            </View>} />
+        ) : null}
       </Group>
       <Group label="Agents you started yourself">
         <OutsideAgents />
@@ -442,10 +469,10 @@ function OutsideAgents() {
   const r = s.reading('workspace', 'outsideAgents', s.settings!.workspace.outsideAgents);
   return (
     <>
-      <Row first stack label="Show in your inbox" desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[r.value as string] ?? ''}`} reading={r}
-        control={<Choice label="Show in your inbox" value={r.value as string} options={AGENT_OPTIONS} onChange={(v) => void s.change({ scope: 'workspace', key: 'outsideAgents', value: v })} />} />
+      <Row first stack label="Show while they run" desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[r.value as string] ?? ''}`} reading={r}
+        control={<Choice label="Show while they run" value={r.value as string} options={AGENT_OPTIONS} onChange={(v) => void s.change({ scope: 'workspace', key: 'outsideAgents', value: v })} />} />
       <SettingSwitch label="Bring in new chats" k="importNew" copy={!!s.settings!.workspace.importNew}
-        desc="A new Claude Code or Codex chat in one of your projects comes in after ten quiet minutes. Waiting ones go to Needs you, finished ones to Done." />
+        desc="A Claude Code or Codex chat in one of your projects comes in after ten quiet minutes." />
     </>
   );
 }
@@ -557,7 +584,7 @@ const ALL_PAGES: SettingsPageDef[] = [
   { id: 'instructions', label: 'Instructions', group: 'Agents', Body: Instructions, shown: hasComputer },
   { id: 'projects', label: 'Projects', group: 'Workspace', Body: Projects, shown: hasComputer },
   { id: 'team', label: 'Team', group: 'Workspace', Body: TeamPage, shown: () => true },
-  { id: 'rooms', label: 'Rooms', group: 'Workspace', Body: Rooms, shown: (s) => roomsPageShown(s.settings) },
+  { id: 'rooms', label: 'Rooms', group: 'Workspace', lede: 'What people in your rooms see of you. Private threads never show.', Body: Rooms, shown: (s) => roomsPageShown(s.settings) },
 ];
 // Left out here, the store build's Settings, Search and page addresses never reach them.
 const NOT_IN_STORE = new Set(['alpha', 'team']);

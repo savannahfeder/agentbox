@@ -153,6 +153,9 @@ export function prepareHome(
   const agents = withAgents
     ? link(path.join(realHome, '.claude'), path.join(home, '.claude'))
     : false;
+  // Somebody with Claude Code has its folder, and a home with none reads as never set up
+  // (main/engine-setup.mts), so the copy would run on Codex beside a signed-in Claude Code.
+  if (claudeBin && !agents) fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
   return { home, claudeBin, keychain, agents };
 }
 
@@ -215,6 +218,14 @@ export function freshEnv(home: string, env: NodeJS.ProcessEnv = process.env, { o
     fresh.CODEX_HOME = path.join(home, '.codex');
   }
   return fresh;
+}
+
+/** `--team`: the team cloud this checkout or computer already has, so the window gets the account, plan and invite steps a download does. */
+export function teamConfigToUse({ repo, realHome = os.homedir(), env = process.env, exists = fs.existsSync }: {
+  repo: string; realHome?: string; env?: NodeJS.ProcessEnv; exists?: (file: string) => boolean;
+}): string | null {
+  const tries = [env.AGENTBOX_TEAM_CONFIG, path.join(repo, 'cloud', 'team.config.json'), path.join(realHome, `.${nameSlug}`, 'team.config.json')];
+  return tries.find((f): f is string => !!f && exists(f)) ?? null;
 }
 
 /** Make one and link its two prerequisites, in a single call. */

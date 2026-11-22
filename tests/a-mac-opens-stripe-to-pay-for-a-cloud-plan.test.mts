@@ -83,8 +83,8 @@ describe('paying', () => {
     await start();
     await signIn();
     await payForCloud({ plan: 'plus', openExternal: open, env, home });
-    expect(stripe.returns.success).toMatch(/^https:\/\/[^/]+\/v1\/paid\?plan=plus$/);
-    expect(stripe.returns.cancel).toMatch(/^https:\/\/[^/]+\/v1\/paid\?cancelled=1$/);
+    expect(stripe.returns.success).toBe('https://app.agentbox.ac/paid?plan=plus');
+    expect(stripe.returns.cancel).toBe('https://app.agentbox.ac/paid?cancelled=1');
   });
 
   it('someone already paying is sent to their billing page', async () => {
@@ -148,10 +148,10 @@ describe('billing', () => {
 });
 
 describe('which plan this Mac is on', () => {
-  it('the free hours until paid, then the plan Stripe says', async () => {
+  it('no plan until paid, then the plan Stripe says', async () => {
     const gw = await start();
     await signIn();
-    expect(await cloudPlan({ env, home })).toMatchObject({ signedIn: true, plan: 'free', agents: 2, hoursPerMonth: 5 });
+    expect(await cloudPlan({ env, home })).toMatchObject({ signedIn: true, plan: 'none', agents: 0, hoursPerMonth: 0 });
     await pays(gw, 'max');
     expect(await cloudPlan({ env, home })).toMatchObject({ signedIn: true, plan: 'max', unlimited: true, hoursPerMonth: 3000 });
   });

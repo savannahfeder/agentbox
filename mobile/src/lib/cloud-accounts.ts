@@ -30,11 +30,24 @@ export function placesOf(w: Copy, engine: Engine, localId: string): string[] {
 
 export const withPlaces = (line: string, places: string[]) => [line, ...places].join(' · ');
 
-/** What Settings' front page says beside Claude Code or Codex: the login in use, or how many the page lists. */
-export function accountsAside(local: readonly { chosen: boolean; email: string | null }[] | undefined, cloudOnly: number): string | undefined {
+type LocalCopy<A, B> = { claude?: { found: boolean }; codex?: { found: boolean }; accounts?: A[]; codexAccounts?: B[] };
+
+/** The computer's own logins for an agent, none while the agent is not on it (the web's `webSettingsGroups`). */
+export function computerAccounts<A, B>(w: LocalCopy<A, B>, engine: Engine): (A | B)[] {
+  if (!w[engine]?.found) return [];
+  return (engine === 'claude' ? w.accounts : w.codexAccounts) ?? [];
+}
+
+/** What a login's row is called: its email, else its name, else "Not signed in" as the desktop says, else "Claude account". */
+export const loginLabel = (a: { email: string | null; name?: string | null; signedIn?: boolean }, engine: Engine, index: number, total: number) =>
+  a.email ?? a.name ?? (a.signedIn === false ? 'Not signed in' : accountName({ engine, index, total }));
+
+/** What Settings' front page says beside Claude Code or Codex: the login in use, or how many signed-in ones the page lists. */
+export function accountsAside(local: readonly { chosen: boolean; email: string | null; signedIn?: boolean }[] | undefined, cloudOnly: number): string | undefined {
   const chosen = local?.find((a) => a.chosen)?.email;
   if (chosen) return chosen;
-  const n = (local?.length ?? 0) + cloudOnly;
+  const n = (local ?? []).filter((a) => a.signedIn !== false).length + cloudOnly;
+  if (!n && local?.length) return 'Not signed in';
   return n ? `${n} account${n === 1 ? '' : 's'}` : undefined;
 }
 

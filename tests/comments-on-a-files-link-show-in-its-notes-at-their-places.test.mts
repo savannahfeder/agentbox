@@ -11,7 +11,7 @@ import { LinkNotes, linkNotesOnTheFile } from '../renderer/src/components/LinkNo
 import { filmPins, filmMarks } from '../renderer/src/artifact-pins.ts';
 
 const c = (id: string, extra = {}) => ({ id, byName: 'Jun', byAvatar: null, text: `words ${id}`, at: Date.parse('2026-11-11T10:00:00Z'), mine: false, byOwner: false, ...extra });
-const draw = (comments) => renderToStaticMarkup(h(LinkNotes, { comments, onGo() {}, reply: async () => true }));
+const draw = (comments) => renderToStaticMarkup(h(LinkNotes, { comments, onGo() {}, onReply() {} }));
 
 describe('On the link, in the file\'s Notes', () => {
   it('is nothing at all when the link has no comments', () => {
@@ -29,7 +29,7 @@ describe('On the link, in the file\'s Notes', () => {
     expect(html).toContain('>Pin 1 at 0:06<');
     expect(html).toContain('“starting the 17th”');
     expect(html).toContain('>You<');
-    expect(html).toContain('Reply on the link page');
+    expect(html.match(/>Reply</g)).toHaveLength(3);
   });
   it('is never offered to the agent', () => {
     const html = draw([c('a', { place: { kind: 'time', s: 1 } })]);

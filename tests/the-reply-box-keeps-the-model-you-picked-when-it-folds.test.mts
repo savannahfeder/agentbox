@@ -113,6 +113,6 @@ describe('the box seeds itself from the thread and not from a passing snapshot',
 
   it('draws the folded pill through the same rule', () => {
     expect(focus).not.toMatch(/engineModelLabel\([^)]*item\.model \?\? null/);
-    expect(focus).toContain('pickOnTheRow(item).model');
+    expect(focus).toContain('modelShown(item, runningEngine ?? null, sending)');
   });
 });

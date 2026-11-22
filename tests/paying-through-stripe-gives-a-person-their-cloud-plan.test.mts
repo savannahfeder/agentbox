@@ -54,8 +54,6 @@ function setup({ billing = true } = {}) {
     whoIs: async (t) => (t === 'session-of-a' ? { id: A } : null),
     now: () => clock,
     plans: PLANS,
-    // As someone whose free hours are spent, so no plan runs nothing.
-    free: { agents: 2, hours: 0 },
     ...(billing ? { stripe: stripeClient({ key: 'sk_test_x', webhookSecret: SECRET, fetchImpl: stripe.fetchImpl }) } : {}),
   });
   let key;
@@ -89,7 +87,7 @@ describe('checkout', () => {
     expect(made.form).toMatchObject({
       mode: 'subscription', 'line_items[0][price]': 'price_pro', 'line_items[0][quantity]': '1',
       client_reference_id: A, 'subscription_data[metadata][person]': A,
-      success_url: `https://${HOST}/v1/paid?plan=pro`, cancel_url: `https://${HOST}/v1/paid?cancelled=1`,
+      success_url: 'https://app.agentbox.ac/paid?plan=pro', cancel_url: 'https://app.agentbox.ac/paid?cancelled=1',
     });
     expect(made.form.customer).toBeUndefined();
     expect(stripe.calls.every((c) => c.deadline && c.auth === 'Bearer sk_test_x')).toBe(true);
@@ -135,7 +133,7 @@ describe('the webhook sets the plan from the subscription as Stripe has it now',
     stripe.subs.set('sub_1', sub('sub_1', 'active', 'pro'));
     const r = await webhook('checkout.session.completed', { id: 'cs_1', object: 'checkout.session', subscription: 'sub_1', client_reference_id: A });
     expect(r).toMatchObject({ status: 200, body: { received: true } });
-    expect(await me()).toMatchObject({ plan: 'pro', agents: 10, hoursPerMonth: 400 });
+    expect(await me()).toMatchObject({ plan: 'pro', unlimited: true, agents: null, hoursPerMonth: 400 });
     expect((await start(2)).body.ok).toBe(true);
   });
 
@@ -219,7 +217,7 @@ describe('billing', () => {
     await paysFor('sub_1', 'active', 'pro', { customer: 'cus_9' });
     const r = await call('POST', '/v1/billing');
     expect(r.body).toEqual({ url: 'https://billing.stripe.com/p/session/test_1' });
-    expect(stripe.calls.find((c) => c.path === '/v1/billing_portal/sessions').form).toMatchObject({ customer: 'cus_9', return_url: `https://${HOST}/v1/paid?billing=1` });
+    expect(stripe.calls.find((c) => c.path === '/v1/billing_portal/sessions').form).toMatchObject({ customer: 'cus_9', return_url: 'https://app.agentbox.ac/paid?billing=1' });
   });
 
   it('someone who never paid has none', async () => {
@@ -243,7 +241,7 @@ describe('setting Stripe up (scripts/stripe-setup.mjs)', () => {
   it('sells each paid plan at its price, and the plan with none is not sold', () => {
     expect(paidPlans().map(([plan, p]) => [plan, p.dollarsPerMonth])).toEqual([['pro', 40], ['plus', 100], ['max', 200]]);
     expect(productOf('max', PLANS.max)).toMatchObject({ name: 'Agentbox Cloud Max', description: 'Unlimited agents at once in the cloud, 3,000 hours a month', metadata: { agentbox_plan: 'max' } });
-    expect(productOf('pro', PLANS.pro).description).toBe('10 agents at once in the cloud, 400 hours a month');
+    expect(productOf('pro', PLANS.pro).description).toBe('Unlimited agents at once in the cloud, 400 hours a month');
   });
 
   it('keeps a price that still matches the plan, and replaces one that does not', () => {

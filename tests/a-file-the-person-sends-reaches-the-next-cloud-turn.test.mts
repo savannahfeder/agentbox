@@ -90,7 +90,7 @@ describe('which file may go', () => {
 });
 
 describe('the computer', () => {
-  it('gives a sent file to that thread\'s next cloud turn only, once, and sends the turn to the cloud', () => {
+  it('gives a sent file to that thread\'s cloud turns only, and sends the turn to the cloud', () => {
     const sup = new Supervisor({ storeRoot: tmp, home, authProfiles: ['default'], cloudRuns: 'full' }, { listItems: () => [], listProducts: () => [], isDue: () => true }, tmp);
     sup._saveState = () => {};
     const film = path.join(home, 'Movies', 'launch film.mov');
@@ -100,7 +100,80 @@ describe('the computer', () => {
     expect(sup._cloudForKey.has('w-1')).toBe(true);
     expect(sup._cloudRelayEnv({ ZERO_ITEM: 'w-2' }).AGENTBOX_SEND_FILES).toBeUndefined();
     expect(JSON.parse(sup._cloudRelayEnv({ ZERO_ITEM: 'w-1' }).AGENTBOX_SEND_FILES)).toEqual([film]);
-    expect(sup._cloudRelayEnv({ ZERO_ITEM: 'w-1' }).AGENTBOX_SEND_FILES).toBeUndefined();
+    sup.stop?.();
+  });
+});
+
+// What broke (2026-11-11, w-77d2735f8e): the file went with the first cloud
+// start of the thread and was then forgotten. A start that failed before the
+// agent began (an upload that broke, the cloud turned away for room, the app
+// quitting) left every retry without it, so the person sent a 32 MB film
+// several times before a run had it. Measured by the starts below: the file
+// now stays until a cloud run of the thread gets going.
+describe('a sent file waits for a run that gets going', () => {
+  const film = () => path.join(home, 'Movies', 'launch film.mov');
+  const make = () => {
+    const sup = new Supervisor({ storeRoot: tmp, home, authProfiles: ['default'], cloudRuns: 'full' }, { listItems: () => [], listProducts: () => [], isDue: () => true }, tmp);
+    sup._saveState = () => {};
+    sup._cloudAccountEnv = () => ({});
+    return sup;
+  };
+  const sent = (sup, id = 'w-1') => { const v = sup._cloudRelayEnv({ ZERO_ITEM: id }).AGENTBOX_SEND_FILES; return v ? JSON.parse(v) : []; };
+
+  it('goes again with the next start when a start died before the agent began', () => {
+    const sup = make();
+    sup.cloudSendFile('w-1', '~/Movies/launch film.mov');
+    expect(sent(sup)).toEqual([film()]);
+    sup._settleFilesForCloud({ id: 'w-1' }, { cloud: true, sessionId: null, result: null });
+    expect(sent(sup)).toEqual([film()]);
+    sup.stop?.();
+  });
+
+  it('is used up once a cloud run of the thread got going', () => {
+    const sup = make();
+    sup.cloudSendFile('w-1', '~/Movies/launch film.mov');
+    sent(sup);
+    sup._settleFilesForCloud({ id: 'w-1' }, { cloud: true, sessionId: 'abc', result: null });
+    expect(sent(sup)).toEqual([]);
+    sup.stop?.();
+  });
+
+  it('keeps a file sent after that run started, for the run after it', () => {
+    const sup = make();
+    sup.cloudSendFile('w-1', '~/Movies/launch film.mov');
+    sent(sup);
+    fs.writeFileSync(path.join(home, 'Movies', 'second.mov'), 'two');
+    sup.cloudSendFile('w-1', '~/Movies/second.mov');
+    sup._settleFilesForCloud({ id: 'w-1' }, { cloud: true, sessionId: 'abc', result: 'done' });
+    expect(sent(sup)).toEqual([path.join(home, 'Movies', 'second.mov')]);
+    sup.stop?.();
+  });
+
+  it('is not used up by a run on this computer, or by another thread\'s run', () => {
+    const sup = make();
+    sup.cloudSendFile('w-1', '~/Movies/launch film.mov');
+    sent(sup);
+    sup._settleFilesForCloud({ id: 'w-1' }, { cloud: false, sessionId: 'abc', result: 'done' });
+    sup._settleFilesForCloud({ id: 'w-2' }, { cloud: true, sessionId: 'abc', result: 'done' });
+    expect(sent(sup)).toEqual([film()]);
+    sup.stop?.();
+  });
+
+  it('outlasts a restart of the app', () => {
+    const sup = make();
+    sup.cloudSendFile('w-1', '~/Movies/launch film.mov');
+    expect(sup._filesForCloudSaved()).toEqual({ 'w-1': { paths: [film()], at: expect.any(Number) } });
+    sup.stop?.();
+    const again = make();
+    again._loadFilesForCloud({ 'w-1': { paths: [film()], at: Date.now() } });
+    expect(sent(again)).toEqual([film()]);
+    again.stop?.();
+  });
+
+  it('is dropped after a week nobody started the thread', () => {
+    const sup = make();
+    sup._loadFilesForCloud({ 'w-1': { paths: [film()], at: Date.now() - 8 * 24 * 3600_000 } });
+    expect(sent(sup)).toEqual([]);
     sup.stop?.();
   });
 });

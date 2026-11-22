@@ -164,7 +164,12 @@
    column paints that glass over the theme's ground colour. */
 :root[data-skin] .tbl-inline .tbl-tr > :first-child,
 :root[data-skin] .tbl-inline.tbl-ranked .tbl-tr > :nth-child(2) { background: linear-gradient(var(--skin-pane), var(--skin-pane)), var(--bg); }
-.tbl-inline .tbl-ell { max-width: 300px; }
+/* Every word of every cell shows: the cell wraps and its row grows, and the
+   table is as wide as the message (inlineTracks shares that width out). */
+.tbl-inline .tbl-grid { width: 100%; }
+.tbl-inline .tbl-td { height: auto; min-height: 46px; padding: 12px 16px; align-items: flex-start; white-space: normal; line-height: 22px; }
+.tbl-inline .tbl-td .tbl-ell { white-space: normal; overflow: visible; max-width: none; overflow-wrap: break-word; }
+.tbl-inline .tbl-name .tbl-logo { margin-top: 2px; }
 /* A long header wraps, so it does not set its column's width. */
 .tbl-inline .tbl-th { white-space: normal; align-items: flex-end; padding: 11px 16px; line-height: 15px; }
 .tbl-inline .tbl-th > .tbl-ell { white-space: normal; overflow: visible; max-width: none; }

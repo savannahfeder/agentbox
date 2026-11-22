@@ -11,16 +11,16 @@ import { paneKey, staysOnNewest } from '../renderer/src/table-follows.ts';
 
 describe('a table being typed into', () => {
   it('follows to the newest version when the newest was the one open', () => {
-    expect(staysOnNewest({ kind: 'table', wasNewest: true })).toBe(true);
+    expect(staysOnNewest({ kind: 'table', wasNewest: true, samePath: true })).toBe(true);
   });
 
   it('stays on an older version someone picked on purpose', () => {
-    expect(staysOnNewest({ kind: 'table', wasNewest: false })).toBe(false);
+    expect(staysOnNewest({ kind: 'table', wasNewest: false, samePath: true })).toBe(false);
   });
 
   it('leaves a document on the page in hand, as before', () => {
-    expect(staysOnNewest({ kind: 'markdown', wasNewest: true })).toBe(false);
-    expect(staysOnNewest({ kind: null, wasNewest: true })).toBe(false);
+    expect(staysOnNewest({ kind: 'markdown', wasNewest: true, samePath: true })).toBe(false);
+    expect(staysOnNewest({ kind: null, wasNewest: true, samePath: true })).toBe(false);
   });
 
   it('keeps one pane while the file it writes is the same file', () => {

@@ -47,6 +47,7 @@ export interface EngineSetupOptions {
   onSignIn?: (engine: string, signedIn: boolean) => void;
   now?: () => number;
   setUpHere?: (engine: string, env: NodeJS.ProcessEnv) => boolean;
+  platform?: NodeJS.Platform;
 }
 
 /**
@@ -88,7 +89,9 @@ export interface EngineSetupStatus {
 
 export interface EngineReadiness { engine: string; found: boolean; signedIn: boolean; certain: boolean; error?: string }
 
-export function installCommand(engine: string) { return harnessFor(engine).install(); }
+export function installCommand(engine: string, platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env) {
+  return harnessFor(engine).install(platform, env);
+}
 
 /** The plan, never the API console: `--claudeai` is Claude Code's own name for it. */
 export function signInCommand(engine: string, bin: string) {
@@ -111,7 +114,7 @@ const ANSI = /\x1b\[[0-9;?]*[A-Za-z]/g;
 function realSpawn(file: string, args: string[], { env, onData, keepStdin = false }: SetupSpawnOptions = {}): SetupProcess {
   let child: ChildProcess;
   try {
-    child = nodeSpawn(file, args, { env, stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'] });
+    child = nodeSpawn(file, args, { env, stdio: [keepStdin ? 'pipe' : 'ignore', 'pipe', 'pipe'], windowsHide: true });
   } catch (error) {
     onData?.(`${(error as Error).message}\n`);
     return { exit: Promise.resolve(127), kill() {} };
@@ -136,7 +139,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * config so the rest of the app runs on what was just installed). `spawn` and
  * `wait` are seams for the tests; nothing in the app passes them.
  */
-export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {}, setUpHere = () => true, now = Date.now }: EngineSetupOptions = {} as EngineSetupOptions) {
+export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env = process.env, poll = POLL, onSignIn = () => {}, setUpHere = () => true, now = Date.now, platform = process.platform }: EngineSetupOptions = {} as EngineSetupOptions) {
   const runEnv = terminalEnv(env);
   const toolEnv = (engine: string, bin: string | null | undefined) => engine === 'codex' ? codexLaunchEnv(bin, runEnv) : runEnv;
   const jobs = new Map<string, SetupJob>();
@@ -183,8 +186,8 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     j.already = !!hit?.found;
     if (!hit?.found) {
       j.phase = 'installing';
-      const { file, args } = installCommand(j.engine);
-      const p = spawn(file, args, { env: runEnv, onData: (d) => say(j, d) });
+      const { file, args, env } = installCommand(j.engine, platform, runEnv);
+      const p = spawn(file, args, { env: env ?? runEnv, onData: (d) => say(j, d) });
       j.running = p;
       const code = await p.exit;
       j.running = null;
