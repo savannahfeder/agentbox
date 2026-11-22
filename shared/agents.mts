@@ -197,8 +197,8 @@ export function putOff(agent: AgentLike, now: number = Date.now()): boolean {
 export function putAway(agent: AgentLike): boolean {
   const through = agent?.doneThrough ?? 0;
   if (through <= 0) return false;
-  // A Codex thread lives for weeks, so closing it lasts until it says something new.
-  if (isCodex(agent)) return (agent.saidAt ?? 0) <= through;
+  // A Codex thread lives for weeks, so closing it lasts until it, or she, says something new.
+  if (isCodex(agent)) return (agent.saidAt ?? 0) <= through && Math.max(0, ...(agent.asked ?? []).map((t) => Number(t?.at) || 0)) <= through;
   return true;
 }
 

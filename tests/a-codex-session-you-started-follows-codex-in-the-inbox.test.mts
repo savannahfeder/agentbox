@@ -191,6 +191,16 @@ describe('closing and reading it', () => {
     expect(putAway({ ...closed, saidAt: a.saidAt + 60_000 })).toBe(false);
   });
 
+  it('a closed row she answers in Codex shows in In progress while it works', () => {
+    const t0 = NOW - 10 * 60_000;
+    write('s1', [meta('s1', t0), ...turn(t0, ASK, ANSWER)], t0 + 21_000);
+    const through = one('s1').saidAt;
+    write('s1', [meta('s1', t0), ...turn(t0, ASK, ANSWER), ...turn(NOW - 30_000, 'switch now', null)], NOW - 29_000);
+    const working = { ...one('s1'), doneThrough: through };
+    expect(putAway(working)).toBe(false);
+    expect(progressAfterReply(working, NOW, 'all')).toBe(true);
+  });
+
   it('the full conversation is her words and its answers, in order', () => {
     const t0 = NOW - 10 * 60_000;
     const file = write('s1', [meta('s1', t0), ...turn(t0, ASK, ANSWER), ...turn(t0 + 60_000, 'switch now', 'Switched.')], t0 + 81_000);
