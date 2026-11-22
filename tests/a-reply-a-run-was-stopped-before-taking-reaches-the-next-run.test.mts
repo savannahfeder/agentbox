@@ -167,8 +167,13 @@ describe('what counts as an agent having begun on its starting words', () => {
     expect(codex.took('thread/started', { thread: { id: 'th-1' } })).toBe(false);
   });
 
-  it('OpenCode: a part of the answer arriving, never the session being made', () => {
-    expect(opencode.took('message.part.updated', { part: { type: 'text' } })).toBe(true);
-    expect(opencode.took('session.updated', { info: {} })).toBe(false);
+  // Over ACP. Thinking counts: OpenCode 2.3.2, stopped while it thought, acted
+  // on those words on the next reply, so they were in its conversation.
+  it('OpenCode: thinking, speaking or calling a tool, never the conversation being opened', () => {
+    for (const sessionUpdate of ['agent_thought_chunk', 'agent_message_chunk', 'tool_call']) {
+      expect(opencode.took('session/update', { update: { sessionUpdate } }), sessionUpdate).toBe(true);
+    }
+    expect(opencode.took('agentbox/session', { sessionId: 'ses_1' })).toBe(false);
+    expect(opencode.took('session/update', { update: { sessionUpdate: 'available_commands_update' } })).toBe(false);
   });
 });

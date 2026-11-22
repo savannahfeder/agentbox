@@ -1395,6 +1395,8 @@ export interface Snapshot {
    *  typechecks. */
   engines?: {
     choices: Engine[];
+    /** Any harness on offer besides Claude Code and Codex, each with its models. Read by the model menu and nothing else. */
+    further?: Engine[];
     workspace: string;
     byItem: Record<string, string>;
   };
