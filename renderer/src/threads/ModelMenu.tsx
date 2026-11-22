@@ -117,11 +117,13 @@ export function ModelMenu({
               {every.codex.map((p) => row(p))}
             </div>
           )}
-          {/* One more column for each further harness, headed by its name like the two above. */}
+          {/* One more column for each further harness, headed by its name like the
+              two above. Its list is whatever its owner connected, which can be
+              hundreds, so it keeps eight rows' height and scrolls. */}
           {(every.others ?? []).map((column) => (
-            <div className="tc-col" key={column.engine}>
+            <div className="tc-col tc-col-more" key={column.engine}>
               <span className="tc-menu-head">{column.label}</span>
-              {column.models.map((p) => row(p))}
+              <div className="tc-col-rows">{column.models.map((p) => row(p))}</div>
             </div>
           ))}
         </div>
