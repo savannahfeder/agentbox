@@ -401,6 +401,16 @@ export function readChatTurn(file: string, bytes = TAIL_BYTES): ChatTurn | null 
   }
 }
 
+/** What was picked in Claude Code's question picker, '' for any other tool's result. */
+function pickedWords(result: unknown): string {
+  const answers = (result as { answers?: unknown } | null | undefined)?.answers;
+  if (!answers || typeof answers !== 'object') return '';
+  const picks = Object.entries(answers)
+    .map(([q, a]) => [q, String(a ?? '').replace(/\s*\(recommended\)\s*$/i, '').trim()])
+    .filter(([, a]) => a);
+  return (picks.length === 1 ? picks[0][1] : picks.map(([q, a]) => `${q}\n${a}`).join('\n\n')).slice(0, FIRST_CHARS);
+}
+
 function turnIn(fd: number, size: number, bytes: number): ChatTurn {
   const from = Math.max(0, size - bytes);
   const buf = Buffer.alloc(size - from);
@@ -418,8 +428,13 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
       Object.assign(turn, { heard: messageText(row).trim().slice(0, FIRST_CHARS), heardAt: at, said: '', saidAt: 0, ended: false });
       continue;
     }
-    // A tool's result: the agent carries on from it.
-    if (row.type === 'user') { turn.ended = false; continue; }
+    // A tool's result: the agent carries on from it. A picker's is yours.
+    if (row.type === 'user') {
+      const picked = pickedWords(row.toolUseResult);
+      if (picked) Object.assign(turn, { heard: picked, heardAt: at });
+      turn.ended = false;
+      continue;
+    }
     // Claude Code refusing the turn, a usage limit: the agent has stopped.
     if (row.isApiErrorMessage) { turn.ended = true; continue; }
     const text = messageText(row).trim();

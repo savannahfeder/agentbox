@@ -304,18 +304,27 @@ export function readRollout(file: string): Rollout | null {
   return value;
 }
 
-function readRolloutAfresh(file: string): Rollout | null {
-  let text = '';
+/** A rollout's lines, and of one longer than two reads its first and its last
+ *  `MAX_BYTES`, with `CUT` where the rest was. */
+const CUT = '\0cut';
+function rolloutLines(file: string): string[] | null {
   try {
     const fd = fs.openSync(file, 'r');
     try {
-      const size = fs.fstatSync(fd).size;
-      const buf = Buffer.alloc(Math.min(size, MAX_BYTES));
-      fs.readSync(fd, buf, 0, buf.length, 0);
-      text = buf.toString('utf8');
+      const { size } = fs.fstatSync(fd);
+      const read = (from: number, to: number) => {
+        const buf = Buffer.alloc(to - from);
+        return buf.subarray(0, fs.readSync(fd, buf, 0, buf.length, from)).toString('utf8').split('\n');
+      };
+      if (size <= 2 * MAX_BYTES) return read(0, size);
+      return [...read(0, MAX_BYTES).slice(0, -1), CUT, ...read(size - MAX_BYTES, size).slice(1)];
     } finally { fs.closeSync(fd); }
   } catch { return null; }
-  const lines = text.split('\n');
+}
+
+function readRolloutAfresh(file: string): Rollout | null {
+  const lines = rolloutLines(file);
+  if (!lines) return null;
   let meta: RolloutMeta | null = null;
   let prompt = '';
   let last = '';
@@ -333,6 +342,8 @@ function readRolloutAfresh(file: string): Rollout | null {
   // present, so a turn is counted once whichever line says it.
   let sawEventTurns = false;
   for (const line of lines) {
+    // Whatever turn was open here may have ended in the part not read.
+    if (line === CUT) { turnOpen = null; continue; }
     if (!line.trim()) continue;
     let j: RolloutLine;
     try { j = JSON.parse(line); } catch { continue; }

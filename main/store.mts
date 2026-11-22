@@ -31,8 +31,9 @@ import { teamOf, PERSONAL_FLAG } from './team/projects.mts';
 import {
   agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL, THREAD_LABEL,
 } from '../shared/agent-import.mts';
-import { heldOutside } from '../shared/carried-on-outside.mts';
+import { heldOutside, stoppedThere } from '../shared/carried-on-outside.mts';
 import { isShared } from '../shared/team-rules.mts';
+import { DONE_FOLLOWED_MOST, DONE_FOLLOWED_MS } from './chat-follow.mts';
 import type { FollowedChat } from './chat-follow.mts';
 import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
@@ -175,6 +176,8 @@ export type FiledItem = {
 export interface ImportedChat extends CodexThreadLike {
   source?: string;
   waiting?: boolean;
+  /** Stopped in its own window, on this (Claude Code's `waitingFor`). */
+  stoppedOn?: string;
   name?: string;
 }
 
@@ -1771,6 +1774,10 @@ export class Store {
     wanted.forEach((thread: ImportedChat, i: number) => {
       const { at, last } = chatTimes(thread, now - i * 1000);
       const row = threadImportRow(thread);
+      if (thread.stoppedOn !== undefined) {
+        row.result = [stoppedThere(thread.stoppedOn), row.result].filter(Boolean).join('\n\n');
+        row.labels = row.labels.filter((l) => l !== CATCH_UP_LABEL);
+      }
       const created = workItemsDisk.createWorkItem(
         dir,
         { title: row.title, kind: row.kind, priority: row.priority, labels: row.labels },
@@ -1986,12 +1993,15 @@ export class Store {
 
   /**
    * THE CHATS BROUGHT IN THAT FOLLOW WHERE THEY STARTED (main/chat-follow.mts),
-   *  and any the follow still holds. Not one in a project shared with a team:
-   *  every line there reaches teammates, and what the agent says next in a
-   *  terminal is nothing anybody chose to share. */
+   *  and any the follow still holds, the newest ones in Done last. Not one in a
+   *  project shared with a team: every line there reaches teammates, and what
+   *  the agent says next in a terminal is nothing anybody chose to share. */
   chatsToFollow(now = Date.now()): FollowedChat[] {
-    const shared = new Set(this.listProducts().filter((p) => isShared(p)).map((p) => p.slug));
+    const products = this.listProducts();
+    const shared = new Set(products.filter((p) => isShared(p)).map((p) => p.slug));
+    const folders = new Map(products.map((p) => [p.slug, p.repoPath ?? null]));
     const out: FollowedChat[] = [];
+    const done: FollowedChat[] = [];
     for (const item of this.listItems(now)) {
       const labels = item.labels ?? [];
       const thread = labels.includes(THREAD_LABEL) ? labels.find((l) => l.startsWith('thread:'))?.slice(7).trim() : '';
@@ -1999,16 +2009,18 @@ export class Store {
       const chat = thread || codex;
       if (!chat) continue;
       const held = heldOutside(item);
-      const follow = (item.status === 'open' || held) && !shared.has(item.product)
-        && !(item.answer && item.answer !== '(withdrawn)');
+      const mine = !shared.has(item.product) && !(item.answer && item.answer !== '(withdrawn)');
+      const doneAt = item.status === 'done' ? item.wrote?.status?.ts ?? 0 : 0;
+      const follow = mine && (item.status === 'open' || held || (doneAt > 0 && now - doneAt < DONE_FOLLOWED_MS));
       if (!follow && !held) continue;
       const knownAt = Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0);
-      out.push({
-        product: item.product, id: item.id, engine: thread ? 'claude' : 'codex', chat,
-        knownAt, heardThrough: Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), held, follow,
+      (doneAt ? done : out).push({
+        product: item.product, id: item.id, engine: thread ? 'claude' : 'codex', chat, folder: folders.get(item.product) ?? null,
+        knownAt, heardThrough: Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), doneAt, held, follow,
       });
     }
-    return out;
+    done.sort((a, b) => b.doneAt - a.doneAt);
+    return [...out, ...done.slice(0, DONE_FOLLOWED_MOST)];
   }
 
   /** What you typed there, on the thread as yours. */
@@ -2048,12 +2060,46 @@ export class Store {
     const item = workItemsDisk.readWorkItem(dir, id, now);
     if (!item) return null;
     workItemsDisk.updateWorkItem(dir, id, { result: said }, { source: 'agent', now });
-    // Written up the way every thread reads (main/catch-up.mts) once already, so again.
-    const labels = item.labels ?? [];
-    if (item.wrote?.problem && !labels.includes(CATCH_UP_LABEL)) {
-      workItemsDisk.updateWorkItem(dir, id, { labels: [...labels, CATCH_UP_LABEL] }, { source: 'system', now });
+    this.owesWriteUp(slug, item, true, now);
+    return this.letGoOfChat(slug, id, { now });
+  }
+
+  /** Its agent stopped there, on a question or a permission prompt only its own
+   *  window shows. Said once until you speak there again or its agent does. */
+  chatStoppedOutside(slug: string, id: string, stop: string, news: string, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item) return null;
+    const said = String(item.result ?? '').startsWith(stop) && (item.wrote?.result?.ts ?? 0) >= (item.wrote?.saidOutside?.ts ?? 0);
+    if (news || !said) {
+      workItemsDisk.updateWorkItem(dir, id, { result: [stop, news].filter(Boolean).join('\n\n') }, { source: 'agent', now });
+      this.owesWriteUp(slug, item, false, now);
     }
     return this.letGoOfChat(slug, id, { now });
+  }
+
+  /** In Done, and its agent waits on an answer to what you typed there since. */
+  chatAsksAgain(slug: string, id: string, { words, said, stopped }: { words: string; said: string; stopped: boolean }, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item || item.status !== 'done') return null;
+    // One line, so the thread reads as your reply there and not as one you sent back.
+    workItemsDisk.updateWorkItem(dir, id, { saidOutside: words, status: 'open' }, { source: 'founder', now });
+    const open = workItemsDisk.updateWorkItem(dir, id, { result: said }, { source: 'agent', now: now + 1 });
+    this.owesWriteUp(slug, item, !stopped, now + 1);
+    return open;
+  }
+
+  /** Written up the way every thread reads (main/catch-up.mts): an answer is, a
+   *  question only its own window shows is not. */
+  owesWriteUp(slug: string, item: StoreItem, owed: boolean, now: number) {
+    const labels = item.labels ?? [];
+    if (labels.includes(CATCH_UP_LABEL) === owed) return;
+    this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), item.id, {
+      labels: owed ? [...labels, CATCH_UP_LABEL] : labels.filter((l) => l !== CATCH_UP_LABEL),
+    }, { source: 'system', now });
   }
 
   letGoOfChat(slug: string, id: string, { now = Date.now() }: { now?: number } = {}) {
