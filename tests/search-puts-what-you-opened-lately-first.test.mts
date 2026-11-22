@@ -10,7 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import { searchItems } from '../renderer/src/search.ts';
 import { searchThreads } from '../renderer/src/threads/search.ts';
-import { titleFirst } from '../renderer/src/palette-pick.ts';
+import fs from 'node:fs';
+import { keptPick, titleFirst } from '../renderer/src/palette-pick.ts';
 import { insideGroups } from '../renderer/src/found-inside.ts';
 import { createFinder } from '../main/everything-found.mts';
 import { openedBand, openedLately, openedOf, LATELY_FIRST_MS, LATELY_MS } from '../shared/opened-lately.mts';
@@ -121,6 +122,19 @@ describe('Command K keeps them first when it puts titles first', () => {
   it('still puts the title first among rows opened alike', () => {
     const rows = [row('a', 'Notes on the launch', 2), row('b', 'Hero video', 2), row('c', 'Other', 0), row('d', 'Hero shot', 0)];
     expect(titleFirst(rows, 'hero').map((r) => r.id)).toEqual(['b', 'a', 'd', 'c']);
+  });
+
+  // In the running app, a thread main found a moment later landed on top while
+  // the highlight stayed on the row that had been first, so Enter opened that.
+  it('a pick nobody made is the top row, whatever lands there', () => {
+    expect(keptPick(null, ['thread-found-inside', 'thread-was-first'])).toBe(0);
+    expect(keptPick('thread-was-first', ['thread-found-inside', 'thread-was-first'])).toBe(1);
+  });
+
+  it('only a key or the pointer makes a pick', () => {
+    const palette = fs.readFileSync(new URL('../renderer/src/components/Palette.tsx', import.meta.url), 'utf8');
+    const sets = [...palette.matchAll(/setPickedKey\(([^;]*?)\)(?=[;,\s])/g)].map((m) => m[1]);
+    expect(sets.sort()).toEqual(['keys[i] ?? null', 'null']);
   });
 });
 

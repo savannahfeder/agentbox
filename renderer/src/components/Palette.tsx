@@ -561,16 +561,17 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
   // through the filter (../palette-keys).
   const keys = useMemo(() => commandKeys(filtered), [filtered]);
 
-  // The pick is a row, not a place: a list that re-sorts or grows under it
-  // (a new snapshot, the found-inside rows) keeps the same row picked, and
-  // Enter opens the row drawn as picked.
+  // A pick the person made is a row, not a place: a list that re-sorts or
+  // grows under it (a new snapshot, the found-inside rows) keeps that row
+  // picked, and Enter opens the row drawn as picked. Until they make one, the
+  // pick is the top row, so a thread opened lately that main found a moment
+  // later takes it.
   const selected = keptPick(pickedKey, keys);
   const pick = (i: number) => setPickedKey(keys[i] ?? null);
   // Chromium sends a pointer event when a list moves under a still pointer.
   const lastPointer = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => setPickedKey(null), [query]);
-  useEffect(() => { if (pickedKey === null && keys.length) setPickedKey(keys[0]); }, [keys, pickedKey]);
   useEffect(() => {
     if (!byKey.current) return;
     byKey.current = false;
