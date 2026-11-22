@@ -205,8 +205,8 @@ export function createResourceRequests({ cwd, docs, account = null, engine, home
           if (!reserve(bytes)) return { status: 'too_large', message: 'This run has reached its resource byte limit.' };
           content = await run('tar', ['-czf', '-', '-C', bundle.dir, '.'], { encoding: null, env: { ...process.env, COPYFILE_DISABLE: '1' } }) as Buffer;
         } else {
-          // An old picture or film may be kept in the cloud and off this computer; a folder's come back as far as one sending holds.
-          await bringBackAt(named.full!, { max: 300 }).catch(() => null);
+          // An old picture or film may be in the cloud and off this computer. A folder brings back no more than one sending carries.
+          if (!fs.statSync(named.full!, { throwIfNoEntry: false })?.isFile()) await bringBackAt(named.full!, { max: 300 }).catch(() => null);
           const real = await fs.promises.realpath(named.full!);
           if (!inside(real, await fs.promises.realpath(named.root!))) return { status: 'denied', message: 'symlink escape from the resource folder' };
           if ((await fs.promises.stat(real)).isDirectory()) {

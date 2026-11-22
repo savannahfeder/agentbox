@@ -141,6 +141,18 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
   let passing: Promise<void> | null = null;
   const coming = new Map<string, Promise<boolean>>();
 
+  // Each place a kept file left from, so asking by path is not a walk of every entry.
+  const offAt = new Map<string, string>();
+  let offBytes = 0;
+  const index = (hash: string, entry: OffEntry, by: 1 | -1): void => {
+    for (const p of entry.paths) {
+      if (by > 0) offAt.set(path.resolve(p), hash);
+      else if (offAt.get(path.resolve(p)) === hash) offAt.delete(path.resolve(p));
+    }
+    offBytes += by * entry.size;
+  };
+  for (const [hash, entry] of Object.entries(ledger.off)) index(hash, entry, 1);
+
   const fold = (): void => {
     fs.mkdirSync(dir, { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
@@ -151,7 +163,10 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
   };
   // A change is written before what it records happens to the files, so a crash never loses a file's place.
   const note = (c: Change): void => {
+    const leaving = 'off' in c ? c.off : 'back' in c ? c.back : null;
+    if (leaving && ledger.off[leaving]) index(leaving, ledger.off[leaving], -1);
     apply(ledger, c);
+    if ('off' in c) index(c.off, c.entry, 1);
     fs.mkdirSync(dir, { recursive: true });
     fs.appendFileSync(changesFile, `${JSON.stringify(c)}\n`);
     if (++changes >= FOLD_AFTER) fold();
@@ -296,16 +311,15 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     /** True while `hash` is on its way back. */
     isComing: (hash: string): boolean => coming.has(hash),
     off: (hash: string): OffEntry | null => ledger.off[hash] ?? null,
-    /** Every kept file that left from a place inside `folder`. */
+    /** The hashes of the kept files that left from inside `folder`. */
     offUnder(folder: string): string[] {
       const inside = `${path.resolve(folder)}${path.sep}`;
-      return Object.entries(ledger.off).filter(([, e]) => e.paths.some((p) => path.resolve(p).startsWith(inside))).map(([hash]) => hash);
+      const out = new Set<string>();
+      for (const [p, hash] of offAt) if (p.startsWith(inside)) out.add(hash);
+      return [...out];
     },
     /** The kept file that was at `file` before it left this computer. */
-    hashAt(file: string): string | null {
-      const at = path.resolve(file);
-      return Object.entries(ledger.off).find(([, e]) => e.paths.some((p) => path.resolve(p) === at))?.[0] ?? null;
-    },
+    hashAt: (file: string): string | null => offAt.get(path.resolve(file)) ?? null,
     isUp: (hash: string): boolean => !!ledger.up[hash],
     opened(hash: string): void { note({ opened: hash, at: now() }); },
     /** The status with the account read again, for a page that shows it. */
@@ -316,7 +330,7 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     },
     status(): KeeperStatus {
       const { on, offAfterDays } = settings();
-      return { ...last, on, offAfterDays, offBytes: Object.values(ledger.off).reduce((s, e) => s + e.size, 0) };
+      return { ...last, on, offAfterDays, offBytes };
     },
   };
 }
