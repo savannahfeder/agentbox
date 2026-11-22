@@ -17,6 +17,7 @@ import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mt
 import { createThreadShare } from './thread-share.mts';
 import { createAsks, type TellThread } from './asks.mts';
 import { changePath, readChangeSummary } from '../code-change.mts';
+import { changeWithCommits } from '../handed-commits.mts';
 import { askBody, askIsOpen, askOf, withoutAskLead, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
@@ -1423,6 +1424,8 @@ export function createTeamService({
       const { words, files, tooBig } = await briefOfThread(row, product);
       const title = shownTitle(row);
       const change = changeOfThread(product, id, title);
+      const withCommits = change.files.length ? changeWithCommits(change.files[0].srcPath, product.repoPath, id, MAX_MESSAGE_FILE_BYTES) : null;
+      const changeFiles: AttachmentFile[] = withCommits ? [{ name: change.name, dataBase64: withCommits.toString('base64') }] : change.files;
       const giver = state.me.name?.split(/\s+/)[0] || 'the giver';
       const loose = change.loose ? `Not committed yet: this work is only on ${giver}'s computer. The file below holds every edit the agent made.` : '';
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
@@ -1436,7 +1439,7 @@ export function createTeamService({
         title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         keepTitle: true,
-        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...files, ...change.files],
+        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...files, ...changeFiles],
       });
       // The asks on it end with it: what they say back would come to a thread you no longer hold.
       for (const r of store.listItems()) {

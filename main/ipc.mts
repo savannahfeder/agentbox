@@ -55,6 +55,7 @@ import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shar
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
 import { readItemHistory } from './store/work-items.mts';
 import { readChange, readChangeSummary, withStandsNow } from './code-change.mts';
+import { startFromHandedCommits } from './handed-commits.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
@@ -1404,6 +1405,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     });
     // A thread a task was handed to an agent in keeps the task's name, so the namer leaves it.
     if (typeof label === 'string' && label.trim() && out?.id) store.nameItem(product, out.id, label);
+    // Before the wake below, so the first run's folder is made on the commits a hand-over carried.
+    if (out?.id) {
+      const made = store.listProducts().find((p) => p.slug === product);
+      startFromHandedCommits({ repoPath: made?.repoPath, dir: made?.dir, id: out.id, body, labels });
+    }
     // Before the wake below, so its first run cannot start in the cloud.
     if (onMac === true && out?.id) supervisor.setThreadOnMac({ [out.id]: true });
     // A real thread ends the walk's hold on agents (`Supervisor#sentByThem`).
