@@ -34,6 +34,7 @@ interface Kept { relayed: string[]; back: string[] }
 
 export function createAsks({ file, me, products, readRows, nameOf, tell, putAway, log = () => {} }: AsksOptions) {
   let kept: Kept | null = null;
+  const telling = new Set<string>();
   const read = (): Kept => {
     if (kept) return kept;
     try {
@@ -52,17 +53,23 @@ export function createAsks({ file, me, products, readRows, nameOf, tell, putAway
   const taskRows = () => products().filter((p) => !!p.team?.direct).flatMap((p) => readRows(p.dir).map((r) => ({ row: r, slug: p.slug })));
 
   return {
-    relay(c: ThreadComment, thread: { item: PhoneItem; product: AskProduct }): boolean {
+    // `orElse` files the comment on the thread, for words the thread could not take.
+    relay(c: ThreadComment, thread: { item: PhoneItem; product: AskProduct }, orElse: () => void = () => {}): boolean {
       const k = read();
-      if (k.relayed.includes(c.id)) return true;
+      if (k.relayed.includes(c.id) || telling.has(c.id)) return true;
       // A thread you handed on is not yours to run on anyone's words.
       if (!tell || handedOn(thread.item)) return false;
       const rows = taskRows().map((t) => t.row);
       if (!helpAskCovering(rows as never[], me(), c.threadId, c.by, c.at)) return false;
-      k.relayed.push(c.id);
-      save();
-      void Promise.resolve(tell(thread.product.slug, c.threadId, { text: c.text, from: { teammate: c.by, name: nameOf(c.by) } }))
-        .catch((err) => log(`asks: ${nameOf(c.by)}'s words did not reach the agent: ${err?.message ?? err}`));
+      telling.add(c.id);
+      const done = () => { telling.delete(c.id); k.relayed.push(c.id); save(); };
+      Promise.resolve().then(() => tell(thread.product.slug, c.threadId, { text: c.text, from: { teammate: c.by, name: nameOf(c.by) } }))
+        .then(done, (err) => {
+          log(`asks: ${nameOf(c.by)}'s words did not reach the agent, so they are filed as a comment: ${err?.message ?? err}`);
+          done();
+          orElse();
+        })
+        .catch((err) => log(`asks: ${nameOf(c.by)}'s words could not be filed either: ${err?.message ?? err}`));
       return true;
     },
 

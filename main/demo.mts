@@ -140,6 +140,15 @@ export function seedDemoStore(home: string, { now = Date.now() }: { now?: number
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, `${doc.text}\n`);
     }
+    // The pictures the agents' answers name on a line of their own, which the
+    // thread draws from the project's folder.
+    for (const line of ledgers[product.slug] ?? []) {
+      const said = String((line.patch as { result?: unknown } | undefined)?.result ?? '');
+      for (const [, file] of said.matchAll(/^designs\/([\w-]+\.png)$/gm)) {
+        fs.mkdirSync(path.join(dir, 'designs'), { recursive: true });
+        fs.copyFileSync(new URL(`../shared/demo-pictures/${file}`, import.meta.url), path.join(dir, 'designs', file));
+      }
+    }
     fs.writeFileSync(path.join(dir, 'index.json'), `${JSON.stringify({
       schemaVersion: 2,
       creations: docs.map((doc, i) => ({

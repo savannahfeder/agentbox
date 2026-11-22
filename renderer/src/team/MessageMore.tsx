@@ -2,8 +2,10 @@
 // delete your own, copy its words, and mark the conversation unread from it.
 // The editor takes the message's place, Return saves and Escape puts it back;
 // deleting asks once, because it is taken back for everyone.
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
+import { RichReply, type RichBox } from './RichReply';
+import { chatDoc, chatMarkdown } from './chat-editor';
 import './chat.css';
 
 export type MoreItem =
@@ -99,14 +101,11 @@ export function MessageEditor({ text, onSave, onCancel, onEmpty }: {
   onCancel: () => void;
   onEmpty: () => void;
 }) {
-  const [value, setValue] = useState(text);
-  const box = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(320, el.scrollHeight)}px`;
-  }, [value]);
+  // In the chat box's own editor, so a quote or a list is edited as one, not as its marks;
+  // compared in that editor's markdown, so opening and saving untouched changes nothing.
+  const start = useMemo(() => chatMarkdown(chatDoc(text)), [text]);
+  const [value, setValue] = useState(start);
+  const box = useRef<RichBox | null>(null);
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -116,17 +115,17 @@ export function MessageEditor({ text, onSave, onCancel, onEmpty }: {
   const save = () => {
     const next = value.trim();
     if (!next) { onEmpty(); return; }
-    if (next === text.trim()) { onCancel(); return; }
+    if (next === start.trim()) { onCancel(); return; }
     onSave(next);
   };
   return (
     <div className="chat-edit">
-      <textarea ref={box} className="chat-edit-box" value={value} rows={1} aria-label="Edit message"
-        onChange={(e) => setValue(e.target.value)}
+      <RichReply className="chat-edit-box" boxRef={box} value={value} onChange={setValue} placeholder="" label="Edit message"
         onKeyDown={(e) => {
           e.stopPropagation();
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); save(); }
-          if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); return true; }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel(); return true; }
+          return false;
         }} />
       <div className="chat-edit-foot">
         <span className="chat-edit-hint">Return to save, Esc to cancel</span>

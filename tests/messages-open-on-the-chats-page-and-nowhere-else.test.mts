@@ -9,7 +9,8 @@
 // worked pretty well." Read off App.tsx that day: a chatsPage flag picked one
 // place or the other per open. Now a chat always opens on the Chats page, team
 // or no team. A card's Message button is the way in from Everything else, and a
-// person who shares no threads opens their chat there.
+// person who shares no threads opens their chat there. The one exception is a
+// chat pressed in Needs you, which opens in the inbox (w-1d47bc5339).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { createElement as h } from 'react';
@@ -73,8 +74,8 @@ describe('in the app', () => {
   });
 
   it('keeps the sidebar\'s Chats row the one it is without a team', () => {
-    expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
-    expect(app).toContain('onGroupsPage={roomShown || directOpen || chatsPlaceShown || cardFromPlace}');
+    expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomOnTeam || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
+    expect(app).toContain('onGroupsPage={roomOnTeam || directOpen || chatsPlaceShown || cardFromPlace}');
     expect(app).toContain('onTeammatesPage={teammatesShown}');
   });
 

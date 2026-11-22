@@ -17,6 +17,7 @@
 //   buffer until the app dies.
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { Writable } from 'node:stream';
 import { createAcpClient, ACP_PROTOCOL_VERSION, rejectionOption } from '../main/acp.mts';
 
 // A fake agent: one object per line in, one object per line out.
@@ -134,6 +135,102 @@ describe('one transport for every agent that speaks ACP', () => {
     expect(child.lastCall('session/cancel').id).toBeUndefined(); // a notification
     settleIt?.('a');
     await vi.waitFor(() => expect(child.sent.filter(m => m.id === 10).length).toBe(1)); // and not twice
+  });
+
+  // A prompt stays open for the whole turn. Under the two-minute deadline every
+  // other request has, a long refactor would be cancelled with nothing in the logs.
+  it('gives a turn no deadline of its own, while every other request keeps one', async () => {
+    const child = fakeAgent();
+    const client = createAcpClient({ transport: child, requestTimeoutMs: 30 });
+    const turn = client.prompt({ sessionId: 's-1', text: 'a long refactor' });
+    await expect(client.newSession({ cwd: '/tmp/task' })).rejects.toThrow(/session\/new did not answer within 30ms/);
+    await new Promise((r) => setTimeout(r, 60));
+    child.reply(child.lastCall('session/prompt').id, { stopReason: 'end_turn' });
+    expect(await turn).toEqual({ stopReason: 'end_turn' });
+  });
+
+  it('ends an open turn when the agent goes away, so nothing waits on it for ever', async () => {
+    const child = fakeAgent();
+    const client = createAcpClient({ transport: child });
+    const turn = client.prompt({ sessionId: 's-1', text: 'do the thing' });
+    child.emit('exit', 3);
+    await expect(turn).rejects.toThrow(/exited with code 3/);
+  });
+
+  // 2026-11-22: a tool that exits the moment it starts leaves a closed pipe, and
+  // a write to one fails twice: in the callback, and as an `error` on the
+  // stream. Nobody listened for the second, so it was an uncaught exception in
+  // the app's main process. Measured with a script that exits 1 at once.
+  it('ends the connection when the agent has already gone, with no error left for nobody to catch', async () => {
+    const child = fakeAgent();
+    child.stdin = new Writable({ write(_chunk, _encoding, done) { done(Object.assign(Error('write EPIPE'), { code: 'EPIPE' })); } });
+    const uncaught = [];
+    const note = (error) => uncaught.push(error);
+    process.on('uncaughtException', note);
+    try {
+      const client = createAcpClient({ transport: child });
+      await expect(client.initialize()).rejects.toThrow(/Write failed: write EPIPE/);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(uncaught).toEqual([]);
+      expect(child.killed).toBe(true);
+    } finally {
+      process.off('uncaughtException', note);
+    }
+  });
+
+  // Found by a second read of the code on 2026-11-22: whatever reads the
+  // agent's messages ran inside the pipe's own listener, so one message it
+  // could not take (a field of the wrong shape) threw out of that listener, an
+  // uncaught exception in the app's main process.
+  it('carries on when one message cannot be read by whoever is listening', async () => {
+    const child = fakeAgent();
+    const seen = [];
+    createAcpClient({ transport: child, onNotification: (_method, params) => { if (params.bad) throw Error('not the shape I expected'); seen.push(params); } });
+    expect(() => child.say({ jsonrpc: '2.0', method: 'session/update', params: { bad: true } })).not.toThrow();
+    child.say({ jsonrpc: '2.0', method: 'session/update', params: { good: 1 } });
+    expect(seen).toEqual([{ good: 1 }]);
+  });
+
+  // An agent that prints why and exits can have its exit seen before its last
+  // words: they are all in only once its pipes have closed.
+  it('waits for the agent\'s last words before it says the agent has gone', async () => {
+    const child = fakeAgent();
+    const client = createAcpClient({ transport: child });
+    let known = null;
+    const start = client.initialize().catch((error) => { known = `${error.message} | ${client.diagnostics()}`; });
+    child.emit('exit', 3);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(known).toBeNull();
+    child.stderr.emit('data', Buffer.from('this model is not on your plan\n'));
+    child.emit('close', 3);
+    await start;
+    expect(known).toMatch(/exited with code 3/);
+    expect(known).toContain('this model is not on your plan');
+  });
+
+  it('still says the agent has gone when its pipes never close, as something it started can hold them', async () => {
+    const child = fakeAgent();
+    const client = createAcpClient({ transport: child });
+    const start = client.initialize();
+    child.emit('exit', 3);
+    await expect(start).rejects.toThrow(/exited with code 3/);
+  });
+
+  // Codex's cards dropped their fifteen-minute clock because the deny it sent
+  // could not be told from the person's own. The same holds here.
+  it('lets a question stand until it is answered, with no clock that refuses for the person', async () => {
+    vi.useFakeTimers();
+    try {
+      const child = fakeAgent();
+      let answer: (optionId: string) => void = () => {};
+      createAcpClient({ transport: child, onPermission: () => new Promise((resolve) => { answer = resolve; }) });
+      child.say({ jsonrpc: '2.0', id: 7, method: 'session/request_permission', params: { sessionId: 's-1', options: [{ optionId: 'once', kind: 'allow_once' }, { optionId: 'no', kind: 'reject_once' }] } });
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60_000);
+      expect(child.sent.find((m) => m.id === 7)).toBeUndefined();
+      answer('once');
+      await vi.advanceTimersByTimeAsync(1);
+      expect(child.sent.find((m) => m.id === 7)?.result).toEqual({ outcome: { outcome: 'selected', optionId: 'once' } });
+    } finally { vi.useRealTimers(); }
   });
 
   it('refuses a door it never opened instead of going quiet', async () => {

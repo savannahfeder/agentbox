@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
-import { PRO_PITCH, bringInWithin, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, bringInBehind, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
@@ -97,8 +97,10 @@ export function SetupSplit(p: SetupSplitProps) {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState({ chats: 0, project: null as string | null, teammates: [] as string[] });
   const hadProject = useRef((p.snap?.products?.length ?? 0) > 0).current;
+  // Chats on their way in make their projects.
+  const [bringing, setBringing] = useState(false);
   // Until the first step is answered a project may still come, so the count does not jump.
-  const project = hadProject || at === 0 || !!done.project || done.chats > 0;
+  const project = hadProject || at === 0 || !!done.project || done.chats > 0 || bringing;
   // Read once: signing in during the setup must not take its own step out from under it.
   const signedInAtStart = useRef(!!p.snap?.team?.signedIn).current;
   // Someone already on a team was asked to join it, not to pay for it.
@@ -207,12 +209,11 @@ export function SetupSplit(p: SetupSplitProps) {
 
   // ---- chats and folder
   const ticked = p.chats.filter((t) => p.ticks.has(t.id));
-  const bring = useCallback(async () => {
-    if (!ticked.length) { next(); return; }
-    setBusy(true);
-    const n = await bringInWithin(p.bringIn);
-    setBusy(false);
-    if (n) setDone((d) => ({ ...d, chats: n }));
+  const bring = useCallback(() => {
+    if (ticked.length) {
+      setBringing(true);
+      bringInBehind(p.bringIn, (n) => { if (n) setDone((d) => ({ ...d, chats: n })); setBringing(false); });
+    }
     next();
   }, [ticked.length, p, next]);
   const [browsing, setBrowsing] = useState(false);

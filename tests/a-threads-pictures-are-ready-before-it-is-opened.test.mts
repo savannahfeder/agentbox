@@ -20,8 +20,9 @@ describe('the pictures a thread names', () => {
     expect(picturesNamedIn(null)).toEqual([]);
   });
 
-  it('leave out a file url with a stray percent sign rather than stopping the inbox', () => {
-    expect(picturesNamedIn('![p](file:///Users/x/p/100%zz.png) ![q](/Users/x/p/q.png)')).toEqual(['/Users/x/p/q.png']);
+  // The thread draws it as written (on-a-mac-or-linux-each-picture-resolves-as-pinned-here), so it is made ready the same way.
+  it('keep a file url with a stray percent sign as written rather than stopping the inbox', () => {
+    expect(picturesNamedIn('![p](file:///Users/x/p/100%zz.png) ![q](/Users/x/p/q.png)')).toEqual(['/Users/x/p/100%zz.png', '/Users/x/p/q.png']);
   });
 
   it('never include a file url that names a web address, so selecting a row fetches nothing remote', () => {

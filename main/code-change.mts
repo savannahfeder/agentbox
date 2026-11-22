@@ -518,9 +518,11 @@ export function withStandsNow<T extends Partial<WorkStands>>(change: T, now: Wor
 
 /** Read a change back off disk for the pane. */
 export function readChange(file: string): SavedChange {
-  const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as SavedChange | null;
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as (SavedChange & { commits?: unknown }) | null;
   if (!parsed || !Array.isArray(parsed.files)) throw new Error('that file is not a change');
-  return parsed;
+  // The commits a hand-over carries (main/handed-commits.mts) are for git, not the reader.
+  const { commits: _forGit, ...change } = parsed;
+  return change;
 }
 
 export type ChangeSummary = Omit<SavedChange, 'files'> & { files: Omit<ChangedFile, 'hunks'>[] };

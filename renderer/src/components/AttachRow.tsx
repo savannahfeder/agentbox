@@ -1,6 +1,7 @@
 // Staged attachments, shown as what they are: images as thumbnails that open
 // large, a voice note as a note you can play before sending, other files as
-// chips. The × removes.
+// chips. The × removes. In a chat's box every one is a tile of one height, with
+// its own × (`look="tiles"`).
 
 import { useState } from 'react';
 import { attachProblem, type Attaching, type PendingAttachment } from '../attachments';
@@ -35,15 +36,104 @@ export function stagedPictures(attachments: PendingAttachment[], pressed: number
   return { pictures, start };
 }
 
-export function AttachRow({ attachments, attaching = [], onRemove }: {
+/** A file's kind as its tile names it: the ending in capitals, or FILE. */
+export const kindOf = (name: string) => /\.([a-z0-9]{1,5})$/i.exec(name)?.[1].toUpperCase() ?? 'FILE';
+
+/**
+ * A long name in two parts, so a tile too narrow for it cuts the first and
+ * keeps the end, which is what tells "report-final-v2" from "report-final-v3":
+ * the last words of up to 12 letters, and the ending.
+ */
+export function nameEnds(name: string): [string, string] {
+  if (name.length <= 20) return [name, ''];
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 && name.length - dot <= 6 ? name.slice(dot) : '';
+  const stem = name.slice(0, name.length - ext.length);
+  const parts = stem.split(/(?<=[\s_-])/);
+  let tail = '';
+  while (parts.length > 1 && parts[parts.length - 1].length + tail.length <= 12) tail = parts.pop() + tail;
+  if (!tail) tail = stem.slice(-8);
+  return [stem.slice(0, stem.length - tail.length), tail + ext];
+}
+
+function FileName({ name }: { name: string }) {
+  const [head, tail] = nameEnds(name);
+  return <span className="attach-name"><span className="attach-head">{head}</span>{tail && <span className="attach-tail">{tail}</span>}</span>;
+}
+
+const Cross = () => (
+  <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" /></svg>
+);
+
+export function AttachRow({ attachments, attaching = [], onRemove, look }: {
   attachments: PendingAttachment[];
   /** Files still on their way in, with how far each has got. */
   attaching?: Attaching[];
   onRemove: (index: number) => void;
+  /** A chat's box draws every file as a tile of one size, the way Slack's does. */
+  look?: 'tiles';
 }) {
   const [open, setOpen] = useState<{ pictures: Picture[]; start: number } | null>(null);
   if (!attachments.length && !attaching.length) return null;
   const problem = attachProblem(attachments);
+  const viewer = open && (
+    <PictureView
+      pictures={open.pictures}
+      start={open.start}
+      resolve={() => Promise.resolve(null)}
+      onClose={() => setOpen(null)}
+    />
+  );
+  if (look === 'tiles') {
+    const x = (i: number, label: string) => (
+      <button type="button" className="attach-x" title="Remove" aria-label={label} onClick={() => onRemove(i)}><Cross /></button>
+    );
+    return (
+      <>
+      <div className="attach-row attach-tiles">
+        {attachments.map((a, i) => {
+          const note = voiceNoteOf(a.name);
+          if (note) {
+            return (
+              <div key={i} className="attach-tile attach-voice">
+                <VoiceNote id={`staged:${a.name}:${(a.dataBase64 ?? a.srcPath ?? '').length}`} ms={note.ms} load={() => bytesOf(a)} mine />
+                {x(i, 'Remove voice note')}
+              </div>
+            );
+          }
+          if (a.image) {
+            return (
+              <div key={i} className="attach-tile attach-picture" title={a.name}>
+                <button type="button" className="attach-open" aria-label={`Open ${a.name} large`} onClick={() => setOpen(stagedPictures(attachments, i))}>
+                  <img src={srcFor(a)} alt={a.name} />
+                </button>
+                {x(i, `Remove ${a.name}`)}
+              </div>
+            );
+          }
+          const big = tooBigToSend(a.size ?? 0);
+          const meta = a.failed ? 'Not attached' : big ? 'Too big to send' : a.size ? sizeWords(a.size) : '';
+          return (
+            <div key={i} className={`attach-tile attach-file${a.failed || big ? ' attach-too-big' : ''}`} title={a.failed ?? (big ? overTheLimit(a.size ?? 0) : a.name)}>
+              <span className="attach-kind">{kindOf(a.name)}</span>
+              <span className="attach-words"><FileName name={a.name} />{meta && <span className="attach-meta">{meta}</span>}</span>
+              {x(i, `Remove ${a.name}`)}
+            </div>
+          );
+        })}
+        {attaching.map((a) => (
+          <div key={a.key} className="attach-tile attach-file attach-coming" role="status">
+            <span className="attach-kind">{kindOf(a.name)}</span>
+            <span className="attach-words"><FileName name={a.name} /><span className="attach-meta">{a.size ? `${Math.floor((100 * a.done) / a.size)}%` : ''}</span></span>
+            <span className="attach-bar" style={{ width: `${a.size ? (100 * a.done) / a.size : 0}%` }} aria-hidden="true" />
+          </div>
+        ))}
+      </div>
+      {problem && <div className="compose-note attach-problem" role="alert">{problem}</div>}
+      {viewer}
+      </>
+    );
+  }
   return (
     <>
     <div className="attach-row">
@@ -78,14 +168,7 @@ export function AttachRow({ attachments, attaching = [], onRemove }: {
       ))}
     </div>
     {problem && <div className="compose-note attach-problem" role="alert">{problem}</div>}
-    {open && (
-      <PictureView
-        pictures={open.pictures}
-        start={open.start}
-        resolve={() => Promise.resolve(null)}
-        onClose={() => setOpen(null)}
-      />
-    )}
+    {viewer}
     </>
   );
 }

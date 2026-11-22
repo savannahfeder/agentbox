@@ -160,7 +160,9 @@ describe('the store a demo opens on', () => {
       expect(all.length).toBeGreaterThanOrEqual(6);
       // Every screen worth demoing has a row that lands on it.
       expect(all.some((i) => i.status === 'open' && /## Options/.test(i.result ?? ''))).toBe(true);
-      expect(all.some((i) => i.status === 'blocked')).toBe(true);
+      // Nothing blocked: on the call, "Send back to agent" on a thread nobody
+      // handed off read as a riddle (2026-11-21).
+      expect(all.some((i) => i.status === 'blocked')).toBe(false);
       expect(all.some((i) => i.status === 'done' && (i.result ?? '').length > 40)).toBe(true);
       // And one row the user wrote, which an agent may not overwrite.
       expect(all.some((i) => i.wrote?.body?.source === 'founder')).toBe(true);
@@ -277,20 +279,64 @@ describe('how the demo rows are written', () => {
     for (const text of said) expect(text).not.toMatch(/[a-z]: [a-z]/i);
   });
 
+  // "The word 'fairy,' by the way, is a little funny because it sounds like
+  // 'fairy fairy,' which is like a slur" (founder, 2026-11-21). Renamed Shuttle.
+  it('never calls the invented company Ferry', () => {
+    const src = fs.readFileSync(path.join(import.meta.dirname, '../shared/demo-world.mts'), 'utf8');
+    expect(src).not.toMatch(/ferry/i);
+    expect(src).toContain("name: 'Shuttle'");
+  });
+
   it('writes no em dash anywhere, because a screenshot of this is our writing', () => {
     for (const line of rows) {
       expect(JSON.stringify(line).includes('—')).toBe(false);
     }
   });
 
-  it('gives every unanswered question and review an options section to draw', () => {
-    // The list under the reply box is drawn from the body's `## Options`
-    // section. A demo whose questions have none demonstrates the app with its
-    // best feature switched off.
-    // An ask that offers a choice ("Ship it, or hold it") draws one.
-    const asks = rows.filter((l) => l.source === 'agent' && /^\*\*[^*\n]*, or /.test(String(l.patch?.result ?? '')));
-    expect(asks.length).toBeGreaterThanOrEqual(2);
-    for (const ask of asks) expect(ask.patch.result).toMatch(/\n## Options\n/);
+  // The founder, 2026-11-21, on the Stripe thread: "They don't give me options
+  // because... they should all have 1, 2, 3 options", and "They don't really
+  // show me screenshots or visuals". Two of four agent threads had neither.
+  it('gives every agent thread waiting on you two or three options to pick', () => {
+    expect(bodies.length).toBe(4);
+    for (const body of bodies) {
+      const options = body.split('\n## Options\n')[1];
+      expect(options).toBeTruthy();
+      const picks = options.split('\n').filter((l) => /^\d\. /.test(l));
+      expect(picks.length).toBeGreaterThanOrEqual(2);
+      expect(picks.length).toBeLessThanOrEqual(3);
+      expect(picks.filter((l) => l.endsWith('(recommended)'))).toHaveLength(1);
+    }
+  });
+
+  it('shows a picture of the work in every agent thread waiting on you', () => {
+    for (const body of bodies) expect(body).toMatch(/^designs\/[\w-]+\.png$/m);
+  });
+
+  // "The first couple of threads should be Claude Code threads with standard
+  // stuff... and then I'll introduce them to messages from Teams." A message
+  // from a person wins a tie in Needs you (threads/page-rules `byPriority`),
+  // so the agents' threads rank a level above the teammates' messages.
+  it('puts two Claude Code threads first in Needs you, and teammates after every agent', () => {
+    const waiting = [...new Set(rows.filter((l) => !finished.has(l.id)).map((l) => l.id))].map((id) => {
+      const mine = rows.filter((l) => l.id === id);
+      return { engine: mine.find((l) => l.patch?.engine)?.patch.engine, priority: Number(mine.find((l) => l.patch?.priority)?.patch.priority), at: mine[0].ts };
+    }).sort((a, b) => b.priority - a.priority || b.at - a.at);
+    expect(waiting.slice(0, 2).map((r) => r.engine)).toEqual(['claude', 'claude']);
+    const lowest = Math.min(...waiting.map((r) => r.priority));
+    for (const m of demoMessages()) expect(m.priority).toBeLessThan(lowest);
+  });
+
+  it('lays every picture it names into the project, where the thread draws it from', () => {
+    const home = aHome();
+    const out = seedDemoStore(home, { now: Date.now() });
+    const byId = new Map(rows.map((l) => [l.id, l]));
+    const named = rows.flatMap((l) => [...String(l.patch?.result ?? '').matchAll(/^(designs\/[\w-]+\.png)$/gm)].map((m) => ({ id: l.id, file: m[1] })));
+    expect(named.length).toBeGreaterThanOrEqual(4);
+    for (const { id, file } of named) {
+      const product = Object.entries(demoLedgerLines(Date.now())).find(([, ls]) => ls.some((l) => l.id === id))![0];
+      expect(byId.has(id)).toBe(true);
+      expect(fs.statSync(path.join(out.accountRoot, product, file)).size).toBeGreaterThan(10_000);
+    }
   });
 });
 

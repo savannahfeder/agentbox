@@ -1,7 +1,7 @@
 {
   "name": "agentbox-app",
   "productName": "Agentbox",
-  "version": "0.1.29",
+  "version": "0.1.31",
   "description": "A desktop GUI for running dozens of Claude Code and Codex agents in parallel, each in its own git worktree.",
   "author": "Savannah Feder",
   "repository": {
@@ -79,6 +79,7 @@
     "accounts": "node scripts/run.mjs scripts/accounts.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "check:public": "node scripts/check-before-public.mjs --all",
+    "check:harnesses": "node scripts/run.mjs scripts/check-harnesses.mts",
     "ship": "node scripts/ship.mjs",
     "phone:build": "vite build renderer --logLevel warn && node scripts/build-phone-site.mjs",
     "phone:deploy": "npm run phone:build && node scripts/deploy-phone-site.mjs",

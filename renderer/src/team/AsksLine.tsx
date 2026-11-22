@@ -63,7 +63,7 @@ export function AsksChip({ item, items, now = Date.now(), onTakeBack, onMessage 
   return (
     <span className="asks-chip-wrap" ref={box}>
       <button type="button" className="ts-done asks-chip" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className="asks-faces">{asks.map((a) => <Face key={a.row.id} person={team.byId.get(a.to) ?? null} size={18} />)}</span>
+        <span className="asks-faces">{[...new Set(asks.map((a) => a.to))].map((to) => <Face key={to} person={team.byId.get(to) ?? null} size={18} />)}</span>
         {label}
       </button>
       {open && <div className="th-menu asks-pop" role="dialog" aria-label="Who you asked">
