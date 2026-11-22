@@ -20,7 +20,6 @@ const A = '11111111-1111-4111-8111-111111111111';
 const HOST = 'gw.example.on.aws';
 const DAY = 24 * 60 * 60_000;
 const MADE = Date.UTC(2026, 10, 17, 9);
-const TRIAL_ENDS = MADE + TEAM.trialDays * DAY;
 
 function setup(start: number, { freeUntil = null as number | null, hadSubscription = false } = {}) {
   const calls: Array<{ method: string; path: string; form: Record<string, string> }> = [];
@@ -57,49 +56,47 @@ function setup(start: number, { freeUntil = null as number | null, hadSubscripti
 }
 
 describe('the team checkout', () => {
-  // 2026-11-13: a checkout opened a minute after the team was made read "6 days free" on Stripe's page
-  // beside the app's "7 days". Stripe words the free time in whole days, rounded down, so it is
-  // given whole days, rounded up: never less than the app promised, and under a day more.
-  it('takes the card now and gives Stripe whole days, so a team just made reads 7 days free', async () => {
+  // Stripe is handed the free days as a number, never an end time, which its page counts
+  // down and rounds to "6 days free" (tests/stripe-is-told-the-free-days-so-its-page-says-7-days-free).
+  const days = (form: Record<string, string>) => form['subscription_data[trial_period_days]'];
+  it('takes the card now and gives Stripe the week, so a team just made reads 7 days free', async () => {
     const { owner, made } = setup(MADE + 60_000);
     const out = await owner({ plan: 'team' });
     expect(out.body).toMatchObject({ where: 'checkout' });
-    const end = Number(made()['subscription_data[trial_end]']) * 1000;
-    expect(end).toBe(TRIAL_ENDS + 60_000);
-    expect((end - (MADE + 60_000)) / DAY).toBe(TEAM.trialDays);
+    expect(days(made())).toBe(String(TEAM.trialDays));
+    expect(made()['subscription_data[trial_end]']).toBeUndefined();
   });
   // Since 2026-11-21 no team has free days without a card, so the week runs from the checkout, not from the day the team was made.
   it('gives a team made weeks ago its whole week, from the checkout', async () => {
-    const at = MADE + 30 * DAY;
-    const { owner, made } = setup(at);
+    const { owner, made } = setup(MADE + 30 * DAY);
     await owner({ plan: 'team' });
-    expect(Number(made()['subscription_data[trial_end]']) * 1000).toBe(at + TEAM.trialDays * DAY);
+    expect(days(made())).toBe(String(TEAM.trialDays));
   });
   it('gives no second week to a team that had a subscription', async () => {
     const { owner, made } = setup(MADE + DAY, { hadSubscription: true });
     await owner({ plan: 'team' });
-    expect(made()['subscription_data[trial_end]']).toBeUndefined();
+    expect(days(made())).toBeUndefined();
   });
   it('runs to the end of days given by hand when they outlast the week, rounded up to a day', async () => {
     const at = MADE + DAY;
     const { owner, made } = setup(at, { freeUntil: at + 13.5 * DAY });
     await owner({ plan: 'team' });
-    expect(Number(made()['subscription_data[trial_end]']) * 1000).toBe(at + 14 * DAY);
+    expect(days(made())).toBe('14');
   });
   it('gives the week when days given by hand end sooner', async () => {
     const at = MADE + DAY;
     const { owner, made } = setup(at, { freeUntil: at + 3 * DAY });
     await owner({ plan: 'team' });
-    expect(Number(made()['subscription_data[trial_end]']) * 1000).toBe(at + TEAM.trialDays * DAY);
+    expect(days(made())).toBe(String(TEAM.trialDays));
   });
   it('after a subscription, honours days given by hand, and charges now when fewer than two are left, which Stripe will not trial', async () => {
     const at = MADE + DAY;
     const given = setup(at, { hadSubscription: true, freeUntil: at + 5 * DAY });
     await given.owner({ plan: 'team' });
-    expect(Number(given.made()['subscription_data[trial_end]']) * 1000).toBe(at + 5 * DAY);
+    expect(days(given.made())).toBe('5');
     const close = setup(at, { hadSubscription: true, freeUntil: at + DAY });
     await close.owner({ plan: 'team' });
-    expect(close.made()['subscription_data[trial_end]']).toBeUndefined();
+    expect(days(close.made())).toBeUndefined();
   });
 });
 
@@ -108,6 +105,6 @@ describe('one person’s own plan', () => {
   it('has its own 7 free days, counted from the checkout, not from the team', async () => {
     const { owner, made } = setup(MADE + 60_000);
     await owner({ plan: 'pro' });
-    expect(made()['subscription_data[trial_end]']).toBe(String(Math.floor((MADE + 60_000 + 7 * 86_400_000) / 1000)));
+    expect(made()['subscription_data[trial_period_days]']).toBe('7');
   });
 });

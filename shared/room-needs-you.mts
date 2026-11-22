@@ -148,7 +148,8 @@ export function groupFileRow({ roomId, roomName, marks = [], me, myName = null, 
 // `pair`, the chat that is just me and one teammate, every message is); only
 // my writing in the group, my comment or approval on a file in it
 // (`answeredAt`) or my Mark done (`doneAt`) ends it, never reading.
-// It says the group's newest words, so a thread reply moves it and says so.
+// It says the newest words to me, so a thread reply to me moves it and says so,
+// and words to someone else never read as waiting on me.
 export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, people = [], pair = false, doneAt = 0, answeredAt = 0, readAt = 0, nameOf = () => '' }: {
   roomId: string;
   roomName: string;
@@ -171,8 +172,8 @@ export function groupRow({ roomId, roomName, messages = [], mentioned = [], me, 
   type Ids = readonly (string | null)[];
   const toMe = (m: RoomSaid): boolean => pair || ((m.mentions ?? []) as Ids).includes(me) || (mentionsIn(m.body, people) as Ids).includes(me)
     || (addressedByOpening(m.body, people) as Ids).includes(me) || (!!m.inReplyTo && myThreads.has(m.inReplyTo));
-  if (!fresh.some(toMe)) return null;
-  const newest = fresh.at(-1)!;
+  const newest = fresh.filter(toMe).at(-1);
+  if (!newest) return null;
   return {
     id: `room-mention:${roomId}`, messageId: newest.id, roomId, roomName, by: newest.by, byName: nameOf(newest.by), body: newest.body, at: newest.at,
     thread: !newest.inReplyTo ? null : myRoots.has(newest.inReplyTo) ? 'yours' : 'theirs',

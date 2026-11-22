@@ -73,6 +73,8 @@ describe('a look at leftovers', () => {
     expect(list).toHaveBeenCalledTimes(1);
     release!([]);
     await Promise.all([first, second]);
+    // A run gives the next look something to find (tests/an-idle-app-lists-every-process-once-every-ten-minutes).
+    cleaner.starting('w-0a1b2c');
     await cleaner.tick();
     expect(list).toHaveBeenCalledTimes(2);
   });

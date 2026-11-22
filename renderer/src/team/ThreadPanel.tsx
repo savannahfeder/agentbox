@@ -27,14 +27,14 @@ import { clock } from '../thread-history';
 import { holdAtBottom } from '../thread-bottom';
 import { THREAD_WIDTH, threadLine } from './chat-threads';
 import { holdTheEdge } from './hold-the-edge';
-import { FormatBar } from './FormatBar';
+import { FormatBar, useMarksRow } from './FormatBar';
+import { ChatSend } from './ChatSend';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type VoiceControl } from './useVoiceRecorder';
 import { RichReply, type RichBox } from './RichReply';
 import { AttachRow } from '../components/AttachRow';
 import { persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { draftKey, readDraft, readDraftAttachments, restoreFailedDraft, saveDraft, saveDraftAttachments } from '../drafts';
 import type { AgentTurn } from '../types';
-import { sendKeyFor } from '../reply-keys';
 import './chat.css';
 
 // Before the frame is drawn in the app; a plain effect where there is no window.
@@ -112,6 +112,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
     return () => window.removeEventListener('zero:reply-restored', restored);
   }, [draftItem]);
   const filePicker = useRef<HTMLInputElement>(null);
+  const [marksAt, setMarksAt] = useMarksRow();
   // Said under the box until the next try, such as the microphone being refused.
   const [notice, setNotice] = useState<string | null>(null);
   const voiceCtl = useRef<VoiceControl | null>(null);
@@ -360,6 +361,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
           {chat.menu}
           {chat.card}
           {named.menu}
+          <div className="fmt-marks-slot" ref={setMarksAt} />
           {/* THE SAME EDITOR AS THE CHAT'S OWN BOX (w-0d55a2b160): ⌘B bolds,
               pasted rich text keeps its bold. Return sends here, as it did. */}
           <RichReply
@@ -382,7 +384,7 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
             onCaret={(b) => { chat.track(b as unknown as HTMLTextAreaElement); named.track(b as unknown as HTMLTextAreaElement); }}
             onClick={(b) => chat.click(b as unknown as HTMLTextAreaElement)}
           />
-          <AttachRow attachments={attachments} attaching={attaching} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+          <AttachRow look="tiles" attachments={attachments} attaching={attaching} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
           {tooBig > 0 && <div className="compose-note" role="alert">{tooBig === 1
             ? 'One pasted image is too big to save. Closing the box loses it.'
             : `${tooBig} pasted images are too big to save. Closing the box loses them.`}</div>}
@@ -396,14 +398,15 @@ function ThreadPanelBody({ product, id, people, parent, replies, md, width, reac
               const picked = await collect(e.target.files ?? []);
               if (picked.length) setAttachments((a) => [...a, ...picked]);
               e.target.value = '';
+              box.current?.focus();
             }}
           />
           <div className="chat-thread-bar">
-            <FormatBar box={box} onChange={setDraft} onAttach={() => filePicker.current?.click()} onFromFiles={(f) => setAttachments((a) => [...a, f])}
+            <FormatBar box={box} onChange={setDraft} marksAt={marksAt} onAttach={() => filePicker.current?.click()} onFromFiles={(f) => setAttachments((a) => [...a, f])}
               onVoice={(note) => setAttachments((a) => (a.some((x) => x.draftId === note.draftId)
                 ? a : [...a, { name: note.name, dataBase64: note.dataBase64, image: false, draftId: note.draftId }]))}
               onNotice={setNotice} voiceKey={voiceKey} voice={voiceCtl} onRecording={setRecording} />
-            <button type="button" className="dock-send" disabled={!ready} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>Send <kbd>{sendKeyFor(true)}</kbd></button>
+            <ChatSend ready={ready} onSend={() => void send()} />
           </div>
         </div>
       </div>

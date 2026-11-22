@@ -51,12 +51,12 @@ export default function ProjectSettings() {
       </Group>
       <Group label="How it runs">
         <Row first label="Let agents start the tasks they file here" reading={auto}
-          desc="A task an agent writes on this project gets a session straight away. Without this it waits in your inbox for your yes. Questions and reviews always wait for you either way."
+          desc="A task an agent writes here starts at once instead of waiting for your yes. Questions and reviews still wait."
           control={<Switch label="Let agents start the tasks they file here" on={!!auto.value} onChange={(v) => set('autonomous', v)} />} />
         {accounts.length > 1 || account.value !== 'any' ? (
           <Row label="Claude account" stack reading={account}
             desc="Every Claude Code agent on this project runs on this account and on no other. If the account cannot run, the work waits."
-            control={<Choice label="Claude account" value={account.value as string} options={[{ value: 'any', label: 'Any account' }, ...accounts.map((a) => ({ value: a.id, label: a.email ?? a.id }))]} onChange={(v) => set('account', v)} />} />
+            control={<Choice label="Claude account" value={account.value as string} options={[{ value: 'any', label: 'The account in use' }, ...accounts.map((a) => ({ value: a.id, label: a.email ?? a.id }))]} onChange={(v) => set('account', v)} />} />
         ) : null}
         {permission.value !== 'workspace' ? (
           <Row stack label={two ? 'This project has its own Claude Code permissions' : 'This project has its own permissions'} reading={permission}
@@ -70,7 +70,7 @@ export default function ProjectSettings() {
       </Group>
       <Group label="Archive">
         <Row first label="Archive this project"
-          desc={`It leaves your inbox, the sidebar and Projects, and no new agents start on it${p.running ? '; the ones running now finish' : ''}. Its files stay where they are, and you can bring it back from Projects on your computer.`}
+          desc={`It leaves your inbox and sidebar${p.running ? ', and the agents running now finish' : ''}. Its files stay, and Projects on your computer can bring it back.`}
           control={<Button title="Archive" onPress={() => { set('archived', true); router.back(); }} />} />
       </Group>
     </Page>

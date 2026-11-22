@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { chatsFound } from '../renderer/src/team/chats-found';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
@@ -78,9 +79,11 @@ describe('a group opened from Team', () => {
 describe('the command bar', () => {
   // A tester typed "Sofia" and got only "Waits on Sofia", an action, and no Sofia.
   it('finds a person on the team by name, and opens their page in Team', () => {
+    expect(chatsFound({ groups: [], teammates: [], persons: [{ id: 'p-so', name: 'Sofia Marquez' }], query: 'Sofia' }))
+      .toMatchObject([{ kind: 'person', key: 'p-so', label: 'Sofia Marquez' }]);
     const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/const persons = \(chatsValue\?\.persons \?\? \[\]\)\.filter\(\(p\) => p\.name\.toLowerCase\(\)\.split\(\/\\s\+\/\)\.some\(\(w\) => w\.startsWith\(q\.toLowerCase\(\)\)\)\);/);
-    expect(app).toContain("run: () => { setModal(null); openChatsPlace(`person:${p.id}`); }");
+    expect(app).toMatch(/chatsFound\(\{[^}]*persons: chatsValue\?\.persons \?\? \[\]/);
+    expect(app).toContain("if (f.kind === 'person') openChatsPlace(`person:${f.key}`);");
   });
 });
 
@@ -91,9 +94,9 @@ describe('a teammate’s thread opened from their page in Team', () => {
   it('stays titled Team, with Team lit in the sidebar', () => {
     expect(app).toContain("const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;");
     expect(app).toContain("<h1 className=\"workspace-title\">{openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'}</h1>");
-    expect(app).toContain('roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
+    expect(app).toContain('roomsUi.sidebarGroups(roomOnTeam || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
   });
   it('goes back to the page it came from, by name', () => {
-    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : chatsPlace === 'tasks' ? 'Tasks' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
   });
 });

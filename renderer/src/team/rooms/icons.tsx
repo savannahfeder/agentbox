@@ -44,7 +44,6 @@ export const I = {
   check: () => svg('<path d="m5 12.5 4.5 4.5L19 7.5"/>', 12, 2),
   lock: () => svg('<rect x="5" y="11" width="14" height="9"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>', 15, 1.4),
   chat: () => svg('<path d="M5 5h14v10H9l-4 4z"/>', 15, 1.4),
-  tasksNav: () => svg('<path d="m4.5 7 1.8 1.8 3.2-3.3M4.5 15.5l1.8 1.8 3.2-3.3M12.5 7.3h7M12.5 15.8h7"/>', 20, 1.25, 'workspace-nav-icon'),
   standupNav: () => svg('<path d="M5 6.5h14M5 12h14M5 17.5h8"/><circle cx="18.5" cy="17.5" r="1.6"/>', 20, 1.25, 'workspace-nav-icon'),
   sliders: () => svg('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>', 15, 1.5),
   groupNav: () => svg('<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.5-3.2 2.7-5 5.5-5s5 1.8 5.5 5"/><path d="M15 5.8a3 3 0 0 1 0 5.4M16.8 14.2c2 .6 3.3 2.2 3.7 4.8"/>', 20, 1.25, 'workspace-nav-icon'),

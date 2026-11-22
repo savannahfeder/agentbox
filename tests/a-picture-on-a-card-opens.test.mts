@@ -40,7 +40,7 @@ describe('a picture a worker put in a message', () => {
 
   it('hands the door the path the message wrote, so the opener resolves it', () => {
     const html = draw({ src: './designs/w-360943ef8d/the-shot.png' });
-    expect(html).toContain('title="designs/w-360943ef8d/the-shot.png"');
+    expect(html).toContain('data-picture="designs/w-360943ef8d/the-shot.png"');
     // The same attribute the chips carry, so a right click offers the file.
     expect(html).toContain('data-copy-file="designs/w-360943ef8d/the-shot.png"');
   });

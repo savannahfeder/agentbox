@@ -4,8 +4,10 @@
 import { planCards, usageLine, usedPercent, type PaidPlan } from '../cloud-upgrade';
 import type { CloudPlan } from '../types';
 
-export function CloudPlanCards({ plan, onChoose, opening = null, waiting = null }: {
+export function CloudPlanCards({ plan, onChoose, opening = null, waiting = null, proLabel = null }: {
   plan: CloudPlan | null;
+  /** Pro's button, when Pro is the team's and its free days are the team's (Settings). */
+  proLabel?: string | null;
   onChoose: (id: PaidPlan) => void;
   /** The plan whose checkout is being made. */
   opening?: PaidPlan | null;
@@ -27,7 +29,7 @@ export function CloudPlanCards({ plan, onChoose, opening = null, waiting = null 
             </div>
           ) : c.button && (
             <button type="button" className="set-ghost cloud-plan-go" disabled={!!opening} onClick={() => onChoose(c.id)}>
-              {opening === c.id ? 'Opening Stripe…' : waiting === c.id ? 'Open Stripe again' : c.button}
+              {opening === c.id ? 'Opening Stripe…' : waiting === c.id ? 'Open Stripe again' : (c.id === 'pro' && proLabel) || c.button}
             </button>
           )}
         </div>

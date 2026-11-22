@@ -87,12 +87,35 @@ export function placeScore(order: readonly string[], slug: string, direct?: Read
  */
 export const DEFAULT_PRIORITY = 5;
 
-type Prioritised = { priority?: number | null } | null | undefined;
+/** `levelForYou`: the level a teammate's row has for you, worked out where the
+ *  window knows who you are (renderer/src/threads/page-rules.ts). */
+type Prioritised = { priority?: number | null; levelForYou?: number } | null | undefined;
+
+const forYou = (item: Prioritised): number | null =>
+  Number.isFinite(item?.levelForYou) ? item!.levelForYou! : null;
 
 export function itemPriority(item: Prioritised): number {
   if (!item) return DEFAULT_PRIORITY;
+  const raised = forYou(item);
+  if (raised !== null) return raised;
   const n = item.priority;
   return Number.isFinite(n) && (n as number) > 0 ? n as number : DEFAULT_PRIORITY;
+}
+
+const HIGH_PRIORITY = 7;
+const LOW_PRIORITY = 2;
+
+/**
+ * WHAT A TEAMMATE SENDS YOU READS ONE LEVEL HIGHER, TO HIGH AT MOST
+ * (w-718af6d149): "items from your teammates get automatically prioritized in
+ * your inbox." A person waiting on you is worth more than an agent waiting on
+ * you, and the level such a row arrives with was never set for you: an ask
+ * carries the level of the asker's own thread. Urgent is left alone, because
+ * it is the one level that interrupts.
+ */
+export function oneLevelUp(level: number): number {
+  if (level >= HIGH_PRIORITY) return level;
+  return level <= LOW_PRIORITY ? DEFAULT_PRIORITY : HIGH_PRIORITY;
 }
 
 /**
@@ -110,6 +133,8 @@ export function itemPriority(item: Prioritised): number {
  * with. `conversation` is the caller's to say, since only it knows the product.
  */
 export function shownPriority(item: Prioritised, conversation = false): number | null {
+  const raised = forYou(item);
+  if (raised !== null) return raised;
   if (conversation) return item?.priority ?? null;
   return itemPriority(item);
 }

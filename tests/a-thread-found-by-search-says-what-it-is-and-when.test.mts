@@ -1,4 +1,5 @@
-// A THREAD FOUND BY ⌘K SAYS WHAT IT IS AND WHEN, AND A FINISHED ONE STEPS BACK.
+// A THREAD FOUND BY ⌘K SAYS WHAT IT IS AND WHEN. Its icon, which says what
+// list it is in, is a-thread-in-search-wears-the-icon-of-the-list-it-sits-in.
 //
 // A tester searched "checkout" and got two rows reading "Prototype checkout
 // screen page · Web app", one from Nov 16 and one queued that morning, with
@@ -43,18 +44,11 @@ describe('a thread found by search', () => {
     const b = threadResult(thread({ id: 'w-2', status: 'done', updatedAt: new Date(2026, 10, 16).getTime() }), { summary: 'Done, the page is in the branch.', project: 'Web app', now: NOW });
     expect([a.sub, a.hint]).not.toEqual([b.sub, b.hint]);
   });
-
-  it('is dimmed once finished, and only then', () => {
-    expect(threadResult(thread({ status: 'done' }), { summary: '', project: 'Web app', now: NOW }).done).toBe(true);
-    expect(threadResult(thread({ status: 'open' }), { summary: '', project: 'Web app', now: NOW }).done).toBe(false);
-    expect(threadResult(thread({ status: 'blocked' }), { summary: '', project: 'Web app', now: NOW }).done).toBe(false);
-  });
 });
 
 describe('⌘K draws it', () => {
   const palette = fs.readFileSync(new URL('../renderer/src/components/Palette.tsx', import.meta.url), 'utf8');
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
 
   it('hands each thread its line, age and state', () => {
     expect(app).toMatch(/threadResult\(/);
@@ -63,10 +57,5 @@ describe('⌘K draws it', () => {
   it('draws the line under the title on the computer, with the words marked', () => {
     expect(palette).toMatch(/c\.sub/);
     expect(palette).toMatch(/markedWords\(c\.sub/);
-  });
-
-  it('dims a finished thread without dimming the highlight behind it', () => {
-    expect(palette).toMatch(/palette-done/);
-    expect(css).toMatch(/\.palette-done > \*[^{]*\{[^}]*opacity/);
   });
 });

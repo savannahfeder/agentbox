@@ -186,7 +186,7 @@ describe('getting to a room, and keys on it', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   const rooms = fs.readFileSync(new URL('../renderer/src/team/rooms/useRooms.tsx', import.meta.url), 'utf8');
   it('opening a room leaves whatever covered it: a thread, a direct chat, the Team page, search', () => {
-    expect(rooms).toMatch(/const openRoom = \(id: string\) => \{\s*onLeavePage\(\);/);
+    expect(rooms).toMatch(/const openRoom = \(id: string, from: 'inbox' \| null = null\) => \{\s*onLeavePage\(\);/);
     expect(app).toMatch(/onLeavePage: \(\) => \{ setFocused\(null\); setFocusedRepeat\(null\); setTeamOpen\(false\); closeSearch\(\); \}/);
     expect(rooms).not.toMatch(/onLeaveDirect/);
   });

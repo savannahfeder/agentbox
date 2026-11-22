@@ -105,7 +105,8 @@ import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, paneForThread, threadToOpen } from '../team/chat-threads';
 import { heldByAPerson, isGivenTask, nameIsAPersons, taskGiver, whatWaits } from '../../../shared/team-rules.mts';
 import { handedFrom as handedFromLink } from '../../../shared/thread-link.mts';
-import { FormatBar } from '../team/FormatBar';
+import { FormatBar, useMarksRow } from '../team/FormatBar';
+import { ChatSend } from '../team/ChatSend';
 import { forgetVoiceDraft, markVoiceSent, sendTurnedBack, type Recorded, type VoiceControl } from '../team/useVoiceRecorder';
 import { VoiceNote } from '../team/VoiceNote';
 import { voiceNoteName, voiceNoteOf } from '../team/voice-note';
@@ -133,7 +134,8 @@ import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
 import { ItemThread } from './ItemThread';
 import { ContinuedFrom, HandedFrom, OpenTeammateThread } from '../threads/ContinuedFrom';
-import { threadLink, threadOfLink, seenWord, seenNow, type SeenBy, type ShareActs } from '../threads/share-rules';
+import { threadLink, threadOfLink, seenWord, seenNow, shareFace, type SeenBy, type ShareActs } from '../threads/share-rules';
+import { shownToPeople } from '../../../shared/thread-cards.mts';
 import { answerOnItsWay, type PendingSaid } from '../item-thread';
 import { isTroubleRow } from '../trouble-row';
 import { rowTitle, showsWhenItComesBack } from '../list-rules';
@@ -143,7 +145,6 @@ import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import { SendBack } from '../team/SendBack';
 import { HandedLine } from '../team/HandedBy';
-import { askAboutStep } from '../team/AsksLine';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
@@ -319,7 +320,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
         className="inline-image-open"
         data-copy-file={/^https?:/.test(path) ? undefined : path}
         data-picture={path}
-        title={path}
+        title={shownName(path)}
         onClick={(e) => onOpen(path, e.currentTarget)}
       >{named(path, picture)}</button>
     )
@@ -510,7 +511,7 @@ function CarriedNote({ src, always = false }: { src: string; always?: boolean })
     return () => { live = false; if (timer) clearTimeout(timer); };
   }, [direct, product, src, looks]);
   const said = carryLine(carry);
-  if (!direct || !said) return always && !direct ? <span className="missing-artifact">{src}</span> : null;
+  if (!direct || !said) return always && !direct ? <span className="missing-artifact">{shownName(src)}</span> : null;
   if (always) return said.state === 'failed'
     ? <PictureTile name={shownName(src)} why={said.label} />
     : <span className="inline-image arriving" aria-hidden="true" />;
@@ -754,7 +755,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, asked = false, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
   /** `supervisor.outOfUsage`, for the reply box's model chip. */
   outOfUsage?: Record<string, { tool: string; until: number }>;
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
@@ -793,8 +794,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   /** Above the reply box: who you asked, and what came back. */
   /** Who you asked onto this thread, in its header. */
   asksCorner?: ReactNode;
-  /** Someone you asked has it now, so the foot does not offer asking again. */
-  asked?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shippedMark?: boolean | null;
   onShipped?: (on: boolean) => void;
@@ -1955,14 +1954,17 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     if ((item.createdBy ?? teamCtx.me) !== teamCtx.me) return null;
     const seen: SeenBy = seenNow(item, teamCtx.products.get(item.product), teamCtx.state.since ?? null);
     const teamName = teamCtx.state.team.name || 'your team';
+    const people = teamCtx.state.people.filter((p) => p.id !== teamCtx.me);
     return {
       link: threadLink(teamCtx.me, item.id),
-      people: teamCtx.state.people.filter((p) => p.id !== teamCtx.me),
+      people,
       last: onShare.last,
       seen,
       seenWord: seenWord(seen, teamName, item.visibleTo?.length ?? 0),
       teamName,
       chosen: item.visibleTo ?? [],
+      // A thread that names nobody of its own goes by its project's chosen people.
+      face: shareFace({ seen, chosen: seen === 'people' ? shownToPeople(item, teamCtx.products.get(item.product)) : [], people, me: teamCtx.me, teamName: teamCtx.state.team.name }),
     };
   })();
   const threadMenu = (
@@ -2526,8 +2528,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
        */}
       {((item.start === 'later' && !!onUnschedule)
         || (scheduledHere && !!onUnschedule)
-        || (!!agent && !agentTakesReply && !!onReveal)
-        || (!agent && item.status === 'blocked' && !session)) && (
+        || (!!agent && !agentTakesReply && !!onReveal)) && (
       <div className="focus-actions">
         {/* ADDED TO LATER (w-afb66e6661): it has no moment to read back, so
             the line says the one thing there is to say and the press starts
@@ -2587,11 +2588,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
           <span className="focus-when">Opens the app it is running in</span></>
         )}
-        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}><ActMark d="M9.5 7 5 11.5 9.5 16M5.5 11.5H15a4 4 0 0 1 0 8h-2" />Send back to agent</button>}
-        {/* Where the agent stopped is the step a teammate is asked about. */}
-        {!agent && item.status === 'blocked' && onAsk && !asked && giveTo.some((p) => !p.id.startsWith('mate:')) && (
-          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}><ActMark d="M5 5.5h14v10H10l-4 3.5v-3.5H5zM10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4M12 14.2v.1" />Ask for help or a review</button>
-        )}
+        {/* A blocked thread has no buttons here: its reply goes to the agent,
+            as on every thread, and asking someone is in Share. "Send back to
+            agent" stays in ⌘K. */}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
       </div>
@@ -3070,6 +3069,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   // The hidden file input the formatting bar's attach button opens.
   const filePicker = useRef<HTMLInputElement>(null);
   const pickFiles = () => filePicker.current?.click();
+  const [marksAt, setMarksAt] = useMarksRow();
   // A finished voice note waits with the other attachments until Send, once.
   const addVoice = (note: Recorded) => setAttachments((a) => (a.some((x) => x.draftId === note.draftId)
     ? a : [...a, { name: note.name, dataBase64: note.dataBase64, image: false, draftId: note.draftId }]));
@@ -3607,6 +3607,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
           <span>{to.words}</span>
         </div>;
       })()}
+      {talkTo?.length ? <div className="fmt-marks-slot" ref={setMarksAt} /> : null}
       {richBox ? (
         // The editor draws a mention's chip on its own words; the layer of
         // chips behind a text field has no text field to sit behind.
@@ -3684,9 +3685,10 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
           if (picked.length) setAttachments((a) => [...a, ...picked]);
           // Cleared so picking the same file twice in a row still fires.
           e.target.value = '';
+          ref.current?.focus();
         }}
       />
-      <AttachRow attachments={attachments} attaching={attaching} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+      <AttachRow look={talkTo?.length ? 'tiles' : undefined} attachments={attachments} attaching={attaching} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
       {/* The notes, which cost a line only when there is something true to say,
           and which are NOT in the sentence: a sentence that grows a clause when
           something goes wrong is a sentence that moves under her. Same rule and
@@ -3732,7 +3734,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
             left of "Goes to Maya's inbox." and left of Send. A reply to an agent
             is an instruction rather than a formatted message, so that box keeps
             exactly the footer it had. */}
-        {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
+        {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} marksAt={marksAt} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
         {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
@@ -3832,7 +3834,9 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
         )}
         {!talkTo?.length && talk.allowed && <MicButton talk={talk} />}
         {/* Stop gives way to Send, which would leave focus on the page and the next words typed nowhere. */}
-        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : (
+        {stop && !hasDraft ? <span style={{ display: 'contents' }} onClick={() => requestAnimationFrame(() => ref.current?.focus())}>{stop}</span> : (talkTo?.length ? (
+          <ChatSend ready={hasDraft} busy={saving} sending="Sending…" onSend={() => send()} />
+        ) : (
         <span className={`dock-send-pair${canWait ? '' : ' solo'}`}>
         <button
           className="dock-send"
@@ -3842,7 +3846,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
         >{saving ? 'Sending…' : <>Send <kbd>{sendKeyFor(enterSends)}</kbd></>}<SendGlyph /></button>
         {canWait && <ReplyLater at={sendAt} onPick={pickSendAt} onClosed={() => ref.current?.focus()} />}
         </span>
-        )}
+        ))}
         </>}
       </div>
     </>
@@ -3862,8 +3866,3 @@ function chipsOverflow(chips: HTMLElement): boolean {
 }
 
 const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
-
-/** The 15px line mark on a button in a stopped thread's action row. */
-function ActMark({ d }: { d: string }) {
-  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
-}

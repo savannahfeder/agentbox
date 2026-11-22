@@ -10,12 +10,12 @@ const settings = fs.readFileSync(new URL('../renderer/src/components/Settings.ts
 const luminance = (hex) => { const n = parseInt(hex.slice(1), 16); return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255); };
 
 describe('the sky themes', () => {
-  it('are the three dark skies and the two approved light ones', () => {
-    expect(SKY_THEMES.map((k) => k.id)).toEqual(['dusk', 'ember', 'aurora', 'sage', 'dusk-light']);
+  it('are the three dark skies and the approved light one', () => {
+    expect(SKY_THEMES.map((k) => k.id)).toEqual(['dusk', 'ember', 'aurora', 'sage']);
     expect(SKY_THEMES.filter((k) => k.dark).map((k) => k.id)).toEqual(['dusk', 'ember', 'aurora']);
   });
   it('offer none of the light skies that were not approved', () => {
-    for (const id of ['morning', 'slate', 'ember-light']) expect(skyTheme(id)).toBeNull();
+    for (const id of ['morning', 'slate', 'ember-light', 'dusk-light']) expect(skyTheme(id)).toBeNull();
     expect(skyTheme(null)).toBeNull();
   });
   it('keep the dark card off black', () => {

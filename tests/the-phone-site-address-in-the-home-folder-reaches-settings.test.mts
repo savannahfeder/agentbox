@@ -7,7 +7,7 @@
 // site, and loadCloudConfig took the first file with a key and read no further,
 // so the address never reached the page. Now a field the folder's file lacks is
 // taken from the Mac's file when both point at the same cloud.
-import { it, expect, describe, afterEach, beforeEach } from 'vitest';
+import { it, expect, describe } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,33 +30,26 @@ function aMac({ inHome = null, inFolder = null } = {}) {
   return { home, appDir };
 }
 
-const was = process.env.AGENTBOX_TEAM_CONFIG;
-const wasHome = process.env.AGENTBOX_HOME;
-beforeEach(() => {
-  delete process.env.AGENTBOX_TEAM_CONFIG;
-  delete process.env.AGENTBOX_HOME;
-});
-afterEach(() => {
-  if (was === undefined) delete process.env.AGENTBOX_TEAM_CONFIG; else process.env.AGENTBOX_TEAM_CONFIG = was;
-  if (wasHome === undefined) delete process.env.AGENTBOX_HOME; else process.env.AGENTBOX_HOME = wasHome;
-});
+// Each lookup gets its own empty environment: a worker started as a fresh user
+// or a demo carries markers that would otherwise decide the answer.
+const env = {};
 
 describe('the phone site address', () => {
   it('is read from the Mac\'s file when the folder\'s file for the same cloud has none', () => {
     const { home, appDir } = aMac({ inFolder: CLOUD, inHome: { ...CLOUD, phoneSite: 'https://phone.test' } });
-    const c = loadCloudConfig(appDir, { packaged: false, home });
+    const c = loadCloudConfig(appDir, { packaged: false, home, env });
     expect(c.url).toBe('https://hers.test');
     expect(c.phoneSite).toBe('https://phone.test');
   });
 
   it('in the folder\'s own file wins over the Mac\'s', () => {
     const { home, appDir } = aMac({ inFolder: { ...CLOUD, phoneSite: 'https://folder-phone.test' }, inHome: { ...CLOUD, phoneSite: 'https://phone.test' } });
-    expect(loadCloudConfig(appDir, { packaged: false, home }).phoneSite).toBe('https://folder-phone.test');
+    expect(loadCloudConfig(appDir, { packaged: false, home, env }).phoneSite).toBe('https://folder-phone.test');
   });
 
   it('is not borrowed from the Mac\'s file when that file is for another cloud', () => {
     const { home, appDir } = aMac({ inFolder: { url: 'https://other-team.test', anonKey: 'k' }, inHome: { ...CLOUD, phoneSite: 'https://phone.test' } });
-    const c = loadCloudConfig(appDir, { packaged: false, home });
+    const c = loadCloudConfig(appDir, { packaged: false, home, env });
     expect(c.url).toBe('https://other-team.test');
     expect(c.anonKey).toBe('k');
     expect(c.phoneSite).toBeUndefined();
@@ -64,11 +57,11 @@ describe('the phone site address', () => {
 
   it('is there when only the Mac has a file', () => {
     const { home, appDir } = aMac({ inHome: { ...CLOUD, phoneSite: 'https://phone.test' } });
-    expect(loadCloudConfig(appDir, { packaged: false, home }).phoneSite).toBe('https://phone.test');
+    expect(loadCloudConfig(appDir, { packaged: false, home, env }).phoneSite).toBe('https://phone.test');
   });
 
   it('never reaches an installed app, which reads no cloud at all', () => {
     const { home, appDir } = aMac({ inFolder: CLOUD, inHome: { ...CLOUD, phoneSite: 'https://phone.test' } });
-    expect(loadCloudConfig(appDir, { packaged: true, home })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
   });
 });

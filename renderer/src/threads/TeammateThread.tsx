@@ -122,13 +122,15 @@ export function CommentBox({ owner, helping, draft, setDraft, sending, onSend, o
   );
 }
 
-export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, onHandBack, handedToYou = null, onOpenTask, headerTarget = null, cornerTarget = null }: {
+export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc, onNotice, backLabel, onBack, onMessage, onContinue, ask = null, helpedAt, onHandBack, handedToYou = null, onOpenTask, headerTarget = null, cornerTarget = null }: {
   card: ThreadCard; person: Person | null; now: number;
   /** The window's header, where an opened thread's crumb and buttons go. */
   headerTarget?: HTMLElement | null;
   cornerTarget?: HTMLElement | null;
   /** Their open ask of you on this thread: help puts your words to their agent. */
   ask?: WorkItem | null;
+  /** Whether a help ask on you, open or handed back, covered words you wrote at this time. */
+  helpedAt?: (at: number) => boolean;
   onHandBack?: (verdict: 'done' | 'yes' | 'changes', words: string) => Promise<boolean>;
   /** The task this thread became when its owner handed it to you, which the page links to. */
   handedToYou?: WorkItem | null;
@@ -211,7 +213,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const built = useMemo(() => itemThread(work?.lines ?? [], [], null, { whole: true }), [work?.lines]);
   // Their copy sends messages, not its bookkeeping; what is drawn is what was said.
   const helpingNow = ask?.ask?.kind === 'help';
-  const events = shownOnTheirThread(built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run'), { me: team?.me ?? null, helping: helpingNow, owner: firstName(person) || '' });
+  const events = shownOnTheirThread(built.events.filter((e: AgentEvent) => e.kind !== 'work' && e.kind !== 'run'), { me: team?.me ?? null, helping: helpedAt ?? helpingNow, owner: firstName(person) || '' });
 
   // An ask that ends while the page is open is said on the page, unless you handed it back yourself.
   const lastAsk = useRef<WorkItem | null>(null);
