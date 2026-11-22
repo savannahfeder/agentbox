@@ -1,4 +1,4 @@
-// The first run's pieces: a serif heading, pill buttons with the main one in
+// The first run's pieces: a large heading, pill buttons with the main one in
 // ink, white cards, and small plain labels.
 import { router } from '../lib/router';
 import type { ReactNode } from 'react';
@@ -33,7 +33,7 @@ export function Screen({ children, foot, top = 72, back }: { children: ReactNode
 export const Logo = ({ size = 36 }: { size?: number }) => <View accessible accessibilityLabel="Agentbox"><AppMark size={size} /></View>;
 
 export function Head({ children, style }: { children: ReactNode; style?: object }) {
-  return <T accessibilityRole="header" style={[{ fontFamily: font.display, fontSize: 34, lineHeight: 40, letterSpacing: -0.7 }, style]}>{children}</T>;
+  return <T accessibilityRole="header" style={[{ fontFamily: font.semibold, fontSize: 30, lineHeight: 36, letterSpacing: -0.8 }, style]}>{children}</T>;
 }
 
 export const Lede = ({ children, style }: { children: ReactNode; style?: object }) => (

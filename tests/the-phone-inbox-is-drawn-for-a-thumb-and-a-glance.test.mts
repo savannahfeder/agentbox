@@ -40,9 +40,9 @@ describe('a row', () => {
     expect(fn('ThreadRow')).toMatch(/fontFamily: unread \? font\.semibold : font\.regular/);
     expect(fn('ThreadRow')).toMatch(/unread && <View style=\{\{ position: 'absolute', left: 7,[^\n]*backgroundColor: color\.accent/);
   });
-  it('gives a person who wrote to you a face you can see: 36 across, their words under their name', () => {
-    expect(fn('MentionRow')).toMatch(/<Face name=\{m\.byName \|\| 'Someone'\} size=\{36\} \/>/);
-    expect(fn('QuestionRow')).toMatch(/<TeammateMark t=\{mate\} size=\{36\} \/>/);
+  it('gives a person who wrote to you a small face on their name\'s line, their words under it', () => {
+    expect(fn('MentionRow')).toMatch(/<Face name=\{m\.byName \|\| 'Someone'\} size=\{FACE\} \/>/);
+    expect(fn('QuestionRow')).toMatch(/<TeammateMark t=\{mate\} size=\{FACE\} \/>/);
   });
   it('says what waits on you in a chip of its own', () => {
     expect(fn('ThreadRow')).toMatch(/aside && <Chip>\{aside\}<\/Chip>/);

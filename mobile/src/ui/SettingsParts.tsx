@@ -30,7 +30,7 @@ export function Page({ title, lede, back = 'Settings', right, head, children }: 
         </View>
       </View>
       <ScrollView contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 16, paddingBottom: Math.max(40 + inset.bottom, approvalRoom + 16) }}>
-        <T style={{ fontFamily: font.display, fontSize: 32, lineHeight: 38, letterSpacing: -0.6, paddingHorizontal: 4 }}>{title}</T>
+        <T style={{ fontFamily: font.semibold, fontSize: 28, lineHeight: 34, letterSpacing: -0.7, paddingHorizontal: 4 }}>{title}</T>
         {lede ? <T style={{ fontSize: 15, lineHeight: 21, color: color.faint, marginTop: 6, paddingHorizontal: 4 }}>{lede}</T> : null}
         {children}
       </ScrollView>

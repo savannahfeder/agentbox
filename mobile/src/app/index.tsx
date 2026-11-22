@@ -56,6 +56,9 @@ const Picking = createContext<{ picked: Set<string> | null; toggle: (key: string
 const Parted = ({ first }: { first: boolean }) => (first ? null : <View style={{ position: 'absolute', top: 0, left: size.inset, right: size.inset, height: 1, backgroundColor: color.rowLine }} />);
 const rowBox = (pressed: boolean) => ({ minHeight: 68, paddingVertical: 14, paddingLeft: size.inset, paddingRight: size.inset, backgroundColor: pressed ? color.fill : 'transparent' });
 const rowTitle = { flexShrink: 1, fontSize: 16.5, lineHeight: 22, letterSpacing: -0.2 };
+// A face rides the name's line, so a row's words keep the whole width.
+const FACE = 20;
+const nameLine = { flexDirection: 'row', alignItems: 'center', gap: 7 } as const;
 /** A row's small second line: project, who, how long ago. */
 const metaWords = () => ({ fontSize: 13.5, lineHeight: 18, color: color.faint });
 const Dot = () => <T style={metaWords()}>·</T>;
@@ -117,18 +120,16 @@ function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean
     <Pressable onPress={open} accessibilityLabel={`${m.byName || 'Someone'} mentioned you in ${m.roomName}, unread`}
       style={({ pressed }) => rowBox(pressed)}>
       <Parted first={first} />
-      <View style={{ position: 'absolute', left: 7, top: 28, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <Face name={m.byName || 'Someone'} size={36} />
-        <View style={{ flex: 1 }}>
-          <T numberOfLines={1} style={{ ...rowTitle, fontFamily: font.semibold }}>{m.byName || 'Someone'}</T>
-          <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 1 }}>{m.body}</T>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
-            <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{`# ${m.roomName}`}</T>
-            <Dot />
-            <T style={meta}>{updatedWords(m.at, now)}</T>
-          </View>
-        </View>
+      <View style={{ position: 'absolute', left: 7, top: 22, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
+      <View style={nameLine}>
+        <Face name={m.byName || 'Someone'} size={FACE} />
+        <T numberOfLines={1} style={{ ...rowTitle, fontFamily: font.semibold }}>{m.byName || 'Someone'}</T>
+      </View>
+      <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 2 }}>{m.body}</T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
+        <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{`# ${m.roomName}`}</T>
+        <Dot />
+        <T style={meta}>{updatedWords(m.at, now)}</T>
       </View>
     </Pressable>
   );
@@ -141,17 +142,15 @@ function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; tex
     <Pressable onPress={open} accessibilityLabel={`${mate.name} asks you: ${text}`}
       style={({ pressed }) => rowBox(pressed)}>
       <Parted first={first} />
-      <View style={{ position: 'absolute', left: 7, top: 28, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <TeammateMark t={mate} size={36} />
-        <View style={{ flex: 1 }}>
-          <T numberOfLines={1} style={{ ...rowTitle, fontFamily: font.semibold }}>{mate.name}</T>
-          <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 1 }}>{text}</T>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
-            <Chip>Asks you</Chip>
-            <T style={meta}>{updatedWords(at, now)}</T>
-          </View>
-        </View>
+      <View style={{ position: 'absolute', left: 7, top: 22, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
+      <View style={nameLine}>
+        <TeammateMark t={mate} size={FACE} />
+        <T numberOfLines={1} style={{ ...rowTitle, fontFamily: font.semibold }}>{mate.name}</T>
+      </View>
+      <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 2 }}>{text}</T>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
+        <Chip>Asks you</Chip>
+        <T style={meta}>{updatedWords(at, now)}</T>
       </View>
     </Pressable>
   );
@@ -240,7 +239,7 @@ function Outlined({ label, onPress, lead }: { label: string; onPress: () => void
   );
 }
 
-const H2 = ({ children }: { children: string }) => <T style={{ fontFamily: font.display, fontSize: 26, lineHeight: 32, letterSpacing: -0.4, marginBottom: 10 }}>{children}</T>;
+const H2 = ({ children }: { children: string }) => <T style={{ fontFamily: font.semibold, fontSize: 22, lineHeight: 28, letterSpacing: -0.4, marginBottom: 10 }}>{children}</T>;
 
 /** The empty inbox is where the next thread starts: the New thread form drawn open on the page (Pages.tsx `InboxClear`). */
 function InboxClear() {

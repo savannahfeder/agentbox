@@ -3,16 +3,30 @@
 import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Animated, Easing, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type PanResponderGestureState, type TextProps, type ViewStyle } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { feel } from '../lib/feel';
 import { sheetLetGo, sheetPull } from '../lib/sheet-drag';
 import { useCloud } from '../state/cloud';
 import { Tick } from './icons';
 import { color, corner, font, lift, size } from './theme';
 
-/** The page behind every screen, the status bar included. */
+/** The page behind every screen, the status bar included. Dark is Ember Grid's wall: the dot grid and the orange glow. */
 export function Wall({ children, style }: { children: ReactNode; style?: ViewStyle }) {
-  return <View style={[{ flex: 1, backgroundColor: color.bg }, style]}>{children}</View>;
+  return (
+    <View style={[{ flex: 1, backgroundColor: color.bg }, style]}>
+      {color.glow > 0 && (
+        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
+          <Defs>
+            <Pattern id="d" width={32} height={32} patternUnits="userSpaceOnUse"><Circle cx={16} cy={16} r={1.15} fill="white" fillOpacity={color.dots} /></Pattern>
+            <RadialGradient id="g" cx="0.72" cy="0.28" r="0.7"><Stop offset="0" stopColor={color.accent} stopOpacity={color.glow} /><Stop offset="1" stopColor={color.accent} stopOpacity={0} /></RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#g)" />
+          <Rect width="100%" height="100%" fill="url(#d)" />
+        </Svg>
+      )}
+      {children}
+    </View>
+  );
 }
 
 // The room under a bottom bar: the whole home bar, as iOS's own tab bars keep it.
@@ -22,14 +36,14 @@ export function T({ style, ...rest }: TextProps) {
   return <Text {...rest} style={[{ fontFamily: font.regular, color: color.text, fontSize: 15.5 }, style]} />;
 }
 
-/** The top bar: no line, a screen's name in the serif, or a smaller sans name
+/** The top bar: no line, a screen's name large and heavy, or a smaller name
  * beside the way back. What goes `below` (the inbox's tabs) sits inside it. */
 export function TopBar({ left, title, right, below, noReview = false }: { left?: ReactNode; title?: ReactNode; right?: ReactNode; below?: ReactNode; noReview?: boolean }) {
   const inset = useSafeAreaInsets();
   const { view, minimizedApproval, setMinimizedApproval } = useCloud();
   // A thread's bar has no room for it; the inbox's bar still brings the card back.
   const aside = !noReview && view.approvals.findIndex((a: { id: string }) => a.id === minimizedApproval) === 0;
-  const name = left ? { fontFamily: font.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, paddingLeft: 8 } : { fontFamily: font.display, fontSize: 32, lineHeight: 38, letterSpacing: -0.6 };
+  const name = left ? { fontFamily: font.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, paddingLeft: 8 } : { fontFamily: font.semibold, fontSize: 28, lineHeight: 34, letterSpacing: -0.7 };
   return (
     <View style={{ paddingTop: inset.top }}>
       <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: left ? 12 : size.inset, paddingRight: 14 }}>

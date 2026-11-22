@@ -21,8 +21,8 @@ describe('a label on the phone', () => {
 
 describe('a heading inside an answer', () => {
   const md = fs.readFileSync('mobile/src/ui/Markdown.tsx', 'utf8');
-  it('is larger and heavier than the words, the first in the serif', () => {
-    expect(md).toMatch(/1: \{ fontSize: 2\d, [^\n]*fontFamily: font\.display/);
+  it('is larger and heavier than the words, both in the heavy weight', () => {
+    expect(md).toMatch(/1: \{ fontSize: 2\d, [^\n]*fontFamily: font\.semibold/);
     expect(md).toMatch(/2: \{ fontSize: 19, [^\n]*fontFamily: font\.semibold/);
   });
 });

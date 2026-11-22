@@ -18,8 +18,8 @@ describe('the top bar', () => {
   it('has no line under it', () => {
     expect(bar).not.toMatch(/borderBottom/);
   });
-  it('names a screen in the serif, large, and a screen you went into in a smaller sans', () => {
-    expect(bar).toMatch(/fontFamily: font\.display, fontSize: 3\d/);
+  it('names a screen large and heavy, and a screen you went into smaller', () => {
+    expect(bar).toMatch(/fontFamily: font\.semibold, fontSize: 28/);
     expect(bar).toMatch(/left \? \{ fontFamily: font\.semibold, fontSize: 17/);
   });
   it('still brings a minimized permission card back', () => {

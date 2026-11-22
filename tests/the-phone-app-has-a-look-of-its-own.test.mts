@@ -31,10 +31,9 @@ describe('the phone app\'s corners', () => {
 });
 
 describe('the phone app\'s colours', () => {
-  it('are warm paper under near-black ink in Light, with white cards over it', () => {
+  it('are a light page under dark ink in Light, with lighter cards over it', () => {
     expect(LIGHT.bg).toMatch(/^#f[0-9a-f]{5}$/);
-    expect(LIGHT.card).toBe('#ffffff');
-    expect(LIGHT.pop).toBe('#ffffff');
+    expect(LIGHT.pop).toBe(LIGHT.card);
     expect(lum(LIGHT.bg)).toBeLessThan(lum(LIGHT.card));
   });
   it.each([['Light', LIGHT], ['Dark', DARK]])('read clearly in %s: text, dim and faint words on the page', (_, p) => {
@@ -50,18 +49,22 @@ describe('the phone app\'s colours', () => {
 });
 
 describe('the phone app\'s type', () => {
-  it('sets its titles in a serif and loads it with the rest', () => {
-    expect(font.display).toMatch(/^Newsreader_/);
-    expect(layout).toMatch(new RegExp(`${font.display}[,} ]`));
-    expect(layout).toMatch(/from '@expo-google-fonts\/newsreader'/);
+  it('is Geist throughout, and every weight it names is loaded', () => {
+    for (const f of Object.values(font)) {
+      expect(f).toMatch(/^Geist(Mono)?_/);
+      expect(layout).toMatch(new RegExp(`${f}[,} ]`));
+    }
   });
 });
 
 describe('the page behind every screen', () => {
   const wall = parts.slice(parts.indexOf('export function Wall('), parts.indexOf('\n}\n', parts.indexOf('export function Wall(')));
-  it('is plain: no dot grid and no glow', () => {
-    expect(wall).not.toMatch(/Pattern|RadialGradient|<Svg/);
+  it('is plain in Light; the dot grid and the glow are Dark\'s alone', () => {
     expect(wall).toMatch(/backgroundColor: color\.bg/);
+    expect(wall).toMatch(/color\.glow > 0 && \(\s*<Svg/);
+    expect(LIGHT.glow).toBe(0);
+    expect(LIGHT.dots).toBe(0);
+    expect(DARK.glow).toBeGreaterThan(0);
   });
 });
 

@@ -1,6 +1,6 @@
-// The phone's own two looks. Light is warm paper under near-black ink with
-// white cards floating over it; Dark is the same page at night. One accent, the
-// brand orange, and it is only for what is live or needs you.
+// Agentbox's two looks, as the desktop names them (renderer/src/styles.css):
+// Light is the plain light theme's cool page and ink, Dark is Ember Grid. One
+// accent, the brand orange, and it is only for what is live or needs you.
 //
 // Every screen reads `color` while it draws, so wearing the other palette is
 // one change to this object and a redraw (state/look.tsx). A colour copied into
@@ -8,65 +8,68 @@
 // tests/the-phone-app-changes-its-look-and-reaches-more-of-your-settings holds
 // every screen to.
 export const LIGHT = {
-  bg: '#f9f8f4',
-  text: '#1b1a18',
-  dim: '#5c5953',
-  faint: '#8a867e',
+  bg: '#f8f8fa',
+  text: '#12182a',
+  dim: '#4a5266',
+  faint: '#6e7590',
   accent: '#ee6018',
-  line: 'rgba(27, 26, 24, 0.09)',
-  lineStrong: 'rgba(27, 26, 24, 0.16)',
-  rowLine: 'rgba(27, 26, 24, 0.07)',
-  fill: 'rgba(27, 26, 24, 0.04)',
-  picked: 'rgba(27, 26, 24, 0.07)',
-  // A faint lift for code, table heads and small marks.
-  film: 'rgba(27, 26, 24, 0.05)',
-  pop: '#ffffff',
-  card: '#ffffff',
+  line: 'rgba(17, 25, 48, 0.11)',
+  lineStrong: 'rgba(17, 25, 48, 0.16)',
+  rowLine: 'rgba(17, 25, 48, 0.08)',
+  fill: 'rgba(17, 25, 48, 0.04)',
+  picked: 'rgba(17, 25, 48, 0.07)',
+  film: 'rgba(17, 25, 48, 0.05)',
+  pop: '#fefefe',
+  card: '#fefefe',
   // A raised block inside a message: a code block, a file's frame.
-  raised: '#f1efe9',
-  // An approval card and a page of a file.
-  sunk: '#ffffff',
-  field: 'rgba(27, 26, 24, 0.045)',
-  // The one filled button on a screen, and the words on it.
-  graphite: '#1b1a18',
-  ink: '#ffffff',
-  scrim: 'rgba(27, 26, 24, 0.32)',
-  // Lines a change added and took out.
+  raised: '#f1f3f6',
+  sunk: '#fefefe',
+  field: 'rgba(17, 25, 48, 0.04)',
+  // What is filled: the picked tab, Send, a main button. `ink` is what is written on it.
+  graphite: '#262b3a',
+  ink: '#f8f8fa',
+  scrim: 'rgba(17, 25, 48, 0.28)',
   plus: '#2f7d4e',
   minus: '#c0503c',
   plusBed: 'rgba(47, 125, 78, 0.10)',
   minusBed: 'rgba(192, 80, 60, 0.09)',
   // How dark a floating card's shadow is.
   shade: 0.1,
+  // Ember Grid's wall: how strong its dots and its orange glow are. Light's page is plain.
+  dots: 0,
+  glow: 0,
 };
 
 export type Palette = typeof LIGHT;
 
 export const DARK: Palette = {
-  bg: '#1a1917',
-  text: '#f1ede7',
-  dim: '#bdb7af',
-  faint: '#8f8a83',
+  bg: '#1a1817',
+  text: '#efebe7',
+  dim: '#c4bdb8',
+  faint: '#a09994',
   accent: '#ee6018',
-  line: 'rgba(255, 250, 240, 0.10)',
-  lineStrong: 'rgba(255, 250, 240, 0.18)',
-  rowLine: 'rgba(255, 250, 240, 0.07)',
-  fill: 'rgba(255, 250, 240, 0.05)',
-  picked: 'rgba(255, 250, 240, 0.09)',
-  film: 'rgba(255, 250, 240, 0.07)',
-  pop: '#2a2826',
-  card: '#262422',
-  raised: '#2c2a28',
-  sunk: '#242220',
-  field: 'rgba(255, 250, 240, 0.06)',
-  graphite: '#f1ede7',
-  ink: '#1a1917',
-  scrim: 'rgba(0, 0, 0, 0.6)',
+  line: '#464443',
+  lineStrong: '#52504f',
+  rowLine: 'rgba(70, 68, 67, 0.375)',
+  fill: 'rgba(255, 255, 255, 0.04)',
+  picked: 'rgba(255, 255, 255, 0.08)',
+  film: 'rgba(255, 255, 255, 0.07)',
+  pop: '#363431',
+  card: '#2d2b29',
+  raised: '#2f2d2c',
+  sunk: '#272524',
+  field: 'rgba(0, 0, 0, 0.18)',
+  // A dark key would be lost on Ember Grid's cards, so what is filled is light here.
+  graphite: '#efebe7',
+  ink: '#1a1817',
+  scrim: 'rgba(0, 0, 0, 0.55)',
   plus: '#7bc98e',
   minus: '#e28f82',
   plusBed: 'rgba(123, 201, 142, 0.13)',
   minusBed: 'rgba(226, 143, 130, 0.12)',
   shade: 0.5,
+  dots: 0.055,
+  glow: 0.075,
 };
 
 /** The colours every screen reads. Light until a look is worn. */
@@ -82,8 +85,6 @@ export const font = {
   medium: 'Geist_500Medium',
   semibold: 'Geist_600SemiBold',
   mono: 'GeistMono_400Regular',
-  // Titles: a screen's name, a thread's title, a greeting.
-  display: 'Newsreader_500Medium',
 };
 
 // What you press or type in, a card, a sheet, and a pill.

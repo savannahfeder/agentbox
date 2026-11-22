@@ -510,7 +510,7 @@ export default function ThreadScreen() {
           onLayout={() => { if (resting.current) scroll.current?.scrollToEnd({ animated: false }); }}>
           {/* The name heads the page, the largest type on it, with the Context under a thin line (one-thing-at-a-time.css). */}
           <View style={{ marginBottom: 18 }}>
-            <T selectable style={{ fontFamily: font.display, fontSize: 30, lineHeight: 36, letterSpacing: -0.5, marginBottom: 8 }}>{page.title}</T>
+            <T selectable style={{ fontFamily: font.semibold, fontSize: 26, lineHeight: 32, letterSpacing: -0.6, marginBottom: 8 }}>{page.title}</T>
             {page.toggle && (
               <Pressable onPress={() => { const open = !earlierOpen; setEarlierOpen(open); setWhole(true); resting.current = open; }} accessibilityRole="button" hitSlop={6} style={{ alignSelf: 'flex-start', marginBottom: 10 }}>
                 <T style={{ fontSize: 13.5, lineHeight: 18, fontFamily: font.medium, color: color.faint }}>{page.toggle}</T>

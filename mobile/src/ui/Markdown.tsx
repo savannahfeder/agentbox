@@ -325,7 +325,7 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
 }
 
 const HEADING: Record<number, TextStyle> = {
-  1: { fontSize: 26, lineHeight: 33, fontFamily: font.display, letterSpacing: -0.4 },
+  1: { fontSize: 24, lineHeight: 31, fontFamily: font.semibold, letterSpacing: -0.5 },
   2: { fontSize: 19, lineHeight: 26, fontFamily: font.semibold, letterSpacing: -0.2 },
   3: { fontSize: 17, lineHeight: 24, fontFamily: font.semibold },
   4: { fontSize: 16, lineHeight: 24, fontFamily: font.semibold },
@@ -335,7 +335,7 @@ const HEADING: Record<number, TextStyle> = {
 
 // A document's own headings.
 const DOC_HEADING: Record<number, TextStyle> = {
-  1: { fontSize: 26, lineHeight: 33, fontFamily: font.display, letterSpacing: -0.4 },
+  1: { fontSize: 24, lineHeight: 31, fontFamily: font.semibold, letterSpacing: -0.5 },
   2: { fontSize: 19, lineHeight: 26, fontFamily: font.semibold, letterSpacing: -0.2 },
   3: { fontSize: 17, lineHeight: 24, fontFamily: font.semibold },
   4: { fontSize: 15, lineHeight: 24, fontFamily: font.semibold },

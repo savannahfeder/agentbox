@@ -1,4 +1,4 @@
-// THE PHONE'S SETTINGS ARE WHITE CARDS UNDER A SERIF TITLE (2026-11-22).
+// THE PHONE'S SETTINGS ARE WHITE CARDS UNDER A LARGE TITLE (2026-11-22).
 // Settings drew the desktop's plates: a grey outlined box per group, 13.5px
 // rows, a 38px switch, 28px outlined chips and buttons, and "Back to app" as
 // letter-spaced words. Part of "a redesign of everything". Measured by reading
@@ -10,8 +10,8 @@ const parts = fs.readFileSync('mobile/src/ui/SettingsParts.tsx', 'utf8');
 const fn = (name: string) => parts.slice(parts.indexOf(`export function ${name}`), parts.indexOf('\n}\n', parts.indexOf(`export function ${name}`)));
 
 describe('a settings page', () => {
-  it('is named in the serif under a round way back', () => {
-    expect(fn('Page')).toMatch(/fontFamily: font\.display, fontSize: 32/);
+  it('is named large and heavy under a round way back', () => {
+    expect(fn('Page')).toMatch(/fontFamily: font\.semibold, fontSize: 28/);
     expect(fn('Page')).toMatch(/<IconButton label=\{back\} onPress=\{leave\}><Back size=\{16\} \/><\/IconButton>/);
   });
   it('keeps its room under the last row for a permission card', () => {
