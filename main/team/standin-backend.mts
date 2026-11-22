@@ -23,7 +23,9 @@ async function post<T>(url: string, door: string, body: unknown, ms = CALL_MS): 
 
 export function standinBackend(url: string, { token, personId, kind, methods }: StandinSignIn): TeamBackend {
   // Its calls are whatever the stand-in names at sign-in, each sent over as it is.
-  const backend: Record<string, unknown> & Partial<TeamBackend> = { kind, personId };
+  // The token is the person's id, as the stand-in hands it out; a cloud server
+  // pointed at the stand-in reads the same id from it (main/cloud/account.mts).
+  const backend: Record<string, unknown> & Partial<TeamBackend> = { kind, personId, liveToken: async () => token };
   for (const method of methods) {
     backend[method] = async (...args: unknown[]) => {
       const sent = args.map((a) => (Buffer.isBuffer(a) ? { __bytes: a.toString('base64') } : a));
