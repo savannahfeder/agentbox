@@ -98,8 +98,12 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'session
 // mentions the moment it opens, so the walk has to outlive that burst; a
 // picture that lands later is found by the next look, which comes after this.
 export const HUNT_FRESH_MS = 5000;
-interface WalkEntry { at: number; fs: ArtifactFs; value: Promise<unknown>; running: boolean; took: number; again?: Promise<unknown>; watched?: boolean; dirty?: boolean }
+interface WalkEntry { at: number; fs: ArtifactFs; value: Promise<unknown>; running: boolean; took: number; again?: Promise<unknown>; watched?: boolean; dirty?: boolean; timer?: NodeJS.Timeout }
 const walks = new Map<string, WalkEntry>();
+// How many trees' lists are kept at once. Each thread's own checkout is a tree
+// as well as each project's two, so a pass over every thread asks about
+// hundreds; a smaller number had each pushing the last one's list out.
+const WALKS_KEPT = 512;
 // How many of a walk's folder reads wait on the disk at once. The app's other
 // disk reads share four threads with these, and a walk that asked for every
 // folder at once kept them waiting for seconds.
@@ -213,24 +217,29 @@ function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T | Pr
     const value = Promise.resolve(read()).finally(() => {
         entry.running = false;
         entry.took = performance.now() - started;
+        // A newer walk took its place while it ran: nothing will ask it again.
+        if (walks.get(key) !== entry)
+            return;
         // A walk past its window answers nobody, so its index is not kept in memory.
-        setTimeout(() => {
-            if (walks.get(key) !== entry)
-                return;
-            walks.delete(key);
-            watchers.get(key)?.close();
-            watchers.delete(key);
-        }, keptFor(entry)).unref?.();
+        entry.timer = setTimeout(() => {
+            if (walks.get(key) === entry)
+                letGo(key);
+        }, keptFor(entry));
+        entry.timer.unref?.();
     });
     entry.value = value;
+    // The timer holds the list it will drop, so the one replaced goes with it.
+    clearTimeout(kept?.timer);
     walks.set(key, entry);
-    if (walks.size > 32) {
-        const oldest = walks.keys().next().value!;
-        walks.delete(oldest);
-        watchers.get(oldest)?.close();
-        watchers.delete(oldest);
-    }
+    if (walks.size > WALKS_KEPT)
+        letGo(walks.keys().next().value!);
     return value;
+}
+function letGo(key: string): void {
+    clearTimeout(walks.get(key)?.timer);
+    walks.delete(key);
+    watchers.get(key)?.close();
+    watchers.delete(key);
 }
 // On a Mac one FSEvents watch per tree is cheap, so a tree's list is kept until
 // something the walk would see changes, and redone after this long regardless.
@@ -270,6 +279,8 @@ export function stopWatchingFolders(): void {
     for (const w of watchers.values())
         w.close();
     watchers.clear();
+    for (const kept of walks.values())
+        clearTimeout(kept.timer);
     walks.clear();
 }
 const namesIn = (tree: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<TreeNames> => freshly(tree, fs, now, () => walkNames(tree, fs), fresh, watchTree(tree, fs));
