@@ -77,9 +77,10 @@ export const ICONS = {
   'priority-high': ['M6 19v-3M10.5 19v-6.5M15 19v-10'],
   'priority-urgent': ['M6 19v-3M10.5 19v-6.5M15 19v-10M19.5 19v-14'],
   chevron: ['m9 6 6 6-6 6'],
-  // A live thread, Needs you or In progress: a pulse, as light as Done's tick beside it.
-  live: ['M3 13h4.5l2-3.5 3 7 2-3.5H21'],
-  blank: [],
+  // An active thread, Needs you or In progress: the app's nine dots, drawn tiny
+  // so they sit as lightly as Done's tick. Later is a snooze's zᶻ.
+  live: [9, 13, 17].flatMap((y) => [8, 12, 16].map((x) => circle(x, y, 0.45))),
+  zz: ['M6 12.5h5l-5 5h5', 'M14 8.5h4l-4 4h4'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type IconName = keyof typeof ICONS;
@@ -187,9 +188,9 @@ const BY_PREFIX: [string, IconName][] = [
   ['wait-', 'wait'],
 ];
 
-// Three kinds, not four: done, live and Later, which is rare enough to go unmarked.
+// Three kinds, not four: done, active and Later.
 // Not the Go to rows' tray, circled play and clock, which read as large and round beside the tick.
-const LIST_ICON: Record<ThreadStateWord, IconName> = { waiting: 'live', running: 'live', scheduled: 'blank', done: 'done' };
+const LIST_ICON: Record<ThreadStateWord, IconName> = { waiting: 'live', running: 'live', scheduled: 'zz', done: 'done' };
 
 export function iconFor(row: { id: string; label: string; state?: ThreadStateWord }): IconName {
   if (row.state) return LIST_ICON[row.state];

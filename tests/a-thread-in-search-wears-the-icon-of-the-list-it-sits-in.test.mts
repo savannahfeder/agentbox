@@ -8,10 +8,11 @@
 // bubble every other thread wore was not obvious. The "Go to" rows' tray,
 // circled play and clock came next and were turned down as large and round
 // beside the tick's few thin lines. Of the line-only sets after that, they
-// asked for three kinds only: done, live (Needs you or In progress alike) and
-// Later, which is rare enough to go unmarked. And the mark sat too high: it
-// hugged the title of a two-line row. So a live thread wears one thin pulse
-// line, Later nothing, and the mark sits in the middle of its row.
+// asked for three kinds only: done, active (Needs you or In progress alike)
+// and Later. The mark sat too high, hugging the title of a two-line row, so it
+// now sits in the middle of the row. Of the active marks they found the app's
+// nine dots the least bad, but too strong, and Later had no mark. So an active
+// thread wears nine dots drawn tiny, Later a small "zᶻ".
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { threadResult } from '../renderer/src/palette-rows';
@@ -41,9 +42,16 @@ describe('a thread found by search wears its list’s mark', () => {
     expect(ICONS[rowIcon('running')].length).toBeGreaterThan(0);
   });
 
-  it('Later draws nothing, and still keeps the space so titles line up', () => {
-    expect(ICONS[rowIcon('scheduled')]).toEqual([]);
-    expect(rowIcon('scheduled')).not.toBe('thread');
+  it('Later has a mark of its own, not the active one or the tick', () => {
+    expect(ICONS[rowIcon('scheduled')].length).toBeGreaterThan(0);
+    expect(rowIcon('scheduled')).not.toBe(rowIcon('running'));
+    expect(rowIcon('scheduled')).not.toBe(rowIcon('done'));
+  });
+
+  it('the active mark is the nine dots, each no bigger than a pinprick', () => {
+    const paths = ICONS[rowIcon('running')];
+    expect(paths).toHaveLength(9);
+    for (const r of arcs(paths)) expect(r).toBeLessThanOrEqual(0.5);
   });
 
   it('none is the speech bubble', () => expect(LISTS.map(rowIcon)).not.toContain('thread'));
