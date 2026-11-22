@@ -190,6 +190,14 @@ function readSlice(file: string, from: number, size: number): string {
   } finally { fs.closeSync(fd); }
 }
 
+/** Whether a transcript's first line is a session a person started, read once. A half-written first line is not decided. */
+function isHersHead(file: string): boolean {
+  let first = '';
+  try { first = readSlice(file, 0, 64 * 1024).split('\n', 1)[0] ?? ''; } catch { return true; }
+  try { JSON.parse(first); } catch { return true; }
+  return codexMeta(first) !== null;
+}
+
 /** A transcript's tail folded, with its first line for who started it. */
 export function readCodexSession(file: string, { whole = false }: { whole?: boolean } = {}): { meta: CodexMeta; fold: CodexFold; firstSaid: string } | null {
   let size = 0;
@@ -251,6 +259,9 @@ export interface CodexLiveOptions {
 }
 
 const kept = new Map<string, { size: number; mtimeMs: number; value: ReturnType<typeof readCodexSession> }>();
+// Who started a session never changes, so a transcript that is not hers (this
+// app's own Codex runs, `codex exec`, a subagent) is not opened again.
+const notHers = new Set<string>();
 
 /** Every Codex session a person started that was written to in the last day, as a live agent record. */
 export function readCodexLive({ home = os.homedir(), codexDirs = null, products = [], now = Date.now(), ours = new Set(), isRunning = commandRuns }: CodexLiveOptions = {}): Agent[] {
@@ -265,11 +276,14 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
     for (const file of listRolloutFiles(dir, { days: 2, since: now - CODEX_LIVE_MS })) {
       let st: fs.Stats;
       try { st = fs.statSync(file); } catch { continue; }
-      if (now - st.mtimeMs > CODEX_LIVE_MS) continue;
+      if (now - st.mtimeMs > CODEX_LIVE_MS || notHers.has(file)) continue;
       const had = kept.get(file);
       const read = had && had.size === st.size && had.mtimeMs === st.mtimeMs ? had.value : readCodexSession(file);
       kept.set(file, { size: st.size, mtimeMs: st.mtimeMs, value: read });
-      if (!read) continue;
+      if (!read) {
+        if (st.size > 0 && !isHersHead(file)) notHers.add(file);
+        continue;
+      }
       const { meta, fold, firstSaid } = read;
       const owner = meta.cwd ? ownerOf(path.resolve(meta.cwd)) : null;
       // A temp folder is nobody's work, unless it is one of the person's own projects.
@@ -310,6 +324,7 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
     }
   }
   if (kept.size > 2000) kept.clear();
+  if (notHers.size > 20000) notHers.clear();
   return [...byId.values()];
 }
 

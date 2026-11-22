@@ -310,3 +310,15 @@ describe('the full conversation of a session waiting on permission', () => {
     expect(granted.ok && granted.turns.at(-1)).toMatchObject({ who: 'you', text: 'look around' });
   });
 });
+
+describe('reading every refresh stays cheap', () => {
+  it("a transcript that is not hers is not opened again however often it changes", () => {
+    const t0 = NOW - 60_000;
+    const file = write('ours2', [meta('ours2', t0, { originator: 'agentbox' }), ...turn(t0, 'x', 'y')], t0 + 21_000);
+    expect(live()).toEqual([]);
+    // Were it read again, this first line would now make it hers.
+    fs.writeFileSync(file, [meta('ours2', t0), ...turn(t0, 'x', 'y'), line(t0 + 30_000, 'event_msg', { type: 'task_started' })].join('\n') + '\n');
+    fs.utimesSync(file, (t0 + 30_000) / 1000, (t0 + 30_000) / 1000);
+    expect(live()).toEqual([]);
+  });
+});
