@@ -6,7 +6,7 @@ import { placeWords, shownName } from '../../../../shared/artifact-marks.mts';
 export interface ChatComment { id: string; by: string | null; at: number; text: string; link: FileMarkLink }
 
 export function commentsInChat(marks: readonly { id: string; by: string | null; mark: ArtifactMark; at: number }[] | null | undefined): ChatComment[] {
-  return (marks ?? [])
+  return (Array.isArray(marks) ? marks : [])
     .filter((r) => (r.mark.do === 'note' || r.mark.do === 'reply') && r.mark.id && r.mark.file && r.mark.text?.trim())
     .sort((a, b) => a.at - b.at)
     .map((r) => ({

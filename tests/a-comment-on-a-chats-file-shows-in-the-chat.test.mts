@@ -33,6 +33,8 @@ describe('the comments a chat shows', () => {
   it('none, for a chat whose files have no comments', () => {
     expect(commentsInChat([])).toEqual([]);
     expect(commentsInChat(undefined)).toEqual([]);
+    // A chat handed no list of comments (an older caller's stub) draws its messages as before.
+    expect(commentsInChat((() => []) as never)).toEqual([]);
   });
 });
 
