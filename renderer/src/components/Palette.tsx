@@ -3,7 +3,7 @@
 
 import { cloudCommands, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import type { Product, View } from '../types';
+import type { Product, ThreadStateWord, View } from '../types';
 import { commandKeys } from '../palette-keys';
 import { keptPick, nameRank, namesIt, pointerMoved, titleFirst } from '../palette-pick';
 import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
@@ -22,6 +22,8 @@ export interface Command {
   hint?: string;
   /** A thread's line under its title: the sentence the query was found in. */
   sub?: string;
+  /** A thread's list, which picks its icon (../palette-glyphs). */
+  state?: ThreadStateWord;
   // Words she might TYPE that the label does not say. Matched, never shown;
   // the hint is shown, never matched (../palette-rows).
   keywords?: string;

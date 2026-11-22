@@ -1,5 +1,5 @@
-// A THREAD FOUND BY ⌘K SAYS WHAT IT IS AND WHEN. How a finished one is marked
-// is in a-finished-thread-in-search-is-drawn-like-the-others-and-says-done.
+// A THREAD FOUND BY ⌘K SAYS WHAT IT IS AND WHEN. Its icon, which says what
+// list it is in, is a-thread-in-search-wears-the-icon-of-the-list-it-sits-in.
 //
 // A tester searched "checkout" and got two rows reading "Prototype checkout
 // screen page · Web app", one from Nov 16 and one queued that morning, with

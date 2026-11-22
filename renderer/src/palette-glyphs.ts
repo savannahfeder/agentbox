@@ -3,6 +3,8 @@
 // wears the menu's own drawing, path for path. Paths only, so this file stays
 // plain TypeScript and Palette.tsx draws them.
 
+import type { ThreadStateWord } from './types';
+
 const circle = (cx: number, cy: number, r: number) => `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
 const box = (x: number, y: number, w: number, h: number, r = 2) =>
   `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
@@ -182,7 +184,11 @@ const BY_PREFIX: [string, IconName][] = [
   ['wait-', 'wait'],
 ];
 
-export function iconFor(row: { id: string; label: string }): IconName {
+// A found thread wears the icon its list's "Go to" row wears.
+const LIST_ICON: Record<ThreadStateWord, IconName> = { waiting: 'inbox', running: 'progress', scheduled: 'later', done: 'done' };
+
+export function iconFor(row: { id: string; label: string; state?: ThreadStateWord }): IconName {
+  if (row.state) return LIST_ICON[row.state];
   // One id for both directions, so the label says which way it goes.
   if (row.id === 'pause') return /^unpause/i.test(row.label) ? 'play' : 'pause';
   if (row.id.startsWith('teammate-pause-') && /^resume/i.test(row.label)) return 'play';
