@@ -114,6 +114,6 @@ describe('the toast after an answer carries the same way in', () => {
     // and there is nothing to go and watch, so those toasts stay plain.
     // The fifth argument, the way in, stays undefined; the last is only what
     // the thread says if a Z takes the close back (w-c78d1e1607).
-    expect(app).toContain('}, `${DONE.verb}: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);');
+    expect(app).toContain('}, `${DONE.verb}: ${clipToSentence(rowTitle(item), TOAST_TITLE)}`, undefined, stay, undefined, undid);');
   });
 });

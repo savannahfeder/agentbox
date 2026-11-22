@@ -17,11 +17,13 @@ import { createTeamSync, fileSyncState, MAX_MESSAGE_FILE_BYTES } from './sync.mt
 import { createThreadShare } from './thread-share.mts';
 import { createAsks, type TellThread } from './asks.mts';
 import { changePath, readChangeSummary } from '../code-change.mts';
-import { askBody, askIsOpen, askOf, type AskKind } from '../../shared/thread-asks.mts';
+import { changeWithCommits } from '../handed-commits.mts';
+import { askBody, askIsOpen, askOf, withoutAskLead, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
 import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
-import { findFileToSend } from './carry-files.mts';
+import { findFileToSend, looksSecret } from './carry-files.mts';
+import { artifactRoots, resolveArtifact } from '../artifact-path.mts';
 import { readableSharedThreads } from '../everything-found.mts';
 import { plainRef } from '../../shared/carried-files.mts';
 import { listSharedProjects, joinSharedProject, linkSharedFolders, markShared, makeDirect } from './projects.mts';
@@ -31,7 +33,7 @@ import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
 import type { PersonStatus } from '../../shared/team-status.mts';
 import { GIVEN_TASK, WORK_THREAD, isTaskRow, isWorkThread, teamPeopleShown } from '../../shared/team-rules.mts';
 import { referencedFiles } from '../../shared/referenced-files.mts';
-import { shortTitle } from '../../shared/thread-title.mts';
+import { shortTitle, shownTitle } from '../../shared/thread-title.mts';
 import { taskTitle } from '../../shared/team-tasks.mts';
 import { doneSteps, firstSentence } from '../../shared/thread-cards.mts';
 import { openTo, seenNow, sentWords, threadLink } from '../../shared/thread-link.mts';
@@ -362,10 +364,18 @@ export interface TeamServiceOptions {
 /** A file handed to a task; one with a `rel` is a file the words name. */
 interface TaskFile extends AttachmentFile { rel?: string }
 
+// "View the change" opens the first .change, so a thread's own goes before one it was handed.
+function sentInOrder(files: readonly TaskFile[], own: readonly TaskFile[]): TaskFile[] {
+  const isChange = (f: TaskFile) => String(f.name ?? '').toLowerCase().endsWith('.change');
+  return [...files.filter((f) => !isChange(f)), ...own, ...files.filter(isChange)];
+}
+
 interface TaskInput {
   title?: unknown; body?: unknown; priority?: number | null; due?: unknown; files?: TaskFile[]; voice?: unknown;
   visibility?: unknown; visibleTo?: unknown[]; blockedBy?: unknown;
   ask?: { kind: AskKind; owner: string; thread: string; product: string; step?: string; note?: string };
+  /** The title is a thread's name as its owner sees it, so it is not cut again. */
+  keepTitle?: boolean;
 }
 
 /** What rides along with a message: a voice note, the agent it is for, a subject that makes it its own thread. */
@@ -375,7 +385,7 @@ import { filmPiece, linkAddress, linkSiteFor } from '../file-link.mts';
 import { noticeLinkComments } from './link-comments.mts';
 import type { LinkComment } from './link-comments.mts';
 import { bringLinkEditsHome, type LinkEdit } from './link-edits.mts';
-import { shownName } from '../../shared/artifact-marks.mts';
+import { filesInLines, otherFilesInLines, shownName, threadFiles, viewKind } from '../../shared/artifact-marks.mts';
 
 const LINK_COMMENTS_EVERY_MS = 60_000;
 const LINK_EDITS_EVERY_MS = 60_000;
@@ -543,31 +553,56 @@ export function createTeamService({
     return products().find((p) => p.dir === made.dir) ?? { slug: made.slug, dir: made.dir };
   }
 
-  // WHAT A THREAD HANDS ON: its words, and every file its messages name that sits
-  // in the project. A repository's files stay out: a coding thread names dozens
-  // in passing.
-  function briefOfThread(row: TeamRow, product: TeamProduct) {
+  // WHAT A THREAD HANDS ON: its words, the files its Files button lists, found
+  // where its owner's copy opens them (its checkout first), and every file its
+  // messages name that sits in the project. A repository's code stays out: a
+  // coding thread names dozens in passing.
+  async function briefOfThread(row: TeamRow, product: TeamProduct) {
     const said = store.readThread(product.slug, row.id).map((t) => t.text).filter(Boolean);
     // A one-line thread has only a title, and a rename must not lose those words.
     const brief = row.body || row.title;
     // The receiver reads it as a person's message, drawn as typed, where bold marks show as marks.
     const unbold = (s: string) => s.replace(/\*\*([^*\n]+)\*\*/g, '$1');
     const tried = doneSteps(row.progress);
-    const words = [
+    // The receiver has none of these threads, so an id would draw as "Unavailable thread".
+    const titled = (s: string) => s.replace(THREAD_ID, (_m, branch: string | undefined, id: string) => {
+      const found = store.listItems().find((i) => i.id === id.toLowerCase());
+      const thread = found ? store.readItem(found.product, found.id) : null;
+      const name = thread ? shownTitle(thread) : '';
+      if (branch) return name ? `the branch for ${name}` : 'another branch';
+      return name || 'another thread';
+    });
+    const words = titled([
       brief,
       tried.length ? `What the agent already tried:\n\n${tried.map((t) => `- ${unbold(t)}`).join('\n')}` : '',
       row.result ? `Where it got to:\n\n${unbold(row.result)}` : '',
-    ].filter(Boolean).join('\n\n');
+    ].filter(Boolean).join('\n\n'));
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];
     const tooBig: string[] = [];
-    for (const rel of referencedFiles(brief, row.result, ...said, { dir: product.dir })) {
-      if (rel === 'project.json' || files.length >= MAX_FILES_HANDED_ON) continue;
-      let real: string;
-      try { real = fs.realpathSync(path.join(product.dir, rel)); } catch { continue; }
-      if (!real.startsWith(root + path.sep) || !fs.statSync(real).isFile()) continue;
+    const taken = new Set<string>();
+    const take = (rel: string, real: string) => {
+      if (files.length >= MAX_FILES_HANDED_ON || taken.has(real) || taken.has(rel.toLowerCase()) || !fs.statSync(real).isFile()) return;
+      taken.add(real).add(rel.toLowerCase());
       if (fs.statSync(real).size > MAX_MESSAGE_FILE_BYTES) tooBig.push(path.basename(rel));
       else files.push({ rel, name: shownName(rel), srcPath: real });
+    };
+    const roots = artifactRoots(product).flatMap((r) => { try { return [fs.realpathSync(r)]; } catch { return []; } });
+    const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
+    const named = [...filesInLines(lines), ...otherFilesInLines(lines).filter((f) => viewKind(f.path) === 'table')];
+    for (const family of threadFiles(named)) {
+      const rel = family.versions[family.versions.length - 1].path;
+      if (looksSecret(rel)) continue;
+      const found = await resolveArtifact({ src: rel, product: product.slug, products: [product], accountRoot, storeRoot: store.config?.storeRoot, thread: row.id });
+      let real: string;
+      try { real = found.ok ? fs.realpathSync(found.path) : ''; } catch { continue; }
+      if (real && roots.some((r) => real.startsWith(r + path.sep))) take(rel, real);
+    }
+    for (const rel of referencedFiles(brief, row.result, ...said, { dir: product.dir })) {
+      if (rel === 'project.json') continue;
+      let real: string;
+      try { real = fs.realpathSync(path.join(product.dir, rel)); } catch { continue; }
+      if (real.startsWith(root + path.sep)) take(rel, real);
     }
     return { words, files, tooBig };
   }
@@ -940,7 +975,7 @@ export function createTeamService({
       onChange,
       log,
       now,
-      relay: (c, thread) => asks.relay(c, thread),
+      relay: (c, thread, orElse) => asks.relay(c, thread, orElse),
     });
     sync = createTeamSync({
       backend,
@@ -1336,7 +1371,7 @@ export function createTeamService({
      * (shared/team-rules.mts). A file with a `rel` is one the words name: its
      * links are pointed at the copy.
      */
-    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy, ask }: TaskInput = {}) {
+    async giveTask(toIn: string | string[] | null | undefined, { title, body, priority, due, files = [], voice, visibility, visibleTo, blockedBy, ask, keepTitle }: TaskInput = {}) {
       if (!backend || !state.team || !state.me) throw new Error('start or join a team first');
       const me = state.me.id;
       const list = [...new Set(([] as string[]).concat(toIn ?? []).filter(Boolean))];
@@ -1347,7 +1382,7 @@ export function createTeamService({
       const words = String(body ?? '').trim();
       const carried = (Array.isArray(files) ? files : []).filter((f) => f && (f.dataBase64 || f.srcPath));
       const names = state.people.filter((p) => p.id !== me).map((p) => p.name ?? '');
-      const named = taskTitle(String(title ?? ''), names, words)
+      const named = (keepTitle ? String(title ?? '').trim() : '') || taskTitle(String(title ?? ''), names, words)
         || (carried.length === 1 ? String(carried[0].name ?? 'A file') : `${carried.length} files`);
       if (!words && !carried.length && !String(title ?? '').trim()) throw new Error('a task needs some words');
       const product = await recordWith(me, [to]);
@@ -1392,8 +1427,11 @@ export function createTeamService({
       const person = state.people.find((p) => p.id === to);
       if (!person) throw new Error('that person is not on your team');
       if (to === state.me.id) throw new Error('that thread is yours already');
-      const { words, files, tooBig } = briefOfThread(row, product);
-      const change = changeOfThread(product, id, String(row.label || row.title || ''));
+      const { words, files, tooBig } = await briefOfThread(row, product);
+      const title = shownTitle(row);
+      const change = changeOfThread(product, id, title);
+      const withCommits = change.files.length ? await changeWithCommits(change.files[0].srcPath, product.repoPath, id, MAX_MESSAGE_FILE_BYTES) : null;
+      const changeFiles: AttachmentFile[] = withCommits ? [{ name: change.name, dataBase64: withCommits.toString('base64') }] : change.files;
       const giver = state.me.name?.split(/\s+/)[0] || 'the giver';
       const loose = change.loose ? `Not committed yet: this work is only on ${giver}'s computer. The file below holds every edit the agent made.` : '';
       const left = tooBig.length ? `(Not sent: ${tooBig.join(', ')}, over 10 MB. Ask ${state.me.name || 'me'} for ${tooBig.length === 1 ? 'it' : 'them'}.)` : '';
@@ -1404,9 +1442,10 @@ export function createTeamService({
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const link = threadLink(state.me.id, id);
       const made = await this.giveTask(to, {
-        title: row.label || row.title,
+        title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
-        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...change.files, ...files],
+        keepTitle: true,
+        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: sentInOrder(files, changeFiles),
       });
       // The asks on it end with it: what they say back would come to a thread you no longer hold.
       for (const r of store.listItems()) {
@@ -1438,15 +1477,16 @@ export function createTeamService({
       if (to === state.me.id) throw new Error('that thread is yours already');
       const seen = seenNow(row, product, kept().getSince(state.me.id));
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
-      const title = String(row.label || row.title || 'A thread');
+      const title = shownTitle(row) || 'A thread';
       const link = threadLink(state.me.id, id);
-      const files = [...changeOfThread(product, id, title).files, ...briefOfThread(row, product).files];
+      const files = sentInOrder((await briefOfThread(row, product)).files, changeOfThread(product, id, title).files);
       const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', helper: person.name?.split(/\s+/)[0] || null, note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,
-        body: link ? sentWords(title, link, brief) : brief,
+        body: link ? sentWords(String(row.label || row.title || 'A thread'), link, brief) : brief,
         priority: row.priority,
         files,
+        keepTitle: true,
         ask: {
           kind, owner: state.me.id, thread: id, product: slug,
           ...(String(step).trim() ? { step: String(step).trim().slice(0, 1200) } : {}),
@@ -1487,7 +1527,8 @@ export function createTeamService({
         if (fs.existsSync(srcPath)) files.push({ name: name || path.basename(file), srcPath });
         return '';
       }).trim();
-      return { title: row.label || row.title, body, files };
+      // The line the ask says to its helper is not for an agent.
+      return { title: row.label || row.title, body: askOf(row as never) ? withoutAskLead(body) : body, files };
     },
 
     /** A teammate's shared thread as this copy holds it: its messages, comments and folder. */
@@ -1718,6 +1759,8 @@ export function createTeamService({
 }
 
 const MAX_FILES_HANDED_ON = 20;
+// A thread's id or branch in prose, as renderer/src/ticket-references.ts finds it; not inside a path or a link.
+const THREAD_ID = /(?<![\w/.:@-])(agentbox\/)?(w-[a-f0-9]{10})(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?(?![\w/-]|\.[a-z0-9])/gi;
 // The link a move leaves under a message, which a second move does not carry.
 const MOVED_NOTE = /^Moved to a new thread: \[[^\]]*\]\(w-[0-9a-f]{10}\)$/;
 

@@ -108,6 +108,8 @@ export interface LiveFacts {
   session?: RunningSession | null;
   /** `supervisor.queued`: the ids a tick will spawn as soon as a slot frees. */
   queued?: string[];
+  /** `supervisor.settingUp`: of those, the ones whose folder is being made now. */
+  settingUp?: string[];
   /** The walkthrough's practice thread, with the app's answer to it on its way. */
   answering?: boolean;
   /** On `supervisor.remoteHeld`: our own session, open between Remote Control turns. */
@@ -458,6 +460,12 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // QUEUED IS A PROMISE THAT AN AGENT IS COMING, and for these it is not.
   const notYet = queued.includes(item.id) && cannotStart[item.id] ? cannotStartLine(cannotStart[item.id]) : null;
   if (notYet) return { state: 'cannot', line: notYet };
+
+  // Its folder being made, with nothing to wait for: it reads as a run does
+  // (w-9993530556). "Queued" there for 19.7 s read as not connected.
+  if (queued.includes(item.id) && facts.settingUp?.includes(item.id)) {
+    return { state: 'working', line: 'The agent just started on this.' };
+  }
 
   if (queued.includes(item.id) && runNow.includes(item.id)) {
     return {

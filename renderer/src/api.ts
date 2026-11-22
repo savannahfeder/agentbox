@@ -12,7 +12,7 @@ import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
 import type { EngineSetupState } from './plan-setup';
 import { fixtureAgents, fixtureSnapshot, fixtureUrgentArrival,fixtureDashboards, fixtureRepeats, fixtureRuns, fixtureMock, fixtureMockDashboards, fixtureTraces, fixtureHistory, fixtureSettings, fixtureConversation, fixtureAgentFiles, fixtureSessionThreads, fixtureSearchableThreads } from './fixtures';
-import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
+import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine, fixtureFurtherHarness } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import type { CarryState } from '../../shared/carried-files.mts';
@@ -25,6 +25,7 @@ interface LaterBridge {
   gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
   gitHubCloudSignIn?(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }>;
   signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }>;
+  signInKeep?(p: { product: string; id: string; ask: string; keep: boolean }): Promise<{ ok: boolean; error?: string }>;
   cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing' | 'started'; error?: string; message?: string }>;
   cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
 }
@@ -125,6 +126,8 @@ const mockFixtures = params.get('fixtures') === 'mock';
 // script already photographs and is the rule it records. The four
 // machines and the whole argument are in ./fixtures, beside the data.
 const engineFixtures = fixtureEngineWorld(params.get('engines'));
+// The harnesses of the world asked for: the second coding agent, then any further harness (`?further=opencode`).
+const withEngines = (snap: Snapshot): Snapshot => fixtureFurtherHarness(fixtureSecondEngine(snap, engineFixtures), params.get('further'));
 // &codexout: Codex's week spent until Sunday 6:10pm, over ?fixtures=empty or the full world.
 function codexOut(snap: Snapshot): Snapshot {
   if (!params.has('codexout')) return snap;
@@ -465,9 +468,9 @@ export const api = {
       // builds its own object; layering it here is what lets
       // ?fixtures=empty&engines=codex photograph the corner naming an agent on
       // the idle page. A world of `null` hands the snapshot straight back.
-      return codexOut(fixtureSecondEngine(empty, engineFixtures));
+      return codexOut(withEngines(empty));
     }
-    if (mockFixtures) return fixtureSecondEngine(structuredClone(fixtureMock), engineFixtures);
+    if (mockFixtures) return withEngines(structuredClone(fixtureMock));
     if (crowdedFixtures) {
       const base = structuredClone(fixtureSnapshot);
       base.products = CROWDED_NAMES.map((name) => ({
@@ -483,7 +486,7 @@ export const api = {
       // live supervisor to write to.
       base.supervisor.hiddenProducts = (params.get('hidden') ?? '').split(',').filter(Boolean);
       if (!params.has('approvals')) base.approvals = [];
-      return fixtureSecondEngine(base, engineFixtures);
+      return withEngines(base);
     }
     if (useFixtures) {
       const base = structuredClone(fixtureSnapshot);
@@ -654,7 +657,7 @@ export const api = {
         base.usage = { engine: 'codex', limits, at: now - 6 * 3_600_000 };
         base.usageByEngine = [base.usage];
       }
-      return codexOut(fixtureSecondEngine(base, engineFixtures));
+      return codexOut(withEngines(base));
     }
     // A document's holder thread is the app's, so no list of threads draws it.
     const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
@@ -1790,6 +1793,13 @@ export const api = {
     const zero = laterBridge();
     if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
     return zero.signInAnswer(p);
+  },
+
+  /** Whether a cloud sign-in an agent on this thread is waiting on is saved for every cloud thread. */
+  async signInKeep(p: { product: string; id: string; ask: string; keep: boolean }): Promise<{ ok: boolean; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.signInKeep) return { ok: false, error: RESTART_NOTE };
+    return zero.signInKeep(p);
   },
 
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */
