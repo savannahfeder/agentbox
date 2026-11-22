@@ -26,7 +26,7 @@ import { resolveEngine } from '../main/engine-bin.mts';
 import { FRESH_USER_ENV } from '../shared/fresh-user-home.mts';
 import { ENGINES, HARNESSES_IN_TESTING_ENV } from '../shared/engines.mts';
 import { HARNESS_DEFINITIONS } from '../shared/harness-definitions.mts';
-import { harnessesToCheck, checkHarness, standingVerdict, verdictsWithoutARun, exitCode, summaryLines, cleanEnv } from './lib/harness-check.mts';
+import { harnessesToCheck, checkHarness, standingVerdict, verdictsWithoutARun, exitCode, summaryLines, cleanEnv, offeredIn } from './lib/harness-check.mts';
 import type { App, Row, Standing, Verdict } from './lib/harness-check.mts';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,7 +43,7 @@ interface Snapshot {
   items?: (Row & { engine?: string | null })[];
   approvals?: { id: string; item: string | null }[];
   supervisor?: { running?: { itemId?: string }[]; outOfUsage?: Record<string, { until?: number } | undefined> };
-  engines?: { choices?: { id: string }[]; workspace?: string; byItem?: Record<string, string> };
+  engines?: { choices?: { id: string }[]; further?: { id: string }[]; workspace?: string; byItem?: Record<string, string> };
 }
 
 function layOut() {
@@ -159,7 +159,7 @@ function appOver(place: ReturnType<typeof layOut>, first: Copy) {
     },
     async standing(harness) {
       const { engines, supervisor } = await snapshot();
-      const offered = (engines?.choices ?? []).some((choice) => choice.id === harness);
+      const offered = offeredIn(engines, harness);
       return {
         // The app offers a candidate only when it found its binary, and its sign-in is asked by its first thread.
         ...(ready.get(harness) ?? { found: offered, signedIn: null }),

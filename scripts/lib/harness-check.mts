@@ -98,6 +98,11 @@ export interface Standing {
   spentUntil?: number | null;
 }
 
+/** Whether the app's own facts name this harness: among the two every screen knows, or among the further ones. */
+export function offeredIn(engines: { choices?: { id: string }[]; further?: { id: string }[] } | null | undefined, harness: string): boolean {
+  return [...(engines?.choices ?? []), ...(engines?.further ?? [])].some((engine) => engine.id === harness);
+}
+
 /**
  * What is already known before a thread is started, or null when the list should run.
  * A signed-out harness is a failure: nobody on this machine can run it. One that

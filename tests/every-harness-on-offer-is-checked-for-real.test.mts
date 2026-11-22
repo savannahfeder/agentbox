@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { ENGINES } from '../shared/engines.mts';
 import { deadRunSentence } from '../shared/spawn-trouble.mts';
 import {
-  SCENARIOS, ASKS_FIRST, harnessesToCheck, checkHarness, standingVerdict, verdictsWithoutARun, exitCode, summaryLines, cleanEnv, whyNot,
+  SCENARIOS, ASKS_FIRST, harnessesToCheck, checkHarness, standingVerdict, verdictsWithoutARun, exitCode, summaryLines, cleanEnv, whyNot, offeredIn,
 } from '../scripts/lib/harness-check.mts';
 import type { App, Row, Verdict } from '../scripts/lib/harness-check.mts';
 
@@ -159,6 +159,27 @@ describe('one harness, the whole list', () => {
     const verdicts = await check({}, 'newcomer');
     expect(outcomes(verdicts)).toMatchObject({ answers: 'passed', approval: 'failed', denial: 'failed' });
     expect(verdicts.find((v) => v.scenario === 'approval')?.said).toMatch(/ASKS_FIRST/);
+  });
+});
+
+// 2026-11-22: the app began telling its screens about a further harness in a
+// list of its own, and the check still looked only in the list of two. The
+// next real run said "OpenCode is not installed on this machine" of an
+// OpenCode that had passed all six steps there two hours before.
+describe('whether the app offers a harness', () => {
+  const engines = { choices: [{ id: 'claude' }, { id: 'codex' }], further: [{ id: 'opencode' }] };
+
+  it('is read from the list of two and from the list of further harnesses', () => {
+    expect(offeredIn(engines, 'claude')).toBe(true);
+    expect(offeredIn(engines, 'codex')).toBe(true);
+    expect(offeredIn(engines, 'opencode')).toBe(true);
+  });
+
+  it('is no for a harness in neither, and when the app has said nothing yet', () => {
+    expect(offeredIn(engines, 'gemini')).toBe(false);
+    expect(offeredIn({ choices: [{ id: 'claude' }] }, 'opencode')).toBe(false);
+    expect(offeredIn(undefined, 'claude')).toBe(false);
+    expect(offeredIn({}, 'claude')).toBe(false);
   });
 });
 
