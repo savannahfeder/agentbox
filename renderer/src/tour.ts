@@ -145,6 +145,10 @@ export function closesThread(e: { key: string; metaKey?: boolean; ctrlKey?: bool
   return thread && !e.metaKey && !e.ctrlKey && !e.altKey && /^e$/i.test(e.key);
 }
 
+/** Whether a reply sent on this thread is the walkthrough's Write back: on its practice thread, when it has one. */
+export const replyTeaches = (t: Tour | null, item: { product: string; id: string }): boolean =>
+  tourLive(t) && (!t!.practice || isTourPractice(t, item));
+
 /** Off the walkthrough's pages: on one it has no tip for (`elsewhere`), or, while its tips are about the
  *  practice thread, on a real thread or on Home, whose tips are only the first and the last. */
 export function awayFromWalk(t: Tour | null, at: { elsewhere: boolean; home: boolean; thread: boolean; practiceThread: boolean }): boolean {

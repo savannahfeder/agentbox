@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { awayFromWalk, finishLesson, skipTour, startTour, withPractice, type Lesson } from '../renderer/src/tour.ts';
+import { awayFromWalk, finishLesson, replyTeaches, skipTour, startTour, withPractice, type Lesson } from '../renderer/src/tour.ts';
 import { TourFrame } from '../renderer/src/components/TourFrame.tsx';
 import { walkPlace } from '../renderer/src/setup-split.ts';
 
@@ -103,6 +103,27 @@ describe('the column beside the app', () => {
     expect(css).toMatch(/:root\[data-tour-frame\] \{ --tf-w: 248px;/);
     expect(css).toMatch(/\.tour-frame \{[^}]*position: fixed; left: 0; top: 0; bottom: 0; width: var\(--tf-w\);/);
     expect(css).toMatch(/:root\[data-tour-frame\] #root \{[^}]*position: fixed; top: 12px; left: calc\(var\(--tf-w\) \+ 12px\); right: 12px; bottom: 12px;/);
+  });
+});
+
+describe('a reply', () => {
+  // Round two of the power test, 2026-11-22: a reply to a real thread moved the count on,
+  // while the practice answer was still unread.
+  const practiceOne = { product: 'practice', id: 'w-practice' };
+  const realOne = { product: 'backend', id: 'w-real' };
+  it('teaches writing back on the practice thread', () => {
+    expect(replyTeaches(sent, practiceOne)).toBe(true);
+  });
+  it('teaches nothing on a real thread while the walkthrough has a practice one', () => {
+    expect(replyTeaches(sent, realOne)).toBe(false);
+    expect(replyTeaches(withPractice(startTour(), { slug: 'practice' }), realOne)).toBe(false);
+  });
+  it('teaches on any thread for a walkthrough with no practice thread, and on none once it is over', () => {
+    expect(replyTeaches(startTour(), realOne)).toBe(true);
+    expect(replyTeaches(skipTour(sent), practiceOne)).toBe(false);
+  });
+  it('is what a sent reply asks', () => {
+    expect(read('renderer/src/App.tsx')).toContain("if (replyTeaches(tourRef.current, item)) {\n      let t = finishLesson(tourRef.current!, 'reply');");
   });
 });
 

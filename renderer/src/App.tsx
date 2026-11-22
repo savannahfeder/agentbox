@@ -188,7 +188,7 @@ import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, replyTeaches, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, FIRST_RUN_LABEL, firstRunDone, firstRunNeeded, projectsOfTheirOwn, restartFirstRun,
   finishFirstRun, TASK_BODY, TASK_TITLE, practiceDraftLeft, whyNotMade, replyWritten,
@@ -4510,7 +4510,7 @@ export default function App() {
     return true;
   };
   const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick, runAt?: number) => {
-    if (tourLive(tourRef.current)) {
+    if (replyTeaches(tourRef.current, item)) {
       let t = finishLesson(tourRef.current!, 'reply');
       if (isTourPractice(t, item)) t = practiceReplied(t);
       setTour(t);
@@ -6680,7 +6680,7 @@ export default function App() {
   // Only when the tip changes: a change of page reaches here before its tip has gone.
   useEffect(() => {
     if (tourNow && !walkAway) walkSpot.current = { view, home: homeOpen, item: focused };
-  }, [tourNow]);
+  }, [tourNow]); // eslint-disable-line react-hooks/exhaustive-deps
   const backToWalk = () => { const s = walkSpot.current; openView(s?.view ?? 'inbox'); if (!s || s.home) setHomeOpen(true); if (s?.item) setFocused(s.item); };
 
   // BACK AND FORWARD, on every computer. Above the early returns below, because
