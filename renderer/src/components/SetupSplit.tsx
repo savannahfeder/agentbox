@@ -57,7 +57,7 @@ const Check = ({ on }: { on: boolean }) => <span className={`ss-check${on ? ' ss
 function Strip({ look }: { look: string }) {
   if (look === 'light') return <span className="ss-strip ss-strip-light" />;
   if (look === 'dark') return <span className="ss-strip ss-strip-dark" />;
-  if (look === MATCH_SKY) return <span className="ss-strip ss-strip-pair"><SkyArt id="ember" /><SkyArt id="sage" /></span>;
+  if (look === MATCH_SKY) return <span className="ss-strip ss-strip-pair"><SkyArt id="ember" /><SkyArt id="mountains" /></span>;
   return <span className="ss-strip"><SkyArt id={look} /></span>;
 }
 function SkyArt({ id }: { id: string }) {
@@ -368,7 +368,7 @@ export function SetupSplit(p: SetupSplitProps) {
     choose.current = (by) => p.onLook(nextChoice(looks, p.look, by));
     body = <>
       <div className="ss-list">
-        {looks.map((id) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={id === MATCH_SKY ? 'Orange in dark mode, green in light' : undefined}
+        {looks.map((id) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={id === MATCH_SKY ? 'Orange sky in dark mode, mountains in light' : undefined}
           end={<Check on={id === p.look} />} on={id === p.look} onClick={() => p.onLook(id)} />)}
       </div>
       <div className="ss-acts">{go('Continue', next)}</div>

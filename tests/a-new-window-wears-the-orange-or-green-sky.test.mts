@@ -20,8 +20,9 @@ describe('with no sky picked', () => {
   it('a dark window wears Dark orange sky', () => {
     expect(skyTheme(shownSkyId(null, true))?.name).toBe('Dark orange sky');
   });
-  it('a light window wears Light green sky', () => {
-    expect(skyTheme(shownSkyId(null, false))?.name).toBe('Light green sky');
+  // Since w-9687db6270 (2026-11-22) the light default is the website's mountains.
+  it('a light window wears Light orange mountains', () => {
+    expect(skyTheme(shownSkyId(null, false))?.name).toBe('Light orange mountains');
   });
 });
 

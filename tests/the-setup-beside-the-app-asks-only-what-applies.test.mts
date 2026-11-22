@@ -163,9 +163,10 @@ describe('the look a new install starts on', () => {
 
 describe('the first page', () => {
   // The founder picked the sky design, "with a better title like 'An inbox for hundreds of agents'".
+  // On 2026-11-22 it took the website's words and mountains (tests/the-light-default-is-orange-mountains-with-birds-that-fly).
   const first = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
   it('says what the app is', () => {
-    expect(first).toContain('An inbox for hundreds of agents.');
+    expect(first).toContain('Your team and its agents, in one place.');
     expect(first).not.toContain('Give your agents an inbox');
   });
   it('stands on the sky the setup will wear', () => {

@@ -1,6 +1,9 @@
 // The dithered sky drawn behind Home and the Inbox.
 // Square dots on a grid, four levels per channel, ordered by an 8x8 Bayer
 // matrix: a bright streak with a glow on its upper side and sparse grain.
+// A sky with `mountains` draws the website's ranges instead (./mountains.ts).
+
+import { drawMountains, type Mountains } from './mountains';
 
 export type Rgb = [number, number, number];
 export type Palette = { core: Rgb; hot: Rgb; halo: Rgb; ember: Rgb };
@@ -23,6 +26,11 @@ export type SkyArt = {
   /** Light only: on the empty Inbox the ink is drawn at this strength, and fainter behind the words. */
   emptySoft?: number;
   glow?: Glow[];
+  mountains?: Mountains;
+  /** The card's colour fades to this at its foot, behind the mountains. */
+  foot?: string;
+  /** Birds fly over the mountains in this ink (./birds.ts). */
+  birds?: Rgb;
 };
 
 export type SkyId = string;
@@ -59,7 +67,13 @@ const AUBERGINE = light(
 
 // The card is white and the sky fades into it, the way dark fades to black.
 // `frame` tints the window around the card so the white stands off it.
+const ORANGE_RANGES: Mountains['inks'] = [[238, 96, 24], [240, 112, 46], [242, 128, 70], [244, 146, 96]];
+
 const LIGHT_SKIES: Sky[] = [
+  // The website's hero (design w-9687db6270/light-theme-1-mountains-home). The frame stays near grey: a warm one read as tinted.
+  { id: 'mountains', name: 'Light orange mountains', dark: false, frame: '#f3f2f0', art: {
+    ...light({ core: [238, 96, 24], hot: [250, 170, 110], halo: [236, 160, 120], ember: [200, 80, 28] }, []),
+    mountains: { inks: ORANGE_RANGES, alpha: 0.44, lift: 0.62 }, foot: '#fbfaf8', birds: [238, 96, 24] } },
   { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
@@ -79,13 +93,13 @@ export function skyTheme(id: string | null | undefined): Sky | null {
 /** Stored when plain Light or Dark is picked, so the default sky never covers that choice. */
 export const PLAIN = 'none';
 
-/** The sky worn: the one picked, none for a plain look picked, and otherwise orange in the dark and green in the light. */
+/** The sky worn: the one picked, none for a plain look picked, and otherwise the orange sky in the dark and the orange mountains in the light. */
 export function shownSkyId(saved: string | null, dark: boolean): SkyId | null {
   if (saved === PLAIN) return null;
-  return skyTheme(saved)?.id ?? (dark ? 'ember' : 'sage');
+  return skyTheme(saved)?.id ?? (dark ? 'ember' : 'mountains');
 }
 
-/** The look step's choice that follows the Mac: it saves no sky, so shownSkyId wears orange in the dark and green in the light. */
+/** The look step's choice that follows the Mac: it saves no sky, so shownSkyId wears the dark or light default. */
 export const MATCH_SKY = 'match';
 
 const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
@@ -117,6 +131,7 @@ export function lineStrength(x: number, y: number, quiet: Box | null | undefined
  *  fully in by `from + span`, dropping out in the ordered pattern above that. */
 /** `curveTop` lays the streak out in the card below that line instead of the whole card. */
 export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dpr = 2, curveTop = 0, quiet = null }: { from: number; span: number; dpr?: number; curveTop?: number; quiet?: Box | null }) {
+  if (art.mountains) { drawMountains(canvas, art.mountains, { dpr, ground: art.bg, foot: art.foot }); return; }
   const W = canvas.clientWidth, H = canvas.clientHeight;
   if (!W || !H) return;
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);

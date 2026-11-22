@@ -36,10 +36,10 @@ describe('the first look', () => {
 
 describe('the sky that follows the Mac', () => {
   // Main's rule (w-1bf65f4322): with no sky saved, the window wears dark orange
-  // in the dark and light green in the light. Match my system is that rule.
-  it('is dark orange on a dark Mac and light green on a light one', () => {
+  // in the dark, and since w-9687db6270 the orange mountains in the light. Match my system is that rule.
+  it('is dark orange on a dark Mac and the orange mountains on a light one', () => {
     expect(shownSkyId(null, true)).toBe('ember');
-    expect(shownSkyId(null, false)).toBe('sage');
+    expect(shownSkyId(null, false)).toBe('mountains');
   });
   it('leaves a picked sky as it is, and plain Light or Dark with no sky', () => {
     expect(shownSkyId('dusk', true)).toBe('dusk');

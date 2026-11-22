@@ -2,6 +2,15 @@ import { useLayoutEffect } from 'react';
 import { paintSky, type SkyArt } from './sky';
 import { followTheCard } from './sky-follows-the-card';
 import { useSidebarShrinks } from '../sidebar-shrinks';
+import { boxIn, flyBirds } from './birds';
+
+/** Home's words, kept clear of birds: the greeting down to the writing box, across the column. */
+function homeWords(wrap: HTMLElement) {
+  const col = boxIn(document.querySelector('.hm-col'), wrap, 24);
+  const top = boxIn(document.querySelector('.hm-hello'), wrap, 24);
+  const end = boxIn(document.querySelector('.hm-start'), wrap, 24);
+  return col && top && end ? { x: col.x, y: top.y, w: col.w, h: end.y + end.h - top.y } : null;
+}
 
 /**
  * The sky, laid over the main card (`.workspace-layout::before`) and under
@@ -31,7 +40,14 @@ export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?:
       },
       paint: () => ({ key: '', draw: () => paintSky(canvas, art, { from, span, dpr: Math.min(2, window.devicePixelRatio || 1) }) }),
     }, { folds });
-    return () => { stop(); wrap.remove(); };
+    let land = () => {};
+    if (art.birds) {
+      const birds = document.createElement('canvas');
+      birds.className = 'home-birds';
+      wrap.appendChild(birds);
+      land = flyBirds(birds, { ink: art.birds, sky: (_W, H) => ({ top: H * 0.06, bottom: H * 0.42, avoid: homeWords(wrap) }) });
+    }
+    return () => { land(); stop(); wrap.remove(); };
   }, [art, from, span, folds]);
   return null;
 }
