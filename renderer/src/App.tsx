@@ -20,13 +20,13 @@ import { chromeIsUp, CHROME_HOLD, CHROME_REACH } from './full-screen-chrome';
 // followed by a refetch.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
+import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, firstRowStaysFirst, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
 import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
-import { setClaudeModels, setCodexFreePlan } from './models';
+import { setClaudeModels, setCodexFreePlan, setFurtherHarnesses } from './models';
 import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
 import { arrowRows, pageTitle, spotIn, stepIn } from './one-thing-at-a-time';
@@ -160,7 +160,7 @@ import { aVoiceNoteIsRecording } from './team/useVoiceRecorder';
 import { aBoxIsListening } from './dictation';
 import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
-import { ChatStart, EmptyChat, JobBlock, MateWork, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow } from './team/everything/PlacePage';
+import { ChatStart, EmptyChat, JobBlock, MateWork, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow, type PlaceView } from './team/everything/PlacePage';
 import { nowAndFinished, personThreads, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
 import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
@@ -249,13 +249,14 @@ import type { ArtifactOpen } from './components/ArtifactView';
 import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
 import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
-import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
+import { insideGroups, NOTHING_INSIDE, type InsideFound, type InsideGroupKey, type InsideRow } from './found-inside';
+import { openedLately } from '../../shared/opened-lately.mts';
 import { revealLine } from './reveal-line';
 import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
 import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
-import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, taskHandedFrom, handedTo as handedToPage, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
+import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, withLevelsForYou, taskHandedFrom, handedTo as handedToPage, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
 import { usePointerHold, useHeldOrder } from './threads/steady-rows';
@@ -1464,6 +1465,8 @@ export default function App() {
     if (isCarrying()) { setTimeout(() => refreshAgain.current(), 300); return next; }
     const worn = next ? wearJustMade(next.items, justMade.current, Date.now()) : null;
     if (worn) justMade.current = worn.held;
+    // A module value, like the model names: set before the repaint the next line causes.
+    setFurtherHarnesses(next?.engines?.further);
     setSnap(next && { ...next, items: overlayPins(overlayPlaces(worn!.items, unsavedPlaces.current), unsavedPins.current) });
     return next;
   }, []);
@@ -1548,7 +1551,9 @@ export default function App() {
     return () => window.removeEventListener(UNDO_MARKS_EVENT, reread);
   }, []);
   const listed = useMemo(() => withoutWithdrawnSends(itemsWithOlder, undoMarks), [itemsWithOlder, undoMarks]);
-  const items = listed;
+  // What a teammate sent you reads one level higher, in every list (w-718af6d149).
+  const meOnTeam = snap?.alpha?.multiplayer !== false && snap?.team?.signedIn ? snap.team.me?.id ?? null : null;
+  const items = useMemo(() => withLevelsForYou(listed, snap?.products ?? [], meOnTeam), [listed, snap?.products, meOnTeam]);
 
   /* --------------------- her agents, as rows in her list ------------------- */
   // EVERY CLAUDE CODE AGENT ON HER MACHINE THAT AGENTBOX DID NOT START. They are
@@ -1720,7 +1725,7 @@ export default function App() {
   // (renderer/src/fleet.ts, w-ec2b04d449).
   const fleet = useMemo((): Fleet => ({
     sessions: new Map(runningRows.map((r) => [r.itemId, r])),
-    queued: queuedWithHeld(snap?.supervisor.queued, heldAnswer && pendingIds.has(heldAnswer) ? heldAnswer : null), remoteHeld: snap?.supervisor.remoteHeld, runNow: snap?.supervisor.runNow,
+    queued: queuedWithHeld(snap?.supervisor.queued, heldAnswer && pendingIds.has(heldAnswer) ? heldAnswer : null), settingUp: snap?.supervisor.settingUp, remoteHeld: snap?.supervisor.remoteHeld, runNow: snap?.supervisor.runNow,
     signInNeeded: snap?.supervisor.signInNeeded, atLimit: snap?.supervisor.atLimit, cannotStart: snap?.supervisor.cannotStart,
     shipping: snap?.supervisor.shipping, stalled: snap?.supervisor.stalled,
     silent: snap?.supervisor.silent, paused: snap?.supervisor.paused,
@@ -2090,9 +2095,16 @@ export default function App() {
   const searchContext = useMemo(() => ({
     products: snap?.products ?? [], people: snap?.team?.people ?? [], me: team?.me ?? null,
   }), [snap?.products, snap?.team?.people, team?.me]);
+  // What you opened lately leads (../../shared/opened-lately). Taken once per
+  // query: J and K open each result in turn, which must not re-sort them.
+  const searchOpened = useMemo(() => {
+    const at = Date.now();
+    return search === null ? null : { opened: openedLately(seenAt, at, focused?.id), now: at };
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [pageInside, setPageInside] = useState<InsideFound>(NOTHING_INSIDE);
   const hits = useMemo(
-    () => (search === null ? null : searchThreads(items, search, searchContext)),
-    [items, search, searchContext],
+    () => (search === null ? null : searchThreads(items, search, searchContext, searchOpened ? { ...searchOpened, inside: pageInside.threads } : undefined)),
+    [items, search, searchContext, searchOpened, pageInside.threads],
   );
   const searchDetails = useMemo(
     () => search === null ? undefined : new Map((hits ?? []).map(h => [h.item.id, threadSearchDetails(h.item, searchContext)])),
@@ -3267,7 +3279,7 @@ export default function App() {
     return () => window.removeEventListener('focus', back);
   }, [focused?.product, focused?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // ⌘K finds threads with the same search as the list's own field.
-  const findThreads = useCallback((q: string) => {
+  const findThreads = useCallback((q: string, inside?: ReadonlyMap<string, string>) => {
     const ruled = repeatsFound(repeats, q);
     return [
     ...ruled.map((rule) => ({
@@ -3277,13 +3289,15 @@ export default function App() {
       run: () => { setModal(null); if (search !== null) closeSearch(); openRepeatRef.current?.(rule); },
     })),
     ...(() => {
-      const found = searchThreads(items, q, searchContext);
-      const summaries = new Map(found.map(({ item, summary }) => [item, summary]));
       const now = Date.now();
+      const found = searchThreads(items, q, searchContext, { opened: openedLately(seenAtNow.current, now, focused?.id), now, inside });
+      const summaries = new Map(found.map(({ item, summary }) => [item, summary]));
+      const leads = new Map(found.map(({ item, lead }) => [item, lead]));
       return withoutRunsOf(found.map(({ item }) => item), ruled).map((item) => ({
       id: `thread-${item.product}-${item.id}`,
       label: threadSearchDetails(item, searchContext).title,
-      ...threadResult(item, { summary: summaries.get(item) ?? '', project: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product, now }),
+      ...threadResult(item, { state: stateOfMine(item), summary: summaries.get(item) ?? '', project: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product, now }),
+      lead: leads.get(item),
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); },
       }));
     })(),
@@ -3291,10 +3305,11 @@ export default function App() {
       id: `card-${card.personId}-${card.threadId}`,
       label: card.title ?? '',
       hint: `${firstName(team?.byId.get(card.personId) ?? null)}'s thread`,
+      state: card.state,
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(null); openTeammateCard(card); },
     })),
     ];
-  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard]);
+  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard, stateOfMine, focused?.id]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
@@ -3638,6 +3653,9 @@ export default function App() {
   const [chatsDirect, setChatsDirect] = useState<string | null>(null);
   // On the chats layout: the page Chats has open beside its list, a member's key or 'team' for the team's day.
   const [chatsPlace, setChatsPlace] = useState<string | null>(null);
+  // Which button is lit on a place, kept here so the window's corner can open your AI teammate's About at its Settings.
+  const [placeView, setPlaceView] = useState<PlaceView>(null);
+  const [aboutAtSettings, setAboutAtSettings] = useState(false);
   // EVERYTHING ELSE (w-b5f23cff71). With AI teammates or Rooms on, the inbox
   // is two tabs: Needs you, and Everything else, where your team sits as cards
   // over whichever one you opened. The Chats page and its sidebar row are gone;
@@ -3793,14 +3811,18 @@ export default function App() {
   // and teammates' shared threads are searched in main; groups and decisions are
   // already on screen.
   const roomNames = useMemo(() => new Map((roomsUi.live ? roomsUi.groups : []).filter((g) => g.key.startsWith('room:')).map((g) => [g.key.slice('room:'.length), g.name])), [roomsUi.live, roomsUi.groups]);
-  const insideFor = useCallback(async (q: string, limit: Record<InsideGroupKey, number>) => {
-    const found = await api.findInThreads({ query: q, limit: { lines: limit.lines + 3, files: limit.files + 2, comments: limit.comments + 2 } });
-    return insideGroups({
-      query: q, found, items, cards: weekCards, rooms: roomNames,
-      messages: snap?.team?.rooms?.messages ?? {}, decisions: snap?.team?.rooms?.decisions ?? {},
-      me: team?.me ?? null, nameOf: (id) => firstName(team?.byId.get(id) ?? null),
-      titleOf: (item) => threadSearchDetails(item, searchContext).title, limit,
-    });
+  const insideFor = useCallback(async (q: string, limit: Record<InsideGroupKey, number>, lately: { opened: Record<string, number>; now: number }): Promise<InsideFound> => {
+    const found = await api.findInThreads({ query: q, limit: { lines: limit.lines + 3, files: limit.files + 2, comments: limit.comments + 2 }, opened: lately.opened });
+    return {
+      groups: insideGroups({
+        query: q, found, items, cards: weekCards, rooms: roomNames,
+        messages: snap?.team?.rooms?.messages ?? {}, decisions: snap?.team?.rooms?.decisions ?? {},
+        me: team?.me ?? null, nameOf: (id) => firstName(team?.byId.get(id) ?? null),
+        titleOf: (item) => threadSearchDetails(item, searchContext).title, limit,
+        opened: { at: lately.opened, now: lately.now },
+      }),
+      threads: new Map((found.threads ?? []).map((t) => [t.id, t.text])),
+    };
   }, [items, weekCards, roomNames, snap?.team?.rooms?.messages, snap?.team?.rooms?.decisions, team, searchContext]);
   // The file a found row asked to open big belongs to that one thread and to that visit.
   const [foundOpenAt, setFoundOpenAt] = useState<{ key: string; open: ArtifactOpen } | null>(null);
@@ -3830,22 +3852,28 @@ export default function App() {
     openTeammateCard(o.card, big);
     if (o.line) revealLine(o.line);
   }, [search, closeSearch, roomsUi, markSeen, openTeammateCard]);
-  const insideForPalette = useCallback(async (q: string) => (await insideFor(q, { lines: 3, files: 3, comments: 2, decisions: 2 })).map((g) => ({
-    key: g.key, label: g.label,
-    rows: g.rows.map((r) => ({
-      id: r.id, label: r.text, found: { text: r.text, file: r.group === 'comments' || r.group === 'files' ? r.file : undefined, who: r.who, at: r.at, where: r.where }, run: () => openInside(r, false),
-    })),
-  })), [insideFor, openInside]);
-  const [pageInside, setPageInside] = useState<InsideGroup[]>([]);
+  const insideForPalette = useCallback(async (q: string) => {
+    const now = Date.now();
+    const got = await insideFor(q, { lines: 3, files: 3, comments: 2, decisions: 2 }, { opened: openedLately(seenAtNow.current, now, focused?.id), now });
+    return {
+      sections: got.groups.map((g) => ({
+        key: g.key, label: g.label,
+        rows: g.rows.map((r) => ({
+          id: r.id, label: r.text, found: { text: r.text, file: r.group === 'comments' || r.group === 'files' ? r.file : undefined, who: r.who, at: r.at, where: r.where }, run: () => openInside(r, false),
+        })),
+      })),
+      threads: got.threads,
+    };
+  }, [insideFor, openInside, focused?.id]);
   const insideForRef = useRef(insideFor);
   insideForRef.current = insideFor;
   useEffect(() => {
     const q = search?.trim();
-    if (!q) { setPageInside([]); return; }
+    if (!q || !searchOpened) { setPageInside(NOTHING_INSIDE); return; }
     let live = true;
-    const timer = setTimeout(() => { void insideForRef.current(q, { lines: 10, files: 6, comments: 6, decisions: 6 }).then((got) => { if (live) setPageInside(got); }).catch(() => {}); }, 90);
+    const timer = setTimeout(() => { void insideForRef.current(q, { lines: 10, files: 6, comments: 6, decisions: 6 }, searchOpened).then((got) => { if (live) { drawnAt.current = firstRowStaysFirst(drawnAt.current); setPageInside(got); } }).catch(() => {}); }, 90);
     return () => { live = false; clearTimeout(timer); };
-  }, [search, items.length]);
+  }, [search, searchOpened, items.length]);
   // Read the threads ahead when a search opens, so the first words typed are answered at once.
   useEffect(() => { if (search !== null || modal === 'palette') api.warmFindInThreads(); }, [search === null, modal === 'palette']); // eslint-disable-line react-hooks/exhaustive-deps
   const openChats = () => {
@@ -7268,6 +7296,8 @@ export default function App() {
       : chatsPlace;
   const backTo = 'Needs you';
   let placeEl: ReactNode = null;
+  // Your AI teammate's ⋯, which stands in the window's corner where the inbox's view and filters do.
+  let mateCorner: ReactNode = null;
   if (placeMember && snap) {
     const back = chatsPlaceShown ? undefined : () => { setEvPick(null); };
     const placeWaits = waits.get(placeMember.key) ?? 0;
@@ -7351,8 +7381,17 @@ export default function App() {
       };
       // Its list is of tasks, so each is named for what it was asked, not for its last message as in the inbox.
       const taskRow = (i: WorkItem, word: string, tone: PlaceRow['tone']): PlaceRow => ({ ...itemRow(i, word, tone), title: shownTitle(i) });
+      const mateKey = placeMember.key;
+      mateCorner = teammatesUi.cornerOf(id, {
+        onSettings: () => { setAboutAtSettings(true); setPlaceView({ of: mateKey, key: 'about' }); },
+        onDeleted: () => { if (chatsPlaceShown) openChatsPlace('team'); else setEvPick(null); },
+      });
       // No chat: you give it tasks here and its answers come to the inbox.
       placeEl = <MemberPlace m={placeMember} waits={placeWaits} about={t?.role ?? 'AI teammate'} onBack={back} backTo={backTo} chatLabel="Tasks"
+        view={placeView} onView={(next) => { setAboutAtSettings(false); setPlaceView(next); }}
+        side={teammatesUi.settingsOf(id, {
+          onJob: () => { setAboutAtSettings(false); setPlaceView({ of: mateKey, key: 'about' }); },
+        })}
         chat={<MateWork name={placeMember.name} now={now}
           active={[...asks.map((i) => taskRow(i, 'Waiting on you', 'ask')), ...split.now.map((i) => taskRow(i, word(i)[0], word(i)[1]))]}
           done={split.finished.map((i) => taskRow(i, '', 'done'))}
@@ -7363,7 +7402,7 @@ export default function App() {
             showToast(`Sent to ${placeMember.name}`);
             return null;
           }} />}
-        parts={[{ key: 'about', label: 'About', body: teammatesUi.aboutOf(id) }]} />;
+        parts={[{ key: 'about', label: 'About', body: teammatesUi.aboutOf(id, { atSettings: aboutAtSettings }) }]} />;
     } else {
       const tm = teamMates.find((x) => `theirmate:${x.owner}:${x.id}` === placeMember.key) ?? null;
       const owner = tm ? team?.byId.get(tm.owner) ?? null : null;
@@ -7649,9 +7688,9 @@ export default function App() {
               onCloudWhenOn={(mode) => { void api.setWorkspaceSetting({ key: 'cloudWhenOn', value: mode }); }}
               onCloudSetUp={() => setCloudSetupOpen(true)}
               onCloudMove={(ids) => { void moveToCloud(ids); }}
-              filters={!roomShown && (!evOn || evKey === 'me' || !!evBoardEl)}
+              filters={!mateCorner && !roomShown && (!evOn || evKey === 'me' || !!evBoardEl)}
               home={teamMode && !onPhone() ? { group: needsGroup, onGroup: setNeedsGroup } : null}
-              view={roomShown ? roomsUi.viewButton : null}
+              view={mateCorner ?? (roomShown ? roomsUi.viewButton : null)}
             />
           ))}
           </>
@@ -8073,7 +8112,7 @@ export default function App() {
                       {leadRowsDrawn(heldLeads.rows.slice(0, heldLeads.rows.length - heldLeads.late))}
                     </> : null}
                   foot={search !== null
-                    ? pageInside.length ? <FoundInside groups={pageInside} query={search} now={now} onOpen={(row) => openInside(row, true)} /> : null
+                    ? pageInside.groups.length ? <FoundInside groups={pageInside.groups} query={search} now={now} onOpen={(row) => openInside(row, true)} /> : null
                     : view === 'inbox' && heldLeads.late ? leadRowsDrawn(heldLeads.rows.slice(-heldLeads.late)) : null}
                   pointer={listPointer}
                   table={search === null}
@@ -8225,6 +8264,7 @@ export default function App() {
           products={rankedProducts}
           items={items}
           engines={snap.engines?.choices}
+          furtherEngines={snap.engines?.further}
           workspaceEngine={snap.engines?.workspace}
           outOfUsage={snap.supervisor.outOfUsage}
           codexModels={codexModels}

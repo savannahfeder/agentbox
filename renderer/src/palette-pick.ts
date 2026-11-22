@@ -2,15 +2,16 @@
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 
-/** Rows whose title is the words first, then starts with them, then has them; otherwise the order they came in. */
-export function titleFirst<T extends { label: string }>(rows: readonly T[], query: string): T[] {
+/** Rows whose title is the words first, then starts with them, then has them; otherwise the order they came in.
+ *  Only among rows of one `lead` (../search SearchHit), so a title never jumps a thread opened lately. */
+export function titleFirst<T extends { label: string; lead?: number }>(rows: readonly T[], query: string): T[] {
   const q = norm(query);
   if (!q) return [...rows];
   const rank = (r: T) => {
     const t = norm(r.label);
     return t === q ? 0 : t.startsWith(q) ? 1 : t.includes(q) ? 2 : 3;
   };
-  return rows.map((r, i) => ({ r, i, k: rank(r) })).sort((a, b) => a.k - b.k || a.i - b.i).map((x) => x.r);
+  return rows.map((r, i) => ({ r, i, k: rank(r), lead: r.lead ?? 0 })).sort((a, b) => b.lead - a.lead || a.k - b.k || a.i - b.i).map((x) => x.r);
 }
 
 /** Every word typed starts a word of the name. */
