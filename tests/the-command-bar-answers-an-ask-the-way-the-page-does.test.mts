@@ -28,17 +28,13 @@ describe('on a help ask', () => {
   });
 });
 
+// A review offers no fixed answers (2026-11-22): "I don't like these
+// predetermined buttons because I think it's just cleaner if somebody replies."
+// Your reply in the box under it is the answer (a-reply-to-a-review-hands-it-back).
 describe('on a review', () => {
-  const rows = threadCommands({ answers: askAnswers('review', 'Sam') });
-  it('offers the two answers the page has', () => {
-    expect(rows.map((r) => r.label)).toEqual(['Looks good', 'Needs changes']);
-    expect(rows.map((r) => r.does)).toEqual([{ act: 'hand-back', verdict: 'yes' }, { act: 'hand-back', verdict: 'changes' }]);
-  });
-  it('finds each by its own words, and "changes" never finds Looks good', () => {
-    expect(type('looks good', rows)).toEqual(['answer-yes']);
-    expect(type('approve', rows)).toEqual(['answer-yes']);
-    expect(type('changes', rows)).toEqual(['answer-changes']);
-    expect(type('review', rows)).toEqual(['answer-yes', 'answer-changes']);
+  it('offers no fixed answer, as the page has none', () => {
+    expect(askAnswers('review', 'Sam')).toEqual([]);
+    expect(threadCommands({ answers: askAnswers('review', 'Sam') }).filter((r) => r.id.startsWith('answer-'))).toEqual([]);
   });
 });
 
@@ -61,6 +57,11 @@ describe('the page', () => {
       const html = page(kind);
       for (const a of askAnswers(kind, 'Sam')) expect(html, a.label).toMatch(new RegExp(`<button[^>]*>${a.label}</button>`));
     }
+  });
+  it('draws no fixed answer under a review', () => {
+    const html = page('review');
+    expect(html).not.toMatch(/<button[^>]*>Looks good<\/button>/);
+    expect(html).not.toMatch(/<button[^>]*>Needs changes<\/button>/);
   });
   it('hands back from the bar through the same hand-back as its buttons', () => {
     const src = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');

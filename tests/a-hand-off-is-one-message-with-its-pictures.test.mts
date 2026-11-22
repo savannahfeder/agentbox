@@ -22,21 +22,21 @@ const pictures = [
   { src: 'attachments/2-after.png', name: '2-after.png', notes: 0, open },
 ];
 const files = [{ src: 'attachments/SKILL.md', name: 'SKILL.md', notes: 2, open }];
-const draw = (layout: 'grid' | 'dock', tried = ['Profile row opens the thread']) => renderToStaticMarkup(React.createElement(HandOffWhat, {
-  owner: 'Theo', tried, pictures, files, roots: ['/shelf/theo/w-5c0ffee123'], layout,
+const draw = (tried = ['Profile row opens the thread']) => renderToStaticMarkup(React.createElement(HandOffWhat, {
+  owner: 'Theo', tried, pictures, files, roots: ['/shelf/theo/w-5c0ffee123'],
 }));
 
 describe('a hand-off from a teammate', () => {
   it('draws every picture on the thread, not only its name', () => {
-    const html = draw('grid');
-    expect(html).toContain('handoff-pics-grid');
+    const html = draw();
+    expect(html).toContain('class="handoff-pics"');
     expect(html.match(/inline-image/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html).toContain('1-before.png');
     expect(html).toContain('2-after.png');
   });
 
   it('says what the agent did, and lists the files that are not pictures', () => {
-    const html = draw('grid');
+    const html = draw();
     expect(html).toMatch(/What Theo(&#x27;|')s agent did/);
     expect(html).toContain('Profile row opens the thread');
     expect(html).toContain('SKILL.md');
@@ -45,7 +45,7 @@ describe('a hand-off from a teammate', () => {
   });
 
   it('says nothing about the agent when it recorded no steps', () => {
-    expect(draw('grid', [])).not.toContain("agent did");
+    expect(draw([])).not.toContain("agent did");
   });
 
   it('is the ask itself, in place of the summary card, so it is said once', () => {

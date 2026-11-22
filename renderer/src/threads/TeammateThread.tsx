@@ -27,11 +27,11 @@ import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
 import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard, WorkItem } from '../types';
 import { AskBar } from '../team/AskBar';
-import { HandOffWhat, handOffLayout } from '../team/HandOff';
+import { HandOffWhat } from '../team/HandOff';
 import { doneSteps } from '../../../shared/thread-cards.mts';
 import { MessagePerson, TeammateStanding, TeammateSummary, ThreadCrumb } from './Summary';
 import { ThreadMenu } from './ThreadMenu';
-import { aroundTheAnswer, stillOnItsWay, askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
+import { aroundTheAnswer, notesWithYourReply, stillOnItsWay, askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
 import { HAND_BACK_EVENT, type AskVerdict } from '../thread-commands';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
@@ -73,10 +73,12 @@ export function TeammateCorner({ person, followed, onFollow, onContinue, onMessa
  * which shows your unsent words and opens on R or a click, and the card it
  * opens into, which grows as you write and says who gets it beside Send.
  */
-export function CommentBox({ owner, helping, draft, setDraft, sending, onSend, open, onOpen, onFold }: {
+export function CommentBox({ owner, helping, notes = 0, draft, setDraft, sending, onSend, open, onOpen, onFold }: {
   owner: string;
   /** You were asked to help: the words go to the owner's agent. */
   helping: boolean;
+  /** Notes on their files that go with this reply, which can then be sent with no words. */
+  notes?: number;
   draft: string; setDraft: (text: string) => void;
   sending: boolean; onSend: () => void;
   open: boolean; onOpen: () => void; onFold: () => void;
@@ -112,9 +114,10 @@ export function CommentBox({ owner, helping, draft, setDraft, sending, onSend, o
           if (e.key === 'Escape') { e.stopPropagation(); if (draft.trim()) field.current?.blur(); else onFold(); }
         }} />
       <div className="compose-sentence dock-bar">
-        <span className="compose-clauses"><span className="dim">{helping ? `Goes to ${owner}'s agent.` : `Goes to ${owner}.`}</span></span>
+        <span className="compose-clauses"><span className="dim">{helping ? `Goes to ${owner}'s agent.`
+          : notes ? `Goes to ${owner} with your ${notes === 1 ? 'note' : `${notes} notes`}.` : `Goes to ${owner}.`}</span></span>
         <span className="dock-send-pair solo">
-          <button type="submit" className="dock-send" disabled={!draft.trim() || sending} title={`Send · ${sendKeyFor(true)}`}>
+          <button type="submit" className="dock-send" disabled={(!draft.trim() && !notes) || sending} title={`Send · ${sendKeyFor(true)}`}>
             {sending ? 'Sending…' : <>Send <kbd>{sendKeyFor(true)}</kbd></>}<SendGlyph />
           </button>
         </span>
@@ -256,6 +259,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
     const lines = work?.lines ?? [];
     return threadFiles([...filesInLines(lines), ...otherFilesInLines(lines)]).flatMap((f) => f.versions.map((v) => ({ path: v.path, file: v.id })));
   }, [work?.lines]);
+  const versionNames = useMemo(() => threadFiles([...filesInLines(work?.lines ?? []), ...otherFilesInLines(work?.lines ?? [])])
+    .flatMap((f) => f.versions.map((v) => ({ id: v.id, name: v.name }))), [work?.lines]);
   const copiesKey = JSON.stringify(copies);
   const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
   const [line, setLine] = useState<FileLine[]>([]);
@@ -318,25 +323,29 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
 
-  // A review on you is answered by the box: your words hand it back, and stand here until the thread has them.
+  // A review on you is answered by the box: your words, and the notes you left on its files, hand it back in one message,
+  // which stands here until the thread has it.
   const reviewing = ask?.ask?.kind === 'review' && !!onHandBack;
+  const held = reviewing && ask ? notesWithYourReply(marks.notes, versionNames, team?.me ?? null, ask.createdAt ?? 0) : null;
   const [sentBack, setSentBack] = useState<{ at: number; text: string } | null>(null);
   useEffect(() => { setSentBack(null); }, [personId, threadId]);
   const send = async (said?: string) => {
     const text = (said ?? draft).trim();
-    if (!text || sending) return;
+    if ((!text && !held?.ids.length) || sending) return;
     if (reviewing && said === undefined) {
       setSending(true);
       const at = Date.now();
-      const ok = await handBack('done', text);
+      const ok = await handBack('done', [text, held?.text].filter(Boolean).join('\n\n'));
       setSending(false);
       if (!ok) return;
+      if (held?.ids.length) void api.teamMarkFile({ personId, threadId, mark: { do: 'sent', on: held.ids } }).catch(() => {});
       setDraft('');
       setBoxOpen(false);
-      setSentBack({ at, text });
+      setSentBack({ at, text: text || held?.text || '' });
       following?.follow(card);
       return;
     }
+    if (!text) return;
     setSending(true);
     const out = await api.teamComment({ personId, threadId, text });
     setSending(false);
@@ -398,32 +407,25 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   });
   const title = card.title || `${owner}'s thread`;
 
-  // AN ASK ON YOU IS ONE MESSAGE: their words, what the agent did, the pictures and files, and the answers.
+  // AN ASK ON YOU IS ONE MESSAGE: their words, what the agent did, the pictures and files. A review is answered by replying, not by fixed buttons.
   const asked = !!(ask && onHandBack);
-  const layout = handOffLayout();
   const pictures = files.filter((f) => PICTURE.test(f.name));
   const otherFiles = files.filter((f) => !PICTURE.test(f.name));
   const handOff = ask && onHandBack ? (
-    <AskBar key={`${ask.product}/${ask.id}`} task={ask} className={`handoff handoff-${layout}`} owner={person} onHandBack={handBack} onOpenChange={(src) => onOpenDoc(ask.product, src)}>
-      <HandOffWhat owner={owner} tried={doneSteps(card.progress)} pictures={pictures} files={otherFiles} roots={dir ? [dir] : []} layout={layout} />
+    <AskBar key={`${ask.product}/${ask.id}`} task={ask} className="handoff" answeredBelow={reviewing} owner={person} onHandBack={handBack} onOpenChange={(src) => onOpenDoc(ask.product, src)}>
+      <HandOffWhat owner={owner} tried={doneSteps(card.progress)} pictures={pictures} files={otherFiles} roots={dir ? [dir] : []} />
     </AskBar>
   ) : null;
   // The thread above the hand-off is there to scroll up through, not folded away, and stays so once it is answered.
   const wasAsked = useRef<string | null>(null);
   if (asked) wasAsked.current = threadId;
   const unfolded = asked || wasAsked.current === threadId;
-  const besideOnce = useRef<string | null>(null);
-  useEffect(() => {
-    if (!asked || layout !== 'beside' || !pictures.length || besideOnce.current === threadId) return;
-    besideOnce.current = threadId;
-    beside(pictures[0].src);
-  }, [asked, layout, pictures.length, threadId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="focus-pane tp-thread">
       {big && product && (
         <ArtifactView product={product} project={card.project ?? null} draftsAcross={`teammate:${personId}:${threadId}`} lines={viewLines} numbers={numbered.numbers} marks={marks}
-          me={team?.me ?? null} people={people} open={big} ownerOfRow={personId}
+          me={team?.me ?? null} people={people} open={big} ownerOfRow={personId} withYourReply={reviewing}
           write={async (mark) => {
             const key = markGoesTo(mark, elsewhere);
             if (key) return api.filesPlaceMark({ key, mark });
@@ -482,7 +484,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             {underAnswer.length > 0 && <FileMarkOpener.Provider value={openMark}>
               <Thread events={underAnswer} name={`${owner}'s agent`} landOn={`${threadId}:after`} onWhole={() => {}} md={md} />
             </FileMarkOpener.Provider>}
-            {layout !== 'dock' && handOff && <div ref={handOffEl}>{handOff}</div>}
+            {handOff && <div ref={handOffEl}>{handOff}</div>}
             {underAsk.length > 0 && <FileMarkOpener.Provider value={openMark}>
               <Thread events={underAsk} name={`${owner}'s agent`} landOn={`${threadId}:after-ask`} onWhole={() => {}} md={md} />
             </FileMarkOpener.Provider>}
@@ -505,9 +507,8 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
               selectedOption={null} selRef={pickRef} onPick={pick}
               onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />
           </div>}
-          {layout === 'dock' && handOff}
           {/* Asked to help, the box to write to the agent stays open. */}
-          <CommentBox owner={owner} helping={helping} draft={draft} setDraft={setDraft} sending={sending} onSend={() => void send()}
+          <CommentBox owner={owner} helping={helping} notes={held?.ids.length ?? 0} draft={draft} setDraft={setDraft} sending={sending} onSend={() => void send()}
             open={boxOpen || helping} onOpen={() => setBoxOpen(true)} onFold={() => setBoxOpen(false)} />
         </div>
       </div>

@@ -20,7 +20,8 @@ const handBack = (at: number, text: string) => ({ at, who: 'you', text } as Agen
 
 describe('a reply to a review', () => {
   it('hands the review back with your words, rather than only commenting', () => {
-    expect(page).toMatch(/if \(reviewing && said === undefined\) \{[\s\S]{0,200}await handBack\('done', text\)/);
+    // With the notes you left on its files (notes-on-a-teammates-pictures-go-with-your-reply).
+    expect(page).toMatch(/if \(reviewing && said === undefined\) \{[\s\S]{0,200}await handBack\('done', \[text, held\?\.text\]/);
   });
 
   it('is drawn while the hand-back has not reached the thread', () => {

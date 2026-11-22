@@ -90,20 +90,5 @@
 .handoff .inline-image { display: block; width: 100%; margin: 0; }
 .handoff .inline-image-open { width: 100%; }
 .handoff .inline-image-name { margin: 6px 0 0; }
-.handoff-pics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 14px; }
-.handoff-pics-full { display: flex; flex-direction: column; gap: 18px; }
-.handoff-pics-dock, .handoff-pics-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 2px; }
-.handoff-pics-beside { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; }
-.handoff-thumb { flex: none; width: 168px; padding: 0; font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer; }
-.handoff-pics-beside .handoff-thumb { width: auto; min-width: 0; }
-.handoff-thumb .inline-image { height: 104px; object-fit: cover; object-position: top; }
-.handoff-thumb:hover .inline-image { border-color: var(--text-faint); }
-.handoff-pics-strip .handoff-thumb { width: 132px; }
-.handoff-pics-strip .handoff-thumb .inline-image { height: 82px; }
-.handoff-pics-strip .handoff-thumb.on .inline-image { border-color: var(--text-dim); }
-.handoff-viewer { display: flex; flex-direction: column; gap: 12px; }
-.handoff-viewer > .inline-image-open { width: fit-content; max-width: 100%; }
-.handoff-viewer > .inline-image-open > .inline-image { width: auto; max-width: 100%; max-height: 340px; }
+.handoff-pics { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 14px; }
 .handoff-files { margin: 0; }
-/* Docked over the reply box, it stays in view while the thread scrolls above it. */
-.focus-dock .ask-bar.handoff-dock { margin: 0 0 12px; padding: 16px 20px 18px; max-height: 46vh; overflow: auto; background: var(--bg-raised); }

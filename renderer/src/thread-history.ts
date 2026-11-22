@@ -30,6 +30,8 @@ import { handBackReadBy } from '../../shared/thread-asks.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
+// How a mark a teammate's copy made is named on the thread (main/team/thread-share.mts `asLine`).
+const TEAMMATE_MARK = 'mark-';
 
 export interface LedgerLine {
   id: string;
@@ -323,6 +325,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       if (mark.do === 'note' && mark.id) {
         const n = (pinsSoFar.get(mark.file ?? '') ?? 0) + (mark.place?.kind === 'pin' || hasSpot(mark.place) ? 1 : 0);
         pinsSoFar.set(mark.file ?? '', n);
+        // A teammate's note addressed to nobody waits for their reply, which says it (TeammateThread `notesWithYourReply`).
+        if (String(line.uid ?? '').startsWith(TEAMMATE_MARK) && mark.wait && !(mark.mentions ?? []).some((m) => m !== line.by)) continue;
         events.push({
           at, who: 'you', said: 'Commented', words: mark.text ?? '', message: true,
           fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}), ...(mark.wait && !sentNotes.has(mark.id) && !(mark.mentions ?? []).some((m) => m !== line.by) ? { unsent: true as const } : {}) },

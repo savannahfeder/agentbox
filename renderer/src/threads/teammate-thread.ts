@@ -1,7 +1,7 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
 import type { AgentEvent, LinkCommentWaiting, ThreadCard } from '../types';
 import { askIsOpen, askOf, handBackReadBy, isHandBack, type AskRow } from '../../../shared/thread-asks.mts';
-import { filesInLines, threadFiles, versionForPath, type ThreadLine } from '../../../shared/artifact-marks.mts';
+import { filesInLines, placeWords, threadFiles, versionForPath, type FileNote, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 /**
  * The owner's thread as you read it: what you wrote to their agent is yours and
@@ -67,6 +67,19 @@ const CLOCKS_DIFFER_MS = 2 * 60_000;
 export function stillOnItsWay(events: readonly AgentEvent[], sent: { at: number; text: string } | null): boolean {
   if (!sent) return false;
   return !events.some((e) => !e.kind && e.at >= sent.at - CLOCKS_DIFFER_MS && String((e as { text?: string }).text ?? '').includes(sent.text));
+}
+
+/**
+ * The notes you left on a teammate's files while their review was on you, held
+ * for your reply: said under each file's name, in the order you wrote them.
+ */
+export function notesWithYourReply(notes: readonly FileNote[], names: readonly { id: string; name: string }[], me: string | null, since: number): { text: string; ids: string[] } {
+  const held = notes.filter((n) => n.by === me && n.wait && !n.sent && !n.resolved && !n.toAgent && n.ts >= since && !(n.mentions ?? []).some((m) => m !== me));
+  const byFile = new Map<string, FileNote[]>();
+  for (const n of held) byFile.set(n.file, [...(byFile.get(n.file) ?? []), n]);
+  const nameOf = new Map(names.map((v) => [v.id, v.name]));
+  const parts = [...byFile].map(([file, these]) => [`Notes on ${nameOf.get(file) ?? 'a file'}:`, ...these.map((n) => `- ${placeWords(n)}: ${n.text}`)].join('\n'));
+  return { text: parts.join('\n\n'), ids: [...byFile.values()].flat().map((n) => n.id) };
 }
 
 /**
