@@ -31,19 +31,21 @@ import { type ThemeChoice } from './theme';
 import { DONE } from './done-word';
 import { agoShort } from './home/home-model';
 import { localDate } from './local-dates';
+import type { ThreadStateWord } from './types';
+import { threadState, type CardItem } from '../../shared/thread-cards.mts';
 
 /* ------------------------------- threads --------------------------------- */
 
-export type ThreadResult = { sub: string; hint: string; done: boolean };
+export type ThreadResult = { sub: string; hint: string; state: ThreadStateWord };
 
-/** A thread ⌘K found: the line it was found by, where it is and how old, and whether it is finished. */
+/** A thread ⌘K found: the line it was found by, where it is and how old, and which list it sits in. */
 export function threadResult(
-  item: { status: string; updatedAt?: number; createdAt: number },
-  { summary, project, now }: { summary: string; project: string; now: number },
+  item: CardItem & { updatedAt?: number; createdAt: number },
+  { summary, project, now, state }: { summary: string; project: string; now: number; state: ThreadStateWord | null },
 ): ThreadResult {
   const at = item.updatedAt ?? item.createdAt;
   const age = now - at < 86_400_000 ? agoShort(at, now) : localDate(at, { month: 'short', day: 'numeric' });
-  return { sub: summary, hint: `${project} · ${age}`, done: item.status === 'done' };
+  return { sub: summary, hint: `${project} · ${age}`, state: state ?? threadState(item, now) };
 }
 
 /* ------------------------------- matching -------------------------------- */

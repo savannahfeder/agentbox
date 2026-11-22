@@ -3,7 +3,7 @@
 
 import { cloudCommands, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import type { Product, View } from '../types';
+import type { Product, ThreadStateWord, View } from '../types';
 import { commandKeys } from '../palette-keys';
 import { keptPick, nameRank, namesIt, pointerMoved, titleFirst } from '../palette-pick';
 import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
@@ -22,8 +22,8 @@ export interface Command {
   hint?: string;
   /** A thread's line under its title: the sentence the query was found in. */
   sub?: string;
-  /** A finished thread, drawn dimmed. */
-  done?: boolean;
+  /** A thread's list, which picks its icon (../palette-glyphs). */
+  state?: ThreadStateWord;
   // Words she might TYPE that the label does not say. Matched, never shown;
   // the hint is shown, never matched (../palette-rows).
   keywords?: string;
@@ -598,7 +598,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
           {filtered.map((c, i) => (<Fragment key={keys[i]}>
             {labels.has(i) && <div className="palette-section">{labels.get(i)}</div>}
             <div
-              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${!phone && c.sub ? 'palette-two ' : ''}${c.done ? 'palette-done ' : ''}${i === selected ? 'selected' : ''}`}
+              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${!phone && c.sub ? 'palette-two ' : ''}${i === selected ? 'selected' : ''}`}
               role="option"
               aria-selected={i === selected}
               onClick={c.run}
