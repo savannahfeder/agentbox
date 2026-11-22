@@ -13,6 +13,7 @@ import { voiceName } from '../../../shared/agent-voice.mts';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
 import { dayAndTime, firstRealLine, itemOptions } from '../format';
 import { asksSomething } from '../../../shared/teammates.mts';
+import { saysItStopped } from '../../../shared/carried-on-outside.mts';
 import { threadState } from '../../../shared/thread-cards.mts';
 import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
@@ -189,8 +190,8 @@ export type Ranked = { priority?: number | null; updatedAt: number; placedAt?: n
 
 /**
  * WHEN A PERSON LAST WROTE ON THE THREAD (w-21b638d821): the newest of the
- * opening message, a reply (a picked option and an approval are replies), and
- * starting it from Later. An agent's write never moves it, because the Status
+ * opening message, a reply (a picked option and an approval are replies, and so
+ * is one typed where a chat brought in started), and starting it from Later. An agent's write never moves it, because the Status
  * column already says what the agent is doing. A thread no person has written
  * on reads when it was made; a row with no record of who wrote what, a
  * teammate's card, reads when it last changed.
@@ -201,7 +202,7 @@ export function sentAt(r: Ranked): number {
     const w = r.wrote?.[field];
     return w && w.source !== 'agent' ? w.ts : 0;
   };
-  return Math.max(by('body'), by('answer'), r.start === 'now' ? by('start') : 0) || r.createdAt || r.updatedAt;
+  return Math.max(by('body'), by('answer'), by('saidOutside'), r.start === 'now' ? by('start') : 0) || r.createdAt || r.updatedAt;
 }
 const bySent = (a: Ranked, b: Ranked) => sentAt(b) - sentAt(a);
 
@@ -698,7 +699,7 @@ export function cellUnderTab(word: string, tab: string | undefined, { fromPeople
 export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined> }): boolean {
   if (itemOptions(item).length) return false;
   const said = (item.wrote?.note?.ts ?? 0) > (item.wrote?.result?.ts ?? 0) ? item.note : item.result;
-  return asksSomething(said);
+  return asksSomething(said) || saysItStopped(said);
 }
 
 /**

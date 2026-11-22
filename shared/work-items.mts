@@ -110,6 +110,7 @@ export type WorkItemPatch = {
   linkComment?: LinkComment;
   linkReply?: { file: string; text: string };
   saidOutside?: string;
+  chatAt?: number;
   comment?: { text: string; name?: string };
   artifact?: ArtifactMarkPatch;
   putAway?: boolean;
@@ -403,6 +404,9 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // written by the app as yours. Like `linkReply` it starts no agent: the agent
   // it was typed to already has it.
   'saidOutside',
+  // HOW FAR THAT CHAT HAS BEEN READ, in its own times: the row's last write is
+  // no measure, since the write-up of one answer lands after the next message.
+  'chatAt',
   // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
   // writes from the cloud's own comment (main/team/thread-share.mts). A delta
   // like `react`, read back as `waitingComments` until the owner deals with
@@ -746,7 +750,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     //
     // A ts rather than a flag, so her NEXT answer outdates it by carrying a
     // later one, with nothing to clear and nobody who has to remember to.
-    case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
+    case 'chatAt': case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
     // An empty list is a real value: it is how the last label, `ship` above
     // all, comes off.
     case 'labels': {

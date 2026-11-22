@@ -25,7 +25,9 @@ export function heldOutside(item: Held | null | undefined): boolean {
 /** An agent stopped on its own window, whose question is nowhere else: Claude
  *  Code writes nothing to the chat while one is open. `waitingFor` is its
  *  session file's word. */
+const STOPPED = '**Claude Code stopped to ';
 export function stoppedThere(waitingFor: string): string {
   const why = waitingFor === 'permission prompt' ? 'ask for your OK' : 'ask you a question';
-  return `**Claude Code stopped to ${why}. Answer it there.**`;
+  return `${STOPPED}${why}. Answer it there.**`;
 }
+export const saysItStopped = (text: unknown): boolean => String(text ?? '').startsWith(STOPPED);

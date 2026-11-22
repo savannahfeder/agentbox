@@ -272,6 +272,56 @@ describe('a Claude Code chat brought in, answered in the terminal', () => {
   });
 });
 
+// Measured 2026-11-21 on a real chat: its answer came at 7:20:46, the write-up
+// of it landed at 7:21:07, and what was typed in the terminal at 7:20:58 never
+// reached the thread, because it was older than the row's last write. The row
+// now remembers how far the chat has been read (`chatAt`).
+describe('what happens in the terminal while the last answer is written up', () => {
+  const writeUp = (now) => s.modules.workItemsDisk.updateWorkItem(s.productDir(slug), row().id, { problem: 'A flaky test.', result: '**Ship it?**\n\nMocked.\n\n## Options\n1. Ship it\n2. Wait' }, { source: 'agent', now });
+  const answered = async () => {
+    write(typed(T0 + 200_000, 'Mock the clock.'), says(T0 + 230_000, 'Mocked. Ship it?'));
+    session('idle');
+    await follow();
+    expect(row().result).toBe('Mocked. Ship it?');
+  };
+
+  it('is on the thread, though it was typed before the write-up landed', async () => {
+    await answered();
+    write(typed(T0 + 240_000, 'Run it 200 times first.'), runs(T0 + 241_000));
+    writeUp(Date.now() + 1_000);
+    session('busy');
+    await followClaudeChats({ store: s, dirs: [home], now: Date.now() + 2_000 });
+    expect(row().status).toBe('claimed');
+    expect(threadEvents(s.readHistory(slug, row().id)).filter((e) => e.saidOutside).map((e) => e.words)).toEqual(['Mock the clock.', 'Run it 200 times first.']);
+    // So the options it answered are no longer offered.
+    expect(offerIsLive(row())).toBe(false);
+  });
+
+  it('answers the row too, when the agent finished before the write-up landed', async () => {
+    await answered();
+    write(typed(T0 + 240_000, 'Run it 200 times first.'), says(T0 + 250_000, 'All 200 passed.'));
+    writeUp(Date.now() + 1_000);
+    await followClaudeChats({ store: s, dirs: [home], now: Date.now() + 2_000 });
+    expect(row().result).toBe('All 200 passed.');
+  });
+
+  it('is not read twice when nothing is newer than what was read', async () => {
+    await answered();
+    writeUp(Date.now() + 1_000);
+    const lines = s.readHistory(slug, row().id).length;
+    await followClaudeChats({ store: s, dirs: [home], now: Date.now() + 2_000 });
+    expect(s.readHistory(slug, row().id).length).toBe(lines);
+    expect(row().result).toMatch(/^\*\*Ship it\?/);
+  });
+
+  it('a row brought in before the app kept this is read from its last write, as it was', () => {
+    const { knownAt, heardThrough } = s.chatsToFollow()[0];
+    expect([knownAt, heardThrough]).toEqual([T0 + 60_000, T0 + 60_000]);
+    s.modules.workItemsDisk.updateWorkItem(s.productDir(slug), row().id, { chatAt: 0 }, { source: 'system' });
+    expect(s.chatsToFollow()[0].knownAt).toBe(row().wrote.result.ts);
+  });
+});
+
 describe('a Codex chat brought in, answered in Codex', () => {
   const CID = '019a7c1e-0000-7000-8000-00000000c0de';
   const codexRow = () => s.listItems().find((i) => i.product === slug && (i.labels ?? []).includes(`codex:${CID}`));
@@ -304,6 +354,18 @@ describe('a Codex chat brought in, answered in Codex', () => {
       ['You replied in Codex', 'Starter, Team and Scale.'],
       ['It came back to you', 'Renamed all three.'],
     ]);
+  });
+
+  it('takes an answer Codex gave while its last one was being written up, and keeps the write-up until then', async () => {
+    const t = Date.now() - 60_000;
+    await pass(thread({ herLast: 'Starter, Team and Scale.', herLastAt: t, turnOpen: false, last: 'Renamed all three.', saidAt: t + 5_000 }));
+    s.modules.workItemsDisk.updateWorkItem(s.productDir(slug), codexRow().id, { problem: 'Plan names.', result: '**Ship it?**' }, { source: 'agent' });
+    // Read again with nothing new: the write-up stands, whatever else touched the file.
+    await pass(thread({ herLast: 'Starter, Team and Scale.', herLastAt: t, turnOpen: false, last: 'Renamed all three.', saidAt: t + 5_000, when: Date.now() + 60_000 }));
+    expect(codexRow().result).toBe('**Ship it?**');
+    await pass(thread({ herLast: 'Docs too.', herLastAt: t + 10_000, turnOpen: false, last: 'Docs renamed.', saidAt: t + 20_000, when: t + 20_000 }));
+    expect(codexRow().result).toBe('Docs renamed.');
+    expect(threadEvents(s.readHistory(slug, codexRow().id)).filter((e) => e.saidOutside).map((e) => e.words)).toEqual(['Starter, Team and Scale.', 'Docs too.']);
   });
 
   it('stays In progress through Codex\'s own messages mid-turn, which is what its turn marks are for', async () => {
@@ -403,7 +465,7 @@ describe('reading where a chat stands', () => {
       line(T0 + 65_000, 'response_item', { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Looking at the plans page.' }] }),
     ];
     fs.writeFileSync(rollout, `${head.join('\n')}\n`);
-    expect(readRollout(rollout)).toMatchObject({ herLast: 'Starter, Team and Scale.', herLastAt: T0 + 60_100, turnOpen: true, herTurnLast: false });
+    expect(readRollout(rollout)).toMatchObject({ herLast: 'Starter, Team and Scale.', herLastAt: T0 + 60_100, saidAt: T0 + 65_000, turnOpen: true, herTurnLast: false });
     fs.appendFileSync(rollout, `${line(T0 + 70_000, 'event_msg', { type: 'task_complete', turn_id: 't2' })}\n`);
     expect(readRollout(rollout).turnOpen).toBe(false);
   });

@@ -46,7 +46,7 @@ export const stoppedOn = (state: ClaudeSessionState | null | undefined) => (stat
 
 export type ChatMove = { move: 'working' } | { move: 'answered'; said: string } | { move: 'stopped'; stop: string; news: string } | { move: 'stays' };
 
-/** `knownAt` is when the row last heard from the chat (its result's time). */
+/** `knownAt` is how far the agent's side of the chat has been read onto the row. */
 export function whereTheChatIs(
   turn: ChatTurn | null,
   { running, waitingFor = null, knownAt }: { running: boolean; waitingFor?: string | null; knownAt: number },
@@ -77,7 +77,7 @@ export interface FollowedChat {
   engine: 'claude' | 'codex';
   chat: string;
   knownAt: number;
-  /** When the row last heard from either side of the chat. */
+  /** How far the chat's own words have been read onto the row. */
   heardThrough: number;
   /** Its project's own folder, where its transcript usually is. */
   folder: string | null;
@@ -91,17 +91,18 @@ export interface FollowedChat {
 
 export interface FollowStore {
   chatsToFollow(now?: number): FollowedChat[];
-  chatSaidOutside(slug: string, id: string, words: string, opts?: { now?: number }): unknown;
+  // `at` is the newest of the chat's own times this puts on the row.
+  chatSaidOutside(slug: string, id: string, words: string, opts: { at: number; now?: number }): unknown;
   holdChatOutside(slug: string, id: string, holder: string, opts?: { now?: number }): Promise<unknown>;
-  chatAnsweredOutside(slug: string, id: string, said: string, opts?: { now?: number }): unknown;
-  chatStoppedOutside(slug: string, id: string, stop: string, news: string, opts?: { now?: number }): unknown;
-  chatAsksAgain(slug: string, id: string, asks: { words: string; said: string; stopped: boolean }, opts?: { now?: number }): unknown;
+  chatAnsweredOutside(slug: string, id: string, said: string, opts: { at: number; now?: number }): unknown;
+  chatStoppedOutside(slug: string, id: string, stop: string, news: string, opts: { at: number; now?: number }): unknown;
+  chatAsksAgain(slug: string, id: string, asks: { words: string; said: string; stopped: boolean }, opts: { at: number; now?: number }): unknown;
   letGoOfChat(slug: string, id: string, opts?: { now?: number }): unknown;
 }
 
 export interface CodexChatLike {
   id?: string; herTurnLast?: boolean; live?: boolean; herLast?: string; herLastAt?: number; turnOpen?: boolean | null; lastActive?: number;
-  last?: string; waiting?: boolean;
+  last?: string; saidAt?: number; waiting?: boolean;
 }
 
 /** A Codex turn this quiet is taken to have died, so the row comes back. */
@@ -147,17 +148,19 @@ function claudeChatFile(c: FollowedChat, dirs: string[]): string | null {
   return null;
 }
 
-async function move(store: FollowStore, c: FollowedChat, where: ChatMove, holder: string, now: number) {
+const newestIn = (turn: ChatTurn) => Math.max(turn.heardAt, turn.saidAt);
+
+async function move(store: FollowStore, c: FollowedChat, where: ChatMove, holder: string, { at, now }: { at: number; now: number }) {
   if (where.move === 'working') {
     const got = await store.holdChatOutside(c.product, c.id, holder, { now });
     return got && !c.held ? 1 : 0;
   }
   if (where.move === 'answered') {
-    store.chatAnsweredOutside(c.product, c.id, where.said, { now });
+    store.chatAnsweredOutside(c.product, c.id, where.said, { at, now });
     return 1;
   }
   if (where.move === 'stopped') {
-    store.chatStoppedOutside(c.product, c.id, where.stop, where.news, { now });
+    store.chatStoppedOutside(c.product, c.id, where.stop, where.news, { at, now });
     return c.held ? 1 : 0;
   }
   if (c.held) {
@@ -185,14 +188,14 @@ export async function followClaudeChats(
     if (c.doneAt) {
       if (!turn || turn.heardAt <= c.doneAt) continue;
       const asks = asksNow(turn, turn.ended ? null : stateOf(c.chat, dirs));
-      if (asks) { store.chatAsksAgain(c.product, c.id, { words: turn.heard, ...asks }, { now }); moved += 1; }
+      if (asks) { store.chatAsksAgain(c.product, c.id, { words: turn.heard, ...asks }, { at: newestIn(turn), now }); moved += 1; }
       continue;
     }
     const words = newWords(turn, c.heardThrough);
-    if (words) store.chatSaidOutside(c.product, c.id, words, { now });
+    if (words) store.chatSaidOutside(c.product, c.id, words, { at: turn!.heardAt, now });
     const state = turn && !turn.ended ? stateOf(c.chat, dirs) : null;
     const running = state?.status ? atWork(state) : now - mtimeMs < FRESH_MS;
-    moved += await move(store, c, whereTheChatIs(turn, { running, waitingFor: stoppedOn(state), knownAt: c.knownAt }), HELD_IN.claude, now);
+    moved += await move(store, c, whereTheChatIs(turn, { running, waitingFor: stoppedOn(state), knownAt: c.knownAt }), HELD_IN.claude, { at: turn ? newestIn(turn) : 0, now });
   }
   return { moved };
 }
@@ -208,7 +211,7 @@ export function noteCodexWords(
     if (c.engine !== 'codex' || !c.follow || c.doneAt) continue;
     const t = byId.get(c.chat);
     const words = newWords({ heard: t?.herLast, heardAt: t?.herLastAt }, c.heardThrough);
-    if (words) { store.chatSaidOutside(c.product, c.id, words, { now }); noted += 1; }
+    if (words) { store.chatSaidOutside(c.product, c.id, words, { at: t!.herLastAt!, now }); noted += 1; }
   }
   return noted;
 }
@@ -226,12 +229,12 @@ export async function followCodexChats(
       // A rollout that marks no turns is at rest once it is no longer written.
       const ended = t?.turnOpen === false || (t?.turnOpen == null && !t?.live);
       if (!t?.waiting || !t.last || !ended || !((t.herLastAt ?? 0) > c.doneAt)) continue;
-      store.chatAsksAgain(c.product, c.id, { words: t.herLast ?? '', said: t.last, stopped: false }, { now });
+      store.chatAsksAgain(c.product, c.id, { words: t.herLast ?? '', said: t.last, stopped: false }, { at: Math.max(t.herLastAt ?? 0, t.saidAt ?? 0), now });
       moved += 1;
       continue;
     }
     const working = c.follow && codexWorking(byId.get(c.chat), now);
-    moved += await move(store, c, working ? { move: 'working' } : { move: 'stays' }, HELD_IN.codex, now);
+    moved += await move(store, c, working ? { move: 'working' } : { move: 'stays' }, HELD_IN.codex, { at: 0, now });
   }
   return { moved };
 }

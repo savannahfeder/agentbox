@@ -27,10 +27,11 @@ import { readChatTurn } from '../main/agent-sessions.mts';
 import { readRollout } from '../main/codex-threads.mts';
 import { scanNewChats, QUIET_MS } from '../main/new-chats-watch.mts';
 import { slugFor, transcriptSearch } from '../main/transcript-search.mts';
-import { stoppedThere } from '../shared/carried-on-outside.mts';
+import { saysItStopped, stoppedThere } from '../shared/carried-on-outside.mts';
 import { CATCH_UP_LABEL, catchUpDue } from '../shared/agent-import.mts';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules.ts';
 import { threadEvents } from '../renderer/src/thread-history.ts';
+import { asksForYourWords, sentAt } from '../renderer/src/threads/page-rules.ts';
 
 const SID = '7b1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f';
 const ASKED = '**Claude Code stopped to ask you a question. Answer it there.**';
@@ -99,6 +100,19 @@ describe('a followed chat whose agent stops on you in the terminal', () => {
     expect(inbox()).toBe(true);
     expect(row().result).toBe(ASKED);
     expect(said().slice(-2)).toEqual([['you', 'Mock the clock.'], ['agent', ASKED]]);
+  });
+
+  it('was sent when you typed it there, so the list does not date it by when the chat began', async () => {
+    const before = sentAt(row());
+    write(typed(Date.now() - 20_000, 'Mock the clock.'));
+    session('busy');
+    await follow();
+    expect(sentAt(row())).toBeGreaterThan(before + 60_000);
+    const words = sentAt(row());
+    session('waiting', 'input needed');
+    await follow(Date.now() + 5_000);
+    // Its agent's side moves nothing.
+    expect(sentAt(row())).toBe(words);
   });
 
   it('says so once, however often it is read', async () => {
@@ -390,6 +404,15 @@ describe('what the session file says', () => {
     expect(stoppedThere('input needed')).toBe(ASKED);
     expect(stoppedThere('permission prompt')).toBe(LEAVE);
     expect(stoppedThere('')).toBe(ASKED);
+  });
+
+  // On a real picker the list said Answered beside it.
+  it('reads as waiting on you in the list, and an ordinary answer does not', () => {
+    expect(asksForYourWords({ result: ASKED, wrote: { result: { ts: 1 } } })).toBe(true);
+    expect(asksForYourWords({ result: `${LEAVE}\n\nThe migration is written.`, wrote: { result: { ts: 1 } } })).toBe(true);
+    expect(saysItStopped('Claude Code stopped to ask. I answered it.')).toBe(false);
+    expect(asksForYourWords({ result: 'Claude Code stopped early. Fixed.', wrote: { result: { ts: 1 } } })).toBe(false);
+    expect(saysItStopped(undefined)).toBe(false);
   });
 
   it('decides a wait only on a turn that has not ended', () => {

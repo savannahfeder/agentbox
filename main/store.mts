@@ -1785,7 +1785,7 @@ export class Store {
       );
       // Your words draw under You and the agent's under the agent.
       workItemsDisk.updateWorkItem(dir, created.id, { body: row.body }, { source: 'founder', now: at });
-      if (row.result) workItemsDisk.updateWorkItem(dir, created.id, { result: row.result }, { source: 'agent', now: last + 1 });
+      workItemsDisk.updateWorkItem(dir, created.id, { ...(row.result ? { result: row.result } : {}), chatAt: last }, { source: 'agent', now: last + 1 });
       if (land === 'sorted' && !thread.waiting) {
         workItemsDisk.updateWorkItem(dir, created.id, { status: 'done' }, { source: 'founder', now: last + 2 });
         done += 1;
@@ -1890,7 +1890,7 @@ export class Store {
     const patch = codexMirrorPatch(t);
     // it draws under You, not under an agent's name.
     workItemsDisk.updateWorkItem(dir, id, { body: patch.body }, { source: 'founder', now: bodyAt });
-    const mirrored = workItemsDisk.updateWorkItem(dir, id, { kind: patch.kind, labels: patch.labels, result: patch.result }, { source: 'agent', now: now + 1 });
+    const mirrored = workItemsDisk.updateWorkItem(dir, id, { kind: patch.kind, labels: patch.labels, result: patch.result, chatAt: t.saidAt || t.when || now }, { source: 'agent', now: now + 1 });
     // At the real moment: the rows above wear the chat's own time, and an engine older than the choice is ignored.
     workItemsDisk.updateWorkItem(dir, id, { engine: (patch as typeof patch & { engine?: string }).engine }, { source: 'agent', now: Math.max(now + 1, Date.now()) });
     // Only a row that was not open is reopened; on an open one the line reads
@@ -1968,7 +1968,7 @@ export class Store {
     return refreshed;
   }
 
-  refreshCodexMirrors(threads: (CodexThreadLike & { when?: number })[] | null | undefined, { now = Date.now() }: { now?: number } = {}) {
+  refreshCodexMirrors(threads: CodexThreadLike[] | null | undefined, { now = Date.now() }: { now?: number } = {}) {
     const { workItemsDisk } = this.modules;
     const byId = new Map((threads ?? []).map((t) => [String(t?.id ?? ''), t]));
     let refreshed = 0;
@@ -1978,13 +1978,15 @@ export class Store {
       if (item.answer) continue;
       const t = byId.get(codexIdOf(item) as string);
       if (!t) continue;
-      // Written up here (main/catch-up.mts) since Codex last said anything: the write-up stands.
+      // Nothing said since what the row already has, which may be written up by now (main/catch-up.mts).
       const wroteUpAt = item.wrote?.problem?.ts ?? 0;
-      if (wroteUpAt && (t.when ?? 0) <= wroteUpAt) continue;
+      const saidAt = t.saidAt || t.when || 0;
+      const readTo = (t.saidAt && Number(item.chatAt)) || wroteUpAt;
+      if (readTo && saidAt <= readTo) continue;
       const patch = codexMirrorPatch(t);
       if (patch.result === item.result) continue;
       const labels = item.labels ?? [];
-      workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { result: patch.result }, { source: 'agent', now });
+      workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { result: patch.result, ...(saidAt ? { chatAt: saidAt } : {}) }, { source: 'agent', now });
       if (wroteUpAt && !labels.includes(CATCH_UP_LABEL)) workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { labels: [...labels, CATCH_UP_LABEL] }, { source: 'system', now });
       refreshed += 1;
     }
@@ -2013,10 +2015,12 @@ export class Store {
       const doneAt = item.status === 'done' ? item.wrote?.status?.ts ?? 0 : 0;
       const follow = mine && (item.status === 'open' || held || (doneAt > 0 && now - doneAt < DONE_FOLLOWED_MS));
       if (!follow && !held) continue;
-      const knownAt = Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0);
+      // A row from before `chatAt` is read from its own last writes.
+      const chatAt = Number(item.chatAt) || 0;
+      const knownAt = chatAt || Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0);
       (doneAt ? done : out).push({
         product: item.product, id: item.id, engine: thread ? 'claude' : 'codex', chat, folder: folders.get(item.product) ?? null,
-        knownAt, heardThrough: Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), doneAt, held, follow,
+        knownAt, heardThrough: chatAt || Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), doneAt, held, follow,
       });
     }
     done.sort((a, b) => b.doneAt - a.doneAt);
@@ -2024,9 +2028,12 @@ export class Store {
   }
 
   /** What you typed there, on the thread as yours. */
-  chatSaidOutside(slug: string, id: string, words: string, { now = Date.now() }: { now?: number } = {}) {
+  chatSaidOutside(slug: string, id: string, words: string, { at, now = Date.now() }: { at: number; now?: number }) {
     const { workItemsDisk } = this.modules;
-    return workItemsDisk.updateWorkItem(this.productDir(slug), id, { saidOutside: words }, { source: 'founder', now });
+    const dir = this.productDir(slug);
+    workItemsDisk.updateWorkItem(dir, id, { saidOutside: words }, { source: 'founder', now });
+    // Its own line: one written as yours would outrank every later one.
+    return workItemsDisk.updateWorkItem(dir, id, { chatAt: at }, { source: 'system', now });
   }
 
   /** Into In progress while its agent works on what was typed there. A claim
@@ -2054,40 +2061,40 @@ export class Store {
   }
 
   /** Its agent answered there: the answer is the row's, and the row is open. */
-  chatAnsweredOutside(slug: string, id: string, said: string, { now = Date.now() }: { now?: number } = {}) {
+  chatAnsweredOutside(slug: string, id: string, said: string, { at, now = Date.now() }: { at: number; now?: number }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const item = workItemsDisk.readWorkItem(dir, id, now);
     if (!item) return null;
-    workItemsDisk.updateWorkItem(dir, id, { result: said }, { source: 'agent', now });
+    workItemsDisk.updateWorkItem(dir, id, { result: said, chatAt: at }, { source: 'agent', now });
     this.owesWriteUp(slug, item, true, now);
     return this.letGoOfChat(slug, id, { now });
   }
 
   /** Its agent stopped there, on a question or a permission prompt only its own
    *  window shows. Said once until you speak there again or its agent does. */
-  chatStoppedOutside(slug: string, id: string, stop: string, news: string, { now = Date.now() }: { now?: number } = {}) {
+  chatStoppedOutside(slug: string, id: string, stop: string, news: string, { at, now = Date.now() }: { at: number; now?: number }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const item = workItemsDisk.readWorkItem(dir, id, now);
     if (!item) return null;
     const said = String(item.result ?? '').startsWith(stop) && (item.wrote?.result?.ts ?? 0) >= (item.wrote?.saidOutside?.ts ?? 0);
     if (news || !said) {
-      workItemsDisk.updateWorkItem(dir, id, { result: [stop, news].filter(Boolean).join('\n\n') }, { source: 'agent', now });
+      workItemsDisk.updateWorkItem(dir, id, { result: [stop, news].filter(Boolean).join('\n\n'), ...(at ? { chatAt: at } : {}) }, { source: 'agent', now });
       this.owesWriteUp(slug, item, false, now);
     }
     return this.letGoOfChat(slug, id, { now });
   }
 
   /** In Done, and its agent waits on an answer to what you typed there since. */
-  chatAsksAgain(slug: string, id: string, { words, said, stopped }: { words: string; said: string; stopped: boolean }, { now = Date.now() }: { now?: number } = {}) {
+  chatAsksAgain(slug: string, id: string, { words, said, stopped }: { words: string; said: string; stopped: boolean }, { at, now = Date.now() }: { at: number; now?: number }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const item = workItemsDisk.readWorkItem(dir, id, now);
     if (!item || item.status !== 'done') return null;
     // One line, so the thread reads as your reply there and not as one you sent back.
     workItemsDisk.updateWorkItem(dir, id, { saidOutside: words, status: 'open' }, { source: 'founder', now });
-    const open = workItemsDisk.updateWorkItem(dir, id, { result: said }, { source: 'agent', now: now + 1 });
+    const open = workItemsDisk.updateWorkItem(dir, id, { result: said, chatAt: at }, { source: 'agent', now: now + 1 });
     this.owesWriteUp(slug, item, !stopped, now + 1);
     return open;
   }

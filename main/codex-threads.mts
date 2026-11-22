@@ -82,6 +82,7 @@ export interface Rollout extends RolloutMeta {
   herTurnLast: boolean;
   herLast: string;
   herLastAt: number;
+  saidAt: number;
   turnOpen: boolean | null;
   turns: number;
   images: number;
@@ -123,6 +124,7 @@ export interface CodexThread {
   herTurnLast?: boolean;
   herLast?: string;
   herLastAt?: number;
+  saidAt?: number;
   turnOpen?: boolean | null;
   lastSaid: string;
   firstSaid: string;
@@ -334,6 +336,7 @@ function readRolloutAfresh(file: string): Rollout | null {
   // (task_started to task_complete; null in a rollout that marks no turns).
   let herLast = '';
   let herLastAt = 0;
+  let saidAt = 0;
   let turnOpen: boolean | null = null;
   let turns = 0;
   let images = 0;
@@ -381,7 +384,7 @@ function readRolloutAfresh(file: string): Rollout | null {
         sawEventTurns = true;
       } else if (p.type === 'agent_message') {
         const said = cleanAnswer(p.message);
-        if (said) { last = said; herTurnLast = false; }
+        if (said) { last = said; herTurnLast = false; saidAt = Number.isFinite(at) ? at : saidAt; }
       }
       continue;
     }
@@ -400,13 +403,13 @@ function readRolloutAfresh(file: string): Rollout | null {
       if (!sawEventTurns) turns += 1;
     } else if (p.role === 'assistant') {
       const said = cleanAnswer(partsOf(p).filter((c) => c.type === 'output_text').map((c) => c.text ?? '').join('\n'));
-      if (said) { last = said; herTurnLast = false; }
+      if (said) { last = said; herTurnLast = false; saidAt = Number.isFinite(at) ? at : saidAt; }
     }
   }
   if (!meta || !meta.id) return null;
   let mtime = 0;
   try { mtime = fs.statSync(file).mtimeMs; } catch { mtime = 0; }
-  return { ...meta, prompt: firstPart(prompt), last: lastPart(last), herTurnLast, herLast: firstPart(herLast), herLastAt, turnOpen, turns, images, lastActive, path: file, mtime };
+  return { ...meta, prompt: firstPart(prompt), last: lastPart(last), herTurnLast, herLast: firstPart(herLast), herLastAt, saidAt, turnOpen, turns, images, lastActive, path: file, mtime };
 }
 
 /**
@@ -489,6 +492,7 @@ function readOneCodexHome(codexDir: string, { home, days, now, cutoff, index, by
       herTurnLast: r.herTurnLast,
       herLast: r.herLast,
       herLastAt: r.herLastAt,
+      saidAt: r.saidAt,
       turnOpen: r.turnOpen,
       ...(r.herTurnLast ? { waiting: false, ask: '' } : howTheChatEnded(r.last)),
       lastSaid: r.last,

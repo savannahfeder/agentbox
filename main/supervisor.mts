@@ -5191,8 +5191,8 @@ export class Supervisor {
   }
 
   /**
-   * A CHAT BROUGHT IN, REWRITTEN AS A THREAD (main/catch-up.mts): its name, its
-   * context and its answer with options. Never awaited, like the namer, and
+   * A CHAT BROUGHT IN, REWRITTEN AS A THREAD (main/catch-up.mts): its name the
+   * first time, its context and its answer with options. Never awaited, like the namer, and
    * a few at once: the person is looking at these rows the moment setup ends. A miss waits a minute; after three the row keeps the
    * agent's own last message.
    */
@@ -5219,7 +5219,10 @@ export class Supervisor {
             return;
           }
           this._catchUpMisses.delete(key(next));
-          this.store.catchUpItem(next.product, next.id, { label: card.title, problem: card.context, result: catchUpResult(card) });
+          // Carried on in its terminal while this was written: its newer answer is owed its own.
+          const row = this.store.readItem?.(next.product, next.id);
+          if (row && (row.result !== next.result || row.wrote?.saidOutside?.ts !== next.wrote?.saidOutside?.ts || row.status !== next.status)) return;
+          this.store.catchUpItem(next.product, next.id, { ...(next.label ? {} : { label: card.title }), problem: card.context, result: catchUpResult(card) });
           this.store.routeItem?.(next.product, next.id, { labels });
           this.onChange?.();
         })

@@ -103,6 +103,35 @@ describe('the rewrite', () => {
     expect(prompt).toContain('Mock the clock.');
   });
 
+  // Measured 2026-11-21 on a real chat carried on in its terminal: each answer
+  // there is written up again, and the second one renamed the thread.
+  it('keeps the name a thread already has when a later answer is written up', async () => {
+    const { sup, writes } = watching(card);
+    await sup.catchUpTheImports([imported({ label: 'Naming the checkout module' })]);
+    expect(writes[0][1]).not.toHaveProperty('label');
+    expect(writes[0][1].result).toMatch(/^\*\*Should I merge it\?\*\*/);
+  });
+
+  // The model takes about 20 s, and a chat carried on in its terminal moves in that time.
+  it('is dropped, and still owed, when the chat moved on while it was written', async () => {
+    const moved = [
+      { result: '**Claude Code stopped to ask you a question. Answer it there.**' },
+      { saidOutside: 'Merge it.', wrote: { ...imported().wrote, saidOutside: { ts: 3, source: 'founder' } } },
+      { status: 'claimed' },
+      { status: 'done' },
+    ];
+    for (const over of moved) {
+      const { sup, writes } = watching(card);
+      sup.store.readItem = () => imported(over);
+      await sup.catchUpTheImports([imported()]);
+      expect(writes, JSON.stringify(over)).toEqual([]);
+    }
+    const { sup, writes } = watching(card);
+    sup.store.readItem = () => imported({ labels: [THREAD_LABEL, 'thread:abc', CATCH_UP_LABEL, 'seen'], priority: 3 });
+    await sup.catchUpTheImports([imported()]);
+    expect(writes.map(([k]) => k)).toEqual(['catchUp', 'route']);
+  });
+
   it('waits for a chat that has no answer to rewrite', async () => {
     const { sup, writes } = watching(card);
     await sup.catchUpTheImports([imported({ result: '' })]);
