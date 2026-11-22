@@ -28,6 +28,7 @@ import { SHIP_FAILED } from '../shared/not-shipped.mts';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const page = fs.readFileSync(path.join(root, 'renderer/src/components/ItemThread.tsx'), 'utf8');
 const thread = fs.readFileSync(path.join(root, 'renderer/src/components/Thread.tsx'), 'utf8');
+const quiet = fs.readFileSync(path.join(root, 'renderer/src/one-thing-at-a-time.css'), 'utf8');
 
 const T0 = Date.parse('2026-11-21T04:00:00Z');
 const line = (ts: number, source: string, patch: Record<string, unknown>) => ({ id: 'w-0a1b2c3d4e', ts, source, patch });
@@ -62,6 +63,11 @@ describe('a note the app wrote on the row', () => {
     expect(note.says).toBe('app');
     expect(messageKind(note)).toBeNull();
     expect(thread).toMatch(/e\.says === 'app'\s*\?\s*<div className="one-app-note">\{md\(e\.text \?\? ''\)\}<\/div>/);
+  });
+
+  it("keeps the thread's own 22px there, which measured 36px with the foot's margin", () => {
+    expect(quiet).toMatch(/\.thread-block > \.one-app-note \{ margin-top: 0; \}/);
+    expect(quiet).toMatch(/\.one-app-note > :first-child \{ margin-top: 0; \}/);
   });
 });
 

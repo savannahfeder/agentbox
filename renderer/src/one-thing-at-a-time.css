@@ -35,6 +35,10 @@
 /* What the app did after the answer, quiet under it. */
 .one-catching-up { margin: 18px 0 0; font-size: 15px; color: var(--text-faint); }
 .one-app-note { margin: 14px 0 0; font-size: 13px; color: var(--text-faint); }
+.one-app-note > :first-child { margin-top: 0; }
+.one-app-note > :last-child { margin-bottom: 0; }
+/* In a thread's history it keeps the thread's own 22px between blocks. */
+.thread-block > .one-app-note { margin-top: 0; }
 
 .one-answer .one-q { margin: 0 0 8px; font-size: 17px; line-height: 1.45; font-weight: 600; color: var(--text); }
 .one-by { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font-size: 14px; color: var(--text-dim); }
