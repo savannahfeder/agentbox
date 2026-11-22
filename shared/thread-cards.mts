@@ -158,7 +158,17 @@ export function wordsIn(text: string | null | undefined): number {
 /** The Done steps in `progress`: one per line, the marks a writer puts in front of a step taken off. */
 export function doneSteps(progress: string | null | undefined): string[] {
   if (typeof progress !== 'string') return [];
-  return progress.split('\n').map((l) => l.trim().replace(/^(?:[-*•✓✔]\s*)+/, '').trim()).filter(Boolean);
+  return (asWordList(progress) ?? progress.split('\n')).map((l) => l.trim().replace(/^(?:[-*•✓✔]\s*)+/, '').trim()).filter(Boolean);
+}
+
+/** Some agents send the steps as a JSON list in the string. */
+export function asWordList(text: string): string[] | null {
+  const t = text.trim();
+  if (!t.startsWith('[') || !t.endsWith(']')) return null;
+  try {
+    const list: unknown = JSON.parse(t);
+    return Array.isArray(list) && list.every((x) => typeof x === 'string') ? list : null;
+  } catch { return null; }
 }
 
 /** The thread's summary: what the agent or the person wrote, else stand-ins. */

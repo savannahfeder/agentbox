@@ -1,10 +1,11 @@
 // The pickers a reply and a new thread share, as sheets from the bottom, in
 // the desktop's own words (priority.ts, modes.ts, models.ts, effort.ts).
+import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { EFFORTS, effortChoicesFor } from '../../../renderer/src/effort';
 import { MENU_TITLE, MODE_ORDER, MODE_WORDS } from '../../../renderer/src/modes';
 import { DEFAULT_MODEL, engineModelChoices, modelChoices } from '../../../renderer/src/models';
-import { PRIORITIES, priorityIdOf, type PriorityId } from '../../../renderer/src/priority';
+import { AGENT_DECIDES, PRIORITIES, priorityIdOf, type PriorityId } from '../../../renderer/src/priority';
 import type { Harness } from '../../../renderer/src/threads/composer-rules';
 import { litEffort, type CodexOpts } from '../lib/compose';
 import { PriorityBars, Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
@@ -14,20 +15,23 @@ const LEVEL: Record<PriorityId, 1 | 2 | 3 | 4> = { urgent: 4, high: 3, medium: 2
 export const barsFor = (priority: number | null | undefined) => LEVEL[priorityIdOf(priority)];
 
 /** The four levels under their head, for a sheet of its own or the thread's menu; none marked for ticked threads that disagree. */
-export function PriorityRows({ value, pick }: { value: number | null; pick: (v: number) => void }) {
+export function PriorityRows({ value, pick, first }: { value: number | null; pick: (v: number) => void; first?: ReactNode }) {
   const on = value === null ? null : priorityIdOf(value);
   return (
     <>
       <SheetHead>Priority</SheetHead>
+      {first}
       {PRIORITIES.map((p) => <SheetRow key={p.id} label={p.label} on={p.id === on} lead={<PriorityBars level={LEVEL[p.id]} />} onPress={() => pick(p.value)} />)}
     </>
   );
 }
 
-export function PrioritySheet({ open, close, value, pick }: { open: boolean; close: () => void; value: number; pick: (v: number) => void }) {
+/** `agentDecides` adds the new task cards' first row, which sends no level (priority.ts `AGENT_DECIDES`). */
+export function PrioritySheet({ open, close, value, pick, agentDecides }: { open: boolean; close: () => void; value: number | null; pick: (v: number) => void; agentDecides?: () => void }) {
   return (
     <Sheet open={open} close={close}>
-      <PriorityRows value={value} pick={(v) => { pick(v); close(); }} />
+      <PriorityRows value={value} pick={(v) => { pick(v); close(); }}
+        first={agentDecides && <SheetRow key="agent" label={AGENT_DECIDES.label} on={value === null} lead={<PriorityBars level={0} />} onPress={() => { agentDecides(); close(); }} />} />
     </Sheet>
   );
 }

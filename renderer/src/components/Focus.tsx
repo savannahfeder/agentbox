@@ -144,7 +144,6 @@ import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
 import { HandedLine } from '../team/HandedBy';
-import { askAboutStep } from '../team/AsksLine';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
 } from './Priority';
@@ -320,7 +319,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
         className="inline-image-open"
         data-copy-file={/^https?:/.test(path) ? undefined : path}
         data-picture={path}
-        title={path}
+        title={shownName(path)}
         onClick={(e) => onOpen(path, e.currentTarget)}
       >{named(path, picture)}</button>
     )
@@ -511,7 +510,7 @@ function CarriedNote({ src, always = false }: { src: string; always?: boolean })
     return () => { live = false; if (timer) clearTimeout(timer); };
   }, [direct, product, src, looks]);
   const said = carryLine(carry);
-  if (!direct || !said) return always && !direct ? <span className="missing-artifact">{src}</span> : null;
+  if (!direct || !said) return always && !direct ? <span className="missing-artifact">{shownName(src)}</span> : null;
   if (always) return said.state === 'failed'
     ? <PictureTile name={shownName(src)} why={said.label} />
     : <span className="inline-image arriving" aria-hidden="true" />;
@@ -755,7 +754,7 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, asked = false, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
   /** `supervisor.outOfUsage`, for the reply box's model chip. */
   outOfUsage?: Record<string, { tool: string; until: number }>;
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
@@ -794,8 +793,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   /** Above the reply box: who you asked, and what came back. */
   /** Who you asked onto this thread, in its header. */
   asksCorner?: ReactNode;
-  /** Someone you asked has it now, so the foot does not offer asking again. */
-  asked?: boolean;
   /** Whether a person has said it shipped, or null where the team would not see that. */
   shippedMark?: boolean | null;
   onShipped?: (on: boolean) => void;
@@ -2530,8 +2527,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
        */}
       {((item.start === 'later' && !!onUnschedule)
         || (scheduledHere && !!onUnschedule)
-        || (!!agent && !agentTakesReply && !!onReveal)
-        || (!agent && item.status === 'blocked' && !session)) && (
+        || (!!agent && !agentTakesReply && !!onReveal)) && (
       <div className="focus-actions">
         {/* ADDED TO LATER (w-afb66e6661): it has no moment to read back, so
             the line says the one thing there is to say and the press starts
@@ -2591,11 +2587,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
           <span className="focus-when">Opens the app it is running in</span></>
         )}
-        {!agent && item.status === 'blocked' && !session && <button onClick={onReopen}><ActMark d="M9.5 7 5 11.5 9.5 16M5.5 11.5H15a4 4 0 0 1 0 8h-2" />Send back to agent</button>}
-        {/* Where the agent stopped is the step a teammate is asked about. */}
-        {!agent && item.status === 'blocked' && onAsk && !asked && giveTo.some((p) => !p.id.startsWith('mate:')) && (
-          <button onClick={() => askAboutStep(String(item.result ?? item.note ?? ''))}><ActMark d="M5 5.5h14v10H10l-4 3.5v-3.5H5zM10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4M12 14.2v.1" />Ask for help or a review</button>
-        )}
+        {/* A blocked thread has no buttons here: its reply goes to the agent,
+            as on every thread, and asking someone is in Share. "Send back to
+            agent" stays in ⌘K. */}
         {/* "esc back" was the third one removed. Escape still closes the pane
             and so does clicking away from it. */}
       </div>
@@ -3869,8 +3863,3 @@ function chipsOverflow(chips: HTMLElement): boolean {
 }
 
 const titleCase = (s: string) => s.replace(/(^|\s)\S/g, (c) => c.toUpperCase());
-
-/** The 15px line mark on a button in a stopped thread's action row. */
-function ActMark({ d }: { d: string }) {
-  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
-}

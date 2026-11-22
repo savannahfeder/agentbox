@@ -1,12 +1,13 @@
 // WHAT THE MAIN THREAD WAS DOING WHEN THE APP FROZE.
 //
 // The spinning wheel is this thread not answering, and it comes when nobody is
-// profiling. So a thread of its own watches all the time: the main thread
-// stamps a clock every 100 ms, the
-// watcher keeps a low-rate CPU profile of it running through the inspector,
-// and when the stamps stop for longer than `thresholdMs` it cuts that stretch
-// out of the profile and writes one line saying which of our functions held
-// it, to `freeze-<day>.jsonl` beside the memory log, kept a week.
+// profiling. So a thread of its own keeps a low-rate CPU profile of it running
+// through the inspector all the time. The main thread stamps a clock every
+// 100 ms; a stamp that comes more than `thresholdMs` after the last one is a
+// hold that just ended, and it tells the watcher, which cuts that stretch out
+// of the profile and writes one line saying which of our functions held it, to
+// `freeze-<day>.jsonl` beside the memory log, kept a week. The watcher never
+// looks on its own: in an idle app it sleeps.
 //
 // It stays on this computer. Nothing here is sent anywhere.
 import fs from 'node:fs';
@@ -178,18 +179,23 @@ export function writeFreeze(dir: string, line: FreezeLine, { keepDays = KEEP_DAY
  * Starts the watcher for this thread. `onFreeze` hears each line as it is
  * written. Never throws: a recorder that breaks the app is worse than a gap.
  */
-export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_MS, rotateMs = 60_000, intervalUs = 10_000, onFreeze = () => {} }: FreezeRecorderOptions = {}) {
+export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_MS, rotateMs = 60_000, intervalUs = 25_000, onFreeze = () => {} }: FreezeRecorderOptions = {}) {
   // [0] the main thread's last beat, [1] 1 while the Mac sleeps, [2] when it
   // last woke, all on the hrtime clock.
   const beat = new SharedArrayBuffer(8 * 3);
   const stamp = new BigInt64Array(beat);
-  const tick = () => Atomics.store(stamp, 0, process.hrtime.bigint());
+  const late = BigInt(thresholdMs) * 1_000_000n;
+  let worker: Worker | null = null;
+  const tick = () => {
+    const now = process.hrtime.bigint();
+    const last = Atomics.exchange(stamp, 0, now);
+    if (last && now - last > late) worker?.postMessage({ hold: { fromUs: Number(last / 1000n), toUs: Number(now / 1000n) } });
+  };
   const asleep = () => Atomics.store(stamp, 1, 1n);
   const awake = () => { Atomics.store(stamp, 2, process.hrtime.bigint()); Atomics.store(stamp, 1, 0n); };
   tick();
   const timer = setInterval(tick, BEAT_MS);
   timer.unref?.();
-  let worker: Worker | null = null;
   try {
     worker = new Worker(new URL('./freeze-recorder-thread.mts', import.meta.url), {
       execArgv: [...process.execArgv, ...stripTypesFlags()],

@@ -6,7 +6,6 @@
 import { itemThread } from '../../../renderer/src/item-thread';
 import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type ParsedOption } from '../../../renderer/src/format';
 import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
-import { askHeading } from '../../../renderer/src/ask-line';
 import { phoneHistory, phoneRuns, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { recapFor, resultLeads } from '../../../renderer/src/recap';
@@ -17,7 +16,7 @@ import { approvableFiled, doItHereWords, threadsMade } from '../../../renderer/s
 import { closeAsk } from '../../../renderer/src/close-asks-first';
 import { figuresFrom } from '../../../renderer/src/change-figures';
 import { referencedFiles } from '../../../renderer/src/referenced-files';
-import { changedFiles, onlyNamedFiles, shipOfferFor, shipOfferLive, standingFrom } from '../../../renderer/src/ship-offer';
+import { agentSaidNotReady, changedFiles, onlyNamedFiles, saidNotToShip, shipOfferFor, shipOfferLive, standingFrom } from '../../../renderer/src/ship-offer';
 import { conversationGap, gapIndex } from '../../../shared/agents.mts';
 import { groupWork } from '../../../shared/work-lines.mts';
 import type { AgentSaid, AgentWork, ThreadStateWord, WorkItem } from '../../../renderer/src/types';
@@ -111,7 +110,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const figures = change ? figuresFrom(change) : null;
   const dir = view.products.find((p) => p.slug === product)?.dir || null;
   const shipAsk = !item.waitsForMac && shipOfferLive(item, { change: !!figures, running: !!session })
-    ? shipOfferFor(standingFrom(change), onlyNamedFiles(changedFiles(change), referencedFiles(item.result, item.note, item.body, item.answer, { dir }), dir))
+    ? shipOfferFor(standingFrom(change), onlyNamedFiles(changedFiles(change), referencedFiles(item.result, item.note, item.body, item.answer, { dir }), dir), { held: saidNotToShip(item.body, item.answer) || agentSaidNotReady(item.result) })
     : null;
   return {
     item,
@@ -132,8 +131,8 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     outcome: outcome && { ...outcome, label: resultLeads(item) && outcome.field === 'result' ? null : outcome.field === 'result' ? 'Result' : 'Latest checkpoint' },
     after: [...built.after, ...receiptsFor(view, product, id)].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)),
     options: (live ? itemOptions(item) : shipAsk?.options ?? []) as ParsedOption[],
-    // The question the options answer, the options card's heading (OptionsOffer.tsx).
-    ask: live ? askHeading(item) : shipAsk?.headed ? shipAsk.ask : '',
+    // The choices are bare unless the ship offer asks its own question (Focus.tsx `bare`).
+    ask: shipAsk?.headed ? shipAsk.ask : '',
     change: figures && change ? { ...figures, list: change.files, more: change.more ?? 0 } : null,
     parent,
     filed,

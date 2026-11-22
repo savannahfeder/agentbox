@@ -114,7 +114,7 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.
-  const delivery: Promise<{ ok: boolean; error?: { code?: unknown } | null }> = Promise.resolve().then(() => {
+  const send = (): Promise<{ ok: boolean; error?: { code?: unknown } | null }> => Promise.resolve().then(() => {
     if (!live) return;
     if (permissionMode != null) throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
     if (answer.trimStart().startsWith('/') && !session.remoteIdle) throw Error('Wait for the current turn to finish before running a slash command.');
@@ -136,6 +136,31 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
     if (now) session.child!.interrupt?.()?.catch?.(() => {});
     return taken;
   }).then(() => ({ ok: true }), error => ({ ok: false, error }));
+  const heard = (item: ReplyItem) => {
+    supervisor._handledAnswers.add(supervisor._answerKey(item));
+    // Taken into this conversation, which a later stop does not undo.
+    supervisor._noteHeard?.(item, session!.sessionId);
+    session!.lastLiveReply = item;
+    supervisor._saveState();
+    if (session!.exitFailed) {
+      supervisor.redeliverAnswer(item, item.answer);
+      if (!session!.stoppedByUs) supervisor.deliverMidflightReply({ ...item, answer: null, wrote: {} }, null);
+    }
+  };
+  // A teammate's words are on the thread before the agent takes them, which
+  // can be minutes away. Not taken, they stay there unhandled for the next run.
+  if (from) {
+    const operation = previous.catch(() => {}).then(async () => {
+      const saved = await commit();
+      const item = saved ? { ...saved, product, id } : saved;
+      if (live && item) void send().then((accepted) => { if (accepted.ok) heard(item); });
+      return item;
+    });
+    sends.set(key, operation);
+    void operation.finally(() => { if (sends.get(key) === operation) sends.delete(key); }).catch(() => {});
+    return operation;
+  }
+  const delivery = send();
   const operation = previous.catch(() => {}).then(async () => {
     const accepted = await delivery;
     // TOO LATE FOR THIS TURN IS NOT A FAILED SEND. The session closed its
@@ -154,17 +179,7 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
       throw error;
     }
     const item = saved ? { ...saved, product, id } : saved;
-    if (steered && item) {
-      supervisor._handledAnswers.add(supervisor._answerKey(item));
-      // Taken into this conversation, which a later stop does not undo.
-      supervisor._noteHeard?.(item, session.sessionId);
-      session.lastLiveReply = item;
-      supervisor._saveState();
-      if (session.exitFailed) {
-        supervisor.redeliverAnswer(item, item.answer);
-        if (!session.stoppedByUs) supervisor.deliverMidflightReply({ ...item, answer: null, wrote: {} }, null);
-      }
-    }
+    if (steered && item) heard(item);
     return item;
   });
   sends.set(key, operation);

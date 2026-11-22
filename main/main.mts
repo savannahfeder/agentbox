@@ -37,6 +37,7 @@ import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
+import { ownUseReader } from './own-use.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { startMemoryRecorder } from './memory-recorder.mts';
 import { threadHeaps } from './thread-heaps.mts';
@@ -487,6 +488,7 @@ async function createWindow() {
   supervisor.idleMs = () => powerMonitor.getSystemIdleTime() * 1000;
   const stalls = stallWatch();
   supervisor.stalls = stalls;
+  supervisor.ownUse = ownUseReader(() => app.getAppMetrics());
   // AND WHICH OF OUR FUNCTIONS HELD THE THREAD, each time it froze.
   const freezes = startFreezeRecorder({
     dir: path.join(userDir, 'memory-log'),

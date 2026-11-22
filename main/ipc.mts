@@ -53,8 +53,9 @@ import { readDoc, writeDoc } from './doc-file.mts';
 import { linkCopyOf, linkKindOf, linkSource } from './file-link.mts';
 import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
-import { readItemHistory } from './store/work-items.mts';
+import { newWorkItemId, readItemHistory } from './store/work-items.mts';
 import { readChange, readChangeSummary, withStandsNow } from './code-change.mts';
+import { mayBeHandedOver, startFromHandedCommits } from './handed-commits.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
@@ -1371,8 +1372,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     await team!.syncNow();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac, label }: ComposeInput & { product: string; onMac?: unknown; label?: unknown }) => {
+  ipcMain.handle('zero:compose', async (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac, label }: ComposeInput & { product: string; onMac?: unknown; label?: unknown }) => {
+    // A hand-over's commits become the thread's branch before its row exists, so no tick can start it on main first.
+    let handedId: string | null = null;
+    if (mayBeHandedOver(labels)) {
+      handedId = newWorkItemId();
+      const into = store.listProducts().find((p) => p.slug === product);
+      await startFromHandedCommits({ repoPath: into?.repoPath, dir: into?.dir, id: handedId, body, labels });
+    }
     const out = store.composeItem(product, {
+      ...(handedId ? { id: handedId } : {}),
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
       // engine's real list (`Supervisor#spawnPlan` for Claude Code,

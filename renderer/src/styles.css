@@ -2684,8 +2684,11 @@ body {
 /* One card in front, the queue as stacked edges peeking above it. The ghosts
    are pure chrome: depth without height, so ten pending asks occupy the same
    screen as one. */
-/* Extra scroll room belongs after the inbox, never inside an opened thread. */
-.app.asking .list-pane:not(.pinned)::after {
+/* The card floats over everything, so scroll room goes only after a list that
+   scrolls. A thread, chat or page that fills its pane would be squeezed by the
+   room, or slide up by it. */
+.app.asking .body:not(.tm-body) > .list-pane:not(.pinned, .rm-open, .tq-open, .pl-open)::after,
+.app.asking .team-page::after {
   content: ''; display: block;
   height: calc(var(--approval-room, 149px) + 16px);
 }
@@ -9518,6 +9521,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .cloud-plan-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .cloud-counts { margin: 0; padding: 4px 0 0 18px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); user-select: text; -webkit-user-select: text; }
 .cloud-plans-say { margin: 14px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); user-select: text; -webkit-user-select: text; }
+.cloud-plans-terms { color: var(--text-dim); }
+.cloud-plans-terms a { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
 
 /* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }

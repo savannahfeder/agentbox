@@ -91,7 +91,9 @@ describe('the shortcuts are off the screen and the verbs are not', () => {
     expect(row).toContain('Back to inbox');
     expect(row).toContain('Let it run now');
     expect(row).toContain('Take me to it');
-    expect(row).toContain('Send back to agent');
+    // Send back to agent was named on 2026-11-21: "I don't really get this function".
+    // It left the row and stays in ⌘K (tests/a-handed-back-thread-reads-like-any-other-thread).
+    expect(row).not.toContain('Send back to agent<');
   });
 
   it('does not draw an empty row on a finished task', () => {
@@ -103,7 +105,7 @@ describe('the shortcuts are off the screen and the verbs are not', () => {
     expect(focus).toMatch(/const scheduledHere = showsWhenItComesBack\(item, scheduledUntil, answered\);/);
     expect(showsWhenItComesBack({ status: 'done', snoozedUntil: 0 }, Date.now() + 60_000, false)).toBe(false);
     expect(guard).toContain('!!agent && !agentTakesReply && !!onReveal');
-    expect(guard).toContain("item.status === 'blocked'");
+    expect(guard).not.toContain("item.status === 'blocked'");
     // And an In progress task no longer opens this row by itself, because the
     // one button it used to open it for has moved to the dock.
     expect(guard).not.toMatch(/\|\|\s*stoppable/);

@@ -3,7 +3,8 @@
 // Claude Code and Codex keep every conversation as files, and a heavy user's
 // run to tens of thousands of them and many GB. Reading them on the main
 // process is the app not answering for as long as the read takes, so every
-// read the import card, setup and the Codex watch make happens here instead.
+// read the import card, setup and the Codex watch make happens here instead,
+// and so does the read of each running Claude Code session the inbox lists.
 // One worker per kind, kept for the life of the app: the Codex one remembers
 // transcripts between its minute reads, and a slow Codex read never holds up
 // a Claude Code one. Where a worker cannot start, the read runs here.
@@ -14,18 +15,22 @@ import { readChatEnds, readSessionThreads } from './agent-sessions.mts';
 import type { ImportThread, SessionThreadOptions } from './agent-sessions.mts';
 import { readCodexThreads } from './codex-threads.mts';
 import type { CodexThreadsOptions, CodexThreadsRead } from './codex-threads.mts';
+import { foldHistory } from './agents.mts';
+import type { Facts, HistoryFold } from './agents.mts';
 
 export type SessionThreadsRead = ReturnType<typeof readSessionThreads>;
 
 export type ChatRead =
   | { op: 'codex'; opts: CodexThreadsOptions }
   | { op: 'claude'; opts: SessionThreadOptions }
-  | { op: 'ends'; threads: ImportThread[] };
+  | { op: 'ends'; threads: ImportThread[] }
+  | { op: 'history'; fold: HistoryFold };
 
 /** What the worker runs, and what runs here when there is no worker. */
-export function readChats(ask: ChatRead): CodexThreadsRead | SessionThreadsRead | ImportThread[] {
+export function readChats(ask: ChatRead): CodexThreadsRead | SessionThreadsRead | ImportThread[] | { offset: number; acc: Facts } {
   if (ask.op === 'codex') return readCodexThreads(ask.opts);
   if (ask.op === 'claude') return readSessionThreads(ask.opts);
+  if (ask.op === 'history') return foldHistory(ask.fold);
   return readChatEnds(ask.threads);
 }
 
@@ -78,3 +83,5 @@ export const readCodexThreadsOffThread = (opts: CodexThreadsOptions = {}) => off
 export const readClaudeThreadsOffThread = (opts: SessionThreadOptions = {}) => offThread<SessionThreadsRead>('claude', { op: 'claude', opts });
 /** The picked chats with their ends read (`readChatEnds`). */
 export const readChatEndsOffThread = (threads: ImportThread[]) => offThread<ImportThread[]>('claude', { op: 'ends', threads });
+/** A running session's transcript folded into its facts (main/agents.mts `foldHistory`). */
+export const foldHistoryOffThread = (fold: HistoryFold) => offThread<{ offset: number; acc: Facts }>('claude', { op: 'history', fold });
