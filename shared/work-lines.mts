@@ -87,6 +87,9 @@ function trimSegments(p: string): string {
   const lead = p.startsWith('~/') ? '~/' : p.startsWith('/') ? '/' : '';
   const body = p.slice(lead.length);
   const parts = body.split('/').filter(Boolean);
+  // Inside another thread's worktree the path starts after its folder, whose name is an internal id.
+  const worktree = parts.findIndex((x, i) => x === 'worktrees' && /^w-[0-9a-f]{6,}$/i.test(parts[i + 1] ?? '') && i + 2 < parts.length);
+  if (worktree >= 0) return `…/${parts.slice(worktree + 2).slice(-PATH_SEGMENTS).join('/')}`;
   if (parts.length <= PATH_SEGMENTS) return lead + parts.join('/');
   return `…/${parts.slice(-PATH_SEGMENTS).join('/')}`;
 }

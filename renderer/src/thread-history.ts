@@ -603,6 +603,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         // repeated once per attempt over a thread out of usage
         // (tests/an-out-of-usage-thread-does-not-say-it-handed-this-back).
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
+        // Nor is the app reopening the row for a teammate's words (`tellItem`).
+        if (line.source === 'system' && events.at(-1)?.from && events.at(-1)?.field === 'answer') continue;
         const said = mine ? 'You sent it back' : 'It handed this back';
         // One press can write the reopening twice (the notes path does), so the same words within a second are one.
         const last = events.at(-1);
