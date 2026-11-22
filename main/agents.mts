@@ -350,6 +350,8 @@ function remember(acc: Facts, line: string) {
     acc.asked.push({ at: Date.parse((obj.timestamp ?? 0) as string) || 0, text: picked.replace(/\s+/g, ' ').trim() || 'Answered its question' });
     if (acc.asked.length > KEEP_TURNS) acc.asked.splice(1, 1);
     acc.question = []; acc.questionId = '';
+    // What it says after her pick answers the pick, so it does not join the words before the question.
+    acc.saidOpen = false;
   }
   if (obj.type === 'assistant' && Array.isArray(obj.message?.content)) {
     const said = obj.message.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n').trim();

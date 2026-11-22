@@ -39,6 +39,11 @@ describe("Claude Code's own question", () => {
     expect(l.bold).toBe('Which date library should I use?');
     expect(l.choices).toEqual(['date-fns', 'Luxon']);
   });
+  it('what it says after her pick stands alone, not joined to the words before the question', () => {
+    const f = read([user(0, 'x'), said(5, 'Should I also drop the cache table?'), asks(6, 'q1'), answered(9, 'q1'), said(12, 'Done. The index is added.')]);
+    expect(f.lastSaid).toBe('Done. The index is added.');
+    expect(agentLayout({ lastSaid: f.lastSaid, question: f.question }).kind).toBe('plain');
+  });
   it('a question asked in a later turn is not led by the answer before it', () => {
     const f = read([user(0, 'x'), said(5, 'Done with the first part.'), user(10, 'now pick a date library'), asks(12, 'q1')]);
     expect(f.question[0].lead).toBeUndefined();
