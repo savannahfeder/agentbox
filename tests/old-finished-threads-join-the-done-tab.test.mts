@@ -81,6 +81,6 @@ describe('the app', () => {
     expect(app).toMatch(/withOlder\(snap\?\.items \?\? \[\], older\)/);
     // Less any send taken back with Z (tests/a-send-taken-back-with-z-leaves-no-thread-behind).
     expect(app).toMatch(/withoutWithdrawnSends\(itemsWithOlder, undoMarks\)/);
-    expect(app).toMatch(/walkRows\(listed, run\)/);
+    expect(app).toMatch(/const items = listed;/);
   });
 });

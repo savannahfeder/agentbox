@@ -1,6 +1,6 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
 import type { AgentEvent, LinkCommentWaiting, ThreadCard } from '../types';
-import { handBackReadBy, isHandBack } from '../../../shared/thread-asks.mts';
+import { askIsOpen, askOf, handBackReadBy, isHandBack, type AskRow } from '../../../shared/thread-asks.mts';
 import { filesInLines, threadFiles, versionForPath, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 /**
@@ -8,7 +8,8 @@ import { filesInLines, threadFiles, versionForPath, type ThreadLine } from '../.
  * says so, both your comment before their copy passes it on and the line it
  * writes once it has (`from` you on an answer), which outlives the ask.
  */
-export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping, owner = '' }: { me: string | null; helping: boolean; owner?: string }): AgentEvent[] {
+export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping, owner = '' }: { me: string | null; helping: boolean | ((at: number) => boolean); owner?: string }): AgentEvent[] {
+  const helped = typeof helping === 'function' ? helping : () => helping;
   return events.map((e) => {
     if (e.kind || !me) return e;
     // The owner's copy wrote "You asked" for its owner; here the reader is the helper.
@@ -17,7 +18,21 @@ export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping,
       const { from: _from, fromId: _fromId, ...rest } = e;
       return { ...rest, who: 'you' as const, by: me, says: 'to-agent' as const };
     }
-    return helping && e.says === 'comment' && e.by === me ? { ...e, says: 'to-agent' as const } : e;
+    return e.says === 'comment' && e.by === me && helped(e.at) ? { ...e, says: 'to-agent' as const } : e;
+  });
+}
+
+/**
+ * Whether a help ask on you covered words you wrote on this thread at `at`, so
+ * the owner's copy passes them to its agent (`helpAskCovering` on that side).
+ */
+export function helpedWhen(rows: readonly AskRow[], me: string | null, owner: string, thread: string, at: number): boolean {
+  return rows.some((r) => {
+    const a = askOf(r);
+    if (!a || a.kind !== 'help' || a.owner !== owner || a.thread !== thread || !me || r.assignee !== me) return false;
+    if (at < (r.wrote?.ask?.ts ?? r.createdAt ?? 0)) return false;
+    if (r.status !== 'done' && r.wrote?.status?.by === me) return false;
+    return askIsOpen(r) || at <= (r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? r.updatedAt ?? 0);
   });
 }
 
@@ -51,7 +66,11 @@ export const boxTarget = (kind: 'help' | 'review' | null | undefined): BoxTarget
 /** One draft per target, so words never change whom they go to on their own. */
 export const draftAtFor = (personId: string, threadId: string, target: BoxTarget) => ({ product: `teammate:${personId}`, id: target === 'comment' ? threadId : `${threadId}:${target}` });
 
-export const askEndedWords = (owner: string, handedToYou: boolean) => (handedToYou ? `${owner} handed this thread to you.` : `${owner} took the ask back.`);
+/** Whether this task is the ask the open teammate's thread page carries, so L and E on the page act on it. */
+export const isTheAskOn = (item: { ask?: { owner: string; thread: string } | null }, card: { personId: string; threadId: string } | null): boolean =>
+  !!card && !!item.ask && item.ask.owner === card.personId && item.ask.thread === card.threadId;
+
+export const askEndedWords =(owner: string, handedToYou: boolean) => (handedToYou ? `${owner} handed this thread to you.` : `${owner} took the ask back.`);
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 

@@ -313,6 +313,7 @@ export function isAgentProcess(p: { cmd?: string | null; exe?: string | null }):
 
 const idOf = (p: ProcessRecord) => `${p.pid}:${p.start}:${p.exe}`;
 const FORMAT = 2;
+const QUIET_LOOK_MS = 10 * 60_000;
 
 interface Resolved { item: string | null; inherits: boolean; guard?: boolean; agent?: boolean }
 
@@ -429,6 +430,7 @@ export class LeftoverCleaner {
   declare withPrograms: Set<string>;
   declare lastStatus: CleanerStatus;
   declare looking: Promise<CleanerStatus> | null;
+  declare lastLook?: { at: number; tasks: number };
   declare runs: Record<string, RunRecord>;
   declare protectedIds: Set<string>;
   declare taskOf: Map<string, string>;
@@ -548,12 +550,17 @@ export class LeftoverCleaner {
     const now = this.clock();
     let pressure: Pressure = 'normal';
     try { pressure = await this.readPressure(); } catch {}
+    if (pressure === 'normal' && this._nothingToFind(now)) {
+      this.lastStatus = { ...this.lastStatus, pressure };
+      return this.lastStatus;
+    }
     let procs: ProcessRecord[];
     try { procs = await this.list(); } catch (err) {
       this.log(`leftovers: could not list processes: ${(err as Error).message}`);
       return this.lastStatus;
     }
     const view = this._view(procs, now);
+    this.lastLook = { at: now, tasks: view.tasks.size };
     this.withPrograms = new Set([...view.tasks.values()].filter((t) => t.procs.length).map((t) => t.item));
     this._reconcileRuns(view, now);
     this._trackStopping(view, now);
@@ -568,6 +575,17 @@ export class LeftoverCleaner {
     };
     this._save();
     return this.lastStatus;
+  }
+
+  /**
+   * A task's programs come only from its runs, so with none running, nothing
+   * being stopped and none seen last time, a look would find nothing. Still
+   * one every `QUIET_LOOK_MS`, and always at the first tick.
+   */
+  _nothingToFind(now: number): boolean {
+    if (!this.lastLook || this.lastLook.tasks || now - this.lastLook.at >= QUIET_LOOK_MS) return false;
+    if (Object.keys(this.stopping).length) return false;
+    return !Object.values(this.runs).some((r) => r.state === 'running');
   }
 
   /**

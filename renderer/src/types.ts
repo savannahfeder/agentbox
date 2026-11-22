@@ -944,6 +944,8 @@ export interface CloudPlan {
   /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {
     trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents?: null; running: number; hours: number; usedSeconds: number;
+    /** What Stripe charges a seat, a code taken off. Absent from servers before 2026-11-21. */
+    dollarsPerSeat?: number;
     people?: { id: string; usedSeconds: number; running: number; name?: string }[];
   };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
@@ -1479,6 +1481,8 @@ export interface AccountSetting {
   // emails.
   email: string | null;
   accountUuid: string | null;
+  /** Main's answer. A login with no email on file can still be signed in. */
+  signedIn?: boolean;
   /**
    * Whether her work runs on THIS account and no other. False on every row
    * until she picks one, and then every account runs as it always has. */

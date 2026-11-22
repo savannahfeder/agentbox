@@ -61,8 +61,8 @@ describe('every page comes back', () => {
     expect(placeIsSomewhere(raw({ view: 'inbox', files: { project: null } }))).toBe(true);
   });
 
-  it('Connections, Team, Today and Tasks', () => {
-    for (const key of ['connections', 'team', 'today', 'tasks'] as const) {
+  it('Connections, Team and Today', () => {
+    for (const key of ['connections', 'team', 'today'] as const) {
       const back = acrossAReload({ view: 'inbox', [key]: true });
       expect(back?.[key]).toBe(true);
       expect(placeIsSomewhere(back)).toBe(true);
@@ -91,21 +91,21 @@ describe('the app is wired to it', () => {
 
   it('writes Home and every page into the note', () => {
     expect(write).toContain('if (homeOn) place.home = homeOpen;');
-    for (const bit of ['place.files', 'place.connections', 'place.team', 'place.chats', 'place.room', 'place.teammate', 'place.today', 'place.tasks']) {
+    for (const bit of ['place.files', 'place.connections', 'place.team', 'place.chats', 'place.room', 'place.teammate', 'place.today']) {
       expect(write).toContain(bit);
     }
   });
 
   it('rewrites the note when any of those pages changes', () => {
     const deps = app.slice(app.indexOf('writePlace(window.localStorage, place);'), app.indexOf('// READING IT BACK'));
-    for (const dep of ['homeOpen', 'filesPage?.project', 'connectionsPage', 'teamOpen', 'chatsPlace', 'roomsUi.openId', 'teammatesUi.open', 'todayOn', 'tasksOn']) {
+    for (const dep of ['homeOpen', 'filesPage?.project', 'connectionsPage', 'teamOpen', 'chatsPlace', 'roomsUi.openId', 'teammatesUi.open', 'todayOn']) {
       expect(deps).toContain(dep);
     }
   });
 
   it('puts each page back on the reload', () => {
     expect(read).toMatch(/setHomeOpen\(place\.home \?\? place\.view === 'inbox'\)/);
-    for (const call of ['setFilesPage(', 'setConnectionsPage(', 'setTeamOpen(true)', 'setChatsPlace(', 'roomsUi.open(', 'teammatesUi.go(', 'setTodayOn(true)', 'setTasksOn(true)']) {
+    for (const call of ['setFilesPage(', 'setConnectionsPage(', 'setTeamOpen(true)', 'setChatsPlace(', 'roomsUi.open(', 'teammatesUi.go(', 'setTodayOn(true)']) {
       expect(read).toContain(call);
     }
   });

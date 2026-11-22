@@ -667,26 +667,3 @@ export function rowKeys(view: string, batch = false): RowKey[] {
   return [{ key: '⏎', word: 'Open' }];
 }
 
-/**
- * The row keys left while the onboarding walk is on. The walk swallows every
- * key except the current beat's, and only on the rows that beat is about, so a
- * row prints that key or nothing. With `walk` null every row prints its usual
- * keys.
- *
- * A beat with a null key is not the same as no walk: no row prints anything,
- * because closing the row the walk waits on would end the beat by accident.
- */
-export function walkRowKeys(
-  all: RowKey[],
-  /**
-   * The beat on screen: the key it asks for (may be null) and the rows that
-   * key is for. Null when no walk is on. */
-  walk: { key: string | null; rows: string[] } | null,
-  id: string,
-): RowKey[] {
-  if (!walk) return all;
-  const want = walk.key;
-  if (!want) return [];
-  if (!walk.rows.includes(id)) return [];
-  return all.filter((k) => k.key.toUpperCase() === want.toUpperCase());
-}

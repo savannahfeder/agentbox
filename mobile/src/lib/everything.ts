@@ -3,12 +3,20 @@
 // phone can read, and whose work goes under the card that is lit.
 import { buildMembers, mateRunsOf, moreLine, orderMembers, personCardsOf, readOrder, rowsShown, teamRunsOf, type Member } from '../../../renderer/src/team/everything/members';
 import { flipEvView, readEvView, writeEvView, type EvView } from '../../../renderer/src/team/everything/whose-board';
+import { isBusy, statusWord } from '../../../renderer/src/team/everything/place';
 import { teammateIdOf } from '../../../shared/teammates.mts';
 import type { Room, RoomMessage, Teammate, ThreadCard, WorkItem } from '../../../renderer/src/types';
 import { groupName } from './groups';
 import type { KeptStore } from './compose';
 
 export { flipEvView, mateRunsOf, personCardsOf, teamRunsOf, type EvView, type Member };
+
+/** The one quiet word under a card's name, and whether its mark moves (team/everything/TeamStrip.tsx `MemberWord`). */
+export function cardWord(m: Member): { word: string; live: boolean } {
+  if (m.kind === 'chat' && !(m.team && m.agents)) return { word: m.unread ? 'New messages' : m.open ? 'Public group' : m.team ? 'Everyone' : 'Chat', live: false };
+  const word = statusWord(m.kind === 'chat' ? { ...m, kind: 'person' } : m);
+  return { word, live: m.kind === 'chat' || isBusy(word) };
+}
 
 const asStorage = (store: KeptStore) => store as unknown as Storage;
 export const evViewOf = (store: KeptStore): EvView => readEvView(asStorage(store));

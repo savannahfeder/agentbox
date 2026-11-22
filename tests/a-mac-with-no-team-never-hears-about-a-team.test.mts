@@ -10,48 +10,17 @@
 // sentences reached a person with no team regardless, because they were drawn
 // whatever the team state was (a fourth, the side summary's "Visible to" row,
 // went with that panel):
-//   - the walk's "who" beat: "Every thread goes to an agent, or to a person on
-//     your team.";
-//   - the walk's last card: "Open Team to see what your teammates are working
-//     on...";
 //   - the empty inbox: "Start a thread and an agent picks it up, or message a
 //     teammate."
-// Each is pinned both ways here: gone with no team, still there with one.
+// The walk's two went with the walk (2026-11-21); the empty inbox is pinned here.
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
 import { InboxClear } from '../renderer/src/threads/Pages';
-import { COACHED, COPY, coach } from '../renderer/src/onboarding';
 
 const TEAM_WORDS = /\bteam\b|teammate|Visible to/i;
 const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-describe('the walk', () => {
-  // THE "WHO" BEAT IS GONE (2026-10-06), the one card that named a team in the
-  // middle of the walk: single player, so a thread only ever goes to an agent.
-  // What is pinned now is the whole walk: no card in it names a team on a
-  // Mac with no team, in any half of any beat.
-  it('names no team on any card of the walk, on a Mac with no team', () => {
-    expect(coach('who', 0, {})).toBeNull();
-    for (const step of COACHED) {
-      for (const ctx of [{}, { opened: true }, { picking: true }, { palette: true }, { board: true }, { replies: 1 }]) {
-        const say = coach(step, 0, ctx);
-        if (say) expect(`${say.quiet} ${say.lead}${say.tail}`, `${step} ${JSON.stringify(ctx)}`).not.toMatch(TEAM_WORDS);
-      }
-    }
-  });
-  it('ends with a next step that names no team', () => {
-    expect(COPY.finishNext.join(' ')).not.toMatch(TEAM_WORDS);
-    expect(COPY.finishNext.join(' ')).toMatch(/thread/);
-  });
-  it('adds the Team line only on a team', () => {
-    expect(COPY.finishNextTeam.join(' ')).toMatch(/\bTeam\b/);
-    const view = fs.readFileSync(new URL('../renderer/src/components/Onboarding.tsx', import.meta.url), 'utf8');
-    expect(view).toMatch(/team \? COPY\.finishNextTeam : \[\]/);
-  });
-});
-
 // The empty inbox has no sentence of its own since w-4e9f957f97: it is the
 // heading over the New thread box, whose To menu is where a teammate is offered.
 describe('the empty inbox', () => {

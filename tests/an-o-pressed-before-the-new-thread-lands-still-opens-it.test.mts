@@ -88,7 +88,7 @@ describe('the app is wired to it', () => {
   });
 
   it('Send starts the window and a failed send ends it', () => {
-    expect(app).toMatch(/onSending=\{walkCard \? undefined : \(how\) => \{[\s\S]{0,900}sentAt\.current = Date\.now\(\);/);
+    expect(app).toMatch(/onSending=\{\(how\) => \{[\s\S]{0,900}sentAt\.current = Date\.now\(\);/);
     expect(app).toMatch(/onFailed=\{\(said, back\) => \{\s*doneSending\(\);\s*sentAt\.current = 0;\s*oWaits\.current = null;/);
   });
 

@@ -157,8 +157,8 @@ describe('the app is wired to it', () => {
   });
 
   it('leaves the first run alone', () => {
-    // The walk drives the tabs itself; a reload in the middle of it belongs to
-    // the walk, not to wherever she was standing before it started.
-    expect(app).toMatch(/if \(run \|\| firstRunNeeded\(\{/);
+    // A reload in the middle of setup belongs to the setup, not to wherever
+    // she was standing before it started.
+    expect(app).toMatch(/if \(firstRunNeeded\(\{ products: projectsOfTheirOwn\(snap\.products\), done: firstRunDone\(localStorage\) \}\)\) \{ setRestored\(true\); return; \}/);
   });
 });

@@ -1,55 +1,54 @@
 // THE "ADD YOUR RECENT AGENTS" STEP NEVER HOLDS THE SETUP.
 //
-// A tester's first setup on a Mac froze on this step (2026-11-16). Its button
-// waited on the import with no limit of its own, and Skip and Back are greyed
-// out while it waits; the import has a five-minute limit behind it, and a
-// press that threw left the step on "Adding…" for good. Now the step waits at
-// most BRING_IN_WAIT_MS, then moves on, and the import carries on behind it.
-// Measured with fake timers below, against an import that never answers, one
-// that throws, and one that answers in time.
-import { describe, it, expect, vi, afterEach } from 'vitest';
+// A tester's first setup on a Mac froze on this step (2026-11-16): its button
+// waited on the import with no limit of its own, with Skip and Back greyed
+// out. It was given a 15-second limit. Then on 2026-11-21 a new user with a
+// very large chat history reached the sign-in step with the import still
+// running and the app not answering (tests/bringing-in-a-heavy-chat-history-
+// never-holds-the-app). Now Add starts the import and moves on at once, and
+// the count is filled in when the import lands. Checked below against an
+// import that never answers, one that throws, and one that answers.
+import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { bringInWithin, BRING_IN_WAIT_MS } from '../renderer/src/setup-split';
+import { bringInBehind } from '../renderer/src/setup-split';
 
-afterEach(() => { vi.useRealTimers(); });
+const settle = () => new Promise((r) => setTimeout(r, 0));
 
-describe('Add to your inbox waits a bounded time', () => {
-  it('gives the count when the import answers in time', async () => {
-    expect(await bringInWithin(async () => 3)).toBe(3);
+describe('Add to your inbox', () => {
+  it('returns before an import that never answers', async () => {
+    const heard: number[] = [];
+    const out = bringInBehind(() => new Promise<number>(() => {}), (n) => heard.push(n));
+    expect(out).toBeUndefined();
+    await settle();
+    expect(heard).toEqual([]);
   });
 
-  it('gives up at the limit on an import that never answers', async () => {
-    vi.useFakeTimers();
-    let settled = false;
-    const out = bringInWithin(() => new Promise<number>(() => {})).then((n) => { settled = true; return n; });
-    await vi.advanceTimersByTimeAsync(BRING_IN_WAIT_MS - 1);
-    expect(settled).toBe(false);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(await out).toBeNull();
+  it('hears the count when the import lands', async () => {
+    const heard: number[] = [];
+    let land: (n: number) => void = () => {};
+    bringInBehind(() => new Promise<number>((r) => { land = r; }), (n) => heard.push(n));
+    await settle();
+    land(3);
+    await settle();
+    expect(heard).toEqual([3]);
   });
 
-  it('takes an answer that lands just inside the limit', async () => {
-    vi.useFakeTimers();
-    const out = bringInWithin(() => new Promise<number>((r) => setTimeout(() => r(2), BRING_IN_WAIT_MS - 1)));
-    await vi.advanceTimersByTimeAsync(BRING_IN_WAIT_MS);
-    expect(await out).toBe(2);
-  });
-
-  it('moves on from an import that throws', async () => {
-    expect(await bringInWithin(async () => { throw new Error('no'); })).toBeNull();
-  });
-
-  it('is short enough not to read as frozen', () => {
-    expect(BRING_IN_WAIT_MS).toBeLessThanOrEqual(20_000);
+  it('hears nothing came in from an import that throws, whether at once or later', async () => {
+    const heard: number[] = [];
+    bringInBehind(() => { throw new Error('no'); }, (n) => heard.push(n));
+    bringInBehind(async () => { throw new Error('no'); }, (n) => heard.push(n));
+    await settle(); await settle();
+    expect(heard).toEqual([0, 0]);
   });
 });
 
 describe('the step and the first run use it', () => {
-  it('the step waits through bringInWithin and moves on whatever it answers', () => {
+  it('the step starts the import and moves on without waiting', () => {
     const src = fs.readFileSync('renderer/src/components/SetupSplit.tsx', 'utf8');
     const bring = src.slice(src.indexOf('const bring = useCallback'), src.indexOf('const [browsing'));
-    expect(bring).toMatch(/await bringInWithin\(p\.bringIn\)/);
-    expect(bring).toMatch(/setBusy\(false\);[\s\S]*next\(\);/);
+    expect(bring).toMatch(/bringInBehind\(p\.bringIn,/);
+    expect(bring).not.toMatch(/await/);
+    expect(bring).toMatch(/\n\s*next\(\);\n\s*\}, \[/);
   });
 
   it("the first run's own busy flag is cleared even when a press throws", () => {
