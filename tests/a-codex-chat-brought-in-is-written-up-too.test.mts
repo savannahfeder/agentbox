@@ -50,7 +50,8 @@ describe('a Codex chat brought in', () => {
     expect(s.listItems().find((i) => i.id === row.id).result).toBe('**Should I anchor the scroll?**');
   });
 
-  it('follows Codex again, and is owed a new rewrite, once that chat moves on', async () => {
+  // A statement is left in Codex's own words: a write-up always asks (2026-11-22).
+  it('follows Codex again, and is owed a new rewrite once that chat asks something more', async () => {
     const { s, slug, folder } = await world();
     s.importCodexThreads(slug, [thread(folder, 'Anchor it, or stop loading?')], { now: NOW });
     const row = s.listItems().find((i) => codexIdOf(i) === 'cx1');
@@ -59,8 +60,11 @@ describe('a Codex chat brought in', () => {
     expect(s.refreshCodexMirrors([thread(folder, 'Anchored it. Done.', NOW + 120e3)], { now: NOW + 180e3 })).toBe(1);
     const after = s.listItems().find((i) => i.id === row.id);
     expect(after.result).toBe('Anchored it. Done.');
-    expect(after.labels).toContain(CATCH_UP_LABEL);
-    expect(catchUpDue(after)).toBe(true);
+    expect(catchUpDue(after)).toBe(false);
+    expect(s.refreshCodexMirrors([thread(folder, 'Ship it too?', NOW + 240e3)], { now: NOW + 300e3 })).toBe(1);
+    const asks = s.listItems().find((i) => i.id === row.id);
+    expect(asks.result).toBe('Ship it too?');
+    expect(catchUpDue(asks)).toBe(true);
   });
 });
 
