@@ -558,7 +558,8 @@ export function createTeamService({
     // The receiver has none of these threads, so an id would draw as "Unavailable thread".
     const titled = (s: string) => s.replace(THREAD_ID, (_m, branch: string | undefined, id: string) => {
       const found = store.listItems().find((i) => i.id === id.toLowerCase());
-      const name = found ? shownTitle(found) : '';
+      const thread = found ? store.readItem(found.product, found.id) : null;
+      const name = thread ? shownTitle(thread) : '';
       if (branch) return name ? `the branch for ${name}` : 'another branch';
       return name || 'another thread';
     });
