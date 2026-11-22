@@ -63,7 +63,8 @@ export const prepareOpenCode: AcpPrepare = ({ dir, instructions, mode }) => {
 };
 
 export const openCodeHarness = {
-  ...acpHarness(definition, { prepare: prepareOpenCode }),
+  // Its own free models are named `opencode/Big Pickle`; a connected provider's keep their provider.
+  ...acpHarness(definition, { prepare: prepareOpenCode, modelLabel: (id, name) => (name || id).replace(/^opencode\//, '') }),
   // Its own credential store, which `opencode auth login` writes and the app never reads.
   signInFiles: ({ folder, home }: SignInFilesWhere) => (folder
     ? definition.credentialFiles.map((file: string) => path.join(folder, file))

@@ -176,6 +176,8 @@ export interface HarnessSupervisor {
   _releaseIdleCodex(profile: string): unknown;
   /** The app's own folder, which no worker is granted. */
   userDir?: string;
+  /** Tells the screens something they draw has changed. */
+  onChange?: (() => void) | null;
   _codexStoreServer(item: HarnessItem): HarnessToolServer | null;
   approvalCardsFor(item: HarnessItem, say: (line: string) => unknown): HarnessApprovalCards;
 }

@@ -42,6 +42,8 @@ export interface AcpWorkerOptions {
   recordFile?: ((sessionId: string) => string) | null;
   /** The command that signs this tool in, for the sentence that says to. */
   signIn?: string | null;
+  /** What the conversation offers to choose from, such as its models, as soon as it says. */
+  onOptions?: ((options: AcpConfigOption[]) => void) | null;
 }
 
 export interface AcpWorker extends EventEmitter {
@@ -64,7 +66,11 @@ interface ToolUpdate {
   content?: ({ type?: unknown; path?: unknown; oldText?: unknown; newText?: unknown; text?: unknown } | null)[] | { type?: unknown; text?: unknown } | null;
 }
 
-interface ConfigOption { id?: string; category?: string; options?: { value?: string }[] }
+export interface AcpConfigOption { id?: string; category?: string; options?: { value?: string; name?: string }[] }
+type ConfigOption = AcpConfigOption;
+
+/** The session's choice of model, among its config options. */
+export const modelOption = (options: readonly AcpConfigOption[] | null | undefined) => (options ?? []).find((option) => option.id === 'model' || option.category === 'model') ?? null;
 
 // How long a stopped turn gets to say it stopped before the agent is ended.
 const STOP_GRACE_MS = 2_000;
@@ -97,7 +103,7 @@ const approvalWords = (approval: AcpApproval) => (approval.kind === 'command' ? 
   : approval.title);
 
 export function createAcpWorker({
-  start, label, cwd, prompt, resumeSessionId = null, mcpServers = [], model = null, ask = null, recordFile = null, signIn = null,
+  start, label, cwd, prompt, resumeSessionId = null, mcpServers = [], model = null, ask = null, recordFile = null, signIn = null, onOptions = null,
 }: AcpWorkerOptions): AcpWorker {
   const worker = new EventEmitter() as AcpWorker;
   worker.stderr = new EventEmitter();
@@ -209,8 +215,9 @@ export function createAcpWorker({
       }
       if (stopping) return;
       const sessionId = worker.sessionId!;
+      try { onOptions?.(offered); } catch { /* a list for a menu is never worth a run */ }
       if (model) {
-        const choice = offered.find((option) => option.id === 'model' || option.category === 'model');
+        const choice = modelOption(offered);
         if (!choice?.id || !choice.options?.some((option) => option.value === model)) return fail(`${label} does not offer the model ${model} on this computer. Pick another model for this thread.`);
         await client.setConfigOption({ sessionId, configId: choice.id, value: model });
       }

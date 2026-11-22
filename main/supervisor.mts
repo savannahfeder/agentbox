@@ -11281,7 +11281,10 @@ export class Supervisor {
    * that ownership. This is a memory lookup, not a scan of transcript files.
    */
   engineFacts(items: WorkItem[] = []) {
-    const choices = this.engineChoices();
+    // A further harness brings its own model list, which only it knows.
+    const choices = this.engineChoices().map((choice) => (choice.id === 'claude' || choice.id === 'codex'
+      ? choice
+      : { ...choice, models: harnessFor(choice.id).models({ sup: this }) as { id: string; label: string }[] }));
     const workspace = this._engineFor(null);
     const byItem: Record<string, string> = {};
     if (choices.length > 1) {

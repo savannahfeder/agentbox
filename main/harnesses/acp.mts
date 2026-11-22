@@ -8,8 +8,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createAcpWorker } from '../acp-worker.mts';
-import type { AcpApproval, AcpMcpServer, AcpWorker } from '../acp-worker.mts';
+import { createAcpClient } from '../acp.mts';
+import { createAcpWorker, modelOption } from '../acp-worker.mts';
+import type { AcpApproval, AcpConfigOption, AcpMcpServer, AcpWorker } from '../acp-worker.mts';
 import { captureAcpEvent, acpStreamingText, summarizeAcpEvent, traceAcpEvent, acpTookTheWords } from '../acp-readers.mts';
 import type { AcpSession } from '../acp-readers.mts';
 import { acpActivity } from '../agent-activity.mts';
@@ -53,11 +54,64 @@ export function oneHunk(oldText: string, newText: string, context = 3): string {
   ].join('\n');
 }
 
-export function acpHarness(definition: HarnessDefinition, { prepare = null }: { prepare?: AcpPrepare | null } = {}) {
+export interface AcpModelRow { id: string; label: string }
+
+/** The models a conversation offered, as rows for the model menu, named in the tool's own words. */
+export function modelRows(options: readonly AcpConfigOption[] | null | undefined, label: (id: string, name: string) => string = (id, name) => name || id): AcpModelRow[] {
+  return (modelOption(options)?.options ?? [])
+    .filter((option): option is { value: string; name?: string } => typeof option?.value === 'string' && !!option.value)
+    .map((option) => ({ id: option.value, label: label(option.value, option.name ?? '') }));
+}
+
+export function acpHarness(definition: HarnessDefinition, { prepare = null, modelLabel }: { prepare?: AcpPrepare | null; modelLabel?: (id: string, name: string) => string } = {}) {
   const { acp } = definition;
   if (!acp) throw Error(`${definition.label} has no ACP command in its definition`);
   const home = (sup: HarnessSupervisor) => path.join(sup.userDir ?? sup.config.storeRoot, 'harnesses', definition.id);
   const recordFile = (sup: HarnessSupervisor, sessionId: string) => path.join(home(sup), 'conversations', `${safe(sessionId)}.jsonl`);
+
+  // THE MODELS THIS TOOL OFFERS ON THIS COMPUTER, kept as the last conversation
+  // said them. Only the tool knows: they depend on what the person connected.
+  // Every conversation states its list when it opens, so the list costs
+  // nothing to keep current; a tool that has never run is asked once.
+  const modelsFile = (sup: HarnessSupervisor) => path.join(home(sup), 'models.json');
+  const known = new Map<string, AcpModelRow[]>();
+  const modelsKnown = (sup: HarnessSupervisor): AcpModelRow[] => {
+    const file = modelsFile(sup);
+    if (!known.has(file)) {
+      let rows: unknown = [];
+      try { rows = JSON.parse(fs.readFileSync(file, 'utf8')).models; } catch { /* never asked */ }
+      known.set(file, Array.isArray(rows) ? rows as AcpModelRow[] : []);
+    }
+    return known.get(file)!;
+  };
+  const keepModels = (sup: HarnessSupervisor, options: readonly AcpConfigOption[] | null | undefined) => {
+    const rows = modelRows(options, modelLabel);
+    if (!rows.length || JSON.stringify(rows) === JSON.stringify(modelsKnown(sup))) return;
+    known.set(modelsFile(sup), rows);
+    try {
+      fs.mkdirSync(home(sup), { recursive: true });
+      fs.writeFileSync(modelsFile(sup), `${JSON.stringify({ at: new Date().toISOString(), models: rows }, null, 1)}\n`);
+    } catch { /* the list is still held for this run of the app */ }
+    sup.onChange?.();
+  };
+  const asked = new Set<string>();
+  /** Opens one empty conversation in the app's own folder to hear the list, once per run of the app. */
+  const askForModels = (sup: HarnessSupervisor) => {
+    const bin = sup.config[definition.binKey as BinKey];
+    const dir = home(sup);
+    if (!bin || asked.has(dir)) return;
+    asked.add(dir);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const env = { ...definitionMethods(definition).workerEnv(process.env), ...(prepare ? prepare({ dir, cwd: dir, instructions: '', mode: null }) : {}) };
+      const client = createAcpClient({ transport: spawn(bin, [...acp.args], { cwd: dir, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }) as never, requestTimeoutMs: 30_000 });
+      (async () => {
+        await client.initialize();
+        const made = await client.newSession({ cwd: dir }) as { configOptions?: AcpConfigOption[] } | null;
+        keepModels(sup, made?.configOptions);
+      })().catch(() => { /* it will say why when a thread starts on it */ }).finally(() => client.close('The model list was read'));
+    } catch { /* a tool that will not start has no list to offer */ }
+  };
 
   return {
     ...definitionMethods(definition),
@@ -69,6 +123,11 @@ export function acpHarness(definition: HarnessDefinition, { prepare = null }: { 
     profileEnv: (env: Env) => env,
     accountKey: () => `${definition.accountPrefix}default`,
     signInFiles: ({ folder }: SignInFilesWhere) => (folder ? definition.credentialFiles.map((file: string) => path.join(folder, file)) : []),
+    models: ({ sup }: { sup: HarnessSupervisor }): AcpModelRow[] => {
+      const rows = modelsKnown(sup);
+      if (!rows.length) askForModels(sup);
+      return rows;
+    },
     defaultModel: () => null,
     workspaceModel: () => null,
     tooling: () => null,
@@ -111,6 +170,7 @@ export function acpHarness(definition: HarnessDefinition, { prepare = null }: { 
         ask,
         recordFile: (sessionId) => recordFile(sup, sessionId),
         signIn: [acp.bin, ...definition.loginArgs].join(' '),
+        onOptions: (options) => keepModels(sup, options),
       });
       // A dead worker's card would stay first in the list and take the next answer.
       worker.once('exit', () => { cards?.close(); });
