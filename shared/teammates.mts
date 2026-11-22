@@ -733,15 +733,17 @@ export function dutyUnread(teammateId: string, dutyId: string, items: readonly R
 }
 
 // The one thread a duty's job lives in: its first-job run while that is still
-// open, else the newest run of the duty itself. Code finds it; the thread
-// decides what the round needs. `busy` is a thread already at work, or one
-// waiting on your answer, which the duty never goes around.
-export function dutyHome(teammateId: string, dutyId: string, items: readonly RunItem[], chat: ChatLike): { item: RunItem; busy: boolean } | null {
+// open, else the newest run of the job, under any of the duties saved with the
+// same words (one job on several weekdays). Code finds it; the thread decides
+// what the round needs. `busy` is a thread already at work, or one waiting on
+// your answer, which the duty never goes around.
+export function dutyHome(teammateId: string, dutyIds: readonly string[], items: readonly RunItem[], chat: ChatLike): { item: RunItem; busy: boolean } | null {
   const firstId = runIdFor(`${teammateId}#first`);
   const newest = (a: RunItem, b: RunItem) => (b.createdAt ?? 0) - (a.createdAt ?? 0);
   const runs = runsOf(teammateId, items);
+  const job = new Set<string | null>(dutyIds);
   const item = runs.filter((i) => i.id === firstId && i.status !== 'done').sort(newest)[0]
-    ?? runs.filter((i) => dutyOf(i) === dutyId).sort(newest)[0];
+    ?? runs.filter((i) => job.has(dutyOf(i))).sort(newest)[0];
   if (!item || (item.status === 'done' && item.wrote?.status?.source === 'founder')) return null;
   const busy = item.status !== 'done' && (isActiveRun(item) || isQueued(item) || (waitingOnYou(item) && asksYouStill(item, teammateId, chat)));
   return { item, busy };
@@ -1187,7 +1189,8 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         key = slot;
       }
       // A duty after each ship keeps a thread per ship, which its weekly most counts.
-      const home = d.after === 'ship' ? null : dutyHome(t.id, d.id, items, chat);
+      const sameJob = (t.duties ?? []).filter((x) => x.what.trim() === d.what.trim() && x.after !== 'ship').map((x) => x.id);
+      const home = d.after === 'ship' ? null : dutyHome(t.id, sameJob, items, chat);
       if (home) {
         if (!home.busy && overLimit(t)) { limited.add(t.id); continue; }
         if (!home.busy) actions.push({ type: 'due', teammate: t.id, item: home.item.id, product: home.item.product, duty: d.id, key, text: dutyDueText(d) });
