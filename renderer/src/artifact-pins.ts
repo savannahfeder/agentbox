@@ -244,7 +244,10 @@ export function unsentWords(total: number, elsewhere: number, kind: 'picture' | 
   return elsewhere >= total ? `${head}, on ${where}` : `${head}, ${elsewhere} on ${where}`;
 }
 
-export type NoteGoes = { to: 'agent'; now: boolean } | { to: 'person'; person: string } | { to: 'file' };
+/** The bar while Send all is on its way. */
+export const sendingWords = (total: number): string => `Sending ${total} ${total === 1 ? 'comment' : 'comments'} to your agent`;
+
+export type NoteGoes ={ to: 'agent'; now: boolean } | { to: 'person'; person: string } | { to: 'file' };
 
 /**
  * WHO A NOTE GOES TO follows whose thing it is on. A name in the words wins.
