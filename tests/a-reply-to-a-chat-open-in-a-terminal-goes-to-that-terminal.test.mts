@@ -134,7 +134,7 @@ describe('a reply to a chat open in a terminal', () => {
     sup._goesToItsTerminal(row());
     await settle();
     await follow();
-    expect(row().result).toBe('**Claude Code stopped to ask you a question. Answer it in its kestrel window, and it gets your reply next.**');
+    expect(row().result).toBe('**Claude Code stopped to ask you a question. Answer it in its window, in the kestrel folder, and it gets your reply next.**');
     expect(row().result).toBe(stoppedThere('input needed', 'kestrel', { replyWaits: true }));
     expect(row().wrote.result.ts).toBeGreaterThanOrEqual(row().wrote.answer.ts);
     expect(inbox()).toBe(true);

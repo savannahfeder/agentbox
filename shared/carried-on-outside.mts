@@ -26,9 +26,10 @@ export function heldOutside(item: Held | null | undefined): boolean {
  *  Code writes nothing to the chat while one is open. `waitingFor` is its
  *  session file's word, and `folder` the one it is open in. */
 const STOPPED = '**Claude Code stopped to ';
+const inItsWindow = (folder?: string | null) => (folder ? `in its window, in the ${folder} folder` : 'there');
 export function stoppedThere(waitingFor: string, folder?: string | null, { replyWaits = false } = {}): string {
   const why = waitingFor === 'permission prompt' ? 'ask for your OK' : 'ask you a question';
-  return `${STOPPED}${why}. Answer it ${folder ? `in its ${folder} window` : 'there'}${replyWaits ? ', and it gets your reply next' : ''}.**`;
+  return `${STOPPED}${why}. Answer it ${inItsWindow(folder)}${replyWaits ? ', and it gets your reply next' : ''}.**`;
 }
 export const saysItStopped = (text: unknown): boolean => String(text ?? '').startsWith(STOPPED);
 /** Any of the lines the follow writes where an answer would be: your move, not an answer. */
@@ -41,4 +42,4 @@ export const CUT_THERE = '**You stopped Claude Code there.**';
 export const CLOSED_THERE = '**Claude Code closed before it answered.**';
 /** It keeps a reply from here until you allow it in its own window. */
 const HELD = '**Claude Code is holding your reply.';
-export const heldThere = (folder?: string | null): string => `${HELD} Allow it ${folder ? `in its ${folder} window` : 'there'}.**`;
+export const heldThere = (folder?: string | null): string => `${HELD} Allow it ${inItsWindow(folder)}.**`;

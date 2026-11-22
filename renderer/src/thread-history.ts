@@ -94,6 +94,8 @@ export interface ThreadEvent {
   field?: 'body' | 'answer' | 'result' | 'note';
   /** Your words to a chat brought in, typed where it started. */
   saidOutside?: true;
+  /** When its agent said what is under the line saying it stopped, which is dated when that was seen. */
+  saidAt?: number;
   /** The agent teammate who handed this over, on a reply the app wrote for it. */
   from?: string;
   /** Whose that was, by id: a person you asked to help draws with their face. */
@@ -511,8 +513,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
 
     if (words(patch.result)) {
       resultAt = at;
-      const then = saysItStopped(patch.result) ? at : saidThen((patch as { chatAt?: unknown }).chatAt, at);
-      events.push({ at: then, who: 'agent', said: 'It came back to you', words: words(patch.result)!, message: true, field: 'result', ...(ranNow() ? { ran: ranNow() } : {}) });
+      const then = saidThen((patch as { chatAt?: unknown }).chatAt, at);
+      events.push({ ...(saysItStopped(patch.result) ? { at, saidAt: then } : { at: then }), who: 'agent', said: 'It came back to you', words: words(patch.result)!, message: true, field: 'result', ...(ranNow() ? { ran: ranNow() } : {}) });
       continue;
     }
 
@@ -649,7 +651,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   }
   tagWriter();
 
-  const told = theAskComesFirst(waitingReplies(stopsAnswered(events)));
+  // A question there is read once it is answered, by when it was put up.
+  const shown = stopsAnswered(events);
+  const told = theAskComesFirst(waitingReplies(startedIn ? shown.sort((a, b) => a.at - b.at) : shown));
   // A chat brought in has the name Claude Code or Codex gave it, which nobody typed.
   return startedIn ? told : withTitleSaid(told, title, label);
 }
@@ -664,7 +668,7 @@ function stopsAnswered(events: ThreadEvent[]): ThreadEvent[] {
     if (e.said === 'You sent it back' && next?.field === 'result' && saysItStopped(next.words) && next.at - e.at <= 5) return [];
     if (i >= lastMessage || e.field !== 'result' || !saysItStopped(e.words)) return [e];
     const before = saidBeforeTheStop(e.words ?? '');
-    return before ? [{ ...e, words: before }] : [];
+    return before ? [{ ...e, words: before, at: e.saidAt ?? e.at }] : [];
   });
 }
 

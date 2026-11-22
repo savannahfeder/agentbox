@@ -162,8 +162,14 @@ export const THREAD_LABEL = 'thread-import';
 export const CATCH_UP_LABEL = 'catch-up';
 export const CATCH_UP_TRIES = 3;
 export const catchUpDue = (item: LabelledItem | null | undefined): boolean => (item?.labels ?? []).includes(CATCH_UP_LABEL) && item?.status === 'open';
-/** Its first write-up: a later answer in a chat that follows its terminal has one to read meanwhile. */
-export const gettingReady = (item: (LabelledItem & { wrote?: { problem?: unknown } }) | null | undefined): boolean => catchUpDue(item) && !item?.wrote?.problem;
+/** Brought in by itself as it goes (main/new-chats-watch.mts). It stays in its agent's
+ *  own words: what a small model made of one was acted on. */
+export const AS_IT_GOES_LABEL = 'as-it-goes';
+/** Whether the write-up is also its answer: a chat picked at setup or on the card, the first time. */
+export const writesTheAnswer = (item: (LabelledItem & { wrote?: { problem?: unknown } }) | null | undefined): boolean =>
+  !item?.wrote?.problem && !(item?.labels ?? []).includes(AS_IT_GOES_LABEL);
+/** Nothing to act on until it is written up. */
+export const gettingReady = (item: (LabelledItem & { wrote?: { problem?: unknown } }) | null | undefined): boolean => catchUpDue(item) && writesTheAnswer(item);
 
 /**
  * And the one that says WHICH thread. The id is Claude Code's own session id,

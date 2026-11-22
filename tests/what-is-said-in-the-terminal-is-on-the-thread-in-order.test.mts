@@ -24,13 +24,14 @@ import { Store } from '../main/store.mts';
 import { followClaudeChats, notYetRead, startChatFollow } from '../main/chat-follow.mts';
 import { readChatTurn } from '../main/agent-sessions.mts';
 import { slugFor } from '../main/transcript-search.mts';
-import { CUT_THERE, saidBeforeTheStop } from '../shared/carried-on-outside.mts';
-import { catchUpDue } from '../shared/agent-import.mts';
+import { CLOSED_THERE, CUT_THERE, saidBeforeTheStop } from '../shared/carried-on-outside.mts';
+import { catchUpDue, gettingReady, writesTheAnswer } from '../shared/agent-import.mts';
+import { itemOptions, offerIsLive } from '../renderer/src/format.ts';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules.ts';
 import { threadEvents } from '../renderer/src/thread-history.ts';
 
 const SID = '5a1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f';
-const ASKED = '**Claude Code stopped to ask you a question. Answer it in its kestrel window.**';
+const ASKED = '**Claude Code stopped to ask you a question. Answer it in its window, in the kestrel folder.**';
 
 let root;
 let home;
@@ -138,10 +139,55 @@ describe('a question its agent put up there', () => {
     await follow();
     expect(said()).toEqual([
       ['you', 'Add a key.'],
-      ['agent', 'I will look first.\n\n**Where should keys live?**\n- SQLite file\n- Memory\n\n**Which route?**\n- POST /payments\n- POST /appointments'],
+      ['agent', 'I will look first.\n\n**Where should keys live?**\n1. SQLite file\n2. Memory\n\n**Which route?**\n1. POST /payments\n2. POST /appointments'],
       ['you', 'SQLite file\nPOST /appointments'],
     ]);
     expect(progress()).toBe(true);
+  });
+
+  // Round three (2026-11-22): the reasons were what the choice was made on, a
+  // command in the question drew raw asterisks, and a refused plan was nowhere.
+  it('keeps each choice\'s reason, and bold to its first line', async () => {
+    const t = T0 + 200_000;
+    write(typed(t, 'Ask me.'), calls(t + 1_000, 'AskUserQuestion', 'q'), result(t + 60_000, {
+      questions: [{ question: 'May I run this?\n\ntouch a && git commit', options: [{ label: 'Yes', description: 'Run it as written.' }, { label: 'No' }] }],
+      answers: { 'May I run this?\n\ntouch a && git commit': 'No' },
+    }, 'q'));
+    session('busy');
+    await follow();
+    expect(said().at(-2)).toEqual(['agent', '**May I run this?**\n\ntouch a && git commit\n\n1. Yes: Run it as written.\n2. No']);
+  });
+
+  it('that you cancelled can still be answered from here', async () => {
+    const t = T0 + 200_000;
+    write(typed(t, 'Ask me.'), row_('assistant', t + 1_000, { role: 'assistant', stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'q', name: 'AskUserQuestion', input: { questions: [question('30 or 90 days?', '30 days', '90 days')] } }] }),
+      result(t + 60_000, 'User rejected tool use', 'q'), interrupted(t + 60_000));
+    session('idle');
+    await follow();
+    expect(itemOptions(row()).map((o) => o.text)).toEqual(['30 days', '90 days']);
+    expect(offerIsLive(row())).toBe(true);
+  });
+
+  it('that was a plan you refused is on the thread too', async () => {
+    const t = T0 + 200_000;
+    write(typed(t, 'Plan it.'), row_('assistant', t + 1_000, { role: 'assistant', stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'p', name: 'ExitPlanMode', input: { plan: '# Log deletes' } }] }),
+      result(t + 60_000, 'User rejected tool use', 'p'), interrupted(t + 60_000));
+    session('idle');
+    await follow();
+    expect(row().result).toBe(`${CUT_THERE}\n\n# Log deletes`);
+  });
+
+  it('is where it was put up, ahead of a reply typed here while it was open', async () => {
+    const t = Date.now() - 600_000;
+    write(typed(t, 'Ask me.'));
+    session('waiting', 'input needed');
+    await follow();
+    s.answerItem(slug, row().id, { answer: 'No, do not run that.' });
+    s.settleAnswer(slug, row().id, row().wrote.answer.ts);
+    write(calls(t + 1_000, 'AskUserQuestion', 'q'), result(Date.now() + 1_000, { questions: [question('Run it?', 'Yes', 'No')], answers: { 'Run it?': 'No' } }, 'q'));
+    session('busy');
+    await follow(Date.now() + 2_000);
+    expect(said().map(([, words]) => words)).toEqual(['Ask me.', '**Run it?**\n1. Yes\n2. No', 'No, do not run that.', 'No']);
   });
 
   it('that was a plan is on the thread once you approve it', async () => {
@@ -157,7 +203,7 @@ describe('a question its agent put up there', () => {
     write(typed(t, 'Plan it.'), says(t + 1_000, 'The folder has changed.', 'tool_use'));
     session('waiting', 'permission prompt');
     await follow();
-    expect(row().result).toMatch(/kestrel window\.\*\*\n\nThe folder has changed\.$/);
+    expect(row().result).toMatch(/kestrel folder\.\*\*\n\nThe folder has changed\.$/);
     write(says(t + 60_000, 'Planned. Build it?'));
     session('idle');
     await follow();
@@ -179,7 +225,7 @@ describe('a question its agent put up there', () => {
       result(t + 60_000, 'User rejected tool use', 'q'), interrupted(t + 60_000));
     session('idle');
     await follow();
-    expect(said()).toEqual([['you', 'Fix the overlap.'], ['agent', `${CUT_THERE}\n\n**It only compares starts. Which way?**\n- Text\n- Real times`]]);
+    expect(said()).toEqual([['you', 'Fix the overlap.'], ['agent', `${CUT_THERE}\n\n**It only compares starts. Which way?**\n1. Text\n2. Real times`]]);
   });
 
   it('says you stopped it there after Esc, once, and the chat goes on from there', async () => {
@@ -256,7 +302,7 @@ describe('a chat closed here while its agent works on there', () => {
     expect(row().status).toBe('done');
     await follow(doneAt + 5_000, waits(doneAt + 2_000));
     expect(row().status).toBe('open');
-    expect(row().result).toBe('**Claude Code stopped to ask for your OK. Answer it in its kestrel window.**');
+    expect(row().result).toBe('**Claude Code stopped to ask for your OK. Answer it in its window, in the kestrel folder.**');
     expect(belongsInInbox(row(), { now: doneAt + 6_000 })).toBe(true);
     // Not drawn as one you sent back, nor as words of yours.
     expect(events().map((e) => e.said)).not.toContain('You sent it back');
@@ -327,6 +373,47 @@ describe('a new chat brought in mid-conversation', () => {
   it('with only a first message and an answer reads as it always has', () => {
     bringIn({ lastSaid: 'Which one?', entries: entries().slice(0, 1).concat({ who: 'agent', at: T0 + 60_000, text: 'Which one?' }) });
     expect(events().filter((e) => e.message).map((e) => e.words)).toEqual(['Fix it.', 'Which one?']);
+  });
+});
+
+describe('a window left before its agent finished', () => {
+  beforeEach(() => bringIn());
+  const left = async () => {
+    write(typed(Date.now() - 30_000, 'Add a toggle.'), calls(Date.now() - 20_000, 'Bash'));
+    session('busy');
+    await follow();
+    expect(progress()).toBe(true);
+  };
+
+  it('is out of In progress at the next look once closed, not two minutes on, and says so', async () => {
+    await left();
+    fs.rmSync(path.join(home, 'sessions', `${process.pid}.json`));
+    await follow();
+    expect(row().claim).toBeNull();
+    expect(row().result).toBe(CLOSED_THERE);
+    expect(inbox()).toBe(true);
+  });
+
+  it('opened again at its prompt says the same, once it has been there long enough to have written an answer', async () => {
+    await left();
+    const at0 = Date.now();
+    await follow(at0, { stateOf: () => ({ status: 'idle', waitingFor: '', since: at0 - 1_000 }) });
+    expect(row().result).not.toBe(CLOSED_THERE);
+    const old = new Date(Date.now() - 60_000);
+    fs.utimesSync(file, old, old);
+    await follow(at0 + 8_000, { stateOf: () => ({ status: 'idle', waitingFor: '', since: at0 - 1_000 }) });
+    expect(row().result).toBe(CLOSED_THERE);
+  });
+});
+
+describe('a chat brought in by itself', () => {
+  it('stays in its agent\'s own words, and one picked at setup is written up as ever', () => {
+    bringIn({ lastSaid: 'Which repository?', entries: [{ who: 'you', at: T0, text: 'Fix it.' }, { who: 'agent', at: T0 + 1_000, text: 'Which repository?' }] });
+    expect(catchUpDue(row())).toBe(true);
+    expect(writesTheAnswer(row())).toBe(false);
+    expect(gettingReady(row())).toBe(false);
+    expect(writesTheAnswer({ ...row(), labels: ['thread-import', 'catch-up'] })).toBe(true);
+    expect(gettingReady({ ...row(), labels: ['thread-import', 'catch-up'] })).toBe(true);
   });
 });
 

@@ -131,7 +131,7 @@ import { namedThreadsBlock } from '../shared/named-threads.mts';
 import { changePath } from './code-change.mts';
 import { noteAgentWrites } from './store/written-elsewhere.mts';
 import { snapshotRepo } from './git-change.mts';
-import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, writesTheAnswer, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
 import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen, claudeSessionState } from './claude-session-open.mts';
 import { carriedOnFromTheApp, reply as replyToSession } from './agents.mts';
@@ -5277,9 +5277,7 @@ export class Supervisor {
           // Carried on in its terminal while this was written: its newer answer is owed its own.
           const row = this.store.readItem?.(next.product, next.id);
           if (row && (row.result !== next.result || row.wrote?.saidOutside?.ts !== next.wrote?.saidOutside?.ts || row.status !== next.status)) return;
-          // A later answer stays in its agent's own words: what was made up over one was acted on.
-          const first = !next.wrote?.problem;
-          this.store.catchUpItem(next.product, next.id, { ...(next.label ? {} : { label: card.title }), problem: card.context, ...(first ? { result: catchUpResult(card) } : {}) });
+          this.store.catchUpItem(next.product, next.id, { ...(next.label ? {} : { label: card.title }), problem: card.context, ...(writesTheAnswer(next) ? { result: catchUpResult(card) } : {}) });
           this.store.routeItem?.(next.product, next.id, { labels });
           this.onChange?.();
         })

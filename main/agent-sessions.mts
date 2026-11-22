@@ -419,11 +419,23 @@ function pickedIn(result: unknown): { asked: string; picked: string } | null {
 
 const bareLabel = (s: unknown) => String(s ?? '').replace(/\s*\(recommended\)\s*$/i, '').trim();
 
+/** A question as a thread draws one: its first line in bold, its choices numbered so they can be pressed. */
 function questionsAsked(questions: unknown): string {
-  return (Array.isArray(questions) ? questions : []).map((q: { question?: unknown; options?: unknown }) => [
-    `**${bareLabel(q?.question)}**`,
-    ...(Array.isArray(q?.options) ? q.options : []).map((o: { label?: unknown }) => `- ${bareLabel(o?.label)}`),
-  ].join('\n')).join('\n\n').slice(0, SAID_CHARS);
+  return (Array.isArray(questions) ? questions : []).map((q: { question?: unknown; options?: unknown }) => {
+    const [first, ...rest] = bareLabel(q?.question).split('\n');
+    const more = rest.join('\n').trim();
+    const choices = (Array.isArray(q?.options) ? q.options : []).map((o: { label?: unknown; description?: unknown }, i: number) => {
+      const why = String(o?.description ?? '').trim();
+      return `${i + 1}. ${bareLabel(o?.label)}${why ? `: ${why}` : ''}`;
+    });
+    return [`**${first}**`, ...(more ? ['', more, ''] : []), ...choices].join('\n');
+  }).join('\n\n').slice(0, SAID_CHARS);
+}
+
+/** What a tool call put up for an answer: a picker's questions, a plan to approve. */
+function putUp(call: { name?: unknown; input?: { questions?: unknown; plan?: unknown } }): string {
+  if (call.name === 'AskUserQuestion') return questionsAsked(call.input?.questions);
+  return call.name === 'ExitPlanMode' && typeof call.input?.plan === 'string' ? call.input.plan.trim().slice(0, SAID_CHARS) : '';
 }
 
 /** Typed while its agent was at work: kept as an attachment, not a message. */
@@ -442,15 +454,15 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
   const lines = buf.slice(0, n).toString('utf8').split('\n');
   if (from > 0) lines.shift();
   const turn: ChatTurn = { heard: '', heardAt: 0, said: '', saidAt: 0, ended: false, cutAt: 0, entries: [] };
-  // Each tool call's question, so one you cancelled is known at all.
-  const called = new Map<unknown, string>();
+  // What each call put up and when, so one you cancelled is known at all.
+  const called = new Map<unknown, { at: number; asked: string }>();
   for (const line of lines) {
     if (!line.trim()) continue;
     let row: TranscriptRow & { isSidechain?: boolean; attachment?: unknown; message?: { content?: unknown; stop_reason?: unknown } };
     try { row = JSON.parse(line); } catch { continue; }
     if (row.isSidechain || (row.type !== 'user' && row.type !== 'assistant' && row.type !== 'attachment')) continue;
     const at = Date.parse(String(row.timestamp ?? '')) || 0;
-    const blocks = Array.isArray(row.message?.content) ? row.message.content as { type?: unknown; id?: unknown; name?: unknown; input?: { questions?: unknown }; tool_use_id?: unknown }[] : [];
+    const blocks = Array.isArray(row.message?.content) ? row.message.content as { type?: unknown; id?: unknown; name?: unknown; input?: { questions?: unknown; plan?: unknown }; tool_use_id?: unknown }[] : [];
     if (row.type === 'attachment') {
       const words = queuedWords(row);
       if (words) turn.entries.push({ who: 'you', at, text: words });
@@ -466,9 +478,8 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
     if (row.type === 'user') {
       const pick = pickedIn(row.toolUseResult);
       const call = called.get(blocks.find((b) => b?.type === 'tool_result')?.tool_use_id);
-      const asked = pick?.asked || call;
-      // Dated just before your answer: the row may have gone to Done while it was up.
-      if (asked) turn.entries.push({ who: 'agent', at: at - 1, text: asked });
+      const asked = pick?.asked || call?.asked;
+      if (asked) turn.entries.push({ who: 'agent', at: Math.min(call?.at ?? at, at - 1), text: asked });
       if (pick) turn.entries.push({ who: 'you', at, text: pick.picked });
       turn.ended = CUT_SHORT.test(messageText(row).trim());
       if (turn.ended) turn.cutAt = at;
@@ -478,7 +489,7 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
     if (row.isApiErrorMessage) { turn.ended = true; continue; }
     // Its own filler over an interrupted turn, which no model wrote.
     if ((row.message as { model?: unknown } | undefined)?.model === '<synthetic>') continue;
-    for (const b of blocks) if (b?.type === 'tool_use') called.set(b.id, b.name === 'AskUserQuestion' ? questionsAsked(b.input?.questions) : '');
+    for (const b of blocks) if (b?.type === 'tool_use') called.set(b.id, { at, asked: putUp(b) });
     const text = messageText(row).trim();
     if (text) {
       turn.entries.push({ who: 'agent', at, text: text.slice(-SAID_CHARS) });

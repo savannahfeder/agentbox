@@ -150,6 +150,11 @@ export function codexWorking(t: CodexChatLike | null | undefined, now = Date.now
 
 type StateOf = (sessionId: string, homes: string[]) => ClaudeSessionState | null;
 
+// The transcripts of chats whose Claude Code has published a session file: one with none now has closed.
+const published = new Set<string>();
+/** A window that says it is idle before its transcript does has this long to write it. */
+const IDLE_FOR_MS = 5_000;
+
 // A transcript as last read, kept while its size and time are unchanged: most
 // brought-in chats are not moving, and a busy one can be megabytes.
 const kept = new Map<string, { size: number; mtimeMs: number; turn: ChatTurn | null }>();
@@ -199,6 +204,7 @@ export async function followClaudeChats(
     const { turn, mtimeMs } = turnOf(file);
     if (!turn) continue;
     const state = turn.ended ? null : stateOf(c.chat, dirs);
+    if (state?.status) published.add(file);
     if (c.doneAt) { moved += comeBack(store, c, turn, state, now); continue; }
     const fresh = notYetRead(turn, c);
     // The agent's words after your last are its turn's, written when that ends or stops.
@@ -212,7 +218,9 @@ export async function followClaudeChats(
       if (tail && turn.ended) store.chatAgentSaid(c.product, c.id, tail.text, { at: tail.at, now });
       continue;
     }
-    const running = state?.status ? atWork(state) : now - mtimeMs < FRESH_MS;
+    const running = state?.status ? atWork(state) : !published.has(file) && now - mtimeMs < FRESH_MS;
+    // Gone, or back at its prompt, with the turn never finished.
+    const left = !turn.ended && !running && (state === null || (state.status === 'idle' && now - Math.max(mtimeMs, state.since ?? 0) > IDLE_FOR_MS));
     const cut = turn.ended && turn.cutAt > Math.max(c.knownAt, c.heardThrough, ...turn.entries.map((e) => e.at));
     const where = whereTheChatIs(turn, { running, stop: stopLine(state, c.told && !tail), news: !!tail, cut });
     if (where.move === 'working') {
@@ -227,10 +235,10 @@ export async function followClaudeChats(
     } else if (where.move === 'cut') {
       store.chatLeftOutside(c.product, c.id, 'cut', tail?.text ?? '', { at: turn.cutAt, now });
       moved += 1;
-    } else if (c.held && !turn.ended && state === null) {
+    } else if (c.held && left) {
       store.chatLeftOutside(c.product, c.id, 'closed', tail?.text ?? '', { at: tail?.at ?? 0, now });
       moved += 1;
-    } else if (c.held) {
+    } else if (c.held && turn.ended) {
       store.letGoOfChat(c.product, c.id, { now });
       moved += 1;
     }
@@ -244,7 +252,8 @@ export async function followClaudeChats(
 function comeBack(store: FollowStore, c: FollowedChat, turn: ChatTurn, state: ClaudeSessionState | null, now: number) {
   const asks = asksNow(turn, state);
   if (!asks || !(turn.heardAt > c.doneAt || (asks.stop !== null && (state?.since ?? 0) > c.doneAt))) return 0;
-  const since = notYetRead(turn, { heardThrough: Math.max(c.heardThrough, c.doneAt), knownAt: Math.max(c.knownAt, c.doneAt) });
+  // Your words from before the close are on it; a question put up before it may not be.
+  const since = notYetRead(turn, { heardThrough: Math.max(c.heardThrough, c.doneAt), knownAt: c.knownAt });
   store.chatAsksAgain(c.product, c.id, since, asks.stop, { now });
   return 1;
 }

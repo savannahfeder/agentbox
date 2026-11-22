@@ -29,7 +29,7 @@ import { projectWrites, projectWritten } from './store/projects-changed.mts';
 import { imgUrl } from './img-scheme.mts';
 import { teamOf, PERSONAL_FLAG } from './team/projects.mts';
 import {
-  agentImportRow, howTheChatEnded, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL, THREAD_LABEL,
+  agentImportRow, AS_IT_GOES_LABEL, howTheChatEnded, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL, THREAD_LABEL,
 } from '../shared/agent-import.mts';
 import { CLOSED_THERE, CUT_THERE, heldOutside, stoppedThere } from '../shared/carried-on-outside.mts';
 import { isShared } from '../shared/team-rules.mts';
@@ -1780,6 +1780,7 @@ export class Store {
       const row = threadImportRow(thread);
       const turns = notYetRead({ entries: thread.entries ?? [] }, { heardThrough: 0, knownAt: 0 });
       if (turns.length) row.result = turns.at(-1)!.who === 'agent' ? turns.pop()!.text : '';
+      if (thread.entries) row.labels.push(AS_IT_GOES_LABEL);
       // The opening is the row's body.
       if (turns[0]?.who === 'you' && turns[0].text === row.body) turns.shift();
       if (thread.stoppedOn !== undefined) {
