@@ -6,9 +6,10 @@
 // threads at High. Nothing had set that level for you: an ask carries the
 // level of the asker's own thread, and a message carries the sender's or the
 // sorter's. So a teammate waiting on you ranked exactly like an agent waiting
-// on you, and agents put High on most of what they write. On the demo team,
-// Priya's task (due today) and Lena's message drew 5th and 6th of 9 in Needs
-// you, under four agent threads at High.
+// on you, and agents put High on most of what they write. In the browser copy
+// of the demo team, Priya's task (due today) and Lena's message drew 5th and
+// 6th of the 6 rows in Needs you, under four agent threads at High; with this
+// change they drew 1st and 2nd, and a level picked by hand stayed as picked.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { levelForYou, messagePriority, sorted, withLevelsForYou, DEFAULT_DISPLAY } from '../renderer/src/threads/page-rules.ts';
