@@ -3,7 +3,7 @@
 // already put off. And the box a time is typed into, which Send later on a new
 // thread uses too.
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
+import { Platform, Pressable, TextInput, View } from 'react-native';
 import { parseWhen } from '../../../renderer/src/format';
 import { laterRows, typedLater, typedLine, type LaterRow } from '../lib/later';
 import { Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
@@ -13,7 +13,7 @@ import { color, corner, font } from './theme';
 export function TypingSheet({ open, close, children }: { open: boolean; close: () => void; children: React.ReactNode }) {
   return (
     <Sheet open={open} close={close}>
-      <KeyboardAvoidingView behavior="padding" style={{ gap: 1 }}>{children}</KeyboardAvoidingView>
+      <View style={{ gap: 1 }}>{children}</View>
     </Sheet>
   );
 }

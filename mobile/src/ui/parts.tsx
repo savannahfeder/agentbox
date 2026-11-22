@@ -1,7 +1,7 @@
 // The pieces every screen is made of, sized from the phone site as it draws
 // (renderer/src/phone.css and the styles under it).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextProps, type ViewStyle } from 'react-native';
+import { Animated, Easing, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type PanResponderGestureState, type TextProps, type ViewStyle } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { feel } from '../lib/feel';
@@ -111,40 +111,46 @@ function SheetBody({ close, slide, children }: { close: () => void; slide: Anima
   const [box, setBox] = useState(0);
   const [inner, setInner] = useState(0);
   const over = inner > box + 1;
+  const follow = useMemo(() => ({
+    onPanResponderMove: (_: unknown, g: PanResponderGestureState) => drag.setValue(sheetPull(g.dy)),
+    onPanResponderRelease: (_: unknown, g: PanResponderGestureState) => {
+      if (sheetLetGo(g.dy, g.vy, tall.current) === 'away') {
+        feel.tap();
+        close();
+        Animated.timing(drag, { toValue: 0, duration: 0, delay: 220, useNativeDriver: true }).start();
+      } else Animated.spring(drag, { toValue: 0, damping: 24, stiffness: 340, useNativeDriver: true }).start();
+    },
+    onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
+  }), [close, drag]);
   const pan = useMemo(() => {
     const claims = (dy: number, dx: number) => atTop.current && dy > 6 && dy > Math.abs(dx) * 1.2;
     return PanResponder.create({
       onMoveShouldSetPanResponderCapture: (_, g) => claims(g.dy, g.dx),
       onMoveShouldSetPanResponder: (_, g) => claims(g.dy, g.dx),
-      onPanResponderMove: (_, g) => drag.setValue(sheetPull(g.dy)),
-      onPanResponderRelease: (_, g) => {
-        if (sheetLetGo(g.dy, g.vy, tall.current) === 'away') {
-          feel.tap();
-          close();
-          Animated.timing(drag, { toValue: 0, duration: 0, delay: 220, useNativeDriver: true }).start();
-        } else Animated.spring(drag, { toValue: 0, damping: 24, stiffness: 340, useNativeDriver: true }).start();
-      },
-      onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
+      ...follow,
     });
-  }, [close, drag]);
+  }, [follow]);
+  const grip = useMemo(() => PanResponder.create({ onStartShouldSetPanResponder: () => true, ...follow }), [follow]);
   const rise = slide.interpolate({ inputRange: [0, 1], outputRange: [room + 40, 0] });
   return (
     <>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color.scrim, opacity: slide }]}>
         <Pressable style={{ flex: 1 }} onPress={close} accessibilityLabel="Close" />
       </Animated.View>
-      <View style={{ flex: 1 }} pointerEvents="none" />
-      <Animated.View {...pan.panHandlers} onLayout={(e) => { tall.current = e.nativeEvent.layout.height; }}
-        style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden', transform: [{ translateY: Animated.add(rise, drag) }] }}>
-        <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 2 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: color.lineStrong }} />
-        </View>
-        <ScrollView style={{ flexGrow: 0 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}
-          onLayout={(e) => setBox(e.nativeEvent.layout.height)} onContentSizeChange={(_, h) => setInner(h)}
-          scrollEventThrottle={16} onScroll={(e) => { atTop.current = e.nativeEvent.contentOffset.y <= 0; }}>
-          {children}
-        </ScrollView>
-      </Animated.View>
+      <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1 }}>
+        <View style={{ flex: 1 }} pointerEvents="none" />
+        <Animated.View {...pan.panHandlers} onLayout={(e) => { tall.current = e.nativeEvent.layout.height; }}
+          style={{ maxHeight: height * 0.72, flexShrink: 1, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden', transform: [{ translateY: Animated.add(rise, drag) }] }}>
+          <View {...grip.panHandlers} style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 2 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: color.lineStrong }} />
+          </View>
+          <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}
+            onLayout={(e) => setBox(e.nativeEvent.layout.height)} onContentSizeChange={(_, h) => setInner(h)}
+            scrollEventThrottle={16} onScroll={(e) => { atTop.current = e.nativeEvent.contentOffset.y <= 0; }}>
+            {children}
+          </ScrollView>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </>
   );
 }
