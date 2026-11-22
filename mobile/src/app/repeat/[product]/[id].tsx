@@ -46,7 +46,7 @@ export default function RepeatPage() {
 
   return (
     <Wall>
-      <TopBar left={<IconButton label="Back" width={34} onPress={back}><Back /></IconButton>} title={<T numberOfLines={1} style={{ fontSize: 15, paddingHorizontal: 6 }}>{rule.title}</T>} />
+      <TopBar left={<IconButton label="Back" onPress={back}><Back /></IconButton>} title={<T numberOfLines={1} style={{ fontSize: 15, paddingHorizontal: 6 }}>{rule.title}</T>} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: size.inset, paddingTop: 22, paddingBottom: 48 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8 }}>
           <Repeat size={15} tint={color.dim} />

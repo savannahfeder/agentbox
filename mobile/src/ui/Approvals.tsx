@@ -11,7 +11,7 @@ import type { Answered } from '../../../renderer/src/approval-stage';
 import { APPROVAL_EXIT_MS, approvalCard, cardOnStage, type Approval } from '../lib/overlays';
 import { useCloud } from '../state/cloud';
 import { footRoom, T } from './parts';
-import { color, corner, font } from './theme';
+import { color, corner, font, lift } from './theme';
 
 const FIRST_RUN_SCREENS = new Set(['/sign-in', '/no-account', '/ai-notice', '/alerts']);
 
@@ -65,7 +65,7 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
   return (
     <Animated.View pointerEvents={verdict ? 'none' : 'auto'} style={[{
       backgroundColor: color.sunk, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: verdict === 'allow' ? color.faint : color.line, paddingVertical: 12, paddingHorizontal: 14,
-      shadowColor: '#000', shadowOpacity: color.lift, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
+      ...lift('float'),
     }, card]}>
       <Animated.View style={recede}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 9 }}>

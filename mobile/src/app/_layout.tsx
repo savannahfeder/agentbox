@@ -2,6 +2,7 @@ import '../platform/polyfills';
 import '../platform/crash';
 import { Geist_400Regular, Geist_500Medium, Geist_600SemiBold, useFonts } from '@expo-google-fonts/geist';
 import { GeistMono_400Regular, GeistMono_500Medium } from '@expo-google-fonts/geist-mono';
+import { Newsreader_500Medium } from '@expo-google-fonts/newsreader';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { router } from '../lib/router';
@@ -51,7 +52,7 @@ export default function Root() {
 
 function App() {
   const { worn } = useLook();
-  const [loaded, failed] = useFonts({ Geist_400Regular, Geist_500Medium, Geist_600SemiBold, GeistMono_400Regular, GeistMono_500Medium });
+  const [loaded, failed] = useFonts({ Geist_400Regular, Geist_500Medium, Geist_600SemiBold, GeistMono_400Regular, GeistMono_500Medium, Newsreader_500Medium });
   useAlertsOpenThreads();
   // A browser swaps the fonts in when they arrive, and WebKit's never reports back.
   if (!loaded && !failed && Platform.OS !== 'web') return <View style={{ flex: 1, backgroundColor: color.bg }} />;

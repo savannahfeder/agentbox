@@ -526,10 +526,10 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
           )}
           {files.length > 0 && <View style={{ paddingBottom: 8 }}><Attached files={files} drop={(i) => setFiles((f) => f.filter((_, n) => n !== i))} /></View>}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: canWrite ? color.lineStrong : color.line, backgroundColor: color.field }}>
-            {!editing && <IconButton label="Attach a photo or file" onPress={() => setSheet('attach')}><Clip size={17} /></IconButton>}
+            {!editing && <IconButton bare label="Attach a photo or file" onPress={() => setSheet('attach')}><Clip size={17} /></IconButton>}
             <TextInput value={text} onChangeText={editing ? setShown : setText} multiline {...(Platform.OS === 'web' ? { numberOfLines: 1 } : {})} placeholder={root ? 'Reply in thread' : `Message ${groupName(room)}`} placeholderTextColor={color.faint}
               style={[{ flex: 1, minHeight: 42, maxHeight: 140, paddingTop: 10, paddingBottom: 10, paddingLeft: editing ? 14 : 2, paddingRight: 14, fontFamily: font.regular, fontSize: 15.5, lineHeight: 22, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
-            {canWrite && <IconButton label={editing ? 'Save' : 'Send'} onPress={() => void send()}><SendGlyph tint={sending ? color.faint : color.accent} /></IconButton>}
+            {canWrite && <IconButton bare label={editing ? 'Save' : 'Send'} onPress={() => void send()}><SendGlyph tint={sending ? color.faint : color.accent} /></IconButton>}
           </View>
         </View>
       </KeyboardAvoidingView>

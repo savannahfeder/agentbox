@@ -146,7 +146,7 @@ export function MateComposer({ mate, placeholder, send, above }: { mate: string 
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
         <TextInput value={text} onChangeText={setText} multiline placeholder={placeholder} placeholderTextColor={color.faint} editable={!busy}
           style={[{ flex: 1, minHeight: 42, maxHeight: 140, paddingTop: 10, paddingBottom: 10, paddingHorizontal: 14, fontFamily: font.regular, fontSize: 15.5, lineHeight: 22, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
-        {!!text.trim() && <IconButton label="Send" onPress={() => void go()}><SendGlyph tint={color.accent} /></IconButton>}
+        {!!text.trim() && <IconButton bare label="Send" onPress={() => void go()}><SendGlyph tint={color.accent} /></IconButton>}
       </View>
     </View>
   );

@@ -17,7 +17,7 @@ import Svg, { Path } from 'react-native-svg';
 import { penOnScreen, threadOnScreen, toastLife, toastPlace, toastTapOpens, TOAST_GOES_MS, TOAST_SWIPE_PX } from '../lib/overlays';
 import { useCloud, type Toast as Said } from '../state/cloud';
 import { footRoom, T } from './parts';
-import { color, corner } from './theme';
+import { color, corner, lift } from './theme';
 
 function Clock() {
   const left = useRef(new Animated.Value(1)).current;
@@ -68,7 +68,7 @@ function Card({ toast, dismiss }: { toast: Said; dismiss: () => void }) {
         style={{
           minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 4,
           backgroundColor: color.pop, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, overflow: 'hidden',
-          shadowColor: '#000', shadowOpacity: color.lift, shadowRadius: 35, shadowOffset: { width: 0, height: 24 }, elevation: 16,
+          ...lift('float'),
         }}>
         <Pressable disabled={!opens} onPress={open} accessibilityRole={opens ? 'button' : undefined}
           style={{ flex: 1, minWidth: 0, minHeight: 40, justifyContent: 'center', marginRight: 8 }}>

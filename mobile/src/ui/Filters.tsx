@@ -10,7 +10,7 @@ import type { Product, ThreadStateWord, WorkItem } from '../../../renderer/src/t
 import { phoneFiltered, type Harness } from '../lib/agent-filter';
 import { barsFor } from './Pickers';
 import { PriorityBars, T } from './parts';
-import { color, size } from './theme';
+import { color, lift, size } from './theme';
 
 type P = { size?: number; tint?: string };
 
@@ -97,7 +97,7 @@ export function ViewMenu({ display, onDisplay, agent = null, agents = [], onAgen
     <View style={{ position: 'absolute', top: inset.top + size.topBar, left: 0, right: 0, bottom: 0, zIndex: 30 }}>
       <ScrollView style={{
         flexGrow: 0, maxHeight: height * 0.75, backgroundColor: color.bg, borderBottomWidth: 1, borderBottomColor: color.line,
-        shadowColor: '#000', shadowOpacity: color.lift * 0.8, shadowRadius: 16, shadowOffset: { width: 0, height: 16 }, elevation: 12,
+        ...lift('float'),
       }} contentContainerStyle={{ paddingTop: 4, paddingBottom: 6 }} accessibilityRole="menu" accessibilityLabel="Inbox view and filters">
         <Line label="View">
           <Choice label="List" on={display.view === 'list'} onPress={() => set({ view: 'list' })} />

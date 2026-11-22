@@ -1,0 +1,76 @@
+// THE PHONE APP HAS A LOOK OF ITS OWN (2026-11-22). The phone drew the desktop
+// at phone width: 6px and 10px corners, hairlines under every bar, meta lines
+// in uppercase mono, a dot grid and an orange glow behind every screen, and a
+// light palette that was the dark one inverted. The founder's words on a
+// recording of it: "looks pretty much exactly the same as the original app and
+// generally looks pretty bad", "I am looking for a redesign of everything".
+// Measured by reading ui/theme.ts and ui/parts.tsx, which held the values above.
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import { LIGHT, DARK, corner, font, lift } from '../mobile/src/ui/theme';
+
+const read = (f: string) => fs.readFileSync(f, 'utf8');
+const parts = read('mobile/src/ui/parts.tsx');
+const layout = read('mobile/src/app/_layout.tsx');
+
+const lum = (hex: string) => {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
+const contrast = (a: string, b: string) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+
+describe('the phone app\'s corners', () => {
+  it('are soft: what you press or type in, a card, a sheet, and a pill', () => {
+    expect(corner.small).toBeGreaterThanOrEqual(12);
+    expect(corner.card).toBeGreaterThanOrEqual(18);
+    expect(corner.sheet).toBeGreaterThanOrEqual(26);
+    expect(corner.card).toBeGreaterThan(corner.small);
+    expect(corner.sheet).toBeGreaterThan(corner.card);
+    expect(corner.pill).toBeGreaterThanOrEqual(999);
+  });
+});
+
+describe('the phone app\'s colours', () => {
+  it('are warm paper under near-black ink in Light, with white cards over it', () => {
+    expect(LIGHT.bg).toMatch(/^#f[0-9a-f]{5}$/);
+    expect(LIGHT.card).toBe('#ffffff');
+    expect(LIGHT.pop).toBe('#ffffff');
+    expect(lum(LIGHT.bg)).toBeLessThan(lum(LIGHT.card));
+  });
+  it.each([['Light', LIGHT], ['Dark', DARK]])('read clearly in %s: text, dim and faint words on the page', (_, p) => {
+    expect(contrast(p.text, p.bg)).toBeGreaterThan(12);
+    expect(contrast(p.dim, p.bg)).toBeGreaterThan(5.5);
+    expect(contrast(p.faint, p.bg)).toBeGreaterThan(3.2);
+    expect(contrast(p.ink, p.graphite)).toBeGreaterThan(10);
+  });
+  it('keep one accent, the brand orange, in both', () => {
+    expect(LIGHT.accent).toBe('#ee6018');
+    expect(DARK.accent).toBe('#ee6018');
+  });
+});
+
+describe('the phone app\'s type', () => {
+  it('sets its titles in a serif and loads it with the rest', () => {
+    expect(font.display).toMatch(/^Newsreader_/);
+    expect(layout).toMatch(new RegExp(`${font.display}[,} ]`));
+    expect(layout).toMatch(/from '@expo-google-fonts\/newsreader'/);
+  });
+});
+
+describe('the page behind every screen', () => {
+  const wall = parts.slice(parts.indexOf('export function Wall('), parts.indexOf('\n}\n', parts.indexOf('export function Wall(')));
+  it('is plain: no dot grid and no glow', () => {
+    expect(wall).not.toMatch(/Pattern|RadialGradient|<Svg/);
+    expect(wall).toMatch(/backgroundColor: color\.bg/);
+  });
+});
+
+describe('what floats over the page', () => {
+  it('casts one soft shadow, named once', () => {
+    const s = lift('card');
+    expect(s.shadowOpacity).toBeGreaterThan(0);
+    expect(s.shadowOpacity).toBeLessThanOrEqual(0.5);
+    expect(s.shadowRadius).toBeGreaterThanOrEqual(12);
+    expect(lift('float').shadowRadius).toBeGreaterThan(s.shadowRadius);
+  });
+});

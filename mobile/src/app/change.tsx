@@ -42,7 +42,7 @@ export default function ChangeScreen() {
 
   return (
     <Wall>
-      <TopBar noReview left={<IconButton label="Back" width={34} onPress={back}><Back /></IconButton>}
+      <TopBar noReview left={<IconButton label="Back" onPress={back}><Back /></IconButton>}
         title={<T numberOfLines={1} ellipsizeMode="head" style={{ fontFamily: font.mono, fontSize: 13.5, paddingLeft: 10, paddingRight: 6 }}>{String(path)}</T>}
         right={file ? <View style={{ flexDirection: 'row', gap: 8, paddingRight: 12 }}>{signed(file).map(({ sign, text: t }) => (
           <T key={sign} style={{ fontFamily: font.mono, fontSize: 12.5, color: sign === '+' ? color.plus : color.minus }}>{t}</T>

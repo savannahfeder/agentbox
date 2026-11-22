@@ -479,12 +479,12 @@ export default function ThreadScreen() {
   return (
     <Wall>
       <TopBar noReview
-        left={<IconButton label="Back" width={34} onPress={back}><Back /></IconButton>}
+        left={<IconButton label="Back" onPress={back}><Back /></IconButton>}
         right={<>
           {walking && (
             <>
-              <IconButton label="Previous thread" width={32} onPress={() => step(-1)}><View style={{ opacity: stepOver(walk, here, -1) ? 1 : 0.35 }}><Chevron up /></View></IconButton>
-              <IconButton label="Next thread" width={32} onPress={() => step(1)}><View style={{ opacity: stepOver(walk, here, 1) ? 1 : 0.35 }}><Chevron /></View></IconButton>
+              <IconButton bare label="Previous thread" onPress={() => step(-1)}><View style={{ opacity: stepOver(walk, here, -1) ? 1 : 0.35 }}><Chevron up /></View></IconButton>
+              <IconButton bare label="Next thread" onPress={() => step(1)}><View style={{ opacity: stepOver(walk, here, 1) ? 1 : 0.35 }}><Chevron /></View></IconButton>
             </>
           )}
           {/* Done in a box of its own, left of the dots, as the desktop draws it (threads/ThreadMenu.tsx). */}
@@ -495,7 +495,7 @@ export default function ThreadScreen() {
               <T style={{ fontSize: 13, color: color.dim }}>Done</T>
             </Pressable>
           )}
-          <IconButton label="More" width={30} onPress={() => setMenu(true)}><More /></IconButton>
+          <IconButton label="More" onPress={() => setMenu(true)}><More /></IconButton>
           <View style={{ width: 16 }} />
         </>}
       />

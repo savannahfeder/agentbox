@@ -1,73 +1,72 @@
-// The desktop's two looks (renderer/src/styles.css): Dark is Ember Grid, Light
-// is the plain light theme's tokens, at the phone layout's sizes
-// (renderer/src/phone.css), as the phone site computes them.
+// The phone's own two looks. Light is warm paper under near-black ink with
+// white cards floating over it; Dark is the same page at night. One accent, the
+// brand orange, and it is only for what is live or needs you.
 //
 // Every screen reads `color` while it draws, so wearing the other palette is
 // one change to this object and a redraw (state/look.tsx). A colour copied into
 // a constant when a file loads would stay on the old look, which
 // tests/the-phone-app-changes-its-look-and-reaches-more-of-your-settings holds
 // every screen to.
-export const DARK = {
-  bg: '#1a1817',
-  text: '#efebe7',
-  dim: '#c4bdb8',
-  faint: '#a09994',
+export const LIGHT = {
+  bg: '#f9f8f4',
+  text: '#1b1a18',
+  dim: '#5c5953',
+  faint: '#8a867e',
   accent: '#ee6018',
-  line: '#464443',
-  lineStrong: '#52504f',
-  // A row's hairline: the line at 37.5% (`--row-line`).
-  rowLine: 'rgba(70, 68, 67, 0.375)',
-  fill: 'rgba(255, 255, 255, 0.04)',
-  picked: 'rgba(255, 255, 255, 0.08)',
-  // A faint lift for code, table heads and small marks (`--bg-raised` at low strength).
-  film: 'rgba(255, 255, 255, 0.07)',
-  pop: '#363431',
-  card: '#2d2b29',
+  line: 'rgba(27, 26, 24, 0.09)',
+  lineStrong: 'rgba(27, 26, 24, 0.16)',
+  rowLine: 'rgba(27, 26, 24, 0.07)',
+  fill: 'rgba(27, 26, 24, 0.04)',
+  picked: 'rgba(27, 26, 24, 0.07)',
+  // A faint lift for code, table heads and small marks.
+  film: 'rgba(27, 26, 24, 0.05)',
+  pop: '#ffffff',
+  card: '#ffffff',
   // A raised block inside a message: a code block, a file's frame.
-  raised: '#2f2d2c',
-  // An approval card and a page of a file, a step below a card.
-  sunk: '#272524',
-  field: 'rgba(0, 0, 0, 0.18)',
-  graphite: '#34312e',
-  ink: '#f2eee8',
-  scrim: 'rgba(0, 0, 0, 0.55)',
-  // Lines a change added and took out (`--code-plus`, `--code-minus`).
-  plus: '#7bc98e',
-  minus: '#e28f82',
-  plusBed: 'rgba(123, 201, 142, 0.13)',
-  minusBed: 'rgba(226, 143, 130, 0.12)',
-  // How dark a floating card's shadow is. Black at .55 reads as a smudge on Light.
-  lift: 0.55,
-};
-
-export type Palette = typeof DARK;
-
-export const LIGHT: Palette = {
-  bg: '#f8f8fa',
-  text: '#12182a',
-  dim: '#4a5266',
-  faint: '#6e7590',
-  accent: '#ee6018',
-  line: 'rgba(17, 25, 48, 0.11)',
-  lineStrong: 'rgba(17, 25, 48, 0.16)',
-  rowLine: 'rgba(17, 25, 48, 0.08)',
-  fill: 'rgba(17, 25, 48, 0.03)',
-  picked: 'rgba(17, 25, 48, 0.06)',
-  film: 'rgba(17, 25, 48, 0.05)',
-  pop: '#fefefe',
-  card: '#fefefe',
-  raised: '#f1f3f6',
-  sunk: '#fefefe',
-  field: 'rgba(17, 25, 48, 0.04)',
-  // The pen button stays a dark key on a light page, as on the desktop.
-  graphite: '#262b3a',
-  ink: '#f8f8fa',
-  scrim: 'rgba(17, 25, 48, 0.28)',
+  raised: '#f1efe9',
+  // An approval card and a page of a file.
+  sunk: '#ffffff',
+  field: 'rgba(27, 26, 24, 0.045)',
+  // The one filled button on a screen, and the words on it.
+  graphite: '#1b1a18',
+  ink: '#ffffff',
+  scrim: 'rgba(27, 26, 24, 0.32)',
+  // Lines a change added and took out.
   plus: '#2f7d4e',
   minus: '#c0503c',
   plusBed: 'rgba(47, 125, 78, 0.10)',
   minusBed: 'rgba(192, 80, 60, 0.09)',
-  lift: 0.14,
+  // How dark a floating card's shadow is.
+  shade: 0.1,
+};
+
+export type Palette = typeof LIGHT;
+
+export const DARK: Palette = {
+  bg: '#1a1917',
+  text: '#f1ede7',
+  dim: '#bdb7af',
+  faint: '#8f8a83',
+  accent: '#ee6018',
+  line: 'rgba(255, 250, 240, 0.10)',
+  lineStrong: 'rgba(255, 250, 240, 0.18)',
+  rowLine: 'rgba(255, 250, 240, 0.07)',
+  fill: 'rgba(255, 250, 240, 0.05)',
+  picked: 'rgba(255, 250, 240, 0.09)',
+  film: 'rgba(255, 250, 240, 0.07)',
+  pop: '#2a2826',
+  card: '#262422',
+  raised: '#2c2a28',
+  sunk: '#242220',
+  field: 'rgba(255, 250, 240, 0.06)',
+  graphite: '#f1ede7',
+  ink: '#1a1917',
+  scrim: 'rgba(0, 0, 0, 0.6)',
+  plus: '#7bc98e',
+  minus: '#e28f82',
+  plusBed: 'rgba(123, 201, 142, 0.13)',
+  minusBed: 'rgba(226, 143, 130, 0.12)',
+  shade: 0.5,
 };
 
 /** The colours every screen reads. Light until a look is worn. */
@@ -83,14 +82,21 @@ export const font = {
   medium: 'Geist_500Medium',
   semibold: 'Geist_600SemiBold',
   mono: 'GeistMono_400Regular',
+  // Titles: a screen's name, a thread's title, a greeting.
+  display: 'Newsreader_500Medium',
 };
 
-// The desktop's three corners (renderer/src/styles.css): small for what you press or type in, card for
-// cards, sheets, menus and what somebody made, round for faces. Rows, dividers, tabs and panels stay square.
-export const corner = { small: 6, card: 10 };
+// What you press or type in, a card, a sheet, and a pill.
+export const corner = { small: 12, card: 20, sheet: 28, pill: 999 };
 
 export const size = {
   topBar: 56,
-  tabs: 48,
-  inset: 16,
+  tabs: 52,
+  inset: 20,
 };
+
+/** The one shadow under what floats: `card` for a card on the page, `float` for what hangs over it. */
+export function lift(kind: 'card' | 'float') {
+  const far = kind === 'float';
+  return { shadowColor: '#000', shadowOpacity: color.shade * (far ? 1.6 : 1), shadowRadius: far ? 32 : 16, shadowOffset: { width: 0, height: far ? 14 : 6 }, elevation: far ? 16 : 6 };
+}

@@ -144,7 +144,7 @@ export function CardSheet({ card, who, close }: { card: ThreadCard | null; who: 
         <View style={{ paddingHorizontal: 14, paddingBottom: 6, gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
             <T selectable style={{ flex: 1, fontFamily: font.medium, fontSize: 17, lineHeight: 23 }}>{card.title ?? 'A thread'}</T>
-            <IconButton label="Close" width={32} onPress={close}><Cross size={16} /></IconButton>
+            <IconButton label="Close" onPress={close}><Cross size={16} /></IconButton>
           </View>
           <T style={{ fontSize: 13, color: color.faint }}>{[who, STATE_WORD[card.state] ?? card.state, card.project].filter(Boolean).join(' · ')}</T>
           {!!card.problem && <T selectable style={{ fontSize: 14, lineHeight: 21, color: color.dim }}>{card.problem}</T>}

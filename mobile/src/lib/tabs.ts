@@ -74,8 +74,8 @@ export interface Row {
 /** The select bar's button, which says what it closes so it does not read as closing the bar beside Cancel. */
 export const closeWords = (n: number) => (n === 1 ? 'Close 1 thread' : n > 1 ? `Close ${n} threads` : 'Close');
 
-export const TAB_GAP = { loose: 22, tight: 12 };
-export const COUNT_GAP = { loose: 13, tight: 6 };
+export const TAB_GAP = { loose: 4, tight: 0 };
+export const COUNT_GAP = { loose: 7, tight: 5 };
 
 /**
  * Whether the tabs take their tight gaps. `content` was measured with the gaps

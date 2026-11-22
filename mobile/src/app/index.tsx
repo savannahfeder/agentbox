@@ -35,7 +35,7 @@ import { repeatRow, repeatTag } from '../../../renderer/src/repeat-words';
 import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
 import { barsFor, PriorityRows } from '../ui/Pickers';
 import { footRoom, IconButton, Squish, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
-import { color, corner, font, size } from '../ui/theme';
+import { color, corner, font, lift, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
 import { ALERTS_ASKED_KEY, FIRST_RUN, nextSetup } from '../lib/first-run';
@@ -52,44 +52,58 @@ const open = (product: string, id: string) => router.push({ pathname: '/thread/[
 const RowActs = createContext<{ close: (i: WorkItem) => void; later: (i: WorkItem) => void }>({ close: () => {}, later: () => {} });
 const Picking = createContext<{ picked: Set<string> | null; toggle: (key: string) => void; start: (key: string) => void }>({ picked: null, toggle: () => {}, start: () => {} });
 
+/** The line over every row but the first, short of both edges. */
+const Parted = ({ first }: { first: boolean }) => (first ? null : <View style={{ position: 'absolute', top: 0, left: size.inset, right: size.inset, height: 1, backgroundColor: color.rowLine }} />);
+const rowBox = (pressed: boolean) => ({ minHeight: 68, paddingVertical: 14, paddingLeft: size.inset, paddingRight: size.inset, backgroundColor: pressed ? color.fill : 'transparent' });
+const rowTitle = { flexShrink: 1, fontSize: 16.5, lineHeight: 22, letterSpacing: -0.2 };
+/** A row's small second line: project, who, how long ago. */
+const metaWords = () => ({ fontSize: 13.5, lineHeight: 18, color: color.faint });
+const Dot = () => <T style={metaWords()}>·</T>;
+/** What a row waits on, in a chip. */
+const Chip = ({ children }: { children: string }) => (
+  <View style={{ height: 22, paddingHorizontal: 8, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: color.picked }}>
+    <T style={{ fontSize: 12, lineHeight: 16, fontFamily: font.medium, color: color.dim }}>{children}</T>
+  </View>
+);
+
 function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unread: boolean; mate: Teammate | null }) {
   const pick = useContext(Picking);
   const picking = pick.picked !== null;
   const on = !!pick.picked?.has(row.key);
-  // "not started" or "2 tasks to approve", faint after the title (Pages.tsx `RowCells`).
+  // "not started" or "2 tasks to approve" (Pages.tsx `RowCells`).
   const aside = row.held ? 'not started' : row.toApprove;
-  const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  const meta = metaWords();
   const acts = useContext(RowActs);
   return (
     <Swiped off={picking} onClose={() => acts.close(row.item)} onLater={() => acts.later(row.item)}>
     <Pressable onPress={() => (picking ? pick.toggle(row.key) : open(row.product, row.id))} onLongPress={() => pick.start(row.key)} delayLongPress={350}
       accessibilityLabel={picking ? `${row.title}, ${on ? 'selected' : 'not selected'}` : unread ? `${row.title}, unread` : undefined} accessibilityState={picking ? { checked: on } : undefined}
-      style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
-      {/* The line over every row but the first, edge to 12px short of the right (`.row + .row::after`). */}
-      {!first && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.rowLine }} />}
-      {/* The unread dot in the margin, level with the title's first line (phone.css `.row.unread::before`). */}
-      {unread && <View style={{ position: 'absolute', left: 5, top: 22, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />}
+      style={({ pressed }) => rowBox(pressed)}>
+      <Parted first={first} />
+      {/* The unread dot in the margin, level with the title's first line. */}
+      {unread && <View style={{ position: 'absolute', left: 7, top: 22, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {picking && <View style={{ width: 18, height: 18, marginRight: 12, borderWidth: 1.5, borderRadius: corner.small, borderColor: on ? color.text : color.faint, backgroundColor: on ? color.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{on && <Tick size={12} tint={color.bg} />}</View>}
+        {picking && <View style={{ width: 22, height: 22, marginRight: 12, borderWidth: 1.5, borderRadius: 11, borderColor: on ? color.text : color.lineStrong, backgroundColor: on ? color.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{on && <Tick size={13} tint={color.bg} />}</View>}
         {row.running && <View style={{ marginRight: row.cloud ? 6 : 8 }}><RunningMark cloud={row.cloud}><Cloud /></RunningMark></View>}
         {/* A thread a teammate's run sent you says whose it is before its title (teammates/row-lead.tsx). */}
         {mate && <View style={{ marginRight: 7 }}><TeammateMark t={mate} /></View>}
-        <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
+        <T numberOfLines={2} style={{ ...rowTitle, fontFamily: unread ? font.semibold : font.regular }}>
           {mate ? <Text style={{ color: color.dim }}>{`${mate.name}  `}</Text> : null}
-          {row.title}{aside ? <Text style={{ color: color.faint }}>{`  ${aside}`}</Text> : null}
+          {row.title}
         </T>
-        {/* Pinned, faint after the title as the desktop draws it (pages.css `.th-pin`); a closed thread keeps no pin. */}
+        {/* A closed thread keeps no pin. */}
         {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin /></View>}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
+        {!!aside && <Chip>{aside}</Chip>}
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
-        {row.queued && <><T style={{ ...small, color: color.dim }}>Queued</T><T style={small}>·</T></>}
-        {row.away && <><T style={{ ...small, color: color.dim }}>Computer offline</T><T style={small}>·</T></>}
+        {row.queued && <><T style={{ ...meta, color: color.dim }}>Queued</T><Dot /></>}
+        {row.away && <><T style={{ ...meta, color: color.dim }}>Computer offline</T><Dot /></>}
         {row.priority && <View accessibilityLabel={row.priority === 'urgent' ? 'Urgent' : 'High priority'}><PriorityBars level={row.priority === 'urgent' ? 4 : 3} /></View>}
-        {row.agent && <><T style={{ ...small, color: color.dim }}>{row.agent}</T><T style={small}>·</T></>}
-        <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
-        <T style={small}>·</T>
-        <T style={small}>{row.when}</T>
+        {row.agent && <><T style={{ ...meta, color: color.dim }}>{row.agent}</T><Dot /></>}
+        <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
+        <Dot />
+        <T style={meta}>{row.when}</T>
       </View>
     </Pressable>
     </Swiped>
@@ -98,23 +112,23 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
 
 /** A message in a group that names you, at the top of Needs you until you read the group past it (team/rooms/MentionRows.tsx). */
 function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean; now: number; open: () => void }) {
-  const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  const meta = metaWords();
   return (
     <Pressable onPress={open} accessibilityLabel={`${m.byName || 'Someone'} mentioned you in ${m.roomName}, unread`}
-      style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
-      {!first && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.rowLine }} />}
-      <View style={{ position: 'absolute', left: 5, top: 22, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Face name={m.byName || 'Someone'} size={20} />
-        <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
-          <Text style={{ fontFamily: font.medium }}>{`${m.byName || 'Someone'}  `}</Text>
-          <Text style={{ color: color.dim }}>{m.body}</Text>
-        </T>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
-        <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{`# ${m.roomName}`}</T>
-        <T style={small}>·</T>
-        <T style={small}>{updatedWords(m.at, now)}</T>
+      style={({ pressed }) => rowBox(pressed)}>
+      <Parted first={first} />
+      <View style={{ position: 'absolute', left: 7, top: 28, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <Face name={m.byName || 'Someone'} size={36} />
+        <View style={{ flex: 1 }}>
+          <T numberOfLines={1} style={{ ...rowTitle, fontFamily: font.semibold }}>{m.byName || 'Someone'}</T>
+          <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 1 }}>{m.body}</T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
+            <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{`# ${m.roomName}`}</T>
+            <Dot />
+            <T style={meta}>{updatedWords(m.at, now)}</T>
+          </View>
+        </View>
       </View>
     </Pressable>
   );
@@ -122,23 +136,22 @@ function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean
 
 /** An AI teammate asking you something, at the top of Needs you with the mentions, until you answer it. */
 function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; text: string; at: number; first: boolean; now: number; open: () => void }) {
-  const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  const meta = metaWords();
   return (
     <Pressable onPress={open} accessibilityLabel={`${mate.name} asks you: ${text}`}
-      style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
-      {!first && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.rowLine }} />}
-      <View style={{ position: 'absolute', left: 5, top: 22, width: 6, height: 6, borderRadius: 3, backgroundColor: color.accent }} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <TeammateMark t={mate} />
-        <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
-          <Text style={{ fontFamily: font.medium }}>{`${mate.name}  `}</Text>
-          <Text style={{ color: color.dim }}>{text}</Text>
-        </T>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
-        <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>Asks you</T>
-        <T style={small}>·</T>
-        <T style={small}>{updatedWords(at, now)}</T>
+      style={({ pressed }) => rowBox(pressed)}>
+      <Parted first={first} />
+      <View style={{ position: 'absolute', left: 7, top: 28, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <TeammateMark t={mate} size={36} />
+        <View style={{ flex: 1 }}>
+          <T numberOfLines={1} style={{ ...rowTitle, fontFamily: font.semibold }}>{mate.name}</T>
+          <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 1 }}>{text}</T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
+            <Chip>Asks you</Chip>
+            <T style={meta}>{updatedWords(at, now)}</T>
+          </View>
+        </View>
       </View>
     </Pressable>
   );
@@ -146,28 +159,27 @@ function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; tex
 
 /** Repeating tasks above what is put off, as the desktop's Later tab has them (List.tsx). */
 function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: WorkItem[]; now: number }) {
-  const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  const meta = metaWords();
   return (
     <View style={{ paddingBottom: 8 }}>
-      <T style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 4, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.faint }}>Repeating</T>
+      <T style={{ paddingHorizontal: size.inset, paddingTop: 14, paddingBottom: 2, fontFamily: font.semibold, fontSize: 13, color: color.faint }}>Repeating</T>
       {repeats.map((r, i) => {
         const last = r.lastOccurrence ? items.find((it) => it.id === r.lastOccurrence) ?? null : null;
         const words = repeatRow(r, last, now);
         return (
           <Pressable key={`${r.product}/${r.id}`} onPress={() => router.push({ pathname: '/repeat/[product]/[id]', params: { product: r.product, id: r.id } })}
-            style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
-            {i > 0 && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.rowLine }} />}
+            style={({ pressed }) => rowBox(pressed)}>
+            <Parted first={i === 0} />
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ marginRight: 9 }}><Repeat /></View>
-              <T numberOfLines={2} style={{ flex: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
-                {r.title}<Text style={{ color: color.faint }}>{`  ${repeatTag(r)}`}</Text>
-              </T>
+              <T numberOfLines={2} style={{ ...rowTitle, flex: 1 }}>{r.title}</T>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
-              {r.waiting && <><T style={{ ...small, color: color.dim }}>Queued</T><T style={small}>·</T></>}
-              <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{r.productName}</T>
-              <T style={small}>·</T>
-              <T numberOfLines={1} style={{ ...small, flexShrink: 1 }}>{`Next ${words.when}`}</T>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
+              <Chip>{repeatTag(r)}</Chip>
+              {r.waiting && <><T style={{ ...meta, color: color.dim }}>Queued</T><Dot /></>}
+              <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{r.productName}</T>
+              <Dot />
+              <T numberOfLines={1} style={{ ...meta, flexShrink: 1 }}>{`Next ${words.when}`}</T>
             </View>
           </Pressable>
         );
@@ -176,11 +188,9 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: Wo
   );
 }
 
-/** The tabs under the title, inside the top bar so one line runs under
- * both, with Groups fifth while it is on. They are the bottom bar as it was,
- * moved up: "the nav at the bottom is very good so just shift that ui upward,
- * without messing much with spacing". The bar's line along their top is gone,
- * since the title bar's is under them; they scroll sideways when they do not fit. */
+/** The tabs under the title, inside the top bar, with Groups fifth while it
+ * is on: a pill each, the picked one filled. They stay at the top ("all that
+ * stuff is best placed at the top") and scroll sideways when they do not fit. */
 function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId, number>; pick: (t: PlaceId) => void; team: boolean }) {
   const [span, setSpan] = useState({ view: 0, content: 0, x: 0 });
   const tabs = bottomTabs(team);
@@ -189,18 +199,18 @@ function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId,
   useEffect(() => { setTight((now) => tabsTighten(span, now, { tabs: tabs.length, counted })); }, [span.view, span.content, tabs.length, counted]);
   const [fit, setFit] = useState({ scale: 1, measuredAt: 0 });
   useEffect(() => { setFit((now) => tabsScale(span, tight, now)); }, [span.view, span.content, tight]);
-  const words = { fontSize: 15 * fit.scale, count: 11 * fit.scale };
+  const words = { fontSize: 15 * fit.scale, count: 12.5 * fit.scale };
   return (
     <View style={{ height: size.tabs, flexDirection: 'row', alignItems: 'center' }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset, paddingRight: 8, gap: tight ? TAB_GAP.tight : TAB_GAP.loose }}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset - 12, paddingRight: 8, gap: tight ? TAB_GAP.tight : TAB_GAP.loose }}
         onLayout={(e) => { const view = e.nativeEvent.layout.width; setSpan((s) => ({ ...s, view })); }}
         onContentSizeChange={(content) => setSpan((s) => ({ ...s, content }))}
         onScroll={(e) => { const x = e.nativeEvent.contentOffset.x; setSpan((s) => ({ ...s, x })); }} scrollEventThrottle={32}>
         {tabs.map((t) => (
           <Pressable key={t.id} onPress={() => { if (on !== t.id) feel.pick(); pick(t.id); }} accessibilityRole="tab" accessibilityState={{ selected: on === t.id }}
-            style={{ height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t.id ? color.accent : 'transparent' }}>
-            <T style={{ fontSize: words.fontSize, lineHeight: 30, color: on === t.id ? color.text : color.dim }}>{t.label}</T>
-            {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: words.count, lineHeight: 30, fontFamily: font.medium, marginLeft: tight ? COUNT_GAP.tight : COUNT_GAP.loose, color: color.faint }}>{counts[t.id]}</T>}
+            style={{ height: 36, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderRadius: corner.pill, backgroundColor: on === t.id ? color.graphite : 'transparent' }}>
+            <T style={{ fontSize: words.fontSize, lineHeight: 20, fontFamily: font.medium, color: on === t.id ? color.ink : color.dim }}>{t.label}</T>
+            {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: words.count, lineHeight: 20, fontFamily: font.medium, marginLeft: tight ? COUNT_GAP.tight : COUNT_GAP.loose, color: on === t.id ? color.ink : color.faint, opacity: on === t.id ? 0.62 : 1 }}>{counts[t.id]}</T>}
           </Pressable>
         ))}
       </ScrollView>
@@ -219,18 +229,18 @@ function EdgeFade() {
   );
 }
 
-/** An outlined button in the empty states (pages.css `.th-clear .th-new`). */
+/** A quiet button in the empty states. */
 function Outlined({ label, onPress, lead }: { label: string; onPress: () => void; lead?: ReactNode }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button"
-      style={({ pressed }) => ({ alignSelf: 'flex-start', height: 32, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+      style={({ pressed }) => ({ alignSelf: 'flex-start', height: 40, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: corner.pill, backgroundColor: pressed ? color.picked : color.fill })}>
       {lead}
-      <T style={{ fontSize: 14, color: color.text }}>{label}</T>
+      <T style={{ fontSize: 15, fontFamily: font.medium, color: color.text }}>{label}</T>
     </Pressable>
   );
 }
 
-const H2 = ({ children }: { children: string }) => <T style={{ fontFamily: font.medium, fontSize: 18, lineHeight: 23, letterSpacing: -0.18, marginBottom: 8 }}>{children}</T>;
+const H2 = ({ children }: { children: string }) => <T style={{ fontFamily: font.display, fontSize: 26, lineHeight: 32, letterSpacing: -0.4, marginBottom: 10 }}>{children}</T>;
 
 /** The empty inbox is where the next thread starts: the New thread form drawn open on the page (Pages.tsx `InboxClear`). */
 function InboxClear() {
@@ -270,33 +280,33 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
         <ScrollView key={c.state} style={{ width: col }} contentContainerStyle={{ paddingBottom: Math.max(88 + foot, room + 16) }} showsVerticalScrollIndicator={false}>
           <View style={{ height: 38, paddingTop: 8, flexDirection: 'row', alignItems: 'center' }}>
             <StateGlyph state={c.state} />
-            <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.dim }}>{c.label}</T>
-            <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, color: color.faint, marginLeft: 8 }}>{c.rows.length + repeatsIn(c.state).length}</T>
+            <T style={{ fontFamily: font.semibold, fontSize: 14, color: color.text }}>{c.label}</T>
+            <T style={{ fontFamily: font.medium, fontSize: 13, color: color.faint, marginLeft: 8 }}>{c.rows.length + repeatsIn(c.state).length}</T>
           </View>
           {repeatsIn(c.state).map((r) => (
             <Pressable key={`${r.product}/${r.id}`} onPress={() => router.push({ pathname: '/repeat/[product]/[id]', params: { product: r.product, id: r.id } })}
-              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
+              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 16, paddingBottom: 14, borderRadius: corner.card, backgroundColor: pressed ? color.raised : color.card, ...lift('card') })}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 }}>
                 <View style={{ marginRight: 8, marginTop: 2 }}><Repeat /></View>
-                <T numberOfLines={3} style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>{r.title}</T>
+                <T numberOfLines={3} style={{ flex: 1, fontSize: 15.5, lineHeight: 21 }}>{r.title}</T>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {r.waiting && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T>}
-                <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{r.productName}</T>
-                <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{`Next ${repeatRow(r, r.lastOccurrence ? c0.view.items.find((it: any) => it.id === r.lastOccurrence) ?? null : null, c0.now).when}`}</T>
+                {r.waiting && <T style={{ fontSize: 12.5, color: color.dim, marginRight: 8 }}>Queued</T>}
+                <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12.5, color: color.faint }}>{r.productName}</T>
+                <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12.5, color: color.faint, marginLeft: 8 }}>{`Next ${repeatRow(r, r.lastOccurrence ? c0.view.items.find((it: any) => it.id === r.lastOccurrence) ?? null : null, c0.now).when}`}</T>
               </View>
             </Pressable>
           ))}
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
-              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
-              <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
+              style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 16, paddingBottom: 14, borderRadius: corner.card, backgroundColor: pressed ? color.raised : color.card, ...lift('card') })}>
+              <T numberOfLines={3} style={{ fontSize: 15.5, lineHeight: 21, marginBottom: 14 }}>{e.title}</T>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
+                {e.queued ? <T style={{ fontSize: 12.5, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
                 {rowPriorityId(e.priority) && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority!)} /></View>}
-                {e.agent && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
-                <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>
-                {c.state === 'scheduled' && e.item && !!backWords(e.item, c0.now) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{backWords(e.item, c0.now)}</T>}
+                {e.agent && <T style={{ fontSize: 12.5, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
+                <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12.5, color: color.faint }}>{e.project}</T>
+                {c.state === 'scheduled' && e.item && !!backWords(e.item, c0.now) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12.5, color: color.faint, marginLeft: 8 }}>{backWords(e.item, c0.now)}</T>}
               </View>
             </Pressable>
           ))}
@@ -489,16 +499,16 @@ export default function Threads() {
         ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
         : board ? <Board columns={board} foot={foot} /> : list}
       {picked && (
-        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: foot, paddingTop: 8, paddingHorizontal: size.inset, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.bg, borderTopWidth: 1, borderTopColor: color.line }}>
-          <T style={{ flex: 1, fontSize: 14, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>
+        <View style={{ position: 'absolute', left: 12, right: 12, bottom: foot, height: 60, paddingLeft: 20, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: corner.pill, backgroundColor: color.pop, ...lift('float') }}>
+          <T style={{ flex: 1, fontSize: 15, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>
           {picked.size > 0 && <IconButton label="More" onPress={() => setPickedMenu(true)}><More /></IconButton>}
-          <Pressable onPress={() => setPicked(null)} accessibilityRole="button" style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: pressed ? color.picked : 'transparent' })}>
-            <T style={{ fontSize: 14, color: color.dim }}>Cancel</T>
+          <Pressable onPress={() => setPicked(null)} accessibilityRole="button" style={({ pressed }) => ({ height: 40, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.picked : 'transparent' })}>
+            <T style={{ fontSize: 15, color: color.dim }}>Cancel</T>
           </Pressable>
           {acts.includes('close') && (
             <Pressable disabled={!picked.size || closing} onPress={() => void closePicked()} accessibilityRole="button"
-              style={({ pressed }) => ({ height: 36, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: !picked.size || closing ? 0.5 : 1 })}>
-              <T style={{ fontSize: 14, fontFamily: font.semibold }}>{closing ? 'Closing…' : closeWords(picked.size)}</T>
+              style={({ pressed }) => ({ height: 40, paddingHorizontal: 18, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.text : color.graphite, opacity: !picked.size || closing ? 0.4 : 1 })}>
+              <T style={{ fontSize: 15, fontFamily: font.semibold, color: color.ink }}>{closing ? 'Closing…' : closeWords(picked.size)}</T>
             </Pressable>
           )}
         </View>
@@ -516,8 +526,7 @@ export default function Threads() {
       {!picked && !penUp && !(inboxEmpty && !board) && <Squish accessibilityLabel="New thread" onPress={() => router.push('/new')}
         style={{
           position: 'absolute', right: PEN.right, bottom: foot + PEN.lift, width: PEN.size, height: PEN.size, borderRadius: PEN.size / 2,
-          backgroundColor: color.graphite, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-          shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+          backgroundColor: color.graphite, ...lift('float'),
         }}>
         <Pen />
       </Squish>}

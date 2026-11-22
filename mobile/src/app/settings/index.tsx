@@ -38,7 +38,7 @@ export default function SettingsHome() {
       <Magnifier size={16} />
       <TextInput value={q} onChangeText={setQ} autoFocus placeholder="Search settings" placeholderTextColor={color.faint} autoCorrect={false} autoCapitalize="none" returnKeyType="search" accessibilityLabel="Search settings"
         style={[{ flex: 1, minWidth: 0, padding: 0, fontFamily: font.regular, fontSize: 16, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
-      <IconButton label="Close search" width={36} onPress={close}><Cross size={15} /></IconButton>
+      <IconButton bare label="Close search" onPress={close}><Cross size={15} /></IconButton>
     </View>
   ) : undefined;
   return (

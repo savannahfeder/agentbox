@@ -60,7 +60,7 @@ function OnItsOwn({ product, src, name }: { product: string; src: string; name?:
   return (
     <Wall style={wide ? { backgroundColor: '#000' } : undefined}>
       {film && <Stack.Screen options={{ orientation: 'default' }} />}
-      {!wide && <TopBar left={<IconButton label="Back" width={34} onPress={back}><Back /></IconButton>}
+      {!wide && <TopBar left={<IconButton label="Back" onPress={back}><Back /></IconButton>}
         title={<T numberOfLines={1} style={{ fontSize: 15, paddingLeft: 10, paddingRight: 6 }}>{fileTitleOf(src, name)}</T>} />}
       {body}
     </Wall>

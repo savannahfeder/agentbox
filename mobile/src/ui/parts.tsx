@@ -3,27 +3,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type PanResponderGestureState, type TextProps, type ViewStyle } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { feel } from '../lib/feel';
 import { sheetLetGo, sheetPull } from '../lib/sheet-drag';
 import { useCloud } from '../state/cloud';
-import { color, corner, font, size } from './theme';
+import { Tick } from './icons';
+import { color, corner, font, lift, size } from './theme';
 
-/** Ember Grid's wall, the dot grid and the orange glow, under everything, the status bar included. */
+/** The page behind every screen, the status bar included. */
 export function Wall({ children, style }: { children: ReactNode; style?: ViewStyle }) {
-  return (
-    <View style={[{ flex: 1, backgroundColor: color.bg }, style]}>
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
-        <Defs>
-          <Pattern id="d" width={32} height={32} patternUnits="userSpaceOnUse"><Circle cx={16} cy={16} r={1.15} fill="white" fillOpacity={0.055} /></Pattern>
-          <RadialGradient id="g" cx="0.72" cy="0.28" r="0.7"><Stop offset="0" stopColor={color.accent} stopOpacity={0.075} /><Stop offset="1" stopColor={color.accent} stopOpacity={0} /></RadialGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#g)" />
-        <Rect width="100%" height="100%" fill="url(#d)" />
-      </Svg>
-      {children}
-    </View>
-  );
+  return <View style={[{ flex: 1, backgroundColor: color.bg }, style]}>{children}</View>;
 }
 
 // The room under a bottom bar: the whole home bar, as iOS's own tab bars keep it.
@@ -33,25 +22,25 @@ export function T({ style, ...rest }: TextProps) {
   return <Text {...rest} style={[{ fontFamily: font.regular, color: color.text, fontSize: 15.5 }, style]} />;
 }
 
-/** The top bar: 56px over the wall with its line, the title on the left. What
- * goes `below` (the inbox's tabs) sits inside it, over the same one line. */
+/** The top bar: no line, a screen's name in the serif, or a smaller sans name
+ * beside the way back. What goes `below` (the inbox's tabs) sits inside it. */
 export function TopBar({ left, title, right, below, noReview = false }: { left?: ReactNode; title?: ReactNode; right?: ReactNode; below?: ReactNode; noReview?: boolean }) {
   const inset = useSafeAreaInsets();
   const { view, minimizedApproval, setMinimizedApproval } = useCloud();
   // A thread's bar has no room for it; the inbox's bar still brings the card back.
   const aside = !noReview && view.approvals.findIndex((a: { id: string }) => a.id === minimizedApproval) === 0;
+  const name = left ? { fontFamily: font.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, paddingLeft: 8 } : { fontFamily: font.display, fontSize: 32, lineHeight: 38, letterSpacing: -0.6 };
   return (
-    <View style={{ paddingTop: inset.top, borderBottomWidth: 1, borderBottomColor: color.line }}>
-      {/* The line is inside the 56px, as the website's border-box bar has it. */}
-      <View style={{ height: size.topBar - 1, flexDirection: 'row', alignItems: 'center', paddingLeft: left ? 8 : size.inset, paddingRight: 4 }}>
+    <View style={{ paddingTop: inset.top }}>
+      <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: left ? 12 : size.inset, paddingRight: 14 }}>
         {left}
         <View style={{ flex: 1, minWidth: 0 }}>
-          {typeof title === 'string' ? <T numberOfLines={1} style={{ fontFamily: font.medium, fontSize: 19, lineHeight: 23, letterSpacing: -0.19 }}>{title}</T> : title}
+          {typeof title === 'string' ? <T numberOfLines={1} style={name}>{title}</T> : title}
         </View>
         {aside && (
           <Pressable onPress={() => setMinimizedApproval(null)} accessibilityRole="button" accessibilityLabel="Review permission" hitSlop={4}
-            style={({ pressed }) => ({ height: 30, paddingHorizontal: 10, marginRight: 6, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
-            <T style={{ fontSize: 13, color: color.text }}>{`Review (${view.approvals.length})`}</T>
+            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.text : color.graphite })}>
+            <T style={{ fontSize: 13.5, fontFamily: font.medium, color: color.ink }}>{`Review (${view.approvals.length})`}</T>
           </Pressable>
         )}
         {right}
@@ -61,21 +50,25 @@ export function TopBar({ left, title, right, below, noReview = false }: { left?:
   );
 }
 
-export function IconButton({ onPress, label, children, width = 40 }: { onPress: () => void; label: string; children: ReactNode; width?: number }) {
+/** A glyph on a soft round key; `bare` leaves the key off, for a glyph inside a field. */
+export function IconButton({ onPress, label, children, bare = false }: { onPress: () => void; label: string; children: ReactNode; bare?: boolean }) {
   return (
-    <Pressable onPress={onPress} accessibilityLabel={label} accessibilityRole="button" hitSlop={4}
-      style={({ pressed }) => ({ width, height: 40, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-      {children}
+    <Pressable onPress={onPress} accessibilityLabel={label} accessibilityRole="button" hitSlop={6} style={{ height: 40, justifyContent: 'center' }}>
+      {({ pressed }) => (
+        <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: bare ? 'transparent' : pressed ? color.picked : color.fill, opacity: bare && pressed ? 0.5 : 1 }}>
+          {children}
+        </View>
+      )}
     </Pressable>
   );
 }
 
-/** The desktop's small outlined button (`.set-ghost`). */
+/** A small quiet button. */
 export function Ghost({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button"
-      style={({ pressed }) => ({ height: 28, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
-      <T style={{ fontSize: 13, color: color.dim }}>{title}</T>
+      style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
+      <T style={{ fontSize: 13.5, fontFamily: font.medium, color: color.text }}>{title}</T>
     </Pressable>
   );
 }
@@ -139,32 +132,36 @@ function SheetBody({ close, slide, children }: { close: () => void; slide: Anima
       </Animated.View>
       <KeyboardAvoidingView behavior="padding" pointerEvents="box-none" style={{ flex: 1 }}>
         <View style={{ flex: 1 }} pointerEvents="none" />
+        {/* The shadow is on the outer box: a box that clips its corners clips its own shadow. */}
         <Animated.View {...pan.panHandlers} onLayout={(e) => { tall.current = e.nativeEvent.layout.height; }}
-          style={{ maxHeight: height * 0.72, flexShrink: 1, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden', transform: [{ translateY: Animated.add(rise, drag) }] }}>
-          <View {...grip.panHandlers} style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 2 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: color.lineStrong }} />
+          style={{ maxHeight: room, flexShrink: 1, marginHorizontal: 8, marginBottom: 8, backgroundColor: color.pop, borderRadius: corner.sheet, ...lift('float'), transform: [{ translateY: Animated.add(rise, drag) }] }}>
+          <View style={{ flexShrink: 1, borderRadius: corner.sheet, overflow: 'hidden' }}>
+            <View {...grip.panHandlers} style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: color.lineStrong }} />
+            </View>
+            <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 10, paddingBottom: Math.max(14, inset.bottom - 8), gap: 2 }}
+              onLayout={(e) => setBox(e.nativeEvent.layout.height)} onContentSizeChange={(_, h) => setInner(h)}
+              scrollEventThrottle={16} onScroll={(e) => { atTop.current = e.nativeEvent.contentOffset.y <= 0; }}>
+              {children}
+            </ScrollView>
           </View>
-          <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}
-            onLayout={(e) => setBox(e.nativeEvent.layout.height)} onContentSizeChange={(_, h) => setInner(h)}
-            scrollEventThrottle={16} onScroll={(e) => { atTop.current = e.nativeEvent.contentOffset.y <= 0; }}>
-            {children}
-          </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
     </>
   );
 }
 export const SheetHead = ({ children }: { children: string }) => (
-  <T style={{ fontFamily: font.mono, fontSize: 12, letterSpacing: 0.96, textTransform: 'uppercase', color: color.faint, paddingTop: 6, paddingHorizontal: 14, paddingBottom: 8 }}>{children}</T>
+  <T style={{ fontFamily: font.semibold, fontSize: 13, lineHeight: 18, color: color.faint, paddingTop: 6, paddingHorizontal: 14, paddingBottom: 6 }}>{children}</T>
 );
-export const SheetSep = () => <View style={{ height: 1, backgroundColor: color.line, marginVertical: 4, marginHorizontal: 6 }} />;
+export const SheetSep = () => <View style={{ height: 1, backgroundColor: color.line, marginVertical: 6, marginHorizontal: 14 }} />;
 export function SheetRow({ label, on, aside, lead, onPress }: { label: string; on?: boolean; aside?: string; lead?: ReactNode; onPress: () => void }) {
   return (
     <Pressable onPress={() => { feel.pick(); onPress(); }} accessibilityRole="button" accessibilityState={{ selected: !!on }}
-      style={({ pressed }) => ({ minHeight: 48, borderRadius: corner.card, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: on || pressed ? color.picked : 'transparent' })}>
+      style={({ pressed }) => ({ minHeight: 52, borderRadius: corner.small, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: pressed ? color.picked : 'transparent' })}>
       {lead}
-      <T style={{ flex: 1, fontSize: 16, color: on ? color.text : color.dim, fontFamily: on ? font.semibold : font.regular }}>{label}</T>
-      {aside ? <T style={{ fontSize: 12, color: color.faint, paddingLeft: 18 }}>{aside}</T> : null}
+      <T style={{ flex: 1, fontSize: 16.5, lineHeight: 22, color: color.text, fontFamily: on ? font.medium : font.regular }}>{label}</T>
+      {aside ? <T style={{ fontSize: 14, color: color.faint, paddingLeft: 12 }}>{aside}</T> : null}
+      {on ? <Tick size={18} tint={color.text} /> : null}
     </Pressable>
   );
 }

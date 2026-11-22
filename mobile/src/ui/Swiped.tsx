@@ -51,8 +51,8 @@ export function Swiped({ off, onClose, onLater, children }: { off?: boolean; onC
     <View onLayout={(e) => setWide(e.nativeEvent.layout.width)} style={{ overflow: 'hidden' }}>
       <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 0, bottom: 0, left: -wide, width: wide, backgroundColor: color.graphite, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', transform: [{ translateX: x.interpolate({ inputRange: [0, wide], outputRange: [0, wide], extrapolate: 'clamp' }) }] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, width: SWIPE_COMMIT, paddingLeft: 20 }}>
-          <Animated.View style={{ transform: [{ scale: grow(1) }] }}><Clock size={18} tint={color.text} /></Animated.View>
-          <T style={{ ...words, color: color.text }}>Later</T>
+          <Animated.View style={{ transform: [{ scale: grow(1) }] }}><Clock size={18} tint={color.ink} /></Animated.View>
+          <T style={{ ...words, color: color.ink }}>Later</T>
         </View>
       </Animated.View>
       <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 0, bottom: 0, left: wide, width: wide, backgroundColor: color.accent, flexDirection: 'row', alignItems: 'center', transform: [{ translateX: x.interpolate({ inputRange: [-wide, 0], outputRange: [-wide, 0], extrapolate: 'clamp' }) }] }}>
