@@ -124,6 +124,30 @@ describe('a picture, film or sound file in a project folder that no thread names
   });
 });
 
+// From the second review of the change, 2026-11-22: a picture a thread names
+// still left an open thread's folder, and a project's own icon could leave.
+describe('what stays however old', () => {
+  it('a picture a thread names stays in an open thread\'s folder, and leaves a closed one\'s', async () => {
+    const open = put(`designs/${ids.open}/hero.png`, 'open hero');
+    const closed = put(`designs/${ids.closed}/hero.png`, 'closed hero');
+    const long = Date.now() - 40 * DAY;
+    disk.updateWorkItem(dir, ids.open, { note: `Saved [the hero](designs/${ids.open}/hero.png)` }, { source: 'agent', now: long });
+    disk.updateWorkItem(dir, ids.closed, { note: `Saved [the hero](designs/${ids.closed}/hero.png)` }, { source: 'agent', now: long });
+    await place.considerNow();
+    expect(here(open)).toBe(true);
+    expect(here(closed)).toBe(false);
+  });
+
+  it('the project\'s own icon', async () => {
+    fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({ schemaVersion: 1, id: 'product', name: 'Product', logo: 'icon.png' }));
+    const icon = put('icon.png', 'the icon');
+    const other = put('marketing/banner.png', 'a banner');
+    await place.considerNow();
+    expect(here(icon)).toBe(true);
+    expect(here(other)).toBe(false);
+  });
+});
+
 describe('an old version kept beside its file', () => {
   it('leaves with the file of the same bytes and comes back with it', async () => {
     const frame = put(`designs/${ids.closed}/frame.png`, 'closed frame');

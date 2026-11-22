@@ -108,6 +108,77 @@ describe('the record of what is in the cloud', () => {
   });
 });
 
+// A second review of the change, 2026-11-22, reproduced the next two: a log
+// holding only a line cut short by a crash swallowed the next change, and a
+// full disk made the whole record's rewrite throw before files could leave.
+describe('a record written through a crash or a full disk', () => {
+  it('a log holding only a line cut short does not swallow the next change', async () => {
+    const w = world({ days: 1 });
+    fs.mkdirSync(w.dir, { recursive: true });
+    fs.writeFileSync(path.join(w.dir, 'files-cloud.jsonl'), '{"up":"abc","si');
+    const film = w.file('designs/w-a/cut.mp4', 'film bytes');
+    const keeper = w.make();
+    await keeper.pass([film]);
+    w.later(2 * DAY);
+    await keeper.pass([film]);
+    expect(fs.existsSync(film.paths[0])).toBe(false);
+    expect(w.make().off(film.hash)).toMatchObject({ name: 'cut.mp4' });
+  });
+
+  it('a record that cannot be rewritten does not stop a file leaving, and its place is still known', async () => {
+    const w = world({ days: 1 });
+    fs.mkdirSync(w.dir, { recursive: true });
+    fs.writeFileSync(path.join(w.dir, 'files-cloud.jsonl'), '{"opened":"x","at":1}\n');
+    const film = w.file('designs/w-a/cut.mp4', 'film bytes');
+    const whole = path.join(w.dir, 'files-cloud.json');
+    const was = fs.renameSync;
+    (fs as { renameSync: typeof fs.renameSync }).renameSync = (from, to) => { if (String(to) === whole) throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' }); return was(from, to); };
+    try {
+      const keeper = w.make();
+      await keeper.pass([film]);
+      w.later(2 * DAY);
+      await keeper.pass([film]);
+      expect(fs.existsSync(film.paths[0])).toBe(false);
+      expect(fs.readdirSync(w.dir).filter((n) => n.endsWith('.tmp'))).toEqual([]);
+    } finally { (fs as { renameSync: typeof fs.renameSync }).renameSync = was; }
+    expect(w.make().off(film.hash)).toMatchObject({ name: 'cut.mp4' });
+  });
+});
+
+describe('a long first pass', () => {
+  it('takes nothing more off once the setting is switched off part way through', async () => {
+    const w = world({ days: 1 });
+    const files = Array.from({ length: 6 }, (_, i) => w.file(`designs/w-a/frame-${i}.png`, `frame ${i}`, { kind: 'image', loose: true, at: w.now() - 3 * DAY }));
+    let on = true;
+    const keeper = filesKeeper({
+      dir: w.dir, storage: async () => ({
+        async putFile(k: string, f: string) { w.held.set(k, fs.readFileSync(f)); if (w.held.size === 2) on = false; },
+        async getToFile() { return false; }, async exists(k: string) { return w.held.has(k); }, async del() {},
+      }),
+      account: async () => ({ bytes: 0, cap: 2 ** 40, full: false }), settings: () => ({ on, offAfterDays: 1 }), now: () => w.now(),
+    });
+    await keeper.pass(files);
+    expect(files.filter((f) => !fs.existsSync(f.paths[0])).length).toBe(1);
+  });
+
+  it('leaves a file whose thread opened again while the pass ran', async () => {
+    const w = world({ days: 1 });
+    let open = false;
+    const frame = w.file('designs/w-a/frame.png', 'frame', { kind: 'image', loose: true, at: w.now() - 3 * DAY, staysNow: () => open });
+    const other = w.file('designs/w-b/other.png', 'other', { kind: 'image', loose: true, at: w.now() - 3 * DAY });
+    const keeper = filesKeeper({
+      dir: w.dir, storage: async () => ({
+        async putFile(k: string, f: string) { w.held.set(k, fs.readFileSync(f)); open = true; },
+        async getToFile() { return false; }, async exists(k: string) { return w.held.has(k); }, async del() {},
+      }),
+      account: async () => ({ bytes: 0, cap: 2 ** 40, full: false }), settings: () => ({ on: true, offAfterDays: 1 }), now: () => w.now(),
+    });
+    await keeper.pass([frame, other]);
+    expect(fs.existsSync(frame.paths[0])).toBe(true);
+    expect(fs.existsSync(other.paths[0])).toBe(false);
+  });
+});
+
 describe('two copies of the same bytes', () => {
   it('leave together and come back to every place either was', async () => {
     const w = world({ days: 1 });
@@ -177,6 +248,25 @@ describe('a thread\'s folder coming back', () => {
     w.later(2 * DAY);
     await keeper.pass([...inside, ...outside]);
     expect(keeper.offUnder(path.join(root, 'docs', 'designs', 'w-a')).sort()).toEqual(inside.map((v) => v.hash).sort());
+  });
+
+  it('stops when the room it leaves free is reached, counting what is still coming down', async () => {
+    const w = world({ days: 1 });
+    const size = 100_000;
+    const files = Array.from({ length: 40 }, (_, i) => w.file(`designs/w-a/frame-${i}.png`, `${i}`.padEnd(size, 'x'), { kind: 'image' }));
+    let free = 2 * 2 ** 30 + 1_000_000;
+    let make = w.make();
+    await make.pass(files);
+    w.later(2 * DAY);
+    await make.pass(files);
+    const storage = {
+      async putFile() {}, async exists() { return true; }, async del() {},
+      async getToFile(k: string, f: string) { await new Promise((r) => setTimeout(r, 10)); fs.writeFileSync(f, w.held.get(k)!); free -= size; return true; },
+    };
+    make = filesKeeper({ dir: w.dir, storage: async () => storage, account: async () => null, settings: () => ({ on: true, offAfterDays: 1 }), freeBytes: async () => free, log: () => {} });
+    const back = await Promise.all(files.map((f) => make.bringBack(f.hash)));
+    expect(back.filter(Boolean).length).toBeLessThanOrEqual(10);
+    expect(free).toBeGreaterThanOrEqual(2 * 2 ** 30);
   });
 
   it('fetches at most four files at a time', async () => {

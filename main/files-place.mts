@@ -25,6 +25,7 @@ import type { SavedVersion } from './file-version.mts';
 import type { Store, StoreProduct } from './store.mts';
 import type { FilesKeeper, KeptVersion } from './files-cloud.mts';
 import { looseFilesIn } from './files-loose.mts';
+import { ICON_KINDS } from './project-identity.mts';
 import type { createTeamService } from './team/index.mts';
 
 type FilesTeam = ReturnType<typeof createTeamService>;
@@ -845,8 +846,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     };
   }
   const within = (dir: string, file: string): boolean => { const rel = path.relative(dir, file); return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel); };
-  function movableIn(roots: Roots, file: string): boolean {
-    const real = realOr(file);
+  const movableIn = (roots: Roots, file: string): boolean => movableReal(roots, realOr(file));
+  function movableReal(roots: Roots, real: string): boolean {
     if (real.split(path.sep).includes('.git') || roots.deny.some((d) => within(d, real))) return false;
     if (isProjectsOwnFile(path.basename(real)) && roots.allow.includes(path.dirname(real))) return false;
     return roots.allow.some((a) => within(a, real));
@@ -936,10 +937,33 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         const paths = await pathsOf(whole, v, products);
         const st = paths[0] ? await fs.promises.stat(paths[0]).catch(() => null) : null;
         if (!st || !v.hash) continue;
-        out.push({ hash: v.hash, size: st.size, paths, kind: whole.kind, at: v.at || st.mtimeMs, name: v.name, movable: paths.every((p) => movableIn(roots, p)) });
+        const threads = paths.map(threadFolderOf).filter((k): k is string => !!k);
+        out.push({
+          hash: v.hash, size: st.size, paths, kind: whole.kind, at: v.at || st.mtimeMs, name: v.name, movable: paths.every((p) => movableIn(roots, p)),
+          ...(threads.length ? { staysNow: () => threads.some((k) => workingNow().has(k)) } : {}),
+        });
       }
     }
     return [...out, ...await looseVersions(out, roots)];
+  }
+
+  // The threads an agent may still work on, read again at most every half minute while a pass runs for hours.
+  let working: { at: number; keys: Set<string> } = { at: 0, keys: new Set() };
+  function workingNow(): Set<string> {
+    if (Date.now() - working.at > 30_000) {
+      working = { at: Date.now(), keys: new Set(store.listAllWorkItems().filter((i) => OPEN_STATUSES.has(i.status ?? '')).map((i) => `${i.product}/${i.id}`)) };
+    }
+    return working.keys;
+  }
+  /** `<project>/<thread>` for a path inside a thread's own designs folder. */
+  function threadFolderOf(file: string): string | null {
+    const at = path.resolve(file);
+    for (const p of store.listProducts()) {
+      if (!p.dir) continue;
+      const parts = path.relative(path.resolve(p.dir), at).split(path.sep);
+      if (parts[0] === 'designs' && parts.length > 2) return `${p.slug}/${parts[1]}`;
+    }
+    return null;
   }
 
   // Most of what agents make is never named one by one, and threads old enough
@@ -949,19 +973,29 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const { offAfterDays } = keeper!.status();
     if (offAfterDays <= 0) return [];
     const before = Date.now() - offAfterDays * DAY_MS;
-    const working = new Set(store.listAllWorkItems().filter((i) => OPEN_STATUSES.has(i.status ?? '')).map((i) => `${i.product}/${i.id}`));
-    const claimed = new Set(named.flatMap((v) => v.paths.map(realOr)));
+    // Plain paths, not real ones: a twin missed here is still one version once the keeper joins them by their bytes.
+    const claimed = new Set(named.flatMap((v) => v.paths.map((p) => path.resolve(p))));
+    const products = store.listProducts().filter((p) => p.dir);
+    // The project's own mark, which the app draws without asking for it back (main/project-identity.mts).
+    for (const p of products) for (const ext of ICON_KINDS) claimed.add(path.resolve(p.dir, `icon${ext}`));
     const places = [
-      ...store.listProducts().filter((p) => p.dir).map((p) => ({ dir: p.dir, slug: p.slug as string | null, skip: p.repoPath ? [p.repoPath] : [] })),
+      ...products.map((p) => ({ dir: p.dir, slug: p.slug as string | null, skip: p.repoPath ? [p.repoPath] : [] })),
       { dir: path.join(logDir(), '.file-versions', 'version-bytes'), slug: null, skip: [] },
     ];
     const out: KeptVersion[] = [];
     for (const place of places) {
+      // The walk follows no link, so a file's real place is its folder's real place and the rest of its path.
+      const realDir = realOr(place.dir);
       for (const f of await looseFilesIn(place.dir, { skip: place.skip })) {
-        if (f.at >= before || (place.slug && f.thread && working.has(`${place.slug}/${f.thread}`)) || claimed.has(realOr(f.path))) continue;
+        const key = place.slug && f.thread ? `${place.slug}/${f.thread}` : null;
+        if (f.at >= before || (key && workingNow().has(key)) || claimed.has(path.resolve(f.path))) continue;
         const bytes = await lineNow().hashOf(f.path);
         if (!bytes) continue;
-        out.push({ hash: bytes.hash, size: bytes.size, paths: [f.path], kind: f.kind, at: f.at, name: path.basename(f.path), movable: movableIn(roots, f.path), loose: true });
+        out.push({
+          hash: bytes.hash, size: bytes.size, paths: [f.path], kind: f.kind, at: f.at, name: path.basename(f.path),
+          movable: movableReal(roots, path.join(realDir, path.relative(place.dir, f.path))), loose: true,
+          ...(key ? { staysNow: () => workingNow().has(key) } : {}),
+        });
       }
     }
     return out;

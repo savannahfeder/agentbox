@@ -8,10 +8,10 @@
 // are small and agents read them all the time. A plan that stops keeping
 // files, or the switch turned off, brings everything back down before the
 // cloud copy is deleted. An account that cannot be read changes nothing.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { cloneFile } from './clone-file.mts';
+import { hashBytesOf } from './hash-bytes.mts';
 
 export interface KeptVersion {
   hash: string;
@@ -28,6 +28,8 @@ export interface KeptVersion {
   loose?: boolean;
   /** In an open thread's own folder, where its agent works: never taken off. */
   stays?: boolean;
+  /** Asked again just before it leaves, as its thread may have opened since the pass began. */
+  staysNow?: () => boolean;
 }
 
 export interface FilesStorage {
@@ -74,7 +76,7 @@ const DAY_MS = 24 * 60 * 60_000;
 const LEDGER = 'files-cloud.json';
 // Each change is a line here, so tens of thousands of files are not a rewrite of the whole record each.
 const CHANGES = 'files-cloud.jsonl';
-const FOLD_AFTER = 2000;
+const FOLD_AFTER = 10_000;
 // What a bring-back leaves free on the disk, so a lapsed plan's files never fill it.
 const KEEP_FREE = 2 * 2 ** 30;
 // A thread's folder can be thousands of files.
@@ -89,6 +91,8 @@ function oneEach(versions: readonly KeptVersion[]): KeptVersion[] {
     for (const p of v.paths) if (!had.paths.includes(p)) had.paths.push(p);
     had.movable &&= v.movable;
     had.stays = !!(had.stays || v.stays);
+    const [a, b] = [had.staysNow, v.staysNow];
+    if (b) had.staysNow = a ? () => a() || b() : b;
     if (had.loose && !v.loose) Object.assign(had, { kind: v.kind, name: v.name, loose: false });
     had.at = Math.max(had.at, v.at);
   }
@@ -107,12 +111,7 @@ export function filesSettingsOf(config: { filesInCloud?: unknown; filesOffAfterD
   return { on: config.filesInCloud !== false, offAfterDays: (OFF_AFTER_DAYS as readonly number[]).includes(days) && config.filesOffAfterDays != null ? days : DEFAULT_OFF_AFTER };
 }
 
-async function hashOf(file: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    const h = crypto.createHash('sha256');
-    fs.createReadStream(file).on('data', (d) => h.update(d)).on('end', () => resolve(h.digest('hex'))).on('error', () => resolve(null));
-  });
-}
+const hashOf = (file: string): Promise<string | null> => hashBytesOf(file).catch(() => null);
 
 export function filesKeeper({ dir, storage, account, settings, now = Date.now, poster = null, freeBytes = null, notify = () => {}, log = (m: string) => console.warn(`files: ${m}`) }: {
   dir: string;
@@ -131,10 +130,15 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
   let ledger: Ledger = { up: {}, off: {}, opened: {} };
   try { ledger = { ...ledger, ...JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Ledger> }; } catch { /* none yet */ }
   let changes = 0;
+  let leftover = false;
   try {
-    for (const line of fs.readFileSync(changesFile, 'utf8').split('\n')) {
+    const text = fs.readFileSync(changesFile, 'utf8');
+    leftover = text.length > 0;
+    // A line cut short by a crash would swallow the next change written after it.
+    if (leftover && !text.endsWith('\n')) fs.appendFileSync(changesFile, '\n');
+    for (const line of text.split('\n')) {
       if (!line) continue;
-      try { apply(ledger, JSON.parse(line) as Change); changes += 1; } catch { /* a line cut short by a crash */ }
+      try { apply(ledger, JSON.parse(line) as Change); changes += 1; } catch { /* cut short */ }
     }
   } catch { /* none yet */ }
   let last: { cap: number | null; bytes: number; full: boolean } = { cap: null, bytes: 0, full: false };
@@ -154,11 +158,17 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
   for (const [hash, entry] of Object.entries(ledger.off)) index(hash, entry, 1);
 
   const fold = (): void => {
-    fs.mkdirSync(dir, { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(ledger));
-    fs.renameSync(tmp, file);
-    fs.writeFileSync(changesFile, '');
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(tmp, JSON.stringify(ledger));
+      fs.renameSync(tmp, file);
+      fs.writeFileSync(changesFile, '');
+    } catch (err) {
+      // Every change is in the log already, so a full disk only puts this off.
+      fs.rmSync(tmp, { force: true });
+      log(`could not rewrite the record of files in the cloud: ${(err as Error).message}`);
+    }
     changes = 0;
   };
   // A change is written before what it records happens to the files, so a crash never loses a file's place.
@@ -171,10 +181,10 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     fs.appendFileSync(changesFile, `${JSON.stringify(c)}\n`);
     if (++changes >= FOLD_AFTER) fold();
   };
-  // A torn last line would swallow the next change written after it.
-  if (changes) fold();
+  if (leftover) fold();
 
   let fetching = 0;
+  let incoming = 0;
   const waitingToFetch: Array<() => void> = [];
   async function inTurn<T>(fn: () => Promise<T>): Promise<T> {
     if (fetching >= FETCH_AT_ONCE) await new Promise<void>((r) => waitingToFetch.push(r));
@@ -183,7 +193,7 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
   }
 
   const mayLeave = (v: KeptVersion, offAfterDays: number): boolean => v.movable && !v.stays && LEAVES.has(v.kind ?? '') && offAfterDays > 0
-    && Math.max(v.at, ledger.opened[v.hash] ?? 0) < now() - offAfterDays * DAY_MS;
+    && Math.max(v.at, ledger.opened[v.hash] ?? 0) < now() - offAfterDays * DAY_MS && !v.staysNow?.();
 
   // A snapshot, so the bytes sent are the bytes hashed even if the file is written meanwhile.
   async function send(store: FilesStorage, v: KeptVersion): Promise<boolean> {
@@ -204,6 +214,9 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     const here: string[] = [];
     for (const p of v.paths) if (await hashOf(p) === v.hash) here.push(p);
     if (!here.length || !(await store.exists(keyOf(v.hash)))) return;
+    // A first pass runs for hours: the setting, or the thread, may have changed since it began.
+    const live = settings();
+    if (!live.on || !mayLeave(v, live.offAfterDays)) return;
     let shown: string | undefined;
     if (poster && !v.loose) {
       const to = path.join(dir, 'posters', `${v.hash}.jpg`);
@@ -219,7 +232,6 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     if (!entry) return true;
     const store = await storage();
     if (!store) return false;
-    if (freeBytes && (await freeBytes()) < entry.size + KEEP_FREE) { log(`no room to bring back ${entry.name}`); return false; }
     // A file at one of its paths now is newer work, so it only fills the free ones.
     const free = entry.paths.filter((p) => !fs.existsSync(p));
     if (!free.length) { log(`newer files took every place ${entry.name} came from; it stays in the cloud`); return false; }
@@ -227,7 +239,15 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     const tmp = `${first}.coming-${process.pid}`;
     fs.mkdirSync(path.dirname(first), { recursive: true });
     try {
-      if (!(await inTurn(() => store.getToFile(keyOf(hash), tmp)))) { log(`the cloud no longer has ${entry.name}`); return false; }
+      // The room is weighed in turn, with what is still coming down counted, or a folder's worth all sees the same free space.
+      const needs = entry.size * free.length;
+      const got = await inTurn(async () => {
+        if (freeBytes && (await freeBytes()) - incoming < needs + KEEP_FREE) return 'no room';
+        incoming += needs;
+        try { return (await store.getToFile(keyOf(hash), tmp)) ? 'here' : 'gone'; } finally { incoming -= needs; }
+      });
+      if (got === 'no room') { log(`no room to bring back ${entry.name}`); return false; }
+      if (got === 'gone') { log(`the cloud no longer has ${entry.name}`); return false; }
       if (await hashOf(tmp) !== hash) { log(`the cloud gave other bytes for ${entry.name}; it stays there`); return false; }
       // Never over a file that turned up while it came down.
       const put = (place: () => void) => { try { place(); } catch (err) { if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err; } };
@@ -269,6 +289,7 @@ export function filesKeeper({ dir, storage, account, settings, now = Date.now, p
     let bytes = acct.bytes;
     let full = acct.full;
     for (const v of [...each].sort((a, b) => b.at - a.at)) {
+      if (!settings().on) break;
       if (!v.movable || ledger.up[v.hash] || ledger.off[v.hash]) continue;
       if (v.loose && !mayLeave(v, offAfterDays)) continue;
       if (full || bytes + v.size > acct.cap) { full = true; continue; }

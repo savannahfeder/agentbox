@@ -115,6 +115,30 @@ describe('a cloud run asking the computer for a file', () => {
     expect(answer).toMatchObject({ status: 'delivered' });
     expect(sent.map(String)).toEqual(['picture a']);
   });
+
+  it('is told the file is in the cloud and could not come back, not that it is not there', async () => {
+    const keeper = await offTheMac({ 'designs/w-a/a.png': 'picture a' });
+    setFilesComeBack(() => ({ ...keeper, bringBack: async () => false }));
+    const { createResourceRequests } = await import('../main/cloud/resources.mts');
+    fs.mkdirSync(path.join(root, 'task'), { recursive: true });
+    const request = createResourceRequests({
+      cwd: path.join(root, 'task'), docs, account: root, homeDir: path.join(root, 'home'), configDir: path.join(root, 'home/.claude'), engine: 'claude',
+      runId: 'run-back-failed', state: {}, save: () => {}, stopped: () => false, timeoutMs: 1000,
+      upload: async (key: string) => `https://storage.invalid/${key}`, deliver: async () => true,
+    });
+    const answer = await request({ kind: 'file', scope: 'documents', path: 'designs/w-a/a.png' });
+    expect(answer.status).toBe('unavailable');
+    expect(JSON.stringify(answer)).toMatch(/kept in the cloud/);
+  });
+});
+
+describe('a page opened in the window', () => {
+  // Read as text: the schemes are Electron's, registered once at boot.
+  it('brings back its own pictures when it asks for them, as a picture opened alone does', () => {
+    const main = fs.readFileSync(new URL('../main/main.mts', import.meta.url), 'utf8');
+    const page = main.slice(main.indexOf('for (const scheme of DOC_SCHEMES)'), main.indexOf('for (const scheme of IMG_SCHEMES)'));
+    expect(page).toMatch(/comeBackAt\(file\)/);
+  });
 });
 
 describe('the store\'s tool', () => {
