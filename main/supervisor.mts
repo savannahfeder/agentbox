@@ -12267,7 +12267,7 @@ export class Supervisor {
    * ONE WORKER'S CARDS, for an engine whose approval requests arrive inside
    * this process (main/harnesses/acp.mts). They are the same in-process cards
    * Codex's are, so the one answering door settles them and nothing new reads
-   * an answer off the disk. The worker's exit must `close` them.
+   * an answer off the disk. The adapter closes them when its worker exits.
    */
   approvalCardsFor(item: Pick<WorkItem, 'id' | 'product'>, say: (line: string) => unknown) {
     const scope = this._codexApprovals().scope({ product: item.product, item: item.id, say });

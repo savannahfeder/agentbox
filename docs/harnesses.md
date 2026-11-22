@@ -118,6 +118,20 @@ A PROMPT HAS NO DEADLINE. Every other request ends after two minutes; a prompt
 stays open for the whole turn, and what ends it is the connection closing or
 the supervisor's own check for a run gone quiet.
 
+ITS MODELS ARE WHAT THE TOOL SAYS THEY ARE. Which models an ACP tool offers
+depends on what its owner connected, so only the tool knows. Every conversation
+states the list when it opens; the adapter keeps the last one under the app's
+own folder (`harnesses/<id>/models.json`) and tells the screens when it
+changes. A tool that has never run is asked once per run of the app, by opening
+one empty conversation in the app's own folder.
+
+A FURTHER HARNESS REACHES THE SCREENS IN A LIST OF ITS OWN. `engineChoices()`
+names Claude Code and Codex only, because Settings, the usage corner and the
+cloud menu were written for those two. `enginesHere()` is every harness a
+thread may run on, and `engineFacts().further` carries the rest to the screens
+with their models. The key is absent on a computer with no further harness, so
+that computer is told exactly what it always was.
+
 ## Standing instructions, on an engine with no system prompt
 
 Claude Code takes them on `--append-system-prompt`; Codex takes them as a
@@ -309,10 +323,17 @@ usage update carries the context used and a cost per run, and those are kept.
 Its slash commands and its fork are advertised over ACP and not wired, so both
 say no. Typing into a live run is not wired either, so `remoteControl` is false.
 
-**Still ahead before it is offered:** the screens. The new-thread composer, the
-model menu and the logos know two harnesses, so OpenCode has nowhere to be
-picked. Its model list has to reach the model menu, and its sign-in has no
-row in Settings.
+**On the screens, behind the same switch:** the model menu has a column for a
+further harness, in the new-thread card and in the reply box; a thread on one
+wears its mark in the list; its reply box names the model in the tool's own
+words and offers none of Claude Code's or Codex's permission words or commands,
+which mean nothing to it. `?fixtures=1&engines=claude&further=opencode` is the
+stand-in world that photographs all of it.
+
+**Still ahead before it is offered:** its sign-in has no row in Settings; any
+list drawn straight from the shared list of harnesses, rather than from what is
+on offer on this computer, would name it everywhere the day it is admitted; the
+phone app knows two harnesses; and nobody has used it for a working day.
 
 Sources: [OpenCode providers](https://opencode.ai/docs/providers/),
 [OpenCode CLI](https://opencode.ai/docs/cli/),

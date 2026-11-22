@@ -6,7 +6,7 @@
 // worker adds because the wire has none for them (main/acp-worker.mts): the
 // session's id, a finished message, a finished tool call, the end of the turn.
 //
-// Shapes read off a running OpenCode 2.3.2 on 2026-11-22:
+// The shapes, as OpenCode 2.3.2 sends them:
 //
 //   agent_message_chunk   { messageId, content: { type: 'text', text } }   a piece of prose
 //   agent_thought_chunk   the model thinking; never shown and never an answer
