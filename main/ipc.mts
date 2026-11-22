@@ -584,6 +584,17 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     if (Date.now() - codexLive.at > 2_000) codexLive = { at: Date.now(), agents: readCodexLive({ products: store.listProducts(), codexDirs: codexHomesNow() }) };
     return codexLive.agents;
   };
+  // Codex says nothing when a session moves, so its folders are watched: a
+  // change to where a session stands, or what it says, sends a new snapshot.
+  let codexSeen = '';
+  const codexWatch = setInterval(() => {
+    if (outsideAgentsMode(config) === 'off') return;
+    try {
+      const now = codexLiveNow().map((a) => [a.sessionId, a.status, a.saidAt, a.approval?.command ?? '', a.question?.length ?? 0, a.asked.length].join('|')).join('\n');
+      if (now !== codexSeen) { const first = !codexSeen; codexSeen = now; if (!first) push(); }
+    } catch { /* a reading that failed is tried again next time */ }
+  }, 3_000);
+  codexWatch.unref?.();
   const liveAgents = () => {
     try {
       const claude = agents.listAgents({
