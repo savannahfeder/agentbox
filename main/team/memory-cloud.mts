@@ -445,21 +445,24 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         .slice(0, limit).map((l) => ({ seq: l.seq, line: asPulled(structuredClone(l.body), { by: l.byPerson, at: l.createdAt, me: personId }) }));
     },
 
-    async putCards(teamId: string, cards: { threadId: string; visible?: unknown; people?: string[] | null; [key: string]: unknown }[]) {
+    async putCards(teamId: string, cards: { threadId: string; visible?: unknown; people?: string[] | null; [key: string]: unknown }[], changed?: ReadonlySet<string>) {
       if (!myTeams().includes(teamId)) throw new Error('not on that team');
       const had = [...cloud.cards.values()].filter((c) => c.personId === personId).map((c) => c.threadId);
-      for (const key of [...cloud.cards.keys()]) if (key.startsWith(`${personId}:`)) cloud.cards.delete(key);
       // A private card never goes up at all, whatever the Mac handed over, as
       // supabase-backend does; the database refuses words on one besides.
-      for (const c of cards) {
-        if (c.visible !== true) continue;
-        // NO LIST IS THE WHOLE TEAM, and an empty one is refused rather than
-        // stored, as the table's own check does: it would have to mean both
-        // everyone and nobody (20261001000800_chosen_people.sql).
+      const shown = cards.filter((c) => c.visible === true);
+      // NO LIST IS THE WHOLE TEAM, and an empty one is refused rather than
+      // stored, as the table's own check does: it would have to mean both
+      // everyone and nobody (20261001000800_chosen_people.sql). Refused before
+      // anything is written, as the database's one upsert is.
+      const writing = shown.filter((c) => !changed || changed.has(c.threadId)).map((c) => {
         const people = c.people == null ? null : [...new Set(c.people.filter((p) => typeof p === 'string' && p))];
         if (people && !people.length) refuse('share a thread with nobody');
-        cloud.cards.set(`${personId}:${c.threadId}`, { ...structuredClone(c), people, personId, teamId });
-      }
+        return { ...structuredClone(c), people, personId, teamId };
+      });
+      for (const c of writing) cloud.cards.set(`${personId}:${c.threadId}`, c);
+      const listed = new Set(shown.map((c) => c.threadId));
+      for (const threadId of had) if (!listed.has(threadId)) cloud.cards.delete(`${personId}:${threadId}`);
       // A thread's work goes with its card (the foreign keys in
       // 20261030120000_shared_threads_carry_their_work.sql).
       for (const threadId of had) {

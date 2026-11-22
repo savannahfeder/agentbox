@@ -20,7 +20,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { configDir, loadConfig, saveConfig } from './config.mts';
-import { installMenu, applyZoom, requestFind } from './menu.mts';
+import { installMenu, applyZoom, announceZoom, requestFind, sizeTheAppWindowWith } from './menu.mts';
+import { keepTheAppSizedForItsScreen, openingSize } from './app-size.mts';
 import { zoomDeltaFor } from './zoom-keys.mts';
 import { copySelection } from './copy-selection.mts';
 import { screenDetailFor } from './screen-detail.mts';
@@ -32,7 +33,7 @@ import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
-import { readCodexThreadsOffThread } from './codex-threads.mts';
+import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
@@ -477,6 +478,9 @@ async function createWindow() {
   supervisor.hostRuns = runHostWorksOn();
   // And their store tools come from one shared process (main/tool-host.mts).
   supervisor.shareTools = true;
+  // The next thread's folder is made ahead, on a Mac, where the copy shares
+  // its blocks with the checkout. Elsewhere it would be a second full copy.
+  supervisor.spareFolders = process.platform === 'darwin';
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).
@@ -808,9 +812,10 @@ async function createWindow() {
 
   const liquidGlass = loadWindowGlass();
   const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass, !!liquidGlass);
+  const opening = openingSize(electronScreen.getPrimaryDisplay(), config.zoomByScreen);
   window = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: opening.width,
+    height: opening.height,
     // Half of a 1440-point screen, so the window tiles; under 700 is the phone layout.
     minWidth: 720,
     minHeight: 600,
@@ -820,8 +825,8 @@ async function createWindow() {
       fresh: runningAsAFreshUser(),
       name: NAME,
       screen: electronScreen.getPrimaryDisplay()?.workArea,
-      width: 1440,
-      height: 900,
+      width: opening.width,
+      height: opening.height,
     }),
     ...glass,
     ...windowFrame(process.platform),
@@ -893,6 +898,15 @@ async function createWindow() {
     electronScreen.removeListener('display-added', tellScreenDetail);
     electronScreen.removeListener('display-removed', tellScreenDetail);
   });
+
+  // How big it draws, from the screen it is on (main/app-size.mts).
+  sizeTheAppWindowWith(keepTheAppSizedForItsScreen({
+    window,
+    screen: electronScreen,
+    chosen: config.zoomByScreen,
+    save: (picks) => saveConfig(config, { zoomByScreen: Object.keys(picks).length ? picks : undefined }),
+    announce: announceZoom,
+  }));
 
   // The junk browser's session presents as plain Chrome. Electron's default
   // UA carries "Electron/x Zero/x", which makes Google-family logins refuse
@@ -1156,6 +1170,7 @@ async function createWindow() {
       }
     };
     supervisor.start();
+    supervisor.warmTheStartPath();
     powerMonitor.on('suspend', () => supervisor.noteSleep());
     powerMonitor.on('resume', () => {
       supervisor.noteWake();

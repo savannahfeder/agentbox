@@ -48,13 +48,13 @@ describe('when the inbox knows a task is on its way', () => {
   const app = read('renderer/src/App.tsx');
 
   it('knows it from the moment Send is pressed, not only on the first run', () => {
-    const sending = app.slice(app.indexOf('onSending={walkCard'), app.indexOf('onFailed={(said, back)'));
+    const sending = app.slice(app.indexOf('onSending={(how) => {'), app.indexOf('onFailed={(said, back)'));
     expect(sending).toMatch(/setJustSent\(true\)/);
   });
 
-  it('draws it off that, the tutorial’s first task included', () => {
+  it('draws it off that', () => {
     const line = app.split('\n').find((l) => l.includes('<EmptyTab'));
-    expect(line).toMatch(/starting=\{!!landOn \|\| justSent\}/);
+    expect(line).toMatch(/starting=\{justSent\}/);
   });
 
   // And only on the tab that was waiting: a glance at Needs you in the middle

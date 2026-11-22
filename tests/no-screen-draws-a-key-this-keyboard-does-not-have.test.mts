@@ -91,14 +91,10 @@ describe('the glyphs come from the table', () => {
     expect(said).toEqual([]);
   });
 
-  it('says the three sentences that carry a key in this keyboard’s words', () => {
-    // The walk's leave card, the toast after it, and the import card: each is a
-    // whole sentence with ⌘K inside it, so it is the sentence that is rewritten.
-    const walk = fs.readFileSync(path.join(root, 'renderer/src/components/Onboarding.tsx'), 'utf8');
-    const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
+  it('says the sentence that carries a key in this keyboard’s words', () => {
+    // The import card's is a whole sentence with ⌘K inside it, so it is the
+    // sentence that is rewritten. (The old walk's two went with it, 2026-11-21.)
     const imports = fs.readFileSync(path.join(root, 'renderer/src/components/ImportAgents.tsx'), 'utf8');
-    expect(walk).toContain('sayKeys(COPY.leaveLine)');
-    expect(app).toContain('sayKeys(WALK_COPY.offerLater)');
     expect(imports).toMatch(/sayKeys\(alreadyIn > 0 \? CARD\.laterAllIn : CARD\.noneLater\)/);
   });
 });

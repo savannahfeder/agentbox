@@ -31,7 +31,6 @@ import { fileURLToPath } from 'node:url';
 import { Store } from '../main/store.mts';
 import { Supervisor } from '../main/supervisor.mts';
 import { PRACTICE_ROWS, PRACTICE_SLUG } from '../shared/first-run-practice.mts';
-import { needsStaging, walkStageKey } from '../renderer/src/walk-staging.ts';
 import { practiceRemembered, rememberProject, rememberedProject, resolveProject } from '../renderer/src/compose-project.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -158,86 +157,23 @@ describe('B: the app stops sending her back into Practice', () => {
     expect(resolveProject([real], [real], 'archived-last-week')).toBe(real);
   });
 
-  it('hands the slot back to her own project when the walk ends', () => {
-    // The walk writes the practice slug into the slot on purpose, so the beats
-    // that file into Practice do. `finishRun` is the moment that stops being
-    // true, and it hands it to the project the walk made rather than clearing it.
-    const fin = app.slice(app.indexOf('const finishRun'), app.indexOf('const finishRun') + 900);
-    expect(fin).toMatch(/rememberProject\(runRef\.current\?\.product \?\? null\)/);
-    // Every write to the slot goes through the one helper now. It was spelled
-    // out by hand in five places in this file and read in two more.
-    expect(app).not.toMatch(/localStorage\.setItem\('zero\.lastProduct'/);
-    // Five places that used to spell the key out, plus the hand-back above and
-    // the one that puts an already-wrong install right, plus the project the
-    // first-run setup makes, plus the walkthrough handing the slot back after its
-    // practice thread (w-fbe5e95dea).
-    expect(app.match(/rememberProject\(/g) ?? []).toHaveLength(9);
-  });
-
-  it('also puts right an install where the slot is ALREADY wrong', () => {
-    // The founder's own is one. So is anybody who quit the walk halfway or shut
-    // the app in the middle of one: none of those ever reaches `finishRun`.
+  it('puts right an install where the slot is ALREADY wrong', () => {
+    // Anybody who quit a walk halfway or shut the app in the middle of one.
     expect(app).toMatch(/practiceRemembered\(snap\.products, slug, \{ practiceSlug: PRACTICE_SLUG \}\)/);
-    // AND ONLY WHEN NO WALK IS RUNNING. During one the slot is SUPPOSED to say
-    // Practice; that is what makes beat nine's task land there.
     const guard = app.slice(
-      app.indexOf('const slug = rememberedProject();') - 400,
+      app.indexOf('const slug = rememberedProject();') - 200,
       app.indexOf('const slug = rememberedProject();') + 200,
     );
-    expect(guard).toMatch(/if \(run \|\| !snap\) return;/);
+    expect(guard).toMatch(/if \(!snap\) return;/);
+    // Every write to the slot goes through the one helper.
+    expect(app).not.toMatch(/localStorage\.setItem\('zero\.lastProduct'/);
   });
+
 });
 
 /* ------------------------------------------------------------------ C ----- */
 
-describe('C: a second walk gets all of its beats', () => {
-  it('stages once per walk, and a SECOND walk stages again', () => {
-    // THE BUG, DRIVEN. `staging` was a boolean ref, so this is the sequence the
-    // founder drove from ⌘K and what it used to produce.
-    let seen = null;
-    const stage = (run, opened) => {
-      const key = walkStageKey(run, opened);
-      if (!needsStaging(seen, key)) return false;
-      seen = key;
-      return true;
-    };
-
-    // Walk one, arriving at beat twelve with the task still open.
-    expect(stage({ step: 'answer', item: 'w-aaa111' }, true)).toBe(false);
-    // She presses E and the row closes: the four waiting rows are let through.
-    expect(stage({ step: 'answer', item: 'w-aaa111' }, false)).toBe(true);
-    // And not a second time on a re-render of the same beat.
-    expect(stage({ step: 'answer', item: 'w-aaa111' }, false)).toBe(false);
-    // The walk runs on and ends.
-    expect(stage({ step: 'note', item: 'w-aaa111' }, false)).toBe(false);
-    expect(stage(null, false)).toBe(false);
-
-    // ⌘K, "Run the onboarding again". Same window, same component, NEW walk,
-    // new task. This returned false before the fix, and everything after beat
-    // twelve — the sidebar note, snoozing, unblocking a stopped agent — never
-    // happened.
-    expect(stage({ step: 'answer', item: 'w-bbb222' }, false)).toBe(true);
-    // Third walk too. It is not a "twice" fix.
-    expect(stage({ step: 'answer', item: 'w-ccc333' }, false)).toBe(true);
-  });
-
-  it('is off on every beat but the one it is for', () => {
-    for (const step of ['welcome', 'make', 'task', 'working', 'open', 'note', 'clear', 'done']) {
-      expect(walkStageKey({ step, item: 'w-aaa111' }, false), step).toBe(null);
-    }
-    expect(walkStageKey(null, false)).toBe(null);
-    // The beat is REACHED with the row open — that is how it was reached — so it
-    // waits for the keypress the beat is about.
-    expect(walkStageKey({ step: 'answer', item: 'w-aaa111' }, true)).toBe(null);
-    // A walk with no task behind it still stages exactly once rather than never.
-    expect(walkStageKey({ step: 'answer', item: null }, false)).toBe('no-task');
-  });
-
-  it('is not a boolean ref any more, in the file it actually runs in', () => {
-    expect(app).toMatch(/const staging = useRef<string \| null>\(null\);/);
-    expect(app).not.toMatch(/const staging = useRef\(false\)/);
-    expect(app).toMatch(/needsStaging\(staging\.current, stageKey\)/);
-  });
+describe('C: a second practice project gets its own rows', () => {
 
   it('is not fixed by the folder going away, and the store proves it', async () => {
     // Worth stating out loud: A does NOT subsume C. Even with the practice
@@ -300,7 +236,8 @@ describe('D: an agent can never run in a practice project', () => {
     // deleted (w-d19d6d387c, 2026-09-22), which had one of its own. Five uses
     // since a sleeping Mac hands repeating tasks to the cloud (`_repeatsAhead`).
     // Six since a pass that stops early counts the rows it held (`_noteWaitingRows`).
-    expect(supervisorSrc.match(/worksHere\(/g) ?? []).toHaveLength(7);
+    // Seven since the next thread's folder is made ahead only where threads run (`_nextFolderBase`).
+    expect(supervisorSrc.match(/worksHere\(/g) ?? []).toHaveLength(8);
     // And the refusal is before the plan is built, because a plan for a practice
     // project already carries a working directory that is not a repository.
     const spawn = supervisorSrc.slice(supervisorSrc.indexOf('  spawnWorker(item'));

@@ -50,6 +50,8 @@ export interface SettingsConfig {
   accountRoot?: string;
   claudeBin?: string | null;
   claudeFound?: boolean | null;
+  /** Claude Code's own sign-in check (main/engine-setup.mts); unset until it gives a real yes or no. */
+  claudeSignedIn?: boolean | null;
   claudeCertain?: boolean;
   claudeBinConfigured?: string | null;
   claudeFrom?: string | null;
@@ -692,6 +694,12 @@ export function readSettings({ config, supervisor, store, onTeam }: SettingsDeps
       profile,
       email: identity?.email ?? null,
       accountUuid: identity?.accountUuid ?? null,
+      // Claude Code's own `auth status` answer speaks only for the login it checked: the default,
+      // unless the app names another folder. A no from it or a run's sign-out beats the email on file;
+      // with no email, only its yes counts.
+      signedIn: trouble?.cause !== 'signed-out' && (profile === 'default' && !process.env.CLAUDE_CONFIG_DIR && typeof config.claudeSignedIn === 'boolean'
+        ? config.claudeSignedIn
+        : !!identity?.email),
       // WHICH ONE RUNS, AND ONE OF THEM ALWAYS DOES (w-dac993a554). This was
       // false on every row until somebody picked, because until then every
       // account really did take a share of the work. One account runs it now,

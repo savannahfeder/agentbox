@@ -262,7 +262,12 @@ export async function waitForEmailConfirmation({ config, session, env = process.
   let token: string | null | undefined;
   try { token = await session.confirmation(); } catch (err) { return { ok: false, error: (err as Cancelable)?.message || String(err), ...((err as Cancelable)?.cancelled ? { cancelled: true } : {}) }; }
   if (!token) return { ok: false, error: 'nothing-waiting' };
-  const out = await signInToCloud({ config, acceptedTerms: await currentCloudTerms(config), googleSignIn: async () => token, env, home });
+  let out: AccountOutcome;
+  try {
+    out = await signInToCloud({ config, acceptedTerms: await currentCloudTerms(config), googleSignIn: async () => token, env, home });
+  } catch (err) {
+    return { ok: false, error: (err as Error)?.message || String(err) };
+  }
   return out.ok ? out : { ok: false, error: out.message || out.error };
 }
 

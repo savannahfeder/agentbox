@@ -38,7 +38,6 @@ const KEPT: Record<string, string> = {
   // A row just dragged into place washes and fades so the eye can find it; `.pp-row.moved` sets it at once.
   '.pp-row': 'the wash a just-moved project row fades out of',
   // The first run's step bars fill as the screens advance; they are not controls.
-  '.first-run .ob-steps i': 'the first run\'s progress bars, filled as screens advance',
   // The sash brightens only once the pointer rests on it, as VS Code's does (her call, 2026-10-08).
   '.task-terminal-grip::before': 'the terminal sash lights only after the pointer rests, like VS Code',
   '.task-terminal-grip:hover::before': 'the terminal sash lights only after the pointer rests, like VS Code',

@@ -231,9 +231,12 @@ function scrubbed(env: NodeJS.ProcessEnv) {
 // session last did anything (not when its process started), its `ai-title`,
 // the `last-prompt`, the files its tool calls touched, and the human turns.
 // The opening human turn can sit hundreds of KB in, behind pasted images, so
-// the whole file is read once and after that only the bytes appended since.
-// No model sees any of it.
+// the first read takes the file's start and its end (a session running
+// hundreds of subagents writes GB), and after that only the bytes appended
+// since. No model sees any of it.
 const CHUNK_BYTES = 4 << 20;
+const FIRST_HEAD_BYTES = 8 << 20;
+const FIRST_TAIL_BYTES = 16 << 20;
 const historyCache = new Map<string, HistoryEntry>(); // sessionId -> { file, size, mtimeMs, offset, ...facts }
 
 // Tools whose file paths count as touched. The card prints at most six, and
@@ -397,7 +400,14 @@ function readHistory(sessionId: string, cwd: string | undefined) {
       asked: [...hit.asked],
     }
     : { ...NOTHING, touched: [], asked: [] };
-  const offset = fold(file, acc, resume ? hit.offset : 0, stat.size);
+  let from = resume ? hit.offset : 0;
+  if (!resume && stat.size > FIRST_HEAD_BYTES + FIRST_TAIL_BYTES) {
+    fold(file, acc, 0, FIRST_HEAD_BYTES);
+    // What the end says is the session now; a reply or a file from the start is not.
+    Object.assign(acc, { lastSaid: '', saidAt: 0, saidOpen: false, touched: [] });
+    from = stat.size - FIRST_TAIL_BYTES;
+  }
+  const offset = fold(file, acc, from, stat.size);
 
   const entry = { file, size: stat.size, mtimeMs: stat.mtimeMs, offset, ...acc };
   historyCache.set(sessionId, entry);

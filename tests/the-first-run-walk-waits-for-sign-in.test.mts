@@ -45,11 +45,6 @@ describe('the first-run walk and the sign-in page', () => {
     expect(start).toMatch(/if \(walkWaitsForSignIn\) return;/);
   });
 
-  it('does not draw the walk or the practice band then, so neither can hold a press or a key', () => {
-    expect(app).toMatch(/\{run && !modeDraft && !walkWaitsForSignIn && \(\s*<Onboarding/);
-    expect(app).toMatch(/\{inPractice && !walkWaitsForSignIn && <PracticeBand \/>\}/);
-  });
-
   it('a build with nothing to sign in to, or a skipped sign-in, still walks as before', () => {
     expect(signInAsk({ team: null, fixtures: false, skipped: false, canSkip: true }).walkWaits).toBe(false);
     expect(signInAsk({ team: { configured: false, canSignIn: false, signedIn: false }, fixtures: false, skipped: false, canSkip: true }).walkWaits).toBe(false);
