@@ -173,6 +173,10 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
     const lead = last && last.who === 'it' && last.at >= acc.turnStartedAt ? last.text : '';
     if (qs.length) { acc.question = lead ? [{ ...qs[0], lead }, ...qs.slice(1)] : qs; acc.pendingCall = String(p.call_id ?? 'pending'); }
   } else if (p.type === 'function_call_output' && acc.pendingCall && p.call_id === acc.pendingCall) {
+    // Her answer to its question is her turn, so the row moves to In progress while it goes on.
+    const out = (p as { output?: unknown }).output;
+    const said = (typeof out === 'string' ? out : JSON.stringify(out ?? '')).replace(/\s+/g, ' ').trim().slice(0, 400);
+    acc.asked.push({ at, text: said || 'Answered its question' });
     acc.pendingCall = ''; acc.question = [];
   }
   if (p.type === 'function_call' || p.type === 'custom_tool_call') {

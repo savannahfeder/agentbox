@@ -342,8 +342,13 @@ function remember(acc: Facts, line: string) {
   // so the blocks of one reply are joined until the next thing arrives.
   if (arrived(obj)) acc.saidOpen = false;
   if (mine) { acc.question = []; acc.questionId = ''; }
-  if (acc.questionId && obj.type === 'user' && Array.isArray(obj.message?.content)
-    && obj.message.content.some((c) => c.type === 'tool_result' && c.tool_use_id === acc.questionId)) {
+  const answer = acc.questionId && obj.type === 'user' && Array.isArray(obj.message?.content)
+    ? obj.message.content.find((c) => c.type === 'tool_result' && c.tool_use_id === acc.questionId) : null;
+  if (answer) {
+    // Her pick in the terminal is her answer, which is what moves the row to In progress.
+    const picked = typeof answer.content === 'string' ? answer.content : (answer.content ?? []).map((c) => c.text ?? '').join(' ');
+    acc.asked.push({ at: Date.parse((obj.timestamp ?? 0) as string) || 0, text: picked.replace(/\s+/g, ' ').trim() || 'Answered its question' });
+    if (acc.asked.length > KEEP_TURNS) acc.asked.splice(1, 1);
     acc.question = []; acc.questionId = '';
   }
   if (obj.type === 'assistant' && Array.isArray(obj.message?.content)) {

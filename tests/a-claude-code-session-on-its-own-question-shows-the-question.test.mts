@@ -53,8 +53,11 @@ describe("Claude Code's own question", () => {
     expect(choicesArePressed(agent)).toBe(true);
     expect(agentLayout(agent).choices).toEqual(['Keep both', 'Switch']);
   });
-  it('once answered it is gone', () => {
-    expect(read([user(0, 'x'), asks(6, 'q1'), answered(9, 'q1')]).question).toEqual([]);
+  it('once answered it is gone, and her pick counts as her answer', () => {
+    const f = read([user(0, 'x'), asks(6, 'q1'), answered(9, 'q1')]);
+    expect(f.question).toEqual([]);
+    expect(f.asked.at(-1)).toEqual({ at: T + 9_000, text: 'date-fns' });
+    expect(answeredWhereItRuns({ status: 'busy', saidAt: T + 5_000, asked: f.asked })).toBe(true);
   });
   it('a new message from her clears it too', () => {
     expect(read([user(0, 'x'), asks(6, 'q1'), user(20, 'actually use Temporal')]).question).toEqual([]);
