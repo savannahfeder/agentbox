@@ -37,6 +37,7 @@ import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
+import { ownUseReader } from './own-use.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { startMemoryRecorder } from './memory-recorder.mts';
 import { threadHeaps } from './thread-heaps.mts';
@@ -467,6 +468,10 @@ async function createWindow() {
     ensurePersonalProject(config.accountRoot);
   } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
+  try {
+    const closed = store.closeShippedThreads();
+    if (closed) console.log(`zero: closed ${closed} shipped thread(s) that only offered closing`);
+  } catch (err) { console.warn(`zero: could not close shipped threads: ${(err as Error).message}`); }
   // Where the window's own pictures may come from (main/img-scheme.mts). The
   // account root holds every product's docs, attachments, designs and the
   // `.staging` folder a pasted screenshot lands in; a product's repo is where a
@@ -487,6 +492,7 @@ async function createWindow() {
   supervisor.idleMs = () => powerMonitor.getSystemIdleTime() * 1000;
   const stalls = stallWatch();
   supervisor.stalls = stalls;
+  supervisor.ownUse = ownUseReader(() => app.getAppMetrics());
   // AND WHICH OF OUR FUNCTIONS HELD THE THREAD, each time it froze.
   const freezes = startFreezeRecorder({
     dir: path.join(userDir, 'memory-log'),

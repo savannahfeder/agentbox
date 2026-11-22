@@ -22,6 +22,8 @@ export const NARROWEST = 340;
 const GAP = 8;
 /** Air between the card and a box it stands beside. */
 export const SIDE_GAP = 16;
+/** The bordered box around a reply, chat or new-thread box, wider than the words inside it. */
+const FRAME = '.dock-card, .rm-compose, .tc-card';
 
 type Box = { left: number; right: number; top: number; bottom: number };
 
@@ -63,7 +65,7 @@ export function roomForTheCard(el: HTMLElement): () => void {
     // `.dock-pill` is the Reply box folded: it is a button until it is pressed.
     const boxes = [...document.querySelectorAll('textarea, [contenteditable="true"], .dock-pill')]
       .filter((box) => !el.contains(box))
-      .map((box) => box.getBoundingClientRect());
+      .map((box) => (box.closest(FRAME) ?? box).getBoundingClientRect());
     const place = cardPlace(corner, boxes, window.innerHeight);
     root.style.setProperty(LIFT, `${place.lift}px`);
     root.style.setProperty(WIDTH, `${place.width}px`);

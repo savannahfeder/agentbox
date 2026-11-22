@@ -258,6 +258,7 @@ contextBridge.exposeInMainWorld('zero', {
   gitHubBrowserSignIn: () => ipcRenderer.invoke('zero:github-browser-sign-in'),
   gitHubCloudSignIn: (payload) => ipcRenderer.invoke('zero:github-cloud-sign-in', payload),
   signInAnswer: (payload) => ipcRenderer.invoke('zero:sign-in-answer', payload),
+  signInKeep: (payload) => ipcRenderer.invoke('zero:sign-in-keep', payload),
   cloudSendFile: (payload) => ipcRenderer.invoke('zero:cloud-send-file', payload),
   cloudSendCode: (payload) => ipcRenderer.invoke('zero:cloud-send-code', payload),
   cloudFileInfo: (payload) => ipcRenderer.invoke('zero:cloud-file-info', payload),
