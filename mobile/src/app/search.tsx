@@ -14,7 +14,7 @@ import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
 import { useLook } from '../state/look';
 import { SettingsProvider, useSettings, type SettingsState } from '../state/settings';
-import { PriorityBars, T, Wall } from '../ui/parts';
+import { Caps, PriorityBars, T, Wall } from '../ui/parts';
 import { SETTINGS_PAGES } from '../ui/SettingsPages';
 import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
@@ -70,7 +70,7 @@ function computerFacts(s: SettingsState): ComputerFacts | null {
 }
 
 const Label = ({ children }: { children: string }) => (
-  <T style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 4, fontFamily: font.semibold, fontSize: 13, color: color.faint }}>{children}</T>
+  <Caps style={{ paddingHorizontal: size.inset, paddingTop: 18, paddingBottom: 4 }}>{children}</Caps>
 );
 
 function CommandRow({ label, aside, onPress }: { label: string; aside?: string; onPress: () => void }) {

@@ -63,9 +63,9 @@ describe('the phone app\'s type', () => {
     expect(all.filter((f) => /Newsreader|font\.display/.test(read(f)))).toEqual([]);
     expect(read('mobile/package.json')).not.toMatch(/newsreader/i);
   });
-  it('still names a screen large and heavy, in Geist', () => {
+  it('still names a screen large, in Geist', () => {
     const parts = read('mobile/src/ui/parts.tsx');
-    expect(parts).toMatch(/fontFamily: font\.semibold, fontSize: 28, lineHeight: 34/);
+    expect(parts).toMatch(/fontFamily: font\.medium, fontSize: 30, lineHeight: 36/);
   });
 });
 

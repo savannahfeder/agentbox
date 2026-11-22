@@ -17,6 +17,8 @@ export const LIGHT = {
   lineStrong: 'rgba(17, 25, 48, 0.16)',
   rowLine: 'rgba(17, 25, 48, 0.08)',
   fill: 'rgba(17, 25, 48, 0.04)',
+  // `fill` over the page, as one solid colour: a round button, which the wall must not show through.
+  round: '#efeff2',
   picked: 'rgba(17, 25, 48, 0.07)',
   film: 'rgba(17, 25, 48, 0.05)',
   pop: '#fefefe',
@@ -35,9 +37,11 @@ export const LIGHT = {
   minusBed: 'rgba(192, 80, 60, 0.09)',
   // How dark a floating card's shadow is.
   shade: 0.1,
-  // Ember Grid's wall: how strong its dots and its orange glow are. Light's page is plain.
+  // Ember Grid's wall: how strong its dots and its orange glow are.
   dots: 0,
   glow: 0,
+  // The website's orange halftone, in the page's top corner.
+  halftone: 0.34,
 };
 
 export type Palette = typeof LIGHT;
@@ -52,6 +56,7 @@ export const DARK: Palette = {
   lineStrong: '#52504f',
   rowLine: 'rgba(70, 68, 67, 0.375)',
   fill: 'rgba(255, 255, 255, 0.04)',
+  round: '#232120',
   picked: 'rgba(255, 255, 255, 0.08)',
   film: 'rgba(255, 255, 255, 0.07)',
   pop: '#363431',
@@ -70,6 +75,7 @@ export const DARK: Palette = {
   shade: 0.5,
   dots: 0.055,
   glow: 0.075,
+  halftone: 0,
 };
 
 /** The colours every screen reads. Light until a look is worn. */

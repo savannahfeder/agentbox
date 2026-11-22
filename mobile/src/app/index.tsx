@@ -34,7 +34,7 @@ import { Waiting } from '../ui/LogoOrbit';
 import { repeatRow, repeatTag } from '../../../renderer/src/repeat-words';
 import type { PhoneRepeat } from '../../../renderer/src/phone-repeats';
 import { barsFor, PriorityRows } from '../ui/Pickers';
-import { footRoom, IconButton, Squish, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
+import { Caps, footRoom, IconButton, Squish, PriorityBars, RunningMark, SheetRow, T, TopBar, Wall } from '../ui/parts';
 import { color, corner, font, lift, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
@@ -62,12 +62,8 @@ const nameLine = { flexDirection: 'row', alignItems: 'center', gap: 7 } as const
 /** A row's small second line: project, who, how long ago. */
 const metaWords = () => ({ fontSize: 13.5, lineHeight: 18, color: color.faint });
 const Dot = () => <T style={metaWords()}>·</T>;
-/** What a row waits on, in a chip. */
-const Chip = ({ children }: { children: string }) => (
-  <View style={{ height: 22, paddingHorizontal: 8, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: color.picked }}>
-    <T style={{ fontSize: 12, lineHeight: 16, fontFamily: font.medium, color: color.dim }}>{children}</T>
-  </View>
-);
+/** What a row waits on, as the website writes a status: `mine` is what waits on you, in the orange. */
+const Chip = ({ children, mine = false }: { children: string; mine?: boolean }) => <Caps tint={mine ? color.accent : color.dim} style={{ lineHeight: 18 }}>{children}</Caps>;
 
 function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unread: boolean; mate: Teammate | null }) {
   const pick = useContext(Picking);
@@ -98,7 +94,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
         {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin /></View>}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
-        {!!aside && <Chip>{aside}</Chip>}
+        {!!aside && <><Chip mine={!row.held}>{aside}</Chip><Dot /></>}
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
         {row.queued && <><T style={{ ...meta, color: color.dim }}>Queued</T><Dot /></>}
         {row.away && <><T style={{ ...meta, color: color.dim }}>Computer offline</T><Dot /></>}
@@ -149,7 +145,8 @@ function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; tex
       </View>
       <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 2 }}>{text}</T>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
-        <Chip>Asks you</Chip>
+        <Chip mine>Asks you</Chip>
+        <Dot />
         <T style={meta}>{updatedWords(at, now)}</T>
       </View>
     </Pressable>
@@ -161,7 +158,7 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: Wo
   const meta = metaWords();
   return (
     <View style={{ paddingBottom: 8 }}>
-      <T style={{ paddingHorizontal: size.inset, paddingTop: 14, paddingBottom: 2, fontFamily: font.semibold, fontSize: 13, color: color.faint }}>Repeating</T>
+      <Caps style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 2 }}>Repeating</Caps>
       {repeats.map((r, i) => {
         const last = r.lastOccurrence ? items.find((it) => it.id === r.lastOccurrence) ?? null : null;
         const words = repeatRow(r, last, now);
@@ -175,6 +172,7 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: Wo
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
               <Chip>{repeatTag(r)}</Chip>
+              <Dot />
               {r.waiting && <><T style={{ ...meta, color: color.dim }}>Queued</T><Dot /></>}
               <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{r.productName}</T>
               <Dot />
@@ -239,7 +237,7 @@ function Outlined({ label, onPress, lead }: { label: string; onPress: () => void
   );
 }
 
-const H2 = ({ children }: { children: string }) => <T style={{ fontFamily: font.semibold, fontSize: 22, lineHeight: 28, letterSpacing: -0.4, marginBottom: 10 }}>{children}</T>;
+const H2 = ({ children }: { children: string }) => <T style={{ fontFamily: font.medium, fontSize: 22, lineHeight: 28, letterSpacing: -0.8, marginBottom: 10 }}>{children}</T>;
 
 /** The empty inbox is where the next thread starts: the New thread form drawn open on the page (Pages.tsx `InboxClear`). */
 function InboxClear() {

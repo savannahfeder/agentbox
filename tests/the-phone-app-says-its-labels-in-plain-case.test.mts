@@ -3,6 +3,8 @@
 // and mostly mono at 10 to 12px, the desktop's look at phone width, which read
 // as a terminal rather than an app. Part of "a redesign of everything".
 // Measured by counting `textTransform: 'uppercase'` in mobile/src: 16.
+// The website's small label came back later the same day as one component,
+// `Caps` in ui/parts.tsx, for a section's heading and what a row waits on.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,11 +13,11 @@ const files = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: tr
 const all = files('mobile/src');
 
 describe('a label on the phone', () => {
-  it('is never forced to uppercase', () => {
-    expect(all.filter((f) => /textTransform: 'uppercase'/.test(fs.readFileSync(f, 'utf8')))).toEqual([]);
+  it('is forced to uppercase in one component and nowhere else', () => {
+    expect(all.filter((f) => /textTransform: 'uppercase'/.test(fs.readFileSync(f, 'utf8')))).toEqual(['mobile/src/ui/parts.tsx']);
   });
-  it('is not smaller than 12px where it used to be a mono cap', () => {
-    for (const f of all) expect(fs.readFileSync(f, 'utf8'), f).not.toMatch(/fontFamily: font\.mono, fontSize: 1[01](\.\d)?, (lineHeight: [\d.]+, )?letterSpacing/);
+  it('is not a mono cap smaller than 12px outside that component', () => {
+    for (const f of all) expect(fs.readFileSync(f, 'utf8').replace(/export function Caps\([\s\S]*?\n}\n/, ''), f).not.toMatch(/fontFamily: font\.mono, fontSize: 1[01](\.\d)?, (lineHeight: [\d.]+, )?letterSpacing/);
   });
 });
 

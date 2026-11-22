@@ -11,8 +11,8 @@ const field = fs.readFileSync('mobile/src/ui/Field.tsx', 'utf8');
 const fn = (name: string) => first.slice(first.indexOf(`export function ${name}(`), first.indexOf('\n}\n', first.indexOf(`export function ${name}(`)));
 
 describe('a first-run screen', () => {
-  it('is headed large and heavy', () => {
-    expect(fn('Head')).toMatch(/fontFamily: font\.semibold, fontSize: 3\d/);
+  it('is headed large', () => {
+    expect(fn('Head')).toMatch(/fontFamily: font\.medium, fontSize: 3\d/);
   });
   it('takes its corners from the phone\'s own, not a pair of its own', () => {
     expect(first).not.toMatch(/export const CORNER/);

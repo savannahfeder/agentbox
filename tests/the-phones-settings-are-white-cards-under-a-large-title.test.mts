@@ -10,8 +10,8 @@ const parts = fs.readFileSync('mobile/src/ui/SettingsParts.tsx', 'utf8');
 const fn = (name: string) => parts.slice(parts.indexOf(`export function ${name}`), parts.indexOf('\n}\n', parts.indexOf(`export function ${name}`)));
 
 describe('a settings page', () => {
-  it('is named large and heavy under a round way back', () => {
-    expect(fn('Page')).toMatch(/fontFamily: font\.semibold, fontSize: 28/);
+  it('is named large under a round way back', () => {
+    expect(fn('Page')).toMatch(/fontFamily: font\.medium, fontSize: 30/);
     expect(fn('Page')).toMatch(/<IconButton label=\{back\} onPress=\{leave\}><Back size=\{16\} \/><\/IconButton>/);
   });
   it('keeps its room under the last row for a permission card', () => {
@@ -20,10 +20,10 @@ describe('a settings page', () => {
 });
 
 describe('a group of settings', () => {
-  it('is a white card with no outline, under a small plain label', () => {
+  it('is a white card with no outline, under a small label', () => {
     expect(fn('Group')).toMatch(/backgroundColor: color\.card, borderRadius: corner\.card/);
     expect(fn('Group')).not.toMatch(/borderWidth/);
-    expect(fn('Group')).toMatch(/fontFamily: font\.semibold, fontSize: 13/);
+    expect(fn('Group')).toMatch(/<Caps style=\{\{ paddingHorizontal: 4/);
   });
 });
 

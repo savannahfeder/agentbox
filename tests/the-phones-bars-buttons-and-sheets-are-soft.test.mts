@@ -18,8 +18,8 @@ describe('the top bar', () => {
   it('has no line under it', () => {
     expect(bar).not.toMatch(/borderBottom/);
   });
-  it('names a screen large and heavy, and a screen you went into smaller', () => {
-    expect(bar).toMatch(/fontFamily: font\.semibold, fontSize: 28/);
+  it('names a screen large, and a screen you went into smaller and heavier', () => {
+    expect(bar).toMatch(/fontFamily: font\.medium, fontSize: 30/);
     expect(bar).toMatch(/left \? \{ fontFamily: font\.semibold, fontSize: 17/);
   });
   it('still brings a minimized permission card back', () => {
@@ -31,7 +31,7 @@ describe('the top bar', () => {
 describe('a button that is only a glyph', () => {
   it('is a soft round key, 36 across in a 40 tall reach', () => {
     expect(button).toMatch(/width: 36, height: 36, borderRadius: 18/);
-    expect(button).toMatch(/backgroundColor: bare \? 'transparent' : pressed \? color\.picked : color\.fill/);
+    expect(button).toMatch(/backgroundColor: bare \? 'transparent' : pressed \? color\.picked : color\.round/);
     expect(button).toMatch(/height: 40/);
   });
 });
@@ -48,9 +48,9 @@ describe('a sheet', () => {
     expect(sheet).toMatch(/pan\.panHandlers/);
     expect(sheet).toMatch(/<KeyboardAvoidingView behavior="padding"/);
   });
-  it('is headed in plain words, not uppercase mono', () => {
+  it('is headed by the one small label the phone has', () => {
+    expect(head).toMatch(/<Caps /);
     expect(head).not.toMatch(/uppercase|font\.mono/);
-    expect(head).toMatch(/font\.semibold/);
   });
   it('has rows a thumb can hit, ticked when picked', () => {
     expect(row).toMatch(/minHeight: 52/);

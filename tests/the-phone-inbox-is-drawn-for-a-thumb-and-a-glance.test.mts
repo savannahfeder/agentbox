@@ -44,8 +44,8 @@ describe('a row', () => {
     expect(fn('MentionRow')).toMatch(/<Face name=\{m\.byName \|\| 'Someone'\} size=\{FACE\} \/>/);
     expect(fn('QuestionRow')).toMatch(/<TeammateMark t=\{mate\} size=\{FACE\} \/>/);
   });
-  it('says what waits on you in a chip of its own', () => {
-    expect(fn('ThreadRow')).toMatch(/aside && <Chip>\{aside\}<\/Chip>/);
+  it('says what waits on you in a label of its own', () => {
+    expect(fn('ThreadRow')).toMatch(/aside && <><Chip mine=\{!row\.held\}>\{aside\}<\/Chip>/);
   });
 });
 

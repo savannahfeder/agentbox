@@ -10,7 +10,7 @@ import { useCloud } from '../state/cloud';
 import { Tick } from './icons';
 import { color, corner, font, lift, size } from './theme';
 
-/** The page behind every screen, the status bar included. Dark is Ember Grid's wall: the dot grid and the orange glow. */
+/** The page behind every screen, the status bar included. Dark is Ember Grid's wall, the dot grid and the orange glow; Light carries the website's orange halftone in its top corner. */
 export function Wall({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   return (
     <View style={[{ flex: 1, backgroundColor: color.bg }, style]}>
@@ -24,16 +24,33 @@ export function Wall({ children, style }: { children: ReactNode; style?: ViewSty
           <Rect width="100%" height="100%" fill="url(#d)" />
         </Svg>
       )}
+      {color.halftone > 0 && (
+        <Svg style={{ position: 'absolute', top: 0, right: 0 }} width={HALFTONE} height={HALFTONE} pointerEvents="none">
+          <Defs>
+            <Pattern id="h" width={7} height={7} patternUnits="userSpaceOnUse"><Circle cx={3.5} cy={3.5} r={1.5} fill={color.accent} fillOpacity={color.halftone} /></Pattern>
+            {/* The page's own colour over the dots, clear at the corner. */}
+            <RadialGradient id="f" cx="1" cy="0" r="1"><Stop offset="0" stopColor={color.bg} stopOpacity={0} /><Stop offset="0.5" stopColor={color.bg} stopOpacity={0.7} /><Stop offset="1" stopColor={color.bg} stopOpacity={1} /></RadialGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#h)" />
+          <Rect width="100%" height="100%" fill="url(#f)" />
+        </Svg>
+      )}
       {children}
     </View>
   );
 }
+const HALFTONE = 220;
 
 // The room under a bottom bar: the whole home bar, as iOS's own tab bars keep it.
 export const footRoom = (inset: { bottom: number }) => Math.max(8, inset.bottom);
 
 export function T({ style, ...rest }: TextProps) {
   return <Text {...rest} style={[{ fontFamily: font.regular, color: color.text, fontSize: 15.5 }, style]} />;
+}
+
+/** The website's small label: mono capitals, spaced out. A section's heading, what a row waits on. */
+export function Caps({ children, tint, style }: { children: ReactNode; tint?: string; style?: TextProps['style'] }) {
+  return <Text style={[{ fontFamily: font.mono, fontSize: 11, lineHeight: 16, letterSpacing: 1.3, textTransform: 'uppercase', color: tint ?? color.faint }, style]}>{children}</Text>;
 }
 
 /** The top bar: no line, a screen's name large and heavy, or a smaller name
@@ -43,7 +60,7 @@ export function TopBar({ left, title, right, below, noReview = false }: { left?:
   const { view, minimizedApproval, setMinimizedApproval } = useCloud();
   // A thread's bar has no room for it; the inbox's bar still brings the card back.
   const aside = !noReview && view.approvals.findIndex((a: { id: string }) => a.id === minimizedApproval) === 0;
-  const name = left ? { fontFamily: font.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, paddingLeft: 8 } : { fontFamily: font.semibold, fontSize: 28, lineHeight: 34, letterSpacing: -0.7 };
+  const name = left ? { fontFamily: font.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, paddingLeft: 8 } : { fontFamily: font.medium, fontSize: 30, lineHeight: 36, letterSpacing: -1.2 };
   return (
     <View style={{ paddingTop: inset.top }}>
       <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: left ? 12 : size.inset, paddingRight: 14 }}>
@@ -69,7 +86,7 @@ export function IconButton({ onPress, label, children, bare = false }: { onPress
   return (
     <Pressable onPress={onPress} accessibilityLabel={label} accessibilityRole="button" hitSlop={6} style={{ height: 40, justifyContent: 'center' }}>
       {({ pressed }) => (
-        <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: bare ? 'transparent' : pressed ? color.picked : color.fill, opacity: bare && pressed ? 0.5 : 1 }}>
+        <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: bare ? 'transparent' : pressed ? color.picked : color.round, opacity: bare && pressed ? 0.5 : 1 }}>
           {children}
         </View>
       )}
@@ -167,7 +184,7 @@ function SheetBody({ close, slide, children }: { close: () => void; slide: Anima
   );
 }
 export const SheetHead = ({ children }: { children: string }) => (
-  <T style={{ fontFamily: font.semibold, fontSize: 13, lineHeight: 18, color: color.faint, paddingTop: 6, paddingHorizontal: 14, paddingBottom: 6 }}>{children}</T>
+  <Caps style={{ paddingTop: 8, paddingHorizontal: 14, paddingBottom: 6 }}>{children}</Caps>
 );
 export const SheetSep = () => <View style={{ height: 1, backgroundColor: color.line, marginVertical: 6, marginHorizontal: 14 }} />;
 export function SheetRow({ label, on, aside, lead, onPress }: { label: string; on?: boolean; aside?: string; lead?: ReactNode; onPress: () => void }) {

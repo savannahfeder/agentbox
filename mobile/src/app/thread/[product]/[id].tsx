@@ -53,7 +53,7 @@ import { agentChoices, laterHint, momentFromWords } from '../../../../../rendere
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
 import { Selectable } from '../../../ui/Selectable';
-import { ChoiceButton, footRoom, IconButton, PriorityBars, RunningMark, SendKey, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
+import { Caps, ChoiceButton, footRoom, IconButton, PriorityBars, RunningMark, SendKey, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
 import { barsFor, ModelSheet, ModeSheet, PrioritySheet } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
@@ -510,7 +510,7 @@ export default function ThreadScreen() {
           onLayout={() => { if (resting.current) scroll.current?.scrollToEnd({ animated: false }); }}>
           {/* The name heads the page, the largest type on it, with the Context under a thin line (one-thing-at-a-time.css). */}
           <View style={{ marginBottom: 18 }}>
-            <T selectable style={{ fontFamily: font.semibold, fontSize: 26, lineHeight: 32, letterSpacing: -0.6, marginBottom: 8 }}>{page.title}</T>
+            <T selectable style={{ fontFamily: font.medium, fontSize: 26, lineHeight: 32, letterSpacing: -1, marginBottom: 8 }}>{page.title}</T>
             {page.toggle && (
               <Pressable onPress={() => { const open = !earlierOpen; setEarlierOpen(open); setWhole(true); resting.current = open; }} accessibilityRole="button" hitSlop={6} style={{ alignSelf: 'flex-start', marginBottom: 10 }}>
                 <T style={{ fontSize: 13.5, lineHeight: 18, fontFamily: font.medium, color: color.faint }}>{page.toggle}</T>
@@ -550,7 +550,7 @@ export default function ThreadScreen() {
                   <T style={{ fontSize: 12.5, color: color.faint }}>{when(thread.outcome.at)}</T>
                 </View>
               ) : thread.outcome.label && (
-                <T style={{ fontSize: 13, fontFamily: font.semibold, color: color.faint, marginBottom: 7 }}>{thread.outcome.label}</T>
+                <Caps style={{ marginBottom: 7 }}>{thread.outcome.label}</Caps>
               )}
               <Markdown text={thread.outcome.text} dir={dir} files={files} />
             </View>

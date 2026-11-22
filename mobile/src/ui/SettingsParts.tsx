@@ -9,7 +9,7 @@ import Svg, { Path } from 'react-native-svg';
 import type { Reading } from '../lib/settings-view';
 import { useCloud } from '../state/cloud';
 import { Back, Caret } from './icons';
-import { IconButton, Sheet, SheetHead, SheetRow, T, Wall } from './parts';
+import { Caps, IconButton, Sheet, SheetHead, SheetRow, T, Wall } from './parts';
 import { color, corner, font, lift, size } from './theme';
 
 export function Page({ title, lede, back = 'Settings', right, head, children }: { title: string; lede?: string; back?: string; /** At the right of the Back row. */ right?: ReactNode; /** Takes the Back row's place (Settings' search field). */ head?: ReactNode; children: ReactNode }) {
@@ -30,7 +30,7 @@ export function Page({ title, lede, back = 'Settings', right, head, children }: 
         </View>
       </View>
       <ScrollView contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 16, paddingBottom: Math.max(40 + inset.bottom, approvalRoom + 16) }}>
-        <T style={{ fontFamily: font.semibold, fontSize: 28, lineHeight: 34, letterSpacing: -0.7, paddingHorizontal: 4 }}>{title}</T>
+        <T style={{ fontFamily: font.medium, fontSize: 30, lineHeight: 36, letterSpacing: -1.2, paddingHorizontal: 4 }}>{title}</T>
         {lede ? <T style={{ fontSize: 15, lineHeight: 21, color: color.faint, marginTop: 6, paddingHorizontal: 4 }}>{lede}</T> : null}
         {children}
       </ScrollView>
@@ -42,7 +42,7 @@ export function Page({ title, lede, back = 'Settings', right, head, children }: 
 export function Group({ label, note, children }: { label?: string; note?: string | null; children: ReactNode }) {
   return (
     <View style={{ marginTop: 28 }}>
-      {label ? <T style={{ fontFamily: font.semibold, fontSize: 13, color: color.faint, paddingHorizontal: 4, paddingBottom: 8 }}>{label}</T> : null}
+      {label ? <Caps style={{ paddingHorizontal: 4, paddingBottom: 8 }}>{label}</Caps> : null}
       {note ? <T style={{ marginTop: -2, paddingHorizontal: 4, paddingBottom: 10, fontSize: 13.5, lineHeight: 19, color: color.dim }}>{note}</T> : null}
       <View style={{ backgroundColor: color.card, borderRadius: corner.card, paddingHorizontal: 16 }}>{children}</View>
     </View>

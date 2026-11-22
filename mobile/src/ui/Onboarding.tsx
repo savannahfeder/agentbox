@@ -33,7 +33,7 @@ export function Screen({ children, foot, top = 72, back }: { children: ReactNode
 export const Logo = ({ size = 36 }: { size?: number }) => <View accessible accessibilityLabel="Agentbox"><AppMark size={size} /></View>;
 
 export function Head({ children, style }: { children: ReactNode; style?: object }) {
-  return <T accessibilityRole="header" style={[{ fontFamily: font.semibold, fontSize: 30, lineHeight: 36, letterSpacing: -0.8 }, style]}>{children}</T>;
+  return <T accessibilityRole="header" style={[{ fontFamily: font.medium, fontSize: 32, lineHeight: 38, letterSpacing: -1.3 }, style]}>{children}</T>;
 }
 
 export const Lede = ({ children, style }: { children: ReactNode; style?: object }) => (

@@ -9,7 +9,7 @@ import { projectChoices, type Display, type UpdatedWindow } from '../../../rende
 import type { Product, ThreadStateWord, WorkItem } from '../../../renderer/src/types';
 import { phoneFiltered, type Harness } from '../lib/agent-filter';
 import { barsFor } from './Pickers';
-import { PriorityBars, T } from './parts';
+import { Caps, PriorityBars, T } from './parts';
 import { color, corner, font, lift, size } from './theme';
 
 type P = { size?: number; tint?: string };
@@ -58,7 +58,7 @@ function Choice({ label, on, onPress, lead }: { label: string; on: boolean; onPr
 function Line({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View style={{ paddingVertical: 8, paddingHorizontal: 16 }}>
-      <T style={{ fontSize: 13, lineHeight: 18, fontFamily: font.semibold, color: color.faint, marginBottom: 8 }}>{label}</T>
+      <Caps style={{ marginBottom: 8 }}>{label}</Caps>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>{children}</View>
     </View>
   );
