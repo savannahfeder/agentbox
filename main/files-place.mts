@@ -24,6 +24,7 @@ import type { LineVersion, VersionLine } from './version-line.mts';
 import type { SavedVersion } from './file-version.mts';
 import type { Store, StoreProduct } from './store.mts';
 import type { FilesKeeper, KeptVersion } from './files-cloud.mts';
+import { looseFilesIn } from './files-loose.mts';
 import type { createTeamService } from './team/index.mts';
 
 type FilesTeam = ReturnType<typeof createTeamService>;
@@ -147,6 +148,9 @@ const toCloudFamily = (family: string): string => family.split('\0').map(encodeU
 const fromCloudFamily = (family: unknown): string => String(family).split('/').map(decodeURIComponent).join('\0');
 const CROSS_EVERY_MS = 10_000;
 const UNDO_KEEP_MS = 10 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
+// A thread its agent may still work on: its folder stays on this computer.
+const OPEN_STATUSES = new Set(['open', 'claimed', 'blocked']);
 // What New makes, and what it starts with: a table needs its columns to be typed into.
 const MADE: Record<MadeKind, { ext: string; seed: string; untitled: string }> = {
   document: { ext: '.md', seed: '', untitled: 'Untitled document' },
@@ -935,16 +939,44 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         out.push({ hash: v.hash, size: st.size, paths, kind: whole.kind, at: v.at || st.mtimeMs, name: v.name, movable: paths.every((p) => movableIn(roots, p)) });
       }
     }
+    return [...out, ...await looseVersions(out, roots)];
+  }
+
+  // Most of what agents make is never named one by one, and threads old enough
+  // drop off the list the app reads, so their folders are looked through too.
+  // Only what is old enough to leave is weighed: hashing the rest is wasted.
+  async function looseVersions(named: readonly KeptVersion[], roots: Roots): Promise<KeptVersion[]> {
+    const { offAfterDays } = keeper!.status();
+    if (offAfterDays <= 0) return [];
+    const before = Date.now() - offAfterDays * DAY_MS;
+    const working = new Set(store.listAllWorkItems().filter((i) => OPEN_STATUSES.has(i.status)).map((i) => `${i.product}/${i.id}`));
+    const claimed = new Set(named.flatMap((v) => v.paths.map(realOr)));
+    const places = [
+      ...store.listProducts().filter((p) => p.dir).map((p) => ({ dir: p.dir, slug: p.slug as string | null, skip: p.repoPath ? [p.repoPath] : [] })),
+      { dir: path.join(logDir(), '.file-versions', 'version-bytes'), slug: null, skip: [] },
+    ];
+    const out: KeptVersion[] = [];
+    for (const place of places) {
+      for (const f of await looseFilesIn(place.dir, { skip: place.skip })) {
+        if (f.at >= before || (place.slug && f.thread && working.has(`${place.slug}/${f.thread}`)) || claimed.has(realOr(f.path))) continue;
+        const bytes = await lineNow().hashOf(f.path);
+        if (!bytes) continue;
+        out.push({ hash: bytes.hash, size: bytes.size, paths: [f.path], kind: f.kind, at: f.at, name: path.basename(f.path), movable: movableIn(roots, f.path), loose: true });
+      }
+    }
     return out;
   }
   const CONSIDER_EVERY_MS = 10 * 60_000;
   let consideredAt = 0;
-  function consider(force = false): void {
-    if (!keeper || (!force && Date.now() - consideredAt < CONSIDER_EVERY_MS)) return;
+  let considering: Promise<void> | null = null;
+  function consider(force = false): Promise<void> {
+    if (!keeper || considering || (!force && Date.now() - consideredAt < CONSIDER_EVERY_MS)) return considering ?? Promise.resolve();
     consideredAt = Date.now();
     // Without a plan for files a pass needs no versions: it only brings back what an ended plan kept.
-    void keeper.wantsVersions().then(async (want) => keeper.pass(want ? await keptVersions() : []))
-      .catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); });
+    considering = keeper.wantsVersions().then(async (want) => keeper.pass(want ? await keptVersions() : []))
+      .catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); })
+      .finally(() => { considering = null; });
+    return considering;
   }
 
   // Shared and group threads are only listed with a team, and a group's only with its rooms.
@@ -1404,7 +1436,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return { ok: true, back };
     },
 
-    /** A thread's files kept in the cloud, brought back as its agent starts. False when one could not come in time. */
+    /** A thread's files kept in the cloud, and its own folder's, brought back as its agent starts. False when one could not come in time. */
     async bringBackFor({ product, id, deadlineMs = 5 * 60_000 }: { product: string; id: string; deadlineMs?: number }): Promise<boolean> {
       if (!keeper || !keeper.status().offBytes) return true;
       const waits: Promise<boolean>[] = [];
@@ -1412,6 +1444,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         const { chain } = await lineChain(whole);
         for (const v of chain) if (v.hash && !v.opened && keeper.off(v.hash)) waits.push(keeper.bringBack(v.hash));
       }
+      const own = store.listProducts().find((p) => p.slug === product)?.dir;
+      if (own) for (const hash of keeper.offUnder(path.join(own, 'designs', id))) waits.push(keeper.bringBack(hash));
       if (!waits.length) return true;
       let timer: NodeJS.Timeout | undefined;
       const late = new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), deadlineMs); timer.unref?.(); });
