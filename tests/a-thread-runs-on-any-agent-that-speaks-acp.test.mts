@@ -22,7 +22,8 @@ const FAKE = path.join(import.meta.dirname, 'fixtures', 'fake-acp-agent.mjs');
 
 let dir = '';
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'acp-worker-')); });
-afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+// The stand-in agent writes its log here until it has gone, which can be a moment after the worker's exit.
+afterEach(() => { endAgentsWithTheApp(); fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
 interface Opts { env?: Record<string, string>; resume?: string | null; model?: string | null; ask?: ((approval: AcpApproval) => Promise<boolean>) | null }
 

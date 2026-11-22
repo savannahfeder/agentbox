@@ -28,7 +28,8 @@ beforeEach(() => {
   // The harness starts whatever its binary is; this one is the stand-in.
   fs.writeFileSync(path.join(dir, 'opencode'), `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" "$@"\n`, { mode: 0o755 });
 });
-afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+// The stand-in agent writes its log here until it has gone, which can be a moment after the worker's exit.
+afterEach(() => { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
 
 /** One turn of a thread on OpenCode, with a supervisor that records the cards it is asked to raise. */
 function turn(prompt: string, { allow = true, resumeId = null as string | null, system = 'Keep answers short.', answerMode = null as string | null } = {}) {

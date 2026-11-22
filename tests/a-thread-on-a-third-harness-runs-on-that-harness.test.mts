@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
+import { endAgentsWithTheApp } from '../main/acp-worker.mts';
 import { listPending } from '../main/approvals.mts';
 import { foldWorkItems } from '../shared/work-items.mts';
 import { ENGINES, isEngine, engineFor, availableEngines, HARNESSES_IN_TESTING_ENV, ENGINE_CHOICE_ENABLED } from '../shared/engines.mts';
@@ -37,10 +38,12 @@ beforeEach(() => {
 afterEach(() => {
   try { sup?._closeCodex?.('the test is over'); } catch { /* nothing open */ }
   for (const session of sup?.sessions?.values?.() ?? []) { try { session.child.kill(); } catch { /* gone */ } }
+  // A stopped worker's agent is signalled only after a grace; one still writing here fails the folder's removal on a Mac.
+  endAgentsWithTheApp();
   sup = null;
   delete process.env.FAKE_ACP_LOG;
   delete process.env.FAKE_ACP_STATE;
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 interface Recorded { id: string; result?: string }

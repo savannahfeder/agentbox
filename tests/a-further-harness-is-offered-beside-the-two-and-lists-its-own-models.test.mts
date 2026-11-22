@@ -19,6 +19,7 @@ import path from 'node:path';
 import { Supervisor } from '../main/supervisor.mts';
 import { loadConfig } from '../main/config.mts';
 import { modelRows } from '../main/harnesses/acp.mts';
+import { endAgentsWithTheApp } from '../main/acp-worker.mts';
 import { foldWorkItems } from '../shared/work-items.mts';
 import { engineChoiceSince } from '../shared/engines.mts';
 
@@ -29,18 +30,23 @@ const FAKE_MODELS = [{ id: 'fake/small', label: 'Small' }, { id: 'fake/large', l
 
 let dir = '';
 let sup: Supervisor | null = null;
+let recorded: string[] = [];
 beforeEach(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'further-harness-'));
   for (const sub of ['project', 'store', 'user']) fs.mkdirSync(path.join(dir, sub));
   fs.writeFileSync(path.join(dir, 'opencode'), `#!/bin/sh\nexec "${process.execPath}" "${FAKE}" "$@"\n`, { mode: 0o755 });
   process.env.FAKE_ACP_LOG = path.join(dir, 'log.jsonl');
+  recorded = [];
 });
 afterEach(() => {
   try { sup?._closeCodex?.('the test is over'); } catch { /* nothing open */ }
   for (const session of sup?.sessions?.values?.() ?? []) { try { session.child.kill(); } catch { /* gone */ } }
+  // A stopped worker's agent is signalled only after a grace, and one still
+  // writing its log here made the folder's removal fail on a Mac (ENOTEMPTY).
+  endAgentsWithTheApp();
   sup = null;
   delete process.env.FAKE_ACP_LOG;
-  fs.rmSync(dir, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 function build({ codexBin = '/nonexistent/codex' as string | null, opencodeBin = path.join(dir, 'opencode') as string | null } = {}) {
@@ -50,15 +56,15 @@ function build({ codexBin = '/nonexistent/codex' as string | null, opencodeBin =
       home: dir, storeRoot: path.join(dir, 'store'), claudeBin: '/nonexistent/claude', claudeFound: true, codexBin,
       opencodeBin, engineChoice: OPENED, maxConcurrentSessions: 4, authProfiles: ['default'],
     } as never,
-    { listItems: () => [], listProducts: () => [product], isDue: () => true, settleAnswer() {}, readItem: () => null, recordSessionResult() {} } as never,
+    { listItems: () => [], listProducts: () => [product], isDue: () => true, settleAnswer() {}, readItem: () => null, recordSessionResult: (_slug: string, id: string) => { recorded.push(id); } } as never,
     '/nonexistent-app', dir, path.join(dir, 'user'),
   );
   return sup;
 }
 
 /** A thread somebody wrote after the harness choice was opened. */
-function row(id: string, engine: string | null) {
-  const item = foldWorkItems([JSON.parse(JSON.stringify({ id, ts: Date.now(), source: 'founder', patch: { title: 'A thread', status: 'open', ...(engine ? { engine } : {}) } }))]).get(id);
+function row(id: string, engine: string | null, title = 'A thread') {
+  const item = foldWorkItems([JSON.parse(JSON.stringify({ id, ts: Date.now(), source: 'founder', patch: { title, status: 'open', ...(engine ? { engine } : {}) } }))]).get(id);
   return { ...item, product: 'sandbox' } as never;
 }
 
@@ -70,6 +76,9 @@ const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const logged = () => (fs.existsSync(path.join(dir, 'log.jsonl')) ? fs.readFileSync(path.join(dir, 'log.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
 const modelsFile = () => path.join(dir, 'user', 'harnesses', 'opencode', 'models.json');
 const further = (s: Supervisor) => (s.engineFacts() as { further?: { id: string; label: string; models: { id: string; label: string }[] }[] }).further;
+// Looking at the facts asks the tool for its models, in a process of its own
+// that writes into this test's folder. It is done once the list has arrived.
+const listArrived = (s: Supervisor) => until(() => further(s)?.[0].models.length, 'the model list arriving');
 
 describe('what the screens are told', () => {
   it('names Claude Code and Codex in the list every two-harness screen draws, and the third only in the list of where a thread may run', () => {
@@ -79,9 +88,10 @@ describe('what the screens are told', () => {
     expect(s.engineOffered('opencode')).toBe('opencode');
   });
 
-  it('tells them about the further harness in a list of its own, by name', () => {
-    const list = further(build());
-    expect(list?.map((e) => [e.id, e.label])).toEqual([['opencode', 'OpenCode']]);
+  it('tells them about the further harness in a list of its own, by name', async () => {
+    const s = build();
+    expect(further(s)?.map((e) => [e.id, e.label])).toEqual([['opencode', 'OpenCode']]);
+    await listArrived(s);
   });
 
   it('tells them exactly what it always did where the further harness was not found', () => {
@@ -91,12 +101,13 @@ describe('what the screens are told', () => {
     expect(s.engineOffered('opencode')).toBeNull();
   });
 
-  it('names the row that runs on it, also on a computer whose only other harness is Claude Code', () => {
+  it('names the row that runs on it, also on a computer whose only other harness is Claude Code', async () => {
     const s = build({ codexBin: null });
     expect(s.engineChoices().map((e) => e.id)).toEqual(['claude']);
     const facts = s.engineFacts([row('w-1', 'opencode'), row('w-2', null), row('w-3', 'claude')]);
     expect(facts.workspace).toBe('claude');
     expect(facts.byItem).toEqual({ 'w-1': 'opencode' });
+    await listArrived(s);
   });
 });
 
@@ -134,10 +145,12 @@ describe('the models it offers', () => {
     fs.writeFileSync(modelsFile(), JSON.stringify({ models: [{ id: 'gone/model', label: 'Gone' }] }));
     const s = build();
     expect(further(s)?.[0].models.map((m) => m.id)).toEqual(['gone/model']);
-    s.spawnWorker(row('w-1', 'opencode'));
+    s.spawnWorker(row('w-1', 'opencode', 'FAKE:SAY done'));
     await until(() => further(s)?.[0].models.length === 2, 'the list a conversation stated');
     expect(further(s)?.[0].models).toEqual(FAKE_MODELS);
     expect(JSON.parse(fs.readFileSync(modelsFile(), 'utf8')).models).toEqual(FAKE_MODELS);
+    // The list arrives when the conversation opens; the run is seen through before the folder goes.
+    await until(() => recorded.includes('w-1'), 'the run ending');
   });
 
   it('are asked for once when the tool will not start, not on every look at the screen', async () => {
