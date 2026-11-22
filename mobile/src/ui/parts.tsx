@@ -12,6 +12,7 @@ import { color, corner, font, lift, size } from './theme';
 
 /** The page behind every screen, the status bar included. Dark is Ember Grid's wall, the dot grid and the orange glow; Light carries the website's orange halftone in its top corner. */
 export function Wall({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+  const inset = useSafeAreaInsets();
   return (
     <View style={[{ flex: 1, backgroundColor: color.bg }, style]}>
       {color.glow > 0 && (
@@ -25,7 +26,7 @@ export function Wall({ children, style }: { children: ReactNode; style?: ViewSty
         </Svg>
       )}
       {color.halftone > 0 && (
-        <Svg style={{ position: 'absolute', top: 0, right: 0 }} width={HALFTONE} height={HALFTONE} pointerEvents="none">
+        <Svg style={{ position: 'absolute', top: 0, right: 0 }} width={HALFTONE} height={inset.top + size.topBar} pointerEvents="none">
           <Defs>
             <Pattern id="h" width={7} height={7} patternUnits="userSpaceOnUse"><Circle cx={3.5} cy={3.5} r={1.5} fill={color.accent} fillOpacity={color.halftone} /></Pattern>
             {/* The page's own colour over the dots, clear at the corner. */}

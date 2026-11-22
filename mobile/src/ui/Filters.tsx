@@ -25,7 +25,7 @@ export const Magnifier = ({ size: s = 15, tint = color.dim }: P) => (
 export function ViewButton({ display, agent = null, onPress, open }: { display: Display; agent?: Harness | null; onPress: () => void; open: boolean }) {
   return (
     <Pressable onPress={onPress} accessibilityLabel="View and filters" accessibilityRole="button" accessibilityState={{ expanded: open }} hitSlop={4}
-      style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: open ? color.graphite : pressed ? color.picked : color.fill })}>
+      style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: open ? color.graphite : pressed ? color.picked : color.round })}>
       <Sliders tint={open ? color.ink : color.dim} />
       {phoneFiltered(display, agent) && <View style={{ position: 'absolute', top: 1, right: 1, width: 8, height: 8, borderRadius: 4, backgroundColor: color.accent }} />}
     </Pressable>
