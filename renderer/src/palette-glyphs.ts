@@ -77,6 +77,11 @@ export const ICONS = {
   'priority-high': ['M6 19v-3M10.5 19v-6.5M15 19v-10'],
   'priority-urgent': ['M6 19v-3M10.5 19v-6.5M15 19v-10M19.5 19v-14'],
   chevron: ['m9 6 6 6-6 6'],
+  // A found thread's list, as light as Done's tick beside it. The dot is two
+  // rings so a stroke-only drawing comes out solid.
+  'list-waiting': [circle(12, 13, 1.2), circle(12, 13, 0.4)],
+  'list-running': [circle(6, 13, 0.55), circle(12, 13, 0.55), circle(18, 13, 0.55)],
+  'list-later': ['M7.5 13h9'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type IconName = keyof typeof ICONS;
@@ -184,8 +189,8 @@ const BY_PREFIX: [string, IconName][] = [
   ['wait-', 'wait'],
 ];
 
-// A found thread wears the icon its list's "Go to" row wears.
-const LIST_ICON: Record<ThreadStateWord, IconName> = { waiting: 'inbox', running: 'progress', scheduled: 'later', done: 'done' };
+// Not the Go to rows' tray, circled play and clock: beside the tick those read as large and round.
+const LIST_ICON: Record<ThreadStateWord, IconName> = { waiting: 'list-waiting', running: 'list-running', scheduled: 'list-later', done: 'done' };
 
 export function iconFor(row: { id: string; label: string; state?: ThreadStateWord }): IconName {
   if (row.state) return LIST_ICON[row.state];

@@ -5,13 +5,14 @@
 // found the grey confusing. Measured on the built renderer: a finished row's
 // icon, words and hint each had opacity 0.5, an open row's 1. Of the designs
 // shown next, they picked a tick on finished threads, and said the speech
-// bubble every other thread wore was not obvious. So each found thread now
-// wears the icon ⌘K's own "Go to" row draws for its list: Inbox, In progress,
-// Later or Done, the tick being Done's.
+// bubble every other thread wore was not obvious. The "Go to" rows' tray,
+// circled play and clock came next and were turned down as large and round
+// beside the tick's few thin lines. So the other lists are drawn as lightly as
+// the tick: a dot for Needs you, three dots for In progress, a dash for Later.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { threadResult } from '../renderer/src/palette-rows';
-import { iconFor } from '../renderer/src/palette-glyphs';
+import { ICONS, iconFor } from '../renderer/src/palette-glyphs';
 
 const NOW = new Date(2026, 10, 22, 12, 0).getTime();
 const min = 60_000;
@@ -24,16 +25,37 @@ const found = (more: Record<string, unknown> = {}, state: 'waiting' | 'running' 
 const goTo = (id: string) => iconFor({ id, label: '' });
 const rowIcon = (state: 'waiting' | 'running' | 'scheduled' | 'done') => iconFor({ id: 'thread-web-w-1', label: 'Landing page UI fixes', state });
 
-describe('a thread found by search wears its list’s icon', () => {
-  it('Done wears Go to Done’s tick', () => expect(rowIcon('done')).toBe(goTo('view-done')));
-  it('Needs you wears Go to Inbox’s', () => expect(rowIcon('waiting')).toBe(goTo('view-inbox')));
-  it('In progress wears Go to In progress’s', () => expect(rowIcon('running')).toBe(goTo('view-progress')));
-  it('Later wears Go to Later’s', () => expect(rowIcon('scheduled')).toBe(goTo('view-later')));
+const LISTS = ['waiting', 'running', 'scheduled', 'done'] as const;
+// Every arc's radius in a drawing: a ring or a clock face has a big one, a dot a small one.
+const arcs = (paths: readonly string[]) => paths.flatMap((d) => [...d.matchAll(/a([\d.]+)[ ,]([\d.]+)/g)].map((m) => Number(m[1])));
 
-  it('no two lists share an icon, and none is the speech bubble', () => {
-    const icons = (['waiting', 'running', 'scheduled', 'done'] as const).map(rowIcon);
+describe('a thread found by search wears its list’s mark', () => {
+  it('Done wears Go to Done’s tick', () => expect(rowIcon('done')).toBe(goTo('view-done')));
+
+  it('no two lists share a mark, and none is the speech bubble', () => {
+    const icons = LISTS.map(rowIcon);
     expect(new Set(icons).size).toBe(4);
     expect(icons).not.toContain('thread');
+  });
+
+  it('the other lists are not the Go to rows’ tray, circled play or clock', () => {
+    expect(rowIcon('waiting')).not.toBe(goTo('view-inbox'));
+    expect(rowIcon('running')).not.toBe(goTo('view-progress'));
+    expect(rowIcon('scheduled')).not.toBe(goTo('view-later'));
+  });
+
+  it('every mark is open lines or dots, with no ring, box or face', () => {
+    for (const state of LISTS) {
+      const paths = ICONS[rowIcon(state)];
+      expect(paths.some((d) => /z/i.test(d)), state).toBe(false);
+      for (const r of arcs(paths)) expect(r, state).toBeLessThanOrEqual(1.2);
+    }
+  });
+
+  it('the check itself catches the round ones it replaced', () => {
+    expect(Math.max(...arcs(ICONS[goTo('view-progress')]))).toBeGreaterThan(1.2);
+    expect(Math.max(...arcs(ICONS[goTo('view-later')]))).toBeGreaterThan(1.2);
+    expect(ICONS[goTo('view-inbox')].some((d) => /z/i.test(d))).toBe(true);
   });
 
   it('a row with no list, such as a repeating task, keeps its own icon', () => {
