@@ -78,9 +78,14 @@
 .asks-pop-foot { justify-content: flex-start; gap: 8px; }
 .asks-pop-foot .asks-when { margin-right: auto; }
 
-/* A HAND-OFF: the ask and everything it carries, as one message (HandOff.tsx). */
-.ask-bar.handoff { gap: 16px; }
+/* Who asked and their words, as a message of theirs reads in a thread (styles.css .msg-head). */
+.ask-bar-said { display: flex; flex-direction: column; gap: 6px; }
+
+/* A HAND-OFF: the ask and everything it carries, as one message (HandOff.tsx). What
+   their agent did sits below a line across the card, so it never reads as their words. */
+.ask-bar.handoff { gap: 18px; }
 .handoff .ask-bar-acts { margin-top: 2px; }
+.handoff-what { display: flex; flex-direction: column; gap: 16px; margin: 0 -22px; padding: 18px 22px 0; border-top: 1px solid var(--line); }
 .handoff-part .ts-h { margin: 0 0 8px; }
 .handoff .ts-trail { margin: 0; padding: 0; list-style: none; font-size: 14px; line-height: 21px; color: var(--text); }
 .handoff .ts-step { margin: 0 0 6px; padding-left: 16px; }

@@ -53,6 +53,22 @@ describe('a hand-off from a teammate', () => {
     expect(page).toContain('{!asked && <TeammateSummary card={card} owner={owner} files={files} />}');
   });
 
+  // The founder on the first version: a gap between "Theo asked for your review" and his words, and
+  // "it also feels like Theo might have written the stuff below". His words now sit under his name as
+  // a message of his does, and what his agent did is drawn apart, below a line across the card.
+  it('sets the teammate\'s words under their name, apart from what their agent did', () => {
+    const bar = fs.readFileSync(new URL('../renderer/src/team/AskBar.tsx', import.meta.url), 'utf8');
+    const css = fs.readFileSync(new URL('../renderer/src/team/asks.css', import.meta.url), 'utf8');
+    expect(bar).toMatch(/<div className="ask-bar-said">\s*<div className="ask-bar-head">[\s\S]*?<p className="ask-bar-note">\{ask\.note\}<\/p>[\s\S]*?<\/div>\}\s*\{children\}/);
+    expect(draw()).toMatch(/^<div class="handoff-what">/);
+    expect(css).toMatch(/\.ask-bar-said \{[^}]*gap: 6px/);
+    expect(css).toMatch(/\.handoff-what \{[^}]*border-top: 1px solid var\(--line\)/);
+  });
+
+  it('draws no line under the words when there is nothing to carry', () => {
+    expect(renderToStaticMarkup(React.createElement(HandOffWhat, { owner: 'Theo', tried: [], pictures: [], files: [], roots: [] }))).toBe('');
+  });
+
   it('has the whole thread above it to scroll up through, and the page lands on it', () => {
     expect(page).toMatch(/\{unfolded && before\.length > 0 && <FileMarkOpener\.Provider value=\{openMark\}>\s*<Thread events=\{before\}/);
     expect(page).toContain('<div ref={handOffEl}>{handOff}</div>');

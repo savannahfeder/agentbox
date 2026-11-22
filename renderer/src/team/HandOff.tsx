@@ -13,8 +13,9 @@ export function HandOffWhat({ owner, tried, pictures, files, roots }: {
   files: Shown[];
   roots: string[];
 }) {
+  if (!tried.length && !pictures.length && !files.length) return null;
   return (
-    <>
+    <div className="handoff-what">
       {tried.length > 0 && <div className="handoff-part">
         <span className="ts-h">What {owner}'s agent did</span>
         <DoneTrail steps={tried} />
@@ -31,6 +32,6 @@ export function HandOffWhat({ owner, tried, pictures, files, roots }: {
           </button>
         </li>)}
       </ul>}
-    </>
+    </div>
   );
 }

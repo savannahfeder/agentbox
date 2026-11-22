@@ -235,8 +235,7 @@ export function offerIsLive(item: HasFields & { answer?: string }): boolean {
   const afterTheShip = isShippedNote(item.note) && !options.some((o) => asksToShip(o.text));
   if (later.some((f) => f !== field && writtenAt(item, f) > offered && !(f === 'note' && afterTheShip))) return false;
   if (!item.answer || item.answer === '(withdrawn)') return true;
-  // A teammate's words handed back to you are not your pick (round three of the team test).
-  if ((item.wrote?.answer as { teammate?: string } | undefined)?.teammate) return true;
+  // A teammate's words handed back answer them too: what is left is yours to say, not a pick.
   const spoke = item.wrote?.answer?.ts ?? 0;
   return offered > spoke;
 }
