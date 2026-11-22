@@ -5962,8 +5962,9 @@ export default function App() {
         // What is typed with no box under it goes in the box of the thread on
         // screen, and a key that closes things waits out a change of screen.
         const means = !e.defaultPrevented && !focused.agent
-          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc })
+          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc, sheetOpen: !!document.querySelector('.th-menu[role="dialog"]') })
           : 'shortcut';
+        if (means === 'the sheet') { e.preventDefault(); return; }
         if (means === 'to the box') {
           e.preventDefault();
           typeIntoTheBox(focused, e.key);
