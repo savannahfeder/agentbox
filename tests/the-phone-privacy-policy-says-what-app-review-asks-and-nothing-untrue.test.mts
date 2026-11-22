@@ -26,6 +26,16 @@ describe('the phone privacy policy', () => {
     expect(says).toBe(/appleSignIn\(/.test(screen));
     expect(/with Apple or Google/.test(policy)).toBe(/googleSignIn\(/.test(screen) && /appleSignIn\(/.test(screen));
   });
+  // 2026-11-10: sign-in emails moved to Resend's SMTP, and the policy named
+  // every company that receives data except the one that now gets each
+  // person's email address.
+  it('names the company the account database sends its emails through', () => {
+    const config = fs.readFileSync(new URL('../cloud/supabase/config.toml', import.meta.url), 'utf8');
+    const smtp = config.match(/^\[auth\.email\.smtp\]\n([\s\S]*?)(?=^\[)/m)?.[1] ?? '';
+    expect(smtp).toMatch(/^enabled = true$/m);
+    expect(smtp).toMatch(/^host = "smtp\.resend\.com"$/m);
+    expect(policy).toMatch(/<strong>Resend<\/strong>[^<]*email address/);
+  });
   it('still says how to delete the account and names the AI companies', () => {
     for (const words of ['Delete account', 'Anthropic', 'OpenAI', 'Supabase', 'Expo']) expect(policy).toContain(words);
   });

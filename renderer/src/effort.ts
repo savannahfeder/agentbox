@@ -41,6 +41,8 @@ export function effortChoicesFor(
   model: string | null,
   { codexModels = [], codexDefault = null }: { codexModels?: ModelChoice[]; codexDefault?: string | null } = {},
 ): EffortChoice[] {
+  // A further harness has said nothing about levels, so it gets no strip rather than Claude Code's.
+  if (engine && engine !== 'claude' && engine !== 'codex') return [];
   if (engine !== 'codex') return EFFORTS;
   const id = model ?? defaultModelFor(engine, codexDefault);
   if (id === CODEX_OWN) return [];
@@ -123,7 +125,7 @@ export const LAST_EFFORT_KEY = 'zero.lastEffort';
  * Code keeps the original key, so a level she has already chosen survives.
  */
 export function lastEffortKey(engine: string | null = null): string {
-  return engine === 'codex' ? `${LAST_EFFORT_KEY}.codex` : LAST_EFFORT_KEY;
+  return engine && engine !== 'claude' ? `${LAST_EFFORT_KEY}.${engine}` : LAST_EFFORT_KEY;
 }
 
 // Remembered the moment she picks, like the level, the project and the model.

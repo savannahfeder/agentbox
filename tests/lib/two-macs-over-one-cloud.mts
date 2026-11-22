@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { onTestFinished } from 'vitest';
 import * as disk from '../../main/store/work-items.mts';
 import { Store } from '../../main/store.mts';
 import { createMemoryCloud, signUpMemory, memoryBackend } from '../../main/team/memory-cloud.mts';
@@ -12,8 +13,12 @@ import { resolveArtifact } from '../../main/artifact-path.mts';
 
 export { disk, createMemoryCloud, signUpMemory, memoryBackend, resolveArtifact };
 
+/** Call from a test or its beforeEach: the store is removed once the test's afterEach (where the consumers sign out) has run, pass or fail. */
 export async function aMac(cloud, personId, { wrap = (b) => b, carrierOptions = { retryMs: [0, 0] } } = {}) {
-  const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'carry-'));
+  let storeRoot = null;
+  // Registered before the store exists, so a setup that throws below still has it removed.
+  onTestFinished(() => { if (storeRoot) fs.rmSync(storeRoot, { recursive: true, force: true, maxRetries: 3 }); });
+  storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'carry-'));
   const accountRoot = path.join(storeRoot, 'accounts', 'a');
   fs.mkdirSync(accountRoot, { recursive: true });
   const store = await new Store({ storeRoot, accountId: 'a', accountRoot, products: [] }).init();

@@ -40,8 +40,8 @@ describe('the engine a new thread card opens on', () => {
   });
   it('is what the card uses, and it lists no Claude model where Claude Code is not offered', () => {
     const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
-    expect(card).toMatch(/recentModels\(items, \{ codexModels, codexDefault, codexOffered, claudeOffered \}\)/);
-    expect(card).toMatch(/allModels\(\{ codexModels, codexOffered, claudeOffered \}\)/);
+    expect(card).toMatch(/recentModels\(items, \{ codexModels, codexDefault, codexOffered, claudeOffered, further \}\)/);
+    expect(card).toMatch(/allModels\(\{ codexModels, codexOffered, claudeOffered, further \}\)/);
     // Seen in the real app: All models drew an empty CLAUDE CODE heading
     // beside the Codex list. A column is drawn only when it has rows. The
     // drawing moved into ./ModelMenu.tsx on w-e1a42f6b21, where the reply box

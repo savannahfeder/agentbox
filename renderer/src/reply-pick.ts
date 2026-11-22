@@ -99,9 +99,30 @@ export function pickToSend(
   // say "clear it" there and nothing is lost by naming what she picked. Codex
   // has no alias for its default and "Codex's own" is a real row, so null is
   // her saying her config.toml decides.
-  const model = engine === 'codex' ? pick.model : (pick.model ?? DEFAULT_MODEL);
+  // A further harness is like Codex here: with nothing named, it decides.
+  const model = engine && engine !== 'claude' ? pick.model : (pick.model ?? DEFAULT_MODEL);
   const moves = engineCount > 1 && !!was && !!engine && engine !== was;
   return { model, effort: pick.effort, ...(moves ? { engine } : {}) };
+}
+
+/**
+ * The harness the thread runs on now, and the one the reply box is showing,
+ * which is the same until a pick moves it. `further` is the ids of the further
+ * harnesses on offer here; any other word reads as Claude Code.
+ */
+export function replyHarness(
+  running: string | null | undefined,
+  chosen: string | null | undefined,
+  further: readonly string[] = [],
+): { now: string; shown: string } {
+  const here = (id: string | null | undefined): id is string => id === 'codex' || (!!id && further.includes(id));
+  const now = here(running) ? running : 'claude';
+  return { now, shown: chosen === 'claude' || here(chosen) ? chosen : now };
+}
+
+/** Claude Code's and Codex's permission words and commands mean nothing to a further harness, so its reply box offers none. */
+export function takesModesAndCommands(running: string | null | undefined, further: readonly string[] = []): boolean {
+  return !running || !further.includes(running);
 }
 
 /**

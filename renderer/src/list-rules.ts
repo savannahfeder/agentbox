@@ -6,6 +6,7 @@ import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../..
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { asksToClose } from '../../shared/asks-to-close.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
+import { closedByItsShip } from '../../shared/ship-closes-its-thread.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
 import { shownTitle } from '../../shared/thread-title.mts';
@@ -260,6 +261,8 @@ export function belongsInInbox(
     if (!hers(i) && !liveAnswer(i)) return false;            // agent work she never touched is filed
     if (i.wrote?.status?.source === 'founder') return false; // she archived it herself
     if (closedAsSheAsked(i)) return false;
+    if (closedByItsShip(i)) return false;
+
     return (i.wrote?.status?.ts ?? i.updatedAt ?? 0) > deliveredThrough;
   }
   // A stopped row is in the inbox whatever its kind. This must come before the
