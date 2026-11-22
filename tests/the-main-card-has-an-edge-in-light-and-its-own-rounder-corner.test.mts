@@ -45,9 +45,10 @@ describe('the light card', () => {
 });
 
 describe('the main card corner', () => {
-  it('is its own token, at least as round as the cards inside it', () => {
+  // 6, 10, 14 and 18px were shown in light and the dark orange sky; 10px was approved.
+  it('is its own token, the approved 10px, as round as the cards inside it', () => {
+    expect(px('pane-corner')).toBe(10);
     expect(px('pane-corner')).toBeGreaterThanOrEqual(px('artifact-corner'));
-    expect(px('pane-corner')).toBeLessThanOrEqual(20);
   });
 
   it('is worn by the card and everything clipped to it', () => {
