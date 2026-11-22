@@ -23,7 +23,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, FileNote, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
@@ -800,7 +800,7 @@ export default function App() {
           const { attachments, ...start } = taskHandOff({ from, brief: b, message: message ?? null, nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
             handFrom: { product: item.product, id: item.id, message: message?.uid ?? 'first' }, offered: snap?.products ?? [], cards: snap?.team?.cards ?? [] });
           const handed = commentsToHand(notes, { me: seen?.me ?? null, files: files ?? null });
-          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(handed.length ? { comments: handed, body: withComments(start.body, handed, { nameOf: commenter }) } : {}) });
+          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(handed.length ? { comments: handed, body: withComments(start.body, handed, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
           setModal('compose');
         })
         .catch((err) => showToast(String(err?.message ?? err)));
@@ -824,7 +824,7 @@ export default function App() {
     void comments.then((notes) => {
       const handed = linked.length ? commentsToHand(notes, { me: seen?.me ?? null, files: linked }) : [];
       const words = (named as { body?: string }).body ?? start.body;
-      setComposeInitial({ ...start, ...named, ...(handed.length ? { comments: handed, body: withComments(words, handed, { nameOf: commenter }) } : {}) });
+      setComposeInitial({ ...start, ...named, ...(handed.length ? { comments: handed, body: withComments(words, handed, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
       setModal('compose');
     });
   }, [snap?.team, snap?.products, commenter]);
@@ -837,6 +837,27 @@ export default function App() {
     window.addEventListener('zero:hand-comments', ask);
     return () => window.removeEventListener('zero:hand-comments', ask);
   }, [snap?.items, handToAgent]);
+  // A file opened outside any thread of yours (a chat's, or one in Files): a new
+  // thread with the file and its comments written into the words.
+  useEffect(() => {
+    const ask = (e: Event) => {
+      const { name, srcPath, product, src, notes } = (e as CustomEvent<{ name: string; srcPath?: string | null; product?: string; src?: string; notes: FileNote[] }>).detail ?? {};
+      const me = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer)?.me ?? null;
+      void (srcPath ? Promise.resolve(srcPath) : api.resolveDoc({ product: product ?? '', src: src ?? '' }).then((r) => r.opened ?? null)).then((path) => {
+        const handed = commentsToHand(notes, { me, files: [name] });
+        setComposeInitial({
+          to: 'agent',
+          body: withComments(`Changes from the comments on ${name}`, handed, { nameOf: commenter }),
+          caret: [0, 0],
+          ...(handed.length ? { comments: handed } : {}),
+          ...(path ? { attachments: [{ name, srcPath: path, image: /\.(png|jpe?g|gif|webp)$/i.test(name) }] } : {}),
+        });
+        setModal('compose');
+      });
+    };
+    window.addEventListener('zero:hand-file-comments', ask);
+    return () => window.removeEventListener('zero:hand-file-comments', ask);
+  }, [snap?.team, snap?.products, snap?.alpha?.multiplayer, commenter]);
   // ADD PEOPLE on an open conversation: New thread, with everyone already in
   // that conversation in To. Nothing is written to the conversation on screen,
   // because adding somebody makes the group's conversation and leaves this one
@@ -2455,7 +2476,7 @@ export default function App() {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
       .then((b) => {
         const start = continueStart(b, card, snap?.products ?? []);
-        setComposeInitial({ ...start, ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }) } : {}) });
+        setComposeInitial({ ...start, ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
         setModal('compose');
       })
       .catch((err) => showToast(String(err?.message ?? err)));

@@ -62,6 +62,14 @@ export function RoomFileView({ room, messages, people, meId, opening, files, onN
     const key = markGoesTo(mark, elsewhere);
     return key ? api.filesPlaceMark({ key, mark }) : files.write(mark);
   };
+  // No agent hears a chat's comments, so they go to a new thread of yours with the file.
+  const handToAgent = (paths: string[]) => {
+    const name = nameIn(paths[0] ?? '');
+    void files.find(name).then((srcPath) => {
+      onClose();
+      window.dispatchEvent(new CustomEvent('zero:hand-file-comments', { detail: { name, srcPath, notes: marks.notes } }));
+    });
+  };
   return <ArtifactView product="" draftsAcross={`room:${room.id}`} lines={allLines} numbers={numbered.numbers} marks={marks} me={meId} people={named}
-    open={open} ownerOfRow={null} write={write} onNewVersion={onNewVersion} onClose={onClose} files={stage} />;
+    open={open} ownerOfRow={null} write={write} onNewVersion={onNewVersion} onClose={onClose} files={stage} onHandToAgent={handToAgent} />;
 }

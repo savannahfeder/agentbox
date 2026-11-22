@@ -416,6 +416,10 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice, onRenam
     open={opened}
     ownerOfRow={null}
     withAgent={!!view?.sentIn.some((p) => p.kind === 'thread' && p.product === product)}
+    onHandToAgent={(paths) => {
+      onClose();
+      window.dispatchEvent(new CustomEvent('zero:hand-file-comments', { detail: { name: view?.name ?? paths[0], product, src: paths[0], notes: view?.marks.notes ?? [] } }));
+    }}
     write={(mark) => api.filesPlaceMark({ key: fileKey, mark })}
     onNewVersion={editsTo ? async (_name, text) => {
       const out = await api.filesPlaceEdit({ key: fileKey, text });

@@ -107,7 +107,7 @@ describe('every way to an agent carries them', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   const card = fs.readFileSync(new URL('../renderer/src/threads/ThreadComposer.tsx', import.meta.url), 'utf8');
   it('the hand-over opens the card with the thread\'s comments', () => {
-    expect(app.match(/commentsToHand\(notes, /g)?.length).toBe(2);
+    expect(app.match(/commentsToHand\(notes, /g)?.length).toBe(3);
     // Round two: a hand-over left out comments made on another copy of the same
     // file, which the notes panel showed. Both read the same list now.
     expect(app).toContain('const comments = notesOnThread(item);');
@@ -132,10 +132,21 @@ describe('every way to an agent carries them', () => {
     expect(big).toMatch(/onHandToAgent=\{withAgent \? undefined : \(files\) => \{ onClose\(\);/);
     expect(app).toMatch(/srcPath: f\.startsWith\('\/'\) \|\| !dir \? f : `\$\{dir\}\/\$\{f\}`/);
   });
+  // Rerun 3 (2026-11-22): a designer opened Theo's comment on a file in their chat
+  // from Needs you and found Approve and Send to Theo, nothing for her own agent.
+  it("a chat's file and a file in Files hand their comments on too, the card opening at its top", () => {
+    const chat = fs.readFileSync(new URL('../renderer/src/team/rooms/RoomFileView.tsx', import.meta.url), 'utf8');
+    const place = fs.readFileSync(new URL('../renderer/src/files/FilesPlace.tsx', import.meta.url), 'utf8');
+    expect(chat).toMatch(/onHandToAgent=\{handToAgent\}/);
+    expect(chat).toContain("'zero:hand-file-comments'");
+    expect(place).toContain("'zero:hand-file-comments'");
+    expect(app).toContain("window.addEventListener('zero:hand-file-comments', ask)");
+    expect(app.match(/caret: \[0, 0\]/g)?.length).toBeGreaterThanOrEqual(4);
+  });
   it('the card has no picker: the comments are in its words, and the ones left in are remembered', () => {
     expect(card).not.toContain('HandedComments');
     expect(fs.existsSync(new URL('../renderer/src/threads/HandedComments.tsx', import.meta.url))).toBe(false);
     expect(card).toMatch(/rememberHanded\(product\.slug, made\.id, handedIn\(/);
-    expect(app.match(/body: withComments\(/g)?.length).toBe(3);
+    expect(app.match(/body: withComments\(/g)?.length).toBe(4);
   });
 });
