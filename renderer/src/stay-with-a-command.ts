@@ -130,3 +130,15 @@ export function freshCopy<T extends { id: string; product: string; updatedAt?: n
   if ((fresh.label ?? '') !== (focused.label ?? '')) return fresh;
   return (fresh.updatedAt ?? 0) !== (focused.updatedAt ?? 0) ? fresh : null;
 }
+
+/**
+ * The open row's newer copy when it stands for a session started outside
+ * Agentbox: such a row is rebuilt from the session on every reading, so it is
+ * taken whenever what the session says or where it stands has moved.
+ */
+export function freshAgentRow<T extends { id: string; agent?: unknown }>(rows: readonly T[], focused: T | null): T | null {
+  if (!focused?.agent) return null;
+  const fresh = rows.find((r) => r.id === focused.id);
+  if (!fresh || fresh === focused) return null;
+  return JSON.stringify(fresh.agent) === JSON.stringify(focused.agent) ? null : fresh;
+}

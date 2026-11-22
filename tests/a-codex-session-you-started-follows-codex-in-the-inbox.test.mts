@@ -297,3 +297,15 @@ describe("the row's second line", () => {
     expect(agentRow(one('s5'), NOW).body).toBe('Tidied 14 files.');
   });
 });
+
+describe('the full conversation of a session waiting on permission', () => {
+  it('ends on the request, in its own words, as the page shows it', () => {
+    const t0 = NOW - 60_000;
+    const call = line(t0 + 2_000, 'response_item', { type: 'custom_tool_call', call_id: 'c9', name: 'exec', input: 'text(await tools.exec_command({cmd:"ls -a",sandbox_permissions:"require_escalated",justification:"May I list the files?"}))\n' });
+    const file = write('p9', [meta('p9', t0, { originator: 'codex-tui' }), line(t0, 'event_msg', { type: 'task_started' }), ...hers(t0 + 10, 'look around'), call], t0 + 2_000);
+    const r = codexConversation(file, { now: NOW, isRunning: () => false });
+    expect(r.ok && r.turns.at(-1)).toMatchObject({ who: 'it', text: '**May I list the files?**\n\n```\nls -a\n```' });
+    const granted = codexConversation(file, { now: NOW, isRunning: () => true });
+    expect(granted.ok && granted.turns.at(-1)).toMatchObject({ who: 'you', text: 'look around' });
+  });
+});

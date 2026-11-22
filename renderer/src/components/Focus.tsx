@@ -2678,7 +2678,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             <div className="dock-pill dock-pill-static">
               <span className="dock-pill-text">
                 {agent?.engine === 'codex'
-                  ? agent.app === 'Codex in your editor' ? 'Answer this one in Codex, in your editor.' : 'Answer this one in the terminal Codex is running in.'
+                  ? agent.app === 'Codex in your editor' ? `${agent.approval ? 'Allow or deny it' : 'Answer this one'} in Codex, in your editor.` : `${agent.approval ? 'Allow or deny it' : 'Answer this one'} in the terminal Codex is running in.`
                   : 'Answer this one in its own window. A message from here would wait behind the box it is stuck on.'}
               </span>
             </div>

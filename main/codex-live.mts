@@ -314,10 +314,16 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
 }
 
 /** The whole conversation of one Codex session, for "Show the full conversation". */
-export function codexConversation(file: string): { ok: true; turns: ThreadEvent[]; omitted: number; total: number } | { ok: false; reason: string } {
+export function codexConversation(file: string, { now = Date.now(), isRunning = commandRuns }: { now?: number; isRunning?: (command: string) => boolean } = {}): { ok: true; turns: ThreadEvent[]; omitted: number; total: number } | { ok: false; reason: string } {
   const read = readCodexSession(file, { whole: true });
   if (!read) return { ok: false, reason: 'That Codex conversation could not be read.' };
-  const turns = read.fold.events;
+  const { fold } = read;
+  let mtime = 0;
+  try { mtime = fs.statSync(file).mtimeMs; } catch { mtime = 0; }
+  // A permission it is waiting on is its newest word, though Codex keeps it in a tool call.
+  const a = fold.approval;
+  const waits = a && !isRunning(a.command) && codexStatus(fold, mtime, now) === 'waiting';
+  const turns = waits ? [...fold.events, { who: 'it' as const, at: fold.lastActiveAt, text: [a.reason && `**${a.reason}**`, a.command && `\`\`\`\n${a.command}\n\`\`\``].filter(Boolean).join('\n\n') }] : fold.events;
   return { ok: true, turns, omitted: 0, total: turns.length };
 }
 

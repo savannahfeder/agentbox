@@ -31,7 +31,7 @@ import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
 import { arrowRows, pageTitle, spotIn, stepIn } from './one-thing-at-a-time';
 import { AIMED_AT_THE_THREAD_YOU_LEFT, CLICK_FOR_THE_THREAD_YOU_LEFT, clickAimedHere, pickLandsHere, type Arrival, type Point } from './pick-settles';
-import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
+import { freshAgentRow, freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { LogoOrbit } from './components/LogoOrbit';
 import { cameBackFromACrash, keepHeldWriter, RELOADED_AFTER_A_CRASH } from './after-a-crash';
@@ -3441,6 +3441,11 @@ export default function App() {
     const fresh = freshCopy(items, focused, following);
     if (fresh) setFocused(fresh);
   }, [items, focused, following]);
+  // A session started outside Agentbox is not in the ledger, so its open page follows its own row.
+  useEffect(() => {
+    const fresh = freshAgentRow(agentRows, focused);
+    if (fresh) setFocused(fresh);
+  }, [agentRows, focused]);
 
   // AND THE WAY OUT OF THAT ROW IS HER INBOX, whichever way she takes it.
   //
