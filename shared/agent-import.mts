@@ -162,6 +162,8 @@ export const THREAD_LABEL = 'thread-import';
 export const CATCH_UP_LABEL = 'catch-up';
 export const CATCH_UP_TRIES = 3;
 export const catchUpDue = (item: LabelledItem | null | undefined): boolean => (item?.labels ?? []).includes(CATCH_UP_LABEL) && item?.status === 'open';
+/** Its first write-up: a later answer in a chat that follows its terminal has one to read meanwhile. */
+export const gettingReady = (item: (LabelledItem & { wrote?: { problem?: unknown } }) | null | undefined): boolean => catchUpDue(item) && !item?.wrote?.problem;
 
 /**
  * And the one that says WHICH thread. The id is Claude Code's own session id,

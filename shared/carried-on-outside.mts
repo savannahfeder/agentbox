@@ -26,9 +26,9 @@ export function heldOutside(item: Held | null | undefined): boolean {
  *  Code writes nothing to the chat while one is open. `waitingFor` is its
  *  session file's word, and `folder` the one it is open in. */
 const STOPPED = '**Claude Code stopped to ';
-export function stoppedThere(waitingFor: string, folder?: string | null): string {
+export function stoppedThere(waitingFor: string, folder?: string | null, { replyWaits = false } = {}): string {
   const why = waitingFor === 'permission prompt' ? 'ask for your OK' : 'ask you a question';
-  return `${STOPPED}${why}. Answer it ${folder ? `in its ${folder} window` : 'there'}.**`;
+  return `${STOPPED}${why}. Answer it ${folder ? `in its ${folder} window` : 'there'}${replyWaits ? ', and it gets your reply next' : ''}.**`;
 }
 export const saysItStopped = (text: unknown): boolean => String(text ?? '').startsWith(STOPPED);
 /** What its agent had said before it stopped, '' for nothing. */

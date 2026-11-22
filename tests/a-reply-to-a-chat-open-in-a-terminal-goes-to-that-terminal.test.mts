@@ -134,9 +134,18 @@ describe('a reply to a chat open in a terminal', () => {
     sup._goesToItsTerminal(row());
     await settle();
     await follow();
-    expect(row().result).toBe(stoppedThere('input needed', 'kestrel'));
+    expect(row().result).toBe('**Claude Code stopped to ask you a question. Answer it in its kestrel window, and it gets your reply next.**');
+    expect(row().result).toBe(stoppedThere('input needed', 'kestrel', { replyWaits: true }));
     expect(row().wrote.result.ts).toBeGreaterThanOrEqual(row().wrote.answer.ts);
     expect(inbox()).toBe(true);
+    const lines = s.readHistory(slug, row().id).length;
+    await follow();
+    expect(s.readHistory(slug, row().id).length).toBe(lines);
+    // Answered, and it reads the reply: a question after that is an ordinary one.
+    const t = Date.now() + 1_000;
+    write(says(t, 'On it.'), peer(t + 100, 'The test clock.'));
+    await follow(t + 1_000);
+    expect(row().result).toContain(stoppedThere('input needed', 'kestrel'));
   });
 
   it('that Claude Code holds for you to allow says so, and is not run here as well', async () => {
@@ -223,11 +232,13 @@ describe('a reply that starts a run here as before', () => {
 });
 
 describe('how it reads in the terminal', () => {
-  it('says who typed it and where, and keeps the mark the cards strip', () => {
+  // Claude Code tells its agent such a message was not typed by its user and is
+  // never their approval. An early wording here told the agent otherwise.
+  it('says where it was written, keeps the mark the cards strip, and argues with no guard of Claude Code\'s', () => {
     const words = carriedOnFromTheApp('Mock the clock.');
     expect(words.split('\n').at(-1)).toBe('Mock the clock.');
     expect(words.split(',')[0]).toBe(fromTheApp('x').split(',')[0]);
-    expect(words).toContain('not from an agent');
+    expect(words).not.toMatch(/not an agent|not from an agent|as if|approv/i);
   });
 });
 

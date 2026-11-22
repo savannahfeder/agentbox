@@ -614,14 +614,13 @@ export function fromTheApp(message: string) {
 }
 
 // The same for a thread brought in from that session, which the reply carries on
-// (Supervisor#_goesToItsTerminal).
+// (Supervisor#_goesToItsTerminal). Claude Code shows it as another session's
+// message, which it never takes as approval. Nothing here argues with that.
 export function carriedOnFromTheApp(message: string) {
   return [
     `${RELAY_MARK} the inbox your user reads, where this conversation is one of their threads.`,
-    'They typed this there, as their reply to you; it is not from an agent. Carry on from',
-    'it as if it had been typed here.',
+    'Their reply there:',
     '',
-    'They said:',
     message,
   ].join('\n');
 }

@@ -48,9 +48,9 @@ export const DONE_FOLLOWED_MOST = 200;
 export const atWork = (state: ClaudeSessionState | null | undefined) => !!state && RUNNING.has(state.status);
 /** What it stopped on in its own window, or null. */
 export const stoppedOn = (state: ClaudeSessionState | null | undefined) => (state?.status === 'waiting' ? state.waitingFor : null);
-const stopLine = (state: ClaudeSessionState | null | undefined) => {
+const stopLine = (state: ClaudeSessionState | null | undefined, replyWaits = false) => {
   const on = stoppedOn(state);
-  return on === null ? null : stoppedThere(on, state?.folder);
+  return on === null ? null : stoppedThere(on, state?.folder, { replyWaits });
 };
 
 /** How far each side of the chat has been read onto the row. */
@@ -108,6 +108,8 @@ export interface FollowedChat extends ReadTo {
   doneAt: number;
   /** A reply typed here waits for a run of ours. */
   replied: boolean;
+  /** One went to its terminal, which has not said anything since. */
+  told: boolean;
   /** The follow holds it now. */
   held: boolean;
   /** Still the follow's to move: open, held or lately in Done, not taken up by a run here, not shared. */
@@ -212,7 +214,7 @@ export async function followClaudeChats(
     }
     const running = state?.status ? atWork(state) : now - mtimeMs < FRESH_MS;
     const cut = turn.ended && turn.cutAt > Math.max(c.knownAt, c.heardThrough, ...turn.entries.map((e) => e.at));
-    const where = whereTheChatIs(turn, { running, stop: stopLine(state), news: !!tail, cut });
+    const where = whereTheChatIs(turn, { running, stop: stopLine(state, c.told && !tail), news: !!tail, cut });
     if (where.move === 'working') {
       const got = await store.holdChatOutside(c.product, c.id, HELD_IN.claude, { now });
       if (got && !c.held) moved += 1;

@@ -139,6 +139,17 @@ describe('the rewrite', () => {
   });
 });
 
+describe('a chat being written up', () => {
+  // A later answer in a chat that follows its terminal read "Getting ready" in
+  // Needs you (2026-11-22), which a tester took for one that had not started.
+  it('says it is getting ready the first time only', async () => {
+    const { gettingReady } = await import('../shared/agent-import.mts');
+    expect(gettingReady(imported())).toBe(true);
+    expect(gettingReady(imported({ wrote: { ...imported().wrote, problem: { ts: 5, source: 'agent' } } }))).toBe(false);
+    expect(gettingReady(imported({ labels: [] }))).toBe(false);
+  });
+});
+
 describe('one name, not two', () => {
   // Measured 2026-10-29 in a fresh window: the namer and the rewrite both took
   // the row in the same tick, and the name changed twice in five seconds,

@@ -2015,15 +2015,16 @@ export class Store {
       const held = heldOutside(item);
       const mine = !shared.has(item.product) && !ours(item.id);
       const replied = replyWaits(item);
+      const told = !!item.answer && item.answer !== '(withdrawn)' && !replied && (item.wrote?.answer?.ts ?? 0) > Math.max(chatAtOf(item), item.wrote?.saidOutside?.ts ?? 0);
       const doneAt = item.status === 'done' ? item.wrote?.status?.ts ?? 0 : 0;
       const follow = mine && (item.status === 'open' || held || (doneAt > 0 && now - doneAt < DONE_FOLLOWED_MS));
       if (!follow && !held) continue;
       // A row from before `chatAt` is read from its own last writes.
-      const chatAt = Number(item.chatAt) || 0;
+      const chatAt = chatAtOf(item);
       const knownAt = chatAt || Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0);
       (doneAt ? done : out).push({
         product: item.product, id: item.id, engine: thread ? 'claude' : 'codex', chat, folder: folders.get(item.product) ?? null,
-        knownAt, heardThrough: chatAt || Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), doneAt, replied, held, follow,
+        knownAt, heardThrough: chatAt || Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), doneAt, replied, told, held, follow,
       });
     }
     done.sort((a, b) => b.doneAt - a.doneAt);
@@ -2283,6 +2284,8 @@ function clockAt(ms: number) {
  * When a chat brought in happened: `at` when it started, `last` when it last
  *  moved. A chat with no time it can be trusted for, or one ahead of `fallback`
  *  (the moment of import), is stamped with `fallback`. */
+const chatAtOf = (item: StoreItem) => Number(item.chatAt) || 0;
+
 /** A reply typed here that nothing has taken up: no run of ours, nor its terminal. */
 function replyWaits(item: StoreItem) {
   return !!item.answer && item.answer !== '(withdrawn)' && (item.wrote?.answer?.ts ?? 0) > (Number(item.answeredThrough) || 0);
