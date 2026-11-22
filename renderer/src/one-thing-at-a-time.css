@@ -134,3 +134,6 @@
   .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-dock-inner { max-width: var(--task-measure); margin: 0; }
   .app.one-at-a-time.workspace-layout:not(.doc-open) :is(.opt-row, .dock-pill) { font-size: max(14.5px, calc(var(--task-type) * 0.78)); }
 }
+
+/* A command a session asks to run is read whole before it is allowed, so it wraps rather than running off the page. */
+.agent-page pre, .agent-page pre code { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -192,14 +192,15 @@ describe('what is not hers, or not now', () => {
 });
 
 describe('closing and reading it', () => {
-  it('closing a Codex row lasts until Codex says something new', () => {
+  it('closing a Codex row lasts until she writes in it again, whatever Codex says meanwhile', () => {
     const t0 = NOW - 10 * 60_000;
     write('s1', [meta('s1', t0), ...turn(t0, ASK, ANSWER)], t0 + 21_000);
     const a = one('s1');
     const closed = { ...a, doneThrough: a.saidAt };
     expect(putAway(closed)).toBe(true);
     expect(reachesInbox(closed, NOW, 'all')).toBe(false);
-    expect(putAway({ ...closed, saidAt: a.saidAt + 60_000 })).toBe(false);
+    expect(putAway({ ...closed, saidAt: a.saidAt + 60_000 })).toBe(true);
+    expect(putAway({ ...closed, asked: [...a.asked, { at: a.saidAt + 60_000, text: 'one more thing' }] })).toBe(false);
   });
 
   it('a closed row she answers in Codex shows in In progress while it works', () => {
