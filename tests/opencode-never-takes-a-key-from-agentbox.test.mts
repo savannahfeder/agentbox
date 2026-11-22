@@ -9,8 +9,8 @@
 // So there is never a reason to hand it a key, and these tests make sure the
 // app cannot.
 //
-// What it IS handed is one file of its own per thread, which `OPENCODE_CONFIG`
-// points at: the permission policy and the person's standing instructions.
+// What it IS handed is its config, written into its environment, and one file
+// of standing instructions that config names.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -62,18 +62,19 @@ describe('OpenCode never takes a key from Agentbox', () => {
   });
 });
 
-describe('the one file a thread on OpenCode is handed', () => {
+describe('what a thread on OpenCode is handed', () => {
   const laidOut = (mode: string | null = null, instructions = 'Keep answers short.') => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-thread-'));
     const env = prepareOpenCode({ dir, cwd: '/repo', instructions, mode });
-    const config = JSON.parse(fs.readFileSync(env.OPENCODE_CONFIG!, 'utf8'));
+    const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT!);
     return { dir, env, config };
   };
 
-  it('is in the folder it was given and nowhere in the project', () => {
+  it('is its config in the environment and one file in the folder it was given, nowhere in the project', () => {
     const { dir, env } = laidOut();
-    expect(env).toEqual({ OPENCODE_CONFIG: path.join(dir, 'opencode.json') });
-    expect(fs.readdirSync(dir).sort()).toEqual(['instructions.md', 'opencode.json']);
+    expect(Object.keys(env).sort()).toEqual(['OPENCODE_CONFIG_CONTENT', 'OPENCODE_CONFIG_PROJECT_DISABLE', 'OPENCODE_DISABLE_PROJECT_CONFIG']);
+    expect(fs.readdirSync(dir)).toEqual(['instructions.md']);
+    // A config path the person's own shell exports is still scrubbed on the way in.
     expect(harnessDefinition('opencode').homeEnv).toBe('OPENCODE_CONFIG');
   });
 

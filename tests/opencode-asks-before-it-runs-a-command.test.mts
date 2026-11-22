@@ -101,14 +101,15 @@ describe('OpenCode asks before it runs a command', () => {
 });
 
 describe('what a thread on OpenCode is started with', () => {
-  it('is `opencode acp`, its own config file in the app\'s folder, the thread it is on, and no key', async () => {
+  const startedWith = () => logged().find((l) => l.started).started;
+  const configOf = (started: { env: Record<string, string> }) => JSON.parse(started.env.OPENCODE_CONFIG_CONTENT);
+
+  it('is `opencode acp`, its config in the environment, the thread it is on, and no key', async () => {
     await turn('FAKE:SAY apple').exit;
-    const { started } = logged().find((l) => l.started);
+    const started = startedWith();
     expect(started.args).toEqual(['acp']);
-    expect(started.env).toEqual({
-      OPENCODE_CONFIG: path.join(dir, 'user', 'harnesses', 'opencode', 'threads', 'w-1', 'opencode.json'),
-      ZERO_ITEM: 'w-1', ZERO_PRODUCT: 'sandbox',
-    });
+    expect(Object.keys(started.env).sort()).toEqual(['OPENCODE_CONFIG_CONTENT', 'OPENCODE_CONFIG_PROJECT_DISABLE', 'OPENCODE_DISABLE_PROJECT_CONFIG', 'ZERO_ITEM', 'ZERO_PRODUCT']);
+    expect(started.env).toMatchObject({ ZERO_ITEM: 'w-1', ZERO_PRODUCT: 'sandbox' });
     // Nothing is written into the project's own folder.
     expect(fs.readdirSync(path.join(dir, 'repo'))).toEqual([]);
   });
@@ -119,7 +120,37 @@ describe('what a thread on OpenCode is started with', () => {
     expect(sent.params.prompt).toEqual([{ type: 'text', text: 'FAKE:SAY apple' }]);
     const thread = path.join(dir, 'user', 'harnesses', 'opencode', 'threads', 'w-1');
     expect(fs.readFileSync(path.join(thread, 'instructions.md'), 'utf8')).toBe('Standing rule: be brief.\n');
-    expect(JSON.parse(fs.readFileSync(path.join(thread, 'opencode.json'), 'utf8')).instructions).toEqual([path.join(thread, 'instructions.md')]);
+    expect(configOf(startedWith()).instructions).toEqual([path.join(thread, 'instructions.md')]);
+  });
+
+  // 2026-11-22, on OpenCode 2.3.2, each case measured with a command the check
+  // would refuse. Agentbox's policy went in as a file `OPENCODE_CONFIG` named,
+  // and a project's own `opencode.json` saying `bash: allow` is loaded after
+  // that file: the command ran and nothing was asked. Passed inline instead,
+  // the top-level policy held against that file but not against a rule set for
+  // one agent (`agent.build.permission`), in the project or in the person's
+  // global config. What held in every case: the project's config switched
+  // off, and the policy inline at the top level and for both built-in agents.
+  it('is told not to read the project\'s own config, which could switch the asking off', async () => {
+    await turn('FAKE:SAY apple').exit;
+    expect(startedWith().env).toMatchObject({ OPENCODE_DISABLE_PROJECT_CONFIG: '1', OPENCODE_CONFIG_PROJECT_DISABLE: '1' });
+    expect(startedWith().env.OPENCODE_CONFIG).toBeUndefined();
+  });
+
+  it('carries the policy inline, at the top level and for each built-in agent, so no rule for one agent outranks it', async () => {
+    await turn('FAKE:SAY apple', { answerMode: 'default' }).exit;
+    const config = configOf(startedWith());
+    expect(config.permission).toMatchObject({ bash: 'ask', edit: 'ask', external_directory: 'ask' });
+    expect(config.agent.build.permission).toEqual(config.permission);
+    expect(config.agent.plan.permission).toEqual(config.permission);
+  });
+
+  it('carries the same policy at every level in a mode that asks for nothing', async () => {
+    await turn('FAKE:SAY apple', { answerMode: 'bypassPermissions' }).exit;
+    const config = configOf(startedWith());
+    expect(config.permission).toMatchObject({ bash: 'allow', edit: 'allow' });
+    expect(config.agent.build.permission).toEqual(config.permission);
+    expect(startedWith().env.OPENCODE_DISABLE_PROJECT_CONFIG).toBe('1');
   });
 
   it('hands it the store\'s tools, without the variables that have no value', async () => {
@@ -129,10 +160,10 @@ describe('what a thread on OpenCode is started with', () => {
     ]);
   });
 
-  it('writes the policy for the mode this run was given', async () => {
+  it('carries the policy for the mode this run was given, and writes no config file', async () => {
     await turn('FAKE:SAY apple', { answerMode: 'default' }).exit;
-    const config = JSON.parse(fs.readFileSync(path.join(dir, 'user', 'harnesses', 'opencode', 'threads', 'w-1', 'opencode.json'), 'utf8'));
-    expect(config.permission).toMatchObject({ bash: 'ask', edit: 'ask' });
+    expect(configOf(startedWith()).permission).toMatchObject({ bash: 'ask', edit: 'ask' });
+    expect(fs.readdirSync(path.join(dir, 'user', 'harnesses', 'opencode', 'threads', 'w-1'))).toEqual(['instructions.md']);
   });
 });
 

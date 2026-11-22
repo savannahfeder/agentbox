@@ -41,17 +41,30 @@ export function openCodePermissionConfig(mode: string | null = null) {
 }
 
 /**
- * One config file per thread, in the app's own folder, which `OPENCODE_CONFIG`
- * points at: the policy above, and the person's standing instructions as a file
- * its `instructions` list names. Rewritten on every start, because a stale one
- * is how a run stops asking.
+ * The config a thread starts with: the policy above, and the person's standing
+ * instructions as a file its `instructions` list names.
+ *
+ * How it is handed over is what keeps the asking on. OpenCode loads a project's
+ * own `opencode.json` after a file `OPENCODE_CONFIG` names, and a rule set for
+ * one agent outranks the top-level one wherever it was written. So the
+ * project's config is switched off (both names the binary knows), and the
+ * policy goes inline, which loads last, at the top level and for both built-in
+ * agents. tests/opencode-asks-before-it-runs-a-command has what was measured.
  */
 export const prepareOpenCode: AcpPrepare = ({ dir, instructions, mode }) => {
   const brief = path.join(dir, 'instructions.md');
   fs.writeFileSync(brief, `${instructions}\n`, 'utf8');
-  const config = path.join(dir, 'opencode.json');
-  fs.writeFileSync(config, `${JSON.stringify({ ...openCodePermissionConfig(mode), ...(instructions ? { instructions: [brief] } : {}) }, null, 2)}\n`, 'utf8');
-  return { OPENCODE_CONFIG: config };
+  const policy = openCodePermissionConfig(mode);
+  const { permission } = policy;
+  return {
+    OPENCODE_CONFIG_CONTENT: JSON.stringify({
+      ...policy,
+      agent: { build: { permission }, plan: { permission } },
+      ...(instructions ? { instructions: [brief] } : {}),
+    }),
+    OPENCODE_DISABLE_PROJECT_CONFIG: '1',
+    OPENCODE_CONFIG_PROJECT_DISABLE: '1',
+  };
 };
 
 export const openCodeHarness = {
