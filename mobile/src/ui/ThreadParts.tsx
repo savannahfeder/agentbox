@@ -22,7 +22,7 @@ import { color, corner, font } from './theme';
 const { DISMISS, DO_HERE, START_NEW } = FILED_WORDS;
 const STOPPED = '#e08a6c';
 const MOVED_HERE = 'Moved here';
-const MONO_CAPS = { fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase' as const };
+const SMALL = { fontFamily: font.medium, fontSize: 13 };
 
 /** Thread.tsx's chevron, turned a quarter when open. */
 export const Chevron = ({ open, tint = color.faint, size = 8 }: { open?: boolean; tint?: string; size?: number }) => (
@@ -44,7 +44,7 @@ export function ActLine({ act, joined }: { act: { at: number; verb: string; subj
         {words.lead}
         {words.choice ? <T style={{ fontSize: 13, color: color.text }}>{` ${words.choice}`}</T> : null}
       </T>
-      <T numberOfLines={1} style={{ flexShrink: 0, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.44, color: color.faint }}>{actWhen(act.at)}</T>
+      <T numberOfLines={1} style={{ flexShrink: 0, fontSize: 12.5, color: color.faint }}>{actWhen(act.at)}</T>
     </View>
   );
 }
@@ -238,7 +238,7 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
   const heading = waiting ? waitingWords(asks.length) : label;
   return (
     <View style={inTurn ? { marginTop: 12 } : { marginTop: 22 }}>
-      {!!heading && <T style={{ ...MONO_CAPS, color: color.faint, marginBottom: 8 }}>{heading}</T>}
+      {!!heading && <T style={{ ...SMALL, color: color.faint, marginBottom: 8 }}>{heading}</T>}
       <View style={{ borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.line }}>
         {shown.map((r, k) => {
           const quiet = waiting && !r.approve;
@@ -248,7 +248,7 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
               <Pressable onPress={() => open(r)} accessibilityRole="button"
                 style={({ pressed }) => ({ flex: 1, minWidth: 0, minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 14, backgroundColor: pressed ? color.fill : 'transparent' })}>
                 <T numberOfLines={1} style={{ flex: 1, fontSize: 14, color: quiet ? color.faint : color.text }}>{r.title}</T>
-                <T style={{ ...MONO_CAPS, color: quiet || r.state === 'done' || r.state === 'scheduled' ? color.faint : color.dim }}>{r.here ? MOVED_HERE : stateWord(r.state)}</T>
+                <T style={{ ...SMALL, color: quiet || r.state === 'done' || r.state === 'scheduled' ? color.faint : color.dim }}>{r.here ? MOVED_HERE : stateWord(r.state)}</T>
               </Pressable>
             </View>
           );
@@ -318,7 +318,7 @@ export function OptionsCard({ ask, options, busy, pick, keep, dir, files, foot =
       )}
       {options.map((o) => row(String(o.n), () => pick(o), (
         <View style={{ borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, paddingHorizontal: 6, height: 19, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 1 }}>
-          <T style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 16, color: color.dim }}>{o.n}</T>
+          <T style={{ fontFamily: font.medium, fontSize: 12, lineHeight: 16, color: color.dim }}>{o.n}</T>
         </View>
       ), (
         <InlineMarkdown text={o.text.replace(/\s*\(recommended\)\s*$/i, '')} dir={dir} files={files} style={{ flexShrink: 1, fontSize: 14, lineHeight: 20.3, color: color.dim }} />

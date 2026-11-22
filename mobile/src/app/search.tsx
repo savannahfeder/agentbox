@@ -32,7 +32,7 @@ function Runs({ runs, weight }: { runs: Hit['title']; weight: string }) {
 }
 
 function HitRow({ hit, first, flush = false }: { hit: Hit; first: boolean; /** Right under the Threads label. */ flush?: boolean }) {
-  const meta = { fontFamily: font.mono, fontSize: 11, letterSpacing: 0.66, textTransform: 'uppercase' as const, color: color.faint };
+  const meta = { fontFamily: font.medium, fontSize: 13, color: color.faint };
   return (
     <Pressable onPress={() => router.push({ pathname: '/thread/[product]/[id]', params: { product: hit.product, id: hit.id } })}
       style={({ pressed }) => ({ flexDirection: 'row', gap: 18, paddingTop: 19, paddingBottom: 15, paddingLeft: size.inset, paddingRight: 12, marginTop: first && !flush ? 14 : 0, backgroundColor: pressed ? color.fill : 'transparent' })}>
@@ -70,7 +70,7 @@ function computerFacts(s: SettingsState): ComputerFacts | null {
 }
 
 const Label = ({ children }: { children: string }) => (
-  <T style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 4, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.faint }}>{children}</T>
+  <T style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 4, fontFamily: font.medium, fontSize: 13, color: color.faint }}>{children}</T>
 );
 
 function CommandRow({ label, aside, onPress }: { label: string; aside?: string; onPress: () => void }) {

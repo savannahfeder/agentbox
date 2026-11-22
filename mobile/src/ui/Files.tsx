@@ -140,7 +140,7 @@ function FileTile({ product, path, open, hold }: { product: string; path: string
   const foot = (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 7 }}>
       <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12, lineHeight: 17, color: color.dim }}>{name}</T>
-      <T style={{ fontFamily: font.mono, fontSize: 10, lineHeight: 14, letterSpacing: 1.2, textTransform: 'uppercase', color: color.faint }}>{isTablePath(path) ? 'Table' : kind ? KIND_LABEL[kind] : 'File'}</T>
+      <T style={{ fontFamily: font.medium, fontSize: 13, lineHeight: 18, color: color.faint }}>{isTablePath(path) ? 'Table' : kind ? KIND_LABEL[kind] : 'File'}</T>
     </View>
   );
   return (

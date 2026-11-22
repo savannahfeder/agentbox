@@ -22,7 +22,7 @@ const TONES: Record<'dark' | 'light', Record<Tone, [string, string, string]>> = 
 };
 const dark = () => color.bg === DARK.bg;
 const line = () => (dark() ? 'rgba(255, 255, 255, 0.09)' : 'rgba(17, 25, 48, 0.08)');
-const head = (): TextStyle => ({ fontFamily: font.mono, fontSize: 10, letterSpacing: 0.9, textTransform: 'uppercase', color: color.faint });
+const head = (): TextStyle => ({ fontFamily: font.medium, fontSize: 13, color: color.faint });
 
 const ROW = 44;
 const NUMBER_W = 40;

@@ -34,7 +34,7 @@ export default function SettingsHome() {
   };
   const close = () => { setSearching(false); setQ(''); };
   const field = searching ? (
-    <View style={{ flex: 1, height: 40, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: color.bg }}>
+    <View style={{ flex: 1, height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 4, borderRadius: corner.pill, backgroundColor: color.card }}>
       <Magnifier size={16} />
       <TextInput value={q} onChangeText={setQ} autoFocus placeholder="Search settings" placeholderTextColor={color.faint} autoCorrect={false} autoCapitalize="none" returnKeyType="search" accessibilityLabel="Search settings"
         style={[{ flex: 1, minWidth: 0, padding: 0, fontFamily: font.regular, fontSize: 16, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
@@ -45,7 +45,7 @@ export default function SettingsHome() {
     <Page title="Settings" back="Back to app" lede={computerLine(s, c.now, cloudCarriesOn(c.rows.projects))} head={field}
       right={<IconButton label="Search settings" onPress={() => setSearching(true)}><Magnifier size={18} /></IconButton>}>
       {!q.trim() ? <PageList /> : (
-        <View style={{ marginTop: 24 }}>
+        <View style={{ marginTop: 24, backgroundColor: hits.length ? color.card : 'transparent', borderRadius: corner.card, paddingHorizontal: 16 }}>
           {hits.map((hit, i) => <NavRow key={`${hit.page}-${hit.label}`} first={i === 0} label={hit.label} aside={hit.pageLabel} onPress={() => open(hit)} />)}
           {hits.length === 0 && <T style={{ fontSize: 14, lineHeight: 21, color: color.faint }}>{`Nothing matches “${q}”.`}</T>}
         </View>

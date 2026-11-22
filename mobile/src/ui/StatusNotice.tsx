@@ -12,9 +12,9 @@ export function StatusNotice({ message, next }: { message?: string | null; next?
   const hidden = useSyncExternalStore(notices.subscribe, () => !message || notices.hidden(message), () => false);
   if (!message || hidden) return null;
   return (
-    <View accessibilityRole="alert" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, marginHorizontal: size.inset, marginBottom: 2, paddingLeft: 12, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.lineStrong }}>
-      <T style={{ flex: 1, paddingVertical: 9, fontSize: 13, lineHeight: 18.2, color: color.dim }}>
-        {message}{!!next && <T style={{ fontSize: 13, lineHeight: 18.2, color: color.faint }}>{` ${next}`}</T>}
+    <View accessibilityRole="alert" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginHorizontal: size.inset - 4, marginBottom: 4, paddingLeft: 16, borderRadius: corner.card, backgroundColor: color.fill }}>
+      <T style={{ flex: 1, paddingVertical: 12, fontSize: 14, lineHeight: 19.5, color: color.dim }}>
+        {message}{!!next && <T style={{ fontSize: 14, lineHeight: 19.5, color: color.faint }}>{` ${next}`}</T>}
       </T>
       <Pressable accessibilityRole="button" accessibilityLabel="Dismiss notice" onPress={() => notices.dismiss(message)}
         style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>

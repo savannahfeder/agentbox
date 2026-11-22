@@ -61,15 +61,15 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
   const stamp = reduced
     ? { opacity: at([0, 0.2, 0.74, 1], [0, 1, 1, 0]) }
     : { opacity: at([0, 0.18, 0.38, 0.78, 1], [0, 0, 1, 1, 0]), transform: [{ scale: at([0, 0.18, 0.38, 0.52, 1], [0.74, 0.78, 1.06, 1, 1]) }] };
-  const small = { fontSize: 11.5, lineHeight: 15 };
+  const small = { fontSize: 13, lineHeight: 18 };
   return (
     <Animated.View pointerEvents={verdict ? 'none' : 'auto'} style={[{
-      backgroundColor: color.sunk, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: verdict === 'allow' ? color.faint : color.line, paddingVertical: 12, paddingHorizontal: 14,
+      backgroundColor: color.sunk, borderWidth: 1, borderRadius: corner.card, borderColor: verdict === 'allow' ? color.faint : color.line, padding: 16,
       ...lift('float'),
     }, card]}>
       <Animated.View style={recede}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 9 }}>
-          <T style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 18.2, fontFamily: font.semibold }}>{words.lede}</T>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
+          <T style={{ flex: 1, minWidth: 0, fontSize: 15.5, lineHeight: 21, fontFamily: font.semibold }}>{words.lede}</T>
           {words.waiting && <T style={{ ...small, color: color.faint }}>{words.waiting}</T>}
           {/* Put aside to read what is under it; Review in the top bar brings it back (App.tsx `minimizedApproval`). */}
           <Pressable onPress={() => c.setMinimizedApproval(a.id)} accessibilityRole="button" hitSlop={8}>
@@ -77,31 +77,31 @@ function Card({ a, verdict, waiting, answer }: { a: Approval; verdict: 'allow' |
           </Pressable>
         </View>
         {/* The whole command, scrolling past six lines rather than cut. */}
-        <ScrollView style={{ maxHeight: 120, backgroundColor: color.film, marginBottom: 10 }} contentContainerStyle={{ paddingVertical: 9, paddingHorizontal: 11 }} nestedScrollEnabled>
-          <T selectable style={{ fontFamily: font.mono, fontSize: 12, lineHeight: 18 }}>{words.command}</T>
+        <ScrollView style={{ maxHeight: 120, backgroundColor: color.film, borderRadius: corner.small, marginBottom: 12 }} contentContainerStyle={{ paddingVertical: 11, paddingHorizontal: 13 }} nestedScrollEnabled>
+          <T selectable style={{ fontFamily: font.mono, fontSize: 12.5, lineHeight: 19 }}>{words.command}</T>
         </ScrollView>
-        {words.opens.map((line) => <T key={line} style={{ fontSize: 11.5, lineHeight: 16.7, color: color.dim, marginTop: -4, marginBottom: 10 }}>{line}</T>)}
+        {words.opens.map((line) => <T key={line} style={{ fontSize: 13, lineHeight: 18, color: color.dim, marginTop: -4, marginBottom: 12 }}>{line}</T>)}
         {(!!words.where || words.task) && (
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12, marginTop: -2, marginBottom: 10 }}>
-            {!!words.where && <T numberOfLines={1} style={{ ...small, fontFamily: font.mono, color: color.faint, flexShrink: 1, maxWidth: '62%' }}>{words.where}</T>}
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12, marginTop: -2, marginBottom: 14 }}>
+            {!!words.where && <T numberOfLines={1} style={{ ...small, color: color.faint, flexShrink: 1, maxWidth: '62%' }}>{words.where}</T>}
             {words.task && (
               <Pressable accessibilityRole="button" accessibilityHint="Opens this agent. The card stays where it is."
                 onPress={() => router.push({ pathname: '/thread/[product]/[id]', params: { product: words.task!.product, id: words.task!.id } })}
                 style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-end', gap: 5 }}>
                 <T numberOfLines={1} style={{ ...small, color: color.dim, flexShrink: 1 }}>{words.task.title}</T>
-                <T style={{ fontSize: 10.5, lineHeight: 14, color: color.faint }}>↗</T>
+                <T style={{ fontSize: 12, lineHeight: 16, color: color.faint }}>↗</T>
               </Pressable>
             )}
           </View>
         )}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable accessibilityRole="button" onPress={() => answer(true)}
-            style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: color.text, borderWidth: 1, borderRadius: corner.small, borderColor: 'transparent', opacity: pressed ? 0.88 : 1 })}>
-            <T style={{ fontSize: 16, fontFamily: font.semibold, color: color.bg }}>Allow</T>
+            style={({ pressed }) => ({ flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: color.graphite, borderRadius: corner.pill, opacity: pressed ? 0.85 : 1 })}>
+            <T style={{ fontSize: 16, fontFamily: font.semibold, color: color.ink }}>Allow</T>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => answer(false)}
-            style={({ pressed }) => ({ flex: 1, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: color.fill, borderWidth: 1, borderRadius: corner.small, borderColor: pressed ? color.faint : color.lineStrong })}>
-            {({ pressed }) => <T style={{ fontSize: 16, fontFamily: font.semibold, color: pressed ? color.text : color.dim }}>Deny</T>}
+            style={({ pressed }) => ({ flex: 1, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? color.lineStrong : color.picked, borderRadius: corner.pill })}>
+            <T style={{ fontSize: 16, fontFamily: font.semibold, color: color.text }}>Deny</T>
           </Pressable>
         </View>
       </Animated.View>

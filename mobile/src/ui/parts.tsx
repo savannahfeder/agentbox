@@ -159,8 +159,8 @@ export function SheetRow({ label, on, aside, lead, onPress }: { label: string; o
     <Pressable onPress={() => { feel.pick(); onPress(); }} accessibilityRole="button" accessibilityState={{ selected: !!on }}
       style={({ pressed }) => ({ minHeight: 52, borderRadius: corner.small, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: pressed ? color.picked : 'transparent' })}>
       {lead}
-      <T style={{ flex: 1, fontSize: 16.5, lineHeight: 22, color: color.text, fontFamily: on ? font.medium : font.regular }}>{label}</T>
-      {aside ? <T style={{ fontSize: 14, color: color.faint, paddingLeft: 12 }}>{aside}</T> : null}
+      <T style={{ flexGrow: 1, flexShrink: 1, paddingVertical: 6, fontSize: 16.5, lineHeight: 22, color: color.text, fontFamily: on ? font.medium : font.regular }}>{label}</T>
+      {aside ? <T numberOfLines={2} style={{ flexShrink: 1, maxWidth: '55%', textAlign: 'right', fontSize: 14, lineHeight: 19, color: color.faint }}>{aside}</T> : null}
       {on ? <Tick size={18} tint={color.text} /> : null}
     </Pressable>
   );
@@ -220,11 +220,23 @@ export function RunningMark({ cloud, children }: { cloud?: boolean; children?: R
   );
 }
 
-/** The dotted word as a view of its own: Android folds a press nested in a Text into the one text, out of a screen reader's and a tap's reach. */
-export function ChoiceButton({ children, said, onPress, style }: { children: string; said: string; onPress: () => void; style?: object }) {
+/** A choice in a box, as a chip: what is picked now, and a press opens the picker. */
+export function ChoiceButton({ children, said, onPress, lead }: { children: string; said: string; onPress: () => void; lead?: ReactNode }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={said} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
-      <T style={[{ textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }, style]}>{children}</T>
+    <Pressable onPress={() => { feel.tap(); onPress(); }} accessibilityRole="button" accessibilityLabel={said} hitSlop={{ top: 6, bottom: 6 }}
+      style={({ pressed }) => ({ height: 32, paddingHorizontal: 11, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: corner.pill, backgroundColor: pressed ? color.picked : color.fill })}>
+      {lead}
+      <T numberOfLines={1} style={{ fontSize: 13.5, lineHeight: 18, fontFamily: font.medium, color: color.dim }}>{children}</T>
+    </Pressable>
+  );
+}
+
+/** Send: the one filled disc in a box. */
+export function SendKey({ onPress, disabled, busy = false, label = 'Send' }: { onPress: () => void; disabled?: boolean; busy?: boolean; label?: string }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={busy ? 'Sending…' : label} hitSlop={6}
+      style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.graphite, opacity: disabled ? 0.3 : pressed ? 0.8 : 1 })}>
+      <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={color.ink} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><Path d="M12 19V5M6 11l6-6 6 6" /></Svg>
     </Pressable>
   );
 }

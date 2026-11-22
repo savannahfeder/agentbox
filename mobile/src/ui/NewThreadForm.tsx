@@ -28,22 +28,13 @@ import { useSendWhenOnline } from '../state/send-when-online';
 import { AttachSheet, Attached } from './Attach';
 import { withPicked } from '../lib/attach';
 import { DictationProblem, Listening, MicButton, useDictation } from './Dictation';
-import { Caret, Clip, Clock, Repeat } from './icons';
+import { Clock, Plus, Repeat } from './icons';
 import { TimeBox, TypingSheet } from './Later';
-import { Pickable, PriorityBars, Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
+import { ChoiceButton, PriorityBars, SendKey, Sheet, SheetHead, SheetRow, SheetSep, T } from './parts';
 import { ModelSheet, PrioritySheet, barsFor } from './Pickers';
-import { color, corner, font, size } from './theme';
+import { color, font, lift, size } from './theme';
 
 const Swatch = ({ slug }: { slug: string }) => <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: projectSwatch(slug) }} />;
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: size.inset, borderBottomWidth: 1, borderBottomColor: color.line }}>
-      <T style={{ width: 84, fontSize: 15, color: color.dim }}>{label}</T>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>{children}</View>
-    </View>
-  );
-}
 
 type Cloud = ReturnType<typeof useCloud>;
 interface Sending { product: string; projectName: string; mate: Teammate | 'new' | null; onAuto: boolean; later: Choices; draft: Draft; harness: Choices }
@@ -173,71 +164,50 @@ export function useNewThread(sent: () => void, reopen?: () => void) {
 }
 export type NewThread = ReturnType<typeof useNewThread>;
 
-/** Send and its Send later caret. */
+/** Send, and Send later beside it. */
 export function SendButtons({ form }: { form: NewThread }) {
   const { canSend, talk, send, busy, setSheet } = form;
-  // The desktop's grey Send (thread-composer.css `--send-fill`, `--send-split`), read here because a theme change rewrites `color`.
-  const SEND_FILL = `${color.text}26`;
-  const SEND_SPLIT = `${color.bg}8c`;
   return (
-    <View style={{ flexDirection: 'row', opacity: canSend ? 1 : 0.45 }}>
-      <Pressable disabled={!canSend} onPress={() => (talk.on ? talk.send() : void send())} accessibilityRole="button" accessibilityLabel="Send"
-        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: SEND_FILL, borderTopLeftRadius: corner.small, borderBottomLeftRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
-        <T style={{ fontSize: 15, fontFamily: font.medium, color: color.text }}>{busy ? 'Sending…' : 'Send'}</T>
-      </Pressable>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       {/* A message to a teammate goes now; it has no later. */}
       {!form.mate && (
         <Pressable disabled={!canSend} onPress={() => setSheet('later')} accessibilityRole="button" accessibilityLabel="Send later"
-          style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: SEND_FILL, borderLeftWidth: 1, borderLeftColor: SEND_SPLIT, borderTopRightRadius: corner.small, borderBottomRightRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
-          <Caret tint={color.text} />
+          style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? color.picked : color.fill, opacity: canSend ? 1 : 0.4 })}>
+          <Clock size={16} />
         </Pressable>
       )}
+      <SendKey disabled={!canSend} busy={busy} onPress={() => (talk.on ? talk.send() : void send())} />
     </View>
   );
 }
 
-/** The four rows and the message. `inline` is the empty inbox's: a shorter box that does not take the keyboard on its own. */
+/** The message, then who it goes to and how as chips under it. `inline` is the empty inbox's: a shorter box that does not take the keyboard on its own. */
 export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { form: NewThread; inline?: boolean; onFocus?: () => void; onBlur?: () => void }) {
   const { draft, box, talk, product, projectName, model, setSheet, agents, offered, engine, codex, mate, onAuto, toWord } = form;
   // A teammate keeps its own model and project; someone new needs only the project it works in.
   const toMate = !!mate && mate !== 'new';
   // A kept draft opens with the cursor after its words, then the cursor is the person's again.
   const [caret, setCaret] = useState<{ start: number; end: number } | undefined>(() => ({ start: draft.text.length, end: draft.text.length }));
+  const to = toWord ?? agentChoices(agents.engines).find((e) => e.id === engine)?.label ?? 'Agent';
+  const toMark = mate && mate !== 'new' ? <TeammateMark t={mate} /> : mate === 'new' ? <TeammateMark t={null} /> : onAuto ? <AutoMark /> : undefined;
+  const side = inline ? 18 : size.inset;
   return (
     <>
-      <Field label="To">
-        {offered.length > 1 || form.reach
-          ? (
-            <Pressable onPress={() => setSheet('to')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {mate && mate !== 'new' ? <TeammateMark t={mate} /> : mate === 'new' ? <TeammateMark t={null} /> : onAuto ? <AutoMark /> : null}
-              {/* The row is the button; a second one inside it is a button in a button. */}
-              <T style={{ fontSize: 15, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{toWord ?? agentChoices(agents.engines).find((e) => e.id === engine)?.label ?? 'Agent'}</T>
-            </Pressable>
-          )
-          : <T style={{ fontSize: 15 }}>Agent</T>}
-      </Field>
-      {!mate && <Field label="Model"><Pickable style={{ fontSize: 15 }} onPress={() => setSheet('model')}>{engineModelLabel(engine, model, codex)}</Pickable></Field>}
-      {!toMate && (
-        <Field label={mate === 'new' ? 'Works in' : 'Project'}>
-          <Pressable onPress={() => setSheet('project')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {!!product && <Swatch slug={product} />}
-            <T style={{ fontSize: 15, marginLeft: 6 }}>{projectName || 'Pick a project'}</T>
-          </Pressable>
-        </Field>
-      )}
-      {!mate && (
-        <Field label="Priority">
-          <Pressable onPress={() => setSheet('priority')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <PriorityBars level={draft.priority ? barsFor(priorityValueOf(draft.priority)) : 0} />
-            <T style={{ fontSize: 15 }}>{choiceLabelOf(draft.priority ?? null)}</T>
-          </Pressable>
-        </Field>
-      )}
       {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
       <TextInput ref={box} multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
         onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onBlur={onBlur}
         selection={caret} onFocus={() => { setTimeout(() => setCaret(undefined), 0); onFocus?.(); }}
-        style={[{ flex: inline ? undefined : 1, minHeight: inline ? 120 : 160, padding: 16, fontFamily: font.regular, fontSize: 16, lineHeight: 24.8, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+        style={[{ flex: inline ? undefined : 1, minHeight: inline ? 96 : 140, paddingTop: inline ? 18 : 12, paddingHorizontal: side, paddingBottom: 12, fontFamily: font.regular, fontSize: inline ? 16.5 : 19, lineHeight: inline ? 24 : 28, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: side - 6, paddingBottom: 8 }}>
+        {offered.length > 1 || form.reach
+          ? <ChoiceButton said={`To: ${to}`} onPress={() => setSheet('to')} lead={toMark}>{to}</ChoiceButton>
+          : null}
+        {!mate && <ChoiceButton said={`Model: ${engineModelLabel(engine, model, codex)}`} onPress={() => setSheet('model')}>{engineModelLabel(engine, model, codex)}</ChoiceButton>}
+        {!toMate && (
+          <ChoiceButton said={`${mate === 'new' ? 'Works in' : 'Project'}: ${projectName || 'Pick a project'}`} onPress={() => setSheet('project')} lead={product ? <Swatch slug={product} /> : undefined}>{projectName || 'Pick a project'}</ChoiceButton>
+        )}
+        {!mate && <ChoiceButton said={`Priority: ${choiceLabelOf(draft.priority ?? null)}`} onPress={() => setSheet('priority')} lead={<PriorityBars level={draft.priority ? barsFor(priorityValueOf(draft.priority)) : 0} />}>{choiceLabelOf(draft.priority ?? null)}</ChoiceButton>}
+      </View>
     </>
   );
 }
@@ -252,7 +222,7 @@ export function NewThreadFoot({ form, foot = 0, send }: { form: NewThread; foot?
   return (
     <>
     {(draft.files.length > 0 || draft.dropped > 0 || !!error || (!talk.on && !!talk.problem)) && (
-      <View style={{ paddingHorizontal: 16, paddingBottom: 12, gap: 10 }}>
+      <View style={{ paddingHorizontal: size.inset, paddingBottom: 12, gap: 10 }}>
         <Attached files={draft.files} drop={(i) => draft.setFiles((f) => f.filter((_, n) => n !== i))} />
         {draft.dropped > 0 && (
           <T style={{ fontSize: 13, color: color.dim }}>
@@ -263,18 +233,18 @@ export function NewThreadFoot({ form, foot = 0, send }: { form: NewThread; foot?
         <DictationProblem talk={talk} />
       </View>
     )}
-    <View style={{ height: 52 + foot, paddingBottom: foot, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: color.line }}>
+    <View style={{ height: 52 + foot, paddingBottom: foot, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       {talk.on ? (
-        <View style={{ flex: 1, flexDirection: 'row', paddingLeft: 16, paddingRight: 12 }}><Listening talk={talk} /></View>
+        <Listening talk={talk} lead={8} />
       ) : (
         <>
-          <Pressable onPress={() => setSheet('attach')} accessibilityRole="button" accessibilityLabel="Attach a file or picture"
-            style={({ pressed }) => ({ flex: 1, height: 52, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: pressed ? color.fill : 'transparent' })}>
-            <Clip />
-            <T style={{ fontSize: 15, color: color.dim }}>{send ? 'Attach' : 'Attach a file or picture'}</T>
+          <Pressable onPress={() => setSheet('attach')} accessibilityRole="button" accessibilityLabel="Attach a file or picture" hitSlop={4}
+            style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? color.picked : color.fill })}>
+            <Plus />
           </Pressable>
-          <View style={{ marginRight: send ? 4 : 8 }}><MicButton talk={talk} /></View>
-          {send && <View style={{ marginRight: 12 }}>{send}</View>}
+          <MicButton talk={talk} />
+          <View style={{ flex: 1 }} />
+          {send}
         </>
       )}
     </View>
@@ -356,7 +326,7 @@ export function InboxComposer() {
   text.current = form.draft.text;
   useEffect(() => () => { if (typing.current && text.current.trim()) router.push('/new'); }, []);
   return (
-    <View style={{ borderWidth: 1, borderRadius: corner.card, overflow: 'hidden', borderColor: color.lineStrong, backgroundColor: color.card }}>
+    <View style={{ borderRadius: 26, backgroundColor: color.card, borderWidth: 1, borderColor: color.line, ...lift('card') }}>
       <NewThreadFields form={form} inline onFocus={() => { typing.current = true; }} onBlur={() => { typing.current = false; }} />
       <NewThreadFoot form={form} send={<SendButtons form={form} />} />
       <NewThreadSheets form={form} now={c.now} />

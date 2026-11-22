@@ -9,8 +9,8 @@ import Svg, { Path } from 'react-native-svg';
 import type { Reading } from '../lib/settings-view';
 import { useCloud } from '../state/cloud';
 import { Back, Caret } from './icons';
-import { Sheet, SheetHead, SheetRow, T, Wall } from './parts';
-import { color, corner, font, size } from './theme';
+import { IconButton, Sheet, SheetHead, SheetRow, T, Wall } from './parts';
+import { color, corner, font, lift, size } from './theme';
 
 export function Page({ title, lede, back = 'Settings', right, head, children }: { title: string; lede?: string; back?: string; /** At the right of the Back row. */ right?: ReactNode; /** Takes the Back row's place (Settings' search field). */ head?: ReactNode; children: ReactNode }) {
   const inset = useSafeAreaInsets();
@@ -19,22 +19,19 @@ export function Page({ title, lede, back = 'Settings', right, head, children }: 
   return (
     <Wall>
       <View style={{ paddingTop: inset.top }}>
-        <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', paddingLeft: head ? 12 : size.inset, paddingRight: head ? 12 : 8 }}>
+        <View style={{ height: size.topBar, flexDirection: 'row', alignItems: 'center', paddingLeft: 12, paddingRight: head ? 12 : 14 }}>
           {head ?? (
             <>
-              <Pressable onPress={leave} accessibilityRole="button" style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10 }}>
-                <Back size={14} />
-                <T style={{ fontSize: 13, letterSpacing: 0.52, color: color.dim }}>{back}</T>
-              </Pressable>
+              <IconButton label={back} onPress={leave}><Back size={16} /></IconButton>
               <View style={{ flex: 1 }} />
               {right}
             </>
           )}
         </View>
       </View>
-      <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: size.inset, paddingBottom: Math.max(40 + inset.bottom, approvalRoom + 16) }}>
-        <T style={{ fontSize: 24, lineHeight: 31, letterSpacing: -0.84 }}>{title}</T>
-        {lede ? <T style={{ fontSize: 13.5, lineHeight: 20, color: color.faint, marginTop: 8 }}>{lede}</T> : null}
+      <ScrollView contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 16, paddingBottom: Math.max(40 + inset.bottom, approvalRoom + 16) }}>
+        <T style={{ fontFamily: font.display, fontSize: 32, lineHeight: 38, letterSpacing: -0.6, paddingHorizontal: 4 }}>{title}</T>
+        {lede ? <T style={{ fontSize: 15, lineHeight: 21, color: color.faint, marginTop: 6, paddingHorizontal: 4 }}>{lede}</T> : null}
         {children}
       </ScrollView>
     </Wall>
@@ -44,10 +41,10 @@ export function Page({ title, lede, back = 'Settings', right, head, children }: 
 /** `note` is the line under the heading (settings.css `.acct-place-line`). */
 export function Group({ label, note, children }: { label?: string; note?: string | null; children: ReactNode }) {
   return (
-    <View style={{ marginTop: 32 }}>
-      {label ? <T style={{ fontSize: 14, fontFamily: font.medium, letterSpacing: -0.07, paddingBottom: 12 }}>{label}</T> : null}
-      {note ? <T style={{ marginTop: -4, paddingBottom: 12, fontSize: 12.5, lineHeight: 19, color: color.dim }}>{note}</T> : null}
-      <View style={{ backgroundColor: color.fill, borderWidth: 1, borderColor: color.line, borderRadius: 10, paddingHorizontal: 18 }}>{children}</View>
+    <View style={{ marginTop: 28 }}>
+      {label ? <T style={{ fontFamily: font.semibold, fontSize: 13, color: color.faint, paddingHorizontal: 4, paddingBottom: 8 }}>{label}</T> : null}
+      {note ? <T style={{ marginTop: -2, paddingHorizontal: 4, paddingBottom: 10, fontSize: 13.5, lineHeight: 19, color: color.dim }}>{note}</T> : null}
+      <View style={{ backgroundColor: color.card, borderRadius: corner.card, paddingHorizontal: 16 }}>{children}</View>
     </View>
   );
 }
@@ -57,18 +54,18 @@ export function Group({ label, note, children }: { label?: string; note?: string
 export function Row({ label, desc, control, first = false, reading, badge, stack = false, below }: { label: string; desc?: string | null; control?: ReactNode; first?: boolean; reading?: Reading; badge?: string; stack?: boolean; below?: ReactNode }) {
   const note = reading?.waiting ? 'Waiting for your computer' : reading?.refused ? `Not changed (${reading.refused})` : null;
   return (
-    <View style={{ paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderTopColor: color.line }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20 }}>
+    <View style={{ paddingVertical: 15, borderTopWidth: first ? 0 : 1, borderTopColor: color.rowLine }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <T style={{ fontSize: 13.5, fontFamily: font.medium, letterSpacing: -0.04 }}>{label}</T>
-            {badge ? <T style={{ fontSize: 11, color: color.dim, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, paddingHorizontal: 6, paddingVertical: 1 }}>{badge}</T> : null}
+            <T style={{ flexShrink: 1, fontSize: 16, lineHeight: 22 }}>{label}</T>
+            {badge ? <View style={{ borderRadius: corner.pill, backgroundColor: color.picked, paddingHorizontal: 8, paddingVertical: 2 }}><T style={{ fontSize: 12, fontFamily: font.medium, color: color.dim }}>{badge}</T></View> : null}
           </View>
-          {desc ? <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.faint, marginTop: 3 }}>{desc}</T> : null}
+          {desc ? <T style={{ fontSize: 13.5, lineHeight: 19, color: color.faint, marginTop: 3 }}>{desc}</T> : null}
           {note ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 }}>
               {reading?.waiting ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color.accent }} /> : null}
-              <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.dim }}>{note}</T>
+              <T style={{ fontSize: 13.5, lineHeight: 19, color: color.dim }}>{note}</T>
             </View>
           ) : null}
           {stack && control ? <View style={{ flexDirection: 'row', marginTop: 10 }}>{control}</View> : null}
@@ -85,8 +82,8 @@ export function Row({ label, desc, control, first = false, reading, badge, stack
 export function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <Pressable onPress={() => onChange(!on)} accessibilityRole="switch" accessibilityState={{ checked: on }} accessibilityLabel={label} hitSlop={8}
-      style={{ width: 38, height: 22, borderRadius: 11, borderWidth: 1, borderColor: on ? color.text : color.lineStrong, backgroundColor: on ? color.text : color.picked, justifyContent: 'center' }}>
-      <View style={{ width: 16, height: 16, borderRadius: 8, marginLeft: on ? 18 : 2, backgroundColor: on ? color.bg : color.dim }} />
+      style={{ width: 50, height: 30, borderRadius: 15, backgroundColor: on ? color.graphite : color.lineStrong, justifyContent: 'center' }}>
+      <View style={{ width: 26, height: 26, borderRadius: 13, marginLeft: on ? 22 : 2, backgroundColor: on ? color.ink : color.card, ...lift('card') }} />
     </Pressable>
   );
 }
@@ -95,8 +92,8 @@ export function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boo
 export function Chip({ label, now, onPress }: { label: string; now: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label}: ${now}`}
-      style={({ pressed }) => ({ height: 28, maxWidth: 240, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderRadius: corner.small, borderColor: pressed ? color.lineStrong : color.line, backgroundColor: color.fill })}>
-      <T numberOfLines={1} style={{ fontSize: 13, flexShrink: 1 }}>{now}</T>
+      style={({ pressed }) => ({ height: 34, maxWidth: 220, paddingLeft: 13, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: corner.pill, backgroundColor: pressed ? color.picked : color.fill })}>
+      <T numberOfLines={1} style={{ fontSize: 14.5, fontFamily: font.medium, color: color.dim, flexShrink: 1 }}>{now}</T>
       <Caret size={11} tint={color.faint} />
     </Pressable>
   );
@@ -127,14 +124,14 @@ const Sign = ({ d, tint }: { d: string; tint: string }) => (
 export function Stepper({ value, min, max, onChange, label }: { value: number; min: number; max: number; onChange: (v: number) => void; label: string }) {
   const chip = (to: number, d: string, off: boolean, what: string) => (
     <Pressable onPress={() => onChange(to)} disabled={off} accessibilityRole="button" accessibilityLabel={`${label}, ${what}`} hitSlop={6}
-      style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+      style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}>
       <Sign d={d} tint={off ? color.lineStrong : color.dim} />
     </Pressable>
   );
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', borderRadius: corner.pill, backgroundColor: color.fill }}>
       {chip(value - 1, 'M2.5 6h7', value <= min, 'fewer')}
-      <T style={{ width: 28, textAlign: 'center', fontSize: 13.5, fontFamily: font.medium }}>{value}</T>
+      <T style={{ width: 28, textAlign: 'center', fontSize: 15, fontFamily: font.medium }}>{value}</T>
       {chip(value + 1, 'M2.5 6h7M6 2.5v7', value >= max, 'more')}
     </View>
   );
@@ -150,8 +147,8 @@ export function Meters({ meters }: { meters: { key: string; word: string; percen
         return (
           <View key={m.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
             <T numberOfLines={1} style={{ width: 54, fontSize: 12, color: color.dim }}>{m.word}</T>
-            <View style={{ flex: 1, height: 4, borderRadius: 2, overflow: 'hidden', backgroundColor: color.line }}>
-              <View style={{ height: 4, width: `${Math.min(100, m.percent ?? 0)}%`, backgroundColor: full ? color.accent : color.dim }} />
+            <View style={{ flex: 1, height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: color.line }}>
+              <View style={{ height: 6, borderRadius: 3, width: `${Math.min(100, m.percent ?? 0)}%`, backgroundColor: full ? color.accent : color.dim }} />
             </View>
             <T style={{ width: 34, textAlign: 'right', fontSize: 12, fontFamily: font.medium, color: full ? color.text : color.dim }}>{m.percent == null ? '–' : `${m.percent}%`}</T>
             <T numberOfLines={1} style={{ width: 78, fontSize: 12, color: color.faint }}>{m.resets ?? ''}</T>
@@ -162,12 +159,12 @@ export function Meters({ meters }: { meters: { key: string; word: string; percen
   );
 }
 
-/** A small outlined button (`.set-ghost`). */
+/** A small quiet button. */
 export function Button({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button"
-      style={({ pressed }) => ({ height: 28, paddingHorizontal: 11, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: disabled ? 0.5 : 1 })}>
-      <T style={{ fontSize: 13, color: color.dim }}>{title}</T>
+      style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked, opacity: disabled ? 0.5 : 1 })}>
+      <T style={{ fontSize: 14, fontFamily: font.medium, color: color.text }}>{title}</T>
     </Pressable>
   );
 }
@@ -180,9 +177,9 @@ const Chevron = () => (
 export function NavRow({ label, aside, onPress, first = false }: { label: string; aside?: string; onPress: () => void; first?: boolean }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="button"
-      style={({ pressed }) => ({ minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: first ? 0 : 1, borderTopColor: color.line, opacity: pressed ? 0.6 : 1 })}>
-      <T style={{ flex: 1, fontSize: 15, letterSpacing: -0.1 }}>{label}</T>
-      {aside ? <T numberOfLines={1} style={{ fontSize: 13, color: color.faint, maxWidth: 170 }}>{aside}</T> : null}
+      style={({ pressed }) => ({ minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: first ? 0 : 1, borderTopColor: color.rowLine, opacity: pressed ? 0.55 : 1 })}>
+      <T style={{ flex: 1, fontSize: 16, lineHeight: 22 }}>{label}</T>
+      {aside ? <T numberOfLines={1} style={{ fontSize: 15, color: color.faint, maxWidth: 170 }}>{aside}</T> : null}
       <Chevron />
     </Pressable>
   );
@@ -190,5 +187,5 @@ export function NavRow({ label, aside, onPress, first = false }: { label: string
 
 /** A sentence on its own under a page's plates. */
 export const Aside = ({ children }: { children: ReactNode }) => (
-  <T style={{ fontSize: 12.5, lineHeight: 18.75, color: color.faint, marginTop: 14 }}>{children}</T>
+  <T style={{ fontSize: 13.5, lineHeight: 19, color: color.faint, marginTop: 14, paddingHorizontal: 4 }}>{children}</T>
 );

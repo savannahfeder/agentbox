@@ -46,23 +46,22 @@ import { useSendWhenOnline } from '../../../state/send-when-online';
 import { AttachSheet, Attached } from '../../../ui/Attach';
 import { withAttachments, withPicked } from '../../../lib/attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
-import { Back, Caret, Chevron, Clip, Clock, Cross, DoneMark, More } from '../../../ui/icons';
+import { Back, Chevron, Clock, Cross, DoneMark, More, Plus } from '../../../ui/icons';
 import { TimeBox, TypingSheet } from '../../../ui/Later';
 import { replyLaterRows } from '../../../lib/later';
 import { agentChoices, laterHint, momentFromWords } from '../../../../../renderer/src/threads/composer-rules';
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
 import { Selectable } from '../../../ui/Selectable';
-import { ChoiceButton, footRoom, IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
-import { ModelSheet, ModeSheet, PrioritySheet } from '../../../ui/Pickers';
+import { ChoiceButton, footRoom, IconButton, PriorityBars, RunningMark, SendKey, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
+import { barsFor, ModelSheet, ModeSheet, PrioritySheet } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
 import { ActLine, ChangeCard, FiledList, FocusActions, LiveLine, OptionsCard, RunLine, WorkLine } from '../../../ui/ThreadParts';
-import { color, corner, font, size } from '../../../ui/theme';
+import { color, corner, font, lift, size } from '../../../ui/theme';
 
 const when = (at: number) => (at ? `${dayHeading(at)} ${clock(at)}` : '');
-// The dark look's `--code-minus`, which a message her Mac refused says why in.
-const REFUSED = '#e28f82';
+
 
 type Kind = 'msg' | 'same' | 'act' | 'work';
 const kindOf = (n: ThreadNode): Kind => (n.kind === 'run' ? 'work' : n.kind === 'work' ? (n.yours ? 'act' : 'work') : n.same && !n.resumed ? 'same' : 'msg');
@@ -85,19 +84,17 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
   const yours = e.who === 'you';
   const words = yours ? typedWords(e.text ?? '') : '';
   return (
-    <View style={[
-      starts ? { marginTop: 16, paddingTop: 22, borderTopWidth: 1, borderTopColor: color.lineStrong } : null,
-      ends ? { marginBottom: 16, paddingBottom: 22, borderBottomWidth: 1, borderBottomColor: color.lineStrong } : null,
-    ]}>
+    <View style={[starts ? { marginTop: 14 } : null, ends ? { marginBottom: 14 } : null]}>
       {(!e.same || e.resumed) && (
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 3, flexWrap: 'wrap' }}>
-          <T style={yours ? { fontSize: 14, lineHeight: 22.4, fontFamily: font.semibold } : { fontSize: 14, lineHeight: 22.4, color: color.dim }}>{yours ? 'You' : name ?? 'The agent'}</T>
-          <T style={{ fontSize: 12.5, lineHeight: 20, color: e.refused ? REFUSED : e.pending ? color.dim : color.faint, flexShrink: 1 }} numberOfLines={2}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: yours ? 'flex-end' : 'flex-start', gap: 10, marginBottom: yours ? 5 : 3, flexWrap: 'wrap' }}>
+          {/* Your own words are the bubble on the right; only the agent's are signed. */}
+          {!yours && <T style={{ fontSize: 14, lineHeight: 22.4, fontFamily: font.medium, color: color.dim }}>{name ?? 'The agent'}</T>}
+          <T style={{ fontSize: 12.5, lineHeight: 20, color: e.refused ? color.minus : e.pending ? color.dim : color.faint, flexShrink: 1 }} numberOfLines={2}>
             {e.refused ? `Not sent: ${e.refused}` : e.pending ? (e.sent ? 'Sent' : e.cloud ? 'Working in Agentbox Cloud' : e.toCloud ? 'Waiting for Agentbox Cloud' : e.scheduled ? `Scheduled for ${dayClock(e.scheduled)}` : 'Waiting for your computer') : when(e.at)}
           </T>
           {e.pending && !e.refused && !e.cloud && !e.toCloud && !e.scheduled && !e.sent && sendNow && (
             <T onPress={sendNow} suppressHighlighting accessibilityRole="button"
-              style={{ fontSize: 12.5, lineHeight: 20, color: color.dim, textDecorationLine: 'underline' }}>Send now</T>
+              style={{ fontSize: 12.5, lineHeight: 20, fontFamily: font.semibold, color: color.text }}>Send now</T>
           )}
           {!!e.on && <T onPress={openOrigin} suppressHighlighting accessibilityRole="button" numberOfLines={1} style={{ fontSize: 12.5, lineHeight: 20, color: color.faint, flexShrink: 1 }}>{`on ${e.on}`}</T>}
         </View>
@@ -106,7 +103,11 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
         {/* Her words as typed; the files the app wrote into them are drawn, not read out. */}
         {yours ? (
           <>
-            {!!words.trim() && <Selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</Selectable>}
+            {!!words.trim() && (
+              <View accessibilityLabel={`You: ${words}`} style={{ alignSelf: 'flex-end', maxWidth: '88%', paddingVertical: 10, paddingHorizontal: 16, borderRadius: corner.card, borderBottomRightRadius: 6, backgroundColor: color.picked }}>
+                <Selectable style={{ fontSize: 16.5, lineHeight: 24 }}>{words}</Selectable>
+              </View>
+            )}
             <SentFiles text={e.text ?? ''} product={product} />
           </>
         ) : <Markdown text={e.text ?? ''} dir={dir} files={files} />}
@@ -151,8 +152,6 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const mode = picked.permissionMode ?? 'auto';
   const priorityWord = priorityLabelOf(shownLevel({ priority }));
   const modeWord = MODE_WORDS[mode as keyof typeof MODE_WORDS] ?? mode;
-  const sentenceWord = { fontSize: 13, lineHeight: 21, color: color.faint };
-  const choiceWord = { fontSize: 13, lineHeight: 21, color: color.dim };
   const folded = foldedReply(draft.text, draft.files.map((f) => ({ name: f.name, image: isImageName(f.name) })));
   const deps = useRef<ReplyDeps | null>(null);
   deps.current = {
@@ -190,87 +189,80 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   // A box that only listened, and heard nothing, folds away as an empty one does on blur.
   useEffect(() => { if (!talk.on && !talk.problem && !ready && !sheet && !typing.current?.isFocused()) setOpen(false); }, [talk.on]);
   const foot = footRoom(inset);
-  const card = { borderWidth: 1, borderRadius: corner.small, backgroundColor: color.fill };
+  const card = { borderRadius: 26, backgroundColor: color.card, borderWidth: 1, borderColor: color.line, ...lift('card') };
   const stopButton = (
     <Pressable onPress={() => setSheet('stop')} disabled={stopping} accessibilityRole="button" accessibilityLabel={thread.running ? 'Stop this agent' : 'Stop this task'}
-      style={({ pressed }) => ({ height: 29, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: stopping ? 0.5 : 1 })}>
+      style={({ pressed }) => ({ height: 36, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked, opacity: stopping ? 0.5 : 1 })}>
       {!stopping && <StopMark />}
-      <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>{stopping ? 'Stopping…' : 'Stop'}</T>
+      <T style={{ fontSize: 14, fontFamily: font.semibold, color: color.text }}>{stopping ? 'Stopping…' : 'Stop'}</T>
     </Pressable>
   );
   return (
-    <View style={{ paddingHorizontal: 12, paddingBottom: 16 + foot, paddingTop: 8 }}>
+    <View style={{ paddingHorizontal: 12, paddingBottom: Math.max(12, foot), paddingTop: 8 }}>
       {!open ? (
-        <View style={{ ...card, borderColor: color.line, height: 43, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ ...card, height: 52, flexDirection: 'row', alignItems: 'center', paddingRight: 8 }}>
           <Pressable onPress={openReply} accessibilityRole="button" accessibilityLabel="Reply" style={{ flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center' }}>
-            <T numberOfLines={1} style={{ flex: 1, fontSize: 14.5, color: folded.draft ? color.dim : color.faint, paddingHorizontal: 16 }}>{folded.text}</T>
-            {!!folded.files && <T style={{ fontSize: 12, color: color.faint, paddingRight: 12 }}>{folded.files}</T>}
-            <T style={{ fontSize: 13, color: color.dim, marginRight: 4, textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }}>{modelLabel}</T>
+            <T numberOfLines={1} style={{ flex: 1, fontSize: 16, color: folded.draft ? color.text : color.faint, paddingLeft: 20, paddingRight: 12 }}>{folded.text}</T>
+            {!!folded.files && <T style={{ fontSize: 13, color: color.faint, paddingRight: 10 }}>{folded.files}</T>}
+            <View style={{ height: 30, paddingHorizontal: 11, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: color.fill, marginRight: 2 }}><T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>{modelLabel}</T></View>
           </Pressable>
           {foldedChoices > 0 && (
             <Pressable onPress={showChoices} accessibilityRole="button" accessibilityLabel={`Show the ${foldedChoices} choices`} hitSlop={6}
               style={{ height: 32, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-              <T style={{ fontFamily: font.mono, fontSize: 11, color: color.dim }}>{foldedChoices}</T>
+              <T style={{ fontFamily: font.medium, fontSize: 13, color: color.dim }}>{foldedChoices}</T>
               <Chevron up size={13} />
             </Pressable>
           )}
-          <View style={{ marginRight: offers.stop ? 0 : 4 }}><MicButton talk={{ ...talk, start: () => { setOpen(true); talk.start(); } }} /></View>
-          {offers.stop && <View style={{ marginRight: 7 }}>{stopButton}</View>}
+          <View><MicButton talk={{ ...talk, start: () => { setOpen(true); talk.start(); } }} /></View>
+          {offers.stop && <View style={{ marginLeft: 2 }}>{stopButton}</View>}
         </View>
       ) : (
-        <View style={{ ...card, borderColor: color.lineStrong }} onTouchStartCapture={() => { pressInside.current = true; }}
+        <View style={{ ...card }} onTouchStartCapture={() => { pressInside.current = true; }}
           onTouchEnd={() => setTimeout(() => { pressInside.current = false; }, 400)}>
           {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
           <TextInput ref={typing} autoFocus={!talk.active()} multiline value={draft.text} placeholder="What should the agent do next?" placeholderTextColor={color.faint}
             selection={caret} onFocus={() => setTimeout(() => setCaret(undefined), 0)}
             onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }}
             onBlur={() => { if (!ready && !sheet && !talk.active() && !pressInside.current) setOpen(false); }}
-            style={[{ minHeight: 92, maxHeight: 220, paddingTop: 12, paddingHorizontal: 16, paddingBottom: 6, fontFamily: font.regular, fontSize: 15.5, lineHeight: 24, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+            style={[{ minHeight: 72, maxHeight: 220, paddingTop: 16, paddingHorizontal: 20, paddingBottom: 6, fontFamily: font.regular, fontSize: 16.5, lineHeight: 24, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
           {(draft.files.length > 0 || failed || draft.dropped > 0 || (!talk.on && !!talk.problem)) && (
-            <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+            <View style={{ paddingHorizontal: 20, paddingBottom: 10, gap: 8 }}>
               <Attached files={draft.files} drop={(i) => draft.setFiles((f) => f.filter((_, n) => n !== i))} />
               {draft.dropped > 0 && <T style={{ fontSize: 13, color: color.dim }}>{draft.dropped === 1 ? 'One file is too big to keep. Leaving this thread loses it.' : `${draft.dropped} files are too big to keep. Leaving this thread loses them.`}</T>}
               {failed && <T style={{ fontSize: 13, color: color.dim }}>{failed}</T>}
               <DictationProblem talk={talk} />
             </View>
           )}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, borderTopWidth: 1, borderTopColor: color.line, paddingTop: 9, paddingBottom: 10, paddingLeft: 12, paddingRight: 14 }}>
+          {/* The chips wrap under each other on a narrow screen; a choice's name never splits. */}
+          {!talk.on && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingBottom: 8 }}>
+              <ChoiceButton said={`Priority: ${priorityWord}`} onPress={() => setSheet('priority')} lead={<PriorityBars level={barsFor(priority)} />}>{priorityWord}</ChoiceButton>
+              <ChoiceButton said={`Mode: ${modeWord}`} onPress={() => setSheet('mode')}>{modeWord}</ChoiceButton>
+              <ChoiceButton said={`Model: ${modelLabel}`} onPress={() => setSheet('model')}>{modelLabel}</ChoiceButton>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 10, paddingLeft: 10, paddingRight: 10 }}>
             {talk.on ? (
-              <Listening talk={talk} lead={4} />
+              <Listening talk={talk} lead={10} />
             ) : (
             <>
             <Pressable onPress={() => setSheet('attach')} accessibilityLabel="Attach a file or picture" accessibilityRole="button" hitSlop={4}
-              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginRight: -4 }}>
-              <Clip />
+              style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? color.picked : color.fill })}>
+              <Plus />
             </Pressable>
-            <View style={{ marginLeft: -10, marginRight: -4 }}><MicButton talk={talk} /></View>
-            {/* Word by word, so the line wraps as the sentence did; a choice's name never splits. */}
-            <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 3.5 }}>
-              <ChoiceButton style={choiceWord} said={`Priority: ${priorityWord}`} onPress={() => setSheet('priority')}>{priorityWord}</ChoiceButton>
-              <T style={sentenceWord}>priority.</T>
-              <T style={sentenceWord}>In</T>
-              <ChoiceButton style={choiceWord} said={`Mode: ${modeWord}`} onPress={() => setSheet('mode')}>{modeWord.replace(/ /g, ' ')}</ChoiceButton>
-              <T style={sentenceWord}>Mode.</T>
-              <T style={sentenceWord}>On</T>
-              <View style={{ flexDirection: 'row' }}>
-                <ChoiceButton style={choiceWord} said={`Model: ${modelLabel}`} onPress={() => setSheet('model')}>{modelLabel.replace(/ /g, ' ')}</ChoiceButton>
-                <T style={sentenceWord}>.</T>
-              </View>
-            </View>
+            <MicButton talk={talk} />
+            <View style={{ flex: 1 }} />
             {/* One slot: Stop while it is in progress and the box is empty, Send once anything is typed (Focus.tsx). */}
             {offers.stop && !ready ? stopButton : (
-              // Send and its Send later caret, which only sets the time; the caret says it (components/ReplyLater.tsx).
-              <View style={{ flexDirection: 'row', opacity: busy || !ready ? 0.5 : 1 }}>
-                <Pressable disabled={busy || !ready} accessibilityRole="button" onPress={sendByHand}
-                  style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderTopLeftRadius: corner.small, borderBottomLeftRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
-                  <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
-                </Pressable>
+              // Send later only sets the time; Send says it.
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Pressable disabled={busy || !ready} onPress={() => setSheet('later')} accessibilityRole="button"
                   accessibilityLabel={sendsAt ? `Sends ${laterHint(sendsAt)}. Change when` : 'Send later'}
-                  style={({ pressed }) => ({ height: 29, minWidth: 29, paddingHorizontal: sendsAt ? 8 : 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderLeftWidth: 0, borderTopRightRadius: corner.small, borderBottomRightRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
-                  {sendsAt > 0 && <T style={{ fontSize: 12, color: color.dim }}>{laterHint(sendsAt)}</T>}
-                  <Caret tint={color.dim} />
+                  style={({ pressed }) => ({ height: 36, minWidth: 36, paddingHorizontal: sendsAt ? 11 : 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: corner.pill, backgroundColor: pressed ? color.picked : color.fill, opacity: busy || !ready ? 0.4 : 1 })}>
+                  <Clock size={16} />
+                  {sendsAt > 0 && <T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>{laterHint(sendsAt)}</T>}
                 </Pressable>
+                <SendKey disabled={busy || !ready} busy={busy} onPress={sendByHand} />
               </View>
             )}
             </>
@@ -490,13 +482,12 @@ export default function ThreadScreen() {
           {/* Done in a box of its own, left of the dots, as the desktop draws it (threads/ThreadMenu.tsx). */}
           {threadState(item) !== 'done' && (
             <Pressable onPress={close} disabled={busy} accessibilityRole="button" accessibilityLabel="Mark done"
-              style={({ pressed }) => ({ height: 30, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 9, paddingRight: 12, marginRight: 4, borderWidth: 1, borderRadius: corner.small, borderColor: pressed ? color.lineStrong : color.line, backgroundColor: pressed ? color.picked : 'transparent' })}>
-              <DoneMark />
-              <T style={{ fontSize: 13, color: color.dim }}>Done</T>
+              style={({ pressed }) => ({ height: 36, flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 12, paddingRight: 15, borderRadius: corner.pill, backgroundColor: pressed ? color.picked : color.fill })}>
+              <DoneMark tint={color.text} />
+              <T style={{ fontSize: 14, fontFamily: font.medium, color: color.text }}>Done</T>
             </Pressable>
           )}
           <IconButton label="More" onPress={() => setMenu(true)}><More /></IconButton>
-          <View style={{ width: 16 }} />
         </>}
       />
       {/* The permission card floats over the foot: the reply box sits 8pt above it and the queued cards' edges (14pt), its own foot room spent. */}
@@ -519,16 +510,16 @@ export default function ThreadScreen() {
           onLayout={() => { if (resting.current) scroll.current?.scrollToEnd({ animated: false }); }}>
           {/* The name heads the page, the largest type on it, with the Context under a thin line (one-thing-at-a-time.css). */}
           <View style={{ marginBottom: 18 }}>
-            <T selectable style={{ fontFamily: font.medium, fontSize: 27, lineHeight: 33.75, letterSpacing: -0.405, marginBottom: 6 }}>{page.title}</T>
+            <T selectable style={{ fontFamily: font.display, fontSize: 30, lineHeight: 36, letterSpacing: -0.5, marginBottom: 8 }}>{page.title}</T>
             {page.toggle && (
               <Pressable onPress={() => { const open = !earlierOpen; setEarlierOpen(open); setWhole(true); resting.current = open; }} accessibilityRole="button" hitSlop={6} style={{ alignSelf: 'flex-start', marginBottom: 10 }}>
-                <T style={{ fontSize: 12.5, lineHeight: 18, color: color.faint, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>{page.toggle}</T>
+                <T style={{ fontSize: 13.5, lineHeight: 18, fontFamily: font.medium, color: color.faint }}>{page.toggle}</T>
               </Pressable>
             )}
             {!!page.context && (
               <Pressable onPress={() => setContextWhole(!contextWhole)} accessibilityRole="button" accessibilityState={{ expanded: contextWhole }}
-                style={{ borderLeftWidth: 2, borderLeftColor: color.lineStrong, paddingLeft: 14 }}>
-                <T numberOfLines={contextWhole ? undefined : 3} style={{ fontSize: 13.5, lineHeight: 20.9, color: color.faint }}>{page.context}</T>
+                style={{ borderRadius: corner.small, backgroundColor: color.fill, paddingVertical: 12, paddingHorizontal: 14 }}>
+                <T numberOfLines={contextWhole ? undefined : 3} style={{ fontSize: 14.5, lineHeight: 21, color: color.dim }}>{page.context}</T>
               </Pressable>
             )}
           </View>
@@ -539,7 +530,7 @@ export default function ThreadScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 12 }}>
                   <TeammateMark t={mate} />
                   <T style={{ fontSize: 14, color: color.dim }}>{mate.name}</T>
-                  <T style={{ fontFamily: font.mono, fontSize: 10.5, color: color.faint }}>{when(page.answer.at)}</T>
+                  <T style={{ fontSize: 12.5, color: color.faint }}>{when(page.answer.at)}</T>
                 </View>
               )}
               {page.answer.headline && <Selectable style={{ fontFamily: font.semibold, fontSize: 17, lineHeight: 24.65, marginBottom: 8 }}>{page.answer.headline}</Selectable>}
@@ -559,7 +550,7 @@ export default function ThreadScreen() {
                   <T style={{ fontSize: 12.5, color: color.faint }}>{when(thread.outcome.at)}</T>
                 </View>
               ) : thread.outcome.label && (
-                <T style={{ fontSize: 12, letterSpacing: 0.84, textTransform: 'uppercase', fontFamily: font.semibold, color: color.faint, marginBottom: 7 }}>{thread.outcome.label}</T>
+                <T style={{ fontSize: 13, fontFamily: font.semibold, color: color.faint, marginBottom: 7 }}>{thread.outcome.label}</T>
               )}
               <Markdown text={thread.outcome.text} dir={dir} files={files} />
             </View>

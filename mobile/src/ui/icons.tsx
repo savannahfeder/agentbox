@@ -51,6 +51,11 @@ export const FileMark = ({ size = 14, tint = color.dim }: P) => (
   <Svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={tint} strokeWidth={1.2}><Path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3" strokeLinejoin="round" /></Svg>
 );
 
+/** Add something to a box: a file, a picture. */
+export const Plus = ({ size = 18, tint = color.dim }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.8} strokeLinecap="round"><Path d="M12 5v14M5 12h14" /></Svg>
+);
+
 /** Attach (components/Focus.tsx `compose-attach`). */
 export const Clip = ({ size = 18, tint = color.dim }: P) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l8-8" /></Svg>

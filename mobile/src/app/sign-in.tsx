@@ -60,11 +60,11 @@ export default function SignIn() {
         {/* Separate elements: Android gives a link nested in other text no bounds, so it cannot be tapped. */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 6 }}>
           <T style={{ fontSize: 14, lineHeight: 20, color: color.faint }}>{failed ? 'New to Agentbox? ' : 'No account? '}</T>
-          <T onPress={toNoAccount} accessibilityRole="link" suppressHighlighting style={{ fontSize: 14, lineHeight: 20, color: color.text, textDecorationLine: 'underline', textDecorationColor: color.lineStrong }}>{failed ? 'Make your account on your computer' : 'Sign up'}</T>
+          <T onPress={toNoAccount} accessibilityRole="link" suppressHighlighting style={{ fontSize: 14, lineHeight: 20, fontFamily: font.semibold, color: color.text }}>{failed ? 'Make your account on your computer' : 'Sign up'}</T>
         </View>
       </>}>
         <Bars at="account" />
-        <AppMark size={36} />
+        <AppMark size={40} />
         <Head style={{ marginTop: 28 }}>Sign in</Head>
         <Lede>{lapsed === null ? 'Use the account from Agentbox on your computer.' : 'Your sign-in ran out. Sign in again to carry on.'}</Lede>
         {!c.cloud && !c.preview && <Lede>This build was made without the cloud's address, so it cannot sign in.</Lede>}
@@ -74,7 +74,7 @@ export default function SignIn() {
             returnKeyType="go" onSubmitEditing={() => { if (canSubmit) void signIn(); }} />
         </View>
         <T onPress={() => router.push({ pathname: '/reset-password', params: { email: email.trim() } })} accessibilityRole="link" suppressHighlighting
-          style={{ alignSelf: 'flex-end', fontSize: 14, lineHeight: 20, color: color.dim, marginTop: 12, paddingVertical: 4 }}>Forgot password?</T>
+          style={{ alignSelf: 'flex-end', fontSize: 14, lineHeight: 20, fontFamily: font.medium, color: color.dim, marginTop: 12, paddingVertical: 4 }}>Forgot password?</T>
       </Screen>
     </KeyboardAvoidingView>
   );

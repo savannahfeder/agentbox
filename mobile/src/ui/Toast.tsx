@@ -17,7 +17,7 @@ import Svg, { Path } from 'react-native-svg';
 import { penOnScreen, threadOnScreen, toastLife, toastPlace, toastTapOpens, TOAST_GOES_MS, TOAST_SWIPE_PX } from '../lib/overlays';
 import { useCloud, type Toast as Said } from '../state/cloud';
 import { footRoom, T } from './parts';
-import { color, corner, lift } from './theme';
+import { color, corner, font, lift } from './theme';
 
 function Clock() {
   const left = useRef(new Animated.Value(1)).current;
@@ -35,7 +35,7 @@ function Clock() {
 
 function Cross() {
   return (
-    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={color.dim} strokeWidth={1.8} strokeLinecap="round">
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={color.ink} strokeOpacity={0.7} strokeWidth={1.8} strokeLinecap="round">
       <Path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5" />
     </Svg>
   );
@@ -61,24 +61,23 @@ function Card({ toast, dismiss }: { toast: Said; dismiss: () => void }) {
     },
   }), [drag, dismiss]);
   return (
-    <Animated.View {...swipe.panHandlers} style={{ transform: [{ translateY: drag }], opacity: drag.interpolate({ inputRange: [-140, 0, 140], outputRange: [0, 1, 0] }) }}>
+    <Animated.View {...swipe.panHandlers} style={{ borderRadius: corner.card, backgroundColor: color.graphite, ...lift('float'), transform: [{ translateY: drag }], opacity: drag.interpolate({ inputRange: [-140, 0, 140], outputRange: [0, 1, 0] }) }}>
       {/* The words open the thread, beside Undo and Dismiss rather than around them: on the web a button
           cannot hold another. */}
       <View
         style={{
-          minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 4,
-          backgroundColor: color.pop, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, overflow: 'hidden',
-          ...lift('float'),
+          minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 18, paddingRight: 6,
+          borderRadius: corner.card, overflow: 'hidden',
         }}>
         <Pressable disabled={!opens} onPress={open} accessibilityRole={opens ? 'button' : undefined}
-          style={{ flex: 1, minWidth: 0, minHeight: 40, justifyContent: 'center', marginRight: 8 }}>
+          style={{ flex: 1, minWidth: 0, minHeight: 48, paddingVertical: 8, justifyContent: 'center', marginRight: 8 }}>
           {/* Only a toast that names a thread stays on one line; a plain one wraps (`.toast-plain`). */}
-          <T numberOfLines={toast.goes ? 1 : undefined} style={{ fontSize: 13.5, lineHeight: 17.55 }}>{toast.line}</T>
+          <T numberOfLines={toast.goes ? 1 : undefined} style={{ fontSize: 14.5, lineHeight: 19, color: color.ink }}>{toast.line}</T>
         </Pressable>
         {toast.undo && (
           <Pressable accessibilityRole="button" onPress={() => { const undo = toast.undo!; dismiss(); void undo(); }}
             style={({ pressed }) => ({ height: 40, paddingHorizontal: 8, justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-            <T style={{ fontSize: 13.5, lineHeight: 17.55, color: color.accent }}>Undo</T>
+            <T style={{ fontSize: 14.5, lineHeight: 19, fontFamily: font.semibold, color: color.accent }}>Undo</T>
           </Pressable>
         )}
         <Pressable accessibilityRole="button" accessibilityLabel="Dismiss" onPress={dismiss} hitSlop={6}

@@ -43,7 +43,7 @@ function MemberFace({ m, s }: { m: Member; s: number }) {
 
 // The bar's words (team/everything/TeamStrip.tsx `AgentsLine`).
 const agentsWords = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'} working`;
-const small = () => ({ fontFamily: font.mono, fontSize: 10.5, lineHeight: 14, letterSpacing: 0.735, textTransform: 'uppercase' as const, color: color.faint });
+const small = () => ({ fontFamily: font.medium, fontSize: 13, lineHeight: 18, color: color.faint });
 
 function Card({ m, on, pick }: { m: Member; on: boolean; pick: () => void }) {
   const chat = m.kind === 'chat' && !(m.team && m.agents);
@@ -129,7 +129,7 @@ function CardRow({ card, who, first, now, open }: { card: ThreadCard; who?: stri
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
         <T style={{ fontSize: 11, lineHeight: 20, color: color.dim }}>{STATE_WORD[card.state] ?? card.state}</T>
-        {!!card.project && <><T style={{ fontSize: 11, color: color.faint }}>·</T><T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim }}>{card.project}</T></>}
+        {!!card.project && <><T style={{ fontSize: 11, color: color.faint }}>·</T><T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.medium, fontSize: 13, color: color.dim }}>{card.project}</T></>}
         <T style={{ fontSize: 11, color: color.faint }}>·</T>
         <T style={{ fontSize: 11, lineHeight: 20, color: color.faint }}>{updatedWords(card.updatedAt, now)}</T>
       </View>
@@ -236,8 +236,8 @@ export function EverythingPlace({ mine, mineTabs, row, openGroup }: {
   return (
     <View style={{ flex: 1 }}>
       <View style={{ height: 38, marginTop: 6, marginHorizontal: size.inset, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.dim }}>Team</T>
-        <T style={{ fontFamily: font.mono, fontSize: 11, color: color.faint }}>{members.length}</T>
+        <T style={{ fontFamily: font.medium, fontSize: 13, color: color.dim }}>Team</T>
+        <T style={{ fontFamily: font.medium, fontSize: 13, color: color.faint }}>{members.length}</T>
       </View>
       <View style={{ paddingHorizontal: size.inset, gap: 10 }}>
         {rows.map((r, i) => <View key={i} style={{ flexDirection: 'row', gap: 10 }}>{r}{r.length < CARDS_PER_ROW && <View style={{ flex: 1 }} />}</View>)}

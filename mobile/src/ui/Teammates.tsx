@@ -73,8 +73,8 @@ export function AutoMark({ size: s = 20 }: { size?: number }) {
 
 const Head = ({ title, count }: { title: string; count: number }) => (
   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: size.inset, paddingTop: 18, paddingBottom: 4 }}>
-    <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: color.faint }}>{title}</T>
-    <T style={{ fontFamily: font.mono, fontSize: 11, color: color.faint }}>{count}</T>
+    <T style={{ fontFamily: font.medium, fontSize: 13, color: color.faint }}>{title}</T>
+    <T style={{ fontFamily: font.medium, fontSize: 13, color: color.faint }}>{count}</T>
   </View>
 );
 

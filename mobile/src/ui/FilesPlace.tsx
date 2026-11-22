@@ -60,7 +60,7 @@ function FileRow({ file, first, now, open, hold }: { file: PhoneFile; first: boo
       <View style={{ flex: 1, minWidth: 0 }}>
         <T numberOfLines={1} style={{ fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16, color: file.big ? color.dim : color.text }}>{file.name}</T>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 8 }}>
-          <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 0, maxWidth: '40%' }}>{file.projectName}</T>
+          <T numberOfLines={1} style={{ fontFamily: font.medium, fontSize: 13, lineHeight: 20, color: color.dim, flexShrink: 0, maxWidth: '40%' }}>{file.projectName}</T>
           <T style={small}>·</T>
           {file.big
             ? <T numberOfLines={1} style={{ ...small, flexShrink: 1 }}>{`${sizeWords(file.bytes)}, too big for your phone`}</T>

@@ -324,22 +324,20 @@ function Table({ block }: { block: Extract<Block, { kind: 'table' }> }) {
   );
 }
 
-// `.markdown h2, h3` are the site's small capitals; the others are the browser's own sizes.
-const SMALL_CAPS: TextStyle = { fontSize: 12, lineHeight: 19.2, letterSpacing: 0.84, textTransform: 'uppercase', get color() { return color.faint; }, fontFamily: font.semibold };
 const HEADING: Record<number, TextStyle> = {
-  1: { fontSize: 32, lineHeight: 51.2, fontFamily: font.semibold },
-  2: SMALL_CAPS,
-  3: SMALL_CAPS,
-  4: { fontSize: 16, lineHeight: 25.6, fontFamily: font.semibold },
-  5: { fontSize: 13.28, lineHeight: 21.25, fontFamily: font.semibold },
-  6: { fontSize: 10.72, lineHeight: 17.15, fontFamily: font.semibold },
+  1: { fontSize: 26, lineHeight: 33, fontFamily: font.display, letterSpacing: -0.4 },
+  2: { fontSize: 19, lineHeight: 26, fontFamily: font.semibold, letterSpacing: -0.2 },
+  3: { fontSize: 17, lineHeight: 24, fontFamily: font.semibold },
+  4: { fontSize: 16, lineHeight: 24, fontFamily: font.semibold },
+  5: { fontSize: 14.5, lineHeight: 22, fontFamily: font.semibold },
+  6: { fontSize: 13.5, lineHeight: 20, fontFamily: font.semibold },
 };
 
-// A document's own headings (`.doc-card h1, h2`).
+// A document's own headings.
 const DOC_HEADING: Record<number, TextStyle> = {
-  1: { fontSize: 23, lineHeight: 36.8, fontFamily: font.semibold, letterSpacing: -0.23 },
-  2: { fontSize: 17, lineHeight: 27.2, fontFamily: font.semibold, letterSpacing: 1.19, textTransform: 'uppercase' },
-  3: { fontSize: 17, lineHeight: 27.2, fontFamily: font.semibold, letterSpacing: 1.19, textTransform: 'uppercase' },
+  1: { fontSize: 26, lineHeight: 33, fontFamily: font.display, letterSpacing: -0.4 },
+  2: { fontSize: 19, lineHeight: 26, fontFamily: font.semibold, letterSpacing: -0.2 },
+  3: { fontSize: 17, lineHeight: 24, fontFamily: font.semibold },
   4: { fontSize: 15, lineHeight: 24, fontFamily: font.semibold },
 };
 

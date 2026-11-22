@@ -151,7 +151,7 @@ function Reactions({ m, me, nameOf, onToggle }: { m: RoomMessage; me: string | n
             accessibilityLabel={`${emoji} ${who.map(nameOf).join(', ')}`}
             style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, paddingHorizontal: 8, borderWidth: 1, borderRadius: corner.small, borderColor: mine ? color.lineStrong : color.line, backgroundColor: pressed || mine ? color.picked : color.fill })}>
             <T style={{ fontSize: 13, lineHeight: 17 }}>{emoji}</T>
-            <T style={{ fontFamily: font.mono, fontSize: 11.5, color: mine ? color.text : color.dim }}>{who.length}</T>
+            <T style={{ fontFamily: font.medium, fontSize: 12.5, color: mine ? color.text : color.dim }}>{who.length}</T>
           </Pressable>
         );
       })}
@@ -194,7 +194,7 @@ function Message({ m, run, nameOf, faceOf, names, replies, onThread, onPress, ro
 function Rule({ label, accent }: { label: string; accent?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 20, paddingBottom: 2 }}>
-      <T style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 0.88, textTransform: 'uppercase', color: accent ? color.dim : color.faint }}>{label}</T>
+      <T style={{ fontFamily: font.medium, fontSize: 13, color: accent ? color.dim : color.faint }}>{label}</T>
       {accent && <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(238, 96, 24, 0.35)' }} />}
     </View>
   );

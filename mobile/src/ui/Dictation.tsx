@@ -59,7 +59,7 @@ export function useDictation(box: { text: string; setText: (text: string) => voi
 export function MicButton({ talk }: { talk: Talk }) {
   return (
     <Pressable onPress={talk.start} accessibilityLabel="Dictate" accessibilityRole="button" hitSlop={4}
-      style={({ pressed }) => ({ width: 36, height: 36, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
+      style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? color.picked : 'transparent' })}>
       <Mic />
     </Pressable>
   );
@@ -70,7 +70,7 @@ function Level({ level, tall = 14 }: { level: number; tall?: number }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2.5, height: tall }}>
       {[0.55, 1, 0.75, 0.4].map((k, i) => (
-        <View key={i} style={{ width: 2, height: Math.max(3, Math.round(tall * Math.min(1, 0.2 + level * k))), backgroundColor: color.dim }} />
+        <View key={i} style={{ width: 2.5, borderRadius: 2, height: Math.max(3, Math.round(tall * Math.min(1, 0.2 + level * k))), backgroundColor: color.dim }} />
       ))}
     </View>
   );
@@ -80,10 +80,10 @@ function Button({ label, a11y, onPress, strong, disabled }: { label: string; a11
   return (
     <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={a11y}
       style={({ pressed }) => ({
-        height: 29, paddingHorizontal: strong ? 16 : 12, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong,
-        backgroundColor: pressed ? color.picked : 'transparent', opacity: disabled ? 0.5 : 1,
+        height: 36, paddingHorizontal: 16, justifyContent: 'center', borderRadius: corner.pill,
+        backgroundColor: strong ? color.graphite : pressed ? color.lineStrong : color.picked, opacity: disabled ? 0.5 : strong && pressed ? 0.8 : 1,
       })}>
-      <T style={{ fontSize: 13, fontFamily: strong ? font.semibold : font.medium, color: strong ? color.text : color.dim }}>{label}</T>
+      <T style={{ fontSize: 14, fontFamily: font.semibold, color: strong ? color.ink : color.text }}>{label}</T>
     </Pressable>
   );
 }
@@ -95,7 +95,7 @@ export function Listening({ talk, lead = 0 }: { talk: Talk; lead?: number }) {
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, height: 36 }}>
       <View style={{ marginLeft: lead, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
       <Level level={talk.level} />
-      <T style={{ flex: 1, fontSize: 13, color: color.dim }}>{talk.phase === 'listening' ? 'Listening' : finishing ? 'Finishing' : 'Starting'}</T>
+      <T style={{ flex: 1, fontSize: 14, color: color.dim }}>{talk.phase === 'listening' ? 'Listening' : finishing ? 'Finishing' : 'Starting'}</T>
       <Button label="Stop" a11y="Stop dictating" onPress={talk.stop} disabled={finishing} />
       <Button label="Send" a11y="Send what you said" onPress={talk.send} strong disabled={finishing} />
     </View>

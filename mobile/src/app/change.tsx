@@ -63,7 +63,7 @@ function Line({ line }: { line: CodeLine }) {
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingRight: 14 }}>
         <View style={{ width: 40, height: 1, backgroundColor: color.line }} />
-        <T style={{ fontFamily: font.mono, fontSize: 11, color: color.faint }}>{line.lines === 1 ? '1 line' : `${line.lines} lines`}</T>
+        <T style={{ fontSize: 12.5, color: color.faint }}>{line.lines === 1 ? '1 line' : `${line.lines} lines`}</T>
         <View style={{ flex: 1, height: 1, backgroundColor: color.line }} />
       </View>
     );
