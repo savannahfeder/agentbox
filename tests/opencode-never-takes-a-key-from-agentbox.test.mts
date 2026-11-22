@@ -1,27 +1,23 @@
 // WHAT THIS GUARDS. CLAUDE.md: "Workers run on the user's own Claude or Codex
 // subscription. Never pass an API key into a worker's environment."
 //
-// OpenCode is the first harness where that rule could actually be broken by
-// accident, because it is bring-your-own-model and will read a provider key
-// straight out of its environment if it finds one. Measured on a real OpenCode
-// 1.18.35 on 2026-10-07: with ZERO credentials in its own
-// ~/.local/share/opencode/auth.json it still listed ten models and finished a
-// run reporting `"cost":0` -- the OpenCode Zen free tier. So there is never a
-// reason for Agentbox to hand it a key, and these tests make sure it cannot.
+// OpenCode is the first harness where that rule could be broken by accident,
+// because it is bring-your-own-model and reads a provider key straight out of
+// its environment if it finds one. Measured on OpenCode 1.18.35 (2026-10-07)
+// and again on 2.3.2 (2026-11-22): with no credentials of its own it still
+// lists ten models and finishes a run at cost 0, the OpenCode Zen free tier.
+// So there is never a reason to hand it a key, and these tests make sure the
+// app cannot.
 //
-// The one secret that IS passed is OPENCODE_SERVER_PASSWORD, which is the
-// server's own basic-auth secret for its loopback port. Measured: without it
-// GET /session answered 401 and with it 200. It is not a provider credential
-// and it buys nobody any model time.
+// What it IS handed is one file of its own per thread, which `OPENCODE_CONFIG`
+// points at: the permission policy and the person's standing instructions.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { harnessFor } from '../main/harnesses.mts';
 import { harnessDefinition } from '../shared/harness-definitions.mts';
-import { openCodePermissionConfig } from '../main/opencode.mts';
-import { writePermissionConfig } from '../main/harnesses/opencode.mts';
-import { splitModel } from '../main/opencode-server.mts';
+import { openCodePermissionConfig, prepareOpenCode } from '../main/harnesses/opencode.mts';
 
 const harness = () => harnessFor('opencode');
 
@@ -59,48 +55,62 @@ describe('OpenCode never takes a key from Agentbox', () => {
   });
 
   it('needs no sign-in to run, because the free tier really runs', () => {
-    // Measured, not assumed: zero credentials, ten models, a finished run at
-    // cost 0. A harness that demanded a login here would refuse to start on a
-    // machine where OpenCode works fine.
     expect(harness().signedIn()).toBe(true);
     expect(harness().profiles()).toEqual(['default']);
     expect(harness().accountKey()).toBe('opencode:default');
-  });
-
-  it('writes a permission policy that asks, and no credentials', () => {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-policy-'));
-    try {
-      const file = writePermissionConfig(folder);
-      expect(file).toBe(path.join(folder, '.agentbox-opencode.json'));
-      const written = JSON.parse(fs.readFileSync(file, 'utf8'));
-      expect(written.permission.bash).toBe('ask');
-      expect(written.permission.edit).toBe('ask');
-      expect(written.permission.webfetch).toBe('ask');
-      // Reading inside the task's own folder is what the folder is for.
-      expect(written.permission.read).toBeUndefined();
-      // Nothing that looks like a credential is ever in this file.
-      expect(JSON.stringify(written)).not.toMatch(/key|token|secret|password/i);
-    } finally {
-      fs.rmSync(folder, { recursive: true, force: true });
-    }
-  });
-
-  it('keeps the policy out of the user’s own OpenCode config', () => {
-    // OPENCODE_CONFIG is a path to a file Agentbox wrote for this folder, not
-    // a change to anything the user owns.
-    expect(harnessDefinition('opencode').homeEnv).toBe('OPENCODE_CONFIG');
-    expect(openCodePermissionConfig().$schema).toBe('https://opencode.ai/config.json');
     expect(harness().profileEnv({ PATH: '/bin' }, 'default')).toEqual({ PATH: '/bin' });
-    expect(harness().profileEnv({ PATH: '/bin' }, '/folder/.agentbox-opencode.json'))
-      .toEqual({ PATH: '/bin', OPENCODE_CONFIG: '/folder/.agentbox-opencode.json' });
+  });
+});
+
+describe('the one file a thread on OpenCode is handed', () => {
+  const laidOut = (mode: string | null = null, instructions = 'Keep answers short.') => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-thread-'));
+    const env = prepareOpenCode({ dir, cwd: '/repo', instructions, mode });
+    const config = JSON.parse(fs.readFileSync(env.OPENCODE_CONFIG!, 'utf8'));
+    return { dir, env, config };
+  };
+
+  it('is in the folder it was given and nowhere in the project', () => {
+    const { dir, env } = laidOut();
+    expect(env).toEqual({ OPENCODE_CONFIG: path.join(dir, 'opencode.json') });
+    expect(fs.readdirSync(dir).sort()).toEqual(['instructions.md', 'opencode.json']);
+    expect(harnessDefinition('opencode').homeEnv).toBe('OPENCODE_CONFIG');
   });
 
-  it('splits a provider-qualified model and refuses to invent a provider', () => {
-    expect(splitModel('opencode/big-pickle')).toEqual({ providerID: 'opencode', modelID: 'big-pickle' });
-    expect(splitModel('anthropic/claude-sonnet-4-5')).toEqual({ providerID: 'anthropic', modelID: 'claude-sonnet-4-5' });
-    // A bare name is left for the server's own default rather than guessed at.
-    for (const bad of ['opus', '', null, undefined, '/model', 'provider/', 42]) {
-      expect(splitModel(bad)).toEqual({});
+  it('carries the standing instructions as a file its config names', () => {
+    const { dir, config } = laidOut();
+    expect(config.instructions).toEqual([path.join(dir, 'instructions.md')]);
+    expect(fs.readFileSync(path.join(dir, 'instructions.md'), 'utf8')).toBe('Keep answers short.\n');
+    expect(laidOut(null, '').config.instructions).toBeUndefined();
+  });
+
+  it('holds nothing that looks like a credential', () => {
+    expect(JSON.stringify(laidOut().config)).not.toMatch(/key|token|secret|password/i);
+  });
+
+  // OpenCode has no sandbox and no reviewer of its own: a shell command asks
+  // unless the person chose a mode that asks for nothing.
+  it('asks before a shell command, a page fetch and a file outside the folder, whatever the mode but the free ones', () => {
+    for (const mode of [null, 'auto', 'acceptEdits', 'default', 'plan', 'read-only', 'dontAsk']) {
+      const { permission } = openCodePermissionConfig(mode);
+      expect([permission.bash, permission.webfetch, permission.websearch, permission.external_directory], String(mode)).toEqual(['ask', 'ask', 'ask', 'ask']);
     }
+  });
+
+  it('lets edits inside the folder go ahead unless the mode asks first', () => {
+    for (const mode of [null, 'auto', 'acceptEdits']) expect(openCodePermissionConfig(mode).permission.edit, String(mode)).toBe('allow');
+    for (const mode of ['default', 'plan', 'read-only']) expect(openCodePermissionConfig(mode).permission.edit, mode).toBe('ask');
+  });
+
+  it('asks for nothing only in the modes that say so', () => {
+    for (const mode of ['bypassPermissions', 'full-access']) {
+      const { permission } = openCodePermissionConfig(mode);
+      expect([permission.bash, permission.edit, permission.external_directory], mode).toEqual(['allow', 'allow', 'allow']);
+    }
+  });
+
+  it('never asks about reading, which would be a card per file', () => {
+    expect(openCodePermissionConfig().permission).not.toHaveProperty('read');
+    expect(openCodePermissionConfig().$schema).toBe('https://opencode.ai/config.json');
   });
 });

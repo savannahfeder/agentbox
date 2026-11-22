@@ -19,8 +19,9 @@
  *
  * - A PERMISSION REQUEST IS ALWAYS ANSWERED. The agent is blocked on us while
  *   it waits, so a dropped answer is not a missing card, it is a task parked
- *   forever with nothing on the row. If the asker throws, or never comes back
- *   inside the deadline, the answer is a refusal rather than silence.
+ *   forever with nothing on the row. If the asker throws, the answer is a
+ *   refusal rather than silence. No clock answers for the person: a card
+ *   settles on their answer, a cancelled turn, or the connection closing.
  * - A REFUSAL IS SPOKEN IN THE AGENT'S OWN WORDS. Option ids belong to the
  *   tool, so "deny" means finding the option whose KIND rejects. If it offered
  *   none, the answer is `cancelled`: we never invent an id, and we never
@@ -52,9 +53,6 @@ export const CLIENT_CAPABILITIES = Object.freeze({
 export const PERMISSION_KINDS = Object.freeze(['allow_once', 'allow_always', 'reject_once', 'reject_always']);
 const REJECTIONS = Object.freeze(['reject_once', 'reject_always']);
 
-// How long a question may stand before it is refused on the person's behalf.
-// Matches the Codex spool, because it is the same person and the same patience.
-export const PERMISSION_TIMEOUT_MS = 15 * 60_000;
 export const REQUEST_TIMEOUT_MS = 2 * 60_000;
 // A line that never ends is not a message, it is a leak.
 export const MAX_FRAME_LENGTH = 16 * 1024 * 1024;
@@ -112,7 +110,6 @@ interface AcpClientOptions {
   clientInfo?: { name: string; version: string };
   onNotification?: ((method: string, params: unknown) => void) | null;
   onPermission?: ((request: PermissionParams & { requestId: RpcId }) => Chosen | PromiseLike<Chosen>) | null;
-  permissionTimeoutMs?: number;
   requestTimeoutMs?: number;
   maxFrameLength?: number;
   stderrLimit?: number;
@@ -121,14 +118,13 @@ interface AcpClientOptions {
 interface PendingRequest {
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
-  timer: NodeJS.Timeout;
+  timer: NodeJS.Timeout | null;
   method: string;
 }
 
 interface StandingPermission {
   sessionId: string | null;
   options: PermissionOption[];
-  timer: NodeJS.Timeout;
 }
 
 /**
@@ -158,7 +154,6 @@ export function createAcpClient({
   clientInfo = { name: 'agentbox', version: '1.0.0' },
   onNotification = null,
   onPermission = null,
-  permissionTimeoutMs = PERMISSION_TIMEOUT_MS,
   requestTimeoutMs = REQUEST_TIMEOUT_MS,
   maxFrameLength = MAX_FRAME_LENGTH,
   stderrLimit = 64 * 1024,
@@ -193,18 +188,20 @@ export function createAcpClient({
     return true;
   }
 
-  function request(method: string, params: unknown) {
+  // `timeoutMs` null is a request with no deadline of its own: a prompt stays
+  // open for the whole turn, and the connection closing is what ends it.
+  function request(method: string, params: unknown, timeoutMs: number | null = requestTimeoutMs) {
     if (gone) return Promise.reject(Error(gone));
     const id = nextId++;
     return new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const timer = timeoutMs === null ? null : setTimeout(() => {
         pending.delete(id);
-        reject(Error(`${method} did not answer within ${requestTimeoutMs}ms`));
-      }, requestTimeoutMs);
-      timer.unref?.();
+        reject(Error(`${method} did not answer within ${timeoutMs}ms`));
+      }, timeoutMs);
+      timer?.unref?.();
       pending.set(id, { resolve, reject, timer, method });
       if (!write({ jsonrpc: '2.0', id, method, params })) {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         pending.delete(id);
         reject(Error(gone ?? 'The agent connection is gone'));
       }
@@ -221,14 +218,11 @@ export function createAcpClient({
    * `optionId` when the person chose one of the offered options; null for
    * `cancelled`, which is what a cancelled turn and an agent that offered no
    * refusal both come to. The entry is dropped before the write, so a late
-   * answer from a card, a deadline and a cancellation racing each other still
-   * only ever put one response on the wire.
+   * answer from a card and a cancellation racing each other still only ever
+   * put one response on the wire.
    */
   function settlePermission(id: RpcId, optionId: Chosen) {
-    const entry = permissions.get(id);
-    if (!entry) return false;
-    permissions.delete(id);
-    clearTimeout(entry.timer);
+    if (!permissions.delete(id)) return false;
     const outcome = optionId ? { outcome: 'selected', optionId } : { outcome: 'cancelled' };
     write({ jsonrpc: '2.0', id, result: { outcome } });
     return true;
@@ -237,9 +231,7 @@ export function createAcpClient({
   function askPermission(id: RpcId, params: PermissionParams | null | undefined) {
     const options = Array.isArray(params?.options) ? params.options : [];
     const deny = () => settlePermission(id, rejectionOption(options));
-    const timer = setTimeout(deny, permissionTimeoutMs);
-    timer.unref?.();
-    permissions.set(id, { sessionId: params?.sessionId ?? null, options, timer });
+    permissions.set(id, { sessionId: params?.sessionId ?? null, options });
     if (!onPermission) return deny();
     // The asker may answer whenever: the reading loop is not waiting on it.
     (async () => onPermission({ requestId: id, ...params }))()
@@ -255,7 +247,7 @@ export function createAcpClient({
       const waiting = pending.get(message.id);
       if (!waiting) return;                       // a response to something we gave up on
       pending.delete(message.id);
-      clearTimeout(waiting.timer);
+      if (waiting.timer) clearTimeout(waiting.timer);
       if (message.error) waiting.reject(Error(`${waiting.method}: ${message.error.message ?? 'failed'}`));
       else waiting.resolve(message.result);
       return;
@@ -289,14 +281,10 @@ export function createAcpClient({
     gone = reason;
     // Every question still standing goes with the connection: an answer whose
     // asker has quit is worth nothing, and the agent is already gone.
-    for (const id of [...permissions.keys()]) {
-      const entry = permissions.get(id);
-      permissions.delete(id);
-      clearTimeout(entry?.timer);
-    }
+    permissions.clear();
     for (const [id, waiting] of [...pending]) {
       pending.delete(id);
-      clearTimeout(waiting.timer);
+      if (waiting.timer) clearTimeout(waiting.timer);
       waiting.reject(Error(reason));
     }
     try { child.stdin.end(); } catch {}
@@ -346,8 +334,12 @@ export function createAcpClient({
       if (!this.can('loadSession')) return Promise.reject(Error('This agent cannot resume a session, so there is no thread to load'));
       return request('session/load', { sessionId, cwd, mcpServers });
     },
+    /** One of the choices the session offered, such as its model. */
+    setConfigOption: ({ sessionId, configId, value }: { sessionId: string; configId: string; value: string }) =>
+      request('session/set_config_option', { sessionId, configId, value }),
+    // No deadline: a 2-minute one here would cancel every long turn with nothing in the logs.
     prompt: ({ sessionId, text, blocks = null }: { sessionId: string; text?: string; blocks?: unknown[] | null }) =>
-      request('session/prompt', { sessionId, prompt: blocks ?? [{ type: 'text', text }] }),
+      request('session/prompt', { sessionId, prompt: blocks ?? [{ type: 'text', text }] }, null),
     /**
      * Stop the turn, and answer what it was parked on. The protocol says a
      * cancelled turn MUST be answered `cancelled`, and this is the only place

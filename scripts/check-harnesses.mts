@@ -5,6 +5,8 @@
 //   npm run check:harnesses -- codex     one of them
 //   npm run check:harnesses -- --json    the verdicts as JSON on stdout
 //   npm run check:harnesses -- --keep    leave the copy's folder to read afterwards
+//   npm run check:harnesses -- --candidate opencode
+//                                        also a harness nobody is offered yet
 //
 // It starts a copy of the app on a store of its own and drives it through the
 // calls the screen makes: a new thread on each harness, replies, a restart, a
@@ -22,7 +24,8 @@ import { fileURLToPath } from 'node:url';
 import { stripTypesFlags } from '../main/strip-types.mts';
 import { resolveEngine } from '../main/engine-bin.mts';
 import { FRESH_USER_ENV } from '../shared/fresh-user-home.mts';
-import { ENGINES } from '../shared/engines.mts';
+import { ENGINES, HARNESSES_IN_TESTING_ENV } from '../shared/engines.mts';
+import { HARNESS_DEFINITIONS } from '../shared/harness-definitions.mts';
 import { harnessesToCheck, checkHarness, standingVerdict, verdictsWithoutARun, exitCode, summaryLines, cleanEnv } from './lib/harness-check.mts';
 import type { App, Row, Standing, Verdict } from './lib/harness-check.mts';
 
@@ -32,6 +35,8 @@ const PRODUCT = 'sandbox';
 const args = process.argv.slice(2);
 const json = args.includes('--json');
 const keep = args.includes('--keep');
+const candidates = args.flatMap((arg, i) => (arg === '--candidate' && args[i + 1] ? [args[i + 1]] : []));
+const named = args.filter((arg, i) => !arg.startsWith('--') && args[i - 1] !== '--candidate');
 const say = (line: string) => (json ? process.stderr : process.stdout).write(`${line}\n`);
 
 interface Snapshot {
@@ -79,7 +84,7 @@ async function startCopy(place: ReturnType<typeof layOut>): Promise<Copy> {
   const fd = fs.openSync(place.log, 'a');
   const child = spawn(process.execPath, [...stripTypesFlags(), path.join(REPO, 'bin', 'agentbox.mjs'), '--dir', place.data, '--no-open'], {
     cwd: REPO, detached: true, stdio: ['ignore', fd, fd],
-    env: { ...cleanEnv(), [FRESH_USER_ENV]: '1', AGENTBOX_NO_SYSTEM_WINDOWS: '1' },
+    env: { ...cleanEnv(), [FRESH_USER_ENV]: '1', AGENTBOX_NO_SYSTEM_WINDOWS: '1', ...(candidates.length ? { [HARNESSES_IN_TESTING_ENV]: candidates.join(',') } : {}) },
   });
   child.unref();
   fs.closeSync(fd);
@@ -154,9 +159,11 @@ function appOver(place: ReturnType<typeof layOut>, first: Copy) {
     },
     async standing(harness) {
       const { engines, supervisor } = await snapshot();
+      const offered = (engines?.choices ?? []).some((choice) => choice.id === harness);
       return {
-        ...(ready.get(harness) ?? { found: false, signedIn: null }),
-        offered: (engines?.choices ?? []).some((choice) => choice.id === harness),
+        // The app offers a candidate only when it found its binary, and its sign-in is asked by its first thread.
+        ...(ready.get(harness) ?? { found: offered, signedIn: null }),
+        offered,
         spentUntil: supervisor?.outOfUsage?.[harness]?.until ?? null,
       };
     },
@@ -187,7 +194,7 @@ function versionsFound(harnesses: readonly string[]): Record<string, string | nu
 }
 
 async function main() {
-  const harnesses = harnessesToCheck(args.filter((a) => !a.startsWith('--')));
+  const harnesses = harnessesToCheck(named, candidates);
   if (!fs.existsSync(path.join(REPO, 'renderer', 'dist', 'index.html'))) {
     say('Building the screen once, which the copy of the app needs to start.');
     const built = spawnSync('npx', ['vite', 'build', 'renderer', '--logLevel', 'warn'], { cwd: REPO, stdio: ['ignore', 'ignore', 'inherit'], timeout: 10 * 60_000 });
@@ -203,7 +210,7 @@ async function main() {
     versions = versionsFound(harnesses);
     await app.settle();
     for (const harness of harnesses) {
-      const word = ENGINES.find((e) => e.id === harness)?.label ?? harness;
+      const word = HARNESS_DEFINITIONS.find((h) => h.id === harness)?.label ?? harness;
       const known = standingVerdict(harness, await app.standing(harness));
       if (known) {
         verdicts.push(...verdictsWithoutARun(harness, known));

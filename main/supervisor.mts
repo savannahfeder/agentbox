@@ -163,7 +163,7 @@ import { effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mts
 import {
   engineFor, engineLabel, engineChoiceSince, engineChoiceOnRowIsStale,
   availableEngines, isEngine, modelForEngine, homeEngine,
-  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS,
+  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS, ENGINES,
 } from '../shared/engines.mts';
 import { createCodexAppServer } from './codex-app-server.mts';
 import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
@@ -11215,7 +11215,12 @@ export class Supervisor {
     // come from the sign-in check (main/engine-setup.mts); until it has
     // answered, nothing moves.
     const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true && !this._addedClaudeSignedIn();
-    return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
+    // Any further harness on offer is here when its binary was found (main/config.mts).
+    const others: Record<string, boolean> = {};
+    for (const { id } of ENGINES) {
+      if (id !== 'claude' && id !== 'codex') others[id] = !!harnessFor(id).binary(this.config);
+    }
+    return { ...others, claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
   }
 
   /** The launch check only asks the default login, so a signed-in added account must be counted here. */
@@ -12241,6 +12246,27 @@ export class Supervisor {
    */
   codexCardChanged(id: string, shown: unknown) {
     return this._codexCards?.changed(id, shown) ?? false;
+  }
+
+  /**
+   * ONE WORKER'S CARDS, for an engine whose approval requests arrive inside
+   * this process (main/harnesses/acp.mts). They are the same in-process cards
+   * Codex's are, so the one answering door settles them and nothing new reads
+   * an answer off the disk. The worker's exit must `close` them.
+   */
+  approvalCardsFor(item: Pick<WorkItem, 'id' | 'product'>, say: (line: string) => unknown) {
+    const scope = this._codexApprovals().scope({ product: item.product, item: item.id, say });
+    let changes = 0;
+    return {
+      command: async (command: string, cwd: string | null) => await scope.handle('item/commandExecution/requestApproval', { command, cwd }) === 'accept',
+      // The card for a file change is drawn from the change itself, which this vocabulary sends first.
+      edit: async (files: { path: string; kind: 'add' | 'update' | 'delete'; diff: string }[]) => {
+        const itemId = `change-${changes += 1}`;
+        scope.remember('item/started', { item: { type: 'fileChange', id: itemId, changes: files.map((file) => ({ path: file.path, kind: { type: file.kind }, diff: file.diff })) } });
+        return await scope.handle('item/fileChange/requestApproval', { itemId }) === 'accept';
+      },
+      close: (why?: string) => scope.close(why),
+    };
   }
 
   // A loaded app-server thread holds Codex's writer lock even after its turn

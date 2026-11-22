@@ -1,6 +1,7 @@
 // The list every harness on offer is checked against, and what a run of it
 // comes to. scripts/check-harnesses.mts drives a real copy of the app with it.
 import { ENGINES } from '../../shared/engines.mts';
+import { HARNESS_DEFINITIONS } from '../../shared/harness-definitions.mts';
 import { deadRunCause } from '../../shared/spawn-trouble.mts';
 
 export interface Scenario { id: string; proves: string }
@@ -16,7 +17,7 @@ export const SCENARIOS: readonly Scenario[] = Object.freeze([
 
 // The permission mode that makes each harness ask before it runs a command.
 // No protocol carries this, so a harness is not checkable until someone says.
-export const ASKS_FIRST: Readonly<Record<string, string>> = Object.freeze({ claude: 'default', codex: 'read-only' });
+export const ASKS_FIRST: Readonly<Record<string, string>> = Object.freeze({ claude: 'default', codex: 'read-only', opencode: 'default' });
 
 export type Outcome = 'passed' | 'failed' | 'unchecked';
 
@@ -59,14 +60,20 @@ export interface Waits { answer: number; start: number; settle: number; stop: nu
 
 export const WAITS: Waits = Object.freeze({ answer: 300_000, start: 90_000, settle: 4_000, stop: 60_000, card: 180_000, every: 500 });
 
-export function harnessesToCheck(only: readonly string[] = []): string[] {
-  const offered = ENGINES.map((e) => e.id);
+/**
+ * Every harness on offer, plus any candidate: one that is registered and not
+ * offered yet, which the copy of the app is told to put on offer for this run.
+ * That is how a harness passes the list before anybody is offered it.
+ */
+export function harnessesToCheck(only: readonly string[] = [], candidates: readonly string[] = []): string[] {
+  for (const id of candidates) if (!HARNESS_DEFINITIONS.some((h) => h.id === id)) throw Error(`${id} is not a harness this app knows. It knows: ${HARNESS_DEFINITIONS.map((h) => h.id).join(', ')}`);
+  const offered = [...new Set([...ENGINES.map((e) => e.id), ...candidates])];
   if (!only.length) return offered;
-  for (const id of only) if (!offered.includes(id)) throw Error(`${id} is not on offer, so there is nothing to check. On offer: ${offered.join(', ')}`);
+  for (const id of only) if (!offered.includes(id)) throw Error(`${id} is not on offer, so there is nothing to check. On offer: ${offered.join(', ')}. A harness not offered yet is checked with --candidate ${id}`);
   return [...only];
 }
 
-const harnessWord = (id: string) => ENGINES.find((e) => e.id === id)?.label ?? id;
+const harnessWord = (id: string) => HARNESS_DEFINITIONS.find((h) => h.id === id)?.label ?? id;
 const firstLine = (text: unknown) => String(text ?? '').trim().split('\n')[0].slice(0, 240);
 const seconds = (ms: number) => Math.round(ms / 1000);
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -141,6 +148,9 @@ export async function checkHarness(
 
   /** The answer written after `sentAt`, or null when none came in time. */
   const answered = (id: string, sentAt: number) => until(async () => {
+    // A turn told to use no tools that asks for one anyway is refused, so it cannot wait on a card nobody will answer.
+    const card = await app.card(id);
+    if (card) await app.decide(card, false);
     const row = await app.row(id);
     return row && (row.wrote?.result?.ts ?? 0) > sentAt && String(row.result ?? '').trim() ? row : null;
   }, waits.answer, waits.every);
@@ -159,6 +169,8 @@ export async function checkHarness(
   const id = await app.start(harness, `Reply with exactly the word ${word} and nothing else. ${NO_TOOLS}`);
   const on = await app.harnessOf?.(id) ?? harness;
   if (on !== harness) {
+    // Stopped at once, so the mistake spends none of the other harness's plan.
+    await app.stop(id);
     say('answers', 'failed', { said: `the app ran the thread on ${harnessWord(on)} instead` });
     return rest(`not tried: the thread did not run on ${harnessWord(harness)}`);
   }
@@ -185,7 +197,8 @@ export async function checkHarness(
       await app.stop(id);
       const stopped = await until(async () => !(await app.running(id)), waits.stop, waits.every);
       if (!stopped) say('stops', 'failed', { said: `still running ${seconds(waits.stop)} seconds after it was told to stop` });
-      else await recalls('stops', id, `Which word did you reply with at the start of this thread? Answer with only that word. ${NO_TOOLS}`);
+      // A harness may pick a stopped command back up on the next reply (OpenCode 2.3.2 did), so it is told not to.
+      else await recalls('stops', id, `Leave the command that was stopped: do not run it or anything else. Which word did you reply with at the start of this thread? Answer with only that word. ${NO_TOOLS}`);
     }
   }
 
