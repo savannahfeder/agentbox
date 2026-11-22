@@ -205,10 +205,12 @@ export function setupLook({ skies, picked, worn, light }: { skies: boolean; pick
 export const tourPlace = (rows: ChecklistRow[]) => Math.min(Math.max(rows.filter((r) => r.state === 'done').length + 1, rows.findIndex((r) => r.state === 'now') + 1), rows.length);
 export const tourCount = (rows: ChecklistRow[]) => `${tourPlace(rows)} of ${rows.length}`;
 
-/** How far through the walkthrough you are, for the column beside the framed app. ⌘K opened before
- *  the practice thread is closed has its own tip, which is not a step further on. */
+/** How far through the walkthrough you are, for the column beside the framed app: the step the tip on
+ *  screen is about. ⌘K opened before the practice thread is closed has its own tip, which is not a step
+ *  further on, and a lesson learned out of turn does not move the count past the tip. */
 export function walkPlace(done: readonly Lesson[], now: Lesson | null): { at: number; of: number } {
   const early = (now === 'palette' || now === 'urgent') && !done.includes('close');
   const rows = tourChecklist(done, '⌘', early ? null : now);
-  return { at: tourPlace(rows), of: rows.length };
+  const at = rows.findIndex((r) => r.state === 'now');
+  return { at: at < 0 ? rows.length : at + 1, of: rows.length };
 }

@@ -1334,7 +1334,9 @@ export default function App() {
     if (!tourGone || !tour?.practice) return;
     // Skipped with the practice thread open: it goes with its project, and you land back on your list.
     if (focused?.product === tour.practice.slug) setFocused(null);
-    void api.firstRunPracticeEnd().then(() => refreshRef.current?.());
+    // E on the practice thread can be what ended it, and is still held for Z: it is written before its project goes.
+    const held = pendingRef.current?.item.product === tour.practice.slug ? flushPending().catch(() => {}) : Promise.resolve();
+    void held.then(() => api.firstRunPracticeEnd()).then(() => refreshRef.current?.());
   }, [tourGone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Starting a setup or the walkthrough from ⌘K hands it the whole window, so
@@ -8868,7 +8870,7 @@ export default function App() {
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
       {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} away={walkAway} onBack={backToWalk} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
       {finishing && <TourFinished covered={settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
-      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
+      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} practiceOpen={!!focused && focused.id === tourPractice?.item} view={view} thread={!!focused}
         answering={practiceAnswering}
         covered={settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}

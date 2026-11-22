@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { awayFromWalk, finishLesson, replyTeaches, skipTour, startTour, withPractice, type Lesson } from '../renderer/src/tour.ts';
+import { awayFromWalk, finishLesson, noteSent, replyTeaches, skipTour, startTour, tourStep, withPractice, type Lesson, type TourScreen } from '../renderer/src/tour.ts';
 import { TourFrame } from '../renderer/src/components/TourFrame.tsx';
 import { walkPlace } from '../renderer/src/setup-split.ts';
 
@@ -23,7 +23,7 @@ const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '
 const column = (props: { done?: Lesson[]; now?: Lesson | null; finished?: boolean; away?: boolean }) =>
   renderToStaticMarkup(React.createElement(TourFrame, { done: props.done ?? ['compose'], now: props.now ?? 'open', finished: props.finished, away: props.away, onBack: () => {}, onSkip: () => {} }));
 
-const sent = finishLesson(withPractice(startTour(), { slug: 'practice', item: 'w-practice' }), 'compose');
+const sent = noteSent(withPractice(startTour(), { slug: 'practice', item: 'w-practice' }));
 const closed = ['open', 'choose', 'close'].reduce((t, l) => finishLesson(t, l as Lesson), sent);
 
 describe('off the walkthrough’s pages', () => {
@@ -66,6 +66,47 @@ describe('how far through you are', () => {
   });
   it('still counts writing back once you are in the practice thread', () => {
     expect(walkPlace(['compose'], 'reply').at).toBe(3);
+  });
+  // Round three, 2026-11-22: ⌘K learned out of turn read 2 of 5 under the tip for step 1.
+  it('is the step the tip on screen is about, whatever was learned out of turn', () => {
+    expect(walkPlace(['palette'], 'compose').at).toBe(1);
+    expect(walkPlace(['palette'], null).at).toBe(1);
+    expect(walkPlace(['palette', 'compose'], 'open').at).toBe(2);
+  });
+  it('stays at the last step once everything is done', () => {
+    expect(walkPlace(['compose', 'open', 'choose', 'reply', 'close', 'palette'], null).at).toBe(5);
+  });
+});
+
+describe('the thread tips', () => {
+  // Round three, 2026-11-22: "Press R to answer this agent" stood on a real thread
+  // while the column offered Back to the walkthrough.
+  const screen = (over: Partial<TourScreen>): TourScreen => ({ composer: 'none', folder: true, text: false, view: 'inbox', rows: 3, running: 0, thread: true, options: false, covered: false, ...over });
+  const opened = finishLesson(sent, 'open');
+  it('stand on the practice thread', () => {
+    expect(tourStep(opened, screen({ practiceThread: true, options: true }))).toBe('choose');
+    expect(tourStep(opened, screen({ practiceThread: true }))).toBe('reply');
+  });
+  it('do not stand on a real thread while the practice one is still open', () => {
+    expect(tourStep(opened, screen({ practiceThread: false, options: true }))).toBeNull();
+    expect(tourStep(opened, screen({ practiceThread: false }))).toBeNull();
+  });
+  it('leave the last tip free to stand over any thread', () => {
+    expect(tourStep(closed, screen({ practiceThread: false }))).toBe('palette');
+  });
+  it('are told which thread is the practice one', () => {
+    expect(read('renderer/src/App.tsx')).toMatch(/<Tour tour=\{tour\} practice=\{!!tourTask\} practiceId=\{tourPractice\?\.item \?\? null\} practiceOpen=\{!!focused && focused\.id === tourPractice\?\.item\} /);
+  });
+});
+
+describe('the end of the walkthrough', () => {
+  // Round two and three, 2026-11-22: E on the practice thread is held for Z, and when it also
+  // ended the walkthrough the practice project went first, so the held close wrote to a project
+  // that was gone ("no such product: practice").
+  it('writes a held action on the practice thread before taking its project away', () => {
+    const app = read('renderer/src/App.tsx');
+    expect(app).toContain('const held = pendingRef.current?.item.product === tour.practice.slug ? flushPending().catch(() => {}) : Promise.resolve();');
+    expect(app).toContain('void held.then(() => api.firstRunPracticeEnd()).then(() => refreshRef.current?.());');
   });
 });
 

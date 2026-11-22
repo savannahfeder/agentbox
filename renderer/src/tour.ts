@@ -53,6 +53,8 @@ export interface TourScreen {
   waiting?: number;
   /** A thread is open. */
   thread: boolean;
+  /** The thread open is the walkthrough's practice thread. */
+  practiceThread?: boolean;
   /** The open thread's agent is still working on it. */
   busy?: boolean;
   /** The open practice thread's answer for this round is still on its way; nothing runs to show it working. */
@@ -201,6 +203,8 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   if (s.preparing && todo('close')) return null;
   if (s.preparing) return todo('palette') && (t.sent || !todo('start')) ? 'palette' : !t.sent && todo('start') ? 'startHere' : null;
   if (s.thread) {
+    // Until the practice thread is closed, its tips teach on it and on no real thread beside it.
+    if (t.practice?.item && !s.practiceThread && todo('close')) return null;
     if (s.typing || s.answering) return null;
     if (s.busy) return todo('busy') ? 'busy' : null;
     if (s.options && todo('choose')) return 'choose';
