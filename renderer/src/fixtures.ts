@@ -1288,7 +1288,7 @@ export const fixtureOpenCodeModels: NonNullable<Engine['models']> = [
  */
 export function fixtureFurtherHarness(snap: Snapshot, asked: string | null): Snapshot {
   if (asked !== 'opencode' || !snap.engines) return snap;
-  const row = 'w-d4';
+  const row = 'w-a1';
   return {
     ...snap,
     engines: {

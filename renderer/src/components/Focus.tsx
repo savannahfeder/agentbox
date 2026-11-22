@@ -100,7 +100,7 @@ import { CODE_PATH, artifactUrlTransform, isMediaPath, remarkArtifactPaths, shor
 import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, readDraftWhen, saveDraftWhen, type SentDraft } from '../drafts';
 import { ReplyLater } from './ReplyLater';
-import { effortSaid, modelShown, pickOnItsWay, pickToSend, replyOpensOn } from '../reply-pick';
+import { effortSaid, modelShown, pickOnItsWay, pickToSend, replyHarness, replyOpensOn, takesModesAndCommands } from '../reply-pick';
 import { withQuote } from '../team/chat-quote';
 import { THREAD_WIDTH, THREAD_WIDTH_KEY, clampThreadWidth, paneForThread, threadToOpen } from '../team/chat-threads';
 import { heldByAPerson, isGivenTask, nameIsAPersons, taskGiver, whatWaits } from '../../../shared/team-rules.mts';
@@ -155,7 +155,7 @@ import { ThreadsMade, type MadeRow } from './ThreadsMade';
 import { ChatAgentsContext, useChatMentions } from '../team/ChatAgents';
 import { useThreadMentions } from './ThreadMentions';
 import { AGENT_SCHEME } from '../team/agent-mentions';
-import { defaultModelFor, engineModelLabel } from '../models';
+import { defaultModelFor, engineModelLabel, furtherHarnesses } from '../models';
 import { defaultEffortFor, effortChoicesFor, effortShown } from '../effort';
 import { ENGINES } from '../../../shared/engines.mts';
 import { lookAgainAfter } from '../picture-looks-again';
@@ -3041,16 +3041,19 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   const codexOffered = engineRows.some((e) => e.id === 'codex');
   const claudeOffered = engineRows.some((e) => e.id === 'claude');
   const modelOpts = { codexModels, codexDefault: codexModelDefault };
+  // A harness besides those two that is on offer here, as the new thread card lists it.
+  const further = furtherHarnesses();
+  const furtherIds = further.map((h) => h.id);
   // The agent the row runs on now, as main resolved it, and the one the menu
   // is showing, which is the same until she picks the other.
-  const engineNow: Harness = (runningEngine === 'codex' ? 'codex' : 'claude');
-  const engineShown: Harness = engineChosen === 'codex' ? 'codex' : engineChosen === 'claude' ? 'claude' : engineNow;
-  const pick: ModelPick = { engine: engineShown, model: model ?? defaultModelFor(engineShown, codexModelDefault) };
+  const { now: engineNow, shown: engineShown } = replyHarness(runningEngine, engineChosen, furtherIds);
+  // A further harness with no model named runs on its own choice, so no row is lit.
+  const pick: ModelPick = { engine: engineShown, model: model ?? (furtherIds.includes(engineShown) ? '' : defaultModelFor(engineShown, codexModelDefault)) };
   const recent = useMemo(
-    () => recentModels(items, { codexModels, codexDefault: codexModelDefault, codexOffered, claudeOffered }),
-    [items, codexModels, codexModelDefault, codexOffered, claudeOffered],
+    () => recentModels(items, { codexModels, codexDefault: codexModelDefault, codexOffered, claudeOffered, further }),
+    [items, codexModels, codexModelDefault, codexOffered, claudeOffered, further],
   );
-  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered }), [codexModels, codexOffered, claudeOffered]);
+  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered, further }), [codexModels, codexOffered, claudeOffered, further]);
   const effortRows = effortChoicesFor(engineShown, pick.model, modelOpts);
   const effortLit = effortShown(effort, effortRows, defaultEffortFor(engineShown, pick.model, modelOpts));
   // A LEVEL BELONGS TO THE MODEL IT WAS PICKED FOR, so crossing to the other
@@ -3060,7 +3063,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   };
   // What a move costs, said only while it is true (drawn below the box).
   const freshNote = engineShown !== engineNow
-    ? `${engineRows.find((e) => e.id === engineShown)?.label ?? 'It'} starts fresh with this thread.`
+    ? `${[...engineRows, ...further].find((e) => e.id === engineShown)?.label ?? 'It'} starts fresh with this thread.`
     : null;
   const ref = useRef<HTMLTextAreaElement | null>(null);
   // The hidden file input the formatting bar's attach button opens.
@@ -3269,7 +3272,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
     // default unpinned the thread rather than pinning it (../reply-pick.ts).
     onSend([named.encode(chat.encode(words)), attachedMd].filter(Boolean).join('\n\n'), prio ? priorityValueOf(prio) : undefined, repeat, sent, mode,
       touched
-        ? pickToSend({ model, effort }, { engine: engineShown, was: engineNow, engineCount: engineRows.length })
+        ? pickToSend({ model, effort }, { engine: engineShown, was: engineNow, engineCount: engineRows.length + further.length })
         : undefined,
       canWait && sendAt > Date.now() ? sendAt : undefined);
   };
@@ -3327,10 +3330,12 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   // `codexThreadParamsFor` had no field to put it in. It has one, so the
   // control is honest on either engine. An external agent row still has none,
   // because that value is thrown away by the send.
-  const canSetMode = !item.agent;
+  // The permission words and the slash menu are Claude Code's and Codex's; a further harness takes neither.
+  const ownControls = takesModesAndCommands(runningEngine, furtherIds);
+  const canSetMode = !item.agent && ownControls;
   // Commands are provider-specific; canSetMode still gates every permission path.
   // A reply that goes to people reaches no agent, so it offers none of an agent's commands.
-  const toAgent = !item.agent && !talkTo?.length;
+  const toAgent = !item.agent && !talkTo?.length && ownControls;
   const query = toAgent ? slashQuery(text) : null;
   /*
    * ONE LIST, AND IT IS THE ONE THE MENU DRAWS. This was `modeMatches(query)`
@@ -3761,10 +3766,10 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
               every={every}
               more={moreCount(recent, every)}
               labelOf={(p) => engineModelLabel(p.engine, p.model, modelOpts)}
-              engineLabel={(id) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id}
+              engineLabel={(id) => [...engineRows, ...further].find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id}
               // The agent is named beside each model only where there are two of
               // them; on every other Mac the menu reads as it always did.
-              engineTags={engineRows.length > 1}
+              engineTags={engineRows.length + further.length > 1}
               effortRows={effortRows}
               effortLit={effortLit}
               // Toggled against HER pick, not against what is lit, so pressing

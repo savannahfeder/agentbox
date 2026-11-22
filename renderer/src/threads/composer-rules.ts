@@ -10,7 +10,7 @@
 // picking where it runs, and the two can never disagree the way two pickers did
 // (a Claude alias sent to Codex is a run the supervisor refuses outright).
 
-import { claudeModelRows, CODEX_OWN, DEFAULT_MODEL, engineModelPicked, type ModelChoice } from '../models';
+import { claudeModelRows, CODEX_OWN, DEFAULT_MODEL, engineModelPicked, type FurtherHarness, type ModelChoice } from '../models';
 import { splitMessage } from '../message-split';
 import { parseWhen } from '../format';
 import { firstName } from '../team/company';
@@ -131,8 +131,7 @@ export function recentModels(
   return out;
 }
 
-/** A harness besides Claude Code and Codex, as the model menu needs it: its name and the models it listed. */
-export interface FurtherHarness { id: string; label: string; models?: readonly { id: string; label: string }[] }
+export type { FurtherHarness };
 
 /** One more column behind "All models", for a further harness that has models to offer. */
 export interface ModelColumn { engine: string; label: string; models: readonly ModelPick[] }

@@ -159,8 +159,16 @@ describe('the stand-in world that photographs it', () => {
     const snap = fixtureFurtherHarness(claudeWorld(), 'opencode');
     expect(snap.engines?.further?.map((e) => e.id)).toEqual(['opencode']);
     expect(snap.engines?.further?.[0].models).toHaveLength(10);
-    expect(snap.engines?.byItem?.['w-d4']).toBe('opencode');
-    expect(snap.items.find((i) => i.id === 'w-d4')).toMatchObject({ engine: 'opencode', model: 'opencode/big-pickle' });
+    expect(snap.engines?.byItem?.['w-a1']).toBe('opencode');
+    expect(snap.items.find((i) => i.id === 'w-a1')).toMatchObject({ engine: 'opencode', model: 'opencode/big-pickle' });
+  });
+
+  // A running thread wears the mark of what it started on, so the mark would not show there.
+  it('puts it on a thread that is resting, not on one a session is running', () => {
+    const snap = fixtureFurtherHarness(claudeWorld(), 'opencode');
+    const running = (snap.supervisor.running ?? []).map((r: { itemId: string }) => r.itemId);
+    expect(running.length).toBeGreaterThan(0);
+    expect(running).not.toContain('w-a1');
   });
 
   it('hands the world back untouched when nobody asked for it, or asked for something else', () => {
