@@ -387,7 +387,7 @@ describe('a new chat, brought in while its agent waits in the terminal', () => {
     expect((await scan(chat({ when: NOW - STOPPED_QUIET_MS + 1_000 }), stopped)).brought).toBe(0);
     expect((await scan(chat({ when: NOW - STOPPED_QUIET_MS - 1_000 }), { status: 'idle', waitingFor: '' })).brought).toBe(0);
     expect((await scan(chat({ when: NOW - STOPPED_QUIET_MS - 1_000 }), { ...stopped, folder: 'kestrel' })).brought).toBe(1);
-    expect(row().result).toBe('**Claude Code stopped to ask you a question. Answer it in its window, in the kestrel folder.**');
+    expect(row().result).toBe('**Claude Code stopped to ask you a question. Answer it in the terminal open in kestrel.**');
   });
 
   it('waits while its agent is at work, however long that writes nothing', async () => {
@@ -421,7 +421,7 @@ describe('what the session file says', () => {
     expect(stoppedThere('input needed')).toBe(ASKED);
     expect(stoppedThere('permission prompt')).toBe(LEAVE);
     expect(stoppedThere('')).toBe(ASKED);
-    expect(stoppedThere('input needed', 'payments-api')).toBe('**Claude Code stopped to ask you a question. Answer it in its window, in the payments-api folder.**');
+    expect(stoppedThere('input needed', 'payments-api')).toBe('**Claude Code stopped to ask you a question. Answer it in the terminal open in payments-api.**');
   });
 
   // On a real picker the list said Answered beside it.

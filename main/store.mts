@@ -1804,6 +1804,8 @@ export class Store {
       const turns = notYetRead({ entries: thread.entries ?? [] }, { heardThrough: 0, knownAt: 0 });
       if (turns.length) row.result = turns.at(-1)!.who === 'agent' ? turns.pop()!.text : '';
       if (thread.entries) row.labels.push(AS_IT_GOES_LABEL);
+      // Claude Code's own name for it, which its window shows too, is the thread's; a name cut from what was typed is not one.
+      const named = thread.entries && !row.body.startsWith(row.title.replace(/…$/, '').trim()) ? row.title : '';
       // The opening is the row's body.
       if (turns[0]?.who === 'you' && turns[0].text === row.body) turns.shift();
       if (thread.stoppedOn !== undefined) {
@@ -1812,7 +1814,7 @@ export class Store {
       }
       const created = workItemsDisk.createWorkItem(
         dir,
-        { title: row.title, kind: row.kind, priority: row.priority, labels: row.labels },
+        { title: row.title, kind: row.kind, priority: row.priority, labels: row.labels, ...(named ? { label: named } : {}) },
         { source: 'agent', now: at },
       );
       // Your words draw under You and the agent's under the agent.
@@ -2058,7 +2060,7 @@ export class Store {
       const knownAt = chatAt || Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0);
       (doneAt ? done : out).push({
         product: item.product, id: item.id, engine: thread ? 'claude' : 'codex', chat, folder: folders.get(item.product) ?? null,
-        knownAt, heardThrough: chatAt || Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), doneAt, replied, told, held, follow,
+        knownAt, heardThrough: chatAt || Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), doneAt, replied, told, left: !told && [CUT_THERE, CLOSED_THERE].some((l) => String(item.result ?? '').startsWith(l)), held, follow,
       });
     }
     done.sort((a, b) => b.doneAt - a.doneAt);

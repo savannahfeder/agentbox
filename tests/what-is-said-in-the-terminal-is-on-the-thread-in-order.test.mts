@@ -29,9 +29,10 @@ import { catchUpDue, gettingReady, writesTheAnswer } from '../shared/agent-impor
 import { itemOptions, offerIsLive } from '../renderer/src/format.ts';
 import { belongsInInbox, belongsInProgress } from '../renderer/src/list-rules.ts';
 import { threadEvents } from '../renderer/src/thread-history.ts';
+import { asksForYourWords } from '../renderer/src/threads/page-rules.ts';
 
 const SID = '5a1c2d3e-4b5a-4c6d-8e7f-0a1b2c3d4e5f';
-const ASKED = '**Claude Code stopped to ask you a question. Answer it in its window, in the kestrel folder.**';
+const ASKED = '**Claude Code stopped to ask you a question. Answer it in the terminal open in kestrel.**';
 
 let root;
 let home;
@@ -203,7 +204,7 @@ describe('a question its agent put up there', () => {
     write(typed(t, 'Plan it.'), says(t + 1_000, 'The folder has changed.', 'tool_use'));
     session('waiting', 'permission prompt');
     await follow();
-    expect(row().result).toMatch(/kestrel folder\.\*\*\n\nThe folder has changed\.$/);
+    expect(row().result).toMatch(/open in kestrel\.\*\*\n\nThe folder has changed\.$/);
     write(says(t + 60_000, 'Planned. Build it?'));
     session('idle');
     await follow();
@@ -302,7 +303,7 @@ describe('a chat closed here while its agent works on there', () => {
     expect(row().status).toBe('done');
     await follow(doneAt + 5_000, waits(doneAt + 2_000));
     expect(row().status).toBe('open');
-    expect(row().result).toBe('**Claude Code stopped to ask for your OK. Answer it in its window, in the kestrel folder.**');
+    expect(row().result).toBe('**Claude Code stopped to ask for your OK. Answer it in the terminal open in kestrel.**');
     expect(belongsInInbox(row(), { now: doneAt + 6_000 })).toBe(true);
     // Not drawn as one you sent back, nor as words of yours.
     expect(events().map((e) => e.said)).not.toContain('You sent it back');
@@ -394,6 +395,28 @@ describe('a window left before its agent finished', () => {
     expect(inbox()).toBe(true);
   });
 
+  // After a restart nothing remembers that a session file was ever published.
+  it('is not held again as working when the app restarts just after, nor said twice', async () => {
+    await left();
+    fs.rmSync(path.join(home, 'sessions', `${process.pid}.json`));
+    await follow();
+    const lines = s.readHistory(slug, row().id).length;
+    const moved = `${file}.copy`;
+    fs.copyFileSync(file, moved);
+    // The same chat, as a path this run of the app has never seen published.
+    const other = path.join(root, 'other-home', 'projects', slugFor(path.join(root, 'kestrel')));
+    fs.mkdirSync(other, { recursive: true });
+    fs.copyFileSync(moved, path.join(other, `${SID}.jsonl`));
+    fs.rmSync(file);
+    fs.rmSync(moved);
+    await followClaudeChats({ store: s, dirs: [path.join(root, 'other-home')] });
+    expect(row().claim).toBeNull();
+    expect(s.readHistory(slug, row().id).length).toBe(lines);
+    fs.appendFileSync(path.join(other, `${SID}.jsonl`), `${JSON.stringify(typed(Date.now(), 'Carry on.'))}\n`);
+    await followClaudeChats({ store: s, dirs: [path.join(root, 'other-home')] });
+    expect(row().claim).not.toBeNull();
+  });
+
   it('opened again at its prompt says the same, once it has been there long enough to have written an answer', async () => {
     await left();
     const at0 = Date.now();
@@ -407,6 +430,26 @@ describe('a window left before its agent finished', () => {
 });
 
 describe('a chat brought in by itself', () => {
+  const brought = (title) => bringIn({ title, firstSaid: 'Fix the overlap check please', entries: [{ who: 'you', at: T0, text: 'Fix the overlap check please' }] });
+
+  // Seen on a real chat: "Refunds gap in src" became "Refunds in src" a minute later,
+  // and the name its window showed was no longer on the list.
+  it('keeps the name Claude Code gave it, which its window shows', () => {
+    brought('Overlap check');
+    expect(row().label).toBe('Overlap check');
+  });
+
+  it('is named by the app when all it has is the start of what was typed', () => {
+    brought('Fix the overlap check…');
+    expect(row().label ?? '').toBe('');
+  });
+
+  it('that you stopped reads as waiting on you, choices and all', () => {
+    const stopped = { result: `${CUT_THERE}\n\n**30 or 90?**\n1. 30\n2. 90`, wrote: { result: { ts: 1 } } };
+    expect(asksForYourWords(stopped)).toBe(true);
+    expect(asksForYourWords({ result: '**30 or 90?**\n1. 30\n2. 90', wrote: { result: { ts: 1 } } })).toBe(false);
+  });
+
   it('stays in its agent\'s own words, and one picked at setup is written up as ever', () => {
     bringIn({ lastSaid: 'Which repository?', entries: [{ who: 'you', at: T0, text: 'Fix it.' }, { who: 'agent', at: T0 + 1_000, text: 'Which repository?' }] });
     expect(catchUpDue(row())).toBe(true);

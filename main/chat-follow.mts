@@ -110,6 +110,8 @@ export interface FollowedChat extends ReadTo {
   replied: boolean;
   /** One went to its terminal, which has not said anything since. */
   told: boolean;
+  /** The row already says its window closed, or that you stopped it there. */
+  left: boolean;
   /** The follow holds it now. */
   held: boolean;
   /** Still the follow's to move: open, held or lately in Done, not taken up by a run here, not shared. */
@@ -218,7 +220,7 @@ export async function followClaudeChats(
       if (tail && turn.ended) store.chatAgentSaid(c.product, c.id, tail.text, { at: tail.at, now });
       continue;
     }
-    const running = state?.status ? atWork(state) : !published.has(file) && now - mtimeMs < FRESH_MS;
+    const running = state?.status ? atWork(state) : !published.has(file) && now - mtimeMs < FRESH_MS && !(c.left && !fresh.length && !tail);
     // Gone, or back at its prompt, with the turn never finished.
     const left = !turn.ended && !running && (state === null || (state.status === 'idle' && now - Math.max(mtimeMs, state.since ?? 0) > IDLE_FOR_MS));
     const cut = turn.ended && turn.cutAt > Math.max(c.knownAt, c.heardThrough, ...turn.entries.map((e) => e.at));

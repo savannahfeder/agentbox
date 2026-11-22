@@ -725,9 +725,10 @@ export function cellUnderTab(word: string, tab: string | undefined, { fromPeople
 
 /** The agent's newest word is a question with no options to pick, so only your words answer it. */
 export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined> }): boolean {
-  if (itemOptions(item).length) return false;
   const said = (item.wrote?.note?.ts ?? 0) > (item.wrote?.result?.ts ?? 0) ? item.note : item.result;
-  return asksSomething(said) || followsWord(said);
+  // A chat whose agent stopped, choices and all: nobody answered.
+  if (followsWord(said)) return true;
+  return !itemOptions(item).length && asksSomething(said);
 }
 
 /**

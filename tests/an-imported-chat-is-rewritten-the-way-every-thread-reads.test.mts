@@ -73,7 +73,7 @@ describe('a chat carried on where it started', () => {
     line('agent', { label: 'Kestrel', problem: 'What it does.', result: '**Next?**' }),
     line('founder', { saidOutside: 'Name the checkout module.' }),
     line('system', { chatAt: 2 }),
-    line('agent', { result: '**Claude Code stopped to ask you a question. Answer it in its window, in the kestrel folder.**' }),
+    line('agent', { result: '**Claude Code stopped to ask you a question. Answer it in the terminal open in kestrel.**' }),
     line('agent', { result: 'I would name it cart. Include tax?', chatAt: 3 }),
     line('founder', { answer: 'Include tax. Reply with the word ok only.' }),
     line('system', { answeredThrough: 4 }),

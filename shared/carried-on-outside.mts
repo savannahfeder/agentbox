@@ -26,7 +26,7 @@ export function heldOutside(item: Held | null | undefined): boolean {
  *  Code writes nothing to the chat while one is open. `waitingFor` is its
  *  session file's word, and `folder` the one it is open in. */
 const STOPPED = '**Claude Code stopped to ';
-const inItsWindow = (folder?: string | null) => (folder ? `in its window, in the ${folder} folder` : 'there');
+const inItsWindow = (folder?: string | null) => (folder ? `in the terminal open in ${folder}` : 'there');
 export function stoppedThere(waitingFor: string, folder?: string | null, { replyWaits = false } = {}): string {
   const why = waitingFor === 'permission prompt' ? 'ask for your OK' : 'ask you a question';
   return `${STOPPED}${why}. Answer it ${inItsWindow(folder)}${replyWaits ? ', and it gets your reply next' : ''}.**`;
