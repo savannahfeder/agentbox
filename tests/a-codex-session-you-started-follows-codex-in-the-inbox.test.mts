@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readCodexLive, codexConversation, CODEX_STALE_TURN_MS } from '../main/codex-live.mts';
-import { reachesInbox, progressAfterReply, putAway, replyIsSwallowed, agentAnswer, agentContext } from '../shared/agents.mts';
+import { reachesInbox, progressAfterReply, putAway, replyIsSwallowed, agentAnswer, agentContext, agentRow } from '../shared/agents.mts';
 import { theirWords } from '../shared/session-layout.mts';
 
 const NOW = Date.parse('2026-11-22T18:00:00Z');
@@ -50,7 +50,8 @@ function write(id: string, lines: string[], mtime: number) {
   return file;
 }
 const name = (id: string, thread: string) => fs.appendFileSync(path.join(codex, 'session_index.jsonl'), JSON.stringify({ id, thread_name: thread, updated_at: iso(NOW) }) + '\n');
-const live = (now = NOW) => readCodexLive({ home, codexDirs: [codex], now });
+let running: string[] = [];
+const live = (now = NOW) => readCodexLive({ home, codexDirs: [codex], now, isRunning: (c) => running.includes(c) });
 const one = (id: string, now = NOW) => live(now).find((a) => a.sessionId === id)!;
 
 const ASK = 'move the config to the new loader, keep the public settings the same';
@@ -106,13 +107,14 @@ describe('the round trip she asked for', () => {
     expect(progressAfterReply(a, NOW, 'all')).toBe(false);
   });
 
-  it('busy on its first task, nobody answered anything yet: not moved to In progress', () => {
+  it('working on the first thing she asked: In progress, not Needs you', () => {
     const t0 = NOW - 60_000;
     write('s2', [meta('s2', t0), ...turn(t0, 'build the receipts page', null)], t0 + 10);
     name('s2', 'Build the receipts page');
     const a = one('s2');
     expect(a.status).toBe('busy');
-    expect(progressAfterReply(a, NOW, 'all')).toBe(false);
+    expect(progressAfterReply(a, NOW, 'all')).toBe(true);
+    expect(reachesInbox(a, NOW, 'all')).toBe(false);
   });
 
   it('a turn nothing has written to for half an hour is not taken to be running', () => {
@@ -226,6 +228,22 @@ describe('a command Codex asks permission to run', () => {
     expect(reachesInbox(a, NOW, 'waiting')).toBe(true);
     expect(agentAnswer(a)).toBe('**May I locate cart.js using a read-only command outside the sandbox?**\n\n```\nrg --files -g cart.js\n```');
   });
+  it('approved while the command still runs: working, not waiting, because the command is running', () => {
+    const t0 = NOW - 60_000;
+    write('p1', [...start(t0), asking(t0 + 2_000, 'c1')], t0 + 2_000);
+    running = ['rg --files -g cart.js'];
+    try {
+      const a = one('p1');
+      expect(a.status).toBe('busy');
+      expect(a.waitingFor).toBeNull();
+      expect(progressAfterReply(a, NOW, 'all')).toBe(true);
+    } finally { running = []; }
+  });
+  it('a permission nobody gave for half an hour, its terminal closed, stops saying it waits', () => {
+    const t0 = NOW - 2 * CODEX_STALE_TURN_MS;
+    write('p1', [...start(t0), asking(t0 + 2_000, 'c1')], t0 + 2_000);
+    expect(one('p1').status).toBe('idle');
+  });
   it('approved and running: working again, nothing asked', () => {
     const t0 = NOW - 60_000;
     write('p1', [...start(t0), asking(t0 + 2_000, 'c1'), output(t0 + 9_000, 'c1')], t0 + 9_000);
@@ -243,5 +261,18 @@ describe('a command Codex asks permission to run', () => {
     const call = line(t0 + 2_000, 'response_item', { type: 'function_call', name: 'shell', call_id: 'c2', arguments: JSON.stringify({ command: ['npm', 'install'], with_escalated_permissions: true, justification: 'Install the packages from the network?' }) });
     write('p1', [...start(t0), call], t0 + 2_000);
     expect(one('p1').approval).toEqual({ command: 'npm install', reason: 'Install the packages from the network?' });
+  });
+});
+
+describe("the row's second line", () => {
+  it('is the ask alone, never a list the page would offer as choices', () => {
+    const t0 = NOW - 10 * 60_000;
+    write('s1', [meta('s1', t0), ...turn(t0, ASK, ANSWER)], t0 + 21_000);
+    expect(agentRow(one('s1'), NOW).body).toBe('**Three customer apps still set TAX_MODE.**');
+  });
+  it('is the first paragraph of a report that asks nothing', () => {
+    const t0 = NOW - 10 * 60_000;
+    write('s5', [meta('s5', t0), ...turn(t0, 'tidy the imports', '## Done\n\nTidied 14 files.\n\n1. Removed unused imports\n2. Sorted the rest')], t0 + 21_000);
+    expect(agentRow(one('s5'), NOW).body).toBe('Tidied 14 files.');
   });
 });

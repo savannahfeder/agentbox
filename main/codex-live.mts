@@ -213,13 +213,31 @@ export function readCodexSession(file: string, { whole = false }: { whole?: bool
 /** Where a session stands. Waiting means stopped on its own question; idle means its turn ended and it is your move. */
 export function codexStatus(fold: CodexFold, mtime: number, now: number): 'busy' | 'waiting' | 'idle' {
   if (fold.pendingCall) return 'waiting';
-  if (fold.approval && fold.turnStartedAt > fold.turnEndedAt) return 'waiting';
+  if (fold.approval && fold.turnStartedAt > fold.turnEndedAt && now - mtime < CODEX_STALE_TURN_MS) return 'waiting';
   const running = fold.turnStartedAt > fold.turnEndedAt && now - mtime < CODEX_STALE_TURN_MS;
   if (running) return 'busy';
   return fold.question.length ? 'waiting' : 'idle';
 }
 
 interface Owner { slug?: string | null; name?: string | null; repoPath?: string | null }
+
+// Codex writes nothing between asking to run a command and the command
+// finishing, so a granted command is told from a pending one by the command
+// being in the process list. Read in the background, at most every few seconds.
+let ps: { at: number; lines: string[]; busy: boolean } = { at: 0, lines: [], busy: false };
+export function runningCommands(now = Date.now()): string[] {
+  if (now - ps.at > 3_000 && !ps.busy) {
+    ps.busy = true;
+    execFile('/bin/ps', ['-Ao', 'command='], { timeout: 3_000, maxBuffer: 16 << 20, encoding: 'utf8', windowsHide: true }, (err, out) => {
+      ps = { at: Date.now(), lines: err ? ps.lines : String(out).split('\n'), busy: false };
+    });
+  }
+  return ps.lines;
+}
+const commandRuns = (command: string) => {
+  const c = command.trim().slice(0, 120);
+  return !!c && runningCommands().some((l) => l.includes(c));
+};
 
 export interface CodexLiveOptions {
   home?: string;
@@ -228,12 +246,14 @@ export interface CodexLiveOptions {
   now?: number;
   /** Session ids this app is running, which are its own work. */
   ours?: Set<string>;
+  /** Whether a command is running on this machine now. */
+  isRunning?: (command: string) => boolean;
 }
 
 const kept = new Map<string, { size: number; mtimeMs: number; value: ReturnType<typeof readCodexSession> }>();
 
 /** Every Codex session a person started that was written to in the last day, as a live agent record. */
-export function readCodexLive({ home = os.homedir(), codexDirs = null, products = [], now = Date.now(), ours = new Set() }: CodexLiveOptions = {}): Agent[] {
+export function readCodexLive({ home = os.homedir(), codexDirs = null, products = [], now = Date.now(), ours = new Set(), isRunning = commandRuns }: CodexLiveOptions = {}): Agent[] {
   const dirs = codexDirs ?? codexDataDirs({ home });
   const owners = new Map<string, Owner>();
   for (const p of products) if (p?.repoPath) owners.set(path.resolve(p.repoPath), p);
@@ -254,7 +274,8 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
       const prev = byId.get(meta.id);
       if (prev && prev.lastActiveAt >= Math.max(fold.lastActiveAt, st.mtimeMs)) continue;
       const owner = owners.get(path.resolve(meta.cwd)) ?? null;
-      const status = codexStatus(fold, st.mtimeMs, now);
+      const granted = !!fold.approval && isRunning(fold.approval.command);
+      const status = codexStatus(granted ? { ...fold, approval: null } : fold, st.mtimeMs, now);
       const asked = fold.asked.length ? fold.asked : [{ at: meta.startedAt, text: firstSaid }];
       byId.set(meta.id, {
         pid: 0,
@@ -307,6 +328,6 @@ export async function revealCodex(agent: Pick<Agent, 'app'> | null, { platform =
 
 function openApp(name: string): Promise<boolean> {
   return new Promise((resolve) => {
-    execFile('/usr/bin/open', ['-a', name], { timeout: 5000 }, (err) => resolve(!err));
+    execFile('/usr/bin/open', ['-a', name], { timeout: 5000, windowsHide: true }, (err) => resolve(!err));
   });
 }

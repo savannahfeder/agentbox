@@ -138,14 +138,13 @@ export function isWorking(agent: AgentLike): boolean {
 }
 
 // She answered it where it runs: it is working on a message she typed there
-// after it last stopped. That takes it out of Needs you and into In progress,
-// the same as a reply sent from here. A session busy on its own is not moved.
+// after it last stopped, or on the first thing she typed into it. That takes it
+// out of Needs you and into In progress, the same as a reply sent from here. A
+// session busy on its own after it stopped is not moved.
 export function answeredWhereItRuns(agent: AgentLike): boolean {
   if (!isWorking(agent)) return false;
-  const stopped = agent.saidAt ?? 0;
-  if (!stopped) return false;
   const hers = Math.max(0, ...(agent.asked ?? []).map((t) => Number(t?.at) || 0));
-  return hers > stopped;
+  return hers > 0 && hers > (agent.saidAt ?? 0);
 }
 
 // A replied-to agent sits in In progress until the session stops again (idle
@@ -392,7 +391,8 @@ export function agentRow(agent: AgentLike, now: number = Date.now()): { title: s
   if (isCodex(agent)) {
     const title = agentTitle(agent, now);
     if (answeredWhereItRuns(agent)) return { title, body: `**You answered it in Codex, and it is working on it.**\n\nIt comes back to your inbox when it stops.` };
-    if (agent.lastSaid || agent.question?.length || agent.approval) return { title, body: agentAnswer(agent) };
+    // Only the ask, as the row's preview: a list in the body would be offered on the page as choices nothing can send.
+    if (agent.lastSaid || agent.question?.length || agent.approval) return { title, body: agentPreview(agent) };
     return { title, body: '**Codex has not answered yet.**' };
   }
   const waited = howLong(now - (agent.lastActiveAt ?? agent.startedAt ?? now));
@@ -471,7 +471,14 @@ export function agentContext(agent: AgentLike, theirAsk: string): string {
   return theirAsk ? `${where} · You asked: ${theirAsk}` : where;
 }
 
-/** The row's preview and the page's answer: the ask in bold and the agent's own words, or the message as it is. */
+/** The row's second line: the ask in bold, or the message's first paragraph. */
+export function agentPreview(agent: AgentLike): string {
+  const l = agentLayout(agent);
+  if (l.kind === 'asks' && l.bold) return `**${l.bold}**`;
+  return (agent.lastSaid ?? '').split(/\n\s*\n/).find((p) => p.trim() && !/^\s*(?:#|[-*•]|\d+[.)]|```|>|\|)/.test(p))?.trim() ?? '';
+}
+
+/** The page's answer: the ask in bold and the agent's own words, or the message as it is. */
 export function agentAnswer(agent: AgentLike): string {
   const l = agentLayout(agent);
   const md = layoutMarkdown(l, agent.lastSaid ?? '');

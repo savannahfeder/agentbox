@@ -1729,8 +1729,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // page and a markdown file have no second door anywhere, and her screenshot
     // has one of each sitting above the code card she was pointing at.
     : withoutBareTwins([...new Set([...messageDocuments(item, productDir), ...referencedFiles(item.result, item.body, item.answer, {dir: productDir}).filter(path => /\.pdf$/i.test(path) && !isBookkeeping(path)), ...linkedDecks(item.result, item.body, item.answer)])]);
-  // An outside session's choices come off its own message, drawn by AgentThread.
-  const showOptions = !agent && offerIsLive(item);
+  const showOptions = offerIsLive(item);
   // WHETHER THE STRIP IS DRAWN, which is not the same question as whether the
   // row has a live offer. Everywhere else the two are the same. Opening the box
   // brings the options with it, and clicking away from the box takes them away

@@ -65,8 +65,11 @@ describe('answered in the terminal', () => {
   it('busy with nothing typed since it stopped is left where it was', () => {
     expect(answeredWhereItRuns({ ...stopped, asked: [{ at: T - 60_000, text: 'first' }] })).toBe(false);
   });
-  it('a session that has never stopped is not moved', () => {
-    expect(answeredWhereItRuns({ ...stopped, saidAt: 0 })).toBe(false);
+  it('working on the first thing she typed, never stopped yet: In progress', () => {
+    expect(answeredWhereItRuns({ ...stopped, saidAt: 0 })).toBe(true);
+  });
+  it('working with nothing of hers read: not moved', () => {
+    expect(answeredWhereItRuns({ ...stopped, saidAt: 0, asked: [] })).toBe(false);
   });
   it('off stays off', () => {
     expect(progressAfterReply(stopped, T, 'off')).toBe(false);

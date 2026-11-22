@@ -61,7 +61,7 @@ function blocks(md: string): Block[] {
       cur.lines.push(line);
       const text = li[3].trim();
       if (li[1].length >= 2 && cur.items.length) continue;
-      cur.items.push({ ordered: !!li[2], label: /^(?:\*\*|\[|_)*\s*(?:[A-F]|\d)\b\s*(?:\*\*)?\s*[—–:).-]/.test(text), text });
+      cur.items.push({ ordered: !!li[2], label: /^(?:\*\*|\[|_)*\s*(?:[A-F]|\d)\b\s*(?:\*\*)?\s*[\u2014\u2013:).-]/.test(text), text });
       continue;
     }
     if (cur?.type === 'list' && /^\s{2,}\S/.test(line)) { cur.lines.push(line); continue; }
@@ -114,7 +114,7 @@ function isStatementAsk(raw: string): boolean {
   const s = plain(raw);
   if (/\b(let me know|tell me) if\b/i.test(s)) return false;
   return /^please\s+(?!note|bear)/i.test(s)
-    || /(?:^|[,;.:—–]\s*|\b(?:so|just|and|then|or)\s+)say\s+(?:["“'‘`*]|yes\b|go\b|when\b|the word\b)/i.test(s)
+    || /(?:^|[,;.:\u2014\u2013]\s*|\b(?:so|just|and|then|or)\s+)say\s+(?:["“'‘`*]|yes\b|go\b|when\b|the word\b)/i.test(s)
     || /^tell me (?:which|what|how|when|whether)\b/i.test(s)
     || /^(?:once|when|after) you(?:['’]ve| have)? (?:approve|confirm|choose|pick|decide|created|reconnected|restarted|signed)/i.test(s)
     || /\b(?:then|and) (?:tell|ping|message) me\b/i.test(s)

@@ -569,11 +569,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // seeing the same agent again is a fresh fact about the app being used.
   const seenAgents = new Set<string>();
 
+  const sessionDirsNow = () => appSessionFolders({ config, supervisor });
   // Every Codex home a person's sessions can be in, as the import reads them, worked out once a minute.
   let codexHomes: { at: number; dirs: string[] } = { at: 0, dirs: [] };
   const codexHomesNow = () => {
     if (Date.now() - codexHomes.at > 60_000) {
-      try { codexHomes = { at: Date.now(), dirs: appSessionFolders({ config, supervisor }).codexDirs }; } catch { codexHomes = { at: Date.now(), dirs: [] }; }
+      try { codexHomes = { at: Date.now(), dirs: sessionDirsNow().codexDirs }; } catch { codexHomes = { at: Date.now(), dirs: [] }; }
     }
     return codexHomes.dirs;
   };
@@ -911,7 +912,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // renderer already hands over both halves it needs.
       const key = agentKey({ sessionId: payload?.sessionId as string | undefined, pid: Number(payload?.pid), startedAt: payload?.startedAt });
       // The file is looked up here, never taken from the window.
-      if ((payload as { engine?: unknown } | undefined)?.engine === 'codex') {
+      if ((payload as { engine?: unknown } | undefined)?.engine === 'codex' || (Number(payload?.pid) === 0 && payload?.sessionId)) {
         const found = liveAgents().find((a) => a.engine === 'codex' && a.sessionId === payload?.sessionId);
         return found?.transcript ? codexConversation(found.transcript) : { ok: false, reason: 'That Codex conversation could not be found.' };
       }
@@ -989,7 +990,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
           let thread = null;
           if (choice === 'yes') {
             try {
-              const { codexDirs } = appSessionFolders({ config, supervisor });
+              const { codexDirs } = sessionDirsNow();
               thread = (await readCodexThreadsOffThread({ codexDirs })).threads.find((t) => t.id === codexIdOf(row)) ?? null;
             } catch { thread = null; }
           }

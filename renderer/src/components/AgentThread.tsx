@@ -29,17 +29,19 @@ export function AgentThread({ agent, title, movedAt, md, onPick }: {
   const laidOut = !!(agent.lastSaid || agent.question?.length || agent.approval);
   const [full, setFull] = useState(!laidOut);
   const [whole, setWhole] = useState(false);
-  useEffect(() => { setWhole(false); setFull(!laidOut); }, [pid, sessionId, cwd]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setWhole(false); }, [pid, sessionId, cwd]);
+  useEffect(() => { setFull(!laidOut); }, [pid, sessionId, cwd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [state, setState] = useState<{ events: AgentEvent[]; omitted: number; total: number; error?: string } | null>(null);
   // Re-reading the same conversation must not blank it and throw away where she was.
   const shown = useRef<string | null>(null);
   const which = `${engine ?? 'claude'}|${pid}|${sessionId ?? ''}|${cwd}`;
+  // Read while the page shows the ask too, so the link opens it at once. A Codex
+  // session has no pid here; the main process knows it by its session id.
   useEffect(() => {
-    if (!full) return undefined;
     let live = true;
     if (shown.current !== which) { setState(null); shown.current = which; }
-    api.agentConversation({ pid, sessionId, cwd, whole, engine })
+    api.agentConversation({ pid, sessionId, cwd, whole })
       .then((r) => {
         if (!live) return;
         setState(r?.ok
@@ -48,7 +50,7 @@ export function AgentThread({ agent, title, movedAt, md, onPick }: {
       })
       .catch((err) => { if (live) setState({ events: [], omitted: 0, total: 0, error: String((err as Error)?.message ?? err) }); });
     return () => { live = false; };
-  }, [which, movedAt, whole, full]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pid, sessionId, cwd, movedAt, whole]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [sel, setSel] = useState<number | null>(null);
   const selRef = useRef<HTMLButtonElement>(null);
