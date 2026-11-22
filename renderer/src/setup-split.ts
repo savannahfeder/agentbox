@@ -161,17 +161,19 @@ type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'c
 export interface ChecklistRow { label: string; keys: string[]; state: 'done' | 'now' | 'todo' }
 /** The tour's lessons as the list beside it. Answering is either a choice or a reply.
  *  `now` is the lesson the tour is pointing at; without one, the first not done is lit. */
+// Each step: its words, its keys, the lessons that tick it, and the tips that point at it.
+const walkSteps = (cmd: string): Array<[string, string[], Lesson[], Lesson[]]> => [
+  ['Send a thread', ['N'], ['start', 'compose'], ['start', 'compose']],
+  // Writing back to a thread or closing it means it was opened, whatever opened it.
+  ['Open one', ['↵'], ['open', 'choose', 'reply', 'close'], ['open', 'working']],
+  ['Write back', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
+  ['Mark it done', ['E'], ['close'], ['close']],
+  ['Find anything', [cmd, 'K'], ['palette'], ['palette', 'urgent']],
+];
+
 export function tourChecklist(done: readonly Lesson[], cmd = '⌘', now: Lesson | null = null): ChecklistRow[] {
   const has = (...l: Lesson[]) => l.some((x) => done.includes(x));
-  // Each row: its words, its keys, the lessons that tick it, and the tips that point at it.
-  const rows: Array<[string, string[], Lesson[], Lesson[]]> = [
-    ['Send a thread', ['N'], ['start', 'compose'], ['start', 'compose']],
-    // Writing back to a thread or closing it means it was opened, whatever opened it.
-    ['Open one', ['↵'], ['open', 'choose', 'reply', 'close'], ['open', 'working']],
-    ['Write back', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
-    ['Mark it done', ['E'], ['close'], ['close']],
-    ['Find anything', [cmd, 'K'], ['palette'], ['palette', 'urgent']],
-  ];
+  const rows = walkSteps(cmd);
   // A row already done keeps its tick; the tour pointing back at it lights the next one to do.
   const at = now ? rows.findIndex(([, , ls, by]) => by.includes(now) && !has(...ls)) : -1;
   const lit = at >= 0 ? at : rows.findIndex(([, , ls]) => !has(...ls));
@@ -210,7 +212,9 @@ export const tourCount = (rows: ChecklistRow[]) => `${tourPlace(rows)} of ${rows
  *  further on, and a lesson learned out of turn does not move the count past the tip. */
 export function walkPlace(done: readonly Lesson[], now: Lesson | null): { at: number; of: number } {
   const early = (now === 'palette' || now === 'urgent') && !done.includes('close');
-  const rows = tourChecklist(done, '⌘', early ? null : now);
-  const at = rows.findIndex((r) => r.state === 'now');
-  return { at: at < 0 ? rows.length : at + 1, of: rows.length };
+  const steps = walkSteps('⌘');
+  const tip = now && !early ? steps.findIndex(([, , , by]) => by.includes(now)) : -1;
+  const next = tourChecklist(done).findIndex((r) => r.state !== 'done');
+  const at = tip >= 0 ? tip : next >= 0 ? next : steps.length - 1;
+  return { at: at + 1, of: steps.length };
 }

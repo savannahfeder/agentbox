@@ -8872,7 +8872,7 @@ export default function App() {
       {finishing && <TourFinished covered={settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
       {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} practiceOpen={!!focused && focused.id === tourPractice?.item} view={view} thread={!!focused}
         answering={practiceAnswering}
-        covered={settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
+        covered={settingsOpen || teamOpen || newProject || walkElsewhere || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
         onChange={setTour}
         onStep={setTourNow}

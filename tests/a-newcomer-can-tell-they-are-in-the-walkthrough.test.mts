@@ -80,6 +80,10 @@ describe('how far through you are', () => {
     expect(walkPlace(['palette'], null).at).toBe(1);
     expect(walkPlace(['palette', 'compose'], 'open').at).toBe(2);
   });
+  // Round four, 2026-11-22: N learned on Files ticked the first step, and the send tip then read 2 of 5.
+  it('stays on sending while the tip asks to send, whatever opened the box before', () => {
+    expect(walkPlace(['start'], 'compose').at).toBe(1);
+  });
   it('stays at the last step once everything is done', () => {
     expect(walkPlace(['compose', 'open', 'choose', 'reply', 'close', 'palette'], null).at).toBe(5);
   });
@@ -100,6 +104,10 @@ describe('the thread tips', () => {
   });
   it('leave the last tip free to stand over any thread', () => {
     expect(tourStep(closed, screen({ practiceThread: false }))).toBe('palette');
+  });
+  // Round four, 2026-11-22: "Press N" stood on Files beside Back to the walkthrough.
+  it('stand on no page the walkthrough is not on', () => {
+    expect(read('renderer/src/App.tsx')).toMatch(/covered=\{settingsOpen \|\| teamOpen \|\| newProject \|\| walkElsewhere \|\| \(modal !== null/);
   });
   it('are told which thread is the practice one', () => {
     expect(read('renderer/src/App.tsx')).toMatch(/<Tour tour=\{tour\} practice=\{!!tourTask\} practiceId=\{tourPractice\?\.item \?\? null\} practiceOpen=\{!!focused && focused\.id === tourPractice\?\.item\} /);
