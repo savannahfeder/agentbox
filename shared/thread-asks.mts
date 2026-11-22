@@ -17,7 +17,7 @@ import type { AskPatch, Verdict } from './work-items.mts';
 export type AskKind = AskPatch['kind'];
 export type Ask = AskPatch;
 
-interface AskRow {
+export interface AskRow {
   id: string;
   status?: string;
   assignee?: string | null;

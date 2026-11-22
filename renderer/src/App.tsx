@@ -249,7 +249,7 @@ import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shar
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
 import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
-import { isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
+import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
 import { revealLine } from './reveal-line';
@@ -7747,6 +7747,7 @@ export default function App() {
                   headerTarget={focused ? null : teamHeader} cornerTarget={focused ? null : teamCorner}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
+                  helpedAt={(at) => helpedWhen(items, team?.me ?? null, openCard.personId, openCard.threadId, at)}
                   handedToYou={taskHandedFrom(items, openCard.threadId, openCard.personId) as WorkItem | null}
                   onOpenTask={(t) => { setOpenCard(null); setTeamOpen(false); setFocused(t); markSeen(t); }}
                   onHandBack={(verdict, words) => {
