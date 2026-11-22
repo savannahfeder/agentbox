@@ -181,12 +181,6 @@
 .app:has(> .inbox-sky-zero) .th-start .tc-chip { color: var(--text); }
 .app:has(> .inbox-sky-zero) .th-start .tc-send > button:disabled { opacity: 1; }
 .app:has(> .inbox-sky-zero) .th-start .tc-send kbd { opacity: 1; }
-/* The light purple sky draws its ink soft here (sky.ts emptySoft), and the
-   controls are filled white so no dot sits inside one. */
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-chip { background: #fff; }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-send > button { background: #fff; box-shadow: inset 0 0 0 1px rgba(30, 22, 36, .14); }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-send > button:hover:not(:disabled) { background: #f3f1f5; }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-ideas { background: rgba(255, 255, 255, .55); }
 
 /* Team and Files wear the Inbox's sky; the Team list would cover it. */
 .app.sky-place .cx-list { background: transparent; }

@@ -51,22 +51,13 @@ const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyA
   bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165, ...over,
 });
 
-// Aubergine (design w-bd2cd91875/7): deep plum ink with a violet seam. No glow and no
-// grey grain, which read pastel and fake; the streak is tight like the dark one's.
-const AUBERGINE = light(
-  { core: [90, 30, 130], hot: [140, 50, 220], halo: [60, 35, 110], ember: [80, 25, 100] }, [],
-  { ink: true, grain: 0, coreW: 0.024, hotW: 0.006, haloW: 0.11, lightDepth: 120 });
-
 // The card is white and the sky fades into it, the way dark fades to black.
-// `frame` tints the window around the card so the white stands off it.
+// `frame` is the window around the card, a step below white so the card
+// stands off it, and no more tinted than plain Light.
 const LIGHT_SKIES: Sky[] = [
-  { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
+  { id: 'sage', name: 'Light green sky', dark: false, frame: '#f0f1f2', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  // Deep plum dots sink every grey word on a white card, so the empty Inbox draws them soft.
-  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, frame: '#eae9ec', art: { ...AUBERGINE, emptySoft: 0.45 },
-    // On a whole page the inbox's tight streak read as a line through it (design 20): Home's dots fill the page above it.
-    home: { ...AUBERGINE, coreW: 0.03, haloW: 0.3, below: 0.25 } },
 ];
 
 /** Every sky theme, in the order Settings and Command-K show them. */
