@@ -29,11 +29,11 @@ import { projectWrites, projectWritten } from './store/projects-changed.mts';
 import { imgUrl } from './img-scheme.mts';
 import { teamOf, PERSONAL_FLAG } from './team/projects.mts';
 import {
-  agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL, THREAD_LABEL,
+  agentImportRow, howTheChatEnded, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL, THREAD_LABEL,
 } from '../shared/agent-import.mts';
 import { CLOSED_THERE, CUT_THERE, heldOutside, stoppedThere } from '../shared/carried-on-outside.mts';
 import { isShared } from '../shared/team-rules.mts';
-import { DONE_FOLLOWED_MOST, DONE_FOLLOWED_MS } from './chat-follow.mts';
+import { DONE_FOLLOWED_MOST, DONE_FOLLOWED_MS, notYetRead } from './chat-follow.mts';
 import type { FollowedChat, Ours } from './chat-follow.mts';
 import type { ChatEntry } from './agent-sessions.mts';
 import {
@@ -180,6 +180,8 @@ export interface ImportedChat extends CodexThreadLike {
   /** Stopped in its own window, on this (Claude Code's `waitingFor`), open in this folder. */
   stoppedOn?: string;
   openIn?: string;
+  /** What was said in it, for one brought in as it goes (main/new-chats-watch.mts). */
+  entries?: ChatEntry[];
   name?: string;
 }
 
@@ -1776,6 +1778,10 @@ export class Store {
     wanted.forEach((thread: ImportedChat, i: number) => {
       const { at, last } = chatTimes(thread, now - i * 1000);
       const row = threadImportRow(thread);
+      const turns = notYetRead({ entries: thread.entries ?? [] }, { heardThrough: 0, knownAt: 0 });
+      if (turns.length) row.result = turns.at(-1)!.who === 'agent' ? turns.pop()!.text : '';
+      // The opening is the row's body.
+      if (turns[0]?.who === 'you' && turns[0].text === row.body) turns.shift();
       if (thread.stoppedOn !== undefined) {
         row.result = [stoppedThere(thread.stoppedOn, thread.openIn), row.result].filter(Boolean).join('\n\n');
         row.labels = row.labels.filter((l) => l !== CATCH_UP_LABEL);
@@ -1787,6 +1793,10 @@ export class Store {
       );
       // Your words draw under You and the agent's under the agent.
       workItemsDisk.updateWorkItem(dir, created.id, { body: row.body }, { source: 'founder', now: at });
+      for (const turn of turns) {
+        const said = turn.who === 'you' ? { saidOutside: turn.text } : { result: turn.text };
+        workItemsDisk.updateWorkItem(dir, created.id, said, { source: turn.who === 'you' ? 'founder' : 'agent', now: Math.min(Math.max(turn.at, at), last) });
+      }
       workItemsDisk.updateWorkItem(dir, created.id, { ...(row.result ? { result: row.result } : {}), chatAt: last }, { source: 'agent', now: last + 1 });
       if (land === 'sorted' && !thread.waiting) {
         workItemsDisk.updateWorkItem(dir, created.id, { status: 'done' }, { source: 'founder', now: last + 2 });
@@ -1989,7 +1999,7 @@ export class Store {
       if (patch.result === item.result) continue;
       const labels = item.labels ?? [];
       workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { result: patch.result, ...(saidAt ? { chatAt: saidAt } : {}) }, { source: 'agent', now });
-      if (wroteUpAt && !labels.includes(CATCH_UP_LABEL)) workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { labels: [...labels, CATCH_UP_LABEL] }, { source: 'system', now });
+      if (wroteUpAt && howTheChatEnded(patch.result).waiting && !labels.includes(CATCH_UP_LABEL)) workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { labels: [...labels, CATCH_UP_LABEL] }, { source: 'system', now });
       refreshed += 1;
     }
     return refreshed;
@@ -2076,7 +2086,7 @@ export class Store {
     const item = workItemsDisk.readWorkItem(dir, id, now);
     if (!item) return null;
     workItemsDisk.updateWorkItem(dir, id, { result: said, chatAt: at }, { source: 'agent', now });
-    this.owesWriteUp(slug, item, true, now);
+    this.owesWriteUp(slug, item, howTheChatEnded(said).waiting, now);
     return this.letGoOfChat(slug, id, { now });
   }
 
@@ -2131,8 +2141,9 @@ export class Store {
     return open;
   }
 
-  /** Written up the way every thread reads (main/catch-up.mts): an answer is, a
-   *  question only its own window shows is not. */
+  /** Written up the way every thread reads (main/catch-up.mts): an answer that
+   *  asks something is. One that asks nothing is not, since a write-up always
+   *  asks, nor is a question only its own window shows. */
   owesWriteUp(slug: string, item: StoreItem, owed: boolean, now: number) {
     const labels = item.labels ?? [];
     if (labels.includes(CATCH_UP_LABEL) === owed) return;

@@ -58,7 +58,7 @@ export interface ReadTo { heardThrough: number; knownAt: number }
 
 /** What the row has not had yet, in the order it was said: your messages one by
  *  one, the agent's between them as one. */
-export function notYetRead(turn: ChatTurn | null, { heardThrough, knownAt }: ReadTo): ChatEntry[] {
+export function notYetRead(turn: Pick<ChatTurn, 'entries'> | null, { heardThrough, knownAt }: ReadTo): ChatEntry[] {
   const out: ChatEntry[] = [];
   for (const e of turn?.entries ?? []) {
     if (e.at <= (e.who === 'you' ? heardThrough : knownAt)) continue;

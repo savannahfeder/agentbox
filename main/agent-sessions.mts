@@ -412,14 +412,18 @@ function pickedIn(result: unknown): { asked: string; picked: string } | null {
   const r = (result ?? {}) as { answers?: unknown; questions?: unknown; plan?: unknown };
   if (typeof r.plan === 'string' && r.plan.trim()) return { asked: r.plan.trim().slice(0, SAID_CHARS), picked: 'Approved the plan' };
   if (!r.answers || typeof r.answers !== 'object') return null;
-  const bare = (s: unknown) => String(s ?? '').replace(/\s*\(recommended\)\s*$/i, '').trim();
-  const picks = Object.entries(r.answers).map(([q, a]) => [q, bare(a)]).filter(([, a]) => a);
+  const picks = Object.entries(r.answers).map(([q, a]) => [q, bareLabel(a)]).filter(([, a]) => a);
   if (!picks.length) return null;
-  const asked = (Array.isArray(r.questions) ? r.questions : []).map((q: { question?: unknown; options?: unknown }) => [
-    `**${bare(q?.question)}**`,
-    ...(Array.isArray(q?.options) ? q.options : []).map((o: { label?: unknown }) => `- ${bare(o?.label)}`),
-  ].join('\n')).join('\n\n');
-  return { asked: asked.slice(0, SAID_CHARS), picked: picks.map(([, a]) => a).join('\n').slice(0, FIRST_CHARS) };
+  return { asked: questionsAsked(r.questions), picked: picks.map(([, a]) => a).join('\n').slice(0, FIRST_CHARS) };
+}
+
+const bareLabel = (s: unknown) => String(s ?? '').replace(/\s*\(recommended\)\s*$/i, '').trim();
+
+function questionsAsked(questions: unknown): string {
+  return (Array.isArray(questions) ? questions : []).map((q: { question?: unknown; options?: unknown }) => [
+    `**${bareLabel(q?.question)}**`,
+    ...(Array.isArray(q?.options) ? q.options : []).map((o: { label?: unknown }) => `- ${bareLabel(o?.label)}`),
+  ].join('\n')).join('\n\n').slice(0, SAID_CHARS);
 }
 
 /** Typed while its agent was at work: kept as an attachment, not a message. */
@@ -438,15 +442,15 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
   const lines = buf.slice(0, n).toString('utf8').split('\n');
   if (from > 0) lines.shift();
   const turn: ChatTurn = { heard: '', heardAt: 0, said: '', saidAt: 0, ended: false, cutAt: 0, entries: [] };
-  // When each tool was called, so a question is dated by when it was put up.
-  const called = new Map<unknown, number>();
+  // Each tool call, so a question is dated by when it was put up, and one you cancelled is known at all.
+  const called = new Map<unknown, { at: number; asked: string }>();
   for (const line of lines) {
     if (!line.trim()) continue;
     let row: TranscriptRow & { isSidechain?: boolean; attachment?: unknown; message?: { content?: unknown; stop_reason?: unknown } };
     try { row = JSON.parse(line); } catch { continue; }
     if (row.isSidechain || (row.type !== 'user' && row.type !== 'assistant' && row.type !== 'attachment')) continue;
     const at = Date.parse(String(row.timestamp ?? '')) || 0;
-    const blocks = Array.isArray(row.message?.content) ? row.message.content as { type?: unknown; id?: unknown; tool_use_id?: unknown }[] : [];
+    const blocks = Array.isArray(row.message?.content) ? row.message.content as { type?: unknown; id?: unknown; name?: unknown; input?: { questions?: unknown }; tool_use_id?: unknown }[] : [];
     if (row.type === 'attachment') {
       const words = queuedWords(row);
       if (words) turn.entries.push({ who: 'you', at, text: words });
@@ -461,18 +465,17 @@ function turnIn(fd: number, size: number, bytes: number): ChatTurn {
     // A tool's result: the agent carries on from it, unless you stopped it there.
     if (row.type === 'user') {
       const pick = pickedIn(row.toolUseResult);
-      if (pick) {
-        const put = called.get(blocks.find((b) => b?.type === 'tool_result')?.tool_use_id) ?? at;
-        if (pick.asked) turn.entries.push({ who: 'agent', at: Math.min(put, at - 1), text: pick.asked });
-        turn.entries.push({ who: 'you', at, text: pick.picked });
-      }
+      const call = called.get(blocks.find((b) => b?.type === 'tool_result')?.tool_use_id);
+      const asked = pick?.asked || call?.asked;
+      if (asked) turn.entries.push({ who: 'agent', at: Math.min(call?.at ?? at, at - 1), text: asked });
+      if (pick) turn.entries.push({ who: 'you', at, text: pick.picked });
       turn.ended = CUT_SHORT.test(messageText(row).trim());
       if (turn.ended) turn.cutAt = at;
       continue;
     }
     // Claude Code refusing the turn, a usage limit: the agent has stopped.
     if (row.isApiErrorMessage) { turn.ended = true; continue; }
-    for (const b of blocks) if (b?.type === 'tool_use') called.set(b.id, at);
+    for (const b of blocks) if (b?.type === 'tool_use') called.set(b.id, { at, asked: b.name === 'AskUserQuestion' ? questionsAsked(b.input?.questions) : '' });
     const text = messageText(row).trim();
     if (text) {
       turn.entries.push({ who: 'agent', at, text: text.slice(-SAID_CHARS) });

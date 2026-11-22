@@ -172,6 +172,16 @@ describe('a question its agent put up there', () => {
     expect(said().at(-1)).toEqual(['agent', ASKED]);
   });
 
+  // The second round (2026-11-22): a picker cancelled in the terminal left no trace.
+  it('that you cancelled is on the thread too, as the agent\'s', async () => {
+    const t = T0 + 200_000;
+    write(typed(t, 'Fix the overlap.'), row_('assistant', t + 1_000, { role: 'assistant', stop_reason: 'tool_use', content: [{ type: 'tool_use', id: 'q', name: 'AskUserQuestion', input: { questions: [question('It only compares starts. Which way?', 'Text', 'Real times (Recommended)')] } }] }),
+      result(t + 60_000, 'User rejected tool use', 'q'), interrupted(t + 60_000));
+    session('idle');
+    await follow();
+    expect(said()).toEqual([['you', 'Fix the overlap.'], ['agent', `${CUT_THERE}\n\n**It only compares starts. Which way?**\n- Text\n- Real times`]]);
+  });
+
   it('says you stopped it there after Esc, once, and the chat goes on from there', async () => {
     const t = T0 + 200_000;
     write(typed(t, 'Add a toggle.'));
@@ -190,7 +200,6 @@ describe('a question its agent put up there', () => {
     write(typed(t + 90_000, 'Light default.'), says(t + 95_000, 'Built.'));
     await follow();
     expect(row().result).toBe('Built.');
-    expect(catchUpDue(row())).toBe(true);
   });
 
   it('says so when you stop it in the middle of its work too', async () => {
@@ -204,6 +213,80 @@ describe('a question its agent put up there', () => {
     await follow();
     expect(row().claim).toBeNull();
     expect(row().result).toBe(`${CUT_THERE}\n\nStarting.`);
+  });
+});
+
+describe('an answer given there', () => {
+  beforeEach(() => bringIn());
+
+  // Its write-up asked "Should I fix the time filter next, or commit first?" over
+  // an answer that asked nothing, with three options no agent wrote; one picked
+  // committed half the change (2026-11-22).
+  it('is written up only when it asks something, and reads as its agent wrote it otherwise', async () => {
+    s.catchUpItem(slug, row().id, { label: 'Flaky test', problem: 'A flaky test.', result: '**Which one?**' });
+    s.routeItem(slug, row().id, { labels: row().labels.filter((l) => l !== 'catch-up') });
+    write(typed(Date.now() + 1_000, 'Mock it.'), says(Date.now() + 2_000, 'Mocked. If you want every commit to pass, squash the two.'));
+    session('idle');
+    await follow(Date.now() + 3_000);
+    expect(row().result).toBe('Mocked. If you want every commit to pass, squash the two.');
+    expect(catchUpDue(row())).toBe(false);
+    write(typed(Date.now() + 5_000, 'And login?'), says(Date.now() + 6_000, 'It waits on email. Stub the mailer?'));
+    await follow(Date.now() + 7_000);
+    expect(catchUpDue(row())).toBe(true);
+    write(typed(Date.now() + 8_000, 'Yes.'), says(Date.now() + 9_000, 'Stubbed.'));
+    await follow(Date.now() + 10_000);
+    expect(catchUpDue(row())).toBe(false);
+  });
+});
+
+describe('who said what', () => {
+  it('draws no reply of yours from a claim alone, as when you approve a command there', async () => {
+    bringIn();
+    write(typed(T0 + 200_000, 'Push it.'));
+    session('waiting', 'permission prompt');
+    await follow();
+    write(calls(T0 + 210_000, 'Bash'), result(T0 + 260_000, { stdout: '' }));
+    session('busy');
+    await follow();
+    expect(row().status).toBe('claimed');
+    expect(events().filter((e) => e.said === 'You replied in Claude Code').map((e) => e.words)).toEqual(['Push it.']);
+  });
+
+  it('never draws the name Claude Code gave the chat as something you typed', () => {
+    bringIn({ title: 'Write to /tmp/note.txt', firstSaid: 'Put one line in the note.' });
+    s.nameItem(slug, row().id, 'A note');
+    const yours = events().filter((e) => e.who === 'you' && e.message).map((e) => e.words);
+    expect(yours).toEqual(['Put one line in the note.']);
+  });
+});
+
+describe('a new chat brought in mid-conversation', () => {
+  const entries = () => [
+    { who: 'you', at: T0, text: 'Fix it.' }, { who: 'agent', at: T0 + 10_000, text: 'It races the clock.' },
+    { who: 'you', at: T0 + 20_000, text: 'Show me where.' }, { who: 'agent', at: T0 + 30_000, text: 'Line 40.' }, { who: 'agent', at: T0 + 31_000, text: 'Mock or retry?' },
+  ];
+
+  it('has every turn of it, at the times they were said', () => {
+    bringIn({ lastSaid: 'Line 40.\n\nMock or retry?', entries: entries() });
+    const messages = events().filter((e) => e.message);
+    expect(messages.map((e) => [e.who, e.words])).toEqual([
+      ['you', 'Fix it.'], ['agent', 'It races the clock.'], ['you', 'Show me where.'], ['agent', 'Line 40.\n\nMock or retry?'],
+    ]);
+    expect(messages.map((e) => e.at).slice(1, 3)).toEqual([T0 + 10_000, T0 + 20_000]);
+    expect(row().result).toBe('Line 40.\n\nMock or retry?');
+    expect(row().status).toBe('open');
+  });
+
+  it('that is stopped on a question has them too, and the line last', () => {
+    bringIn({ lastSaid: 'Line 40.', stoppedOn: 'input needed', openIn: 'kestrel', entries: entries().slice(0, 4).concat({ who: 'you', at: T0 + 40_000, text: 'Ask me.' }) });
+    expect(events().filter((e) => e.message).map((e) => e.words)).toEqual(['Fix it.', 'It races the clock.', 'Show me where.', 'Line 40.', 'Ask me.', ASKED]);
+    // Nothing the follow reads next is said twice.
+    expect(s.chatsToFollow()[0].heardThrough).toBeGreaterThanOrEqual(T0 + 40_000);
+  });
+
+  it('with only a first message and an answer reads as it always has', () => {
+    bringIn({ lastSaid: 'Which one?', entries: entries().slice(0, 1).concat({ who: 'agent', at: T0 + 60_000, text: 'Which one?' }) });
+    expect(events().filter((e) => e.message).map((e) => e.words)).toEqual(['Fix it.', 'Which one?']);
   });
 });
 

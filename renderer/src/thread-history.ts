@@ -351,16 +351,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     // news: an agent that held a task for an hour did one thing, not thirty.
     if (line.heartbeat || line.release) continue;
     // A chat brought in, carried on where it started (main/chat-follow.mts): no
-    // run of ours, so no diary hangs off it. Your words there, when they were
-    // read, are the line just before and say it already.
-    const carriedOn = line.claim ? carriedOnIn(line.claim.holder) : null;
-    if (carriedOn) {
-      // So is a reply typed here that went to its terminal (Supervisor#_goesToItsTerminal).
-      const before = events.at(-1);
-      if (before?.saidOutside || (before?.who === 'you' && before.field === 'answer')) continue;
-      events.push({ at, who: 'you', said: `You replied in ${carriedOn}` });
-      continue;
-    }
+    // run of ours, and your words there have lines of their own.
+    if (line.claim && carriedOnIn(line.claim.holder)) continue;
     if (line.claim) {
       events.push({ at, who: 'agent', said: 'An agent picked it up', pickup: true });
       continue;
@@ -657,7 +649,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   }
   tagWriter();
 
-  return withTitleSaid(theAskComesFirst(waitingReplies(stopsAnswered(events))), title, label);
+  const told = theAskComesFirst(waitingReplies(stopsAnswered(events)));
+  // A chat brought in has the name Claude Code or Codex gave it, which nobody typed.
+  return startedIn ? told : withTitleSaid(told, title, label);
 }
 
 // WHERE A CHAT STOPPED ON ITS OWN WINDOW IS NEWS ONLY UNTIL YOU ARE THERE: once

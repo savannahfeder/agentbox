@@ -155,7 +155,7 @@ describe('a followed chat whose agent stops on you in the terminal', () => {
     session('busy');
     await follow(t + 1_000);
     expect(row().status).toBe('claimed');
-    write(says(t + 2_000, 'Mocked the test clock. It passes now.'));
+    write(says(t + 2_000, 'Mocked the test clock. Ship it?'));
     session('idle');
     await follow(t + 3_000);
     expect(row().status).toBe('open');
@@ -163,7 +163,7 @@ describe('a followed chat whose agent stops on you in the terminal', () => {
       ['you', 'Mock the clock.'],
       ['agent', '**Which clock?**\n- One way\n- Another'],
       ['you', 'The test clock'],
-      ['agent', 'Mocked the test clock. It passes now.'],
+      ['agent', 'Mocked the test clock. Ship it?'],
     ]);
     expect(catchUpDue(row())).toBe(true);
   });
@@ -355,7 +355,7 @@ describe('a Codex chat in Done, carried on in Codex', () => {
 describe('a new chat, brought in while its agent waits in the terminal', () => {
   const NOW = Date.now();
   const chat = (over: Record<string, unknown> = {}) => ({
-    id: SID, source: 'terminal', folder: path.join(root, 'kestrel'), folderName: 'kestrel', path: file, title: 'Fix the flaky checkout test',
+    id: SID, source: 'terminal', folder: path.join(root, 'kestrel'), folderName: 'kestrel', path: '/nowhere.jsonl', title: 'Fix the flaky checkout test',
     startedAt: NOW - 3600e3, when: NOW - QUIET_MS - 60e3, firstSaid: 'Fix it.', lastSaid: '', waiting: false, ask: '', ...over,
   });
   const scan = (t: ReturnType<typeof chat>, state: { status: string; waitingFor: string; folder?: string } | null) => scanNewChats({

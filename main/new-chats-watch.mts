@@ -24,6 +24,8 @@ import type { ClaudeSessionState } from './claude-session-open.mts';
 import { atWork, stoppedOn } from './chat-follow.mts';
 import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { readRecentThreads } from './importable-threads.mts';
+import { readChatTurn } from './agent-sessions.mts';
+import type { ChatEntry } from './agent-sessions.mts';
 
 export const NEW_CHATS_POLL_MS = 60_000;
 /** How long a chat has to have been still before it comes in. */
@@ -32,7 +34,7 @@ export const QUIET_MS = 10 * 60_000;
 export const STOPPED_QUIET_MS = 2 * 60_000;
 const PASS_DEADLINE_MS = 90_000;
 
-export interface NewChatThread extends CodexThreadLike { source?: string; waiting?: boolean; stoppedOn?: string; openIn?: string }
+export interface NewChatThread extends CodexThreadLike { source?: string; waiting?: boolean; stoppedOn?: string; openIn?: string; path?: string; entries?: ChatEntry[] }
 
 type StateOf = (t: NewChatThread) => ClaudeSessionState | null;
 
@@ -123,7 +125,8 @@ export async function scanNewChats({ store, config, readThreads, isOpen, stateOf
   const picks = newChatsToBring(threads, { products, items: store.listItems(), since, now, isOpen, stateOf, openShownLive });
   let brought = 0;
   for (const [slug, list] of picks) {
-    brought += store.importThreadRows(slug, list, { now, land: 'sorted' }).added;
+    const whole = list.map((t) => (t.source === 'codex' || !t.path ? t : { ...t, entries: readChatTurn(t.path)?.entries }));
+    brought += store.importThreadRows(slug, whole, { now, land: 'sorted' }).added;
     brought += store.importCodexThreads(slug, list, { now, land: 'sorted' }).added;
   }
   return { brought };
