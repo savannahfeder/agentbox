@@ -1729,7 +1729,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     // page and a markdown file have no second door anywhere, and her screenshot
     // has one of each sitting above the code card she was pointing at.
     : withoutBareTwins([...new Set([...messageDocuments(item, productDir), ...referencedFiles(item.result, item.body, item.answer, {dir: productDir}).filter(path => /\.pdf$/i.test(path) && !isBookkeeping(path)), ...linkedDecks(item.result, item.body, item.answer)])]);
-  const showOptions = offerIsLive(item);
+  // An outside session's choices come off its own message, drawn by AgentThread.
+  const showOptions = !agent && offerIsLive(item);
   // WHETHER THE STRIP IS DRAWN, which is not the same question as whether the
   // row has a live offer. Everywhere else the two are the same. Opening the box
   // brings the options with it, and clicking away from the box takes them away
@@ -2526,7 +2527,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
        */}
       {((item.start === 'later' && !!onUnschedule)
         || (scheduledHere && !!onUnschedule)
-        || (!!agent && !agentTakesReply && !!onReveal)) && (
+        || (!!agent && !agentTakesReply && !!onReveal && agent.engine !== 'codex')) && (
       <div className="focus-actions">
         {/* ADDED TO LATER (w-afb66e6661): it has no moment to read back, so
             the line says the one thing there is to say and the press starts
@@ -2582,7 +2583,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             in. This is honestly named: it brings the APPLICATION the session is
             running inside to the front, which is the whole of what is actually
             available. Nothing public focuses one pane inside another app. */}
-        {agent && !agentTakesReply && onReveal && (
+        {agent && !agentTakesReply && onReveal && agent.engine !== 'codex' && (
           <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
           <span className="focus-when">Opens the app it is running in</span></>
         )}
@@ -2670,13 +2671,19 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                THIS IS THE ONLY ONE. A quiet agent used to get this pill too,
                saying there was nothing there to answer, and that was false: it
                is sitting at its prompt and it is listening. w-9348b8d148. */
+            agent?.engine === 'codex' && agent.app === 'Codex app' && onReveal ? (
+              <button type="button" className="dock-pill" onClick={onReveal}>
+                <span className="dock-pill-text">Answer in the Codex app</span>
+              </button>
+            ) : (
             <div className="dock-pill dock-pill-static">
               <span className="dock-pill-text">
                 {agent?.engine === 'codex'
-                  ? agent.app === 'Codex app' ? 'Answer this one in the Codex app.' : agent.app === 'Codex in your editor' ? 'Answer this one in Codex, in your editor.' : 'Answer this one in the terminal Codex is running in.'
+                  ? agent.app === 'Codex in your editor' ? 'Answer this one in Codex, in your editor.' : 'Answer this one in the terminal Codex is running in.'
                   : 'Answer this one in its own window. A message from here would wait behind the box it is stuck on.'}
               </span>
             </div>
+            )
           ) : replyOpen ? (
             /* THE STOP RIDES IN THE COMPOSER'S OWN FOOTER, beside Send, rather
                than beside the box: that row is where this card already keeps

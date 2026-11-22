@@ -32,6 +32,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
+import { agentLayout } from '../../../shared/agents.mts';
 import { asksForYourWords, cellUnderTab, handedTo as handedOnTo, taskHandedFrom, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
@@ -794,7 +795,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   const handedWord = !handedOnName ? null
     : handedTask?.status === 'done' && handedTask.wrote?.status?.by === handedTask.assignee ? `${handedOnName.split(/\s+/)[0]} finished it`
       : handedTask && handedTask.status !== 'done' ? `With ${handedOnName.split(/\s+/)[0]}` : `Handed to ${handedOnName.split(/\s+/)[0]}`;
-  const shownWord = wants ?? backFrom ?? askedOut ?? handedWord ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
+  const shownWord = wants ?? backFrom ?? askedOut ?? handedWord ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: item.agent ? agentLayout(item.agent).kind === 'asks' : asksForYourWords(item) });
   // Out with a person, it is no agent's state, so it wears no agent mark and offers no try again.
   const status = shownWord === null ? undefined : askedOut && shownWord === askedOut ? { ...worded, word: shownWord, agent: false, title: undefined } : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the

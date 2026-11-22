@@ -2610,7 +2610,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             <Group id="outside" label="Agents you started yourself">
               <Row
                 label="Show while they run"
-                desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[w.outsideAgents]}`}
+                desc={`Claude Code and Codex, started in a terminal or the Codex app. ${AGENT_SENTENCE[w.outsideAgents]}`}
               >
                 <Picker bare label="Agents you started yourself" value={w.outsideAgents} options={AGENT_OPTIONS} onChange={(v) => setWorkspace('outsideAgents', v)} />
               </Row>
@@ -3003,7 +3003,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
         </Group>
         {/* Bring in new chats is not in the copy, so it is not drawn here. */}
         <Group id="outside" label="Agents you started yourself">
-          <ReadRow label="Show while they run" reading={outside} desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[outside.value as AgentMode] ?? ''}`}>
+          <ReadRow label="Show while they run" reading={outside} desc={`Claude Code and Codex, started in a terminal or the Codex app. ${AGENT_SENTENCE[outside.value as AgentMode] ?? ''}`}>
             <Picker bare label="Agents you started yourself" value={outside.value as string} options={AGENT_OPTIONS} onChange={(v) => onWorkspace('outsideAgents', v)} />
           </ReadRow>
         </Group>
