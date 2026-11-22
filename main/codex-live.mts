@@ -226,7 +226,9 @@ export function readCodexSession(file: string, { whole = false }: { whole?: bool
 
 /** Where a session stands. Waiting means stopped on its own question; idle means its turn ended and it is your move. */
 export function codexStatus(fold: CodexFold, mtime: number, now: number): 'busy' | 'waiting' | 'idle' {
-  if (fold.pendingCall) return 'waiting';
+  // Codex asks with request_user_input_async and works on while the question
+  // stays open in its window, so an open question is waiting on her either way.
+  if (fold.pendingCall || fold.question.length) return 'waiting';
   if (fold.approval && fold.turnStartedAt > fold.turnEndedAt && now - mtime < CODEX_STALE_TURN_MS) return 'waiting';
   const running = fold.turnStartedAt > fold.turnEndedAt && now - mtime < CODEX_STALE_TURN_MS;
   if (running) return 'busy';
@@ -242,16 +244,23 @@ let ps: { at: number; lines: string[]; busy: boolean } = { at: 0, lines: [], bus
 export function runningCommands(now = Date.now()): string[] {
   if (now - ps.at > 3_000 && !ps.busy) {
     ps.busy = true;
-    execFile('/bin/ps', ['-Ao', 'command='], { timeout: 3_000, maxBuffer: 16 << 20, encoding: 'utf8', windowsHide: true }, (err, out) => {
+    execFile('/bin/ps', ['-Aww', '-o', 'command='], { timeout: 3_000, maxBuffer: 16 << 20, encoding: 'utf8', windowsHide: true }, (err, out) => {
       ps = { at: Date.now(), lines: err ? ps.lines : String(out).split('\n'), busy: false };
     });
   }
   return ps.lines;
 }
-const commandRuns = (command: string) => {
-  const c = command.trim().slice(0, 120);
-  return !!c && runningCommands().some((l) => l.includes(c));
-};
+/**
+ * Whether some process is running that command: Codex hands it to a shell
+ * (`bash -lc <command>`), so a process line ends with it. A short command
+ * like `ls` appears inside half the lines on a machine, so containing it is
+ * not enough (a power tester's open approval read as granted).
+ */
+export function runsIn(lines: readonly string[], command: string): boolean {
+  const c = command.trim();
+  return !!c && lines.some((l) => { const t = l.trimEnd(); return t === c || t.endsWith(` ${c}`); });
+}
+const commandRuns = (command: string) => runsIn(runningCommands(), command);
 
 export interface CodexLiveOptions {
   home?: string;

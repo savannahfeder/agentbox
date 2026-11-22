@@ -92,7 +92,8 @@ function sentences(s: string): string[] {
   for (const w of t.split(' ')) {
     if (!w) continue;
     cur += (cur ? ' ' : '') + w;
-    if (/[.!?:]["”’')\]*_`]*$/.test(w) && !/^\d+[.)]$/.test(w)) { out.push(cur); cur = ''; }
+    // "1." opening a sentence is a list number; "out of 10." ends one.
+    if (/[.!?:]["”’')\]*_`]*$/.test(w) && !(cur === w && /^\d+[.)]$/.test(w))) { out.push(cur); cur = ''; }
   }
   if (cur) out.push(cur);
   return out.map((x) => x.split(HOLD).join('.').trim()).filter(Boolean);
@@ -111,11 +112,15 @@ function isQuestion(raw: string): boolean {
   return ASKING.test(tail) && /\b(I|me|we|you want|you prefer)\b/.test(tail);
 }
 
-/** A sentence only the person can act on. "Let me know if…" is politeness, not an ask. */
-function isStatementAsk(raw: string): boolean {
+/**
+ * A sentence only the person can act on. "Let me know if…" is politeness, not
+ * an ask. "Please…" counts only where the paragraph speaks to her: an agent
+ * asked for an error message answers "Please try again." (two power testers).
+ */
+function isStatementAsk(raw: string, paragraph = raw): boolean {
   const s = plain(raw);
   if (/\b(let me know|tell me) if\b/i.test(s)) return false;
-  return /^please\s+(?!note|bear)/i.test(s)
+  return (/^please\s+(?!note|bear)/i.test(s) && /\b(you|your|I|I['’]ll|me|my|we)\b/i.test(plain(paragraph)))
     || /(?:^|[,;.:\u2014\u2013]\s*|\b(?:so|just|and|then|or)\s+)say\s+(?:["“'‘`*]|yes\b|go\b|when\b|the word\b)/i.test(s)
     || /^tell me (?:which|what|how|when|whether)\b/i.test(s)
     || /^(?:once|when|after) you(?:['’]ve| have)? (?:approve|confirm|choose|pick|decide|created|reconnected|restarted|signed)/i.test(s)
@@ -146,11 +151,11 @@ export function sessionLayout(message: string, questions: ToolQuestion[] = []): 
   const n = bs.length;
   type Hit = { i: number; k: number; ss: string[]; from: 'question' | 'statement' };
   let hit: Hit | null = null;
-  const look = (test: (s: string) => boolean, from: Hit['from'], first: number) => {
+  const look = (test: (s: string, paragraph: string) => boolean, from: Hit['from'], first: number) => {
     for (let i = n - 1; i >= first && !hit; i--) {
       if (bs[i].type !== 'p') continue;
       const ss = sentences(bs[i].raw);
-      for (let k = ss.length - 1; k >= 0 && !hit; k--) if (test(ss[k])) hit = { i, k, ss, from };
+      for (let k = ss.length - 1; k >= 0 && !hit; k--) if (test(ss[k], bs[i].raw)) hit = { i, k, ss, from };
     }
   };
   const tail = Math.max(0, n - 4);
@@ -158,7 +163,7 @@ export function sessionLayout(message: string, questions: ToolQuestion[] = []): 
   if (!hit) look(isStatementAsk, 'statement', tail);
   if (!hit && n > 4 && bs[0].type === 'p') {
     const ss = sentences(bs[0].raw);
-    const k = ss.findIndex(isStatementAsk);
+    const k = ss.findIndex((s) => isStatementAsk(s, bs[0].raw));
     if (k >= 0) hit = { i: 0, k, ss, from: 'statement' };
   }
   if (!hit) return PLAIN;

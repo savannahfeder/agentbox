@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readCodexLive, codexConversation, CODEX_STALE_TURN_MS } from '../main/codex-live.mts';
+import { readCodexLive, codexConversation, runsIn, CODEX_STALE_TURN_MS } from '../main/codex-live.mts';
 import { reachesInbox, progressAfterReply, putAway, replyIsSwallowed, agentAnswer, agentContext, agentRow } from '../shared/agents.mts';
 import { theirWords } from '../shared/session-layout.mts';
 
@@ -138,6 +138,23 @@ describe("the tool's own question", () => {
     const b = one('q1');
     expect(b.question).toEqual([]);
     expect(b.status).toBe('busy');
+  });
+
+  it('a question Codex asks while it works on is waiting on her, not In progress', () => {
+    // Codex 0.171 in a terminal (a power tester's session, 2026-11-22): request_user_input_async
+    // is accepted at once, the question is an AgentMessage, and Codex sleeps on in the same turn.
+    const t0 = NOW - 60_000;
+    const call = line(t0 + 2_000, 'response_item', { type: 'function_call', name: 'request_user_input_async', call_id: 'a1', arguments: JSON.stringify({ questions: [{ title: 'May I inspect the three files?', options: ['Yes, inspect them', 'Use the prior inspection'] }] }) });
+    const accepted = line(t0 + 2_100, 'response_item', { type: 'function_call_output', call_id: 'a1', output: '{"accepted":true}' });
+    const card = line(t0 + 2_000, 'event_msg', { type: 'item_completed', item: { type: 'AgentMessage', content: [{ type: 'Text', text: 'May I inspect the three files?' }], phase: 'final_answer', delivery: 'async', questions: [{ title: 'May I inspect the three files?', options: ['Yes, inspect them', 'Use the prior inspection'] }] } });
+    const sleeping = line(t0 + 3_000, 'response_item', { type: 'function_call', name: 'sleep', call_id: 's1', arguments: '{"duration_ms":30000}' });
+    write('aq', [meta('aq', t0 - 60_000, { originator: 'codex-tui' }), ...turn(t0 - 60_000, 'map the booking files', 'Mapped.'), line(t0, 'event_msg', { type: 'task_started' }), ...hers(t0 + 10, 'review the booking code, ask before running commands'), call, card, accepted, sleeping], t0 + 3_000);
+    const a = one('aq');
+    expect(a.status).toBe('waiting');
+    expect(a.question[0]).toMatchObject({ question: 'May I inspect the three files?', options: ['Yes, inspect them', 'Use the prior inspection'] });
+    expect(progressAfterReply(a, NOW, 'all')).toBe(false);
+    expect(reachesInbox(a, NOW, 'waiting')).toBe(true);
+    expect(a.asked.map((x) => x.text)).not.toContain('{"accepted":true}');
   });
 
   it("the Codex app's own question card is read with its options", () => {
@@ -320,5 +337,20 @@ describe('reading every refresh stays cheap', () => {
     fs.writeFileSync(file, [meta('ours2', t0), ...turn(t0, 'x', 'y'), line(t0 + 30_000, 'event_msg', { type: 'task_started' })].join('\n') + '\n');
     fs.utimesSync(file, (t0 + 30_000) / 1000, (t0 + 30_000) / 1000);
     expect(live()).toEqual([]);
+  });
+});
+
+describe('telling a granted command from one still waiting', () => {
+  const ps = ['/sbin/init', '/usr/bin/node /x/tools/false-alarm.mjs --ls', '/bin/bash -lc git grep "Book your first"', 'sleep 45'];
+  it('a command its shell is running is granted', () => {
+    expect(runsIn(ps, 'git grep "Book your first"')).toBe(true);
+    expect(runsIn(ps, 'sleep 45')).toBe(true);
+  });
+  it('a short command found inside some other line is not', () => {
+    expect(runsIn(ps, 'ls')).toBe(false);
+    expect(runsIn(ps, 'git grep')).toBe(false);
+  });
+  it('no command, no match', () => {
+    expect(runsIn(ps, '')).toBe(false);
   });
 });

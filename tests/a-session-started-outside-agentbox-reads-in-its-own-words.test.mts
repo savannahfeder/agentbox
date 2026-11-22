@@ -113,6 +113,13 @@ describe('what must not be taken for an ask', () => {
   it('"can only say" is not "say yes"', () => {
     expect(sessionLayout('One limit: the card can only say "ended" after a run on it is refused.').kind).toBe('plain');
   });
+  it('interface copy that says "Please" is not put to her', () => {
+    expect(sessionLayout('This time overlaps with an existing appointment. Please choose a different time.').kind).toBe('plain');
+    expect(sessionLayout("Couldn't refresh appointments. The list may be out of date. Please try again.").kind).toBe('plain');
+  });
+  it('"Please" said to her still is', () => {
+    expect(sessionLayout('[The test is ready](http://x). Please rate each set out of 10. I will reveal the counts afterwards.').bold).toBe('Please rate each set out of 10.');
+  });
   it('"let me know if" is politeness, not an ask', () => {
     expect(sessionLayout('Shipped. Let me know if any spacing still feels off.').kind).toBe('plain');
   });
