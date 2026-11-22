@@ -45,36 +45,32 @@ export function commentsToHand(notes: readonly NoteIn[] | null | undefined, { me
     });
 }
 
-/** Who wrote them, you first, then each teammate in the order they first commented. */
-export function whoseComments(comments: readonly HandedComment[], nameOf: (id: string | null) => string): { by: string | null; mine: boolean; name: string; count: number }[] {
-  const out: { by: string | null; mine: boolean; name: string; count: number }[] = [];
-  for (const c of comments) {
-    const had = out.find((o) => o.by === c.by);
-    if (had) had.count++;
-    else out.push({ by: c.by, mine: c.mine, name: c.mine ? 'You' : nameOf(c.by), count: 1 });
-  }
-  return [...out.filter((o) => o.mine), ...out.filter((o) => !o.mine)];
-}
+type NameOf = (id: string | null) => string;
+const whoWrote = (c: { mine: boolean; by: string | null }, nameOf: NameOf) => (c.mine ? 'me' : nameOf(c.by));
+
+/** One comment as a line of the message: what it is on, what it says, who said it. */
+export const commentLine = (c: HandedComment, nameOf: NameOf): string =>
+  `- On ${c.place === null ? 'the whole file' : c.quote ? `“${c.place}”` : c.place}: ${c.text} (${whoWrote(c, nameOf)})`;
 
 /** The comments as the agent reads them, a block per file, each asking for that file's next version. */
-export function commentsForTheAgent(comments: readonly HandedComment[], { nameOf }: { nameOf: (id: string | null) => string }): string {
-  const who = (c: { mine: boolean; by: string | null }) => (c.mine ? 'me' : nameOf(c.by));
+export function commentsForTheAgent(comments: readonly HandedComment[], { nameOf }: { nameOf: NameOf }): string {
   const byFile = new Map<string, HandedComment[]>();
   for (const c of comments) byFile.set(c.name, [...(byFile.get(c.name) ?? []), c]);
   return [...byFile].map(([name, list]) => [
     `Comments on ${name}:`,
-    ...list.map((c) => [
-      `- On ${c.place === null ? 'the whole file' : c.quote ? `“${c.place}”` : c.place}: ${c.text} (${who(c)})`,
-      ...c.replies.map((r) => `  - ${r.text} (${who(r)})`),
-    ].join('\n')),
+    ...list.map((c) => [commentLine(c, nameOf), ...c.replies.map((r) => `  - ${r.text} (${whoWrote(r, nameOf)})`)].join('\n')),
     '',
-    // What the person typed above comes first: a name they gave the result wins over this one.
-    `Make the changes they ask for. Unless told otherwise above, save the result as ${nextVersionName(name, 1)} beside ${name}, and name the new file in your reply.`,
+    // A name the person typed for the result, anywhere in the message, wins over this one.
+    `Make the changes they ask for. Save the result as ${nextVersionName(name, 1)} beside ${name} unless the message names another file, and name the new file in your reply.`,
   ].join('\n')).join('\n\n');
 }
 
-/** What the card sends: its words, then the comments still ticked. */
-export function withComments(body: string, comments: readonly HandedComment[], leftOut: ReadonlySet<string>, { nameOf }: { nameOf: (id: string | null) => string }): string {
-  const said = commentsForTheAgent(comments.filter((c) => !leftOut.has(c.id)), { nameOf });
-  return [body.trim(), said].filter(Boolean).join('\n\n');
+/** The message a hand-over opens on: its words, then every comment as a line the person can delete. */
+export function withComments(body: string, comments: readonly HandedComment[], { nameOf }: { nameOf: NameOf }): string {
+  return [body.trim(), commentsForTheAgent(comments, { nameOf })].filter(Boolean).join('\n\n');
+}
+
+/** The comments whose lines are still in the message as sent: the ones the agent was given. */
+export function handedIn(text: string, comments: readonly HandedComment[], { nameOf }: { nameOf: NameOf }): string[] {
+  return comments.filter((c) => text.includes(commentLine(c, nameOf))).map((c) => c.id);
 }

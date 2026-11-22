@@ -247,7 +247,7 @@ import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shar
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
 import { fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
-import { commentsToHand, type HandedComment } from './threads/comments-to-hand';
+import { commentsToHand, withComments, type HandedComment } from './threads/comments-to-hand';
 import { notesOnThread } from './threads/thread-notes';
 import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
@@ -781,6 +781,9 @@ export default function App() {
     setFocused(convo);
     setModal('reply');
   }, []);
+  // Who wrote a comment, by first name, on its line in a hand-over's words.
+  const commenter = useCallback((id: string | null) => teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer)?.byId.get(id ?? '')?.name?.split(/\s+/)[0] || 'A teammate',
+    [snap?.team, snap?.products, snap?.alpha?.multiplayer]);
   // `files`: only the comments on these, when a file's own notes asked.
   const handToAgent = useCallback((item: WorkItem, message?: AgentTurn, files?: string[]) => {
     const seen = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer);
@@ -797,7 +800,7 @@ export default function App() {
           const { attachments, ...start } = taskHandOff({ from, brief: b, message: message ?? null, nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
             handFrom: { product: item.product, id: item.id, message: message?.uid ?? 'first' }, offered: snap?.products ?? [], cards: snap?.team?.cards ?? [] });
           const handed = commentsToHand(notes, { me: seen?.me ?? null, files: files ?? null });
-          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(handed.length ? { comments: handed } : {}) });
+          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(handed.length ? { comments: handed, body: withComments(start.body, handed, { nameOf: commenter }) } : {}) });
           setModal('compose');
         })
         .catch((err) => showToast(String(err?.message ?? err)));
@@ -820,10 +823,11 @@ export default function App() {
     } : {};
     void comments.then((notes) => {
       const handed = linked.length ? commentsToHand(notes, { me: seen?.me ?? null, files: linked }) : [];
-      setComposeInitial({ ...start, ...named, ...(handed.length ? { comments: handed } : {}) });
+      const words = (named as { body?: string }).body ?? start.body;
+      setComposeInitial({ ...start, ...named, ...(handed.length ? { comments: handed, body: withComments(words, handed, { nameOf: commenter }) } : {}) });
       setModal('compose');
     });
-  }, [snap?.team, snap?.products]);
+  }, [snap?.team, snap?.products, commenter]);
   useEffect(() => {
     const ask = (e: Event) => {
       const { product, id, files } = (e as CustomEvent<{ product: string; id: string; files: string[] }>).detail ?? {};
@@ -2449,9 +2453,13 @@ export default function App() {
   }, [weekCards, openTeammateCard]);
   const continueTeammateThread = useCallback((card: ThreadCard, comments: HandedComment[] = []) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
-      .then((b) => { setComposeInitial({ ...continueStart(b, card, snap?.products ?? []), ...(comments.length ? { comments } : {}) }); setModal('compose'); })
+      .then((b) => {
+        const start = continueStart(b, card, snap?.products ?? []);
+        setComposeInitial({ ...start, ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }) } : {}) });
+        setModal('compose');
+      })
       .catch((err) => showToast(String(err?.message ?? err)));
-  }, [snap?.products]);
+  }, [snap?.products, commenter]);
   const [teamBody, setTeamBody] = useState<HTMLElement | null>(null);
   // The card on screen is the newest one, and once its owner takes it back it
   // is not on screen at all: words they made private must not stay up.

@@ -7,9 +7,14 @@
 // The founder: "how do I have my agents do these? ... will it send everyone's
 // comments or just mine, or maybe I can choose that?" Measured by reading
 // what taskHandOff opened the card on: no field held a comment.
+//
+// 2026-11-22: a picker of ticks and face chips answered "can I choose", and the
+// founder found it confusing: "multiplayer should just be super minimalist".
+// The comments are now lines of the message itself, each saying who wrote it,
+// and choosing is deleting a line, as in any message.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { commentsToHand, whoseComments, commentsForTheAgent, withComments } from '../renderer/src/threads/comments-to-hand';
+import { commentsToHand, commentsForTheAgent, withComments, handedIn } from '../renderer/src/threads/comments-to-hand';
 
 const ME = 'jamie';
 const note = (id: string, extra: Record<string, unknown>) => ({
@@ -52,16 +57,6 @@ describe('which comments a hand-over offers', () => {
   });
 });
 
-describe('whose they are', () => {
-  it('you first, then each teammate, with how many', () => {
-    expect(whoseComments(commentsToHand(notes, { me: ME }), nameOf)).toEqual([
-      { by: ME, mine: true, name: 'You', count: 3 },
-      { by: 'priya', mine: false, name: 'Priya', count: 1 },
-      { by: 'theo', mine: false, name: 'Theo', count: 1 },
-    ]);
-  });
-});
-
 describe('what the agent is told', () => {
   const all = commentsToHand(notes, { me: ME });
   const words = commentsForTheAgent(all, { nameOf });
@@ -83,21 +78,28 @@ describe('what the agent is told', () => {
 
   // Rerun: Lena asked for clinic-checkout-mobile-review.html above the comments,
   // and the line under them told the agent to save clinic-checkout-v3.html.
-  it('yields to a name the person gave above', () => {
-    expect(words).toContain('Unless told otherwise above, save the result as sign-up-screens-v2.md');
+  it('yields to a name the person gave anywhere in the message', () => {
+    expect(words).toContain('Save the result as sign-up-screens-v2.md beside sign-up-screens.md unless the message names another file');
   });
 
   it('nothing, when none are chosen', () => {
     expect(commentsForTheAgent([], { nameOf })).toBe('');
   });
 
-  it('the card sends the words with only the comments still ticked', () => {
-    const body = withComments('Approve the words on the sign-up screens', all, new Set(['n3', 'n5']), { nameOf });
+  it('the card opens on the words, then every comment as a line of the message', () => {
+    const body = withComments('Approve the words on the sign-up screens', all, { nameOf });
     expect(body.startsWith('Approve the words on the sign-up screens\n\nComments on sign-up-screens.md:')).toBe(true);
     expect(body).toContain('nah (me)');
-    expect(body).not.toContain('Say which folders');
-    expect(body).not.toContain('launch-email');
-    expect(withComments('Just the task', all, new Set(all.map((c) => c.id)), { nameOf })).toBe('Just the task');
+    expect(body).toContain('Say which folders. (Priya)');
+    expect(withComments('Just the task', [], { nameOf })).toBe('Just the task');
+  });
+
+  it('a line deleted before Send is a comment the agent was not given', () => {
+    const body = withComments('Approve the words', all, { nameOf });
+    const without = body.split('\n').filter((l) => !l.includes('Say which folders')).join('\n');
+    expect(handedIn(body, all, { nameOf })).toEqual(['n1', 'n3', 'n2', 'n5', 'n6']);
+    expect(handedIn(without, all, { nameOf })).toEqual(['n1', 'n2', 'n5', 'n6']);
+    expect(handedIn('Just do it', all, { nameOf })).toEqual([]);
   });
 });
 
@@ -130,15 +132,10 @@ describe('every way to an agent carries them', () => {
     expect(big).toMatch(/onHandToAgent=\{withAgent \? undefined : \(files\) => \{ onClose\(\);/);
     expect(app).toMatch(/srcPath: f\.startsWith\('\/'\) \|\| !dir \? f : `\$\{dir\}\/\$\{f\}`/);
   });
-  // Rerun: a teammate's reply under a comment showed only as "1 reply", so
-  // Sam's words were hidden in the list of what the agent gets.
-  it("the card shows each reply's words and face under its comment", () => {
-    const list = fs.readFileSync(new URL('../renderer/src/threads/HandedComments.tsx', import.meta.url), 'utf8');
-    expect(list).toMatch(/c\.replies\.map\(\(r, i\) => <span key=\{i\} className="hc-reply">\{face\(r\.by, r\.mine\)\}<span>\{r\.text\}<\/span><\/span>\)/);
-    expect(list).not.toContain('1 reply');
-  });
-  it('the card shows them and sends the ticked ones', () => {
-    expect(card).toContain('<HandedComments');
-    expect(card).toMatch(/withComments\(/);
+  it('the card has no picker: the comments are in its words, and the ones left in are remembered', () => {
+    expect(card).not.toContain('HandedComments');
+    expect(fs.existsSync(new URL('../renderer/src/threads/HandedComments.tsx', import.meta.url))).toBe(false);
+    expect(card).toMatch(/rememberHanded\(product\.slug, made\.id, handedIn\(/);
+    expect(app.match(/body: withComments\(/g)?.length).toBe(3);
   });
 });
