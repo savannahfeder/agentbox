@@ -3287,7 +3287,7 @@ export default function App() {
       return withoutRunsOf(found.map(({ item }) => item), ruled).map((item) => ({
       id: `thread-${item.product}-${item.id}`,
       label: threadSearchDetails(item, searchContext).title,
-      ...threadResult(item, { summary: summaries.get(item) ?? '', project: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product, now }),
+      ...threadResult(item, { state: stateOfMine(item), summary: summaries.get(item) ?? '', project: snap?.products.find((p) => p.slug === item.product)?.name ?? item.product, now }),
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); },
       }));
     })(),
@@ -3295,10 +3295,11 @@ export default function App() {
       id: `card-${card.personId}-${card.threadId}`,
       label: card.title ?? '',
       hint: `${firstName(team?.byId.get(card.personId) ?? null)}'s thread`,
+      state: card.state,
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(null); openTeammateCard(card); },
     })),
     ];
-  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard]);
+  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard, stateOfMine]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
