@@ -122,12 +122,19 @@ export function ruleLabel(rule: unknown): string {
   return `${DAY_NAMES[rule.on!]}s at ${time}`;
 }
 
+// toLocaleTimeString builds a formatter on every call, and the Teammates view
+// words every duty's times each time the phone's settings are published.
+const clockWords = new Map<string, string>();
 export function clockLabel(at: string): string {
+  const kept = clockWords.get(at);
+  if (kept !== undefined) return kept;
   const [h, m] = at.split(':').map(Number);
   const d = new Date();
   d.setHours(h, m, 0, 0);
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const words = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
     .toLowerCase().replace(/\s/g, '');
+  clockWords.set(at, words);
+  return words;
 }
 
 // Does this calendar date belong to the rule at all? A weekday rule skips the

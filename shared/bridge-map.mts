@@ -217,6 +217,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   glassTone: 'zero:glass-tone',
   windowButtons: 'zero:window-buttons',
   track: 'zero:track',
+  // How long the window's own thread held (renderer/src/window-holds.ts).
+  windowHeld: 'zero:window-held',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
   openArtifact: 'zero:open-artifact',
@@ -289,6 +291,7 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
 export const WRAPPED_ARGS: Readonly<Record<string, string[]>> = {
   notify: ['arrivals', 'needsYou'],
   track: ['name', 'count'],
+  windowHeld: ['ms'],
   instructionWrite: ['id', 'text'],
   instructionVersion: ['id', 'at'],
 };
