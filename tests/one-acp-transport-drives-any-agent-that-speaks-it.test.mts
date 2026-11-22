@@ -17,6 +17,7 @@
 //   buffer until the app dies.
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { Writable } from 'node:stream';
 import { createAcpClient, ACP_PROTOCOL_VERSION, rejectionOption } from '../main/acp.mts';
 
 // A fake agent: one object per line in, one object per line out.
@@ -154,6 +155,27 @@ describe('one transport for every agent that speaks ACP', () => {
     const turn = client.prompt({ sessionId: 's-1', text: 'do the thing' });
     child.emit('exit', 3);
     await expect(turn).rejects.toThrow(/exited with code 3/);
+  });
+
+  // 2026-11-22: a tool that exits the moment it starts leaves a closed pipe, and
+  // a write to one fails twice: in the callback, and as an `error` on the
+  // stream. Nobody listened for the second, so it was an uncaught exception in
+  // the app's main process. Measured with a script that exits 1 at once.
+  it('ends the connection when the agent has already gone, with no error left for nobody to catch', async () => {
+    const child = fakeAgent();
+    child.stdin = new Writable({ write(_chunk, _encoding, done) { done(Object.assign(Error('write EPIPE'), { code: 'EPIPE' })); } });
+    const uncaught = [];
+    const note = (error) => uncaught.push(error);
+    process.on('uncaughtException', note);
+    try {
+      const client = createAcpClient({ transport: child });
+      await expect(client.initialize()).rejects.toThrow(/Write failed: write EPIPE/);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(uncaught).toEqual([]);
+      expect(child.killed).toBe(true);
+    } finally {
+      process.off('uncaughtException', note);
+    }
   });
 
   // Codex's cards dropped their fifteen-minute clock because the deny it sent

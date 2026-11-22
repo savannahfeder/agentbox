@@ -93,7 +93,7 @@ interface Negotiated {
 }
 
 interface AcpChild {
-  stdin: { write(line: string, callback?: (error?: Error | null) => void): unknown; end(): unknown };
+  stdin: { write(line: string, callback?: (error?: Error | null) => void): unknown; end(): unknown; on?(event: 'error', listener: (error: Error) => void): unknown };
   stdout?: {
     on(event: 'data', listener: (chunk: Buffer) => void): unknown;
     on(event: 'end', listener: () => void): unknown;
@@ -299,6 +299,8 @@ export function createAcpClient({
   });
   child.on?.('error', error => close(`The agent could not be run: ${error.message}`));
   child.on?.('exit', code => close(gone ?? `The agent exited with code ${code}`));
+  // A write to an agent that has gone also fails as an `error` on the pipe, and one nobody hears ends the app.
+  child.stdin.on?.('error', error => close(`Write failed: ${error.message}`));
 
   /* -------------------------------- the API -------------------------------- */
 
