@@ -20,13 +20,24 @@ type MemoryRecorderOptions = {
   threads?: () => Promise<Record<string, number>>;
   everyMs?: number;
   askMs?: number;
+  now?: () => number;
 };
+
+/** An ask holding {"afterUpMin": N} waits for a launch that has been up N minutes. */
+function upMinAsked(ask: string): number {
+  try {
+    const n = (JSON.parse(fs.readFileSync(ask, 'utf8')) as { afterUpMin?: unknown })?.afterUpMin;
+    return typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
 
 const mb = (bytes: number) => Math.round(bytes / 1048576);
 const stampOf = (d: Date) => d.toISOString().slice(0, 19).replace(/:/g, '-');
 
-export function startMemoryRecorder({ dir, processes = () => [], windowSnapshot, threads = async () => ({}), everyMs = 15 * 60_000, askMs = 60_000 }: MemoryRecorderOptions) {
-  const startedAt = Date.now();
+export function startMemoryRecorder({ dir, processes = () => [], windowSnapshot, threads = async () => ({}), everyMs = 15 * 60_000, askMs = 60_000, now = Date.now }: MemoryRecorderOptions) {
+  const startedAt = now();
   let snapping = false;
 
   const append = (line: Record<string, unknown>) => {
@@ -47,7 +58,7 @@ export function startMemoryRecorder({ dir, processes = () => [], windowSnapshot,
     let heaps: Record<string, number> = {};
     try { heaps = await threads(); } catch { /* likewise */ }
     append({
-      upMin: Math.round((Date.now() - startedAt) / 60_000),
+      upMin: Math.round((now() - startedAt) / 60_000),
       heapMb: mb(heap.used_heap_size),
       heapTotalMb: mb(heap.total_heap_size),
       externalMb: mb(usage.external),
@@ -76,6 +87,7 @@ export function startMemoryRecorder({ dir, processes = () => [], windowSnapshot,
     if (snapping) return;
     const ask = path.join(dir, SNAPSHOT_ASK);
     if (!fs.existsSync(ask)) return;
+    if ((now() - startedAt) / 60_000 < upMinAsked(ask)) return;
     snapping = true;
     // The ask goes first, so a snapshot that fails is not tried again every minute.
     fs.rmSync(ask, { force: true });

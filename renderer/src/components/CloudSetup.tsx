@@ -15,7 +15,7 @@ import { api } from '../api';
 import { AppMark } from './AppMark';
 import { EngineLogo } from './EngineLogos';
 import { AskList } from './PlanSetup';
-import { Cap } from './Onboarding';
+import { Cap } from './Cap';
 import { NAME } from '../../../shared/product-name.mjs';
 import { accountLabel, engineWord, pageToOpen, type CloudAccount, type CloudMode, type CloudSignIn, type CloudStatus } from '../cloud-menu';
 import { SETUP, WHERE_ROWS, activeSignIn, addingRows, doneAsksWhere, mayFinish, signInView } from '../cloud-setup';

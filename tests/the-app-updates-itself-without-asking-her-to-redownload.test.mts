@@ -302,13 +302,13 @@ describe('a ready update shows in the sidebar, never as a row in the inbox', () 
   });
 
   it('hands the sidebar the same answer ⌘K reads', () => {
-    expect(app).toContain("update={announcesUpdate(snap?.update, { walking, closed: '' })");
+    expect(app).toContain("update={announcesUpdate(snap?.update, { closed: '' })");
   });
 
   it('exists only when there is really something to install', () => {
-    expect(announcesUpdate({ ready: false, newVersion: null }, { walking: false, closed: '' })).toBe(false);
-    expect(announcesUpdate(null, { walking: false, closed: '' })).toBe(false);
-    expect(announcesUpdate({ ready: true, newVersion: '0.2.0' }, { walking: false, closed: '' })).toBe(true);
+    expect(announcesUpdate({ ready: false, newVersion: null }, { closed: '' })).toBe(false);
+    expect(announcesUpdate(null, { closed: '' })).toBe(false);
+    expect(announcesUpdate({ ready: true, newVersion: '0.2.0' }, { closed: '' })).toBe(true);
   });
 
   // THE THREE THAT WERE NOT PICKED. Keeping any of them switchable is a
@@ -346,44 +346,9 @@ describe('nothing loses the update', () => {
   });
 });
 
-/* ------------------- and never in the middle of the walk ------------------- */
-// The walk is a made list with one row in it, and every sentence on the screen
-// points at that row. `walkRows` (renderer/src/onboarding.ts) holds back
-// everything else, but it filters the LEDGER, and this row is not in any
-// ledger: the app builds it. So the walk has to be named where the row is
-// built, and it is named once, in `announcesUpdate`.
-describe('nothing about a new version reaches the walk', () => {
-  const app = read('renderer/src/App.tsx');
-  const ready = { ready: true, newVersion: '0.2.0' };
-
-  it('says nothing at all while somebody is being walked through the app', () => {
-    expect(announcesUpdate(ready, { walking: true, closed: '' })).toBe(false);
-  });
-
-  // The download is already on the disk. Nothing is thrown away here and
-  // nothing waits on another check: the walk ends and the row is in the list.
-  it('is waiting in the sidebar the moment the walk is over', () => {
-    expect(announcesUpdate(ready, { walking: false, closed: '' })).toBe(true);
-  });
-
-  // BOTH WAYS IN. `walkAgain` is the full first run and `startTutorial` is the
-  // practice on its own, and both set the same `run`, which is what `walking`
-  // reads. The tutorial is the one where the problem was first seen.
-  it('reads the same flag the practice tutorial sets', () => {
-    expect(app).toContain("const walking = !!run && run.step !== 'landed';");
-    expect(app).toContain('setRun(tutorialRun(product))');
-  });
-
-  // ⌘K IS A BEAT OF THE WALK. It is the surface the tutorial teaches, so an
-  // extra command about a new version turns up in the middle of the lesson.
-  it('keeps the restart out of the palette during the walk too', () => {
-    expect(app).toContain("announcesUpdate(snap.update, { walking, closed: '' })");
-  });
-
-  // And the palette is NOT gated on the close, which is the other half of the
-  // rule: rejecting the row loses nothing (see the block above).
-  it('still offers the restart in the palette for a version she closed', () => {
-    expect(announcesUpdate(ready, { walking: false, closed: '' })).toBe(true);
+describe('the palette asks the same rule', () => {
+  it('offers the restart in ⌘K by the same answer the sidebar reads', () => {
+    expect(read('renderer/src/App.tsx')).toContain("announcesUpdate(snap.update, { closed: '' })");
   });
 });
 

@@ -92,9 +92,10 @@ describe('a group row', () => {
     expect(row([said('1', 'p-maya', 'shipped', 10), said('2', 'p-sofia', 'nice', 11, { inReplyTo: '1' })])).toBeNull();
   });
 
-  it('shows the newest words in the group and who wrote them, whoever was addressed', () => {
+  // It used to show the group's newest words whoever they were to, and a message to someone else read as waiting on you (a-group-row-says-the-message-to-you-not-the-newest-to-anyone).
+  it('shows the newest words to you and who wrote them', () => {
     const r = row([said('1', 'p-maya', 'Dev, the bug?', 10), said('2', 'p-sofia', 'I can pair on it', 12)]);
-    expect(r).toMatchObject({ id: 'room-mention:r', roomId: 'r', by: 'p-sofia', byName: 'Sofia R.', body: 'I can pair on it', at: 12, messageId: '2', thread: null });
+    expect(r).toMatchObject({ id: 'room-mention:r', roomId: 'r', by: 'p-maya', byName: 'Maya', body: 'Dev, the bug?', at: 10, messageId: '1', thread: null });
   });
 
   it('ends when you write in the group, and comes back on the next message to you', () => {
@@ -121,9 +122,9 @@ describe('a group row', () => {
     expect(row([said('1', 'p-maya', '', 10, { deleted: true, mentions: [] })])).toBeNull();
   });
 
-  it('finds a mention older than the messages held', () => {
+  it('finds a mention older than the messages held, and says it', () => {
     const r = row([said('9', 'p-sofia', 'noise', 50)], { mentioned: [said('1', 'p-maya', 'look', 10, { mentions: ['p-dev'] })] });
-    expect(r).toMatchObject({ body: 'noise', at: 50 });
+    expect(r).toMatchObject({ body: 'look', at: 10 });
   });
 });
 
@@ -138,9 +139,10 @@ describe('a reply in a group\'s side thread', () => {
     expect(r).toMatchObject({ at: 20, byName: 'Sofia R.', thread: 'theirs' });
   });
 
-  it('is what the row says when it is the newest thing in a row that is already there', () => {
+  // A reply in a thread between two others is not to you, so the row keeps saying what was.
+  it('is not what the row says when it is a reply between others', () => {
     const r = row([said('1', 'p-maya', 'Dev, the bug?', 10), said('2', 'p-maya', 'Sofia, the mock', 11), said('3', 'p-sofia', 'sent', 20, { inReplyTo: '2' })]);
-    expect(r).toMatchObject({ at: 20, byName: 'Sofia R.', thread: 'theirs' });
+    expect(r).toMatchObject({ at: 10, byName: 'Maya', body: 'Dev, the bug?', thread: null });
   });
 });
 
@@ -277,7 +279,7 @@ describe('on two Macs', () => {
     await w.maya.backend.sendRoomMessage(room, { body: 'the newest' });
     await w.dev.rooms.refresh();
     expect(rows()).toHaveLength(1);
-    expect(rows()[0].body).toBe('the newest');
+    expect(rows()[0].body).toBe('look at this');
   });
 
   it('a pass with no new invitation redraws nothing', async () => {

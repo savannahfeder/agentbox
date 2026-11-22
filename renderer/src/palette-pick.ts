@@ -20,6 +20,22 @@ export function namesIt(query: string, label: string): boolean {
   return words.length > 0 && words.every((w) => own.some((o) => o.startsWith(w)));
 }
 
+const wordsOf = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
+/** How well the words typed name a row, best first: 0 they are its name, 1 its name begins with them,
+ *  2 each starts a word of it, 3 it has them inside a word, 4 it does not have them. */
+export function nameRank(query: string, label: string): number {
+  const typed = wordsOf(query);
+  const own = wordsOf(label);
+  if (!typed.length) return 4;
+  const last = typed.length - 1;
+  if (typed.length <= own.length && typed.every((w, i) => (i < last ? own[i] === w : own[i].startsWith(w)))) {
+    return typed.length === own.length && own[last] === typed[last] ? 0 : 1;
+  }
+  if (typed.every((w) => own.some((o) => o.startsWith(w)))) return 2;
+  return norm(label).includes(norm(query)) ? 3 : 4;
+}
+
 /** Where the picked row is now; the first row when it is gone. */
 export function keptPick(key: string | null, keys: readonly string[]): number {
   if (!keys.length) return -1;

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 /** A thread the arrows can take you back to. Pages are not on the trail. */
 export type Stop =
   | { at: 'thread'; product: string; id: string }
+  /** A chat opened from Needs you, which is drawn in the inbox like a thread. */
+  | { at: 'group'; id: string }
   /** A teammate's thread, which is a card from their Mac rather than one of your rows. */
   | { at: 'card'; person: string; thread: string };
 
@@ -14,6 +16,7 @@ export const TRAIL_LIMIT = 50;
 
 export function sameStop(a: Stop, b: Stop): boolean {
   if (a.at === 'thread' && b.at === 'thread') return a.product === b.product && a.id === b.id;
+  if (a.at === 'group' && b.at === 'group') return a.id === b.id;
   if (a.at === 'card' && b.at === 'card') return a.person === b.person && a.thread === b.thread;
   return false;
 }
@@ -24,16 +27,19 @@ export type Screen = {
   thread: { product: string; id: string } | null;
   /** A teammate's thread, opened from your inbox. */
   card: { person: string; thread: string } | null;
+  /** A chat opened from Needs you. */
+  group: string | null;
   /** The inbox with no thread open, in any of its tabs. */
   inbox: boolean;
 };
 
 /** The arrows walk threads, so they are drawn only where you go between them. */
-export const onInboxPage = (s: Screen): boolean => !!s.thread || !!s.card || s.inbox;
+export const onInboxPage = (s: Screen): boolean => !!s.thread || !!s.card || !!s.group || s.inbox;
 
 export function stopOnScreen(s: Screen): Stop | null {
   if (s.thread) return { at: 'thread', product: s.thread.product, id: s.thread.id };
   if (s.card) return { at: 'card', person: s.card.person, thread: s.card.thread };
+  if (s.group) return { at: 'group', id: s.group };
   return null;
 }
 

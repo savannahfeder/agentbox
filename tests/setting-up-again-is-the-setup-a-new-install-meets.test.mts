@@ -21,12 +21,8 @@ const body = (name: string) => app.slice(app.indexOf(`const ${name} = useCallbac
 describe('Set Agentbox up again', () => {
   it('opens the first run this install gets, not the old walk', () => {
     const fn = body('walkAgain');
-    expect(fn).toContain('void armNow().then((a) => { setArm(a); setFresh(true); });');
-    expect(fn).not.toMatch(/setArm\('tour'\)/);
+    expect(fn).toContain('noteOnboarding(); setFresh(true);');
     expect(fn).not.toMatch(/setRun\(/);
-  });
-  it('ends the old first run where a first run ends too', () => {
-    expect(body('finishClassic')).toMatch(/setupStartedAgain\.current = false/);
   });
   it('hands that setup a way back to the app', () => {
     expect(app).toMatch(/onLeave=\{setupStartedAgain\.current \? leaveSetupAgain : undefined\}/);

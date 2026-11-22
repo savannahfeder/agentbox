@@ -25,12 +25,12 @@ describe('a thread opened on the Team page', () => {
     // App.tsx hands the arrows a teammate's thread only when its back says Inbox.
     expect(app).toMatch(/card: openCard && onTeammateThread && !roomsUi\.roomName \?/);
     expect(app).toContain('const onTeammateThread = teamShown && !!openCard && !cardFromPlace;');
-    expect(onInboxPage({ thread: null, card: null, inbox: false })).toBe(false);
-    expect(stopOnScreen({ thread: null, card: null, inbox: false })).toBeNull();
+    expect(onInboxPage({ thread: null, card: null, group: null, inbox: false })).toBe(false);
+    expect(stopOnScreen({ thread: null, card: null, group: null, inbox: false })).toBeNull();
   });
 
-  it('keeps its own back, which names the Standup, Tasks or the teammate it was opened from', () => {
-    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : chatsPlace === 'tasks' ? 'Tasks' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
+  it('keeps its own back, which names the Standup or the teammate it was opened from', () => {
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
     // It closes the thread and leaves the Team page under it on screen.
     expect(app).toContain('onBack={() => { setOpenCard(null); setTeamOpen(false); }}');
   });
@@ -41,9 +41,11 @@ describe('a thread opened on the Team page', () => {
     expect(read('renderer/src/threads/Summary.tsx')).toMatch(/className="back-esc thread-crumb-back"[^>]*onClick=\{onBack\}/);
   });
 
+  // A chat is on the trail only once it is opened in the inbox
+  // (a-chat-opened-from-needs-you-stays-in-the-inbox).
   it('is not on the trail, and nor is the Team page itself', () => {
     const hook = read('renderer/src/back-and-forward.ts');
     const stop = hook.slice(hook.indexOf('export type Stop'), hook.indexOf('export type Trail'));
-    expect(stop).not.toMatch(/'team'|'group'|'teammate'|'home'|'list'|'files'|'settings'|'connections'/);
+    expect(stop).not.toMatch(/'team'|'teammate'|'home'|'files'|'settings'|'connections'/);
   });
 });

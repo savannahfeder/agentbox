@@ -64,6 +64,11 @@
 .ts-done.ts-code { gap: 8px; }
 .ts-done.ts-handed { gap: 8px; }
 .ts-done.ts-handed:disabled { cursor: default; }
+/* Share wearing who can open it: faces stacked as the asks chip stacks them. */
+.ts-done.ts-share:has(.ts-share-faces) { gap: 8px; }
+.ts-share-faces { display: inline-flex; }
+.ts-share-faces > * + * { margin-left: -6px; }
+.ts-share-words { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .ts-handed-face { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line-strong); font: 600 9px/1 var(--mono); letter-spacing: .02em; color: var(--text); }
 /* Pressed: the change open beside the thread, a teammate's thread followed or its About out. */
 .ts-done[aria-pressed="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }

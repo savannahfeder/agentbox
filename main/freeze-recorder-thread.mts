@@ -36,7 +36,6 @@ const post = <T extends object = object>(method: string, params: object = {}) =>
 
 let running: { anchorUs: number } | null = null;  // { anchorUs } of the profile being taken
 let previous: StoppedProfile | null = null; // { profile, offsetUs } of the last one stopped
-let frozeAt: number | null = null;  // the last stamp before the freeze in progress, in µs
 const seen: { fromUs: number; toUs: number }[] = [];     // freezes ended and not yet cut out of a profile
 let busy = false;
 
@@ -70,30 +69,26 @@ async function turn() {
   } catch (err) { quit(err); } finally { busy = false; }
 }
 
-function watch() {
-  const last = Number(Atomics.load(stamp, 0) / 1000n);
-  if (nowUs() - last > thresholdMs * 1000) { frozeAt ??= last; return; }
-  if (frozeAt === null) return;
+// The main thread's first beat after a hold says so.
+function held({ fromUs, toUs }: { fromUs: number; toUs: number }) {
   // On waking, the beat and the wake can come in either order: still asleep
   // covers the beat first, a wake since the hold began covers the wake first.
-  const slept = Atomics.load(stamp, 1) !== 0n || Number(Atomics.load(stamp, 2) / 1000n) >= frozeAt;
-  if (!slept) seen.push({ fromUs: frozeAt, toUs: last });
-  frozeAt = null;
+  const slept = Atomics.load(stamp, 1) !== 0n || Number(Atomics.load(stamp, 2) / 1000n) >= fromUs;
+  if (!slept) seen.push({ fromUs, toUs });
   void turn();
 }
+const holding = () => nowUs() - Number(Atomics.load(stamp, 0) / 1000n) > thresholdMs * 1000;
 
-let watching: NodeJS.Timeout | null = null;
 let rotating: NodeJS.Timeout | null = null;
 function quit(err: unknown) {
-  clearInterval(watching!);
   clearInterval(rotating!);
   try { session.disconnect(); } catch { /* already gone */ }
   parentPort!.postMessage({ gaveUp: String((err as Error | null)?.message ?? err) });
 }
 
-// The timers go first: an inspector reply does not keep this thread alive.
-watching = setInterval(watch, 50);
-rotating = setInterval(() => { if (frozeAt === null) void turn(); }, rotateMs);
+// These go first: an inspector reply does not keep this thread alive.
+parentPort!.on('message', (m: { hold?: { fromUs: number; toUs: number } } | null) => { if (m?.hold) held(m.hold); });
+rotating = setInterval(() => { if (!holding()) void turn(); }, rotateMs);
 try {
   session.connectToMainThread();
   await post('Profiler.enable');

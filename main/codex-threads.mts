@@ -24,15 +24,12 @@
 // table. It is not read: Electron ships no sqlite, the file is written live
 // under WAL, and the two plain files carry what the row needs.
 import fs from 'node:fs';
-import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import path from 'node:path';
 import { RECENT_DAYS, isScratchFolder, isTaskFolder, shortFolder, threadTitle } from './agent-sessions.mts';
 import { codexDataDirs } from './agent-homes.mts';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
-import { howTheChatEnded } from '../shared/agent-import.mts';
-import { stripTypesFlags } from './strip-types.mts';
-import { noteThread } from './thread-heaps.mts';
+import { firstPart, howTheChatEnded, lastPart } from '../shared/agent-import.mts';
 
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
 
@@ -145,18 +142,6 @@ interface CodexHomeRead {
   skipped: CodexSkipped;
 }
 
-interface OffThreadReply {
-  id: number;
-  ok: boolean;
-  value: CodexThreadsRead;
-  error?: string;
-}
-
-interface OffThreadWait {
-  resolve: (value: CodexThreadsRead) => void;
-  reject: (err: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
-}
 /** The originator Codex records for a run this app started (CLIENT_INFO.name), now and before. */
 const OUR_ORIGINATORS = new Set([nameSlug, ...WAS_SLUGS]);
 /** `codex exec` and Codex as an MCP server: one-shot runs a program starts. */
@@ -393,7 +378,7 @@ function readRolloutAfresh(file: string): Rollout | null {
   if (!meta || !meta.id) return null;
   let mtime = 0;
   try { mtime = fs.statSync(file).mtimeMs; } catch { mtime = 0; }
-  return { ...meta, prompt, last, herTurnLast, turns, images, lastActive, path: file, mtime };
+  return { ...meta, prompt: firstPart(prompt), last: lastPart(last), herTurnLast, turns, images, lastActive, path: file, mtime };
 }
 
 /**
@@ -478,46 +463,4 @@ function readOneCodexHome(codexDir: string, { home, days, now, cutoff, index, by
       firstSaid: r.prompt,
     });
   }
-}
-
-// THE SAME READ IN A THREAD OF ITS OWN, for the watch that runs every minute:
-// a first read of a large Codex folder takes seconds, and on the main process
-// that is seconds of the app not answering. One worker, kept for the life of
-// the app, so its transcripts stay remembered between reads. Where a worker
-// cannot start, the read runs here as before.
-const OFF_THREAD_DEADLINE_MS = 5 * 60_000;
-let worker: Worker | null = null;
-let asked = 0;
-const waiting = new Map<number, OffThreadWait>();
-export function readCodexThreadsOffThread(opts: CodexThreadsOptions = {}): Promise<CodexThreadsRead> {
-  try {
-    if (!worker) {
-      worker = new Worker(new URL('./codex-threads-worker.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
-      worker.unref();
-      noteThread('codex reader', worker);
-      worker.on('message', ({ id, ok, value, error }: OffThreadReply) => {
-        const w = waiting.get(id);
-        if (!w) return;
-        waiting.delete(id);
-        clearTimeout(w.timer);
-        if (ok) w.resolve(value); else w.reject(new Error(error));
-      });
-      const fail = (err: Error) => {
-        for (const w of waiting.values()) { clearTimeout(w.timer); w.reject(err); }
-        waiting.clear();
-        worker = null;
-      };
-      worker.on('error', fail);
-      worker.on('exit', () => fail(new Error('the Codex reader stopped')));
-    }
-  } catch {
-    return Promise.resolve().then(() => readCodexThreads(opts));
-  }
-  const id = (asked += 1);
-  return new Promise<CodexThreadsRead>((resolve, reject) => {
-    const timer = setTimeout(() => { waiting.delete(id); reject(new Error('the Codex reader did not answer in time')); }, OFF_THREAD_DEADLINE_MS);
-    timer.unref?.();
-    waiting.set(id, { resolve, reject, timer });
-    worker!.postMessage({ id, opts });
-  });
 }

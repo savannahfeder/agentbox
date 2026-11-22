@@ -14,7 +14,11 @@
 //   beside it (founder: "It doesn't really match Slack"); at 36px she found
 //   them "still too large", so they are 28px with their top on the name's;
 // - the box was 79px tall at rest: the field, then a row of tools and a
-//   bordered Send holding a second box with "Enter" in it.
+//   bordered Send holding a second box with "Enter" in it. It became one line
+//   with the tools at its right, which the founder then found messy and unlike
+//   Slack (w-f689c07680): the words wrapped beside an empty column. It is
+//   stacked again, and Send is an arrow with no key in it
+//   (tests/the-chat-box-is-its-words-then-its-files-then-its-tools).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -43,8 +47,18 @@ describe('a thread that passed between two people, in their chat', () => {
   it('leaves a comment as words, with where it was left under them', () => {
     const html = drawn([comment]);
     expect(html).not.toContain('rm-thread-card');
-    expect(html).toContain('<div class="tx">The expiry should be a day.</div>');
+    expect(html).toContain('<div class="tx"><p>The expiry should be a day.</p></div>');
     expect(html).toContain('class="rm-there"');
+  });
+
+  // A synthetic tester replied on a task with two points and a quote, and the
+  // person's chat showed the reply with its "- " and "> " (w-f689c07680).
+  it('draws a reply’s list and quote as a list and a quote', () => {
+    const reply = { key: 'reply:1', at: at + 120_000, by: 'sam', text: 'Two things:\n\n- the copy\n- the button\n\n> Keep it short', where: { label: 'on Sign-up screens', onOpen: () => {} } };
+    const html = drawn([reply]);
+    expect(html).toMatch(/<li>the copy<\/li>\s*<li>the button<\/li>/);
+    expect(html).toMatch(/<blockquote>\s*<p>Keep it short<\/p>\s*<\/blockquote>/);
+    expect(html).not.toContain('- the copy');
   });
 
   it('is a card for a task, a hand-off, an ask and its answer, and not for words', () => {
@@ -84,14 +98,10 @@ describe('a person\'s or a group\'s chat', () => {
     expect(fs.readFileSync(new URL('../renderer/src/team/rooms/RoomChat.tsx', import.meta.url), 'utf8')).toContain('size={hang ? 28 : 16}');
   });
 
-  it('has a box one line high with its tools at the right of that line', () => {
-    expect(rule('.gr-page .rm-compose')).toMatch(/grid-template-columns: minmax\(0, 1fr\) auto/);
-    expect(rule('.gr-page .rm-compose > .rm-compose-bar')).toMatch(/grid-column: 2; grid-row: 1;/);
-    expect(rule('.gr-page .rm-compose-bar .dock-send kbd')).toMatch(/display: none/);
-  });
-
-  it('puts the tools back under the words when a file beside it squeezes it', () => {
-    expect(rule('.app.doc-open .gr-page .rm-compose')).toMatch(/grid-template-columns: minmax\(0, 1fr\);/);
+  it('has a box with its words across it and its tools under them, Send with no key inside', () => {
+    expect(rule('.gr-page .rm-compose')).toBe('');
+    expect(rule('.rm-compose')).toMatch(/flex-direction: column;/);
+    expect(fs.readFileSync(new URL('../renderer/src/team/ChatSend.tsx', import.meta.url), 'utf8')).not.toContain('<kbd>');
   });
 });
 

@@ -79,7 +79,9 @@ export const aWordFollows = ({ key, repeat }: { key: string; repeat: boolean }):
  * you opened the thread, which is a close unless a letter follows within
  * WORD_FOLLOWS_MS. A thread the app moved you to is never closed by it.
  */
-export function keyOnAnOpenThread({ key, justChanged, appMovedYou = false, hasOptions = false, stillTyping = false, boxOnScreen = true }: { key: string; justChanged: boolean; appMovedYou?: boolean; hasOptions?: boolean; stillTyping?: boolean; boxOnScreen?: boolean }): 'shortcut' | 'to the box' | 'wait' {
+export function keyOnAnOpenThread({ key, justChanged, appMovedYou = false, hasOptions = false, stillTyping = false, boxOnScreen = true, sheetOpen = false }: { key: string; justChanged: boolean; appMovedYou?: boolean; hasOptions?: boolean; stillTyping?: boolean; boxOnScreen?: boolean; sheetOpen?: boolean }): 'shortcut' | 'to the box' | 'wait' | 'the sheet' {
+  // A sheet over the thread has its own note; a letter meant for it must not land in the agent's box.
+  if (sheetOpen && printable(key)) return 'the sheet';
   if (!boxOnScreen) return 'shortcut';
   if (stillTyping && key.length === 1) return 'to the box';
   if (!printable(key)) return 'shortcut';

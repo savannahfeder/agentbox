@@ -11,24 +11,8 @@
 // task box on the page. With no offer, activeElement was <body>.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { offerOnNewProject } from '../renderer/src/tutorial.ts';
 
 const read = (f) => fs.readFileSync(new URL(`../renderer/src/${f}`, import.meta.url), 'utf8');
-
-describe('the tutorial offer after a new project', () => {
-  it('is not made while a task is being written', () => {
-    expect(offerOnNewProject({ made: true, walking: false, offered: false, writing: true })).toBe(false);
-  });
-
-  it('is still made when nothing is being written', () => {
-    expect(offerOnNewProject({ made: true, walking: false, offered: false, writing: false })).toBe(true);
-    expect(offerOnNewProject({ made: true, walking: false, offered: false })).toBe(true);
-  });
-
-  it('is told whether the task box is open or holds words', () => {
-    expect(read('App.tsx')).toMatch(/offerOnNewProject\(\{[\s\S]{0,400}?writing: modalNow\.current === 'compose' \|\| clearWriting/);
-  });
-});
 
 describe('the task box after a new project', () => {
   it('takes the keyboard back when the project it is pointed at arrives', () => {

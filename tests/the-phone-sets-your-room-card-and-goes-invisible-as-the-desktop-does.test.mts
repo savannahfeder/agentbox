@@ -160,7 +160,7 @@ describe('the cloud', () => {
 describe('the screen', () => {
   const src = fs.readFileSync(new URL('../mobile/src/ui/SettingsPages.tsx', import.meta.url), 'utf8');
   it('is a Workspace page shown by the same rule', () => {
-    expect(src).toMatch(/id: 'rooms', label: 'Rooms', group: 'Workspace', Body: Rooms, shown: \(s\) => roomsPageShown\(s\.settings\)/);
+    expect(src).toMatch(/id: 'rooms', label: 'Rooms', group: 'Workspace', lede: '[^']+', Body: Rooms, shown: \(s\) => roomsPageShown\(s\.settings\)/);
   });
   it('draws each row from the rule and saves through the cloud', () => {
     expect(src).toMatch(/roomCardGroups\(/);

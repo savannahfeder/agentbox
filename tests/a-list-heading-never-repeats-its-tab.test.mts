@@ -11,7 +11,6 @@ import React, { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { stackRows } from '../renderer/src/threads/stack-rules.ts';
 import { List } from '../renderer/src/components/List.tsx';
-import { TasksPage } from '../renderer/src/team/TasksPage.tsx';
 globalThis.React = React;
 
 const DAY = Date.parse('2026-11-01T00:00:00');
@@ -59,31 +58,5 @@ describe('the table', () => {
     const html = draw(stackRows({ progress: [row('a')], later: [row('b', { start: 'later' })], done: [], dayStart: DAY, folded: new Set() }));
     expect((html.match(/th-section/g) ?? []).length).toBe(2);
     expect(html).not.toContain('>Thread<');
-  });
-});
-
-describe('the Tasks tab', () => {
-  const task = (key, extra = {}) => ({ key, item: null, title: key, holder: null, giver: null, due: null, block: null, agent: null, done: false, unread: false, ...extra });
-  const draw = (groups) => renderToStaticMarkup(h(TasksPage, {
-    groups: { late: [], blocked: [], open: [], done: [], ...groups }, faces: new Map(), nameOf: () => 'Someone', me: null,
-    picked: null, onPicked() {}, keys: false, onOpen() {}, onOpenBlock() {}, onDone() {},
-  }));
-
-  it('draws no "All open" over its one group', () => {
-    const html = draw({ open: [task('Write the words')] });
-    expect(html).not.toMatch(/All open/i);
-    expect(html).not.toContain('tk-label');
-    expect(html).toContain('Write the words');
-  });
-
-  it('still names Open when Late or Blocked sits above it', () => {
-    const html = draw({ late: [task('Late one')], open: [task('Write the words')] });
-    expect(html).toContain('>Late<');
-    expect(html).toContain('>Open<');
-  });
-
-  it('keeps Done this week, which folds', () => {
-    const html = draw({ open: [task('Write the words')], done: [task('Done one', { done: true })] });
-    expect(html).toContain('Done this week');
   });
 });

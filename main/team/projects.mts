@@ -212,7 +212,9 @@ export function linkSharedFolders(products: readonly { dir: string; name?: strin
   const linked: { dir: string; repoPath: string }[] = [];
   for (const shared of products) {
     if (!shared.team || shared.team.direct || shared.repoPath) continue;
-    const own = products.filter((p) => !p.team && p.repoPath && sameName(p.name) === sameName(shared.name));
+    // joinedName may have put the sharer's name after it.
+    const names = new Set([sameName(shared.name), sameName(String(shared.name ?? '').replace(/ · [^·]+$/, ''))]);
+    const own = products.filter((p) => !p.team && p.repoPath && names.has(sameName(p.name)));
     if (own.length !== 1 || !fs.existsSync(own[0].repoPath!)) continue;
     const project = readProject(shared.dir);
     if (!project || project.repoPath) continue;

@@ -83,10 +83,11 @@ export function teamConfigOnThisMac(home = os.homedir()): string {
   return path.join(home, `.${nameSlug}`, 'team.config.json');
 }
 
-// The hosted project's address and public key. Row level security, not secrecy,
-// is what protects the data, but the file is kept out of the repository (it is
-// ignored), so a checkout with no key on its Mac runs as the single-person app;
-// cloud/team.config.example.json shows its shape.
+// Which team cloud this copy signs in to. Row level security, not secrecy,
+// protects the data, so A CHECKOUT WITH NO TEAM FILE USES THE ONE THAT SHIPS
+// (shared/cloud-address.mts): a fork, the npm command and the Linux install
+// get Multiplayer as the Mac download does. cloud/team.config.json (ignored;
+// cloud/team.config.example.json shows its shape) points a copy at another.
 //
 // THE FOLDER'S OWN KEY WINS when it has one, so a worktree set up against
 // another team is never quietly moved onto this Mac's. AGENTBOX_TEAM_CONFIG
@@ -141,9 +142,10 @@ function cloudConfigFound(appDir: string, { packaged = isPackagedElectron(), hom
       if (!found) found = c;
       // TypeScript loses the narrowing of `found` inside its own reassignment.
       else if (c.url === found.url) found = { ...c, ...(found as CloudConfig) };
-    } catch { /* try the next place; none of them is the single-person app */ }
+    } catch { /* try the next place */ }
   }
-  return found;
+  if (found || runningAsAFreshUser(env)) return found;
+  return { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey };
 }
 
 function bakedTeam(appDir: string): CloudConfig | null {
