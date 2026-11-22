@@ -5,14 +5,14 @@
 // `once`, `always` and `reject`, and a refusal ends the turn `cancelled`.
 //
 // What a turn does is read off the words of its prompt:
-//   SAY <word>        answers with the word, in two pieces
-//   RUN <command>     asks before a shell command, then runs it
-//   EDIT <path>       asks before changing a file, with the change
-//   WRITE <path>      asks before making a new file, with its content
-//   HANG              starts a command and never finishes it
-//   DIE               exits in the middle of the turn
-//   TOKENS            ends because the model ran out of room
-//   RECALL            answers with the first word this conversation was told to say
+//   FAKE:SAY <word>        answers with the word, in two pieces
+//   FAKE:RUN <command>     asks before a shell command, then runs it
+//   FAKE:EDIT <path>       asks before changing a file, with the change
+//   FAKE:WRITE <path>      asks before making a new file, with its content
+//   FAKE:HANG              starts a command and never finishes it
+//   FAKE:DIE               exits in the middle of the turn
+//   FAKE:TOKENS            ends because the model ran out of room
+//   FAKE:RECALL            answers with the first word this conversation was told to say
 //
 // FAKE_ACP_LOG names a file each request is appended to. FAKE_ACP_VERSION,
 // FAKE_ACP_NO_LOAD and FAKE_ACP_SIGNED_OUT change what it answers when a
@@ -81,17 +81,17 @@ function prompt(id, { sessionId, prompt: blocks }) {
   const words = (blocks ?? []).map((b) => b?.text ?? '').join('\n');
   turn = { id, sessionId };
   const session = state.sessions[sessionId] ??= {};
-  const arg = (verb) => words.match(new RegExp(`\\b${verb} (\\S+)`))?.[1] ?? null;
+  const arg = (verb) => words.match(new RegExp(`FAKE:${verb} (\\S+)`))?.[1] ?? null;
 
-  if (/\bDIE\b/.test(words)) { say(sessionId, 'starting'); return setTimeout(() => process.exit(3), 20); }
-  if (/\bTOKENS\b/.test(words)) { say(sessionId, 'part of an answer'); return finish('max_tokens'); }
-  if (/\bHANG\b/.test(words)) {
+  if (/FAKE:DIE\b/.test(words)) { say(sessionId, 'starting'); return setTimeout(() => process.exit(3), 20); }
+  if (/FAKE:TOKENS\b/.test(words)) { say(sessionId, 'part of an answer'); return finish('max_tokens'); }
+  if (/FAKE:HANG\b/.test(words)) {
     const toolCallId = `call_${calls += 1}`;
     update(sessionId, { sessionUpdate: 'tool_call', toolCallId, name: 'shell', title: 'shell', kind: 'execute', status: 'pending', locations: [], rawInput: {} });
     update(sessionId, { sessionUpdate: 'tool_call_update', toolCallId, status: 'in_progress', kind: 'execute', title: 'sleep 100', rawInput: { command: 'sleep 100' } });
     return;
   }
-  const command = words.match(/\bRUN (.+)$/m)?.[1];
+  const command = words.match(/FAKE:RUN (.+)$/m)?.[1];
   if (command) {
     return askThenDo(sessionId, {
       name: 'shell', kind: 'execute', title: command, rawInput: { command, cwd: session.cwd }, locations: [{ path: session.cwd }],
@@ -107,7 +107,7 @@ function prompt(id, { sessionId, prompt: blocks }) {
   if (write) return askThenDo(sessionId, { name: 'write', kind: 'edit', title: write, rawInput: { path: write, content: 'new file\n' }, locations: [{ path: write }] });
   const word = arg('SAY');
   if (word) { session.word ??= word; save(); say(sessionId, word); return finish('end_turn'); }
-  if (/\bRECALL\b/.test(words)) { say(sessionId, session.word ?? 'I do not know'); return finish('end_turn'); }
+  if (/FAKE:RECALL\b/.test(words)) { say(sessionId, session.word ?? 'I do not know'); return finish('end_turn'); }
   say(sessionId, 'ok');
   finish('end_turn');
 }

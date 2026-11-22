@@ -62,7 +62,7 @@ const logged = () => fs.readFileSync(path.join(dir, 'log.jsonl'), 'utf8').trim()
 describe('OpenCode asks before it runs a command', () => {
   it('puts the command to the person as one card, and runs it once allowed', async () => {
     const file = path.join(dir, 'repo', 'made.txt');
-    const run = turn(`RUN echo ok > ${file}`);
+    const run = turn(`FAKE:RUN echo ok > ${file}`);
     expect(await run.exit).toBe(0);
     expect(run.asked).toEqual([{ command: `echo ok > ${file}`, cwd: path.join(dir, 'repo') }]);
     expect(fs.existsSync(file)).toBe(true);
@@ -71,7 +71,7 @@ describe('OpenCode asks before it runs a command', () => {
 
   it('does not run a refused command', async () => {
     const file = path.join(dir, 'repo', 'made.txt');
-    const run = turn(`RUN echo ok > ${file}`, { allow: false });
+    const run = turn(`FAKE:RUN echo ok > ${file}`, { allow: false });
     await run.exit;
     expect(run.asked).toHaveLength(1);
     expect(fs.existsSync(file)).toBe(false);
@@ -79,22 +79,22 @@ describe('OpenCode asks before it runs a command', () => {
   });
 
   it('puts a change to a file as the lines that differ', async () => {
-    const run = turn('EDIT /repo/a.txt');
+    const run = turn('FAKE:EDIT /repo/a.txt');
     await run.exit;
     expect(run.asked).toEqual([{ files: [{ path: '/repo/a.txt', kind: 'update', diff: '@@ -1,3 +1,3 @@\n one\n-two\n+2\n three' }] }]);
   });
 
   it('puts a new file as the file itself', async () => {
-    const run = turn('WRITE /elsewhere/new.txt', { allow: false });
+    const run = turn('FAKE:WRITE /elsewhere/new.txt', { allow: false });
     await run.exit;
     expect(run.asked).toEqual([{ files: [{ path: '/elsewhere/new.txt', kind: 'add', diff: 'new file\n' }] }]);
   });
 
   it('closes its cards when the run ends, and opens none when nothing was asked', async () => {
-    const asking = turn(`RUN echo ok > ${path.join(dir, 'repo', 'made.txt')}`);
+    const asking = turn(`FAKE:RUN echo ok > ${path.join(dir, 'repo', 'made.txt')}`);
     await asking.exit;
     expect(asking.cards()).toEqual({ opened: 1, closed: 1 });
-    const quiet = turn('SAY apple');
+    const quiet = turn('FAKE:SAY apple');
     await quiet.exit;
     expect(quiet.cards()).toEqual({ opened: 0, closed: 0 });
   });
@@ -102,7 +102,7 @@ describe('OpenCode asks before it runs a command', () => {
 
 describe('what a thread on OpenCode is started with', () => {
   it('is `opencode acp`, its own config file in the app\'s folder, the thread it is on, and no key', async () => {
-    await turn('SAY apple').exit;
+    await turn('FAKE:SAY apple').exit;
     const { started } = logged().find((l) => l.started);
     expect(started.args).toEqual(['acp']);
     expect(started.env).toEqual({
@@ -114,23 +114,23 @@ describe('what a thread on OpenCode is started with', () => {
   });
 
   it('sends the task as the prompt and the standing instructions as a file, not in the prompt', async () => {
-    await turn('SAY apple', { system: 'Standing rule: be brief.' }).exit;
+    await turn('FAKE:SAY apple', { system: 'Standing rule: be brief.' }).exit;
     const sent = logged().find((l) => l.method === 'session/prompt');
-    expect(sent.params.prompt).toEqual([{ type: 'text', text: 'SAY apple' }]);
+    expect(sent.params.prompt).toEqual([{ type: 'text', text: 'FAKE:SAY apple' }]);
     const thread = path.join(dir, 'user', 'harnesses', 'opencode', 'threads', 'w-1');
     expect(fs.readFileSync(path.join(thread, 'instructions.md'), 'utf8')).toBe('Standing rule: be brief.\n');
     expect(JSON.parse(fs.readFileSync(path.join(thread, 'opencode.json'), 'utf8')).instructions).toEqual([path.join(thread, 'instructions.md')]);
   });
 
   it('hands it the store\'s tools, without the variables that have no value', async () => {
-    await turn('SAY apple').exit;
+    await turn('FAKE:SAY apple').exit;
     expect(logged().find((l) => l.method === 'session/new').params.mcpServers).toEqual([
       { name: 'agentbox', command: '/bin/store', args: ['--stdio'], env: [{ name: 'ZERO_ITEM', value: 'w-1' }, { name: 'STORE_ACCOUNT_ID', value: 'me' }] },
     ]);
   });
 
   it('writes the policy for the mode this run was given', async () => {
-    await turn('SAY apple', { answerMode: 'default' }).exit;
+    await turn('FAKE:SAY apple', { answerMode: 'default' }).exit;
     const config = JSON.parse(fs.readFileSync(path.join(dir, 'user', 'harnesses', 'opencode', 'threads', 'w-1', 'opencode.json'), 'utf8'));
     expect(config.permission).toMatchObject({ bash: 'ask', edit: 'ask' });
   });
@@ -138,7 +138,7 @@ describe('what a thread on OpenCode is started with', () => {
 
 describe('a conversation the app can carry on', () => {
   it('has a record on disk once it has run, which is what a reply looks for', async () => {
-    const first = turn('SAY apple');
+    const first = turn('FAKE:SAY apple');
     await first.exit;
     const harness = harnessFor('opencode');
     const record = harness.transcript(first.sup as never, { sessionId: first.session.sessionId });
@@ -148,9 +148,9 @@ describe('a conversation the app can carry on', () => {
   });
 
   it('carries on in a new process when the reply names it', async () => {
-    const first = turn('SAY apple');
+    const first = turn('FAKE:SAY apple');
     await first.exit;
-    const reply = turn('RECALL', { resumeId: first.session.sessionId! });
+    const reply = turn('FAKE:RECALL', { resumeId: first.session.sessionId! });
     expect(await reply.exit).toBe(0);
     expect(reply.session.result).toBe('apple');
   });

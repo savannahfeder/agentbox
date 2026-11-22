@@ -51,7 +51,7 @@ const until = async (ok: () => boolean) => { for (let i = 0; i < 400 && !ok(); i
 
 describe('a turn that answers', () => {
   it('ends 0 with the answer, the conversation id, and one event for the finished message', async () => {
-    const run = turn('SAY apple');
+    const run = turn('FAKE:SAY apple');
     expect(await run.exit).toEqual({ code: 0, signal: null });
     expect(run.session).toMatchObject({ sessionId: 'ses_fake_1', result: 'apple', resultIsError: false });
     expect(run.ours(ACP_MESSAGE)).toEqual([{ text: 'apple' }]);
@@ -60,23 +60,23 @@ describe('a turn that answers', () => {
   });
 
   it('says it has started only once the conversation exists, and before any of its events', async () => {
-    const run = turn('SAY apple');
+    const run = turn('FAKE:SAY apple');
     await run.exit;
     expect(run.spawned()).toBe(0);
     expect(run.events[0]).toEqual([ACP_SESSION, { sessionId: 'ses_fake_1' }]);
   });
 
   it('hands the agent the folder and the tool servers it was given', async () => {
-    await turn('SAY apple').exit;
+    await turn('FAKE:SAY apple').exit;
     const opened = logged().find((l) => l.method === 'session/new');
     expect(opened.params).toEqual({ cwd: dir, mcpServers: [{ name: 'store', command: '/bin/store', args: ['--stdio'], env: [{ name: 'ZERO_ITEM', value: 'w-1' }] }] });
   });
 
   it('keeps a record of the conversation, which is what lets the app carry it on', async () => {
-    await turn('SAY apple').exit;
+    await turn('FAKE:SAY apple').exit;
     const lines = fs.readFileSync(path.join(dir, 'conversations', 'ses_fake_1.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     expect(lines.map((l) => l.event)).toEqual(['prompt', ACP_MESSAGE, ACP_TURN]);
-    expect(lines[0].text).toBe('SAY apple');
+    expect(lines[0].text).toBe('FAKE:SAY apple');
   });
 });
 
@@ -84,7 +84,7 @@ describe('a command that needs a yes', () => {
   it('asks with the command and where it would run, and runs once allowed', async () => {
     const file = path.join(dir, 'made.txt');
     const asked: AcpApproval[] = [];
-    const run = turn(`RUN echo ok > ${file}`, { ask: async (approval) => { asked.push(approval); expect(fs.existsSync(file)).toBe(false); return true; } });
+    const run = turn(`FAKE:RUN echo ok > ${file}`, { ask: async (approval) => { asked.push(approval); expect(fs.existsSync(file)).toBe(false); return true; } });
     expect(await run.exit).toEqual({ code: 0, signal: null });
     expect(asked).toEqual([{ kind: 'command', command: `echo ok > ${file}`, cwd: dir }]);
     expect(fs.existsSync(file)).toBe(true);
@@ -92,13 +92,13 @@ describe('a command that needs a yes', () => {
   });
 
   it('answers with the agent\'s own "allow once", never its "always"', async () => {
-    await turn(`RUN echo ok > ${path.join(dir, 'made.txt')}`, { ask: async () => true }).exit;
+    await turn(`FAKE:RUN echo ok > ${path.join(dir, 'made.txt')}`, { ask: async () => true }).exit;
     expect(logged().find((l) => l.answered)?.answered).toEqual({ outcome: 'selected', optionId: 'once' });
   });
 
   it('does not run when refused, and the thread says what was refused', async () => {
     const file = path.join(dir, 'made.txt');
-    const run = turn(`RUN echo ok > ${file}`, { ask: async () => false });
+    const run = turn(`FAKE:RUN echo ok > ${file}`, { ask: async () => false });
     expect(await run.exit).toEqual({ code: 0, signal: null });
     expect(fs.existsSync(file)).toBe(false);
     expect(logged().find((l) => l.answered)?.answered).toEqual({ outcome: 'selected', optionId: 'reject' });
@@ -107,19 +107,19 @@ describe('a command that needs a yes', () => {
 
   it('refuses everything asked when nobody can be asked', async () => {
     const file = path.join(dir, 'made.txt');
-    await turn(`RUN echo ok > ${file}`).exit;
+    await turn(`FAKE:RUN echo ok > ${file}`).exit;
     expect(fs.existsSync(file)).toBe(false);
   });
 
   it('refuses when the asker throws', async () => {
     const file = path.join(dir, 'made.txt');
-    await turn(`RUN echo ok > ${file}`, { ask: async () => { throw Error('the card could not be drawn'); } }).exit;
+    await turn(`FAKE:RUN echo ok > ${file}`, { ask: async () => { throw Error('the card could not be drawn'); } }).exit;
     expect(fs.existsSync(file)).toBe(false);
   });
 
   it('joins a tool call\'s pieces into one started and one finished event', async () => {
     const file = path.join(dir, 'made.txt');
-    const run = turn(`RUN echo ok > ${file}`, { ask: async () => true });
+    const run = turn(`FAKE:RUN echo ok > ${file}`, { ask: async () => true });
     await run.exit;
     expect(run.ours(ACP_TOOL).map((t) => [t.kind, t.status, t.detail])).toEqual([
       ['execute', 'started', `echo ok > ${file}`],
@@ -131,7 +131,7 @@ describe('a command that needs a yes', () => {
 describe('a file change that needs a yes', () => {
   it('asks with the change itself, and names the file it changed afterwards', async () => {
     const asked: AcpApproval[] = [];
-    const run = turn('EDIT /repo/a.txt', { ask: async (approval) => { asked.push(approval); return true; } });
+    const run = turn('FAKE:EDIT /repo/a.txt', { ask: async (approval) => { asked.push(approval); return true; } });
     await run.exit;
     expect(asked).toEqual([{ kind: 'edit', changes: [{ path: '/repo/a.txt', oldText: 'one\ntwo\nthree\n', newText: 'one\n2\nthree\n' }] }]);
     expect(run.session.acpChange).toEqual(['/repo/a.txt']);
@@ -139,7 +139,7 @@ describe('a file change that needs a yes', () => {
 
   it('asks about a new file with its content, which arrives with no diff', async () => {
     const asked: AcpApproval[] = [];
-    await turn('WRITE /elsewhere/new.txt', { ask: async (approval) => { asked.push(approval); return false; } }).exit;
+    await turn('FAKE:WRITE /elsewhere/new.txt', { ask: async (approval) => { asked.push(approval); return false; } }).exit;
     expect(asked).toEqual([{ kind: 'edit', changes: [{ path: '/elsewhere/new.txt', oldText: null, newText: 'new file\n' }] }]);
   });
 
@@ -150,8 +150,8 @@ describe('a file change that needs a yes', () => {
 
 describe('a reply on the same conversation', () => {
   it('loads the conversation in a new process and does not pass its history off as this turn', async () => {
-    await turn('SAY apple').exit;
-    const run = turn('RECALL', { resume: 'ses_fake_1' });
+    await turn('FAKE:SAY apple').exit;
+    const run = turn('FAKE:RECALL', { resume: 'ses_fake_1' });
     expect(await run.exit).toEqual({ code: 0, signal: null });
     expect(logged().some((l) => l.method === 'session/load' && l.params.sessionId === 'ses_fake_1')).toBe(true);
     expect(run.ours(ACP_MESSAGE)).toEqual([{ text: 'apple' }]);
@@ -159,8 +159,8 @@ describe('a reply on the same conversation', () => {
   });
 
   it('says so and starts nothing when the agent cannot carry a conversation on', async () => {
-    await turn('SAY apple').exit;
-    const run = turn('RECALL', { resume: 'ses_fake_1', env: { FAKE_ACP_NO_LOAD: '1' } });
+    await turn('FAKE:SAY apple').exit;
+    const run = turn('FAKE:RECALL', { resume: 'ses_fake_1', env: { FAKE_ACP_NO_LOAD: '1' } });
     expect(await run.exit).toEqual({ code: 1, signal: null });
     expect(run.stderr.join('\n')).toMatch(/Fake cannot carry on an earlier conversation/);
     expect(run.spawned()).toBeNull();
@@ -170,7 +170,7 @@ describe('a reply on the same conversation', () => {
 
 describe('a start that cannot happen says why, and leaves no result', () => {
   it('names the sign-in command when the agent is signed out', async () => {
-    const run = turn('SAY apple', { env: { FAKE_ACP_SIGNED_OUT: '1' } });
+    const run = turn('FAKE:SAY apple', { env: { FAKE_ACP_SIGNED_OUT: '1' } });
     expect(await run.exit).toEqual({ code: 1, signal: null });
     expect(run.stderr[0]).toBe('Fake is not signed in on this computer. Sign in by running: fake auth login');
     expect(run.session.result).toBeUndefined();
@@ -178,24 +178,24 @@ describe('a start that cannot happen says why, and leaves no result', () => {
   });
 
   it('refuses an agent that answers with another version of the protocol', async () => {
-    const run = turn('SAY apple', { env: { FAKE_ACP_VERSION: '2' } });
+    const run = turn('FAKE:SAY apple', { env: { FAKE_ACP_VERSION: '2' } });
     expect(await run.exit).toEqual({ code: 1, signal: null });
     expect(run.stderr[0]).toMatch(/version 2 of the agent protocol, and this app speaks version 1/);
   });
 
   it('refuses a model the agent does not offer, and sets one it does', async () => {
-    const wrong = turn('SAY apple', { model: 'fake/huge' });
+    const wrong = turn('FAKE:SAY apple', { model: 'fake/huge' });
     expect(await wrong.exit).toEqual({ code: 1, signal: null });
     expect(wrong.stderr[0]).toMatch(/Fake does not offer the model fake\/huge/);
     fs.rmSync(path.join(dir, 'log.jsonl'));
-    expect(await turn('SAY apple', { model: 'fake/large' }).exit).toEqual({ code: 0, signal: null });
+    expect(await turn('FAKE:SAY apple', { model: 'fake/large' }).exit).toEqual({ code: 0, signal: null });
     expect(logged().find((l) => l.method === 'session/set_config_option')?.params).toMatchObject({ configId: 'model', value: 'fake/large' });
   });
 });
 
 describe('a turn that does not end on its own', () => {
   it('is cancelled and ends as a stopped process when the worker is killed', async () => {
-    const run = turn('HANG');
+    const run = turn('FAKE:HANG');
     await until(() => run.ours(ACP_TOOL).length > 0);
     expect(run.worker.kill()).toBe(true);
     expect(await run.exit).toEqual({ code: 143, signal: 'SIGTERM' });
@@ -205,7 +205,7 @@ describe('a turn that does not end on its own', () => {
 
   it('withdraws a question nobody answered when the worker is killed', async () => {
     let asked = false;
-    const run = turn(`RUN echo ok > ${path.join(dir, 'made.txt')}`, { ask: () => { asked = true; return new Promise(() => {}); } });
+    const run = turn(`FAKE:RUN echo ok > ${path.join(dir, 'made.txt')}`, { ask: () => { asked = true; return new Promise(() => {}); } });
     await until(() => asked);
     run.worker.kill();
     expect(await run.exit).toEqual({ code: 143, signal: 'SIGTERM' });
@@ -214,13 +214,13 @@ describe('a turn that does not end on its own', () => {
   });
 
   it('fails with the reason when the agent dies in the middle', async () => {
-    const run = turn('DIE');
+    const run = turn('FAKE:DIE');
     expect(await run.exit).toEqual({ code: 1, signal: null });
     expect(run.stderr[0]).toMatch(/^Fake stopped: /);
   });
 
   it('keeps nothing as an answer when the model ran out of room, and says to reply', async () => {
-    const run = turn('TOKENS');
+    const run = turn('FAKE:TOKENS');
     await run.exit;
     expect(run.session.resultIsError).toBe(true);
     expect(run.session.result).toMatch(/stopped part way.*Reply to carry on/);

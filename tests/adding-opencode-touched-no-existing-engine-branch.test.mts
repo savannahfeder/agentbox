@@ -41,16 +41,15 @@ describe('adding OpenCode touched no existing engine branch', () => {
 
   it('declares the capabilities it has not got rather than being special-cased', () => {
     const { capabilities } = harnessDefinition('opencode');
-    // `/tui/append-prompt` exists but drives the terminal UI, not a headless
-    // run, so typing into a live OpenCode run is not offered.
+    // Typing into a live run is not wired, so it is not offered.
     expect(capabilities.remoteControl).toBe(false);
     expect(supportsHarnessOperation('opencode', 'attachInput')).toBe(false);
     expect(capabilities.nativeReview).toBe(false);
     expect(capabilities.claudeEffort).toBe(false);
     expect(harnessFor('opencode').effortLevels()).toEqual({ supported: false, engine: 'opencode', capability: 'effortLevels' });
-    // And the ones it does have, each measured against the real server.
-    expect(capabilities.nativeCommands).toBe(true);   // GET /command, POST /session/:id/command
-    expect(capabilities.fork).toBe(true);             // POST /session/:id/fork
+    // Its commands and its fork are advertised over ACP and not wired, so they say no rather than half work.
+    expect(capabilities.nativeCommands).toBe(false);
+    expect(capabilities.fork).toBe(false);
   });
 
   it('is registered without being offered to anybody', () => {
@@ -88,8 +87,12 @@ describe('adding OpenCode touched no existing engine branch', () => {
   });
 
   it('lives in its own files, and the shared list is data only', () => {
-    for (const file of ['main/harnesses/opencode.mts', 'main/opencode.mts', 'main/opencode-server.mts']) {
+    // Its own file is the two things ACP does not carry; the rest is the adapter every ACP harness shares.
+    for (const file of ['main/harnesses/opencode.mts', 'main/harnesses/acp.mts', 'main/acp-worker.mts', 'main/acp-readers.mts']) {
       expect(fs.existsSync(path.join(root, file)), `${file} is missing`).toBe(true);
+    }
+    for (const file of ['main/harnesses/acp.mts', 'main/acp-worker.mts', 'main/acp-readers.mts', 'main/acp.mts']) {
+      expect(read(file), `${file} names one tool`).not.toMatch(/['"]opencode['"]|openCode[A-Z]/);
     }
     // The renderer-safe definitions file must stay free of processes, keys and
     // transports, which is the promise written at the top of it.
@@ -104,9 +107,9 @@ describe('adding OpenCode touched no existing engine branch', () => {
     // denied. Measured 2026-10-07: without it, `opencode run` AUTO-REJECTS
     // instead ("permission requested: bash (...); auto-rejecting"), so the CLI
     // can only approve everything or refuse everything. Neither is a card,
-    // which is why the harness drives the server and why this flag must never
-    // appear anywhere in it.
-    for (const file of ['main/harnesses/opencode.mts', 'main/opencode.mts', 'main/opencode-server.mts']) {
+    // which is why the harness drives `opencode acp` and why this flag must
+    // never appear anywhere in it.
+    for (const file of ['main/harnesses/opencode.mts', 'main/harnesses/acp.mts', 'main/acp-worker.mts']) {
       const source = read(file);
       const code = source.split('\n').filter(line => !/^\s*(\/\/|\*|\/\*)/.test(line)).join('\n');
       expect(code, `${file} passes --auto`).not.toMatch(/--auto\b/);

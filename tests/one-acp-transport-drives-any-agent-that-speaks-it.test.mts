@@ -136,6 +136,43 @@ describe('one transport for every agent that speaks ACP', () => {
     await vi.waitFor(() => expect(child.sent.filter(m => m.id === 10).length).toBe(1)); // and not twice
   });
 
+  // A prompt stays open for the whole turn. Under the two-minute deadline every
+  // other request has, a long refactor would be cancelled with nothing in the logs.
+  it('gives a turn no deadline of its own, while every other request keeps one', async () => {
+    const child = fakeAgent();
+    const client = createAcpClient({ transport: child, requestTimeoutMs: 30 });
+    const turn = client.prompt({ sessionId: 's-1', text: 'a long refactor' });
+    await expect(client.newSession({ cwd: '/tmp/task' })).rejects.toThrow(/session\/new did not answer within 30ms/);
+    await new Promise((r) => setTimeout(r, 60));
+    child.reply(child.lastCall('session/prompt').id, { stopReason: 'end_turn' });
+    expect(await turn).toEqual({ stopReason: 'end_turn' });
+  });
+
+  it('ends an open turn when the agent goes away, so nothing waits on it for ever', async () => {
+    const child = fakeAgent();
+    const client = createAcpClient({ transport: child });
+    const turn = client.prompt({ sessionId: 's-1', text: 'do the thing' });
+    child.emit('exit', 3);
+    await expect(turn).rejects.toThrow(/exited with code 3/);
+  });
+
+  // Codex's cards dropped their fifteen-minute clock because the deny it sent
+  // could not be told from the person's own. The same holds here.
+  it('lets a question stand until it is answered, with no clock that refuses for the person', async () => {
+    vi.useFakeTimers();
+    try {
+      const child = fakeAgent();
+      let answer: (optionId: string) => void = () => {};
+      createAcpClient({ transport: child, onPermission: () => new Promise((resolve) => { answer = resolve; }) });
+      child.say({ jsonrpc: '2.0', id: 7, method: 'session/request_permission', params: { sessionId: 's-1', options: [{ optionId: 'once', kind: 'allow_once' }, { optionId: 'no', kind: 'reject_once' }] } });
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60_000);
+      expect(child.sent.find((m) => m.id === 7)).toBeUndefined();
+      answer('once');
+      await vi.advanceTimersByTimeAsync(1);
+      expect(child.sent.find((m) => m.id === 7)?.result).toEqual({ outcome: { outcome: 'selected', optionId: 'once' } });
+    } finally { vi.useRealTimers(); }
+  });
+
   it('refuses a door it never opened instead of going quiet', async () => {
     const child = fakeAgent();
     createAcpClient({ transport: child });
