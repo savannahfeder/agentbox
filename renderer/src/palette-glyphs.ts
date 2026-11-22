@@ -3,6 +3,8 @@
 // wears the menu's own drawing, path for path. Paths only, so this file stays
 // plain TypeScript and Palette.tsx draws them.
 
+import type { ThreadStateWord } from './types';
+
 const circle = (cx: number, cy: number, r: number) => `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
 const box = (x: number, y: number, w: number, h: number, r = 2) =>
   `M${x + r} ${y}h${w - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${h - 2 * r}a${r} ${r} 0 0 1 ${-r} ${r}h${-(w - 2 * r)}a${r} ${r} 0 0 1 ${-r} ${-r}v${-(h - 2 * r)}a${r} ${r} 0 0 1 ${r} ${-r}z`;
@@ -75,6 +77,10 @@ export const ICONS = {
   'priority-high': ['M6 19v-3M10.5 19v-6.5M15 19v-10'],
   'priority-urgent': ['M6 19v-3M10.5 19v-6.5M15 19v-10M19.5 19v-14'],
   chevron: ['m9 6 6 6-6 6'],
+  // An active thread, Needs you or In progress: the app's nine dots, drawn tiny
+  // so they sit as lightly as Done's tick. Later is a snooze's zᶻ.
+  live: [9, 13, 17].flatMap((y) => [8, 12, 16].map((x) => circle(x, y, 0.45))),
+  zz: ['M6 12.5h5l-5 5h5', 'M14 8.5h4l-4 4h4'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type IconName = keyof typeof ICONS;
@@ -182,7 +188,12 @@ const BY_PREFIX: [string, IconName][] = [
   ['wait-', 'wait'],
 ];
 
-export function iconFor(row: { id: string; label: string }): IconName {
+// Three kinds, not four: done, active and Later.
+// Not the Go to rows' tray, circled play and clock, which read as large and round beside the tick.
+const LIST_ICON: Record<ThreadStateWord, IconName> = { waiting: 'live', running: 'live', scheduled: 'zz', done: 'done' };
+
+export function iconFor(row: { id: string; label: string; state?: ThreadStateWord }): IconName {
+  if (row.state) return LIST_ICON[row.state];
   // One id for both directions, so the label says which way it goes.
   if (row.id === 'pause') return /^unpause/i.test(row.label) ? 'play' : 'pause';
   if (row.id.startsWith('teammate-pause-') && /^resume/i.test(row.label)) return 'play';
