@@ -1341,6 +1341,8 @@ export class Supervisor {
   declare count: ((name: string, props?: Record<string, unknown>) => void) | undefined;
   declare idleMs: (() => number | null | undefined) | undefined;
   declare stalls: { take(): Record<string, unknown> | undefined; longestNow?(): number } | undefined;
+  /** The app's own memory and CPU (main/own-use.mts); the desktop sets it. */
+  declare ownUse: (() => unknown) | undefined;
   declare hostRuns: boolean | undefined;
   declare shareTools: boolean | undefined;
   declare spareFolders: boolean | undefined;
@@ -1891,6 +1893,7 @@ export class Supervisor {
     this._memoryLog ??= new MemoryLog({
       dir: path.join(this.userDir, 'memory-log'),
       facts: () => ({ running: this._load(), capacity: this._capacity(), holding: this.startHoldStatus().holding, ...this.stalls?.take() }),
+      own: () => this.ownUse?.() ?? null,
     });
     this._memoryLogTimer = setInterval(() => this._memoryLog!.tick(), 60_000);
     this._memoryLogTimer.unref?.();
