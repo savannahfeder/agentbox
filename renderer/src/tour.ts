@@ -145,6 +145,10 @@ export function closesThread(e: { key: string; metaKey?: boolean; ctrlKey?: bool
   return thread && !e.metaKey && !e.ctrlKey && !e.altKey && /^e$/i.test(e.key);
 }
 
+/** Off the walkthrough's pages: on one it has no tip for (`elsewhere`), or on a real thread while its tips are still about the practice one. */
+export const awayFromWalk = (t: Tour | null, at: { elsewhere: boolean; thread: boolean; practiceThread: boolean }): boolean =>
+  tourLive(t) && (at.elsewhere || (at.thread && !at.practiceThread && !!t!.practice?.item && !t!.done.includes('close')));
+
 /** The suggestions, in every New thread box until the tutorial is over or skipped. */
 export const showIdeas = (t: Tour | null): boolean => !!t && !t.skipped && !(t.done.includes('close') && t.done.includes('palette'));
 /** Before the first send: the box asks for a folder, and the empty inbox says to give a first task. */

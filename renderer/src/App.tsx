@@ -188,7 +188,7 @@ import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, FIRST_RUN_LABEL, firstRunDone, firstRunNeeded, projectsOfTheirOwn, restartFirstRun,
   finishFirstRun, TASK_BODY, TASK_TITLE, practiceDraftLeft, whyNotMade, replyWritten,
@@ -6673,6 +6673,14 @@ export default function App() {
   // opened from Needs you lands back on the Chats screen with another reply box.
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setOpenCard(null); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setChatsPlace(null); setHomeOpen(false); };
 
+  // THE WALKTHROUGH'S WAY BACK, from a page it has no tip on to where its last tip stood.
+  const walkAway = awayFromWalk(tour, { elsewhere: settingsOpen || teamShown || filesShown || connectionsShown || teammatesShown || roomShown || chatsPlaceShown || search !== null, thread: !!focused, practiceThread: !!focused && focused.id === tourPractice?.item });
+  const walkSpot = useRef<{ view: View; home: boolean; item: WorkItem | null } | null>(null);
+  useEffect(() => {
+    if (tourNow && !walkAway) walkSpot.current = { view, home: homeOpen, item: focused };
+  }, [tourNow, walkAway, view, homeOpen, focused]);
+  const backToWalk = () => { const s = walkSpot.current; openView(s?.view ?? 'inbox'); if (!s || s.home) setHomeOpen(true); if (s?.item) setFocused(s.item); };
+
   // BACK AND FORWARD, on every computer. Above the early returns below, because
   // it is a hook; `homeShown` is worked out again here for the same reason.
   const backForwardOn = !onPhone();
@@ -8856,7 +8864,7 @@ export default function App() {
           if (homeOn) setHomeOpen(true);
         }}
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
-      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
+      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} away={walkAway} onBack={backToWalk} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
       {finishing && <TourFinished covered={settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
       {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
         answering={practiceAnswering}

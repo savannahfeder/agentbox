@@ -10,10 +10,12 @@ import './start-team.css';
 
 const plus = <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>;
 
-export function StartTeam({ me, multiplayer, onStarted }: { me: Person | null; multiplayer?: boolean | null; onStarted?: () => void }) {
+export function StartTeam({ me, multiplayer, onStarted, left = false }: { me: Person | null; multiplayer?: boolean | null; onStarted?: () => void;
+  /** In Settings › Team's column, lined up with the page's other rows. */
+  left?: boolean }) {
   const letIn = multiplayer !== false;
   return (
-    <div className="st-empty">
+    <div className={`st-empty${left ? ' st-left' : ''}`}>
       <div className="st-seats">
         <Face person={me} me size={40} />
         <span className="st-seat" aria-hidden="true">{plus}</span>
