@@ -6,7 +6,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, View } from '../types';
 import { commandKeys } from '../palette-keys';
 import { keptPick, nameRank, namesIt, pointerMoved, titleFirst } from '../palette-pick';
-import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
+import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches, walkRows } from '../palette-rows';
 import { ICONS, iconFor } from '../palette-glyphs';
 import { markedWords } from '../found-inside';
 import { ago } from '../format';
@@ -409,7 +409,9 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     },
 
   ], [itemCommands, batch, projects, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, cloud, onCloudMode]);
-  return open ? <PaletteBox commands={commands} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
+  // The walkthrough's ⌘K is a short list, with the rest a word away.
+  const drawn = useMemo(() => (onEndTutorial ? walkRows(commands) : commands), [onEndTutorial, commands]);
+  return open ? <PaletteBox commands={drawn} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 
 /** How many threads the box lists under the commands before "See all". */

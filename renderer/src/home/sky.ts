@@ -73,7 +73,7 @@ const LIGHT_SKIES: Sky[] = [
   // The website's hero (design w-9687db6270/light-theme-1-mountains-home). The frame stays near grey: a warm one read as tinted.
   { id: 'mountains', name: 'Light orange mountains', dark: false, frame: '#f3f2f0', art: {
     ...light({ core: [238, 96, 24], hot: [250, 170, 110], halo: [236, 160, 120], ember: [200, 80, 28] }, []),
-    mountains: { inks: ORANGE_RANGES, alpha: 0.44, lift: 0.62 }, foot: '#fbfaf8', birds: [238, 96, 24] } },
+    mountains: { inks: ORANGE_RANGES, alpha: 0.44, lift: 1.06, quiet: { x: 0.5, y: 0.7, rx: 0.3, ry: 0.17 } }, foot: '#fbfaf8', birds: [238, 96, 24] } },
   { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },

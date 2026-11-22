@@ -9,6 +9,9 @@ html:root[data-tour-frame][data-theme="light"] body { background: var(--tf-groun
   border-radius: 14px; overflow: hidden;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 10%, transparent), 0 20px 60px rgba(0, 0, 0, .18); }
 
+/* A dialog belongs to the app's card, so it is centred on it and its scrim keeps to its corners. */
+:root[data-tour-frame] .modal-backdrop { top: 12px; right: 12px; bottom: 12px; left: calc(var(--tf-w) + 12px); border-radius: 14px; }
+
 .tour-frame { position: fixed; left: 0; top: 0; bottom: 0; width: var(--tf-w); z-index: 40; box-sizing: border-box;
   background: var(--bg); border-right: 1px solid color-mix(in srgb, var(--text) 8%, transparent); color: var(--text);
   -webkit-app-region: drag; font-family: 'Geist', 'Avenir Next', -apple-system, BlinkMacSystemFont, 'DejaVu Sans', sans-serif; }

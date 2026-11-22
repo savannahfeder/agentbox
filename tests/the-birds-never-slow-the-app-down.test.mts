@@ -12,7 +12,7 @@
 // while the computer is struggling.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { MAX_BIRDS, flockWaits, lateness, seedBirds, stepBirds } from '../renderer/src/home/birds.ts';
+import { MAX_BIRDS, flockWaits, lateness, perches, seedBirds, stepBirds } from '../renderer/src/home/birds.ts';
 
 const src = fs.readFileSync(new URL('../renderer/src/home/birds.ts', import.meta.url), 'utf8');
 const seeded = (seed: number) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
@@ -109,5 +109,46 @@ describe('at ten updates a second', () => {
       }
     }
     expect(inWords / seen).toBeLessThan(0.05);
+  });
+});
+
+describe('how they are spread', () => {
+  // The founder, 2026-11-22: "The birds are often scattered and cluttered in their own area, near each other."
+  it('flies apart rather than in a knot', () => {
+    const birds = seedBirds(4, world, seeded(21));
+    const near: number[] = [];
+    const rnd = seeded(31);
+    for (let i = 0; i < 900; i++) {
+      for (let k = 0; k < 3; k++) stepBirds(birds, 0.08 / 3, world, rnd);
+      if (i > 150) for (const b of birds) near.push(Math.min(...birds.filter((o) => o !== b).map((o) => Math.hypot(b.x - o.x, b.y - o.y))));
+    }
+    expect(near.reduce((a, b) => a + b, 0) / near.length).toBeGreaterThan(200);
+  });
+  it('turns at the card\'s edges rather than half leaving it', () => {
+    const birds = seedBirds(4, world, seeded(41));
+    const rnd = seeded(51);
+    for (let i = 0; i < 1500; i++) {
+      for (let k = 0; k < 3; k++) stepBirds(birds, 0.08 / 3, world, rnd);
+      for (const b of birds) { expect(b.x).toBeGreaterThan(0); expect(b.x).toBeLessThan(world.W); }
+    }
+  });
+  it('perches evenly, clear of the words, while the setup or the walkthrough is on', () => {
+    for (const w of [world, { ...world, W: 1010, H: 1126, top: 70, bottom: 430, avoid: { x: 120, y: 300, w: 700, h: 260 } }]) {
+      const spots = perches(4, w);
+      expect(spots).toHaveLength(4);
+      const xs = spots.map((s) => s.x).sort((a, b) => a - b);
+      for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThan(w.W * 0.12);
+      for (const s of spots) {
+        expect(s.y).toBeGreaterThanOrEqual(w.top - 5);
+        expect(s.y).toBeLessThanOrEqual(w.bottom + 5);
+        const inside = s.x > w.avoid.x && s.x < w.avoid.x + w.avoid.w && s.y > w.avoid.y && s.y < w.avoid.y + w.avoid.h;
+        expect(inside).toBe(false);
+      }
+    }
+  });
+  it('does not move while the setup or the walkthrough is on, and flies again after', () => {
+    expect(src).toMatch(/dataset\.setup/);
+    expect(src).toMatch(/dataset\.tourFrame/);
+    expect(src).toMatch(/MutationObserver/);
   });
 });

@@ -8,16 +8,18 @@ type Box = { x: number; y: number; w: number; h: number };
 /** The card in px; the birds keep between `top` and `bottom`, and out of `avoid`. */
 export type BirdSky = { W: number; H: number; top: number; bottom: number; avoid: Box | null; pointer: { x: number; y: number } | null };
 
-const CRUISE = 45, FLEE_R = 150, MARGIN = 30;
+const CRUISE = 45, FLEE_R = 150, MARGIN = 30, APART = 420, EDGE = 60;
 
 const outside = (x: number, y: number, box: Box | null, pad = 0) => !box || x < box.x - pad || x > box.x + box.w + pad || y < box.y - pad || y > box.y + box.h + pad;
 
 export function seedBirds(n: number, sky: BirdSky, rnd: () => number = Math.random): Bird[] {
   const birds: Bird[] = [];
   for (let i = 0; i < n; i++) {
-    let x = 0, y = 0;
+    // Set off from an even spread, a little off it.
+    const spot = perches(n, sky)[i];
+    let x = spot.x, y = spot.y;
     for (let tries = 0; tries < 50; tries++) {
-      x = rnd() * sky.W; y = sky.top + rnd() * Math.max(1, sky.bottom - sky.top);
+      x = spot.x + (rnd() - 0.5) * 120; y = Math.min(sky.bottom, Math.max(sky.top, spot.y + (rnd() - 0.5) * 80));
       if (outside(x, y, sky.avoid, MARGIN)) break;
     }
     const a = rnd() * Math.PI * 2;
@@ -26,19 +28,33 @@ export function seedBirds(n: number, sky: BirdSky, rnd: () => number = Math.rand
   return birds;
 }
 
+/** Where `n` birds sit still: evenly across the sky, at different heights, clear of the words. */
+export function perches(n: number, sky: BirdSky): { x: number; y: number }[] {
+  const spots: { x: number; y: number }[] = [];
+  const heights = [0.5, 0.12, 0.22, 0.62];
+  for (let i = 0; i < n; i++) {
+    const x = sky.W * ((i + 0.5) / n);
+    let y = sky.top + (sky.bottom - sky.top) * heights[i % heights.length];
+    const box = sky.avoid;
+    // Over the words it sits above them.
+    if (box && !outside(x, y, box, MARGIN)) y = Math.max(sky.top, box.y - MARGIN);
+    spots.push({ x, y });
+  }
+  return spots;
+}
+
 export function stepBirds(birds: Bird[], dt: number, sky: BirdSky, rnd: () => number = Math.random) {
-  let cx = 0, cy = 0;
-  for (const b of birds) { cx += b.x; cy += b.y; }
-  cx /= birds.length || 1; cy /= birds.length || 1;
   for (const b of birds) {
     b.h += (rnd() - 0.5) * 2.4 * dt;
     let ax = (Math.cos(b.h) * CRUISE - b.vx) * 0.8, ay = (Math.sin(b.h) * CRUISE * 0.35 - b.vy) * 0.8;
-    ax += (cx - b.x) * 0.02; ay += (cy - b.y) * 0.02;
+    // They keep a sky's width apart rather than flocking: near each other they read as clutter.
     for (const o of birds) {
       if (o === b) continue;
       const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy);
-      if (d > 0 && d < 40) { ax += (dx / d) * 120; ay += (dy / d) * 120; }
+      if (d > 0 && d < APART) { const f = 1 - d / APART; ax += (dx / d) * 110 * f; ay += (dy / d) * 40 * f; }
     }
+    // They turn at the card's edges: one half off the edge reads as a mistake.
+    if (b.x < EDGE) { ax += (EDGE - b.x) * 6; b.h = 0; } else if (b.x > sky.W - EDGE) { ax -= (b.x - (sky.W - EDGE)) * 6; b.h = Math.PI; }
     if (b.y < sky.top) ay += (sky.top - b.y) * 3;
     if (b.y > sky.bottom) ay -= (b.y - sky.bottom) * 3;
     const box = sky.avoid;
@@ -67,7 +83,6 @@ export function stepBirds(birds: Bird[], dt: number, sky: BirdSky, rnd: () => nu
     const sp = Math.hypot(b.vx, b.vy), max = 60 + 220 * b.fear;
     if (sp > max) { b.vx *= max / sp; b.vy *= max / sp; }
     b.x += b.vx * dt; b.y += b.vy * dt;
-    if (b.x < -b.s * 2) b.x = sky.W + b.s; else if (b.x > sky.W + b.s * 2) b.x = -b.s;
     b.fear = Math.max(0, b.fear - dt * 0.8);
     b.ph += (6 + 14 * b.fear) * dt;
   }
@@ -159,6 +174,11 @@ function sprite(ink: Rgb, pitch: number): string {
   return url;
 }
 
+/** Somebody is being shown round: the setup, or the walkthrough beside the app. Birds there sit still. */
+const beingShownRound = () => document.documentElement.dataset.setup !== undefined || document.documentElement.dataset.tourFrame !== undefined;
+/** Wings, for birds sitting still: level, up, down, level. */
+const SITTING = [0, Math.PI / 2, -Math.PI / 2, 0];
+
 const FRAMES = [-Math.PI / 2, 0, Math.PI / 2];
 /** Which of the sprite's wing positions a bird shows now. */
 export const wingFrame = (b: Bird): number => (Math.sin(b.ph) > 0.35 ? 2 : Math.sin(b.ph) < -0.35 ? 0 : 1);
@@ -222,7 +242,7 @@ export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sk
   };
   const tick = () => {
     timer = 0;
-    if (gone || document.hidden || !document.hasFocus()) { last = 0; return; }
+    if (gone || document.hidden || !document.hasFocus() || beingShownRound()) { last = 0; return; }
     const now = performance.now();
     if (last) late = lateness(late, now - last);
     last = now;
@@ -235,8 +255,15 @@ export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sk
     timer = window.setTimeout(tick, TICK_MS);
   };
   const go = () => { if (!timer && !resting && !gone) { last = 0; timer = window.setTimeout(tick, TICK_MS); } };
+  const perch = () => {
+    if (!birds.length && !hatch()) return;
+    if (!look()) return;
+    perches(birds.length, world()).forEach((spot, i) => { birds[i].x = spot.x; birds[i].y = spot.y; birds[i].ph = SITTING[i % SITTING.length]; });
+    put();
+  };
   const start = () => {
     if (gone || resting || document.hidden) return;
+    if (beingShownRound()) { halt(); perch(); return; }
     if (!birds.length && !hatch()) return;
     put();
     if (!still) go();
@@ -251,20 +278,25 @@ export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sk
     if (!timer && !resting && !gone && birds.length) go();
   };
   const onBusy = () => { lastInput = performance.now(); busyUntil = lastInput + BUSY_MS; if (!timer) start(); };
-  const onResize = () => { looked = 0; };
+  const onResize = () => { looked = 0; if (beingShownRound()) perch(); };
+  const shown = new MutationObserver(() => start());
+  const resized = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null;
 
   const ready = window.setTimeout(() => {
     start();
     if (still) return;
+    shown.observe(document.documentElement, { attributes: true, attributeFilter: ['data-setup', 'data-tour-frame'] });
     window.addEventListener('blur', onBlur); window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('pointermove', onMove, { passive: true });
     window.addEventListener('keydown', onBusy, { passive: true, capture: true });
     window.addEventListener('wheel', onBusy, { passive: true, capture: true });
     window.addEventListener('resize', onResize);
+    resized?.observe(layer);
   }, 600);
   return () => {
     gone = true;
+    shown.disconnect(); resized?.disconnect();
     clearTimeout(ready); clearTimeout(timer);
     window.removeEventListener('blur', onBlur); window.removeEventListener('focus', onFocus);
     document.removeEventListener('visibilitychange', onVisible);

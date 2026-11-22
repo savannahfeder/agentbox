@@ -117,6 +117,15 @@ export function pageRows({ team }: { team: boolean }): PageRow[] {
   ];
 }
 
+/** What a newcomer's first ⌘K lists: the things the walkthrough is about, and the way out of it. */
+const WALK_ROWS = ['new-thread', 'view-home', 'view-inbox', 'view-progress', 'end-tutorial'];
+
+/** The walkthrough's list: those rows in that order, and everything else a word away. */
+export function walkRows<T extends { id: string; unlisted?: boolean }>(rows: readonly T[]): T[] {
+  const listed = WALK_ROWS.flatMap((id) => rows.filter((r) => r.id === id));
+  return [...listed, ...rows.filter((r) => !WALK_ROWS.includes(r.id)).map((r) => ({ ...r, unlisted: true }))];
+}
+
 // Then a row whose name starts with what was typed: "go to" is Go to Inbox,
 // not a row that matched because "logo" holds "go".
 export function rankMatches<T extends { id: string; label?: string }>(query: string, rows: T[]): T[] {
