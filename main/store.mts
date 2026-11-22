@@ -38,6 +38,7 @@ import {
 import { buildClaimLine, buildReleaseLine, GIVEN_TASK, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mts';
+import { shipClosesIt, shippedButOpen } from '../shared/ship-closes-its-thread.mts';
 import { notShipped } from '../shared/not-shipped.mts';
 import { asksForGitHubSignIn, SHIPPING_AGAIN } from '../shared/github-push-sign-in.mts';
 import { cleanSignInAnswer, openSignIn } from '../shared/sign-in-ask.mts';
@@ -700,7 +701,21 @@ export class Store {
   shipped(slug: string, id: string, { sha, labels }: { sha: string | null; labels: string[] }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    return workItemsDisk.updateWorkItem(dir, id, { labels, note: shippedNote(sha) }, { source: 'system' });
+    const closes = shipClosesIt(this.readItem(slug, id));
+    return workItemsDisk.updateWorkItem(dir, id, { labels, note: shippedNote(sha), ...(closes ? { status: 'done' } : {}) }, { source: 'system' });
+  }
+
+  /** Closes threads shipped before a ship closed its thread, by the same rule. How many it closed. */
+  closeShippedThreads(now = Date.now()): number {
+    let closed = 0;
+    for (const item of this.listItems(now)) {
+      if (!shippedButOpen(item)) continue;
+      const dir = this.productDir(item.product);
+      if (!dir) continue;
+      this.modules.workItemsDisk.updateWorkItem(dir, item.id, { status: 'done', note: item.note }, { source: 'system', now });
+      closed++;
+    }
+    return closed;
   }
 
   shipFailed(slug: string, id: string, { note, labels }: { note: string; labels: string[] }) {
