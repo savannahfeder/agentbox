@@ -83,11 +83,11 @@ for (const name of ['.mcp.json', '.codex/config.toml', '.claude/settings.json', 
 }
 
 it('carries work in a project whose own main already has a .mcp.json the commits leave alone', async () => {
-  for (const repo of [mine, theirs]) {
-    put(path.join(repo, '.mcp.json'), '{"mcpServers":{}}\n');
-    git(repo, 'add', '.');
-    git(repo, 'commit', '-q', '-m', 'Our servers');
-  }
+  put(path.join(mine, '.mcp.json'), '{"mcpServers":{}}\n');
+  git(mine, 'add', '.');
+  git(mine, 'commit', '-q', '-m', 'Our servers');
+  // One shared main: committing it in each copy apart made two commits whenever a second ticked between them.
+  git(theirs, 'pull', '-q', '--ff-only', mine, 'main');
   aHandOver({ 'health.js': 'export const ok = true;\n' });
   expect((await startIt()).started).toBe(true);
 });
