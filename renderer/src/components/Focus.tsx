@@ -320,7 +320,7 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
         className="inline-image-open"
         data-copy-file={/^https?:/.test(path) ? undefined : path}
         data-picture={path}
-        title={path}
+        title={shownName(path)}
         onClick={(e) => onOpen(path, e.currentTarget)}
       >{named(path, picture)}</button>
     )
@@ -511,7 +511,7 @@ function CarriedNote({ src, always = false }: { src: string; always?: boolean })
     return () => { live = false; if (timer) clearTimeout(timer); };
   }, [direct, product, src, looks]);
   const said = carryLine(carry);
-  if (!direct || !said) return always && !direct ? <span className="missing-artifact">{src}</span> : null;
+  if (!direct || !said) return always && !direct ? <span className="missing-artifact">{shownName(src)}</span> : null;
   if (always) return said.state === 'failed'
     ? <PictureTile name={shownName(src)} why={said.label} />
     : <span className="inline-image arriving" aria-hidden="true" />;
