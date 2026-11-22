@@ -2687,8 +2687,11 @@ body {
 /* One card in front, the queue as stacked edges peeking above it. The ghosts
    are pure chrome: depth without height, so ten pending asks occupy the same
    screen as one. */
-/* Extra scroll room belongs after the inbox, never inside an opened thread. */
-.app.asking .list-pane:not(.pinned)::after {
+/* The card floats over everything, so scroll room goes only after a list that
+   scrolls. A thread, chat or page that fills its pane would be squeezed by the
+   room, or slide up by it. */
+.app.asking .body:not(.tm-body) > .list-pane:not(.pinned, .rm-open, .tq-open, .pl-open)::after,
+.app.asking .team-page::after {
   content: ''; display: block;
   height: calc(var(--approval-room, 149px) + 16px);
 }

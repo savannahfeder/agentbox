@@ -70,7 +70,7 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askIGave, askIsOpen, askOnMe, asksOnThread, handedBackBy, newestAskPerThread, sentAwayByMe } from '../../shared/thread-asks.mts';
+import { askIGave, askIsOpen, askOf, askOnMe, asksOnThread, handedBackBy, newestAskPerThread, sentAwayByMe, withoutAskLead } from '../../shared/thread-asks.mts';
 import { ASK_PERSON_EVENT, HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -247,7 +247,7 @@ import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shar
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
 import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
-import { isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
+import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, type InsideGroup, type InsideGroupKey, type InsideRow } from './found-inside';
 import { revealLine } from './reveal-line';
@@ -255,7 +255,7 @@ import { FoundInside } from './components/FoundInside';
 import type { PlaceAct } from './threads/ThreadMenu';
 import { SignInPage } from './team/SignInPage';
 import { SIGN_IN_TO_SHARE, ShareLink, canShareFile } from './components/ShareLink';
-import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, taskHandedFrom, handedTo as handedToPage, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
+import { DEFAULT_DISPLAY, rowPriorityId, sentAt as sentAtOf, boardColumns, boardSideways, boardWalk, readColumnOrder, writeColumnOrder, conversationSlugs, conversationWith, crumbTab, flipView, isDirect, nextTab, pageDisplay, pageFor, peopleInConversation, peopleToAdd, readDisplay, readPrivacy, rowSharing, whatAddPeopleDoes, writeDisplay, writePrivacy, keeps as keepsDisplay, overlayPins, overlayPlaces, dropWithPins, rankScore, sorted as sortedByDisplay, tabOfState, withLevelsForYou, taskHandedFrom, handedTo as handedToPage, type Display, type Privacy, type Unsaved, type UnsavedPins } from './threads/page-rules';
 import { inboxEveryone, mergeRows, needsWord, normalizePicked, othersInView, readPicked, teammateRows, writePicked } from './threads/people-rules';
 import { boardStops, leadStops, listStops, stepFromPlace, stepStop, stopKey, type PageStop, type Stop } from './threads/walk-rules';
 import { usePointerHold, useHeldOrder } from './threads/steady-rows';
@@ -785,6 +785,8 @@ export default function App() {
     // read, so they go on the card and the links come out of the words.
     if (isTaskRow(item)) {
       const from = item.createdBy ? seen?.byId.get(item.createdBy)?.name : null;
+      // As main's taskBrief does to the brief, so the two still match.
+      if (message?.text && askOf(item)) message = { ...message, text: withoutAskLead(message.text) };
       void api.teamTaskBrief({ product: item.product, id: item.id })
         .then((b) => {
           const { attachments, ...start } = taskHandOff({ from, brief: b, message: message ?? null, nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
@@ -1546,7 +1548,9 @@ export default function App() {
     return () => window.removeEventListener(UNDO_MARKS_EVENT, reread);
   }, []);
   const listed = useMemo(() => withoutWithdrawnSends(itemsWithOlder, undoMarks), [itemsWithOlder, undoMarks]);
-  const items = listed;
+  // What a teammate sent you reads one level higher, in every list (w-718af6d149).
+  const meOnTeam = snap?.alpha?.multiplayer !== false && snap?.team?.signedIn ? snap.team.me?.id ?? null : null;
+  const items = useMemo(() => withLevelsForYou(listed, snap?.products ?? [], meOnTeam), [listed, snap?.products, meOnTeam]);
 
   /* --------------------- her agents, as rows in her list ------------------- */
   // EVERY CLAUDE CODE AGENT ON HER MACHINE THAT AGENTBOX DID NOT START. They are
@@ -1718,7 +1722,7 @@ export default function App() {
   // (renderer/src/fleet.ts, w-ec2b04d449).
   const fleet = useMemo((): Fleet => ({
     sessions: new Map(runningRows.map((r) => [r.itemId, r])),
-    queued: queuedWithHeld(snap?.supervisor.queued, heldAnswer && pendingIds.has(heldAnswer) ? heldAnswer : null), remoteHeld: snap?.supervisor.remoteHeld, runNow: snap?.supervisor.runNow,
+    queued: queuedWithHeld(snap?.supervisor.queued, heldAnswer && pendingIds.has(heldAnswer) ? heldAnswer : null), settingUp: snap?.supervisor.settingUp, remoteHeld: snap?.supervisor.remoteHeld, runNow: snap?.supervisor.runNow,
     signInNeeded: snap?.supervisor.signInNeeded, atLimit: snap?.supervisor.atLimit, cannotStart: snap?.supervisor.cannotStart,
     shipping: snap?.supervisor.shipping, stalled: snap?.supervisor.stalled,
     silent: snap?.supervisor.silent, paused: snap?.supervisor.paused,
@@ -4336,11 +4340,11 @@ export default function App() {
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done', ...(unshippedOk ? { closeUnshipped: true } : {}) });
       for (const t of carried) await api.answer({ product: t.product, id: t.id, status: 'done' });
-      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => {
+      pushUndo({ label: `Reopened: ${clipToSentence(rowTitle(item), TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(rowTitle(item), TOAST_TITLE)}”`, brings: item, undid, run: async () => {
         await api.answer({ product: item.product, id: item.id, status: 'open', reopenAs: wasBeforeClose(item) });
         for (const t of carried) await api.answer({ product: t.product, id: t.id, status: 'open' });
       } });
-    }, `${DONE.verb}: ${clipToSentence(item.title, TOAST_TITLE)}`, undefined, stay, undefined, undid);
+    }, `${DONE.verb}: ${clipToSentence(rowTitle(item), TOAST_TITLE)}`, undefined, stay, undefined, undid);
   }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, showToast, pushUndo, nudgeOnStopped, waitingFiled, focused, markSeen, team, tour]);
 
   const reopenDone = useCallback(async (item: WorkItem) => {
@@ -5955,8 +5959,9 @@ export default function App() {
         // What is typed with no box under it goes in the box of the thread on
         // screen, and a key that closes things waits out a change of screen.
         const means = !e.defaultPrevented && !focused.agent
-          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc })
+          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc, sheetOpen: !!document.querySelector('.th-menu[role="dialog"]') })
           : 'shortcut';
+        if (means === 'the sheet') { e.preventDefault(); return; }
         if (means === 'to the box') {
           e.preventDefault();
           typeIntoTheBox(focused, e.key);
@@ -6722,6 +6727,10 @@ export default function App() {
       }
     },
   });
+  const threadName = (s: { product: string; id: string }): string => {
+    const thread = selectable.find((i) => i.id === s.id && i.product === s.product);
+    return thread ? rowTitle(thread) : 'the thread';
+  };
   const stopName = (s: TrailStop): string => s.at === 'home' ? 'Home'
     : s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
     : s.at === 'files' ? 'Files'
@@ -6731,7 +6740,7 @@ export default function App() {
     : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
     : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
     : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
-    : selectable.find((i) => i.id === s.id && i.product === s.product)?.title ?? 'the thread';
+    : threadName(s);
   useEffect(() => {
     if (!onPhone()) return;
     if (signInGate) {
@@ -7719,6 +7728,7 @@ export default function App() {
                   headerTarget={focused ? null : teamHeader} cornerTarget={focused ? null : teamCorner}
                   syncedAt={snap.team.lastSyncAt ?? null} onNotice={showToast} onOpenDoc={openTeammateFile} openAt={cardOpenAt}
                   ask={(askOnMe(items, team?.me ?? null, openCard.personId, openCard.threadId) as WorkItem | null)}
+                  helpedAt={(at) => helpedWhen(items, team?.me ?? null, openCard.personId, openCard.threadId, at)}
                   handedToYou={taskHandedFrom(items, openCard.threadId, openCard.personId) as WorkItem | null}
                   onOpenTask={(t) => { setOpenCard(null); setTeamOpen(false); setFocused(t); markSeen(t); }}
                   onHandBack={(verdict, words) => {
@@ -7822,7 +7832,6 @@ export default function App() {
                   giveTo={giveToFor(focused)}
                   onGive={(to, note) => { void giveThread(focused, to, note); }}
                   onAsk={team ? (to, kind, note, step) => { void askOnThread(focused, to, kind, note, step); } : undefined}
-                  asked={!!team && asksOnThread(items, team.me, focused.id).some((a) => a.open)}
                   asksCorner={team && !focused.ask ? <AsksChip item={focused} items={items} now={now} onTakeBack={(task) => { void takeAskBack(task); }} onMessage={(personId) => messageAbout(personId, rowTitle(focused))} /> : null}
                   shippedMark={shippedFor(focused)}
                   onShipped={(on) => { void markShipped(focused, on); }}

@@ -41,6 +41,8 @@ export interface MemoryLogOptions {
   readPressure?: () => Promise<PressureReading> | PressureReading;
   now?: () => number;
   facts?: () => Record<string, unknown> | null | undefined;
+  /** The app's own memory and CPU (main/own-use.mts), on every line. */
+  own?: () => unknown;
   keepDays?: number;
   footprints?: () => Promise<Map<number, number>> | Map<number, number>;
 }
@@ -169,6 +171,7 @@ export class MemoryLog {
   declare readPressure: NonNullable<MemoryLogOptions['readPressure']>;
   declare now: () => number;
   declare facts: NonNullable<MemoryLogOptions['facts']>;
+  declare own: MemoryLogOptions['own'];
   declare keepDays: number;
   declare footprints: NonNullable<MemoryLogOptions['footprints']>;
   declare _pruned: string | null;
@@ -177,11 +180,11 @@ export class MemoryLog {
 
   constructor({
     dir, appPid = process.pid, list = listProcesses, readPressure = readMacPressure,
-    now = Date.now, facts = () => ({}), keepDays = KEEP_DAYS,
+    now = Date.now, facts = () => ({}), own, keepDays = KEEP_DAYS,
     // Footprints are by pid of this Mac, so they only belong over its own listing.
     footprints = list === listProcesses ? readFootprints : () => new Map(),
   }: MemoryLogOptions) {
-    Object.assign(this, { dir, appPid, list, readPressure, now, facts, keepDays, footprints });
+    Object.assign(this, { dir, appPid, list, readPressure, now, facts, own, keepDays, footprints });
     this._pruned = null;
   }
 
@@ -208,6 +211,7 @@ export class MemoryLog {
         const procs = fp.size ? listed.map((p) => (fp.has(p.pid) ? { ...p, mb: fp.get(p.pid)! } : p)) : listed;
         line = { ...summarizeMemory(procs, { appPid: this.appPid, at, reading }), measure: fp.size ? 'footprint' : 'rss', ...facts };
       }
+      if (this.own) { try { line.own = this.own() ?? null; } catch { line.own = null; } }
       fs.mkdirSync(this.dir, { recursive: true });
       fs.appendFileSync(path.join(this.dir, `memory-${dayOf(at)}.jsonl`), `${JSON.stringify(line)}\n`);
       this._prune(at);
