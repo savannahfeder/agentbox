@@ -178,6 +178,44 @@ describe('one transport for every agent that speaks ACP', () => {
     }
   });
 
+  // Found by a second read of the code on 2026-11-22: whatever reads the
+  // agent's messages ran inside the pipe's own listener, so one message it
+  // could not take (a field of the wrong shape) threw out of that listener, an
+  // uncaught exception in the app's main process.
+  it('carries on when one message cannot be read by whoever is listening', async () => {
+    const child = fakeAgent();
+    const seen = [];
+    createAcpClient({ transport: child, onNotification: (_method, params) => { if (params.bad) throw Error('not the shape I expected'); seen.push(params); } });
+    expect(() => child.say({ jsonrpc: '2.0', method: 'session/update', params: { bad: true } })).not.toThrow();
+    child.say({ jsonrpc: '2.0', method: 'session/update', params: { good: 1 } });
+    expect(seen).toEqual([{ good: 1 }]);
+  });
+
+  // An agent that prints why and exits can have its exit seen before its last
+  // words: they are all in only once its pipes have closed.
+  it('waits for the agent\'s last words before it says the agent has gone', async () => {
+    const child = fakeAgent();
+    const client = createAcpClient({ transport: child });
+    let known = null;
+    const start = client.initialize().catch((error) => { known = `${error.message} | ${client.diagnostics()}`; });
+    child.emit('exit', 3);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(known).toBeNull();
+    child.stderr.emit('data', Buffer.from('this model is not on your plan\n'));
+    child.emit('close', 3);
+    await start;
+    expect(known).toMatch(/exited with code 3/);
+    expect(known).toContain('this model is not on your plan');
+  });
+
+  it('still says the agent has gone when its pipes never close, as something it started can hold them', async () => {
+    const child = fakeAgent();
+    const client = createAcpClient({ transport: child });
+    const start = client.initialize();
+    child.emit('exit', 3);
+    await expect(start).rejects.toThrow(/exited with code 3/);
+  });
+
   // Codex's cards dropped their fifteen-minute clock because the deny it sent
   // could not be told from the person's own. The same holds here.
   it('lets a question stand until it is answered, with no clock that refuses for the person', async () => {

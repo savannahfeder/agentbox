@@ -56,6 +56,7 @@ const REJECTIONS = Object.freeze(['reject_once', 'reject_always']);
 export const REQUEST_TIMEOUT_MS = 2 * 60_000;
 // A line that never ends is not a message, it is a leak.
 export const MAX_FRAME_LENGTH = 16 * 1024 * 1024;
+const EXIT_DRAIN_MS = 250;
 
 type RpcId = string | number;
 
@@ -100,7 +101,7 @@ interface AcpChild {
   } | null;
   stderr?: { on(event: 'data', listener: (chunk: Buffer | string) => void): unknown } | null;
   on?(event: 'error', listener: (error: Error) => void): unknown;
-  on?(event: 'exit', listener: (code: number | null) => void): unknown;
+  on?(event: 'exit' | 'close', listener: (code: number | null) => void): unknown;
   kill?(): unknown;
 }
 
@@ -271,7 +272,8 @@ export function createAcpClient({
       if (!line) continue;
       let message: unknown = null;
       try { message = JSON.parse(line); } catch { continue; } // a line we cannot read is not a reason to die
-      if (message && typeof message === 'object') handle(message as RpcMessage);
+      // Nor is one its reader cannot take: a throw here would leave this listener as an uncaught exception.
+      try { if (message && typeof message === 'object') handle(message as RpcMessage); } catch { continue; }
     }
     if (buffer.length > maxFrameLength) close(`A frame longer than ${maxFrameLength} bytes was too long to be a message`);
   }
@@ -298,7 +300,13 @@ export function createAcpClient({
     if (stderrText.length < stderrLimit) stderrText += chunk.toString().slice(0, stderrLimit - stderrText.length);
   });
   child.on?.('error', error => close(`The agent could not be run: ${error.message}`));
-  child.on?.('exit', code => close(gone ?? `The agent exited with code ${code}`));
+  // What the agent printed as it died is all in once its pipes close, which can be after its exit.
+  // Something it started can hold them open, so the wait is short.
+  child.on?.('exit', code => {
+    const say = () => close(gone ?? `The agent exited with code ${code}`);
+    const cap = setTimeout(say, EXIT_DRAIN_MS);
+    child.on?.('close', () => { clearTimeout(cap); say(); });
+  });
   // A write to an agent that has gone also fails as an `error` on the pipe, and one nobody hears ends the app.
   child.stdin.on?.('error', error => close(`Write failed: ${error.message}`));
 

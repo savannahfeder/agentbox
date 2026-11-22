@@ -76,6 +76,15 @@ export const modelOption = (options: readonly AcpConfigOption[] | null | undefin
 const STOP_GRACE_MS = 2_000;
 const STDERR_TAIL = 600;
 
+// A stopped turn is signalled only after its grace, and an app that quits stops
+// every worker and exits at once. Whatever is still here then is signalled as
+// the process goes, so no agent outlives the app.
+const running = new Set<{ kill(): unknown }>();
+export function endAgentsWithTheApp(): void {
+  for (const child of running) { try { child.kill(); } catch { /* already gone */ } }
+}
+process.once('exit', endAgentsWithTheApp);
+
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
 // A change to a file is the part of a tool call's content that carries a path and the new text.
 const changesIn = (content: ToolUpdate['content']) => (Array.isArray(content) ? content : [])
@@ -133,7 +142,7 @@ export function createAcpWorker({
   };
   const tool = (call: ToolUpdate, status: AcpTool['status']) => {
     const paths = status === 'completed' && ['edit', 'delete', 'move'].includes(call.kind ?? '')
-      ? [...new Set([...changesIn(call.content).map((c) => c.path), ...(call.locations ?? []).map((l) => text(l?.path)).filter(Boolean)])]
+      ? [...new Set([...changesIn(call.content).map((c) => c.path), ...(Array.isArray(call.locations) ? call.locations : []).map((l) => text(l?.path)).filter(Boolean)])]
       : [];
     sendOurs(ACP_TOOL, { id: call.toolCallId, kind: call.kind ?? 'other', detail: detailOf(call), status, paths });
   };
@@ -163,6 +172,8 @@ export function createAcpWorker({
 
   const child = start();
   worker.pid = child.pid;
+  running.add(child);
+  worker.once('exit', () => { running.delete(child); });
   const client = createAcpClient({
     transport: child as never,
     onNotification(method, params) {

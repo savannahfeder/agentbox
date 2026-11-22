@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createAcpWorker, approvalOf } from '../main/acp-worker.mts';
+import { createAcpWorker, approvalOf, endAgentsWithTheApp } from '../main/acp-worker.mts';
 import type { AcpApproval } from '../main/acp-worker.mts';
 import { captureAcpEvent, acpStreamingText, summarizeAcpEvent, traceAcpEvent, acpTookTheWords, ACP_SESSION, ACP_MESSAGE, ACP_TOOL, ACP_TURN } from '../main/acp-readers.mts';
 import type { AcpSession } from '../main/acp-readers.mts';
@@ -32,8 +32,9 @@ function turn(prompt: string, { env = {}, resume = null, model = null, ask = nul
   const stderr: string[] = [];
   const session: AcpSession = {};
   let spawnedBefore: number | null = null;
+  let agent: ReturnType<typeof spawn> | null = null;
   const worker = createAcpWorker({
-    start: () => spawn(process.execPath, [FAKE], { env: { ...process.env, FAKE_ACP_LOG: path.join(dir, 'log.jsonl'), FAKE_ACP_STATE: path.join(dir, 'state.json'), ...env }, stdio: ['pipe', 'pipe', 'pipe'] }),
+    start: () => (agent = spawn(process.execPath, [FAKE], { env: { ...process.env, FAKE_ACP_LOG: path.join(dir, 'log.jsonl'), FAKE_ACP_STATE: path.join(dir, 'state.json'), ...env }, stdio: ['pipe', 'pipe', 'pipe'] })),
     label: 'Fake', cwd: dir, prompt, resumeSessionId: resume, model, ask,
     mcpServers: [{ name: 'store', command: '/bin/store', args: ['--stdio'], env: [{ name: 'ZERO_ITEM', value: 'w-1' }] }],
     recordFile: (id) => path.join(dir, 'conversations', `${id}.jsonl`),
@@ -44,7 +45,7 @@ function turn(prompt: string, { env = {}, resume = null, model = null, ask = nul
   worker.stderr.on('data', (line: unknown) => stderr.push(String(line)));
   const exit = new Promise<{ code: number | null; signal: string | null }>((resolve) => worker.once('exit', (code, signal) => resolve({ code, signal })));
   const ours = (method: string) => events.filter(([m]) => m === method).map(([, p]) => p);
-  return { worker, events, stderr, session, exit, ours, spawned: () => spawnedBefore };
+  return { worker, events, stderr, session, exit, ours, spawned: () => spawnedBefore, child: () => agent };
 }
 const logged = () => fs.readFileSync(path.join(dir, 'log.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 const until = async (ok: () => boolean) => { for (let i = 0; i < 400 && !ok(); i += 1) await new Promise((r) => setTimeout(r, 10)); expect(ok()).toBe(true); };
@@ -193,6 +194,15 @@ describe('a start that cannot happen says why, and leaves no result', () => {
   });
 });
 
+describe('a tool call the agent describes off the spec', () => {
+  it('is read for what it does say, and the turn still ends with its answer', async () => {
+    const run = turn('FAKE:ODD');
+    expect(await run.exit).toEqual({ code: 0, signal: null });
+    expect(run.session).toMatchObject({ result: 'done', resultIsError: false });
+    expect(run.ours(ACP_TOOL).at(-1)).toMatchObject({ kind: 'edit', status: 'completed', paths: [] });
+  });
+});
+
 describe('a turn that does not end on its own', () => {
   it('is cancelled and ends as a stopped process when the worker is killed', async () => {
     const run = turn('FAKE:HANG');
@@ -201,6 +211,29 @@ describe('a turn that does not end on its own', () => {
     expect(await run.exit).toEqual({ code: 143, signal: 'SIGTERM' });
     expect(logged().some((l) => l.method === 'session/cancel')).toBe(true);
     expect(run.worker.kill()).toBe(false);
+  });
+
+  // Found by a second read of the code on 2026-11-22: a stopped turn gets two
+  // seconds to say it stopped before its agent is signalled, and the app
+  // stops every worker and exits in one go when it quits. An agent in those
+  // two seconds was never signalled, so it and its command lived on.
+  it('ends an agent still inside its stop when the app itself is going', async () => {
+    const run = turn('FAKE:HANG', { env: { FAKE_ACP_DEAF: '1' } });
+    await until(() => run.ours(ACP_TOOL).length > 0);
+    run.worker.kill();
+    const signalled = () => run.child()?.killed === true;
+    expect(signalled()).toBe(false);
+    endAgentsWithTheApp();
+    expect(signalled()).toBe(true);
+    expect(await run.exit).toEqual({ code: 143, signal: 'SIGTERM' });
+  });
+
+  it('leaves a finished run\'s agent off the list of ones to end with the app', async () => {
+    const run = turn('FAKE:SAY apple');
+    await run.exit;
+    const before = run.child()?.killed;
+    endAgentsWithTheApp();
+    expect(run.child()?.killed).toBe(before);
   });
 
   it('withdraws a question nobody answered when the worker is killed', async () => {

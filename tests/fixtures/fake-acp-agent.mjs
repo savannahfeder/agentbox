@@ -10,6 +10,7 @@
 //   FAKE:EDIT <path>       asks before changing a file, with the change
 //   FAKE:WRITE <path>      asks before making a new file, with its content
 //   FAKE:HANG              starts a command and never finishes it
+//   FAKE:ODD               finishes a tool call with fields of the wrong shape
 //   FAKE:DIE               exits in the middle of the turn
 //   FAKE:TOKENS            ends because the model ran out of room
 //   FAKE:RECALL            answers with the first word this conversation was told to say
@@ -17,7 +18,7 @@
 // FAKE_ACP_LOG names a file each request is appended to. FAKE_ACP_VERSION,
 // FAKE_ACP_NO_LOAD and FAKE_ACP_SIGNED_OUT change what it answers when a
 // session opens. FAKE_ACP_STATE names a file conversations are kept in, so a
-// second process can carry one on.
+// second process can carry one on. FAKE_ACP_DEAF makes it ignore a stop.
 import fs from 'node:fs';
 
 const log = (line) => { if (process.env.FAKE_ACP_LOG) fs.appendFileSync(process.env.FAKE_ACP_LOG, `${JSON.stringify(line)}\n`); };
@@ -85,6 +86,14 @@ function prompt(id, { sessionId, prompt: blocks }) {
 
   if (/FAKE:DIE\b/.test(words)) { say(sessionId, 'starting'); return setTimeout(() => process.exit(3), 20); }
   if (/FAKE:TOKENS\b/.test(words)) { say(sessionId, 'part of an answer'); return finish('max_tokens'); }
+  if (/FAKE:ODD\b/.test(words)) {
+    const toolCallId = `call_${calls += 1}`;
+    update(sessionId, { sessionUpdate: 'tool_call', toolCallId, name: 'edit', title: 'edit', kind: 'edit', status: 'pending', locations: [], rawInput: {} });
+    // Off the spec on purpose: both fields are lists everywhere else.
+    update(sessionId, { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed', kind: 'edit', title: 'notes.md', locations: {}, content: 'not a list' });
+    say(sessionId, 'done');
+    return finish('end_turn');
+  }
   if (/FAKE:HANG\b/.test(words)) {
     const toolCallId = `call_${calls += 1}`;
     update(sessionId, { sessionUpdate: 'tool_call', toolCallId, name: 'shell', title: 'shell', kind: 'execute', status: 'pending', locations: [], rawInput: {} });
@@ -144,6 +153,7 @@ function handle(message) {
   if (method === 'session/set_config_option') return send({ id, result: { configOptions: [{ ...MODELS, currentValue: params?.value }] } });
   if (method === 'session/prompt') return prompt(id, params);
   if (method === 'session/cancel') {
+    if (process.env.FAKE_ACP_DEAF) return;
     if (asked) asked = null;
     return finish('cancelled');
   }
