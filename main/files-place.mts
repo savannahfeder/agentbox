@@ -236,6 +236,22 @@ export function filesOf(threads: readonly PlaceThread[]): PlacedFile[] {
 }
 
 const COPY_PATH = /^sources\/[^/]+\/[^/]+$/;
+// A teammate's shared thread names its copy for the first 12 of its bytes' sha256 (main/team/thread-share.mts).
+const copiedHash = (c: ChainCopy): string | null => (c.thread.ref.kind === 'shared' ? /^attachments\/([0-9a-f]{12})-[^/]+$/.exec(c.path)?.[1] ?? null : null);
+
+/**
+ * The version a copy whose bytes are not here is: the one its copied name's
+ * hash names, else the one that names it. Two threads' report.md share one
+ * version whatever their bytes, so that version must not contradict the hash,
+ * and a hash two versions start with names neither.
+ */
+export function versionOfMissingCopy(chain: readonly LinedVersion[], c: ChainCopy): LinedVersion | null {
+  const sum = copiedHash(c);
+  const byHash = sum ? chain.filter((v) => v.hash?.startsWith(sum)) : [];
+  if (byHash.length > 1) return null;
+  const fits = (v: LinedVersion): boolean => !sum || !v.hash || v.hash.startsWith(sum);
+  return byHash[0] ?? chain.find((v) => !v.away && fits(v) && v.copies.some((x) => refKey(x.thread.ref) === refKey(c.thread.ref) && x.path === c.path)) ?? null;
+}
 const firsts = new WeakMap<FileFamily, number>();
 const firstAt = (fam: FileFamily): number => {
   if (!firsts.has(fam)) firsts.set(fam, Math.min(...fam.versions.map((v) => v.at || 0)));
@@ -705,10 +721,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     }
     return null;
   }
-  // A copy whose bytes are not here is the version that names it.
   const versionOfCopy = async (chain: readonly LinedVersion[], c: ChainCopy, products: ArtifactProduct[]): Promise<LinedVersion | null> => {
     const held = await versionHeld(chain, await copyHere(c, products));
-    return held === undefined ? chain.find((v) => !v.away && v.copies.some((x) => refKey(x.thread.ref) === refKey(c.thread.ref) && x.path === c.path)) ?? null : held;
+    return held === undefined ? versionOfMissingCopy(chain, c) : held;
   };
 
   const nameInRoom = (src: string): string => String(src).replace(/^\.?\/?attachments\//, '');

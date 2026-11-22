@@ -122,7 +122,7 @@ describe('the composer asks which engine the row runs on, once', () => {
   });
 
   it('reads that one answer from the mode rule and from the menu alike', () => {
-    expect(composer).toContain('const canSetMode = !item.agent;');
+    expect(composer).toContain('const canSetMode = !item.agent && ownControls;');
     expect(composer).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);');
   });
 
@@ -156,7 +156,7 @@ describe('every door into a permission mode goes through that one answer', () =>
   // gated twice, on purpose: `query` feeds nothing else, but a null query means
   // the menu cannot open even if somebody widens `slashRows` later.
   it('keeps external agent queries gated while allowing Codex commands', () => {
-    expect(composer).toContain('const toAgent = !item.agent && !talkTo?.length;');
+    expect(composer).toContain('const toAgent = !item.agent && !talkTo?.length && ownControls;');
     expect(composer).toContain('const query = toAgent ? slashQuery(text) : null;');
   });
 });
