@@ -26,7 +26,10 @@ export function AgentUpdates({children}:{children:ReactNode}){
   void check();const timer=setInterval(check,3600000);window.addEventListener('focus',check);
   return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',check);};
  },[]);
+ // An update starts only from a click here, and only a running one changes on its own.
+ const updating=Object.values(updates).some(u=>u.state==='running');
  useEffect(()=>{
+  if(!updating)return;
   let live=true;
   // An app slower than this clock must not gain a queue of status questions.
   let asking=false;
@@ -41,7 +44,7 @@ export function AgentUpdates({children}:{children:ReactNode}){
   };
   // Every second on a desktop; a phone pays per question (../phone-polls).
   const timer=setInterval(poll,pollEvery(1000,onPhone()));return()=>{live=false;clearInterval(timer);};
- },[]);
+ },[updating]);
  const start=async(engine:string)=>{
   setPanel(engine);
   if(updates[engine]?.state==='running'){setReady(true);return;}

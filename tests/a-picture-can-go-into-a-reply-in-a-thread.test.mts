@@ -159,7 +159,9 @@ describe('a new message to a person', () => {
   it('has an attach button beside Send', () => {
     const from = src.indexOf('{person ? (\n');
     const bar = src.slice(from, src.indexOf('\n        ) : (', from));
-    expect(bar).toMatch(/aria-label="Attach files"/);
+    // The paperclip every bar draws, Home's quiet one included.
+    expect(bar).toMatch(/\{clipButton\}\s*\{fileInput\}\s*\{sendSolo\}/);
+    expect(src).toMatch(/const clipButton = \(\s*<button[^>]*aria-label="Attach files"/);
   });
 });
 

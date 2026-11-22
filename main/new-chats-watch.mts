@@ -16,7 +16,7 @@ import type { HomesSupervisor } from './agent-homes.mts';
 import { outsideAgentsMode } from './settings.mts';
 import type { SettingsConfig } from './settings.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
-import { readCodexThreadsOffThread } from './codex-threads.mts';
+import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { readRecentThreads } from './importable-threads.mts';
 
 export const NEW_CHATS_POLL_MS = 60_000;

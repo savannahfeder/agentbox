@@ -9518,6 +9518,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .cloud-plan-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .cloud-counts { margin: 0; padding: 4px 0 0 18px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); user-select: text; -webkit-user-select: text; }
 .cloud-plans-say { margin: 14px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); user-select: text; -webkit-user-select: text; }
+.cloud-plans-terms { color: var(--text-dim); }
+.cloud-plans-terms a { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
 
 /* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }

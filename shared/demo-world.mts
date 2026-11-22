@@ -478,6 +478,97 @@ export interface DemoCard {
   task?: { from: DemoPerson; dueInDays: number }; blockedOn?: DemoPerson;
 }
 
+/**
+ * What a teammate's thread holds when you open it from the Standup or the Team
+ * page: their words to their agent, what it is about, and the agent's answer.
+ * Without it the page said "Priya's app has not shared these messages yet"
+ * (founder, on a call, 2026-11-21). A thread still running has no answer yet.
+ */
+export interface DemoThreadWords { ask: string; about: string; said?: string }
+
+export const DEMO_THREAD_WORDS: Record<string, DemoThreadWords> = {
+  'w-c3a1e09d42': {
+    ask: 'Rewrite the sync engine so a move over 20,000 files does not stall.',
+    about: 'Theo wanted large moves to stop stalling. The engine kept every file in one upload queue, which ran out of memory past 20,000 files.',
+  },
+  'w-c3b27f8e15': {
+    ask: 'When the connection drops for a second, a move fails outright. Make it try again.',
+    about: 'Theo wanted a move to survive a connection that drops for a moment, instead of failing on the first error.',
+    said: 'A move now tries a file three times before it gives up, and when it does it names the file. I dropped the connection 50 times during a 9,000 file move and it finished every time.',
+  },
+  'w-c3c84a1f06': {
+    ask: 'Shared folders lose who can edit what. Carry the permissions across.',
+    about: 'Theo wanted the people on a shared folder to keep the same access after a move.',
+    said: 'Owners, editors and viewers now carry across to Google Drive. I checked 120 shared folders after a test move and every person had the access they had in Dropbox.',
+  },
+  'w-c3d51b7e29': {
+    ask: 'Listing a big Dropbox takes six minutes before the move starts. Make it faster.',
+    about: 'Theo wanted a shorter wait before a move starts on a large Dropbox.',
+    said: 'A 100,000 file Dropbox now lists in 40 seconds instead of 6 minutes. It asks Dropbox for 8 folders at a time, which stays under its rate limit.',
+  },
+  'w-c3e95a2b70': {
+    ask: 'Jamie asked for old file dates to survive on shared drives. Carry them through the new engine.',
+    about: 'Jamie gave Theo this task. Files moved to shared drives arrive with today\'s date instead of their real one.',
+  },
+  'w-b2c4d0a873': {
+    ask: 'Draw the three sign-up screens in light and dark, and send Jamie the words to approve.',
+    about: 'Priya wanted the sign-up screens drawn and their words approved before her agent builds them.',
+    said: 'The three sign-up screens are drawn in light and dark. I sent Jamie the words to approve, and I will build the screens as soon as they say yes.',
+  },
+  'w-b2d91e6c50': {
+    ask: 'Draw what the move list shows when there is nothing in it yet, for each of the six cases.',
+    about: 'Priya wanted the move list to say something useful when it is empty, in each of the six ways it can be.',
+  },
+  'w-b2e3f7a915': {
+    ask: 'Make the pricing page work in dark mode.',
+    about: 'Priya wanted the pricing page to read properly for people whose computer is set to dark.',
+    said: 'The pricing page now follows dark mode. I checked it on a phone and a laptop, and every price and button keeps its contrast.',
+  },
+  'w-b2f60c4d18': {
+    ask: 'Rewrite every error message in plain words, each saying what to do next.',
+    about: 'Priya wanted the error messages to stop reading like code and to tell people what to do.',
+    said: 'All 23 error messages are rewritten. Each says what went wrong in one sentence and what to do next, such as "Dropbox stopped answering. Shuttle will try again in a minute."',
+  },
+  'w-b2a78e3f51': {
+    ask: 'Show a progress bar on every move, with the files moved and the time left.',
+    about: 'Priya wanted people to see how far a move has got and how long is left.',
+    said: 'Every move now shows a progress bar with the files moved and the time left. The estimate settles in the first minute and stays within 10% after that.',
+  },
+  'w-b2c07d5e94': {
+    ask: 'Lena needs four screenshots for the launch email. Take them from the new sign-up screens.',
+    about: 'Lena gave Priya this task for the launch email. It was due yesterday, and two of the four are taken.',
+  },
+  'w-d4e8a2f617': {
+    ask: 'Write the launch email for all 4,000 trial users and send it to Jamie to read.',
+    about: 'Lena wanted the launch email written for every trial user, and read by Jamie before it goes out.',
+    said: 'The launch email is written for all 4,000 trial users and sent to Jamie to read. It goes out tomorrow morning.',
+  },
+  'w-d4b37e0c84': {
+    ask: 'Write the five welcome emails a new team gets in its first two weeks.',
+    about: 'Lena wanted a new team to hear from Shuttle at the right moments in its first two weeks.',
+  },
+  'w-d4e61f9a03': {
+    ask: 'Draft the pricing page for the per-seat plan.',
+    about: 'Lena wanted the pricing page ready for the new plan. It waits on Jamie choosing the price.',
+    said: 'Both versions of the pricing page are drafted, one at $8 a seat and one at $99 a team. It waits on Jamie choosing the price.',
+  },
+  'w-d4f05c1b98': {
+    ask: 'Write a page comparing Shuttle with moving files by hand.',
+    about: 'Lena wanted a page showing what Shuttle saves over moving files by hand.',
+    said: 'The comparison page is live and linked from the pricing page.',
+  },
+  'w-d4a96e3c27': {
+    ask: 'Write to the trial teams that signed up and never started a move.',
+    about: 'Lena wanted to reach the trial teams that signed up but never moved a file.',
+    said: '212 teams got a two line note with a link straight to their first move. 31 of them have started one since.',
+  },
+  'w-d4c19a6b02': {
+    ask: 'Write up the first team that moved, for the site.',
+    about: 'Lena wanted a short story about the first team to move with Shuttle, for the site.',
+    said: 'The story is up. 14 people moved 18,000 files and were done by lunch, and their lead says nothing went missing.',
+  },
+};
+
 /** The end of the day `days` from today, local time, which is when a task due that day is late. */
 export function endOfDayIn(now: number, days: number): number {
   const d = new Date(now);
@@ -504,7 +595,7 @@ export function demoCards(now: number = Date.now()): DemoCard[] {
     { by: PRIYA, threadId: 'w-b2a78e3f51', project: 'Shuttle', title: 'A progress bar for every move', state: 'done', updatedAt: done - 4 * HR, shippedAt: done - 4 * HR, progress: 'Shows files moved and time left' },
     { by: LENA, threadId: 'w-d4e8a2f617', project: 'Website', title: 'Launch email for the trial users', state: 'done', updatedAt: done - 1.3 * HR, progress: 'For all 4,000 trial users\nSent to Jamie to read' },
     { by: LENA, threadId: 'w-d4b37e0c84', project: 'Website', title: 'Welcome emails for new teams', state: 'running', updatedAt: now - 6 * MIN, progress: 'Three of the five emails written' },
-    // The team's tasks, for the Tasks page: one late, one blocked on you, one ahead.
+    // The team's tasks: one late, one blocked on you, one ahead.
     { by: PRIYA, threadId: 'w-b2c07d5e94', project: 'Website', title: 'Screenshots for the launch email', state: 'running', updatedAt: now - 50 * MIN, progress: 'Two of the four taken', task: { from: LENA, dueInDays: -1 } },
     { by: LENA, threadId: 'w-d4e61f9a03', project: 'Website', title: 'Pricing page for the per-seat plan', state: 'waiting', updatedAt: now - 1.4 * HR, progress: 'Drafted both versions\nWaiting on the price from Jamie', task: { from: DEMO_ME, dueInDays: 1 }, blockedOn: DEMO_ME },
     { by: THEO, threadId: 'w-c3e95a2b70', project: 'Shuttle', title: 'Dates on shared drives', state: 'running', updatedAt: now - 30 * MIN, progress: 'Old dates carried through the new engine\nTesting on 40 shared drives', task: { from: DEMO_ME, dueInDays: 3 } },

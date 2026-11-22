@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { claudeDataDirs } from './agent-homes.mts';
-import { howTheChatEnded } from '../shared/agent-import.mts';
+import { FIRST_CHARS, SAID_CHARS, howTheChatEnded } from '../shared/agent-import.mts';
 
 export interface ImportThread {
   id: string;
@@ -105,10 +105,6 @@ const FIRST_TURN_BYTES = 8 * 1024 * 1024;
 
 /** How much of a transcript's end is read for its title and last reply. */
 const TAIL_BYTES = 256 * 1024;
-/** The longest last reply kept, from its end, which is where the answer is. */
-const SAID_CHARS = 8000;
-/** The longest first prompt kept for an imported row's opening message. */
-const FIRST_CHARS = 4000;
 
 /** A cap on how many threads are kept, so opening the card is not a disk
  *  crawl. It caps reading, never looking: the terminal walk stats every file

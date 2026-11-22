@@ -16,7 +16,6 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { foundLine, installGate, setupWord, signedOutEngines } from '../renderer/src/first-run.ts';
-import * as classic from '../renderer/src/first-run-classic.ts';
 
 const CODEX_SIGNED_OUT = [{ engine: 'claude', found: false, signedIn: false }, { engine: 'codex', found: true, signedIn: false }];
 const NOTHING = [{ engine: 'claude', found: false, signedIn: false }, { engine: 'codex', found: false, signedIn: false }];
@@ -65,12 +64,7 @@ describe('while a sign-in waits on the browser', () => {
     expect(installGate({ engine: 'codex', phase: 'idle' }, ['codex']).running).toBe(false);
   });
 
-  it('is the same rule in both first runs', () => {
-    expect(classic.installGate).toBe(installGate);
-    expect(classic.setupWord).toBe(setupWord);
-  });
-
-  for (const file of ['FirstRun.tsx', 'FirstRunClassic.tsx']) {
+  for (const file of ['FirstRun.tsx']) {
     const src = fs.readFileSync(new URL(`../renderer/src/components/${file}`, import.meta.url), 'utf8');
     it(`${file} draws Back and Open the page again, and they reach main`, () => {
       expect(src).toContain("api.engineSetup('cancel', setup.engine)");

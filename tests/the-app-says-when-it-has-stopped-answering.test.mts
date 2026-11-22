@@ -79,7 +79,7 @@ describe('the three screens say it', () => {
   });
 
   it('the send, which otherwise closes the card and goes quiet', () => {
-    const sending = app.slice(app.indexOf('onSending={walkCard'), app.indexOf('onSent={async'));
+    const sending = app.slice(app.indexOf('onSending={(how) => {'), app.indexOf('onSent={async'));
     expect(sending).toMatch(/waitingOnSend\.current = window\.setTimeout\(\(\) => showToast\(SEND_NOT_TAKEN\), NOT_ANSWERING_MS\)/);
     // And stops saying it the moment the send lands, either way.
     expect(app).toMatch(/onFailed=\{\(said, back\) => \{\n\s*doneSending\(\);/);

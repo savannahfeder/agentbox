@@ -13,7 +13,7 @@
 // client's page cannot reach the buttons, so there they follow the system's
 // light or dark. The Mac and Linux keep `hiddenInset` exactly.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -112,6 +112,26 @@ describe('the windows the app makes', () => {
     expect(read('main/main.mts')).toContain("ipcMain.handle('zero:window-buttons', (_e, payload) => { tintWindowButtons(window, process.platform, payload?.dark); });");
     expect(read('main/serve.mts')).toContain("ipcMain.handle('zero:window-buttons', () => null);");
     expect(read('renderer/src/App.tsx')).toContain('useEffect(() => { if (WINDOWS) window.zero?.windowButtons?.({ dark: darkWindow }); }, [darkWindow]);');
+  });
+});
+
+// The tests above read App.tsx as text, so they still pass when the WINDOWS it
+// imports from this-keyboard.ts is gone.
+describe('the page that tints them', () => {
+  it.each([['Win32', true], ['MacIntel', false], ['Linux x86_64', false], ['iPhone', false]])('knows it is on Windows from a navigator that says %s', async (platform, windows) => {
+    vi.resetModules();
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('navigator', { platform, userAgent: '' });
+    try {
+      expect((await import('../renderer/src/this-keyboard.ts')).WINDOWS).toBe(windows);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
+  });
+
+  it('is not on Windows when there is no window', async () => {
+    expect((await import('../renderer/src/this-keyboard.ts')).WINDOWS).toBe(false);
   });
 });
 
