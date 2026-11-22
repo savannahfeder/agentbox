@@ -48,7 +48,9 @@ function aHandOver(files: Record<string, string>, { from = 'main', root = false 
   if (root) git(theirs, 'checkout', '-q', '--orphan', 'agentbox/w-their01');
   else git(theirs, 'checkout', '-q', '-b', 'agentbox/w-their01', from);
   for (const [name, text] of Object.entries(files)) put(path.join(theirs, name), text);
-  git(theirs, 'add', '-A');
+  // Forced: a crafted bundle carries a file whatever anyone's ignore rules say,
+  // and a Mac's own git often ignores .claude/settings.local.json everywhere.
+  git(theirs, 'add', '-f', '--', ...Object.keys(files));
   git(theirs, 'commit', '-q', '-m', 'Their work');
   const tip = git(theirs, 'rev-parse', 'HEAD');
   const file = path.join(tmp, 'b.bundle');
