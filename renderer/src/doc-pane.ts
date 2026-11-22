@@ -70,8 +70,8 @@ export function opensInPane(path: string | undefined | null): boolean {
  * above it; when no root matches it keeps the last three segments, which is
  * enough to say which file this is without printing a disk layout.
  */
-// A thread's own folder is named by its id, which means nothing on screen.
-const THREAD_FOLDER = /^w-[0-9a-f]{10}$/;
+// A thread's own folder is named by its id, which means nothing on screen, and so is a teammate's thread's copy.
+const THREAD_FOLDER = /^(?:w-[0-9a-f]{10}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 const withoutThreadIds = (parts: string[]) => parts.filter((p, i) => i === parts.length - 1 || !THREAD_FOLDER.test(p));
 
 export function crumbParts(fullPath: string, roots: string[] = []): string[] {
