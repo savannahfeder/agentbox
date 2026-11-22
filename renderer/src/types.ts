@@ -994,6 +994,8 @@ export interface SupervisorStatus {
   queued?: string[];
   // Of those, the ones being set up or asked for by name, which count as In progress.
   starting?: string[];
+  // Of those, only the ones whose folder is being made now.
+  settingUp?: string[];
   // Sessions this app holds open between Remote Control turns, which `running` leaves out.
   remoteHeld?: string[];
   // With the cloud on Everything, why a thread runs locally or waits (Supervisor#status).
