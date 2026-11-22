@@ -29,7 +29,7 @@ export interface RunItem {
   start?: string;
   createdAt?: number;
   updatedAt?: number;
-  wrote?: Partial<Record<'note' | 'result' | 'answer' | 'status' | 'start' | 'labels', Written>>;
+  wrote?: Partial<Record<'note' | 'result' | 'answer' | 'status' | 'start' | 'labels' | 'body', Written>>;
 }
 
 export type DutyEvery = 'day' | 'weekday' | 'week';
@@ -763,6 +763,13 @@ export function isQueued(item: { status?: string; start?: string } | null | unde
   return item?.status === 'open' && item?.start === 'later';
 }
 
+// The order a teammate's queue lets runs out: your own words first, then the
+// teammate's own rounds and hand-offs, oldest first within each.
+export function queueOrder(a: RunItem, b: RunItem): number {
+  const yours = (i: RunItem) => (i.wrote?.body?.source === 'founder' ? 0 : 1);
+  return yours(a) - yours(b) || (a.createdAt ?? 0) - (b.createdAt ?? 0);
+}
+
 // Running or about to: one at a time per teammate, so this is what the queue
 // waits behind.
 export function isActiveRun(item: RunItem | null | undefined): boolean {
@@ -1226,7 +1233,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
 
   for (const t of live) {
     if (t.paused || active(t)) continue;
-    const next = runsOf(t.id, items).filter(isQueued).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))[0];
+    const next = runsOf(t.id, items).filter(isQueued).sort(queueOrder)[0];
     if (next) actions.push({ type: 'release', teammate: t.id, item: next.id, product: next.product });
   }
 
@@ -1330,7 +1337,7 @@ export function statusOf(teammate: { id: string; paused?: boolean }, items: read
   const runs = runsOf(teammate.id, items);
   const waiting = runs.filter(waitingOnYou).map((i) => ({ id: i.id, product: i.product, title: i.label || i.title }));
   const running = runs.find((i) => isActiveRun(i));
-  const next = runs.filter(isQueued).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0)).map((i) => ({ id: i.id, product: i.product, title: i.label || i.title }));
+  const next = runs.filter(isQueued).sort(queueOrder).map((i) => ({ id: i.id, product: i.product, title: i.label || i.title }));
   const queued = next.length;
   const today = startOfDay(now);
   const done = runs
