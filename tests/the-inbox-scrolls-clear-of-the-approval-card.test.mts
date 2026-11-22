@@ -13,7 +13,7 @@ const app = read('renderer/src/App.tsx');
 const room = read('renderer/src/room-for-the-card.ts');
 
 describe('the inbox while an approval is waiting', () => {
-  const rule = css.match(/\n\.app\.asking \.list-pane:not\(\.pinned\)::after \{[^}]*\}/)?.[0] ?? '';
+  const rule = css.match(/\n\.app\.asking \.body:not\(\.tm-body\) > \.list-pane:not\([^)]*\)::after,\n\.app\.asking \.team-page::after \{[^}]*\}/)?.[0] ?? '';
 
   it('adds scrollable room after the inbox without resizing its content', () => {
     expect(rule).toMatch(/content:\s*''/);
