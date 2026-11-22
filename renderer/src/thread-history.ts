@@ -27,6 +27,7 @@ import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { handBackReadBy } from '../../shared/thread-asks.mts';
+import { Name } from '../../shared/product-name.mjs';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
@@ -509,7 +510,10 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     }
 
     if (words(patch.note)) {
-      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', says: 'progress', ...(ranNow() ? { ran: ranNow() } : {}) });
+      // The app's own news on the row is signed as the app's, never with the
+      // model the agent runs on (tests/the-apps-own-note-is-never-signed-as-the-agents).
+      const signed = line.source === 'system' ? { from: Name } : ranNow() ? { ran: ranNow() } : {};
+      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', says: 'progress', ...signed });
       continue;
     }
 

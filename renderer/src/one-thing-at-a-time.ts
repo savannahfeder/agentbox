@@ -6,6 +6,7 @@ import type { AgentEvent, AgentTurn } from './types';
 import type { ItemOutcome } from './item-thread';
 import { optionsFrom } from './format';
 import { instructionOf } from '../../shared/repeats.mts';
+import { notShipped, type NotedItem } from '../../shared/not-shipped.mts';
 import { rowTitle } from './list-rules';
 
 export interface Spot { pos: number; total: number; index: number }
@@ -36,8 +37,15 @@ export function stepIn<T extends Keyed>(rows: T[], item: Keyed, dir: 1 | -1): T 
 const said = (e: AgentEvent): e is AgentTurn & { kind?: undefined } => e.kind !== 'work';
 
 /** A note the app wrote on the row (the ship queue's "Shipped to main as …"), not an answer to lead with. */
-export function appWrote(outcome: ItemOutcome | null, wrote?: Record<string, { source: string } | undefined>): boolean {
+export function appWrote(outcome: ItemOutcome | null, wrote?: Record<string, { source?: string } | undefined>): boolean {
   return !!outcome && outcome.field === 'note' && wrote?.note?.source === 'system';
+}
+
+/** How the newest answer is drawn at the foot of a thread: the app's own note as its quiet line, a ship that failed as Not shipped, anything else as the agent's. */
+export function footOf(outcome: ItemOutcome | null, item: NotedItem): 'app' | 'unshipped' | 'agent' | null {
+  if (!outcome) return null;
+  if (outcome.field === 'note' && notShipped(item)) return 'unshipped';
+  return appWrote(outcome, item.wrote) ? 'app' : 'agent';
 }
 
 /** The newest answer: the one lifted to the foot, or else the last thing said that was not yours. */
