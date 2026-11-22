@@ -31,7 +31,7 @@ import type { AttachmentFile, SavedAttachment } from '../save-attachments.mts';
 import type { PersonStatus } from '../../shared/team-status.mts';
 import { GIVEN_TASK, WORK_THREAD, isTaskRow, isWorkThread, teamPeopleShown } from '../../shared/team-rules.mts';
 import { referencedFiles } from '../../shared/referenced-files.mts';
-import { shortTitle } from '../../shared/thread-title.mts';
+import { shortTitle, shownTitle } from '../../shared/thread-title.mts';
 import { taskTitle } from '../../shared/team-tasks.mts';
 import { doneSteps, firstSentence } from '../../shared/thread-cards.mts';
 import { openTo, seenNow, sentWords, threadLink } from '../../shared/thread-link.mts';
@@ -553,11 +553,18 @@ export function createTeamService({
     // The receiver reads it as a person's message, drawn as typed, where bold marks show as marks.
     const unbold = (s: string) => s.replace(/\*\*([^*\n]+)\*\*/g, '$1');
     const tried = doneSteps(row.progress);
-    const words = [
+    // The receiver has none of these threads, so an id would draw as "Unavailable thread".
+    const titled = (s: string) => s.replace(THREAD_ID, (_m, branch: string | undefined, id: string) => {
+      const found = store.listItems().find((i) => i.id === id.toLowerCase());
+      const name = found ? shownTitle(found) : '';
+      if (branch) return name ? `the branch for ${name}` : 'another branch';
+      return name || 'another thread';
+    });
+    const words = titled([
       brief,
       tried.length ? `What the agent already tried:\n\n${tried.map((t) => `- ${unbold(t)}`).join('\n')}` : '',
       row.result ? `Where it got to:\n\n${unbold(row.result)}` : '',
-    ].filter(Boolean).join('\n\n');
+    ].filter(Boolean).join('\n\n'));
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];
     const tooBig: string[] = [];
@@ -1718,6 +1725,8 @@ export function createTeamService({
 }
 
 const MAX_FILES_HANDED_ON = 20;
+// A thread's id or branch in prose, as renderer/src/ticket-references.ts finds it; not inside a path or a link.
+const THREAD_ID = /(?<![\w/.:@-])(agentbox\/)?(w-[a-f0-9]{10})(?:-[a-z0-9]+(?:-[a-z0-9]+)*)?(?![\w/-]|\.[a-z0-9])/gi;
 // The link a move leaves under a message, which a second move does not carry.
 const MOVED_NOTE = /^Moved to a new thread: \[[^\]]*\]\(w-[0-9a-f]{10}\)$/;
 
