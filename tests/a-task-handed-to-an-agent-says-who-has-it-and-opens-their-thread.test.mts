@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { taskHandOff, handedFromLabel } from '../renderer/src/threads/composer-rules';
-import { agentOnTask, agentOnTaskWord, teamTasks } from '../renderer/src/team/tasks';
+import { agentOnTask, agentOnTaskWord } from '../renderer/src/team/tasks';
 
 const brief = { body: 'Fix LUM-50: Cancel does not give the seat back.', files: [] };
 const task = { id: 'w-task', product: 'dm-maya', status: 'open', title: 'Fix LUM-50', labels: ['given-task'], assignee: 'dev', createdBy: 'maya', people: ['maya', 'dev'], updatedAt: 10 };
@@ -64,15 +64,8 @@ describe('who has it', () => {
     expect(agentOnTask([task, thread({ labels: [handedFromLabel('dm-maya', 'w-other')] })], task, mates)).toBe(null);
     expect(agentOnTask([task, thread({ labels: [handedFromLabel('dm-maya', 'w-task-2')] })], task, mates)).toBe(null);
   });
-  it('the Tasks row carries it', () => {
-    const products = [{ slug: 'dm-maya', team: { direct: true, people: ['maya', 'dev'] } }];
-    const g = teamTasks({ items: [task, thread()], products, cards: [], me: 'dev', now: 100, nameOf: (id) => id, mates });
-    expect(g.open[0].agent?.item.id).toBe('w-agent');
-  });
-  it('the row and the task page draw it', () => {
-    const page = fs.readFileSync(new URL('../renderer/src/team/TasksPage.tsx', import.meta.url), 'utf8');
+  it('the task page draws it', () => {
     const focus = fs.readFileSync(new URL('../renderer/src/team/TeamFocus.tsx', import.meta.url), 'utf8');
-    expect(page).toContain('{agentOnTaskWord(r.agent)}');
     expect(focus).toContain('{agentOnTaskWord(on)}');
   });
 });

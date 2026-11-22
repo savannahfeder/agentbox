@@ -28,7 +28,7 @@ describe('with no sky picked', () => {
 describe('a choice somebody made', () => {
   it('keeps the sky they picked, dark or light', () => {
     expect(shownSkyId('dusk', true)).toBe('dusk');
-    expect(shownSkyId('dusk-light', false)).toBe('dusk-light');
+    expect(shownSkyId('sage', false)).toBe('sage');
   });
   it('keeps plain Light, Dark or Match system plain', () => {
     expect(shownSkyId(PLAIN, true)).toBeNull();

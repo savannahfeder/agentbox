@@ -122,8 +122,8 @@ describe('the app closes the card on the hand-over, not on the answer', () => {
   const at = app.indexOf('<ThreadComposer');
   const wiring = app.slice(at, app.indexOf("/>, modal === 'compose' ? null : clearSlot)}", at));
 
-  it('closes it and says Sending in onSending, except in the tutorial, which waits as before', () => {
-    expect(wiring).toMatch(/onSending=\{walkCard \? undefined : /);
+  it('closes it and says Sending in onSending', () => {
+    expect(wiring).toMatch(/onSending=\{\(how\) => \{/);
     const sending = wiring.slice(wiring.indexOf('onSending='));
     expect(sending).toMatch(/setModal\(null\)/);
     expect(sending).toMatch(/showToast\(sendingLine\(/);
@@ -131,10 +131,8 @@ describe('the app closes the card on the hand-over, not on the answer', () => {
 
   it('the answer arriving does not close whatever she opened since', () => {
     const sent = wiring.slice(wiring.indexOf('onSent='));
-    // The one close left in onSent is the tutorial's, whose card is still up.
-    expect(sent).toMatch(/if \(walkCard\) \{ setComposeInitial\(null\); setModal\(null\); \}/);
-    expect(sent.match(/setModal\(null\)/g)).toHaveLength(1);
-    expect(sent.match(/setComposeInitial\(null\)/g)).toHaveLength(1);
+    // The card closed on Send (onSending); nothing in onSent closes anything.
+    expect(sent.slice(0, sent.indexOf('onFailed='))).not.toMatch(/setModal\(null\)|setComposeInitial\(null\)/);
   });
 
   it('puts the made row in the list before the snapshot comes back', () => {

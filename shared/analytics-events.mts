@@ -50,14 +50,21 @@ export const EVENTS: Record<string, string> = {
   // never started an agent, and nothing said which of a dozen checks held it
   // (tests/a-start-that-is-turned-away-is-counted-and-said.test.mts).
   run_waiting: 'An agent could not start yet',
+  // HOW HEAVY IT IS ON THE MACS OF THE PEOPLE USING IT (2026-11-22), which
+  // only the person's own Mac could say until now
+  // (tests/each-install-says-once-a-day-how-heavy-the-app-was.test.mts).
+  app_health: 'How heavy the app was on a day',
+  // Sent as it happens, since somebody stuck in setup may never open the app
+  // again (tests/a-freeze-during-setup-or-an-import-is-counted-at-once.test.mts).
+  app_froze: 'The app froze during setup or an import',
 };
 
 export const EVENT_NAMES: string[] = Object.keys(EVENTS);
 
-// THE ONLY PROPERTIES A CALLER MAY ATTACH, and every one of them is a number or
-// a boolean. A string is refused outright rather than scrubbed, because a
-// scrubbed string is a promise about a regular expression and this is a promise
-// about a type. The version pair is set by the sender itself (`main/analytics
+// THE ONLY PROPERTIES A CALLER MAY ATTACH. Each is a number, a boolean or a
+// word from a closed list, except `freezeWhere`, which must be a place in the
+// app's own code (`appCode`). Any other string is refused outright rather than
+// scrubbed. The version pair is set by the sender itself (`main/analytics
 // .mjs`), never by a caller, which is why it is not in here.
 export const ALLOWED_PROPS: Set<string> = new Set([
   'seconds',        // how long something took, rounded
@@ -68,10 +75,47 @@ export const ALLOWED_PROPS: Set<string> = new Set([
   'practice',       // whether it happened in setup's practice project
   'engine',         // -> ENGINES below, which coding agent ran
   'reason',         // -> WAIT_REASONS below, why an agent could not start yet
+  // `app_health`'s nine, all numbers (main/health-day.mts).
+  'appMb',          // the most memory the app's own processes used
+  'mainMb',         // the most its main process used
+  'idleCpu',        // its average CPU, % of one core, while no agent ran
+  'busyCpu',        // the same while one did
+  'wakeups',        // how often a second it woke the Mac while idle
+  'freezes',        // how many times its main thread held for half a second or more
+  'freezeSeconds',  // the longest of those
+  'tightMinutes',   // minutes the Mac was short of memory
+  'hours',          // hours it was open
+  // And when and how it got heavy, said by time since it opened, never the hour.
+  'peakHours',      // how long it had been open when its memory peaked
+  'peakAgents',     // how many agents were running then
+  'peakPart',       // -> PARTS below, which part of the app held the most
+  'mainMbPerHour',  // how fast main grew over the longest stretch it stayed open
+  'cpuPeak',        // its busiest minute, % of one core
+  'cpuPeakPart',    // -> PARTS below, which part was busiest then
+  'freezeWhere',    // the app's own function that held the longest freeze, as `appCode` allows
+  'freezeHours',    // how long it had been open then
+  'freezeAgents',   // how many agents were running then
+  // `app_froze`'s, beside `seconds`, `count` (setup's step) and `freezeWhere`.
+  'during',         // -> DURING below, setup or an import
+  'heldPart',       // -> PARTS below, the main process or a window
 ]);
 
-// `kind`, `engine` and `reason` are the properties that are not numbers, so each is a
-// closed list. A value outside it is dropped, not passed through.
+// The parts of the app main/own-use.mts measures.
+export const PARTS: Set<string> = new Set(['main', 'windows', 'gpu', 'helpers']);
+export const DURING: Set<string> = new Set(['setup', 'import']);
+
+/**
+ * A function in the app's own code, as main/freeze-recorder.mts names it:
+ * its name and its file and line under the app's own folders. A frame from
+ * anywhere else is written `…/a/b.js` there, and so never matches.
+ */
+export function appCode(where: unknown): where is string {
+  return typeof where === 'string' && where.length <= 120 && !where.includes('..')
+    && /^(\(anonymous\)|[A-Za-z_$][\w$]*) (main|shared|mcp|bin)\/[\w./-]+\.(mts|mjs|cjs|js|ts):\d+$/.test(where);
+}
+
+// `kind`, `engine`, `reason`, `during` and the parts are closed lists. A value
+// outside one is dropped, not passed through.
 export const KINDS: Set<string> = new Set(['task', 'question', 'review', 'directive', 'agent', 'digest']);
 export const ENGINES: Set<string> = new Set(['claude', 'codex']);
 export const WAIT_REASONS: Set<string> = new Set([
@@ -96,6 +140,18 @@ export function sanitize(name: string, props: Record<string, unknown> | null = {
     }
     if (key === 'reason') {
       if (typeof value === 'string' && WAIT_REASONS.has(value)) out.reason = value;
+      continue;
+    }
+    if (key === 'peakPart' || key === 'cpuPeakPart' || key === 'heldPart') {
+      if (typeof value === 'string' && PARTS.has(value)) out[key] = value;
+      continue;
+    }
+    if (key === 'during') {
+      if (typeof value === 'string' && DURING.has(value)) out.during = value;
+      continue;
+    }
+    if (key === 'freezeWhere') {
+      if (appCode(value)) out.freezeWhere = value;
       continue;
     }
     if (typeof value === 'number' && Number.isFinite(value)) out[key] = value;

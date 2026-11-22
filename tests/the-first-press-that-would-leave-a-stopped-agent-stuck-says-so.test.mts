@@ -57,7 +57,7 @@ const busy = { id: 'agent:72', product: '', agent: { status: 'busy', waitingFor:
 // a reply would wait behind that box, so this row is not the lesson.
 const atAPrompt = { id: 'agent:73', product: '', agent: { status: 'waiting', waitingFor: 'permission prompt' } };
 
-const hold = (rows, over = {}) => holdForStoppedAgent({ rows, key: 'E', warned: false, walking: false, ...over });
+const hold = (rows, over = {}) => holdForStoppedAgent({ rows, key: 'E', warned: false, ...over });
 
 describe('which rows are an agent stopped, waiting on you', () => {
   it('a live offer is one, because the screen is showing the answers it wants', () => {
@@ -128,13 +128,6 @@ describe('the first press that would leave one stuck says so instead', () => {
     const held = hold([finished, parked, answered]);
     expect(held).toBeTruthy();
     expect(held.goes).toEqual({ product: '', id: 'agent:71' });
-  });
-
-  it('the walk keeps its own lesson, so a walk never spends the one nudge', () => {
-    // `closingRefused` has the practice rows while the walk is on, and it
-    // refuses them every time rather than once. A press inside the walk must
-    // not be the press that uses this up.
-    expect(hold([stopped], { walking: true })).toBe(null);
   });
 });
 

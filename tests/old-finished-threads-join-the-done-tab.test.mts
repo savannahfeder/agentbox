@@ -81,6 +81,7 @@ describe('the app', () => {
     expect(app).toMatch(/withOlder\(snap\?\.items \?\? \[\], older\)/);
     // Less any send taken back with Z (tests/a-send-taken-back-with-z-leaves-no-thread-behind).
     expect(app).toMatch(/withoutWithdrawnSends\(itemsWithOlder, undoMarks\)/);
-    expect(app).toMatch(/walkRows\(listed, run\)/);
+    // Then a teammate's sends are raised a level (w-718af6d149); the rows are still these.
+    expect(app).toMatch(/const items = useMemo\(\(\) => withLevelsForYou\(listed,/);
   });
 });

@@ -122,6 +122,18 @@ function must<T>({ data, error }: CloudAnswer, what: string): T {
 
 export type Must = typeof must;
 
+// PostgREST hands back at most its max_rows a read (1,000 on the hosted project) and says nothing of the rest.
+const MAX_ROWS = 1000;
+/** Every row, a page at a time; `read` must order by a unique key so no row falls between pages. */
+async function everyRow<T>(read: (from: number, to: number) => PromiseLike<CloudAnswer>, what: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += MAX_ROWS) {
+    const rows = must<T[] | null>(await read(from, from + MAX_ROWS - 1), what) ?? [];
+    out.push(...rows);
+    if (rows.length < MAX_ROWS) return out;
+  }
+}
+
 const COMMAND_COLUMNS = 'id,owner,device,project,item,kind,payload,created_at,claimed_at,taken_at,outcome';
 // Who claimed (`cloud:<run>`, 20261026000000_phone_carries_on_in_the_cloud.sql),
 // asked for only once the database has the column, so a computer that runs
@@ -388,14 +400,16 @@ export function supabaseBackend(client: SupabaseClient) {
     },
 
     // YOUR CARDS: one per thread worth showing the team (shared/thread-cards.mts).
-    // Upserted whole, and any card of yours the Mac no longer lists is removed,
-    // so a thread made private or finished yesterday leaves the board. A card
-    // not marked visible never goes up at all, whatever the Mac handed over.
-    async putCards(teamId: string, all: CardToPut[]) {
+    // The ones in `changed` are upserted whole (all of them without it), and
+    // any card of yours the Mac no longer lists is removed, so a thread made
+    // private or finished yesterday leaves the board. A card not marked
+    // visible never goes up at all, whatever the Mac handed over.
+    async putCards(teamId: string, all: CardToPut[], changed?: ReadonlySet<string>) {
       const me = await myId();
       const cards = all.filter((c) => c.visible === true);
-      if (cards.length) {
-        const rows = cards.map((c) => ({
+      const writing = changed ? cards.filter((c) => changed.has(c.threadId)) : cards;
+      if (writing.length) {
+        const rows = writing.map((c) => ({
           person_id: me, team_id: teamId, thread_id: c.threadId, visible: !!c.visible,
           // WHO IT REACHES: the chosen people, or no list at all for the whole
           // team (w-41ff964775). The read rule on the table does the enforcing.
@@ -643,7 +657,8 @@ export function supabaseBackend(client: SupabaseClient) {
 
     async filePlaces() {
       await myId();
-      const rows = must<{ owner: string; thread_id: string; project: string; family: string; folder: string | null; by_person: string; at: number | string }[]>(await client.from('file_places').select('owner,thread_id,project,family,folder,by_person,at'), 'reading where files sit');
+      const rows = await everyRow<{ owner: string; thread_id: string; project: string; family: string; folder: string | null; by_person: string; at: number | string }>((a, z) => client.from('file_places').select('owner,thread_id,project,family,folder,by_person,at')
+        .order('owner').order('thread_id').order('family').range(a, z), 'reading where files sit');
       return rows.map((r) => ({ owner: r.owner, threadId: r.thread_id, project: r.project, family: r.family, folder: r.folder, by: r.by_person, at: Number(r.at) }));
     },
 
@@ -656,7 +671,8 @@ export function supabaseBackend(client: SupabaseClient) {
 
     async fileVersions(teamId: string) {
       await myId();
-      const rows = must<{ file: string; n: number | string; hash: string; name: string | null; by_person: string | null; at: number | string }[]>(await client.from('file_versions').select('file,n,hash,name,by_person,at').eq('team_id', teamId), 'reading the versions of files');
+      const rows = await everyRow<{ file: string; n: number | string; hash: string; name: string | null; by_person: string | null; at: number | string }>((a, z) => client.from('file_versions').select('file,n,hash,name,by_person,at').eq('team_id', teamId)
+        .order('file').order('n').range(a, z), 'reading the versions of files');
       return rows.map((r) => ({ file: r.file, n: Number(r.n), hash: r.hash, name: r.name, by: r.by_person, at: Number(r.at) }));
     },
 

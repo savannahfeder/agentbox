@@ -45,8 +45,8 @@ async function checkoutTrialDays(at: number, { freeUntil = null as number | null
   const key = (await gw.handle({ method: 'POST', path: '/v1/devices', headers: { authorization: 'Bearer session-a' }, body: JSON.stringify({ acceptedTerms: TERMS_VERSION }) })).body.key;
   const me = (await gw.handle({ method: 'GET', path: '/v1/me', headers: { authorization: `Bearer ${key}` }, body: '' })).body;
   await gw.handle({ method: 'POST', path: '/v1/checkout', headers: { authorization: `Bearer ${key}`, host: 'gw.example.on.aws' }, body: JSON.stringify({ plan: 'team' }) });
-  const end = form['subscription_data[trial_end]'];
-  return { checkout: end ? (Number(end) * 1000 - at) / DAY : 0, page: proFreeDays(true, me, at) };
+  const days = form['subscription_data[trial_period_days]'];
+  return { checkout: days ? Number(days) : 0, page: proFreeDays(true, me, at) };
 }
 
 describe('the free days a team has left', () => {

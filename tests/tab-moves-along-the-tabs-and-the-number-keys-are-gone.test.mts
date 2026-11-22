@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import * as nav from '../renderer/src/workspace-navigation.ts';
 import { HINTS, capsFor, capWord } from '../renderer/src/hint-plate';
 import { SHORTCUTS } from '../renderer/src/shortcuts';
-import { TEAM_TABS, TEAM_TAB_NAMES, coach, keyName, keyToken } from '../renderer/src/onboarding';
+import { keyName } from '../renderer/src/onboarding';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -86,7 +86,7 @@ describe('Tab is offered where the number keys were', () => {
     expect([...plateKeys, ...pageKeys].filter((k) => /⇧(tab|⇥)|^tab$/i.test(k))).toEqual([]);
   });
 
-  it('draws ⇥ as one cap with "Tab" in it, the way the tutorial does', () => {
+  it('draws ⇥ as one cap with "Tab" in it, the way the setup does', () => {
     expect(capsFor('⇥')).toEqual(['⇥']);
     expect(capWord('⇥')).toBe('Tab');
     // The tutorial's own cap says the same word.
@@ -102,30 +102,5 @@ describe('Tab is offered where the number keys were', () => {
   it('puts the word inside the cap on the plate and on the shortcuts page', () => {
     expect(code('renderer/src/components/HintPlate.tsx')).toMatch(/capWord\(glyph\)/);
     expect(code('renderer/src/components/Settings.tsx')).toMatch(/capWord\(k\)/);
-  });
-});
-
-describe('the tutorial tours the tabs with Tab', () => {
-  const tabs = [...TEAM_TABS];
-
-  it.each(tabs)('says Tab, never a number, standing on %s', (view) => {
-    const said = coach('where', 0, { view, tabs, tabNames: TEAM_TAB_NAMES });
-    expect(said.key).toBe('⇥');
-    expect(`${said.lead}${said.key}${said.tail}`).not.toMatch(numberChord);
-  });
-
-  it('still names the tab to click', () => {
-    const said = coach('where', 0, { view: 'inbox', tabs, tabNames: TEAM_TAB_NAMES });
-    expect(`${said.lead}${said.key}${said.tail}`).toBe('Press ⇥ or click In progress to see where it all went.');
-  });
-
-  it('hears Tab as the answer and no longer hears ⌘2', () => {
-    expect(keyToken({ key: 'Tab' })).toBe('⇥');
-    expect(keyToken({ key: 'Tab', shiftKey: true })).toBe('⇥');
-    expect(keyToken({ key: '2', metaKey: true })).toBeNull();
-    // The keys either side are untouched: ⌘K is still the walk's, and a bare
-    // number is still an option pick.
-    expect(keyToken({ key: 'k', metaKey: true })).toBe('⌘K');
-    expect(keyToken({ key: '2' })).toBe('2');
   });
 });

@@ -7,16 +7,15 @@
 // Thread.tsx, run-now.ts). Its live line names the newest step, how long the
 // run has been up and how many steps came before (Live.tsx, live-line.ts). An
 // untagged thread reads Medium, as it runs (shared/rank.mts `shownPriority`).
-// Its summary strips the bullet marks an agent wrote and says when it was last
-// updated (Summary.tsx). The app offered none of the four presses, showed only
-// the first step, drew an untagged thread as Low, and doubled the bullets.
+// The app offered none of the four presses, showed only the first step, and
+// drew an untagged thread as Low.
 // These hold the app (mobile/src/lib/thread-offers.ts, mobile/src/lib/actions.ts)
 // to the site, along with what must not be offered: Stop on a thread not in
 // progress, Run now while a run is up, and Send back on a thread still open.
 import { describe, it, expect } from 'vitest';
 import { phoneSlug } from '../renderer/src/phone-rows';
 import { phoneSender } from '../renderer/src/phone-send';
-import { liveOf, offersOf, shownLevel, summaryParts } from '../mobile/src/lib/thread-offers';
+import { liveOf, offersOf, shownLevel } from '../mobile/src/lib/thread-offers';
 import { planFor, runSteps } from '../mobile/src/lib/actions';
 
 const NOW = Date.UTC(2026, 9, 20, 12);
@@ -114,18 +113,6 @@ describe('the priority a thread shows', () => {
   it('is its own level when it has one', () => {
     expect(shownLevel(item({ priority: 9 }))).toBe('urgent');
     expect(shownLevel(item({ priority: 2 }))).toBe('low');
-  });
-});
-
-describe('the summary', () => {
-  it('draws each step once, without the marks an agent wrote before it', () => {
-    expect(summaryParts(item({ progress: '- Read the code\n✓ Drew the screens\n\n* Shipped' }), NOW).steps).toEqual(['Read the code', 'Drew the screens', 'Shipped']);
-  });
-  it('says when it was last written', () => {
-    expect(summaryParts(item({ problem: 'Why', wrote: { problem: { ts: NOW - 6 * MIN, source: 'agent' } } }), NOW).updated).toBe('6 min ago');
-  });
-  it('says nothing about when, if it was never written', () => {
-    expect(summaryParts(item(), NOW).updated).toBeNull();
   });
 });
 

@@ -26,7 +26,7 @@ import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
 import { AttachSheet, Attached } from './Attach';
 import { Markdown } from './Markdown';
-import { Back, Caret, Clip } from './icons';
+import { Back, Caret, Clip, FileMark } from './icons';
 import { footRoom, IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar } from './parts';
 import { color, corner, font, size } from './theme';
 
@@ -111,7 +111,7 @@ function RoomFile({ roomId, name, label }: { roomId: string; name: string; label
   };
   return (
     <Pressable onPress={() => void open()} onLongPress={hold ?? undefined} delayLongPress={350} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 11, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
-      <Clip size={14} />
+      <FileMark size={14} />
       <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 13.5, color: color.dim }}>{label}</T>
     </Pressable>
   );
@@ -213,7 +213,7 @@ function PeopleSheet({ room, open, close, blocked, unblock }: { room: Room; open
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 7 }}>
               <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 15.5, lineHeight: 21 }}>{cardName(c)}</T>
             </View>
-            <T numberOfLines={1} style={{ fontSize: 13, lineHeight: 19, color: c.agents ? color.dim : color.faint }}>{onWords(c)}</T>
+            {!!onWords(c) && <T numberOfLines={1} style={{ fontSize: 13, lineHeight: 19, color: c.agents ? color.dim : color.faint }}>{onWords(c)}</T>}
           </View>
           {blocked.has(c.id) ? (
             <Pressable onPress={() => unblock(c.id)} accessibilityRole="button" accessibilityLabel={`Unblock ${cardName(c)}`}

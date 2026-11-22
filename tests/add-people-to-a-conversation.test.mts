@@ -110,9 +110,9 @@ describe('the control at the top of a conversation', () => {
     products: new Map([[pair.slug, pair], [group.slug, group], [project.slug, project]]),
   });
   const team = teamOf(COMPANY);
-  const draw = (product, t = team) => renderToStaticMarkup(
+  const draw = (product, t = team, item: Record<string, unknown> = {}) => renderToStaticMarkup(
     React.createElement(TeamContext.Provider, { value: t },
-      React.createElement(AddPeople, { item: { id: 'w', product: product.slug }, product, onAdd: () => {} })),
+      React.createElement(AddPeople, { item: { id: 'w', product: product.slug, ...item }, product, onAdd: () => {} })),
   );
 
   it('is there on a conversation', () => {
@@ -126,8 +126,14 @@ describe('the control at the top of a conversation', () => {
 
   // There it is a small menu that adds in place
   // (tests/add-people-makes-a-new-group-from-a-conversation-and-adds-in-place-on-an-agent-thread).
-  it('is on an agent thread too', () => {
-    expect(draw(project)).toContain('Add people');
+  it('is on a teammate\'s agent thread too', () => {
+    expect(draw(project, team, { createdBy: MAYA })).toContain('Add people');
+  });
+
+  // Share, beside Done, is the door to people there (tests/the-share-button-says-who-can-open-the-thread).
+  it('is not on an agent thread of your own', () => {
+    expect(draw(project)).toBe('');
+    expect(draw(project, team, { createdBy: ME })).toBe('');
   });
 
   it('is not there in a company of two', () => {
