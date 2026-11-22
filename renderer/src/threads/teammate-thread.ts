@@ -1,7 +1,7 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
 import type { AgentEvent, LinkCommentWaiting, ThreadCard } from '../types';
 import { askIsOpen, askOf, handBackReadBy, isHandBack, type AskRow } from '../../../shared/thread-asks.mts';
-import { filesInLines, placeWords, threadFiles, versionForPath, type FileNote, type ThreadLine } from '../../../shared/artifact-marks.mts';
+import { filesInLines, otherFilesInLines, otherKind, placeWords, threadFiles, versionForPath, type FileNote, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 /**
  * The owner's thread as you read it: what you wrote to their agent is yours and
@@ -163,13 +163,17 @@ export function standingLine(state: ThreadCard['state'], owner: string, waits: s
 }
 
 /**
- * The files beside a teammate's thread: each file once, at its newest version,
- * with the notes on any of its versions. The same families the file view
- * pages through (shared/artifact-marks.mts), so a note counted here is one it shows.
+ * The files beside a teammate's thread, pages and tables among them: each file
+ * once, at its newest version, with the notes on any of its versions. The same
+ * families the file view pages through (shared/artifact-marks.mts), so a note
+ * counted here is one it shows. A name said in words is no copy of the file, so
+ * the newest version drawn is the newest one that has a folder in its path.
  */
 export function filesOnThread(lines: readonly ThreadLine[], notes: { file: string }[]): { src: string; name: string; notes: number }[] {
-  return threadFiles(filesInLines(lines)).map((family) => {
-    const newest = family.versions[family.versions.length - 1];
+  const pages = otherFilesInLines(lines).filter((f) => otherKind(f.path) !== 'code');
+  return threadFiles([...filesInLines(lines), ...pages]).map((family) => {
+    const copies = family.versions.filter((v) => v.path.includes('/'));
+    const newest = (copies.length ? copies : family.versions)[(copies.length ? copies : family.versions).length - 1];
     const ids = new Set(family.versions.map((v) => v.id));
     return { src: newest.path, name: newest.name, notes: notes.filter((n) => ids.has(n.file)).length };
   });

@@ -1141,7 +1141,7 @@ export function foldWorkItems(lines: unknown, now = Date.now()): Map<string, Wor
 // A reply taken back reads as this, and is nobody's news.
 const WITHDRAWN = '(withdrawn)';
 // How much of a message the record keeps: enough for a row's one line.
-const TALK_TEXT = 280;
+export const TALK_TEXT = 280;
 // How many of the newest messages the record keeps, in the chat and in each
 // thread. The counts it answers stop at your own newest word, which in a chat
 // you are part of is never this far back.
