@@ -46,7 +46,7 @@ export function keepAfterSignIn(service: string, { finishing = false }: { finish
   const svc = SERVICES.find((s) => s.id === n || plain(s.name) === n || n.startsWith(plain(s.name)));
   const when = finishing ? 'Once the login finishes, keep' : 'First, keep';
   const why = 'this sign-in for every later cloud thread: a cloud machine forgets its logins when the run ends.';
-  if (!svc) return { message: 'A cloud machine forgets its logins when the run ends. If later cloud runs need this one, ask for its key with an AGENTBOX-NEEDS: key line, which they answer on a card.' };
+  if (!svc) return { message: 'A cloud machine forgets its logins when the run ends. If later cloud runs need this one, ask for its key with an AGENTBOX-NEEDS: key line, which they answer on a card. A tool server\'s own sign-in (its authenticate tool, `codex mcp login`) has no key to ask for: if they will want that tool again, give them its link in Connections (agentbox://connections), which every thread can use.' };
   if (svc.keys.length !== 1) {
     return { message: `${when} ${why} Read the token its login saved and call sign_in with this ask and keep under ${svc.keys.map((k) => k.name).join(' and ')}, one call each.` };
   }
@@ -55,6 +55,14 @@ export function keepAfterSignIn(service: string, { finishing = false }: { finish
   const how = read ? `Run \`${read}\`` : 'Read the token its login saved';
   return { keep: { name, ...(read ? { read } : {}) }, message: `${when} ${why} ${how} and call sign_in with this ask and keep { name: '${name}', value: the token }.` };
 }
+
+/** Whether the person unticked saving the sign-in `askId` for every cloud thread. */
+export function notToBeSaved(id: string, askId: string, { product = null }: { product?: string | null } = {}): boolean {
+  const open = askOn(own(id, product).item);
+  return open?.id === askId && open.keep === false;
+}
+
+export const NOT_SAVED = 'They chose not to save this sign-in for other threads, so do not keep it.';
 
 /** The keys a known service's sign-in may be kept under, or null for one not on the list. */
 export function keyNamesFor(service: string): string[] | null {
