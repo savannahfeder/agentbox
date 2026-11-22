@@ -69,7 +69,9 @@ export const openCodeHarness = {
     ? definition.credentialFiles.map((file: string) => path.join(folder, file))
     : [path.join(home, '.local/share/opencode/auth.json')]),
   // Never `--auto`, which approves everything that is not explicitly denied.
-  smallModelArgs: (prompt: string, model?: string | null) => ['run', '--format', 'json', ...(model ? ['--model', model] : []), prompt],
+  // `--standalone`, because without it a command starts OpenCode's background
+  // service and leaves it running (measured on 2.3.2: 277 MB, after the command had ended).
+  smallModelArgs: (prompt: string, model?: string | null) => ['run', '--standalone', '--format', 'json', ...(model ? ['--model', model] : []), prompt],
   // `run --format json` prints one event a line, and the answer is its `text` parts (read off 2.3.2).
   smallModelReply: (out: string) => out.split('\n').flatMap((line) => {
     try {

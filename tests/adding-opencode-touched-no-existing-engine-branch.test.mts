@@ -115,6 +115,24 @@ describe('adding OpenCode touched no existing engine branch', () => {
       expect(code, `${file} passes --auto`).not.toMatch(/--auto\b/);
     }
     expect(harnessFor('opencode').smallModelArgs('say hi', 'opencode/big-pickle'))
-      .toEqual(['run', '--format', 'json', '--model', 'opencode/big-pickle', 'say hi']);
+      .toEqual(['run', '--standalone', '--format', 'json', '--model', 'opencode/big-pickle', 'say hi']);
+  });
+
+  // Measured on 2.3.2: `opencode models` and a `run` without `--standalone`
+  // each left `opencode serve --service` running at 277 MB after they had
+  // ended; `opencode acp` and `run --standalone` left nothing.
+  it('starts nothing that stays running after it', () => {
+    expect(harnessFor('opencode').smallModelArgs('say hi')).toContain('--standalone');
+    expect(harnessDefinition('opencode').acp).toEqual({ bin: 'opencode', args: ['acp'] });
+  });
+
+  it('reads a small answer out of the events its one-shot command prints', () => {
+    const out = [
+      '{"type":"step_start","part":{"type":"step-start"}}',
+      '{"type":"text","part":{"type":"text","text":"ok"}}',
+      '{"type":"step_finish","part":{"type":"step-finish","reason":"stop"}}',
+    ].join('\n');
+    expect(harnessFor('opencode').smallModelReply(out)).toBe('ok');
+    expect(harnessFor('opencode').smallModelReply('not json at all')).toBe('');
   });
 });
