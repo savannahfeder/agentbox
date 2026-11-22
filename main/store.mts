@@ -742,6 +742,14 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signInAnswer: clean }, { source, now });
   }
 
+  // Whether the person wants a cloud sign-in saved for every cloud thread. Kept on the ask, so it holds however the sign-in ends.
+  chooseSignInKeep(slug: string, id: string, choice: { id: unknown; keep: boolean }, { now = Date.now() }: { now?: number } = {}) {
+    const ask = openSignIn(this.readItem(slug, id));
+    if (!ask || ask.id !== choice.id) throw new Error('That sign-in is no longer open.');
+    const { keep: _was, ...rest } = ask;
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signIn: choice.keep ? rest : { ...rest, keep: false } }, { source: 'founder', now });
+  }
+
   // Every thread whose ship waited on a GitHub sign-in on this computer goes to the queue again.
   shipAgainAfterGitHubSignIn(now = Date.now()) {
     const { workItemsDisk } = this.modules;
