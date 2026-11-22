@@ -25,8 +25,8 @@ describe('a thread opened on the Team page', () => {
     // App.tsx hands the arrows a teammate's thread only when its back says Inbox.
     expect(app).toMatch(/card: openCard && onTeammateThread && !roomsUi\.roomName \?/);
     expect(app).toContain('const onTeammateThread = teamShown && !!openCard && !cardFromPlace;');
-    expect(onInboxPage({ thread: null, card: null, group: null, inbox: false })).toBe(false);
-    expect(stopOnScreen({ thread: null, card: null, group: null, inbox: false })).toBeNull();
+    expect(onInboxPage({ thread: null, card: null, group: null, list: null })).toBe(false);
+    expect(stopOnScreen({ thread: null, card: null, group: null, list: null })).toBeNull();
   });
 
   it('keeps its own back, which names the Standup or the teammate it was opened from', () => {

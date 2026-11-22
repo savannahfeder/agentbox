@@ -6679,10 +6679,10 @@ export default function App() {
   // opened from Needs you lands back on the Chats screen with another reply box.
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setOpenCard(null); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setChatsPlace(null); setHomeOpen(false); };
 
-  // BACK AND FORWARD WALK THE THREADS YOU WERE IN, on every computer and only
-  // on the inbox page. A thread opened inside another page keeps that page's
-  // own back. Above the early returns below, because it is a hook; `homeShown`
-  // is worked out again here for the same reason.
+  // BACK AND FORWARD WALK THE LIST AND THE THREADS YOU WERE IN, on every
+  // computer and only on the inbox page. A thread opened inside another page
+  // keeps that page's own back. Above the early returns below, because it is a
+  // hook; `homeShown` is worked out again here for the same reason.
   const backForwardOn = !onPhone();
   const homeHere = homeOn && homeOpen && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
@@ -6700,7 +6700,7 @@ export default function App() {
     thread: focused && !settingsOpen && !inChats && !teamOpen && !(directOpen && roomsUi.openId) ? { product: focused.product, id: focused.id } : null,
     card: openCard && onTeammateThread && !roomsUi.roomName ? { person: openCard.personId, thread: openCard.threadId } : null,
     group: groupInInbox,
-    inbox: !focused && !settingsOpen && !teamShown && !homeHere && !filesShown && !connectionsShown && !roomShown && !teammatesShown && !chatsPlaceShown,
+    list: !focused && !settingsOpen && !teamShown && !homeHere && !filesShown && !connectionsShown && !roomShown && !teammatesShown && !chatsPlaceShown ? view : null,
   };
   const cardOf = (s: { person: string; thread: string }) => cards.find((c) => c.personId === s.person && c.threadId === s.thread);
   const trail = useBackAndForward({
@@ -6710,9 +6710,13 @@ export default function App() {
     exists: (s) => s.at === 'thread' ? selectable.some((i) => i.id === s.id && i.product === s.product)
       : s.at === 'card' ? !!cardOf(s)
       : true,
-    // Over the inbox whatever was open before, so the thread's own back says Inbox.
+    // The list comes back as Esc leaves it, cursor and all, unless it was on
+    // another tab. Anything else opens over the inbox, so its own back says Inbox.
     go: (s) => {
-      if (s.at === 'group') { openView(view); roomsUi.open(s.id, 'inbox'); }
+      if (s.at === 'list') {
+        if (s.view !== view) openView(s.view);
+        else { roomsUi.leave(); setOpenCard(null); setTeamOpen(false); setFocused(null); }
+      } else if (s.at === 'group') { openView(view); roomsUi.open(s.id, 'inbox'); }
       else if (s.at === 'card') {
         const card = cardOf(s);
         if (card) { openView(view); openTeammateCard(card); }
@@ -6726,7 +6730,8 @@ export default function App() {
     const thread = selectable.find((i) => i.id === s.id && i.product === s.product);
     return thread ? rowTitle(thread) : 'the thread';
   };
-  const stopName = (s: TrailStop): string => s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
+  const stopName = (s: TrailStop): string => s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
+    : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
     : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
     : threadName(s);
   useEffect(() => {

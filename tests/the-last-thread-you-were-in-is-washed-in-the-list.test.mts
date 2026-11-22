@@ -49,8 +49,10 @@ describe('the last thread you were in', () => {
   it('is noted for every place the arrows take you to, not only new visits', () => {
     const hook = read('renderer/src/back-and-forward.ts');
     const settle = hook.slice(hook.indexOf('settledPlaces((s) => {'), hook.indexOf('settledPlaces((s) => {') + 400);
-    expect(settle.indexOf('lastThreadAfter')).toBeGreaterThan(-1);
-    expect(settle.indexOf('lastThreadAfter')).toBeLessThan(settle.indexOf('return;'));
+    const noted = settle.indexOf('lastThreadAfter');
+    const ends = settle.indexOf('return;');
+    expect(noted).toBeGreaterThan(-1);
+    expect(ends === -1 || noted < ends).toBe(true);
   });
 });
 

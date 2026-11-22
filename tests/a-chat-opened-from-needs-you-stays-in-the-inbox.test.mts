@@ -160,7 +160,7 @@ describe.skipIf(!browserAvailable)('a chat opened from the Team page', () => {
 
 // The arrows are on the inbox page alone, so only a chat opened there is on their trail.
 describe('back and forward', () => {
-  const screen = (over = {}) => stopOnScreen({ thread: null, card: null, group: null, inbox: false, ...over });
+  const screen = (over = {}) => stopOnScreen({ thread: null, card: null, group: null, list: null, ...over });
   it('keep a chat opened in the inbox as a place in the inbox', () => {
     expect(screen({ group: 'g1' })).toEqual({ at: 'group', id: 'g1' });
   });
