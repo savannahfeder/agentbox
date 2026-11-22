@@ -6674,11 +6674,13 @@ export default function App() {
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setOpenCard(null); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setChatsPlace(null); setHomeOpen(false); };
 
   // THE WALKTHROUGH'S WAY BACK, from a page it has no tip on to where its last tip stood.
-  const walkAway = awayFromWalk(tour, { elsewhere: settingsOpen || teamShown || filesShown || connectionsShown || teammatesShown || roomShown || chatsPlaceShown || search !== null, thread: !!focused, practiceThread: !!focused && focused.id === tourPractice?.item });
+  const walkElsewhere = settingsOpen || teamShown || filesShown || connectionsShown || teammatesShown || roomShown || chatsPlaceShown || search !== null;
+  const walkAway = awayFromWalk(tour, { elsewhere: walkElsewhere, home: homeOpen && !focused && !walkElsewhere, thread: !!focused, practiceThread: !!focused && focused.id === tourPractice?.item });
   const walkSpot = useRef<{ view: View; home: boolean; item: WorkItem | null } | null>(null);
+  // Only when the tip changes: a change of page reaches here before its tip has gone.
   useEffect(() => {
     if (tourNow && !walkAway) walkSpot.current = { view, home: homeOpen, item: focused };
-  }, [tourNow, walkAway, view, homeOpen, focused]);
+  }, [tourNow]);
   const backToWalk = () => { const s = walkSpot.current; openView(s?.view ?? 'inbox'); if (!s || s.home) setHomeOpen(true); if (s?.item) setFocused(s.item); };
 
   // BACK AND FORWARD, on every computer. Above the early returns below, because

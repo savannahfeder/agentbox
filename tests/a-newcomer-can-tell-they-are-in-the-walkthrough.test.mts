@@ -15,6 +15,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { awayFromWalk, finishLesson, skipTour, startTour, withPractice, type Lesson } from '../renderer/src/tour.ts';
 import { TourFrame } from '../renderer/src/components/TourFrame.tsx';
+import { walkPlace } from '../renderer/src/setup-split.ts';
 
 globalThis.React = React;
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -26,22 +27,45 @@ const sent = finishLesson(withPractice(startTour(), { slug: 'practice', item: 'w
 const closed = ['open', 'choose', 'close'].reduce((t, l) => finishLesson(t, l as Lesson), sent);
 
 describe('off the walkthrough’s pages', () => {
+  const at = (over: Partial<{ elsewhere: boolean; home: boolean; thread: boolean; practiceThread: boolean }>) => ({ elsewhere: false, home: false, thread: false, practiceThread: false, ...over });
+  const fresh = withPractice(startTour(), { slug: 'practice' });
   it('is a page it has no tip on: Settings, the Team page, Files and the rest', () => {
-    expect(awayFromWalk(sent, { elsewhere: true, thread: false, practiceThread: false })).toBe(true);
+    expect(awayFromWalk(sent, at({ elsewhere: true }))).toBe(true);
   });
-  it('is not the list, Home or the practice thread', () => {
-    expect(awayFromWalk(sent, { elsewhere: false, thread: false, practiceThread: false })).toBe(false);
-    expect(awayFromWalk(sent, { elsewhere: false, thread: true, practiceThread: true })).toBe(false);
+  it('is not the list or the practice thread', () => {
+    expect(awayFromWalk(sent, at({}))).toBe(false);
+    expect(awayFromWalk(sent, at({ thread: true, practiceThread: true }))).toBe(false);
+  });
+  // Round two of the power test, 2026-11-22: Home at 3 of 5 had no tip and no way back.
+  it('is Home from sending the practice thread to closing it, when Home has no tip', () => {
+    expect(awayFromWalk(fresh, at({ home: true }))).toBe(false);
+    expect(awayFromWalk(sent, at({ home: true }))).toBe(true);
+    expect(awayFromWalk(closed, at({ home: true }))).toBe(false);
   });
   it('is a real thread while the walkthrough is still about its practice one', () => {
-    expect(awayFromWalk(sent, { elsewhere: false, thread: true, practiceThread: false })).toBe(true);
+    expect(awayFromWalk(sent, at({ thread: true }))).toBe(true);
   });
   it('is not a real thread once the practice one is closed, since the last tip stands over any thread', () => {
-    expect(awayFromWalk(closed, { elsewhere: false, thread: true, practiceThread: false })).toBe(false);
+    expect(awayFromWalk(closed, at({ thread: true }))).toBe(false);
   });
   it('is nowhere once the walkthrough is skipped or there is none', () => {
-    expect(awayFromWalk(skipTour(sent), { elsewhere: true, thread: false, practiceThread: false })).toBe(false);
-    expect(awayFromWalk(null, { elsewhere: true, thread: false, practiceThread: false })).toBe(false);
+    expect(awayFromWalk(skipTour(sent), at({ elsewhere: true }))).toBe(false);
+    expect(awayFromWalk(null, at({ elsewhere: true }))).toBe(false);
+  });
+});
+
+describe('how far through you are', () => {
+  // Round two of the power test, 2026-11-22: ⌘K opened at 2 of 5 read 5 of 5, then 3 of 5 after Esc.
+  it('does not move on for a tip ahead of its turn', () => {
+    expect(walkPlace(['compose'], 'palette').at).toBe(2);
+    expect(walkPlace(['compose'], 'urgent').at).toBe(2);
+    expect(walkPlace(['compose', 'open', 'choose'], 'palette').at).toBe(4);
+  });
+  it('reaches the last step once the thread is closed', () => {
+    expect(walkPlace(['compose', 'open', 'choose', 'close'], 'palette').at).toBe(5);
+  });
+  it('still counts writing back once you are in the practice thread', () => {
+    expect(walkPlace(['compose'], 'reply').at).toBe(3);
   });
 });
 
@@ -100,11 +124,15 @@ describe('its name in the command bar', () => {
 describe('the way back', () => {
   const app = read('renderer/src/App.tsx');
   it('is offered from the pages the walkthrough has no tip on', () => {
-    expect(app).toMatch(/const walkAway = awayFromWalk\(tour, \{ elsewhere: settingsOpen \|\| teamShown \|\| filesShown \|\| connectionsShown \|\| teammatesShown \|\| roomShown \|\| chatsPlaceShown \|\| search !== null, thread: !!focused, practiceThread: !!focused && focused\.id === tourPractice\?\.item \}\);/);
+    expect(app).toMatch(/const walkElsewhere = settingsOpen \|\| teamShown \|\| filesShown \|\| connectionsShown \|\| teammatesShown \|\| roomShown \|\| chatsPlaceShown \|\| search !== null;/);
+    expect(app).toMatch(/const walkAway = awayFromWalk\(tour, \{ elsewhere: walkElsewhere, home: homeOpen && !focused && !walkElsewhere, thread: !!focused, practiceThread: !!focused && focused\.id === tourPractice\?\.item \}\);/);
     expect(app).toMatch(/<TourFrame done=\{tour!\.done\} now=\{tourNow\} finished=\{finishing\} away=\{walkAway\} onBack=\{backToWalk\} /);
   });
   it('goes back to where its last tip was, or Home when there was none', () => {
     expect(app).toMatch(/if \(tourNow && !walkAway\) walkSpot\.current = \{ view, home: homeOpen, item: focused \};/);
+    // Recorded when the tip changes only: a page change reaches the app before its tip has gone,
+    // and Back from Files then went to Home (power test round two, 2026-11-22).
+    expect(app).toMatch(/walkSpot\.current = \{ view, home: homeOpen, item: focused \};\n  \}, \[tourNow\]\);/);
     expect(app).toMatch(/const backToWalk = \(\) => \{ const s = walkSpot\.current; openView\(s\?\.view \?\? 'inbox'\); if \(!s \|\| s\.home\) setHomeOpen\(true\); if \(s\?\.item\) setFocused\(s\.item\); \};/);
   });
 });
