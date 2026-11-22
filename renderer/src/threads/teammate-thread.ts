@@ -158,7 +158,7 @@ export function endWasInView(scroll: { scrollHeight: number; scrollTop: number; 
 /** Under the "Waiting on Dev" at the top of a teammate's thread: what that means, in one line. */
 export function standingLine(state: ThreadCard['state'], owner: string, waits: string | null): string | null {
   if (state === 'running') return `${owner}'s agent is working on it.`;
-  if (state === 'waiting') return waits ? 'It starts again when that is done.' : `The agent stopped. ${owner} looks at it next.`;
+  if (state === 'waiting') return waits ? 'It starts again when that is done.' : `Nothing is running. ${owner} looks at it next.`;
   return null;
 }
 

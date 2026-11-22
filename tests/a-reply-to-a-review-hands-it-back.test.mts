@@ -53,6 +53,8 @@ describe('a reply to a review', () => {
     expect(page).toContain('const shownAsk = ask ?? answeredAsk;');
     expect(page).toContain("const lastIt = !built.outcome ? [...said].reverse().find((e) => e.who === 'it' && !e.fromId) ?? null : null;");
     expect(page).toContain('const askAt = shownAsk && onHandBack ? shownAsk.createdAt ?? 0 : null;');
+    // The ask's card says where it stands while it is shown, so no "Waiting on" line sits over it.
+    expect(page).toContain('{card.visible && !shownAsk && <TeammateStanding card={card} person={person} />}');
   });
 
   it('is drawn on the page as your words', () => {

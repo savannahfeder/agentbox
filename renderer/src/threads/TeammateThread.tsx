@@ -467,7 +467,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
                 {card.visible && <span className="tp-ago">Updated {agoWords(card.updatedAt, now)}</span>}
               </p>
               {/* While you were asked in, the ask at the end says where it stands, not "waiting on" its owner. */}
-              {card.visible && !ask && <TeammateStanding card={card} person={person} />}
+              {card.visible && !shownAsk && <TeammateStanding card={card} person={person} />}
               {!asked && <TeammateSummary card={card} owner={owner} files={files} />}
             </div>
             {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
