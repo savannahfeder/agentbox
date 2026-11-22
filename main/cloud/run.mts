@@ -67,7 +67,7 @@ import { CLIENT_INFO } from '../codex-app-server.mts';
 import { appendCloudUsage } from './usage.mts';
 import { docsFolderFor, docsToSend, tarDocs, layDocs } from './docs.mts';
 import type { LaidFile } from './docs.mts';
-import { troubleCause, limitResetMoment } from '../../shared/spawn-trouble.mts';
+import { troubleCause, limitResetMoment, accountRefused } from '../../shared/spawn-trouble.mts';
 import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
 import { clock } from './logins.mts';
 import { NEED, SERVICES } from '../../shared/cloud-needs.mts';
@@ -288,6 +288,7 @@ export interface CloudRunOptions {
   keys?: { name: string; key: string }[];
   onLoginTrouble?: (trouble: { state: string; id: string | null }) => void;
   onLimit?: (limit: { until: number }) => void;
+  onRefused?: (refusal: { until: number }) => void;
   stdin?: Readable;
   stdout?: Writable;
   stderr?: Writable;
@@ -456,6 +457,17 @@ export function limitInResultLine(line: string, now: number = Date.now()) {
   const text = String(msg.result ?? '');
   if (troubleCause(text) !== 'at-limit') return null;
   return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
+}
+
+// How long a cloud account Claude refused sits out before one run tries it again.
+export const REFUSED_REST_MS = 30 * 60_000;
+
+// The same for a failed result that says Claude refuses the account itself.
+export function refusedInResultLine(line: string, now: number = Date.now()) {
+  let msg: { type?: string; is_error?: boolean; result?: unknown } | null;
+  try { msg = JSON.parse(line); } catch { return null; }
+  if (msg?.type !== 'result' || msg.is_error !== true) return null;
+  return accountRefused(troubleCause(String(msg.result ?? ''))) ? now + REFUSED_REST_MS : null;
 }
 
 // The same for a Codex turn relayed from the cloud: its code goes in front, as
@@ -1010,6 +1022,8 @@ export async function cloudRun({
   onLoginTrouble = () => {},
   // Told the moment the account's limit resets, when a run ends on it.
   onLimit = () => {},
+  // Told when the run's account is refused: until when it sits out.
+  onRefused = () => {},
   stdin = process.stdin, stdout = process.stdout, stderr = process.stderr,
   remoteCommand = 'claude',
   homeDir = os.homedir(),
@@ -1762,6 +1776,8 @@ export async function cloudRun({
       if (!line.includes('"result"')) continue;
       const until = limitInResultLine(line);
       if (until) { try { onLimit({ until }); } catch { /* noted elsewhere */ } }
+      const refused = refusedInResultLine(line);
+      if (refused) { try { onRefused({ until: refused }); } catch { /* noted elsewhere */ } }
     }
   }
   let codexLine = '';
