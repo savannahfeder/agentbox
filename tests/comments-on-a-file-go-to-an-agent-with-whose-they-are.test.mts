@@ -40,6 +40,17 @@ describe('which comments a hand-over offers', () => {
     expect(commentsToHand(later, { me: ME, files: ['attachments/sign-up-screens.md'] }).map((c) => c.id)).toEqual(['n1', 'n3', 'n2', 'n6', 'n7']);
   });
 
+  // Rerun 4: from a chat's file the hand-over named the file by its copy on disk,
+  // mwsgbe7x-mdfg29-payment-failed-copy.md, which no comment was on, and the agent
+  // asked for the comments to be pasted. A chat's comments name it as people do.
+  it("a chat's file, named by its copy on disk, finds the comments made on it by name", () => {
+    const chat = [note('c1', { file: 'payment-failed-copy.md', by: 'theo', text: 'Say what failed.', ts: 60 })];
+    const stamp = Date.now().toString(36);
+    expect(commentsToHand(chat, { me: ME, files: [`attachments/${stamp}-mdfg29-payment-failed-copy.md`] }).map((c) => c.id)).toEqual(['c1']);
+    const view = fs.readFileSync(new URL('../renderer/src/team/rooms/RoomFileView.tsx', import.meta.url), 'utf8');
+    expect(view).toContain("const name = shownName(paths[0] ?? '');");
+  });
+
   it('a comment on another file is not one of them', () => {
     expect(commentsToHand(notes, { me: ME, files: ['attachments/launch-email.md'] }).map((c) => c.id)).toEqual(['n5']);
   });
