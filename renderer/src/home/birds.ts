@@ -1,34 +1,22 @@
-// The website's flock: gull shapes in the mountains' 3px dots that wander the
-// sky together, keep out of the words, and scatter from the pointer.
+// The website's birds in the mountains' 3px dots, each drifting slowly about a
+// spot of its own. They keep out of the words, and stay put rather than fly
+// across: the website's flock was too much to have in view all day.
 
 import type { Rgb } from './mountains';
 
-export type Bird = { x: number; y: number; vx: number; vy: number; h: number; ph: number; fear: number; s: number };
+/** Its spot, how far it drifts from it, and where in its drift it is. */
+export type Bird = { hx: number; hy: number; x: number; y: number; t: number; rx: number; ry: number; w: [number, number]; p: [number, number, number, number]; ph: number; s: number };
 type Box = { x: number; y: number; w: number; h: number };
 /** The card in px; the birds keep between `top` and `bottom`, and out of `avoid`. */
-export type BirdSky = { W: number; H: number; top: number; bottom: number; avoid: Box | null; pointer: { x: number; y: number } | null };
+export type BirdSky = { W: number; H: number; top: number; bottom: number; avoid: Box | null };
 
-const CRUISE = 45, FLEE_R = 150, MARGIN = 30, APART = 420, EDGE = 60;
+const MARGIN = 60, SIZE = 14;
+/** How far a bird drifts from its spot, at most, sideways and up or down. */
+export const DRIFT = { x: 42, y: 18 };
 
 const outside = (x: number, y: number, box: Box | null, pad = 0) => !box || x < box.x - pad || x > box.x + box.w + pad || y < box.y - pad || y > box.y + box.h + pad;
 
-export function seedBirds(n: number, sky: BirdSky, rnd: () => number = Math.random): Bird[] {
-  const birds: Bird[] = [];
-  for (let i = 0; i < n; i++) {
-    // Set off from an even spread, a little off it.
-    const spot = perches(n, sky)[i];
-    let x = spot.x, y = spot.y;
-    for (let tries = 0; tries < 50; tries++) {
-      x = spot.x + (rnd() - 0.5) * 120; y = Math.min(sky.bottom, Math.max(sky.top, spot.y + (rnd() - 0.5) * 80));
-      if (outside(x, y, sky.avoid, MARGIN)) break;
-    }
-    const a = rnd() * Math.PI * 2;
-    birds.push({ x, y, vx: Math.cos(a) * 40, vy: Math.sin(a) * 10, h: a, ph: rnd() * Math.PI * 2, fear: 0, s: 12 + rnd() * 5 });
-  }
-  return birds;
-}
-
-/** Where `n` birds sit still: evenly across the sky, at different heights, clear of the words. */
+/** Where `n` birds keep to: evenly across the sky, at different heights, clear of the words. */
 export function perches(n: number, sky: BirdSky): { x: number; y: number }[] {
   const spots: { x: number; y: number }[] = [];
   const heights = [0.5, 0.12, 0.22, 0.62];
@@ -43,53 +31,28 @@ export function perches(n: number, sky: BirdSky): { x: number; y: number }[] {
   return spots;
 }
 
-export function stepBirds(birds: Bird[], dt: number, sky: BirdSky, rnd: () => number = Math.random) {
-  for (const b of birds) {
-    b.h += (rnd() - 0.5) * 2.4 * dt;
-    let ax = (Math.cos(b.h) * CRUISE - b.vx) * 0.8, ay = (Math.sin(b.h) * CRUISE * 0.35 - b.vy) * 0.8;
-    // They keep a sky's width apart rather than flocking: near each other they read as clutter.
-    for (const o of birds) {
-      if (o === b) continue;
-      const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy);
-      if (d > 0 && d < APART) { const f = 1 - d / APART; ax += (dx / d) * 110 * f; ay += (dy / d) * 40 * f; }
-    }
-    // They turn at the card's edges: one half off the edge reads as a mistake.
-    if (b.x < EDGE) { ax += (EDGE - b.x) * 6; b.h = 0; } else if (b.x > sky.W - EDGE) { ax -= (b.x - (sky.W - EDGE)) * 6; b.h = Math.PI; }
-    if (b.y < sky.top) ay += (sky.top - b.y) * 3;
-    if (b.y > sky.bottom) ay -= (b.y - sky.bottom) * 3;
-    const box = sky.avoid;
-    if (box) {
-      const nx = Math.min(Math.max(b.x, box.x), box.x + box.w), ny = Math.min(Math.max(b.y, box.y), box.y + box.h);
-      const dx = b.x - nx, dy = b.y - ny, d = Math.hypot(dx, dy);
-      if (d === 0) {
-        const l = b.x - box.x, r = box.x + box.w - b.x, t = b.y - box.y;
-        if (t <= l && t <= r) { ay -= 900; b.h = -Math.PI / 2; } else if (l < r) { ax -= 900; b.h = Math.PI; } else { ax += 900; b.h = 0; }
-      } else if (d < MARGIN) {
-        const f = 1 - d / MARGIN;
-        ax += (dx / d) * 600 * f; ay += (dy / d) * 600 * f;
-        b.h = Math.atan2(dy, dx);
-      }
-    }
-    const p = sky.pointer;
-    if (p) {
-      const mx = b.x - p.x, my = b.y - p.y, md = Math.hypot(mx, my);
-      if (md > 0 && md < FLEE_R) {
-        const f = 1 - md / FLEE_R;
-        ax += (mx / md) * 2200 * f; ay += (my / md) * 2200 * f;
-        b.fear = 1; b.h = Math.atan2(my, mx);
-      }
-    }
-    b.vx += ax * dt; b.vy += ay * dt;
-    const sp = Math.hypot(b.vx, b.vy), max = 60 + 220 * b.fear;
-    if (sp > max) { b.vx *= max / sp; b.vy *= max / sp; }
-    b.x += b.vx * dt; b.y += b.vy * dt;
-    b.fear = Math.max(0, b.fear - dt * 0.8);
-    b.ph += (6 + 14 * b.fear) * dt;
-  }
+export function seedBirds(n: number, sky: BirdSky, rnd: () => number = Math.random): Bird[] {
+  const birds = perches(n, sky).map(({ x, y }): Bird => ({
+    hx: x, hy: y, x, y, t: 0,
+    rx: DRIFT.x * (0.65 + 0.35 * rnd()), ry: DRIFT.y * (0.6 + 0.4 * rnd()),
+    w: [0.2 + 0.12 * rnd(), 0.15 + 0.1 * rnd()],
+    p: [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28, rnd() * 6.28],
+    ph: rnd() * 6.28, s: SIZE,
+  }));
+  for (const b of birds) drift(b, 0);
+  return birds;
+}
+
+/** Move a bird along its drift by `dt` seconds. Its path is a sum of slow sines, so it never leaves its radius. */
+export function drift(b: Bird, dt: number) {
+  b.t += dt;
+  b.x = b.hx + b.rx * (0.7 * Math.sin(b.w[0] * b.t + b.p[0]) + 0.3 * Math.sin(1.7 * b.w[0] * b.t + b.p[1]));
+  b.y = b.hy + b.ry * (0.7 * Math.sin(b.w[1] * b.t + b.p[2]) + 0.3 * Math.sin(1.9 * b.w[1] * b.t + b.p[3]));
+  b.ph += 2.2 * dt;
 }
 
 /** The dots a bird lights, as grid cells: two bent wings mirrored about its middle, up or down with its flap. */
-export function birdCells(b: Bird, pitch: number): [number, number][] {
+export function birdCells(b: Pick<Bird, 'x' | 'y' | 'ph' | 's'>, pitch: number): [number, number][] {
   const flap = Math.sin(b.ph), s = b.s;
   const seg = (qx: number, qy: number, ax: number, ay: number, bx: number, by: number) => {
     const pax = qx - ax, pay = qy - ay, bax = bx - ax, bay = by - ay;
@@ -120,9 +83,9 @@ export function boxIn(el: Element | null, frame: HTMLElement, pad = 0): Box | nu
 
 /** The most that fly at once. */
 export const MAX_BIRDS = 4;
-/** How often the flock moves. Each update is a step of a dot or two, so nothing is animated in between:
+/** How often they move. Each update is a pixel or two, so nothing is animated in between:
  *  a picture sliding 60 times a second would redraw the window that often. */
-const TICK_MS = 80;
+const TICK_MS = 125;
 /** A tick this much later than planned is the computer struggling, not a bird. */
 const SLOW_GAP = 2.5;
 /** This many late ticks, not made up since, and the flock rests. */
@@ -163,7 +126,7 @@ function sprite(ink: Rgb, pitch: number): string {
   g.fillStyle = `rgb(${ink.join(',')})`;
   // Wings down, level, up: where sin(ph) sits at each end and in the middle.
   [-Math.PI / 2, 0, Math.PI / 2].forEach((ph, frame) => {
-    const b: Bird = { x: CELL_W / 2, y: CELL_H / 2, vx: 0, vy: 0, h: 0, ph, fear: 0, s: CELL_S };
+    const b = { x: CELL_W / 2, y: CELL_H / 2, ph, s: CELL_S };
     for (const [cx, cy] of birdCells(b, pitch)) {
       const y = cy * pitch;
       if (y >= 0 && y < CELL_H) g.fillRect(cx * pitch, frame * CELL_H + y, pitch - 0.2, pitch - 0.2);
@@ -174,44 +137,38 @@ function sprite(ink: Rgb, pitch: number): string {
   return url;
 }
 
-/** Somebody is being shown round: the setup, or the walkthrough beside the app. Birds there sit still. */
-const beingShownRound = () => document.documentElement.dataset.setup !== undefined || document.documentElement.dataset.tourFrame !== undefined;
-/** Wings, for birds sitting still: level, up, down, level. */
-const SITTING = [0, Math.PI / 2, -Math.PI / 2, 0];
-
 const FRAMES = [-Math.PI / 2, 0, Math.PI / 2];
 /** Which of the sprite's wing positions a bird shows now. */
 export const wingFrame = (b: Bird): number => (Math.sin(b.ph) > 0.35 ? 2 : Math.sin(b.ph) < -0.35 ? 0 : 1);
 
 /**
- * Flies up to MAX_BIRDS birds over `layer`, which lies over the card, until the
- * returned function is called. Each bird is a small picture moved by transform,
- * so nothing is repainted and the whole flock costs almost nothing. `sky` says
- * where they may go, and is asked twice a second.
+ * Puts up to MAX_BIRDS birds over `layer`, which lies over the card, and drifts
+ * each about its own spot until the returned function is called. Each is a
+ * small picture moved by transform, so nothing is repainted. `sky` says where
+ * they may be, and is asked twice a second.
  */
-export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sky }: { ink: Rgb; n?: number; pitch?: number; sky: (W: number, H: number) => Omit<BirdSky, 'W' | 'H' | 'pointer'> }): () => void {
+export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sky }: { ink: Rgb; n?: number; pitch?: number; sky: (W: number, H: number) => Omit<BirdSky, 'W' | 'H'> }): () => void {
   const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   Object.assign(layer.style, { position: 'absolute', inset: '0', overflow: 'hidden', pointerEvents: 'none' });
-  let W = 0, H = 0, k = 1, left = 0, top = 0, birds: Bird[] = [], els: { wrap: HTMLElement; wing: HTMLElement }[] = [];
-  let area: Omit<BirdSky, 'W' | 'H' | 'pointer'> = { top: 0, bottom: 0, avoid: null };
-  let pointer: { x: number; y: number } | null = null, raw: { x: number; y: number } | null = null;
+  let W = 0, H = 0, birds: Bird[] = [], els: { wrap: HTMLElement; wing: HTMLElement }[] = [];
+  let world: BirdSky = { W, H, top: 0, bottom: 0, avoid: null };
   let timer = 0, last = 0, looked = 0, late = 0, resting = false, gone = false;
   let busyUntil = 0, lastInput = performance.now();
 
+  /** Read the card's size and where the words are, and move the spots with them. */
   const look = () => {
     W = layer.clientWidth; H = layer.clientHeight;
     if (!W || !H) return false;
-    const r = layer.getBoundingClientRect();
-    k = r.width ? W / r.width : 1; left = r.left; top = r.top;
-    area = sky(W, H);
+    const before = world;
+    world = { W, H, ...sky(W, H) };
+    const spots = birds.length ? perches(birds.length, world) : [];
+    if (spots.length && (before.W !== W || before.H !== H || before.top !== world.top || before.avoid?.y !== world.avoid?.y || before.avoid?.x !== world.avoid?.x)) birds.forEach((b, i) => { b.hx = spots[i].x; b.hy = spots[i].y; });
     return true;
   };
-  const world = (): BirdSky => ({ W, H, pointer, ...area });
-
   const hatch = () => {
     if (!look()) return false;
     const url = sprite(ink, pitch);
-    birds = seedBirds(Math.min(n, MAX_BIRDS), world());
+    birds = seedBirds(Math.min(n, MAX_BIRDS), world);
     els = birds.map(() => {
       const wrap = document.createElement('div'), wing = document.createElement('i');
       Object.assign(wrap.style, { position: 'absolute', left: '0', top: '0', width: `${CELL_W}px`, height: `${CELL_H}px`, overflow: 'hidden', willChange: 'transform' });
@@ -222,17 +179,11 @@ export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sk
     });
     return true;
   };
-  // On the mountains' dot grid, so the birds look drawn in the same dots.
   const put = () => {
     birds.forEach((b, i) => {
-      const x = Math.round((b.x - CELL_W / 2) / pitch) * pitch, y = Math.round((b.y - CELL_H / 2) / pitch) * pitch;
-      els[i].wrap.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      els[i].wrap.style.transform = `translate3d(${(b.x - CELL_W / 2).toFixed(1)}px, ${(b.y - CELL_H / 2).toFixed(1)}px, 0)`;
       els[i].wing.style.transform = `translateY(${-wingFrame(b) * CELL_H}px)`;
     });
-  };
-  const move = () => {
-    for (let s = 0; s < 3; s++) stepBirds(birds, TICK_MS / 1000 / 3, world());
-    put();
   };
   const rest = () => {
     resting = true;
@@ -242,7 +193,7 @@ export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sk
   };
   const tick = () => {
     timer = 0;
-    if (gone || document.hidden || !document.hasFocus() || beingShownRound()) { last = 0; return; }
+    if (gone || document.hidden || !document.hasFocus()) { last = 0; return; }
     const now = performance.now();
     if (last) late = lateness(late, now - last);
     last = now;
@@ -250,60 +201,46 @@ export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sk
     if (waits === 'slow') { rest(); return; }
     if (waits === 'idle') { last = 0; return; }
     if (waits === 'busy') { last = 0; timer = window.setTimeout(tick, busyUntil - now + 20); return; }
-    if (now - looked > LOOK_MS) { looked = now; look(); pointer = raw ? { x: (raw.x - left) * k, y: (raw.y - top) * k } : null; }
-    move();
+    if (now - looked > LOOK_MS) { looked = now; look(); }
+    for (const b of birds) drift(b, TICK_MS / 1000);
+    put();
     timer = window.setTimeout(tick, TICK_MS);
   };
   const go = () => { if (!timer && !resting && !gone) { last = 0; timer = window.setTimeout(tick, TICK_MS); } };
-  const perch = () => {
-    if (!birds.length && !hatch()) return;
-    if (!look()) return;
-    perches(birds.length, world()).forEach((spot, i) => { birds[i].x = spot.x; birds[i].y = spot.y; birds[i].ph = SITTING[i % SITTING.length]; });
-    put();
-  };
   const start = () => {
     if (gone || resting || document.hidden) return;
-    if (beingShownRound()) { halt(); perch(); return; }
     if (!birds.length && !hatch()) return;
     put();
     if (!still) go();
   };
   const halt = () => { if (timer && !resting) { clearTimeout(timer); timer = 0; } last = 0; };
   const onVisible = () => { if (document.hidden) halt(); else start(); };
-  const onBlur = () => { halt(); raw = null; pointer = null; };
+  const onBlur = () => halt();
   const onFocus = () => start();
-  const onMove = (e: PointerEvent) => {
-    raw = { x: e.clientX, y: e.clientY };
-    lastInput = performance.now();
-    if (!timer && !resting && !gone && birds.length) go();
-  };
+  const onMove = () => { lastInput = performance.now(); if (!timer && !resting && !gone && birds.length) go(); };
   const onBusy = () => { lastInput = performance.now(); busyUntil = lastInput + BUSY_MS; if (!timer) start(); };
-  const onResize = () => { looked = 0; if (beingShownRound()) perch(); };
-  const shown = new MutationObserver(() => start());
+  const onResize = () => { looked = 0; if (look()) put(); };
   const resized = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null;
 
   const ready = window.setTimeout(() => {
     start();
     if (still) return;
-    shown.observe(document.documentElement, { attributes: true, attributeFilter: ['data-setup', 'data-tour-frame'] });
     window.addEventListener('blur', onBlur); window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('pointermove', onMove, { passive: true });
     window.addEventListener('keydown', onBusy, { passive: true, capture: true });
     window.addEventListener('wheel', onBusy, { passive: true, capture: true });
-    window.addEventListener('resize', onResize);
     resized?.observe(layer);
   }, 600);
   return () => {
     gone = true;
-    shown.disconnect(); resized?.disconnect();
+    resized?.disconnect();
     clearTimeout(ready); clearTimeout(timer);
     window.removeEventListener('blur', onBlur); window.removeEventListener('focus', onFocus);
     document.removeEventListener('visibilitychange', onVisible);
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('keydown', onBusy, true);
     window.removeEventListener('wheel', onBusy, true);
-    window.removeEventListener('resize', onResize);
     layer.replaceChildren();
   };
 }

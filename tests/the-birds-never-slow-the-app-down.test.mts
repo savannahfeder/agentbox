@@ -12,11 +12,13 @@
 // while the computer is struggling.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { MAX_BIRDS, flockWaits, lateness, perches, seedBirds, stepBirds } from '../renderer/src/home/birds.ts';
+import { DRIFT, MAX_BIRDS, drift, flockWaits, lateness, seedBirds, type Bird } from '../renderer/src/home/birds.ts';
 
 const src = fs.readFileSync(new URL('../renderer/src/home/birds.ts', import.meta.url), 'utf8');
 const seeded = (seed: number) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
-const world = { W: 1200, H: 800, top: 60, bottom: 380, avoid: { x: 400, y: 100, w: 400, h: 600 }, pointer: null };
+/** A bird's path over `seconds`, at its eight updates a second. */
+const run = (b: Bird, seconds: number) => { const path: { x: number; y: number }[] = []; for (let i = 0; i < seconds * 8; i++) { drift(b, 0.125); path.push({ x: b.x, y: b.y }); } return path; };
+const world = { W: 1200, H: 800, top: 60, bottom: 380, avoid: { x: 400, y: 100, w: 400, h: 600 } };
 
 describe('how many fly', () => {
   it('is never more than a handful', () => {
@@ -39,8 +41,8 @@ describe('what a bird costs', () => {
     expect(tick).toBeGreaterThanOrEqual(80);
   });
   it('asks the page for nothing on every move of the pointer', () => {
-    const move = src.match(/const onMove = [\s\S]*?\n {2}\};/)?.[0] ?? '';
-    expect(move).toContain('clientX');
+    const move = src.match(/const onMove = [^\n]*/)?.[0] ?? '';
+    expect(move).toContain('lastInput');
     expect(move).not.toMatch(/getBoundingClientRect|clientWidth|offsetWidth|querySelector/);
   });
 });
@@ -67,8 +69,8 @@ describe('while you are typing or scrolling, or away', () => {
     expect(flockWaits(95_000, { ...s, lastInput: 0 })).toBe('idle');
     expect(flockWaits(95_000, { ...s, lastInput: 60_000 })).toBe(null);
   });
-  it('does not stop for the pointer, which they scatter from', () => {
-    expect(src.match(/const onMove = [\s\S]*?\n {2}\};/)?.[0]).not.toMatch(/busy/i);
+  it('does not stop for the pointer', () => {
+    expect(src.match(/const onMove = [^\n]*/)?.[0]).not.toMatch(/busy/i);
   });
 });
 
@@ -94,61 +96,54 @@ describe('when the computer is struggling', () => {
   });
 });
 
-describe('at ten updates a second', () => {
-  // Steps this far apart are where a flock would fly off or through the words.
-  it('the flock still keeps to the sky and out of the words', () => {
-    const birds = seedBirds(4, world, seeded(11));
-    let inWords = 0, seen = 0;
-    for (let i = 0; i < 1800; i++) {
-      for (let k = 0; k < 3; k++) stepBirds(birds, 0.1 / 3, world, seeded(100 + i));
-      for (const b of birds) {
-        seen += 1;
-        expect(b.y).toBeGreaterThan(world.top - 40);
-        expect(b.y).toBeLessThan(world.bottom + 40);
-        if (b.x > 400 && b.x < 800 && b.y > 100) inWords += 1;
+describe('how they move', () => {
+  // The founder, 2026-11-22: "These actually do need to move, but way less. They should each have their own radius and
+  // move more slowly toward them so it's not too annoying. Maybe we even consider doing something like that in all cases."
+  it('drifts about its own spot and never leaves it', () => {
+    for (const bird of seedBirds(4, world, seeded(21))) {
+      const home = { x: bird.hx, y: bird.hy };
+      for (const p of run(bird, 180)) {
+        expect(Math.abs(p.x - home.x)).toBeLessThanOrEqual(DRIFT.x + 0.1);
+        expect(Math.abs(p.y - home.y)).toBeLessThanOrEqual(DRIFT.y + 0.1);
       }
     }
-    expect(inWords / seen).toBeLessThan(0.05);
+  });
+  it('is slow: never faster than a slow walk across the card, and moving', () => {
+    for (const bird of seedBirds(4, world, seeded(5))) {
+      const path = run(bird, 60);
+      const steps = path.slice(1).map((p, i) => Math.hypot(p.x - path[i].x, p.y - path[i].y) / 0.125);
+      expect(Math.max(...steps)).toBeLessThan(22);
+      expect(steps.reduce((m, v) => m + v, 0) / steps.length).toBeGreaterThan(1);
+    }
+  });
+  it('flaps slowly', () => {
+    const [b] = seedBirds(1, world, seeded(9));
+    const before = b.ph;
+    drift(b, 1);
+    expect(b.ph - before).toBeLessThan(3);
   });
 });
 
 describe('how they are spread', () => {
   // The founder, 2026-11-22: "The birds are often scattered and cluttered in their own area, near each other."
-  it('flies apart rather than in a knot', () => {
+  it('keeps to spots spread evenly across the sky, at least a sixth of the card apart', () => {
     const birds = seedBirds(4, world, seeded(21));
-    const near: number[] = [];
-    const rnd = seeded(31);
-    for (let i = 0; i < 900; i++) {
-      for (let k = 0; k < 3; k++) stepBirds(birds, 0.08 / 3, world, rnd);
-      if (i > 150) for (const b of birds) near.push(Math.min(...birds.filter((o) => o !== b).map((o) => Math.hypot(b.x - o.x, b.y - o.y))));
-    }
-    expect(near.reduce((a, b) => a + b, 0) / near.length).toBeGreaterThan(200);
+    const xs = birds.map((b) => b.hx).sort((p, q) => p - q);
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThan(world.W / 6);
   });
-  it('turns at the card\'s edges rather than half leaving it', () => {
-    const birds = seedBirds(4, world, seeded(41));
-    const rnd = seeded(51);
-    for (let i = 0; i < 1500; i++) {
-      for (let k = 0; k < 3; k++) stepBirds(birds, 0.08 / 3, world, rnd);
-      for (const b of birds) { expect(b.x).toBeGreaterThan(0); expect(b.x).toBeLessThan(world.W); }
-    }
-  });
-  it('perches evenly, clear of the words, while the setup or the walkthrough is on', () => {
+  it('keeps clear of the words, wherever it drifts', () => {
     for (const w of [world, { ...world, W: 1010, H: 1126, top: 70, bottom: 430, avoid: { x: 120, y: 300, w: 700, h: 260 } }]) {
-      const spots = perches(4, w);
-      expect(spots).toHaveLength(4);
-      const xs = spots.map((s) => s.x).sort((a, b) => a - b);
-      for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThan(w.W * 0.12);
-      for (const s of spots) {
-        expect(s.y).toBeGreaterThanOrEqual(w.top - 5);
-        expect(s.y).toBeLessThanOrEqual(w.bottom + 5);
-        const inside = s.x > w.avoid.x && s.x < w.avoid.x + w.avoid.w && s.y > w.avoid.y && s.y < w.avoid.y + w.avoid.h;
-        expect(inside).toBe(false);
+      for (const bird of seedBirds(4, w, seeded(41))) {
+        const box = w.avoid;
+        for (const p of run(bird, 120)) {
+          const inside = p.x > box.x && p.x < box.x + box.w && p.y > box.y && p.y < box.y + box.h;
+          expect(inside).toBe(false);
+        }
+        expect(bird.hy).toBeGreaterThanOrEqual(w.top - 1);
       }
     }
   });
-  it('does not move while the setup or the walkthrough is on, and flies again after', () => {
-    expect(src).toMatch(/dataset\.setup/);
-    expect(src).toMatch(/dataset\.tourFrame/);
-    expect(src).toMatch(/MutationObserver/);
+  it('is the same in setup, the walkthrough and Home', () => {
+    expect(src).not.toMatch(/dataset\.setup|dataset\.tourFrame/);
   });
 });

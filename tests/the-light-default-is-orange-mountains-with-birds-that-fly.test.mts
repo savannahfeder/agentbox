@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { shownSkyId, skyTheme } from '../renderer/src/home/sky.ts';
 import { mountainDots, type Mountains } from '../renderer/src/home/mountains.ts';
-import { seedBirds, stepBirds, birdCells, type Bird } from '../renderer/src/home/birds.ts';
+import { seedBirds, drift, birdCells } from '../renderer/src/home/birds.ts';
 
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const seeded = (seed: number) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
@@ -56,37 +56,12 @@ describe('the mountains', () => {
 });
 
 describe('the birds', () => {
-  const world = { W: 1200, H: 800, top: 60, bottom: 380, avoid: { x: 400, y: 100, w: 400, h: 600 }, pointer: null };
-  const fly = (birds: Bird[], frames: number, w = world) => { for (let i = 0; i < frames; i++) stepBirds(birds, 1 / 30, w); };
-  it('stay in the sky and out of the words for a whole minute', () => {
-    const birds = seedBirds(7, world, seeded(3));
-    let inWords = 0, seen = 0;
-    for (let i = 0; i < 1800; i++) {
-      fly(birds, 1);
-      for (const b of birds) {
-        seen += 1;
-        expect(b.y).toBeGreaterThan(world.top - 40);
-        expect(b.y).toBeLessThan(world.bottom + 40);
-        if (b.x > 400 && b.x < 800 && b.y > 100) inWords += 1;
-      }
-    }
-    expect(inWords / seen).toBeLessThan(0.05);
-  });
-  it('move', () => {
-    const birds = seedBirds(3, world, seeded(5));
-    const at = birds.map((b) => b.x);
-    fly(birds, 30);
-    expect(birds.some((b, i) => Math.abs(b.x - at[i]) > 20)).toBe(true);
-  });
-  it('scatter from the pointer', () => {
-    const [b] = seedBirds(1, world, seeded(7));
-    const pointer = { x: b.x + 10, y: b.y };
-    const before = Math.hypot(b.x - pointer.x, b.y - pointer.y);
-    fly([b], 10, { ...world, avoid: null, pointer });
-    expect(Math.hypot(b.x - pointer.x, b.y - pointer.y)).toBeGreaterThan(before + 30);
-  });
-  it('flap their wings', () => {
+  const world = { W: 1200, H: 800, top: 60, bottom: 380, avoid: { x: 400, y: 100, w: 400, h: 600 } };
+  it('move, and flap their wings', () => {
     const [b] = seedBirds(1, world, seeded(9));
+    const at = { x: b.x, y: b.y };
+    for (let i = 0; i < 40; i++) drift(b, 0.125);
+    expect(Math.hypot(b.x - at.x, b.y - at.y)).toBeGreaterThan(1);
     const up = JSON.stringify(birdCells({ ...b, ph: Math.PI / 2 }, 3));
     const down = JSON.stringify(birdCells({ ...b, ph: -Math.PI / 2 }, 3));
     expect(up).not.toBe(down);
