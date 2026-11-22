@@ -241,12 +241,15 @@
      right-side details while the original font stays everywhere else. The body stays Avenir Next; only what reads var(--mono)
      takes Geist Mono. Its @font-face sits with Ember's block below. */
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
-  /* Three corners: the small one for what you press or type in, the artifact
-     one for cards, sheets, menus and what somebody made, and round for faces.
-     Rows, dividers, tabs and the window's panels stay square. --radius is the
-     small corner under its old name, so the Ember Grid skin can still square it. */
+  /* Four corners: the small one for what you press or type in, the artifact
+     one for cards, sheets, menus and what somebody made, the pane one for the
+     main card the app sits in, and round for faces. The pane corner is never
+     smaller than the artifact one, so nothing inside the card is rounder than
+     the card. Rows, dividers and tabs stay square. --radius is the small
+     corner under its old name, so the Ember Grid skin can still square it. */
   --artifact-corner: 10px;
   --artifact-corner-small: 6px;
+  --pane-corner: 10px;
   --radius: var(--artifact-corner-small);
   --pill: 999px;
   /* An AI teammate is round like a person; its dashed ring tells it apart. */
@@ -2684,8 +2687,11 @@ body {
 /* One card in front, the queue as stacked edges peeking above it. The ghosts
    are pure chrome: depth without height, so ten pending asks occupy the same
    screen as one. */
-/* Extra scroll room belongs after the inbox, never inside an opened thread. */
-.app.asking .list-pane:not(.pinned)::after {
+/* The card floats over everything, so scroll room goes only after a list that
+   scrolls. A thread, chat or page that fills its pane would be squeezed by the
+   room, or slide up by it. */
+.app.asking .body:not(.tm-body) > .list-pane:not(.pinned, .rm-open, .tq-open, .pl-open)::after,
+.app.asking .team-page::after {
   content: ''; display: block;
   height: calc(var(--approval-room, 149px) + 16px);
 }
@@ -4202,12 +4208,12 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
    was found by. Two lines, so the row is taller. */
 .palette-k :is(.palette-found, .palette-two) { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
 .palette-k :is(.palette-found, .palette-two) .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+/* Up by the title, a small mark read as floating at the top of the row. */
+.palette-k :is(.palette-found, .palette-two) .palette-glyph { align-self: center; }
 .palette-k :is(.palette-found, .palette-two) .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
 .palette-k :is(.palette-found, .palette-two) .hit { color: var(--text); font-weight: 600; }
 .palette-k .palette-two .palette-hint { padding-top: 2px; }
-/* Finished threads step back; the highlight behind a selected one does not. */
-.palette-k .palette-done > * { opacity: .5; }
 
 /* A found line, landed on from the results: marked for a moment. */
 [data-line] { transition: background-color .5s ease, box-shadow .5s ease; }
@@ -9518,6 +9524,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .cloud-plan-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .cloud-counts { margin: 0; padding: 4px 0 0 18px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); user-select: text; -webkit-user-select: text; }
 .cloud-plans-say { margin: 14px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); user-select: text; -webkit-user-select: text; }
+.cloud-plans-terms { color: var(--text-dim); }
+.cloud-plans-terms a { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
 
 /* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }

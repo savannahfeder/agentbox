@@ -125,7 +125,7 @@ export interface ThreadShareOptions {
   /** A teammate's name by their id, carried on their comment for the owner's agent. */
   nameOf?: (personId: string) => string | null | undefined;
   /** True when a comment on your thread was taken as words to its agent, so it is not filed as a comment too. */
-  relay?: (comment: ThreadComment, thread: { item: PhoneItem; product: TeamProduct }) => boolean;
+  relay?: (comment: ThreadComment, thread: { item: PhoneItem; product: TeamProduct }, orElse: () => void) => boolean;
 }
 
 export interface ThreadShare {
@@ -644,15 +644,18 @@ export function createThreadShare({
     if (!unsaid.length && fileMarks.every((m) => m.owner !== me || m.by === me || deliveredMarks.has(m.id))) return;
     const threads = listThreads();
     let added = 0;
+    // The name is for the owner's agent, which has no team list to look it up in.
+    const file = (c: ThreadComment, dir: string) => {
+      const name = nameOf(c.by);
+      return disk.appendForeignLines(dir, [{
+        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
+      }]);
+    };
     for (const c of unsaid) {
       const thread = threads.get(c.threadId);
       if (!thread) continue;
-      if (relay?.(c, thread)) { delivered.add(c.id); added += 1; continue; }
-      // The name is for the owner's agent, which has no team list to look it up in.
-      const name = nameOf(c.by);
-      added += disk.appendForeignLines(thread.product.dir, [{
-        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
-      }]);
+      if (relay?.(c, thread, () => { if (file(c, thread.product.dir)) onChange(); })) { delivered.add(c.id); added += 1; continue; }
+      added += file(c, thread.product.dir);
       delivered.add(c.id);
     }
     for (const m of fileMarks) {

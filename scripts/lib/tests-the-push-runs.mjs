@@ -100,8 +100,11 @@ function capped(named, code, root, cap) {
 export async function testsTheChangeReaches(changed, root = process.cwd(), { reaches = testsTheGraphReaches } = {}) {
   const code = changed.filter(Boolean);
   const own = code.filter((f) => isTest(f) && fs.existsSync(path.join(root, f)));
+  // A changed test runs itself, and a test that imports it is found by
+  // testsThatImport, so a push of only tests need not start vitest.
+  const source = code.filter((f) => !isTest(f));
   return [...new Set([
-    ...own, ...testsThatRead(code, root), ...testsThatImport(code, root), ...await reaches(code, root),
+    ...own, ...testsThatRead(code, root), ...testsThatImport(code, root), ...(source.length ? await reaches(source, root) : []),
   ])].sort();
 }
 

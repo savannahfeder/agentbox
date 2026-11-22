@@ -46,7 +46,7 @@ describe('every helper the app starts on a .mts file asks for it', () => {
     expect(read(file)).toMatch(line);
   });
 
-  it.each(['main/codex-threads.mts', 'main/freeze-recorder.mts', 'main/git-change-offthread.mts', 'main/task-folders-offthread.mts'])('%s starts its thread with the flag', (file) => {
+  it.each(['main/chat-reader.mts', 'main/freeze-recorder.mts', 'main/git-change-offthread.mts', 'main/task-folders-offthread.mts'])('%s starts its thread with the flag', (file) => {
     expect(read(file)).toMatch(/new Worker\(new URL\('\.\/[\w-]+\.mts', import\.meta\.url\), \{[^}]*execArgv: \[\.\.\.process\.execArgv, \.\.\.stripTypesFlags\(\)\]/);
   });
 

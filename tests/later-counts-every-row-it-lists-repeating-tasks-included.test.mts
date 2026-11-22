@@ -71,7 +71,7 @@ describe("Later's number on the tab bar is the rows its page draws", () => {
     expect(rowsDrawn([], [rule])).toBe(1);
     const count = tabCount('snoozed', { rules: [rule] });
     expect(count).toBe(1);
-    expect(laterTabShown({ count, view: 'inbox', walking: false })).toBe(true);
+    expect(laterTabShown({ count, view: 'inbox' })).toBe(true);
     const html = renderToStaticMarkup(React.createElement(StateTabs, { view: 'inbox', counts: { inbox: 2, snoozed: count }, onView() {} }));
     expect(html).toMatch(/Later<b>1<\/b>/);
   });
@@ -84,7 +84,7 @@ describe("Later's number on the tab bar is the rows its page draws", () => {
   });
 
   it('and Tab stops on Later whenever the tab bar draws it', () => {
-    expect(app).toContain("laterTabShown({ count: scheduledCount, view, walking: !!run })");
+    expect(app).toContain("laterTabShown({ count: scheduledCount, view })");
     expect(app).toContain('const scheduledCount = snoozed.length + repeats.length + chatsLater;');
   });
 

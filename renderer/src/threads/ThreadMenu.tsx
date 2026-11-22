@@ -45,9 +45,9 @@ import { PriorityIcon } from '../components/Priority';
 import { PRIORITIES, priorityLabelOf, type PriorityId } from '../priority';
 import { Face } from '../team/people';
 import type { Person } from '../types';
-import { ChooseList, CopiedSheet, GiveSheet, PanelBack, SeeList, SendSheet, ShareList, pointsAtStep } from './SharePanel';
+import { ChooseList, CopiedSheet, EveryoneMark, GiveSheet, PanelBack, SeeList, SendSheet, ShareList, pointsAtStep } from './SharePanel';
 import { readAskDraft, saveAskDraft, type AskDraft, type ItemRef } from '../drafts';
-import type { SeenBy } from './share-rules';
+import type { SeenBy, ShareFace } from './share-rules';
 
 /** ⌘K asking a person: the thread's menu opens its sheet for them. */
 export const ASK_PERSON_EVENT = 'zero:ask-person';
@@ -99,7 +99,7 @@ export interface ThreadMenuRow {
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, follow = null, carryOn = false, runNow = false, share = false, people = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, stopRepeat = false, closeTask = false, reopen = false }: {
+export function threadMenuRows({ change, terminal, finish, follow = null, carryOn = false, runNow = false, share = false, shareButton = false, shareSays = null, people = false, later = false, priority = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, stopRepeat = false, closeTask = false, reopen = false }: {
   /** A teammate's thread: whether you are told when it is done, or null where that cannot change. */
   follow?: 'on' | 'off' | null;
   /** A teammate's thread you can carry on in one of your own. */
@@ -108,6 +108,10 @@ export function threadMenuRows({ change, terminal, finish, follow = null, carryO
   reopen?: boolean;
   /** Share… opens the link, the inbox and who can open it; it takes Add people's place. */
   share?: boolean;
+  /** Share is the button beside Done, so the menu does not repeat it. */
+  shareButton?: boolean;
+  /** Who can open it, beside the Share row where there is no button to wear it. */
+  shareSays?: string | null;
   /** Someone could still be added to the thread. */
   people?: boolean;
   /** A run of a repeating task: no more runs after this one. */
@@ -135,7 +139,7 @@ export function threadMenuRows({ change, terminal, finish, follow = null, carryO
   if (follow) rows.push({ id: 'follow', label: 'Tell me when it is done', key: null, on: follow === 'on' });
   if (carryOn) rows.push({ id: 'continue', label: 'Continue it yourself', key: null });
   // One door for both: someone looking to hand it off goes to Share first (founder, 2026-11-21).
-  if (share) rows.push({ id: 'share', label: give ? 'Ask, hand over or share…' : 'Share…', key: null });
+  if (share && !shareButton) rows.push({ id: 'share', label: give ? 'Ask, hand over or share…' : 'Share…', key: null, ...(shareSays ? { detail: shareSays } : {}) });
   if (runNow) rows.push({ id: 'run', label: 'Run now', key: null });
   if (change) rows.push({ id: 'code', label: 'View code changes', key: null });
   if (terminal) rows.push({ id: 'terminal', label: terminal === 'open' ? 'Hide terminal' : 'Open terminal', key: '⌘J' });
@@ -286,6 +290,17 @@ function BlockWords({ onPick }: { onPick: (id: string) => void }) {
   </label>;
 }
 
+/** Who can open the thread, worn by the Share button as the hand-over button wears who has it. */
+function ShareButtonFace({ face }: { face?: ShareFace<Person> }) {
+  if (!face || face.mark === 'share') return <><PeopleMark /><span>Share</span></>;
+  return <>
+    {face.people.length
+      ? <span className="ts-share-faces">{face.people.map((p) => <Face key={p.id} person={p} size={18} />)}</span>
+      : <EveryoneMark />}
+    <span className="ts-share-words">{face.words}</span>
+  </>;
+}
+
 /* ----------------------------------------------------------------- button */
 
 export function ThreadMenu({ thread = null, following = null, onFollow, onContinue = null, share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
@@ -296,8 +311,8 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
   onContinue?: (() => void) | null;
   /** The thread the ask sheet sends, by its name; what the sheet holds is kept for it across closes and visits. */
   thread?: (ItemRef & { name?: string }) | null;
-  /** What Share… offers, or null where the thread cannot be shared. */
-  share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string; chosen?: readonly string[] } | null;
+  /** What Share… offers, or null where the thread cannot be shared. `face` is what its button wears. */
+  share?: { link: string | null; people: readonly Person[]; last?: string | null; seen: SeenBy; seenWord: string; teamName: string; chosen?: readonly string[]; face?: ShareFace<Person> } | null;
   /** Puts the link on the clipboard; false when it could not. */
   onCopyLink?: () => Promise<boolean>;
   onSendTo?: (to: string[], note: string) => void;
@@ -367,7 +382,10 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
 }) {
   const canGive = giveTo.length > 0 && !!onGive && !!onFinish;
   // With both, the Share button beside Done is the one door, so the menu does not repeat it.
-  const { done, menu: rows } = splitDone(threadMenuRows({ follow: following === null || !onFollow ? null : following ? 'on' : 'off', carryOn: !!onContinue, change: !!change && !codeButton, share: !!share && !canGive, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: canGive && !share, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
+  // A phone's bar has no room for it, so there Share is the menu's first row.
+  const shareButton = !!share && canGive && !onPhone();
+  const shareSays = share?.face && share.face.mark !== 'share' ? share.face.words : null;
+  const { done, menu: rows } = splitDone(threadMenuRows({ follow: following === null || !onFollow ? null : following ? 'on' : 'off', carryOn: !!onContinue, change: !!change && !codeButton, share: !!share, shareButton, shareSays, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: canGive, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [givingTo, setGivingTo] = useState<{ id: string; name: string } | null>(null);
@@ -550,9 +568,10 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
       {place && <PlaceButton place={place} {...placeFacts} onPlace={onPlace} />}
       {handedTo && !done && <button type="button" className="ts-done ts-handed" disabled={!handedTo.onOpen} onClick={handedTo.onOpen ?? undefined}><span className="ts-handed-face" aria-hidden="true">{handedTo.initials}</span><span>{handedTo.name}</span></button>}
       {onReopen && !handedTo && !done && <button type="button" className="ts-done ts-reopen" onClick={onReopen}><span>Reopen</span></button>}
-      {share && canGive && <button type="button" className="ts-done ts-share" aria-haspopup="menu" aria-expanded={open && !!sharing}
+      {share && shareButton && <button type="button" className="ts-done ts-share" aria-haspopup="menu" aria-expanded={open && !!sharing}
+        aria-label={!share.face || share.face.mark === 'share' ? 'Share' : `Share, ${share.face.words} can open it`}
         onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); setShareDirect(true); }}>
-        <PeopleMark /><span>Share</span>
+        <ShareButtonFace face={share.face} />
       </button>}
       {done && (
         <button

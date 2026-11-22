@@ -18,20 +18,10 @@ export function setupPreview(width: number, height: number) {
   return { left, x, y, scale, h: (height - 16 - y) / scale, right: Math.max(0, 1120 - (width - 16 - x) / scale) };
 }
 
-/** How long Add waits on the import before the setup moves on. Skip and Back are greyed out
- *  while it waits, so a longer wait reads as a frozen screen; the import carries on behind it. */
-export const BRING_IN_WAIT_MS = 15_000;
-
-/** How many chats came in, or null when the import failed or ran past the wait. */
-export async function bringInWithin(bring: () => Promise<number>, ms = BRING_IN_WAIT_MS): Promise<number | null> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([bring(), new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), ms); })]);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+/** Starts the import and returns at once, so no step of the setup waits on it.
+ *  `landed` hears how many chats came in, 0 when the import failed. */
+export function bringInBehind(bring: () => Promise<number>, landed: (n: number) => void): void {
+  void Promise.resolve().then(bring).then((n) => Number(n) || 0, () => 0).then(landed);
 }
 
 export type SetupStep = 'chats' | 'folder' | 'agent' | 'account' | 'plan' | 'join' | 'teammates' | 'look';
@@ -138,8 +128,8 @@ export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
-const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'dusk-light', 'light', 'dark'];
-const LIGHT_SKIES = ['sage', 'dusk-light'];
+const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'light', 'dark'];
+const LIGHT_SKIES = ['sage'];
 /** The look you have first, then Match my system, then every sky Settings offers.
  *  A sky is drawn only on Home, so without it the choice is Light or Dark. */
 export function lookChoices(current: string, skies: boolean): string[] {

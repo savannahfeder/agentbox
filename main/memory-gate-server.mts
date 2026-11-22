@@ -95,6 +95,7 @@ export async function listProcesses(): Promise<ProcessSample[]> {
 // The process an agent IS: Claude Code's `claude`, or Codex's app-server.
 // Used only to find whose command a hook was, never to decide anything.
 const AGENT = /(^|\/)(claude|codex)(\s|$)/;
+const CLAUDE_AGENT = /(^|\/)claude(\s|$)/;
 
 // A hook asking for a later command runs under the same agent but is no
 // command's work. Only its exact launch matches, so a command that merely
@@ -135,6 +136,8 @@ export interface Grant {
   wallStart: number;
   startedAt: number;
   ambiguous: boolean;
+  sharedNow?: boolean;
+  soloPeakMb?: number;
   emptySince: number | null;
 }
 
@@ -163,6 +166,7 @@ export interface MemoryGateServerOptions {
   sampleProcesses?: () => Promise<ProcessSample[]>;
   parentOf?: (pid: number) => number | null;
   pollMs?: number;
+  idlePollMs?: number;
   takeoverMs?: number;
   lockPort?: number;
   idleReleaseMs?: number;
@@ -190,6 +194,9 @@ export class MemoryGateServer {
   declare sampleProcesses: () => Promise<ProcessSample[]>;
   declare parentOf: (pid: number) => number | null;
   declare pollMs: number;
+  declare idlePollMs: number;
+  declare pollEvery?: number;
+  declare readAt?: number;
   declare takeoverMs: number;
   declare lockPort: number;
   declare log: (line: string) => void;
@@ -204,7 +211,7 @@ export class MemoryGateServer {
   declare pollTimer?: NodeJS.Timeout;
   declare server?: http.Server | null;
   declare lock?: net.Server | null;
-  declare polling?: boolean;
+  declare polling?: Promise<void> | null;
   declare saves?: number;
   declare grantBytes?: number;
 
@@ -234,6 +241,9 @@ export class MemoryGateServer {
     sampleProcesses = listProcesses,
     parentOf = readParentPid,
     pollMs = 2_000,
+    // With nothing asked, granted or waiting, a reading is only kept fresh for
+    // the status page: the next ask reads again first if this one is stale.
+    idlePollMs = 30_000,
     takeoverMs = 5_000,
     // The port whose holder is the one coordinator on this Mac. Fixed so that
     // every Agentbox finds the same one; a test passes its own.
@@ -266,6 +276,7 @@ export class MemoryGateServer {
     this.sampleProcesses = sampleProcesses;
     this.parentOf = parentOf;
     this.pollMs = pollMs;
+    this.idlePollMs = idlePollMs;
     this.takeoverMs = takeoverMs;
     this.lockPort = lockPort;
     this.log = log;
@@ -291,6 +302,7 @@ export class MemoryGateServer {
     this.stopping = true;
     clearTimeout(this.takeoverTimer);
     clearInterval(this.pollTimer);
+    this.pollTimer = undefined;
     // Everything still waiting goes: the gate is off, so nothing should hold.
     for (const w of this.gate.waiting.values()) for (const r of w.replies) r({ allow: true });
     this.gate.waiting.clear();
@@ -325,9 +337,8 @@ export class MemoryGateServer {
     if (await this._listen()) {
       this.role = 'owner';
       this.log(`memory gate: coordinating on ${this.socketPath}`);
-      this._poll();
-      this.pollTimer = setInterval(() => this._poll(), this.pollMs);
-      this.pollTimer.unref?.();
+      void this._poll();
+      this._pace();
       return;
     }
     this.role = 'standby';
@@ -392,7 +403,7 @@ export class MemoryGateServer {
     req.on('end', () => {
       let body: HookBody | null;
       try { body = JSON.parse(raw) as HookBody | null; } catch { res.end(''); return; }
-      if (req.url === '/pre') this._pre(body, req, res);
+      if (req.url === '/pre') this._pre(body, req, res).catch(() => res.end(''));
       else if (req.url === '/post') { this._post(body); res.end(''); }
       else res.end('');
     });
@@ -448,12 +459,16 @@ export class MemoryGateServer {
       this.grants.delete(r.id);
       this.gate.finish(r.id);
     }
+    this._pace();
   }
 
-  _pre(body: HookBody | null, req: http.IncomingMessage, res: http.ServerResponse) {
+  async _pre(body: HookBody | null, req: http.IncomingMessage, res: http.ServerResponse) {
     const hook = body?.hook ?? {};
     const command = hook?.tool_input?.command;
     if (typeof command !== 'string' || !command.trim()) { res.end(''); return; }
+    if (this.clock() - (this.readAt ?? 0) > this.pollMs) await this._poll();
+    // An asker that gave up during that reading would never send its close.
+    if (res.destroyed) return;
     const whose = this._whose(body, hook);
     // A COMMAND THIS APP DID NOT START IS NOT ITS TO HOLD. Only a Codex ask can
     // land here unowned, and letting it run is the only honest answer: holding a
@@ -495,8 +510,9 @@ export class MemoryGateServer {
     if (!answered) this.counts.waited++;
     // The agent stopped waiting (killed, interrupted, timed out): forget it.
     res.on('close', () => {
-      if (!answered) this.gate.finish(id);
+      if (!answered) { this.gate.finish(id); this._pace(); }
     });
+    this._pace();
   }
 
   /** The pids above `pid`, nearest first, as far as they can be read. */
@@ -518,6 +534,7 @@ export class MemoryGateServer {
     const grant = this.grants.get(id);
     this.grants.delete(id);
     const was = this.gate.finish(id);
+    this._pace();
     if (!was) return;
     this._writeGrant({
       refused: false,
@@ -547,11 +564,26 @@ export class MemoryGateServer {
 
   /* ------------------------------ measuring ------------------------------ */
 
-  async _poll() {
-    if (this.polling) return;
-    this.polling = true;
+  _poll(): Promise<void> {
+    this.polling ??= this._read().finally(() => { this.polling = null; this._pace(); });
+    return this.polling;
+  }
+
+  /** The busy rate while anything is asked, granted or waiting, else the idle one. */
+  _pace() {
+    if (this.role !== 'owner' || this.stopping) return;
+    const every = this.grants.size || this.gate.running.size || this.gate.waiting.size ? this.pollMs : this.idlePollMs;
+    if (this.pollTimer && this.pollEvery === every) return;
+    clearInterval(this.pollTimer);
+    this.pollEvery = every;
+    this.pollTimer = setInterval(() => { void this._poll(); }, every);
+    this.pollTimer.unref?.();
+  }
+
+  async _read() {
     try {
       this.reading = await this.readPressure();
+      this.readAt = this.clock();
       this.gate.setPressure(pressureFrom(this.reading, GATE_LINES));
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
@@ -560,8 +592,6 @@ export class MemoryGateServer {
       if (this.dirty && (this.saves = (this.saves ?? 0) + 1) % 15 === 0) this._saveHistory();
     } catch (err) {
       this.log(`memory gate: poll failed: ${(err as Error).message}`);
-    } finally {
-      this.polling = false;
     }
   }
 
@@ -633,8 +663,15 @@ export class MemoryGateServer {
       const since = Math.min(...grants.map((g) => g.wallStart)) - 1_000;
       const baseline = grants.reduce<Set<number> | null>((acc, g) => (acc && g.baseline.size < acc.size ? g.baseline : acc ?? g.baseline), null);
       const ours = (p: ProcessSample) => (typeof p.startedAt === 'number' ? p.startedAt >= since : !baseline!.has(p.pid));
+      // Under Claude Code each command is a new shell the agent starts, so what
+      // the agent started before these grants (an MCP server, an earlier
+      // command sent to the background) is not their work, and nor is anything
+      // it starts later, however new. Codex's own tree is unmeasured, so it
+      // keeps the old reading.
+      const claude = CLAUDE_AGENT.test(byPid.get(anchorPid)?.args ?? '');
+      const older = (p: ProcessSample) => claude && typeof p.startedAt === 'number' && p.startedAt < since;
       let mb = 0;
-      const stack = [...(children.get(anchorPid) ?? [])];
+      const stack = (children.get(anchorPid) ?? []).filter((p) => !older(p));
       while (stack.length) {
         const p = stack.pop()!;
         if (HOOK.test(p.args)) continue;
@@ -644,9 +681,20 @@ export class MemoryGateServer {
       for (const g of grants) {
         if (grants.length > 1) {
           g.ambiguous = true;
+          if (claude) g.sharedNow = true;
           this.gate.share(g.id, anchorPid);
+          this.gate.observe(g.id, Math.round(mb));
+        } else {
+          g.soloPeakMb = Math.max(g.soloPeakMb ?? 0, Math.round(mb));
+          if (g.sharedNow) {
+            // The others it was measured with are gone, so their peak goes
+            // too, and what it reached on its own stays.
+            g.sharedNow = false;
+            this.gate.restartPeak(g.id, g.soloPeakMb);
+          } else {
+            this.gate.observe(g.id, Math.round(mb));
+          }
         }
-        this.gate.observe(g.id, Math.round(mb));
         // NOTHING RUNNING UNDER IT FOR A WHILE: its "after" report was lost
         // (the hook was killed, the agent crashed mid-call). Every running
         // command has at least the shell it runs in, so an empty reading that

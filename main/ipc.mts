@@ -53,8 +53,9 @@ import { readDoc, writeDoc } from './doc-file.mts';
 import { linkCopyOf, linkKindOf, linkSource } from './file-link.mts';
 import { bringSharedFile, fileLinkToken, projectToBringInto } from './bring-shared-file.mts';
 import { familyKeyOf, type Mark } from '../shared/artifact-marks.mts';
-import { readItemHistory } from './store/work-items.mts';
+import { newWorkItemId, readItemHistory } from './store/work-items.mts';
 import { readChange, readChangeSummary, withStandsNow } from './code-change.mts';
+import { mayBeHandedOver, startFromHandedCommits } from './handed-commits.mts';
 import { findFile, readCodeFile, writeCodeFile } from './code-file.mts';
 import { readNote, writeNote } from './rail-note.mts';
 import { teamForWindow } from './team/index.mts';
@@ -72,10 +73,9 @@ import { DEFAULT_ENGINE, isEngine } from '../shared/engines.mts';
 import { routedPatch, PICKED_WHY } from '../shared/auto-route.mts';
 import * as agents from './agents.mts';
 import { findAgentFolders, readAgentFiles, readFolderAgents } from './agent-files.mts';
-import { readCodexThreadsOffThread } from './codex-threads.mts';
+import { readChatEndsOffThread, readClaudeThreadsOffThread, readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { readImportableThreads, readSearchableThreads } from './importable-threads.mts';
-import { readChatEnds } from './agent-sessions.mts';
 import { markImported } from '../shared/agent-import.mts';
 import { codexIdOf, importChoice, isCodexImportRow, isNotImportedRow } from '../shared/codex-import.mts';
 import { checkProjectFolder, chooserStartsIn, folderFromChooser } from '../shared/project-folder-check.mts';
@@ -109,6 +109,7 @@ import type { UpdateTerminals } from './agent-updates.mts';
 import type { AttachmentFile } from './save-attachments.mts';
 import type { PostInput } from './teammates.mts';
 import type { ConversationInput } from './agents.mts';
+import type { FreezeCounter } from './setup-freezes.mts';
 import type { ConnectionTile } from './connections/index.mts';
 
 export interface IpcEvent { sender?: unknown; senderFrame?: { parent?: unknown } | null }
@@ -200,6 +201,8 @@ export interface IpcDeps<W extends IpcWindow = IpcWindow> {
   connections?: IpcConnections | null;
   copies?: IpcCopies | null;
   onCount?: () => void;
+  /** Freezes during setup or an import (main/setup-freezes.mts); the desktop's. */
+  froze?: FreezeCounter | null;
   /** The live relay's address, null when this cloud has none. */
   liveAt?: string | null;
   /** Turns the window's glass on or off when the Alpha switch flips. */
@@ -298,7 +301,7 @@ const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', '
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'undoDone', 'later', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute'] as const);
 type RoomOp = typeof ROOM_OPS extends Set<infer O> ? O : never;
 
-export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, liveAt = null, glass = () => {} }: IpcDeps<W>) {
+export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, froze = null, liveAt = null, glass = () => {} }: IpcDeps<W>) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -417,10 +420,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // appears): a browser SDK autocaptures the text of what was clicked, and in
   // Agentbox that text is task titles. A NUMBER MAY RIDE WITH THE NAME, and only
   // a number (2026-10-06): which setup step was reached.
-  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'classic');
+  ipcMain.handle('zero:onboarding-arm', () => analytics.onboardingArm?.() ?? 'tour');
   ipcMain.handle('zero:track', (_e, { name, count }: { name: string; count?: unknown } = {} as { name: string; count?: unknown }) => {
     if (!EVENT_NAMES.includes(name)) return false;
     onCount();
+    froze?.saw(name, count);
     return analytics.track(name, Number.isFinite(count) ? { count } : undefined);
   });
 
@@ -1372,8 +1376,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     await team!.syncNow();
   }));
 
-  ipcMain.handle('zero:compose', (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac, label }: ComposeInput & { product: string; onMac?: unknown; label?: unknown }) => {
+  ipcMain.handle('zero:compose', async (_e, { product, title, body, kind, priority, runAt, start, labels, engine, model, effort, assignee, due, visibility, visibleTo, fromPhone, onMac, label }: ComposeInput & { product: string; onMac?: unknown; label?: unknown }) => {
+    // A hand-over's commits become the thread's branch before its row exists, so no tick can start it on main first.
+    let handedId: string | null = null;
+    if (mayBeHandedOver(labels)) {
+      handedId = newWorkItemId();
+      const into = store.listProducts().find((p) => p.slug === product);
+      await startFromHandedCommits({ repoPath: into?.repoPath, dir: into?.dir, id: handedId, body, labels });
+    }
     const out = store.composeItem(product, {
+      ...(handedId ? { id: handedId } : {}),
       // HOW HARD IT THINKS rides through unjudged: the store keeps any word
       // shaped like a level, and the spawn is the gate that knows each
       // engine's real list (`Supervisor#spawnPlan` for Claude Code,
@@ -1777,8 +1789,13 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // EVERY FOLDER EITHER TOOL KEEPS SESSIONS IN (main/agent-homes.mts), not only
   // ~/.claude and ~/.codex, which is where the import used to look and nothing
   // else (w-e46f2e9cea).
-  const readAllThreads = () => readImportableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread });
-  ipcMain.handle('zero:agent-threads', async () => {
+  const readAllThreads = () => readImportableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread, readClaude: readClaudeThreadsOffThread });
+  // A freeze while chats come in, or just after, is counted at once (main/setup-freezes.mts).
+  const whileImporting = <A extends unknown[], R>(fn: (...args: A) => R | Promise<R>) => async (...args: A): Promise<R> => {
+    froze?.importing();
+    try { return await fn(...args); } finally { froze?.importing(); }
+  };
+  ipcMain.handle('zero:agent-threads', whileImporting(async () => {
     const threads = await readAllThreads();
     lastThreads = threads;
     // Each one already in the inbox says so, and the card leaves it out
@@ -1786,7 +1803,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     let items: ReturnType<Store['listItems']> = [];
     try { items = store.listItems(); } catch { items = []; }
     return { threads: markImported(threads, items) };
-  });
+  }));
 
   /**
    * EVERY CHAT THE NAME FIELD CAN SEARCH, read once and kept (w-6418318cd5).
@@ -1809,11 +1826,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
    *  ending, and its copy would bring the chat in without them.
    */
   let searchable: { threads: ImportableThreads; reached: number } | null = null;
-  ipcMain.handle('zero:search-agent-threads', async (_e, { again = false }: { again?: boolean } = {}) => {
+  ipcMain.handle('zero:search-agent-threads', whileImporting(async (_e: unknown, { again = false }: { again?: boolean } = {}) => {
     if (again) searchable = null;
     if (!searchable) {
       let got: { threads: ImportableThreads; reached: number } = { threads: [], reached: 0 };
-      try { got = await readSearchableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread }); } catch { got = { threads: [], reached: 0 }; }
+      try { got = await readSearchableThreads({ config, supervisor, readCodex: readCodexThreadsOffThread, readClaude: readClaudeThreadsOffThread }); } catch { got = { threads: [], reached: 0 }; }
       searchable = got;
     }
     const byId = new Map(lastThreads.map((t) => [String(t?.id ?? ''), t]));
@@ -1822,14 +1839,14 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     let items: ReturnType<Store['listItems']> = [];
     try { items = store.listItems(); } catch { items = []; }
     return { threads: markImported(lastThreads, items), reached: searchable.reached };
-  });
+  }));
 
   // So this is `zero:import-agents` with the agent taken out of it. No ticks are
   // saved, because there is nothing for the card to remember: an imported thread
   // is a row, and a row is what stops it being imported twice
   // (`threadsNeedingRows`). The row's first reply resumes the conversation as a
   // copy (`Supervisor#importedThreadFor`, GitHub #44).
-  ipcMain.handle('zero:import-threads', async (_e, { product, threads, land }: { product?: string; threads?: unknown; land?: string } = {}) => {
+  ipcMain.handle('zero:import-threads', whileImporting(async (_e: unknown, { product, threads, land }: { product?: string; threads?: unknown; land?: string } = {}) => {
     if (!product) return { ok: false, added: 0, already: 0, ids: [] };
     const want = new Set(
       (Array.isArray(threads) ? threads : [])
@@ -1841,9 +1858,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     // the case a test or a fresh window can reach and a person cannot.
     if (!lastThreads.length) lastThreads = await readAllThreads();
     // Two kinds, two rows.
-    const chosen = readChatEnds(lastThreads.filter((t) => want.has(String(t?.id ?? ''))));
     let out: { ids: string[]; added: number; already: number; done: number } = { ids: [], added: 0, already: 0, done: 0 };
     try {
+      const chosen = await readChatEndsOffThread(lastThreads.filter((t) => want.has(String(t?.id ?? ''))));
       // Each store method takes its own kind off the list and leaves the other.
       // Setup's last screen sorts what it brings in: finished chats go to Done.
       const how = { land: land === 'sorted' ? 'sorted' : 'inbox' };
@@ -1856,7 +1873,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     }
     push();
     return { ok: true, ...out };
-  });
+  }));
 
   // TAKING THEM, which is the half that used to do nothing.
   //
@@ -1875,7 +1892,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // whole list already, so it could hand the paths over, but a row that names a
   // file on somebody's disk should name a file that was on the disk a moment
   // ago and not one a screen was holding from earlier in the walk.
-  ipcMain.handle('zero:import-agents', (_e, { product, agents }: { product?: string; agents?: unknown } = {}) => {
+  ipcMain.handle('zero:import-agents', whileImporting((_e: unknown, { product, agents }: { product?: string; agents?: unknown } = {}) => {
     if (!product) return { ok: false, added: 0, ids: [] };
     const names = (Array.isArray(agents) ? agents : [])
       .filter((n) => typeof n === 'string' && n.trim())
@@ -1897,6 +1914,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     }
     push();
     return { ok: true, ...out };
+  }));
+
+  // The window says when its own thread held (renderer/src/window-holds.ts).
+  ipcMain.handle('zero:window-held', (event, { ms }: { ms?: unknown } = {}) => {
+    if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) return false;
+    return froze?.held({ ms: Number(ms), part: 'windows' }) ?? false;
   });
 
   ipcMain.handle('zero:supervisor-pause', (_e, paused) => {
@@ -2310,6 +2333,15 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:sign-in-answer', (_e, { product, id, ask, said, url, code } = {}) => {
     try {
       store.answerSignIn(product, id, { id: ask, said, url, code });
+      push();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String((err as Error).message) };
+    }
+  });
+  ipcMain.handle('zero:sign-in-keep', (_e, { product, id, ask, keep } = {}) => {
+    try {
+      store.chooseSignInKeep(product, id, { id: ask, keep: keep !== false });
       push();
       return { ok: true };
     } catch (err) {

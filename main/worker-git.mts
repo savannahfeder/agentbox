@@ -26,5 +26,6 @@ If either check fails, finish the edit and tests, then ask which name and email 
 Never invent an author or copy an author from git history. Do not add user.name or user.email overrides when Git already has an identity. Only use an override if the person explicitly supplied it for this commit, and include each setting once.
 If they supply a name and email because Git has none, set them for this repository with git config in that same command, so a later task does not have to ask again.
 After tests pass and identity is confirmed, combine staging the named changed files, committing, and checking status in one command and one approval request. Name the commit and author in that request. Do not launch concurrent or duplicate requests for these steps. A denied request stays denied; do not rephrase it to ask again.
+In what you write for a person, answers and options included, name a branch by its thread's title, never by its agentbox/w-… name, and give commit hashes only if they ask for them.
 `;
 }
