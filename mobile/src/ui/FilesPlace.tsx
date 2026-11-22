@@ -120,7 +120,7 @@ export function FilesPlace({ tabs }: { tabs: ReactNode }) {
       <TopBar title="Files" right={<IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>} below={tabs} />
       {files.length > 0 && (
         <View style={{ paddingTop: 12, paddingBottom: 6, gap: 10 }}>
-          <View style={{ marginHorizontal: size.inset, height: 40, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field }}>
+          <View style={{ marginHorizontal: size.inset, height: 40, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderRadius: corner.small, backgroundColor: color.field }}>
             <Magnifier size={15} tint={color.faint} />
             <TextInput value={query} onChangeText={setQuery} placeholder="Search files" placeholderTextColor={color.faint} accessibilityLabel="Search files"
               autoCorrect={false} autoCapitalize="none" returnKeyType="search" clearButtonMode="while-editing"

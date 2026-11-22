@@ -204,7 +204,7 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
           <Pressable onPress={openReply} accessibilityRole="button" accessibilityLabel="Reply" style={{ flex: 1, height: '100%', flexDirection: 'row', alignItems: 'center' }}>
             <T numberOfLines={1} style={{ flex: 1, fontSize: 16, color: folded.draft ? color.text : color.faint, paddingLeft: 20, paddingRight: 12 }}>{folded.text}</T>
             {!!folded.files && <T style={{ fontSize: 13, color: color.faint, paddingRight: 10 }}>{folded.files}</T>}
-            <View style={{ height: 30, paddingHorizontal: 11, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: color.fill, marginRight: 2 }}><T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>{modelLabel}</T></View>
+            <View style={{ height: 32, paddingHorizontal: 12, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: color.fill, marginRight: 2 }}><T style={{ fontSize: 13, fontFamily: font.medium, color: color.dim }}>{modelLabel}</T></View>
           </Pressable>
           {foldedChoices > 0 && (
             <Pressable onPress={showChoices} accessibilityRole="button" accessibilityLabel={`Show the ${foldedChoices} choices`} hitSlop={6}

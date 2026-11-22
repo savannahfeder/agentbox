@@ -47,7 +47,7 @@ export function FeedbackPage({ about = null }: { about?: ReportAbout } = {}) {
     );
   }
   return (
-    <View style={{ marginTop: 14, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: color.fill }}>
+    <View style={{ marginTop: 14, borderRadius: corner.small, backgroundColor: color.fill }}>
       <TextInput multiline autoFocus value={text} onChangeText={(t) => { setText(t); setSaid(null); }} accessibilityLabel="Your feedback"
         placeholder={about?.kind === 'message' ? 'What is wrong with this message?' : about ? 'What is wrong with what the agent wrote?' : 'What happened, and what did you expect?'} placeholderTextColor={color.faint}
         style={[{ minHeight: 160, padding: 16, fontFamily: font.regular, fontSize: 15.5, lineHeight: 24, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
@@ -64,7 +64,7 @@ export function FeedbackPage({ about = null }: { about?: ReportAbout } = {}) {
           <T style={{ fontSize: 14, color: color.dim }}>Attach</T>
         </Pressable>
         <Pressable disabled={!ready} onPress={() => void send()} accessibilityRole="button"
-          style={({ pressed }) => ({ height: 29, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: ready ? 1 : 0.5 })}>
+          style={({ pressed }) => ({ height: 34, paddingHorizontal: 16, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked, opacity: ready ? 1 : 0.5 })}>
           <T style={{ fontSize: 13, fontFamily: font.semibold }}>{busy ? 'Sending…' : 'Send'}</T>
         </Pressable>
       </View>

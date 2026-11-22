@@ -134,12 +134,12 @@ function SheetBody({ close, slide, children }: { close: () => void; slide: Anima
         <View style={{ flex: 1 }} pointerEvents="none" />
         {/* The shadow is on the outer box: a box that clips its corners clips its own shadow. */}
         <Animated.View {...pan.panHandlers} onLayout={(e) => { tall.current = e.nativeEvent.layout.height; }}
-          style={{ maxHeight: room, flexShrink: 1, marginHorizontal: 8, marginBottom: 8, backgroundColor: color.pop, borderRadius: corner.sheet, ...lift('float'), transform: [{ translateY: Animated.add(rise, drag) }] }}>
+          style={{ maxHeight: height * 0.72, flexShrink: 1, marginHorizontal: 8, marginBottom: Platform.OS === 'android' ? 8 + inset.bottom : 8, backgroundColor: color.pop, borderRadius: corner.sheet, ...lift('float'), transform: [{ translateY: Animated.add(rise, drag) }] }}>
           <View style={{ flexShrink: 1, borderRadius: corner.sheet, overflow: 'hidden' }}>
             <View {...grip.panHandlers} style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: color.lineStrong }} />
             </View>
-            <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 10, paddingBottom: Math.max(14, inset.bottom - 8), gap: 2 }}
+            <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 10, paddingBottom: Platform.OS === 'android' ? 14 : Math.max(14, inset.bottom - 8), gap: 2 }}
               onLayout={(e) => setBox(e.nativeEvent.layout.height)} onContentSizeChange={(_, h) => setInner(h)}
               scrollEventThrottle={16} onScroll={(e) => { atTop.current = e.nativeEvent.contentOffset.y <= 0; }}>
               {children}

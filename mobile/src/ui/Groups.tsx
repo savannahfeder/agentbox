@@ -28,7 +28,7 @@ import { AttachSheet, Attached } from './Attach';
 import { Markdown } from './Markdown';
 import { Back, Caret, Clip, FileMark } from './icons';
 import { footRoom, IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar } from './parts';
-import { color, corner, font, size } from './theme';
+import { color, corner, font, lift, size } from './theme';
 
 /** A round face: two letters in mono on one grey ground for everyone (renderer/src/team/people.tsx). */
 export function Face({ name, size: s }: { name: string; size: number }) {
@@ -110,7 +110,7 @@ function RoomFile({ roomId, name, label }: { roomId: string; name: string; label
     setBusy(false);
   };
   return (
-    <Pressable onPress={() => void open()} onLongPress={hold ?? undefined} delayLongPress={350} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 11, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
+    <Pressable onPress={() => void open()} onLongPress={hold ?? undefined} delayLongPress={350} disabled={busy} accessibilityRole="button" style={({ pressed }) => ({ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, height: 34, paddingHorizontal: 14, borderRadius: corner.pill, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
       <FileMark size={14} />
       <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 13.5, color: color.dim }}>{label}</T>
     </Pressable>
@@ -149,7 +149,7 @@ function Reactions({ m, me, nameOf, onToggle }: { m: RoomMessage; me: string | n
         return (
           <Pressable key={emoji} onPress={() => onToggle(emoji, !mine)} accessibilityRole="button" accessibilityState={{ selected: mine }}
             accessibilityLabel={`${emoji} ${who.map(nameOf).join(', ')}`}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, paddingHorizontal: 8, borderWidth: 1, borderRadius: corner.small, borderColor: mine ? color.lineStrong : color.line, backgroundColor: pressed || mine ? color.picked : color.fill })}>
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 5, height: 34, paddingHorizontal: 14, borderRadius: corner.pill, backgroundColor: pressed || mine ? color.picked : color.fill })}>
             <T style={{ fontSize: 13, lineHeight: 17 }}>{emoji}</T>
             <T style={{ fontFamily: font.medium, fontSize: 12.5, color: mine ? color.text : color.dim }}>{who.length}</T>
           </Pressable>
@@ -217,7 +217,7 @@ function PeopleSheet({ room, open, close, blocked, unblock }: { room: Room; open
           </View>
           {blocked.has(c.id) ? (
             <Pressable onPress={() => unblock(c.id)} accessibilityRole="button" accessibilityLabel={`Unblock ${cardName(c)}`}
-              style={({ pressed }) => ({ height: 30, paddingHorizontal: 12, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+              style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked })}>
               <T style={{ fontSize: 13, color: color.dim }}>Unblock</T>
             </Pressable>
           ) : c.agents ? (
@@ -272,7 +272,7 @@ function MessageSheet({ m, me, who, open, close, onReact, onThread, onEdit, onDe
           const on = !!me && !!m.reactions?.[e]?.includes(me);
           return (
             <Pressable key={e} onPress={done(() => onReact(e))} accessibilityRole="button" accessibilityLabel={`React ${e}`} accessibilityState={{ selected: on }}
-              style={({ pressed }) => ({ width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: on ? color.lineStrong : color.line, backgroundColor: pressed || on ? color.picked : color.fill })}>
+              style={({ pressed }) => ({ width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed || on ? color.picked : color.fill })}>
               <T style={{ fontSize: 21, lineHeight: 26 }}>{e}</T>
             </Pressable>
           );
@@ -299,7 +299,7 @@ export function ChatRules({ onAgree }: { onAgree: () => void }) {
       <T style={{ fontSize: 15, lineHeight: 22, color: color.dim }}>Nothing abusive, hateful, threatening or explicit. Hold any message to report it or block the person who wrote it. We read reports within 24 hours and remove what breaks the rules, and whoever posted it.</T>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, paddingTop: 4 }}>
         <Pressable onPress={onAgree} accessibilityRole="button"
-          style={({ pressed }) => ({ height: 40, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
+          style={({ pressed }) => ({ height: 40, paddingHorizontal: 16, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked })}>
           <T style={{ fontFamily: font.semibold, fontSize: 14.5 }}>I agree</T>
         </Pressable>
         {site ? <Pressable onPress={() => void WebBrowser.openBrowserAsync(`${site}/terms`)} accessibilityRole="link" hitSlop={8}>
@@ -334,13 +334,13 @@ export function NewChatSheet({ open, close, mates, start }: { open: boolean; clo
       })}
       {picked.length > 1 && (
         <TextInput value={name} onChangeText={setName} placeholder="Name the group" placeholderTextColor={color.faint} maxLength={80}
-          style={[{ marginHorizontal: 14, marginTop: 8, height: 42, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15.5, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+          style={[{ marginHorizontal: 14, marginTop: 8, height: 42, paddingHorizontal: 12, borderRadius: corner.small, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15.5, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
       )}
       {why && <T style={{ paddingHorizontal: 14, paddingTop: 8, fontSize: 13, color: color.dim }}>{why}</T>}
       {picked.length > 0 && (
         <View style={{ paddingHorizontal: 14, paddingTop: 12 }}>
           <Pressable onPress={() => void go()} disabled={busy} accessibilityRole="button"
-            style={({ pressed }) => ({ height: 44, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill, opacity: busy ? 0.6 : 1 })}>
+            style={({ pressed }) => ({ height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked, opacity: busy ? 0.6 : 1 })}>
             <T style={{ fontFamily: font.semibold, fontSize: 15 }}>{busy ? 'Starting…' : picked.length === 1 ? 'Start chat' : 'Start group'}</T>
           </Pressable>
         </View>
@@ -429,7 +429,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 80 }}>
         <T style={{ fontFamily: font.medium, fontSize: 18, lineHeight: 23, marginBottom: 16 }}>You are not in any groups yet.</T>
         <Pressable onPress={() => setSheet('new')} accessibilityRole="button"
-          style={({ pressed }) => ({ alignSelf: 'flex-start', height: 40, paddingHorizontal: 16, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
+          style={({ pressed }) => ({ alignSelf: 'flex-start', height: 40, paddingHorizontal: 16, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked })}>
           <T style={{ fontFamily: font.semibold, fontSize: 14.5 }}>New chat</T>
         </Pressable>
       </View>
@@ -525,7 +525,7 @@ export function GroupsPlace({ tabs, onBack }: { tabs?: ReactNode; onBack?: () =>
             </View>
           )}
           {files.length > 0 && <View style={{ paddingBottom: 8 }}><Attached files={files} drop={(i) => setFiles((f) => f.filter((_, n) => n !== i))} /></View>}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: canWrite ? color.lineStrong : color.line, backgroundColor: color.field }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, paddingRight: 4, backgroundColor: color.card, borderWidth: 1, borderColor: color.line, ...lift('card') }}>
             {!editing && <IconButton bare label="Attach a photo or file" onPress={() => setSheet('attach')}><Clip size={17} /></IconButton>}
             <TextInput value={text} onChangeText={editing ? setShown : setText} multiline {...(Platform.OS === 'web' ? { numberOfLines: 1 } : {})} placeholder={root ? 'Reply in thread' : `Message ${groupName(room)}`} placeholderTextColor={color.faint}
               style={[{ flex: 1, minHeight: 42, maxHeight: 140, paddingTop: 10, paddingBottom: 10, paddingLeft: editing ? 14 : 2, paddingRight: 14, fontFamily: font.regular, fontSize: 15.5, lineHeight: 22, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />

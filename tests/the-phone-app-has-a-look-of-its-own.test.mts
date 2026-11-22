@@ -74,3 +74,15 @@ describe('what floats over the page', () => {
     expect(lift('float').shadowRadius).toBeGreaterThan(s.shadowRadius);
   });
 });
+
+describe('a small button or a box you type in, anywhere in the app', () => {
+  const tree = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? tree(`${dir}/${e.name}`) : /\.tsx$/.test(e.name) ? [`${dir}/${e.name}`] : []));
+  const all = tree('mobile/src');
+  it('is filled and soft, never a thin outline with small corners', () => {
+    const outlined = all.filter((f) => /borderWidth: 1, borderRadius: corner\.small, borderColor: color\.line(Strong)?[,} ]/.test(read(f)));
+    expect(outlined).toEqual([]);
+  });
+  it('is at least 32 tall where it is pressed', () => {
+    for (const f of all) expect(read(f), f).not.toMatch(/height: (2[4-9]|30), (minWidth: \d+, )?padding(Horizontal|Left): \d+[^\n]*borderRadius: corner\.pill/);
+  });
+});

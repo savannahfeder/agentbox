@@ -77,7 +77,7 @@ export function TeamPage() {
               <Row first label={owner ? PRO_FOR_INVITES : askOwnerForPro(team.people.find((p) => p.role === 'owner')?.name)} desc={owner ? 'Start it on your computer, in Settings, Team.' : undefined} />
             ) : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
               <TextInput value={email} onChangeText={setEmail} placeholder="Their email" placeholderTextColor={color.faint} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" inputMode="email"
-                style={{ flex: 1, height: 36, color: color.text, fontFamily: font.regular, fontSize: 15, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field }} />
+                style={{ flex: 1, height: 36, color: color.text, fontFamily: font.regular, fontSize: 15, paddingHorizontal: 10, borderRadius: corner.small, backgroundColor: color.field }} />
               <Button title="Invite" disabled={busy || !email.trim()} onPress={async () => { if (await run(() => inviteTo(cloud!, team.id, email))()) setEmail(''); }} />
             </View>}
           </Group>

@@ -23,7 +23,7 @@ import { filtered } from '../platform/word-filter';
 import { ChatRules, Face, NewChatSheet } from './Groups';
 import { Gear } from './icons';
 import { footRoom, IconButton, Sheet, T, TopBar } from './parts';
-import { color, corner, font, size } from './theme';
+import { color, corner, font, lift, size } from './theme';
 
 /** The corner of an AI teammate's dashed mark, as `--mate-corner` is on the web: round, like a person. */
 export const mateCorner = (s: number) => s / 2;
@@ -143,7 +143,7 @@ export function MateComposer({ mate, placeholder, send, above }: { mate: string 
   return (
     <View style={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 16 + footRoom(inset) }}>
       {above}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderWidth: 1, borderRadius: corner.small, borderColor: text ? color.lineStrong : color.line, backgroundColor: color.field }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, paddingRight: 4, backgroundColor: color.card, borderWidth: 1, borderColor: color.line, ...lift('card') }}>
         <TextInput value={text} onChangeText={setText} multiline placeholder={placeholder} placeholderTextColor={color.faint} editable={!busy}
           style={[{ flex: 1, minHeight: 42, maxHeight: 140, paddingTop: 10, paddingBottom: 10, paddingHorizontal: 14, fontFamily: font.regular, fontSize: 15.5, lineHeight: 22, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
         {!!text.trim() && <IconButton bare label="Send" onPress={() => void go()}><SendGlyph tint={color.accent} /></IconButton>}
@@ -178,7 +178,7 @@ export function ThreadQuestions({ item }: { item: { id: string; labels?: string[
   const answered = open.filter((q) => picks[q.id]).length;
   return (
     <ScrollView style={{ flexGrow: 0, flexShrink: 0, maxHeight: 300, marginHorizontal: 12, marginTop: 8 }} keyboardShouldPersistTaps="handled">
-      <View style={{ borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
+      <View style={{ borderRadius: corner.small, backgroundColor: color.fill, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, gap: 14 }}>
         {open.map((q) => (
           <View key={q.id}>
             <Markdown text={q.text ?? ''} />

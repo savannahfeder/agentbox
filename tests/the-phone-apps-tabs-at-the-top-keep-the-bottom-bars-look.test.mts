@@ -1,15 +1,14 @@
-// THE PHONE APP'S TABS AT THE TOP KEEP THE BOTTOM BAR'S LOOK (2026-10-28).
+// THE PHONE APP'S TABS STAY AT THE TOP (2026-10-28).
 //
-// When Needs you, In progress, Later and Done moved from the foot of the phone
-// app to under its title, they were redrawn as the web app draws them: 18pt
-// apart, each count 6pt from its word, the picked word in medium, and the mark
-// on the bar's line. The ask was the opposite: "the nav at the bottom is very
-// good so just shift that ui upward, without messing much with spacing". So the
-// row is the bottom bar as it was (48pt tall, 22pt apart, each count 13pt from
-// its word at 11pt, every word regular, the mark under the word itself), moved
-// up into the title bar. The title bar's own line is the one line under it; the
-// bottom bar's line along its top is gone, since a line under the title and
-// another under the tabs "doesn't really work well".
+// Needs you, In progress, Later and Done moved from the foot of the phone app
+// to under its title: "all that stuff is best placed at the top", and a line
+// under the title and another under the tabs "doesn't really work well". They
+// were then the bottom bar's row moved up, an underline under the picked word.
+//
+// 2026-11-22: the redesign drew them as pills, the picked one filled
+// (the-phone-inbox-is-drawn-for-a-thumb-and-a-glance). Where they are is what
+// this file still holds: inside the title bar, on the list, on Chats and on
+// Files, with no line of their own, and never at the foot.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
@@ -18,32 +17,31 @@ const theme = fs.readFileSync('mobile/src/ui/theme.ts', 'utf8');
 const rules = fs.readFileSync('mobile/src/lib/tabs.ts', 'utf8');
 const tabs = inbox.slice(inbox.indexOf('function Tabs('), inbox.indexOf('\n}\n', inbox.indexOf('function Tabs(')));
 
-describe("the phone app's tabs, now at the top", () => {
-  it('are the bottom bar\'s 48pt row, with no line of their own', () => {
-    expect(theme).toMatch(/tabs: 48,/);
+describe("the phone app's tabs, at the top", () => {
+  it('are one row with no line of their own', () => {
+    expect(theme).toMatch(/tabs: 52,/);
     expect(tabs).toMatch(/height: size\.tabs,/);
-    expect(tabs).not.toMatch(/border(Top|Bottom)Width: 1/);
+    expect(tabs).not.toMatch(/border(Top|Bottom)Width/);
     expect(tabs).not.toMatch(/foot/);
   });
   // Closer only on a screen too narrow for all of them (QA M-33,
   // tests/the-phones-tab-row-shows-it-goes-on-past-the-edge).
-  it('sit 22pt apart from the title\'s left edge, as they did at the bottom', () => {
-    expect(rules).toMatch(/TAB_GAP = \{ loose: 22,/);
-    expect(tabs).toMatch(/paddingLeft: size\.inset, paddingRight: 8, gap: tight \? TAB_GAP\.tight : TAB_GAP\.loose/);
-    expect(tabs).not.toMatch(/gap: 18/);
+  it('start where the title does: a pill pads its word 12pt, so the row starts 12pt before it', () => {
+    expect(rules).toMatch(/TAB_GAP = \{ loose: 4, tight: 0 \}/);
+    expect(tabs).toMatch(/paddingLeft: size\.inset - 12, paddingRight: 8, gap: tight \? TAB_GAP\.tight : TAB_GAP\.loose/);
+    expect(tabs).toMatch(/height: 36, paddingHorizontal: 12,/);
   });
-  it('draw each word at 15pt in regular, picked or not', () => {
+  it('draw each word at 15pt in the one weight, picked or not', () => {
     // 15pt until large text pushes the row off the screen (the-phones-tabs-shrink-to-fit-a-small-screen-with-large-text).
-    expect(tabs).toMatch(/const words = \{ fontSize: 15 \* fit\.scale, count: 11 \* fit\.scale \}/);
-    expect(tabs).toMatch(/fontSize: words\.fontSize, lineHeight: 30, color: on === t\.id \? color\.text : color\.dim/);
+    expect(tabs).toMatch(/const words = \{ fontSize: 15 \* fit\.scale, count: 12\.5 \* fit\.scale \}/);
     expect(tabs).not.toMatch(/font\.medium : font\.regular/);
   });
-  it('keep each count 13pt from its word, at 11pt', () => {
-    expect(rules).toMatch(/COUNT_GAP = \{ loose: 13,/);
-    expect(tabs).toMatch(/fontSize: words\.count, lineHeight: 30, fontFamily: font\.medium, marginLeft: tight \? COUNT_GAP\.tight : COUNT_GAP\.loose, color: color\.faint/);
+  it('keep each count beside its word, closer when the row is tight', () => {
+    expect(rules).toMatch(/COUNT_GAP = \{ loose: 7, tight: 5 \}/);
+    expect(tabs).toMatch(/marginLeft: tight \? COUNT_GAP\.tight : COUNT_GAP\.loose/);
   });
-  it('underline the picked word itself, not the bar', () => {
-    expect(tabs).toMatch(/height: 32, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 2, borderBottomColor: on === t\.id \? color\.accent : 'transparent'/);
+  it('mark the picked tab on the tab itself, not on the bar', () => {
+    expect(tabs).toMatch(/backgroundColor: on === t\.id \? color\.graphite : 'transparent'/);
     expect(tabs).not.toMatch(/position: 'absolute'/);
   });
   it('are drawn inside the title bar, on the list, on Chats and on Files, and never at the foot', () => {

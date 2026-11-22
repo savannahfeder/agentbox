@@ -77,8 +77,8 @@ export function WorkLine({ work }: { work: AgentWork }) {
         style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
         {head}
       </Pressable>
-      {open && !!whole && <T style={{ marginTop: 6, paddingVertical: 7, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, fontFamily: font.mono, fontSize: 11.5, lineHeight: 17.8, color: color.faint }}>{whole}</T>}
-      {open && output.length > 0 && <T style={{ marginTop: 6, paddingVertical: 9, paddingHorizontal: 12, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.fill, fontFamily: font.mono, fontSize: 11.5, lineHeight: 17.8, color: color.faint }}>{output.join('\n')}</T>}
+      {open && !!whole && <T style={{ marginTop: 6, paddingVertical: 7, paddingHorizontal: 10, borderRadius: corner.small, backgroundColor: color.fill, fontFamily: font.mono, fontSize: 11.5, lineHeight: 17.8, color: color.faint }}>{whole}</T>}
+      {open && output.length > 0 && <T style={{ marginTop: 6, paddingVertical: 9, paddingHorizontal: 12, borderRadius: corner.small, backgroundColor: color.fill, fontFamily: font.mono, fontSize: 11.5, lineHeight: 17.8, color: color.faint }}>{output.join('\n')}</T>}
     </View>
   );
 }
@@ -317,7 +317,7 @@ export function OptionsCard({ ask, options, busy, pick, keep, dir, files, foot =
         </View>
       )}
       {options.map((o) => row(String(o.n), () => pick(o), (
-        <View style={{ borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, paddingHorizontal: 6, height: 19, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 1 }}>
+        <View style={{ borderRadius: corner.small, backgroundColor: color.fill, paddingHorizontal: 6, height: 19, justifyContent: 'center', alignSelf: 'flex-start', marginTop: 1 }}>
           <T style={{ fontFamily: font.medium, fontSize: 12, lineHeight: 16, color: color.dim }}>{o.n}</T>
         </View>
       ), (

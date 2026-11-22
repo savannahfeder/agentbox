@@ -94,9 +94,9 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 52 }}>
           <TextInput value={naming} onChangeText={setNaming} autoFocus returnKeyType="done" onSubmitEditing={rename} maxLength={200}
             accessibilityLabel="The thread's name"
-            style={[{ flex: 1, height: 40, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+            style={[{ flex: 1, height: 40, paddingHorizontal: 10, borderRadius: corner.small, backgroundColor: color.field, fontFamily: font.regular, fontSize: 15, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
           <Pressable disabled={!ready} onPress={rename} accessibilityRole="button" hitSlop={8}
-            style={{ height: 32, paddingHorizontal: 10, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, opacity: ready ? 1 : 0.45 }}>
+            style={{ height: 32, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: color.picked, opacity: ready ? 1 : 0.45 }}>
             <T style={{ fontSize: 13, fontFamily: font.medium }}>Save</T>
           </Pressable>
         </View>

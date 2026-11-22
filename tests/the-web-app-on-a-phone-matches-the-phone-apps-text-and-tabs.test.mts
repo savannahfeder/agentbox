@@ -125,19 +125,19 @@ describe('the tabs on the phone app', () => {
     expect(inbox).toMatch(/<FilesPlace tabs=\{<Tabs on="files"/);
     expect(inbox.match(/<Tabs /g)).toHaveLength(3);
   });
-  it('draw no line of their own; the picked word is underlined, as at the bottom', () => {
-    // The look itself is in the-phone-apps-tabs-at-the-top-keep-the-bottom-bars-look.
+  // 2026-11-22: the app was redesigned and the website was not, so the app's
+  // tabs are pills now (the-phone-inbox-is-drawn-for-a-thumb-and-a-glance).
+  it('draw no line of their own', () => {
     expect(tabs).not.toMatch(/border(Top|Bottom)Width: 1/);
-    expect(tabs).toMatch(/borderBottomWidth: 2, borderBottomColor: on === t\.id \? color\.accent/);
   });
   it('are 15pt, start where the title does, and scroll on a phone set larger still', () => {
     expect(tabs).toMatch(/fontSize: 15 \* fit\.scale,/);
-    expect(tabs).toMatch(/paddingLeft: size\.inset/);
+    expect(tabs).toMatch(/paddingLeft: size\.inset - 12/);
     expect(tabs).toMatch(/<ScrollView horizontal/);
   });
-  it('leave the new-thread button on the home bar room, and the rows as they were', () => {
+  it('leave the new-thread button on the home bar room, and a row its 14pt above and below', () => {
     expect(inbox).toMatch(/bottom: foot \+ PEN\.lift,/);
-    expect(row).toMatch(/paddingTop: 14, paddingBottom: 14/);
-    expect(row).toMatch(/fontSize: 16, lineHeight: 21\.6/);
+    expect(inbox).toMatch(/const rowBox = [^\n]*paddingVertical: 14/);
+    expect(row).toMatch(/style=\{\(\{ pressed \}\) => rowBox\(pressed\)\}/);
   });
 });

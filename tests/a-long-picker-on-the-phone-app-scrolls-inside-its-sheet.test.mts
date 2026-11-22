@@ -20,6 +20,7 @@ describe('a picker sheet', () => {
   });
 
   it('scrolls its rows, padding and all, and a tap on a row works with the keyboard up', () => {
-    expect(sheet).toMatch(/<ScrollView[^>]*keyboardShouldPersistTaps="handled"[^>]*contentContainerStyle=\{\{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 \+ inset\.bottom/);
+    // The padding is the floating sheet's since 2026-11-22 (the-phones-bars-buttons-and-sheets-are-soft).
+    expect(sheet).toMatch(/<ScrollView[^>]*keyboardShouldPersistTaps="handled"[^>]*contentContainerStyle=\{\{ paddingTop: 8, paddingHorizontal: 10, paddingBottom: /);
   });
 });

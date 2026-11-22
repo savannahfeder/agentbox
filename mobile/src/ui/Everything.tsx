@@ -101,13 +101,13 @@ function Bar({ m, onMessage, onShipped, tabs }: { m: Member; onMessage?: () => v
         </View>
       )}
       {onMessage && (
-        <Pressable onPress={onMessage} accessibilityRole="button" style={({ pressed }) => ({ height: 28, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 11, marginLeft: 4, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+        <Pressable onPress={onMessage} accessibilityRole="button" style={({ pressed }) => ({ height: 34, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, paddingRight: 11, marginLeft: 4, borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked })}>
           <Bubble />
           <T style={{ fontSize: 13, color: color.dim }}>Message</T>
         </Pressable>
       )}
       {onShipped && (
-        <Pressable onPress={onShipped} accessibilityRole="button" style={({ pressed }) => ({ height: 28, justifyContent: 'center', paddingHorizontal: 11, marginLeft: 4, borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+        <Pressable onPress={onShipped} accessibilityRole="button" style={({ pressed }) => ({ height: 34, justifyContent: 'center', paddingHorizontal: 14, marginLeft: 4, borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked })}>
           <T style={{ fontSize: 13, color: color.dim }}>Shipped this week</T>
         </Pressable>
       )}

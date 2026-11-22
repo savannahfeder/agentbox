@@ -40,7 +40,7 @@ export default function ProjectSettings() {
         <Row first stack label="Name" reading={name}
           control={<>
             <TextInput value={typed} onChangeText={setDraft} maxLength={120} autoCorrect={false} accessibilityLabel="Project name" returnKeyType="done"
-              style={[{ flex: 1, height: 36, marginRight: 12, color: color.text, fontFamily: font.regular, fontSize: 15, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+              style={[{ flex: 1, height: 36, marginRight: 12, color: color.text, fontFamily: font.regular, fontSize: 15, paddingHorizontal: 10, borderRadius: corner.small, backgroundColor: color.field }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
             <Button title="Rename" disabled={!typed.trim() || typed.trim() === name.value} onPress={() => { set('name', typed.trim()); setDraft(null); }} />
           </>} />
       </Group>

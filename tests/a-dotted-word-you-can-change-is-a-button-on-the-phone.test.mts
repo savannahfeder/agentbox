@@ -15,11 +15,15 @@ describe('Pickable', () => {
   it('says it is a button', () => {
     expect(pickable).toMatch(/role="button"/);
   });
+  // New thread's choices are chips since 2026-11-22, each one button that says what it is.
   it('is never inside another button, which the web build refuses as a button in a button', () => {
     const form = fs.readFileSync('mobile/src/ui/NewThreadForm.tsx', 'utf8');
-    const toRow = form.slice(form.indexOf('<Field label="To">'), form.indexOf('<Field label="Model">'));
-    expect(toRow).toMatch(/<Pressable onPress=\{\(\) => setSheet\('to'\)\}/);
-    expect(toRow).not.toMatch(/<Pickable/);
+    expect(form).not.toMatch(/<Pickable/);
+    expect(form).toMatch(/<ChoiceButton said=\{`To: \$\{to\}`\} onPress=\{\(\) => setSheet\('to'\)\}/);
+    expect(form).toMatch(/<ChoiceButton said=\{`Model: /);
+    const chip = src.slice(src.indexOf('export function ChoiceButton('), src.indexOf('\n}\n', src.indexOf('export function ChoiceButton(')));
+    expect(chip).toMatch(/accessibilityRole="button" accessibilityLabel=\{said\}/);
+    expect(chip.match(/<Pressable/g)).toHaveLength(1);
   });
   it('stays text, so it can sit inside a sentence', () => {
     expect(pickable).toMatch(/<T onPress=/);

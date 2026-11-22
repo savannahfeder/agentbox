@@ -58,3 +58,14 @@ describe('a sheet', () => {
     expect(row).toMatch(/on \? <Tick/);
   });
 });
+
+describe('the search page', () => {
+  const search = fs.readFileSync('mobile/src/app/search.tsx', 'utf8');
+  it('types into a soft pill, with no line under it or under the bar', () => {
+    expect(search).toMatch(/height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 8, borderRadius: corner\.pill, backgroundColor: color\.card/);
+    expect(search).not.toMatch(/borderBottomWidth/);
+  });
+  it('still clears the words first and closes second from the one cross', () => {
+    expect(search).toMatch(/accessibilityLabel=\{q \? 'Clear search' : 'Close search'\}/);
+  });
+});

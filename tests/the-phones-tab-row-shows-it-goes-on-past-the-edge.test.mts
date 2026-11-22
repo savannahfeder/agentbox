@@ -20,10 +20,10 @@ describe('whether the tabs close up their gaps', () => {
     expect(tabsTighten({ view: 320, content: 349 }, false, four)).toBe(true);
   });
   it('stays tight once tight, while the loose row would still not fit', () => {
-    expect(tabsTighten({ view: 320, content: 305 }, true, four)).toBe(true);
+    expect(tabsTighten({ view: 320, content: 315 }, true, four)).toBe(true);
   });
   it('opens up again when the screen grows to fit the loose row', () => {
-    expect(tabsTighten({ view: 402, content: 305 }, true, four)).toBe(false);
+    expect(tabsTighten({ view: 402, content: 315 }, true, four)).toBe(false);
   });
   it('keeps what it had before the row is measured', () => {
     expect(tabsTighten({ view: 0, content: 0 }, true, four)).toBe(true);

@@ -133,7 +133,7 @@ export default function TeammateChat() {
         <Act key={r.key} verb={w.verb} text={w.text} when={r.e.ts} status={w.status} onOpen={w.open ? () => openThread(w.open!) : undefined}>
           {w.goAhead && (
             <Pressable onPress={() => void c.askTeammate('goAhead', w.goAhead!).then(() => c.say('Going ahead'), (err) => setError(message(err)))} accessibilityRole="button"
-              style={({ pressed }) => ({ height: 26, paddingHorizontal: 10, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : color.fill })}>
+              style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked })}>
               <T style={{ fontSize: 13, color: color.text }}>Go ahead</T>
             </Pressable>
           )}
@@ -195,7 +195,7 @@ export default function TeammateChat() {
               {asked === true ? 'Pausing when your computer gets this' : 'Your messages wait until you resume it'}
             </T>
             <Pressable disabled={busy} onPress={() => void setPaused(false)} accessibilityRole="button"
-              style={({ pressed }) => ({ height: 30, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent', opacity: busy ? 0.5 : 1 })}>
+              style={({ pressed }) => ({ height: 34, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked, opacity: busy ? 0.5 : 1 })}>
               <T style={{ fontSize: 13.5, fontFamily: font.medium }}>Resume</T>
             </Pressable>
           </View>
@@ -227,7 +227,7 @@ export default function TeammateChat() {
           </View>
         ))}
         <Pressable disabled={busy} onPress={() => { setAbout(false); void setPaused(!t.paused); }} accessibilityRole="button"
-          style={({ pressed }) => ({ alignSelf: 'flex-start', marginHorizontal: 14, marginTop: 10, height: 32, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+          style={({ pressed }) => ({ alignSelf: 'flex-start', marginHorizontal: 14, marginTop: 10, height: 32, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked })}>
           <T style={{ fontSize: 14, color: t.paused ? color.text : color.dim }}>{`${t.paused ? 'Resume' : 'Pause'} ${t.name}`}</T>
         </Pressable>
         <T style={{ paddingHorizontal: 14, paddingTop: 8, fontSize: 12.5, lineHeight: 18, color: color.faint }}>Change its job or make it primary on your computer.</T>

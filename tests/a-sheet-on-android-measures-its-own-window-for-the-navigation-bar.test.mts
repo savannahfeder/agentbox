@@ -21,6 +21,7 @@ describe('Sheet', () => {
     const inner = sheet.slice(sheet.indexOf('function SheetBody'));
     expect(outer).not.toMatch(/useSafeAreaInsets\(\)/);
     expect(inner).toMatch(/useSafeAreaInsets\(\)/);
-    expect(inner).toMatch(/paddingBottom: 16 \+ inset\.bottom/);
+    // A floating sheet stands on the navigation bar's room rather than padding into it (2026-11-22).
+    expect(inner).toMatch(/marginBottom: Platform\.OS === 'android' \? 8 \+ inset\.bottom : 8/);
   });
 });

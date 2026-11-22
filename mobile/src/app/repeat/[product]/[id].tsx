@@ -76,7 +76,7 @@ export default function RepeatPage() {
 
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 32 }}>
           <Pressable onPress={() => setSheet('when')} accessibilityRole="button"
-            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderWidth: 1, borderRadius: corner.small, borderColor: color.lineStrong, backgroundColor: pressed ? color.picked : 'transparent' })}>
+            style={({ pressed }) => ({ height: 36, paddingHorizontal: 14, justifyContent: 'center', borderRadius: corner.pill, backgroundColor: pressed ? color.lineStrong : color.picked })}>
             <T style={{ fontSize: 14 }}>Change when</T>
           </Pressable>
           <Pressable onPress={() => setSheet('end')} accessibilityRole="button"

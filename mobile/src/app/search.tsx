@@ -16,7 +16,7 @@ import { useLook } from '../state/look';
 import { SettingsProvider, useSettings, type SettingsState } from '../state/settings';
 import { PriorityBars, T, Wall } from '../ui/parts';
 import { SETTINGS_PAGES } from '../ui/SettingsPages';
-import { color, font, size } from '../ui/theme';
+import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 
 const Glass = () => (
@@ -32,17 +32,17 @@ function Runs({ runs, weight }: { runs: Hit['title']; weight: string }) {
 }
 
 function HitRow({ hit, first, flush = false }: { hit: Hit; first: boolean; /** Right under the Threads label. */ flush?: boolean }) {
-  const meta = { fontFamily: font.medium, fontSize: 13, color: color.faint };
+  const meta = { fontSize: 13, color: color.faint };
   return (
     <Pressable onPress={() => router.push({ pathname: '/thread/[product]/[id]', params: { product: hit.product, id: hit.id } })}
-      style={({ pressed }) => ({ flexDirection: 'row', gap: 18, paddingTop: 19, paddingBottom: 15, paddingLeft: size.inset, paddingRight: 12, marginTop: first && !flush ? 14 : 0, backgroundColor: pressed ? color.fill : 'transparent' })}>
-      {!first && <View style={{ position: 'absolute', top: 0, left: 0, right: 12, height: 1, backgroundColor: color.line }} />}
+      style={({ pressed }) => ({ flexDirection: 'row', gap: 14, paddingVertical: 14, paddingHorizontal: size.inset, marginTop: first && !flush ? 14 : 0, backgroundColor: pressed ? color.fill : 'transparent' })}>
+      {!first && <View style={{ position: 'absolute', top: 0, left: size.inset, right: size.inset, height: 1, backgroundColor: color.rowLine }} />}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <T numberOfLines={1} style={{ fontSize: 14, lineHeight: 18.9, letterSpacing: -0.14 }}>
+        <T numberOfLines={1} style={{ fontSize: 16, lineHeight: 22, letterSpacing: -0.16 }}>
           <Runs runs={hit.title} weight={font.semibold} />
           {hit.toApprove ? <Text style={{ color: color.faint }}>{`  ${hit.toApprove}`}</Text> : null}
         </T>
-        <T numberOfLines={1} style={{ marginTop: 3, fontSize: 13, lineHeight: 18.85, color: color.dim }}><Runs runs={hit.summary} weight={font.medium} /></T>
+        <T numberOfLines={1} style={{ marginTop: 2, fontSize: 14, lineHeight: 20, color: color.dim }}><Runs runs={hit.summary} weight={font.medium} /></T>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 2, height: 18 }}>
         {hit.bars && <View style={{ opacity: hit.bars === 1 ? 0.7 : 0.75, transform: [{ translateY: 1 }] }}><PriorityBars level={hit.bars} /></View>}
@@ -70,14 +70,14 @@ function computerFacts(s: SettingsState): ComputerFacts | null {
 }
 
 const Label = ({ children }: { children: string }) => (
-  <T style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 4, fontFamily: font.medium, fontSize: 13, color: color.faint }}>{children}</T>
+  <T style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 4, fontFamily: font.semibold, fontSize: 13, color: color.faint }}>{children}</T>
 );
 
 function CommandRow({ label, aside, onPress }: { label: string; aside?: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: size.inset, paddingRight: 16, backgroundColor: pressed ? color.fill : 'transparent' })}>
-      <T numberOfLines={1} style={{ flex: 1, fontSize: 15.5, lineHeight: 21 }}>{label}</T>
-      {aside ? <T style={{ fontSize: 12.5, color: color.faint }}>{aside}</T> : null}
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: size.inset, backgroundColor: pressed ? color.fill : 'transparent' })}>
+      <T numberOfLines={1} style={{ flex: 1, fontSize: 16.5, lineHeight: 22 }}>{label}</T>
+      {aside ? <T style={{ fontSize: 13.5, color: color.faint }}>{aside}</T> : null}
     </Pressable>
   );
 }
@@ -133,15 +133,15 @@ function SearchScreen() {
   };
   return (
     <Wall>
-      <View style={{ paddingTop: inset.top, borderBottomWidth: 1, borderBottomColor: color.line, backgroundColor: color.bg }}>
-        <View style={{ height: size.topBar, justifyContent: 'center', paddingLeft: size.inset, paddingRight: 48 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: 1, borderBottomColor: color.lineStrong, paddingBottom: 9, marginTop: 8 }}>
+      <View style={{ paddingTop: inset.top, backgroundColor: color.bg }}>
+        <View style={{ height: size.topBar, justifyContent: 'center', paddingHorizontal: 12 }}>
+          <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 8, borderRadius: corner.pill, backgroundColor: color.card }}>
             <Glass />
             <TextInput ref={box} value={q} onChangeText={(t) => { setQ(t); setAll(false); }} autoFocus placeholder="Search" placeholderTextColor={color.faint}
               autoCorrect={false} autoCapitalize="none" spellCheck={false} returnKeyType="search" accessibilityLabel="Search threads"
-              style={[{ flex: 1, minWidth: 0, padding: 0, fontFamily: font.medium, fontSize: 15, letterSpacing: -0.075, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
+              style={[{ flex: 1, minWidth: 0, padding: 0, fontFamily: font.regular, fontSize: 16.5, color: color.text }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
             <Pressable onPress={cross} accessibilityLabel={q ? 'Clear search' : 'Close search'} accessibilityRole="button" hitSlop={10}
-              style={{ width: 26, height: 26, alignItems: 'center', justifyContent: 'center' }}>
+              style={({ pressed }) => ({ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? color.picked : color.fill })}>
               <Out />
             </Pressable>
           </View>

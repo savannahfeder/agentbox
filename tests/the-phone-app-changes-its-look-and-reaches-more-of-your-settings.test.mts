@@ -56,11 +56,10 @@ describe('the two palettes', () => {
     expect(Object.keys(LIGHT).sort()).toEqual(Object.keys(DARK).sort());
   });
 
-  it('take the desktop\'s light tokens (renderer/src/styles.css :root)', () => {
-    expect(LIGHT.bg).toBe('#f8f8fa');
-    expect(LIGHT.text).toBe('#12182a');
-    expect(LIGHT.dim).toBe('#4a5266');
-    expect(LIGHT.faint).toBe('#6e7590');
+  // The colours are the phone's own since 2026-11-22 (the-phone-app-has-a-look-of-its-own).
+  it('name the same colours in both, with the one accent', () => {
+    expect(Object.keys(LIGHT)).toEqual(Object.keys(DARK));
+    expect(LIGHT.bg).not.toBe(DARK.bg);
     expect(LIGHT.accent).toBe(DARK.accent);
   });
 
