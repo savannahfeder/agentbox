@@ -126,6 +126,12 @@ describe('the page and the viewer', () => {
     expect(viewer).toMatch(/const mentions = withYourReply \? \[\] : /);
   });
 
+  // The power test: two testers paused at Approve beside "Add to your reply", unsure whether it sent a
+  // review result of its own. In a review the reply is the answer, so the viewer offers no Approve.
+  it('offers no Approve on a picture while a review is open', () => {
+    expect(viewer).toContain('{offers.approve && !withYourReply && <button');
+  });
+
   it('says where a note went', () => {
     expect(noteSentWords('Add to your reply')).toBe('Added to your reply');
     expect(noteSentWords('Send to Theo')).toBe('Sent to Theo');

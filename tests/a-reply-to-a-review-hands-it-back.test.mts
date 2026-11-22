@@ -46,6 +46,15 @@ describe('a reply to a review', () => {
     expect(stillOnItsWay([handBack(10_002_000, 'Anything')], null)).toBe(false);
   });
 
+  // The power test: after Dana handed a review back, Lena's ask left the page and Dana's reply stood
+  // alone as the thread's headline. The ask stays where it was with the reply under it, and a
+  // teammate's words (a hand-back, a helper's message) are never taken as the agent's newest answer.
+  it('keeps the ask you answered on the page, with your answer under it', () => {
+    expect(page).toContain('const shownAsk = ask ?? answeredAsk;');
+    expect(page).toContain("const lastIt = !built.outcome ? [...said].reverse().find((e) => e.who === 'it' && !e.fromId) ?? null : null;");
+    expect(page).toContain('const askAt = shownAsk && onHandBack ? shownAsk.createdAt ?? 0 : null;');
+  });
+
   it('is drawn on the page as your words', () => {
     expect(page).toContain('stillOnItsWay(events, sentBack)');
   });

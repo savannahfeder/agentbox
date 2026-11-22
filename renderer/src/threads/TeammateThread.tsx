@@ -224,7 +224,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const handedBack = useRef(false);
   const [ended, setEnded] = useState<{ note: string } | null>(null);
   const askKey = ask ? `${ask.product}/${ask.id}` : null;
-  useEffect(() => { lastAsk.current = null; setEnded(null); }, [personId, threadId]);
+  // The ask you answered stays where it was, with your answer under it, while the page is open.
+  const [answeredAsk, setAnsweredAsk] = useState<WorkItem | null>(null);
+  useEffect(() => { lastAsk.current = null; setEnded(null); setAnsweredAsk(null); }, [personId, threadId]);
   useEffect(() => {
     const was = lastAsk.current;
     lastAsk.current = ask;
@@ -234,10 +236,12 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const handBack = useCallback(async (verdict: AskVerdict, words: string) => {
     if (!onHandBack) return false;
     handedBack.current = true;
+    setAnsweredAsk(ask);
     const ok = await onHandBack(verdict, words);
-    if (!ok) handedBack.current = false;
+    if (!ok) { handedBack.current = false; setAnsweredAsk(null); }
     return ok;
-  }, [onHandBack]);
+  }, [onHandBack, ask]);
+  const shownAsk = ask ?? answeredAsk;
   // The command bar's answers (thread-commands.ts); changes need words, which the ask's own box takes.
   useEffect(() => {
     if (!ask || !onHandBack) return undefined;
@@ -372,11 +376,12 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
 
   // Drawn as a thread of your own: its name, what came before folded, the newest answer, and the reply box at the foot.
   const said = events.filter((e): e is AgentSaid => !e.kind);
-  const lastIt = !built.outcome ? [...said].reverse().find((e) => e.who === 'it') ?? null : null;
+  // A teammate's words on the thread (a hand-back, a helper's message) are theirs, never the agent's newest answer.
+  const lastIt = !built.outcome ? [...said].reverse().find((e) => e.who === 'it' && !e.fromId) ?? null : null;
   const newest = built.outcome ? { at: built.outcome.at, text: built.outcome.text } : lastIt ? { at: lastIt.at, text: lastIt.text } : null;
   const { before, after } = aroundTheAnswer(events, lastIt, newest?.at ?? null);
   // The ask is drawn where it came in, so what you said since it came sits under it.
-  const askAt = ask && onHandBack ? ask.createdAt ?? 0 : null;
+  const askAt = shownAsk && onHandBack ? shownAsk.createdAt ?? 0 : null;
   const underAnswer = askAt == null ? after : after.filter((e: AgentEvent) => e.at <= askAt);
   const underAsk = askAt == null ? [] : after.filter((e: AgentEvent) => e.at > askAt);
   const [earlierOpen, setEarlierOpen] = useState(false);
@@ -408,11 +413,11 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const title = card.title || `${owner}'s thread`;
 
   // AN ASK ON YOU IS ONE MESSAGE: their words, what the agent did, the pictures and files. A review is answered by replying, not by fixed buttons.
-  const asked = !!(ask && onHandBack);
+  const asked = !!(shownAsk && onHandBack);
   const pictures = files.filter((f) => PICTURE.test(f.name));
   const otherFiles = files.filter((f) => !PICTURE.test(f.name));
-  const handOff = ask && onHandBack ? (
-    <AskBar key={`${ask.product}/${ask.id}`} task={ask} className="handoff" answeredBelow={reviewing} owner={person} onHandBack={handBack} onOpenChange={(src) => onOpenDoc(ask.product, src)}>
+  const handOff = shownAsk && onHandBack ? (
+    <AskBar key={`${shownAsk.product}/${shownAsk.id}`} task={shownAsk} className="handoff" answeredBelow={reviewing || !ask} owner={person} onHandBack={handBack} onOpenChange={(src) => onOpenDoc(shownAsk.product, src)}>
       <HandOffWhat owner={owner} tried={doneSteps(card.progress)} pictures={pictures} files={otherFiles} roots={dir ? [dir] : []} />
     </AskBar>
   ) : null;
