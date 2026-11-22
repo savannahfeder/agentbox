@@ -67,8 +67,8 @@ function OnItsOwn({ product, src, name }: { product: string; src: string; name?:
   );
 }
 
-const PAGE = '#282625';
-const RAISED = '#2f2d2c';
+const PAGE = '#262626';
+const RAISED = '#2e2e2e';
 const Said = ({ words }: { words: string }) => <T style={{ padding: 28, textAlign: 'center', fontSize: 14, color: color.faint }}>{words}</T>;
 
 function Doc({ product, src, style }: { product: string; src: string; style: object }) {
