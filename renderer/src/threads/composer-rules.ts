@@ -783,7 +783,10 @@ export function taskHandOff({ from, brief, message, nameOf, handFrom, offered = 
   const where = projectOrAsk(handOffProject({ words: `${brief.title ?? ''}\n${brief.body}\n${pressed}`, cards, offered }));
   if (pressed && pressed !== brief.body.trim()) {
     const who = message?.by ? nameOf(message.by) : null;
-    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_, ...where };
+    // Named for the task: a message's first line is often the link to the thread it came from.
+    const named = String(brief.title ?? '').trim();
+    const said = `${who ? `${who} wrote: ` : ''}${pressed}\n\n`;
+    return { to: 'agent', body: named ? `${named}\n\n${said}` : said, ...(named ? { named } : {}), attachments, ...from_, ...where };
   }
   // The thread is called what the task is called; who asked is its first words.
   const name = String(brief.title ?? '').trim();

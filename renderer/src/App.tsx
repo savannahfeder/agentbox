@@ -3322,8 +3322,8 @@ export default function App() {
   const queueSpot = spotIn(shownInbox, focused);
   const arrowsWalk = arrowRows(shownInbox, search !== null ? list : null, focused);
   // And every thread with an agent is drawn on that page, Needs you or not; a
-  // conversation between people keeps its chat.
-  const onePage = !!focused && !directSlugs.has(focused.product);
+  // conversation between people keeps its chat, but a task given in it is a thread.
+  const onePage = !!focused && (!directSlugs.has(focused.product) || isTaskRow(focused));
   const stepQueue = useCallback((dir: 1 | -1) => {
     const to = focused && stepIn(arrowsWalk, focused, dir);
     if (to) openInQueue(to);
