@@ -2,7 +2,7 @@
 // their note, the step they picked, and handing it back with your answer. On
 // the task's own page the same buttons sit under the message that asked
 // (`AskActions`), since that message already says the rest.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Person, WorkItem } from '../types';
 import { Face, firstName } from './people';
 import { clock, dayHeading } from '../thread-history';
@@ -20,8 +20,11 @@ export function askChange(task: Pick<WorkItem, 'body'>): string | null {
   return /\]\((attachments\/[^)\s]+\.change)\)/.exec(String(task.body ?? ''))?.[1] ?? null;
 }
 
-export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, under = false, answeredBelow = false }: {
+export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, under = false, answeredBelow = false, className = '', children }: {
   task: WorkItem;
+  className?: string;
+  /** What the ask hands over (the thread's summary, its pictures and files), between the words and the answers. */
+  children?: ReactNode;
   /** The page's own box below answers it, so the bar keeps only its links. */
   answeredBelow?: boolean;
   /** Only the answer, under the message that asked, which already names the thread and the change. */
@@ -54,7 +57,7 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
   };
   const ask4 = giving === 'changes' ? `What should ${first} change?` : `Anything ${first} should know? (optional)`;
   return (
-    <section className={`ask-bar${under ? ' ask-under' : ''}`} aria-label={`What ${first} asked`}>
+    <section className={`ask-bar${under ? ' ask-under' : ''}${className ? ` ${className}` : ''}`} aria-label={`What ${first} asked`}>
       {!under && <div className="ask-bar-head">
         <Face person={owner} size={22} />
         <b>{first}</b><span>{ask.kind === 'help' ? 'asked you to help' : 'asked for your review'}</span>
@@ -63,6 +66,7 @@ export function AskBar({ task, owner, onHandBack, onOpenThread, onOpenChange, un
       {/* On the task's own page its message already says both. */}
       {ask.note && !onOpenThread && !under && <p className="ask-bar-note">{ask.note}</p>}
       {ask.step && !onOpenThread && !under && <blockquote className="ask-bar-step">{ask.step.length > 400 ? `${ask.step.slice(0, 400)}…` : ask.step}</blockquote>}
+      {children}
       {giving ? (
         <div className="ask-bar-back" ref={backBox}>
           <textarea autoFocus value={words} placeholder={ask4} aria-label={ask4} rows={2}

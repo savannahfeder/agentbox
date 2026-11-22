@@ -27,9 +27,11 @@ import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
 import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, FileMarks, Person, ThreadCard, WorkItem } from '../types';
 import { AskBar } from '../team/AskBar';
+import { HandOffWhat, handOffLayout } from '../team/HandOff';
+import { doneSteps } from '../../../shared/thread-cards.mts';
 import { MessagePerson, TeammateStanding, TeammateSummary, ThreadCrumb } from './Summary';
 import { ThreadMenu } from './ThreadMenu';
-import { aroundTheAnswer, askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
+import { aroundTheAnswer, stillOnItsWay, askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
 import { HAND_BACK_EVENT, type AskVerdict } from '../thread-commands';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
@@ -293,18 +295,48 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   }, []);
   // Asked onto it, you land where the ask and the box to write in are, once per thread.
   const landed = useRef<string | null>(null);
+  const handOffEl = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ask || !work || landed.current === threadId) return;
     landed.current = threadId;
     const pane = scrollEl.current;
-    if (pane) pane.scrollTop = pane.scrollHeight;
-  }, [ask, work, threadId]);
+    if (!pane) return undefined;
+    const land = () => {
+      const el = handOffEl.current;
+      if (!el) { pane.scrollTop = pane.scrollHeight; return; }
+      pane.scrollTop += el.getBoundingClientRect().top - pane.getBoundingClientRect().top - 24;
+    };
+    land();
+    // Pictures above it draw late and push it down, so it is landed on again until you scroll yourself.
+    const grew = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(land);
+    if (pane.firstElementChild) grew?.observe(pane.firstElementChild);
+    const stop = () => { grew?.disconnect(); for (const k of ['wheel', 'keydown', 'pointerdown', 'touchstart']) pane.removeEventListener(k, stop); };
+    for (const k of ['wheel', 'keydown', 'pointerdown', 'touchstart']) pane.addEventListener(k, stop, { passive: true });
+    const done = setTimeout(stop, 6000);
+    return () => { clearTimeout(done); stop(); };
+  }, [ask?.id, !!work, threadId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setBig(openAt ? { ...openAt, at: Date.now() } : null); }, [openAt, personId, threadId]);
   const people = useMemo(() => (team ? [...team.byId.values()].filter((p) => !card.people?.length || card.people.includes(p.id) || p.id === personId) : []), [team, card.people, personId]);
 
+  // A review on you is answered by the box: your words hand it back, and stand here until the thread has them.
+  const reviewing = ask?.ask?.kind === 'review' && !!onHandBack;
+  const [sentBack, setSentBack] = useState<{ at: number; text: string } | null>(null);
+  useEffect(() => { setSentBack(null); }, [personId, threadId]);
   const send = async (said?: string) => {
     const text = (said ?? draft).trim();
     if (!text || sending) return;
+    if (reviewing && said === undefined) {
+      setSending(true);
+      const at = Date.now();
+      const ok = await handBack('done', text);
+      setSending(false);
+      if (!ok) return;
+      setDraft('');
+      setBoxOpen(false);
+      setSentBack({ at, text });
+      following?.follow(card);
+      return;
+    }
     setSending(true);
     const out = await api.teamComment({ personId, threadId, text });
     setSending(false);
@@ -366,6 +398,27 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   });
   const title = card.title || `${owner}'s thread`;
 
+  // AN ASK ON YOU IS ONE MESSAGE: their words, what the agent did, the pictures and files, and the answers.
+  const asked = !!(ask && onHandBack);
+  const layout = handOffLayout();
+  const pictures = files.filter((f) => PICTURE.test(f.name));
+  const otherFiles = files.filter((f) => !PICTURE.test(f.name));
+  const handOff = ask && onHandBack ? (
+    <AskBar key={`${ask.product}/${ask.id}`} task={ask} className={`handoff handoff-${layout}`} owner={person} onHandBack={handBack} onOpenChange={(src) => onOpenDoc(ask.product, src)}>
+      <HandOffWhat owner={owner} tried={doneSteps(card.progress)} pictures={pictures} files={otherFiles} roots={dir ? [dir] : []} layout={layout} />
+    </AskBar>
+  ) : null;
+  // The thread above the hand-off is there to scroll up through, not folded away, and stays so once it is answered.
+  const wasAsked = useRef<string | null>(null);
+  if (asked) wasAsked.current = threadId;
+  const unfolded = asked || wasAsked.current === threadId;
+  const besideOnce = useRef<string | null>(null);
+  useEffect(() => {
+    if (!asked || layout !== 'beside' || !pictures.length || besideOnce.current === threadId) return;
+    besideOnce.current = threadId;
+    beside(pictures[0].src);
+  }, [asked, layout, pictures.length, threadId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="focus-pane tp-thread">
       {big && product && (
@@ -408,26 +461,33 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
               </p>
               {/* While you were asked in, the ask at the end says where it stands, not "waiting on" its owner. */}
               {card.visible && !ask && <TeammateStanding card={card} person={person} />}
-              <TeammateSummary card={card} owner={owner} files={files} />
+              {!asked && <TeammateSummary card={card} owner={owner} files={files} />}
             </div>
             {work && !work.shared && <p className="th-work-note">{notSharedWords(owner)}</p>}
-            {earlierCount > 0 && <div className="one-head">
+            {unfolded && work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
+            {unfolded && before.length > 0 && <FileMarkOpener.Provider value={openMark}>
+              <Thread events={before} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />
+            </FileMarkOpener.Provider>}
+            {!unfolded && earlierCount > 0 && <div className="one-head">
               <button type="button" className="one-earlier" onClick={() => setEarlierOpen((o) => !o)}>
                 {earlierOpen ? 'Hide earlier messages' : `Show ${earlierCount} earlier ${earlierCount === 1 ? 'message' : 'messages'}`}
               </button>
             </div>}
-            {earlierOpen && work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
-            {earlierOpen && before.length > 0 && <FileMarkOpener.Provider value={openMark}>
+            {!unfolded && earlierOpen && work && work.earlier > 0 && <p className="th-work-note">{earlierWords(work.earlier, owner)}</p>}
+            {!unfolded && earlierOpen && before.length > 0 && <FileMarkOpener.Provider value={openMark}>
               <Thread events={before} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />
             </FileMarkOpener.Provider>}
-            {newest && <QueueAnswer text={options.length ? stripOptionsSection(newest.text) : newest.text} md={md} name={title} />}
+            {/* The owner's choices are theirs: asked to review, you answer the ask, not them. */}
+            {newest && <QueueAnswer text={options.length || unfolded ? stripOptionsSection(newest.text) : newest.text} md={md} name={title} />}
             {underAnswer.length > 0 && <FileMarkOpener.Provider value={openMark}>
               <Thread events={underAnswer} name={`${owner}'s agent`} landOn={`${threadId}:after`} onWhole={() => {}} md={md} />
             </FileMarkOpener.Provider>}
-            {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={handBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+            {layout !== 'dock' && handOff && <div ref={handOffEl}>{handOff}</div>}
             {underAsk.length > 0 && <FileMarkOpener.Provider value={openMark}>
               <Thread events={underAsk} name={`${owner}'s agent`} landOn={`${threadId}:after-ask`} onWhole={() => {}} md={md} />
             </FileMarkOpener.Provider>}
+            {sentBack && stillOnItsWay(events, sentBack) && <Thread events={[{ at: sentBack.at, who: 'you', text: sentBack.text, ...(team?.me ? { by: team.me } : {}) }]}
+              name={`${owner}'s agent`} landOn={`${threadId}:sent-back`} onWhole={() => {}} md={md} />}
             {(handedToYou || (ended && !ask)) && <p className="th-work-note tp-ask-ended">
               {askEndedWords(firstName(person) || 'Someone', !!handedToYou)}
               {/* The ask's own words leave with it, so what was asked stays said here. */}
@@ -445,6 +505,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
               selectedOption={null} selRef={pickRef} onPick={pick}
               onOptionEnter={() => {}} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} />
           </div>}
+          {layout === 'dock' && handOff}
           {/* Asked to help, the box to write to the agent stays open. */}
           <CommentBox owner={owner} helping={helping} draft={draft} setDraft={setDraft} sending={sending} onSend={() => void send()}
             open={boxOpen || helping} onOpen={() => setBoxOpen(true)} onFold={() => setBoxOpen(false)} />

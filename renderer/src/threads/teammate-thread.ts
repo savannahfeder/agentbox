@@ -59,6 +59,17 @@ export function aroundTheAnswer<E extends { at: number }>(events: readonly E[], 
 }
 
 /**
+ * Whether words you handed back are still on their way to the owner's thread,
+ * so the page draws them itself: until a line said since holds them. The line
+ * is stamped by the owner's computer, whose clock may run a little behind.
+ */
+const CLOCKS_DIFFER_MS = 2 * 60_000;
+export function stillOnItsWay(events: readonly AgentEvent[], sent: { at: number; text: string } | null): boolean {
+  if (!sent) return false;
+  return !events.some((e) => !e.kind && e.at >= sent.at - CLOCKS_DIFFER_MS && String((e as { text?: string }).text ?? '').includes(sent.text));
+}
+
+/**
  * Where an ask on you goes among the owner's messages: after the message `after`
  * (an index into `events`), above them all, or at the foot under the outcome.
  */
