@@ -122,7 +122,7 @@ import { optionIsClipped, optionPeek } from '../option-peek';
 import { agentSaidNotReady, changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, saidNotToShip, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw, stripUnderThePointer } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
-import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
+import { answeredWhereItRuns, replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
@@ -1028,6 +1028,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // 2026-08-17. The only agent a message really is swallowed by is the one
   // frozen on a permission prompt, and that is now the only one without a box.
   const replyBlocked = agent ? replyIsSwallowed(agent) : false;
+  // Codex working on her message in its own window: nothing here to answer, so no box at all.
+  const codexAtWork = agent?.engine === 'codex' && !agent.approval && answeredWhereItRuns(agent);
 
   // A SUMMARISED THREAD is work with a ledger: not a message between two people
   // (main/team/projects.mts makeDirect), and not a running agent's row, the
@@ -2627,7 +2629,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
           </div>
         )}
         {!sentUp && aboveDock}
-        {outWithThem ? <div className="dock-handed"><span>{handedName!.split(/\s+/)[0]} has this now.</span>{onReopen && <button type="button" className="ts-done" onClick={onReopen}>Take it back</button>}</div> : <div className="dock-card">
+        {outWithThem ? <div className="dock-handed"><span>{handedName!.split(/\s+/)[0]} has this now.</span>{onReopen && <button type="button" className="ts-done" onClick={onReopen}>Take it back</button>}</div> : codexAtWork ? null : <div className="dock-card">
           {/* A TASK A TEAMMATE GAVE YOU: to an agent, keep it, or hand it back.
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
