@@ -50,6 +50,10 @@ export const EVENTS: Record<string, string> = {
   // never started an agent, and nothing said which of a dozen checks held it
   // (tests/a-start-that-is-turned-away-is-counted-and-said.test.mts).
   run_waiting: 'An agent could not start yet',
+  // HOW HEAVY IT IS ON THE MACS OF THE PEOPLE USING IT (2026-11-22), which
+  // only the person's own Mac could say until now
+  // (tests/each-install-says-once-a-day-how-heavy-the-app-was.test.mts).
+  app_health: 'How heavy the app was on a day',
 };
 
 export const EVENT_NAMES: string[] = Object.keys(EVENTS);
@@ -68,6 +72,16 @@ export const ALLOWED_PROPS: Set<string> = new Set([
   'practice',       // whether it happened in setup's practice project
   'engine',         // -> ENGINES below, which coding agent ran
   'reason',         // -> WAIT_REASONS below, why an agent could not start yet
+  // `app_health`'s nine, all numbers (main/health-day.mts).
+  'appMb',          // the most memory the app's own processes used
+  'mainMb',         // the most its main process used
+  'idleCpu',        // its average CPU, % of one core, while no agent ran
+  'busyCpu',        // the same while one did
+  'wakeups',        // how often a second it woke the Mac while idle
+  'freezes',        // how many times its main thread held for half a second or more
+  'freezeSeconds',  // the longest of those
+  'tightMinutes',   // minutes the Mac was short of memory
+  'hours',          // hours it was open
 ]);
 
 // `kind`, `engine` and `reason` are the properties that are not numbers, so each is a

@@ -329,10 +329,11 @@ Nothing, unless you are running a released copy: the Mac app, or
 released. A build made from this repo has no key, so a clone and a fork are
 silent, and with no key the whole path is off at every send.
 
-A released copy counts nineteen things, and they are counts:
+A released copy counts twenty things, and they are counts:
 
 - the app was opened
 - the app was used today, once a day
+- how heavy the app was on a day, sent once, the next day the app is used
 - a setup step was reached, by its number
 - first run finished
 - a repo was connected
@@ -358,9 +359,14 @@ which kind of row it was out of six fixed words, whether an agent or you did
 it, whether an agent's run failed, whether it happened in setup's practice
 project, which coding agent ran it, Claude Code or Codex, and why an agent
 could not start yet, out of eighteen fixed words.
+The count of how heavy the app was carries nine numbers instead. They are the
+most memory the app and its main process used, its average CPU while no agent
+ran and while one did, how often a second it woke the Mac while idle, how many
+times it froze for half a second or more and the longest, how many minutes the
+Mac was short of memory, and how many hours the app was open.
 No file contents, no prompts, no paths, no titles, nothing you typed.
 `shared/analytics-events.mts` is the whole list, and anything a caller attaches
-beyond those eight is dropped rather than sent, so nobody can widen it by
+beyond those is dropped rather than sent, so nobody can widen it by
 accident. Crash reports travel the same way and are scrubbed first
 (`shared/crash-scrub.mts`).
 
