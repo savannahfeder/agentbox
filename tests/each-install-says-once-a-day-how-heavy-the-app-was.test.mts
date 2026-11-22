@@ -35,23 +35,63 @@ function aDay(dir: string, day: string) {
     // The memory recorder's heap line shares the file and is not a minute.
     { at: `${day}T09:04:30Z`, upMin: 4, heapMb: 31 },
   ]);
-  lines(dir, `freeze-${day}.jsonl`, [{ at: `${day}T09:02:10Z`, ms: 620 }, { at: `${day}T09:03:10Z`, ms: 2400 }]);
+  lines(dir, `freeze-${day}.jsonl`, [
+    { at: `${day}T09:02:10Z`, ms: 620, where: 'secretHelper …/her-repo/build.js:3' },
+    { at: `${day}T09:03:10Z`, ms: 2400, where: 'scan main/claude-models.mts:173' },
+  ]);
 }
 
+const WHOLE_DAY = {
+  appMb: 3100, mainMb: 2900, idleCpu: 1.5, busyCpu: 7, wakeups: 100, freezes: 2, freezeSeconds: 2.4, tightMinutes: 2, hours: 0.1,
+  peakHours: 0.1, peakAgents: 1, peakPart: 'main', cpuPeak: 8, cpuPeakPart: 'main',
+  freezeWhere: 'scan main/claude-models.mts:173', freezeHours: 0.1, freezeAgents: 1,
+};
+
 describe('how heavy the app was on a day', () => {
-  it('is a count on the approved list, and only numbers go', () => {
+  it('is a count on the approved list, and only numbers and closed words go', () => {
     expect(EVENTS.app_health).toBe('How heavy the app was on a day');
-    const props = { appMb: 3100, mainMb: 2900, idleCpu: 1.5, busyCpu: 7, wakeups: 100, freezes: 2, freezeSeconds: 2.4, tightMinutes: 2, hours: 0.1 };
-    expect(sanitize('app_health', props)).toEqual(props);
-    expect(sanitize('app_health', { appMb: '3 GB', name: 'a-repo', mainMb: 10 })).toEqual({ mainMb: 10 });
+    expect(sanitize('app_health', WHOLE_DAY)).toEqual(WHOLE_DAY);
+    expect(sanitize('app_health', { appMb: '3 GB', name: 'a-repo', mainMb: 10, peakPart: 'her-repo' })).toEqual({ mainMb: 10 });
   });
 
-  it('reads the day from the memory and freeze logs', () => {
+  it('names a freeze only by a function in the app\'s own code', () => {
+    for (const where of ['scan main/claude-models.mts:173', '(anonymous) shared/store.mts:9', '_tick main/supervisor.mts:9521']) {
+      expect(sanitize('app_health', { freezeWhere: where })).toEqual({ freezeWhere: where });
+    }
+    for (const where of ['secretHelper …/her-repo/build.js:3', 'f /Users/her/code/app/main/x.mts:1', 'readFileUtf8', 'x main/../../etc/passwd:1', `a ${'main/'.repeat(40)}x.mts:1`]) {
+      expect(sanitize('app_health', { freezeWhere: where })).toEqual({});
+    }
+  });
+
+  it('reads the day from the memory and freeze logs, and when and how it got heavy', () => {
     const dir = tmp();
     aDay(dir, '2026-11-21');
-    expect(summarizeHealthDay(dir, '2026-11-21')).toEqual({
-      appMb: 3100, mainMb: 2900, idleCpu: 1.5, busyCpu: 7, wakeups: 100, freezes: 2, freezeSeconds: 2.4, tightMinutes: 2, hours: 0.1,
-    });
+    expect(summarizeHealthDay(dir, '2026-11-21')).toEqual(WHOLE_DAY);
+  });
+
+  it('says how fast main grew over the longest stretch the app stayed open', () => {
+    const dir = tmp();
+    const rows: object[] = [];
+    // A launch at 08:00 told by the memory recorder's uptime, open two hours.
+    rows.push({ at: '2026-11-21T08:30:00Z', upMin: 30, heapMb: 40 });
+    for (let m = 0; m <= 120; m += 10) rows.push({ at: new Date(Date.UTC(2026, 10, 21, 8, 30 + m)).toISOString(), pressure: 'normal', running: 0, own: own(400 + m, 200 + m * (110 / 60), 1, 50) });
+    // A restart, whose own first reading has no CPU yet, open 20 minutes.
+    for (let m = 0; m <= 20; m += 10) rows.push({ at: new Date(Date.UTC(2026, 10, 21, 11, m)).toISOString(), pressure: 'normal', running: 0, own: own(300, 150 + m * 2, m ? 1 : null, 50) });
+    lines(dir, 'memory-2026-11-21.jsonl', rows);
+    const day = summarizeHealthDay(dir, '2026-11-21')!;
+    expect(day.mainMbPerHour).toBe(110);
+    // The app peaked at 10:30, two and a half hours after the 08:00 launch.
+    expect(day.peakHours).toBe(2.5);
+  });
+
+  it('says which part of the app was busiest', () => {
+    const dir = tmp();
+    const busyWindow = { ...own(600, 200, 15, 80), windows: { mb: 300, cpu: 14, wakeups: 80 }, main: { mb: 200, cpu: 1, wakeups: 0 } };
+    lines(dir, 'memory-2026-11-21.jsonl', [
+      { at: '2026-11-21T09:00:00Z', pressure: 'normal', running: 0, own: own(500, 200, null) },
+      { at: '2026-11-21T09:01:00Z', pressure: 'normal', running: 0, own: busyWindow },
+    ]);
+    expect(summarizeHealthDay(dir, '2026-11-21')).toMatchObject({ cpuPeak: 15, cpuPeakPart: 'windows', peakPart: 'windows' });
   });
 
   it('falls back to the whole listing on a day logged before the app read its own use', () => {

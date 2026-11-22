@@ -58,10 +58,10 @@ export const EVENTS: Record<string, string> = {
 
 export const EVENT_NAMES: string[] = Object.keys(EVENTS);
 
-// THE ONLY PROPERTIES A CALLER MAY ATTACH, and every one of them is a number or
-// a boolean. A string is refused outright rather than scrubbed, because a
-// scrubbed string is a promise about a regular expression and this is a promise
-// about a type. The version pair is set by the sender itself (`main/analytics
+// THE ONLY PROPERTIES A CALLER MAY ATTACH. Each is a number, a boolean or a
+// word from a closed list, except `freezeWhere`, which must be a place in the
+// app's own code (`appCode`). Any other string is refused outright rather than
+// scrubbed. The version pair is set by the sender itself (`main/analytics
 // .mjs`), never by a caller, which is why it is not in here.
 export const ALLOWED_PROPS: Set<string> = new Set([
   'seconds',        // how long something took, rounded
@@ -82,10 +82,33 @@ export const ALLOWED_PROPS: Set<string> = new Set([
   'freezeSeconds',  // the longest of those
   'tightMinutes',   // minutes the Mac was short of memory
   'hours',          // hours it was open
+  // And when and how it got heavy, said by time since it opened, never the hour.
+  'peakHours',      // how long it had been open when its memory peaked
+  'peakAgents',     // how many agents were running then
+  'peakPart',       // -> PARTS below, which part of the app held the most
+  'mainMbPerHour',  // how fast main grew over the longest stretch it stayed open
+  'cpuPeak',        // its busiest minute, % of one core
+  'cpuPeakPart',    // -> PARTS below, which part was busiest then
+  'freezeWhere',    // the app's own function that held the longest freeze, as `appCode` allows
+  'freezeHours',    // how long it had been open then
+  'freezeAgents',   // how many agents were running then
 ]);
 
-// `kind`, `engine` and `reason` are the properties that are not numbers, so each is a
-// closed list. A value outside it is dropped, not passed through.
+// The parts of the app main/own-use.mts measures.
+export const PARTS: Set<string> = new Set(['main', 'windows', 'gpu', 'helpers']);
+
+/**
+ * A function in the app's own code, as main/freeze-recorder.mts names it:
+ * its name and its file and line under the app's own folders. A frame from
+ * anywhere else is written `…/a/b.js` there, and so never matches.
+ */
+export function appCode(where: unknown): where is string {
+  return typeof where === 'string' && where.length <= 120 && !where.includes('..')
+    && /^(\(anonymous\)|[A-Za-z_$][\w$]*) (main|shared|mcp|bin)\/[\w./-]+\.(mts|mjs|cjs|js|ts):\d+$/.test(where);
+}
+
+// `kind`, `engine`, `reason` and the two parts are closed lists. A value outside
+// one is dropped, not passed through.
 export const KINDS: Set<string> = new Set(['task', 'question', 'review', 'directive', 'agent', 'digest']);
 export const ENGINES: Set<string> = new Set(['claude', 'codex']);
 export const WAIT_REASONS: Set<string> = new Set([
@@ -110,6 +133,14 @@ export function sanitize(name: string, props: Record<string, unknown> | null = {
     }
     if (key === 'reason') {
       if (typeof value === 'string' && WAIT_REASONS.has(value)) out.reason = value;
+      continue;
+    }
+    if (key === 'peakPart' || key === 'cpuPeakPart') {
+      if (typeof value === 'string' && PARTS.has(value)) out[key] = value;
+      continue;
+    }
+    if (key === 'freezeWhere') {
+      if (appCode(value)) out.freezeWhere = value;
       continue;
     }
     if (typeof value === 'number' && Number.isFinite(value)) out[key] = value;
