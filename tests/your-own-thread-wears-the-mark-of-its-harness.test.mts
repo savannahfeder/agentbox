@@ -66,9 +66,13 @@ describe("your own thread's slot", () => {
   });
 
   it('keeps the agent face for a harness that has no mark', () => {
-    const html = draw(row(), { engines: { workspace: 'opencode', byItem: {} } });
+    const html = draw(row(), { engines: { workspace: 'some-new-harness', byItem: {} } });
     expect(markOf(html)).toBeNull();
     expect(slotOf(html)).toContain('agent-eyes');
+  });
+
+  it('wears OpenCode\'s mark on a thread that runs on OpenCode', () => {
+    expect(markOf(draw(row({ id: 'w-9' }), { engines: { workspace: 'claude', byItem: { 'w-9': 'opencode' } } }))).toBe('opencode');
   });
 });
 

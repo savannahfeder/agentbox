@@ -23,7 +23,8 @@ describe('a thread in a group chat', () => {
   });
   it('puts the cursor in its reply box when it opens', () => {
     expect(chat).toMatch(/useEffect\(\(\) => \{ if \(takesTyping\) requestAnimationFrame\(\(\) => ref\.current\?\.focus\(\)\); \}, \[\]\);/);
-    expect(chat).toMatch(/takesTyping=\{full \|\| !!thread\}/);
+    // Folded, as a chat opened from Needs you is, only its side thread takes the typing.
+    expect(chat).toMatch(/takesTyping=\{folded \? !!thread : full \|\| !!thread\}/);
   });
   it('says how many replies only when there are some', () => {
     expect(chat).toContain("{(replies.get(root.id)?.length ?? 0) > 0 && <span className=\"rm-label\"");

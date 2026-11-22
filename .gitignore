@@ -105,9 +105,9 @@ briefs/founder.md
 
 # THE TEAM CLOUD'S ADDRESS AND KEY ARE NOT SOURCE EITHER.
 #
-# `cloud/team.config.json` points the team version at one hosted project. It
-# lives only on the machines that run that version; a checkout without it is
-# the single-person app. `cloud/team.config.example.json` shows the shape.
+# `cloud/team.config.json` points this copy at another team cloud than the one
+# every copy ships with (shared/cloud-address.mts).
+# `cloud/team.config.example.json` shows the shape.
 cloud/team.config.json
 # Points this copy at another Agentbox Cloud than the one every copy ships
 # with (shared/cloud-address.mjs).

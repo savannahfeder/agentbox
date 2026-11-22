@@ -32,6 +32,7 @@ const { loadConfig } = await import('../main/config.mts');
 const { autoAgents } = await import('../main/machine.mts');
 const { Supervisor } = await import('../main/supervisor.mts');
 const { NAME } = await import('../shared/product-name.mjs');
+const { HARNESS_DEFINITIONS } = await import('../shared/harness-definitions.mts');
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const MAC = { memBytes: 24 * 1024 ** 3, cores: 10 };
@@ -46,11 +47,18 @@ const layPlan = (at, tier) => {
 };
 const layConfig = (over) => fs.writeFileSync(path.join(appDir, 'zero.config.json'), JSON.stringify(over));
 
+// Which agents are here is read off their binaries, so the test lays them out
+// rather than taking whatever this runner has installed.
+const installed = (engines) => ({
+  ...Object.fromEntries(HARNESS_DEFINITIONS.map(({ id, binKey }) => [binKey, engines.includes(id) ? `/test/bin/${id}` : null])),
+  claudeFound: engines.includes('claude'),
+  engineChoice: '2026-01-01T00:00:00.000Z',
+});
+
 function supervisorFor(config, engines = ['claude']) {
   const store = { listItems: () => [], listProducts: () => [], isDue: () => true, readItem: () => null };
-  const s = new Supervisor({ ...config, storeRoot: appDir, home }, store, root, appDir, appDir);
+  const s = new Supervisor({ ...config, ...installed(engines), storeRoot: appDir, home }, store, root, appDir, appDir);
   s._liveProfilesFor = () => ['default'];
-  s.engineChoices = () => engines.map((id) => ({ id }));
   s._machine = () => MAC;
   made.push(s);
   return s;
@@ -95,6 +103,14 @@ describe('a login that is not on Max', () => {
     const config = loadConfig(appDir, { home });
     const s = supervisorFor(config, ['claude', 'codex']);
     expect(s._capacityFor('claude')).toBe(s._capacityFor('codex'));
+    expect(s._capacityFor('claude')).toBe(autoAgents({ ...MAC, gated: config.memoryGate }));
+  });
+
+  it('gives Codex nothing when it is not installed, and Claude Code the whole number', () => {
+    layPlan(path.join(home, '.claude.json'), 'default_claude_pro');
+    const config = loadConfig(appDir, { home });
+    const s = supervisorFor(config, ['claude']);
+    expect(s._capacityFor('codex')).toBe(0);
     expect(s._capacityFor('claude')).toBe(autoAgents({ ...MAC, gated: config.memoryGate }));
   });
 });

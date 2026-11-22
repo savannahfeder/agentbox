@@ -25,7 +25,7 @@ import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-fi
 import { legacyRoot } from '../main/store/project.mts';
 import { listProductChats, readProductChat } from './core/chat.mts';
 import { lookAtPage } from './core/page.mts';
-import { askToSignIn, keepAfterSignIn, keyNamesFor, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
+import { askToSignIn, keepAfterSignIn, keyNamesFor, notToBeSaved, NOT_SAVED, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
@@ -642,6 +642,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       if (keep) {
         if (!ask) throw new Error('keep goes with the ask of a sign-in that worked');
         if (typeof keepCloudKey !== 'function') return json({ status: 'kept_here', message: 'On this computer the login keeps its own sign-in, so there is nothing to keep.' });
+        if (notToBeSaved(id, ask, { product })) return json({ status: 'not_saved', message: NOT_SAVED });
         const said = (await waitForSignIn(id, asked.id, { product, waitMs: 0 })).status;
         if (said === 'skipped' || said === 'replied') return json({ status: 'denied', message: 'They did not sign in here, so there is nothing to keep.' });
         const names = keyNamesFor(asked.service);
@@ -654,6 +655,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       const inCloud = typeof keepCloudKey === 'function';
       const withKeep = <T extends { message: string }>(out: T, finishing = false): T => {
         if (!inCloud) return out;
+        if (notToBeSaved(id, asked.id, { product })) return { ...out, message: `${out.message} ${NOT_SAVED}` };
         const k = keepAfterSignIn(asked.service, { finishing });
         return { ...out, ...(k.keep ? { keep: k.keep } : {}), message: `${out.message} ${k.message}` };
       };
