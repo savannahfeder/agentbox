@@ -134,6 +134,33 @@ command menus and automatic updates. Unknown usage is never zero usage, and a
 tool without compaction is acceptable only if running out of context is a
 recoverable outcome someone can understand.
 
+## The real check: `npm run check:harnesses`
+
+The unit tests drive stand-ins of each tool, and a stand-in keeps passing after
+the tool or a sign-in has moved. So one list runs against the real tool of
+every harness on offer, through a copy of the app on a store of its own, driven
+by the calls the screen makes:
+
+- a new thread gets its answer, on the harness it named;
+- a reply carries on the same conversation;
+- a reply after the app restarts still carries it on;
+- a running thread stops when told to, and still answers afterwards;
+- a command that needs a yes waits for the card, then runs;
+- a command that was refused did not run.
+
+`npm run check:harnesses` checks them all, `npm run check:harnesses -- codex`
+one, and `--json` prints the verdicts. It exits 0 only when every scenario of
+every harness passed, 1 when one failed, and 2 when one could not be checked:
+not installed, not signed in, or out of usage. A plan at its limit is "could not
+check", never a pass, and no run is started on it: Codex carries on past a spent
+week on paid credits. Each run spends a few one-word turns of each plan.
+
+The list is in `scripts/lib/harness-check.mts`. A harness on offer is in it by
+being on offer, and its two command scenarios fail until `ASKS_FIRST` names the
+permission mode that makes it ask, because no protocol carries that. This is
+the "Required before a tool is offered" list above as something that runs: a
+harness is offered only while it passes.
+
 ## Hermes integration direction
 
 The proposed first integration is an optional local task session over Hermes'
