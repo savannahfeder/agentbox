@@ -77,8 +77,14 @@ describe('back never goes round in circles', () => {
   // Hundreds of made-up sessions: whatever was opened, in whatever order,
   // walking back shows each thread once and never stands still.
   it('holds for any order of visits, backs and forwards', () => {
+    // mulberry32: an ordinary seeded generator, so a failure replays.
     let seed = 7;
-    const random = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+    const random = (n: number) => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let x = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return Math.floor((((x ^ (x >>> 14)) >>> 0) / 4294967296) * n);
+    };
     const places = [a, b, c, d, card('x'), chat('g'), L, L, list('progress'), list('done')];
     for (let run = 0; run < 400; run++) {
       let t = EMPTY_TRAIL;
