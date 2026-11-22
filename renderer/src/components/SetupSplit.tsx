@@ -20,6 +20,7 @@ import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
+import { EngineLogo } from './EngineLogos';
 import { PERK_ICONS, ProShowcase } from './ProShowcase';
 import { SignInPage } from '../team/SignInPage';
 import { Name } from '../../../shared/product-name.mjs';
@@ -356,7 +357,7 @@ export function SetupSplit(p: SetupSplitProps) {
     choose.current = (by) => setEngine(nextChoice(['claude', 'codex'] as const, engine, by));
     body = <>
       <div className="ss-list">
-        {(['claude', 'codex'] as const).map((id) => <Row key={id} face={<span className="ss-ai">{id === 'claude' ? 'C' : 'X'}</span>} name={id === 'claude' ? 'Claude Code' : 'Codex'}
+        {(['claude', 'codex'] as const).map((id) => <Row key={id} face={<span className="ss-ai"><EngineLogo engine={id} size={18} /></span>} name={id === 'claude' ? 'Claude Code' : 'Codex'}
           end={<Check on={engine === id} />} on={engine === id} onClick={() => setEngine(id)} />)}
       </div>
       <div className="ss-acts">{go('Continue', () => { void api.setWorkspaceSetting({ key: 'engine', value: engine }); writeLastEngine(engine === 'codex' ? 'codex' : null); dispatchEvent(new CustomEvent(ENGINE_CHOSEN, { detail: engine })); next(); })}</div>

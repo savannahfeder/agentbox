@@ -1,65 +1,81 @@
-// The website's birds in the mountains' 3px dots, each drifting slowly about a
-// spot of its own. They keep out of the words, and stay put rather than fly
-// across: the website's flock was too much to have in view all day.
+// The website's birds in the mountains' 3px dots, each going round a spot of its
+// own at an even speed, clear of the words. The website's whole flock was too
+// much to have in view all day, and birds that stop and start look stuck.
 
 import type { Rgb } from './mountains';
 
-/** Its spot, how far it drifts from it, and where in its drift it is. */
-export type Bird = { hx: number; hy: number; x: number; y: number; t: number; rx: number; ry: number; w: [number, number]; p: [number, number, number, number]; ph: number; s: number };
 type Box = { x: number; y: number; w: number; h: number };
 /** The card in px; the birds keep between `top` and `bottom`, and out of `avoid`. */
 export type BirdSky = { W: number; H: number; top: number; bottom: number; avoid: Box | null };
+/** Where a bird keeps to, and how far round it it goes. */
+export type Spot = { x: number; y: number; rx: number; ry: number };
+/** Its spot, where it is, how far round its spot it has got, and its wings. */
+export type Bird = { hx: number; hy: number; rx: number; ry: number; x: number; y: number; a: number; dir: 1 | -1; v: number; t: number; p: [number, number, number]; ph: number };
 
-const MARGIN = 60, SIZE = 14;
-/** How far a bird drifts from its spot, at most, sideways and up or down. */
-export const DRIFT = { x: 42, y: 18 };
+/** The most that fly at once. */
+export const MAX_BIRDS = 4;
+/** The furthest a bird goes from its spot. */
+export const RADIUS = { x: 84, y: 26 };
+/** In px a second. The flock's 50 was too active, and 10 looked stuck. */
+const SPEED = 24;
+/** Half a bird, kept clear of the words and the card's top. */
+const HALF = { w: 22, h: 14 };
+const SIZE = 14;
 
-const outside = (x: number, y: number, box: Box | null, pad = 0) => !box || x < box.x - pad || x > box.x + box.w + pad || y < box.y - pad || y > box.y + box.h + pad;
+const between = (lo: number, hi: number, k: number) => lo + (Math.max(lo, hi) - lo) * k;
 
-/** Where `n` birds keep to: evenly across the sky, at different heights, clear of the words. */
-export function perches(n: number, sky: BirdSky): { x: number; y: number }[] {
-  const spots: { x: number; y: number }[] = [];
-  const heights = [0.5, 0.12, 0.22, 0.62];
-  for (let i = 0; i < n; i++) {
-    const x = sky.W * ((i + 0.5) / n);
-    let y = sky.top + (sky.bottom - sky.top) * heights[i % heights.length];
-    const box = sky.avoid;
-    // Over the words it sits above them.
-    if (box && !outside(x, y, box, MARGIN)) y = Math.max(sky.top, box.y - MARGIN);
-    spots.push({ x, y });
-  }
-  return spots;
+/** `n` spots, evenly across the sky at different heights, each round clear of the words. */
+export function spots(n: number, sky: BirdSky): Spot[] {
+  const heights = [0.5, 0.12, 0.3, 0.62], above = [0.7, 0.1, 0.4, 0.8];
+  const rx = Math.min(RADIUS.x, (sky.W / n) * 0.34), box = sky.avoid;
+  return Array.from({ length: n }, (_, i) => {
+    const x = (sky.W * (i + 0.5)) / n;
+    let ry = RADIUS.y, y = between(sky.top + ry, sky.bottom - ry, heights[i % heights.length]);
+    const overWords = box && x + rx + HALF.w > box.x && x - rx - HALF.w < box.x + box.w && y + ry + HALF.h > box.y && y - ry - HALF.h < box.y + box.h;
+    if (overWords) {
+      ry = Math.min(RADIUS.y, Math.max(3, (box.y - sky.top) / 2 - HALF.h));
+      const lowest = box.y - HALF.h - ry;
+      y = Math.max(HALF.h + ry, Math.min(lowest, between(sky.top + ry, lowest, above[i % above.length])));
+    }
+    return { x, y, rx, ry };
+  });
 }
 
 export function seedBirds(n: number, sky: BirdSky, rnd: () => number = Math.random): Bird[] {
-  const birds = perches(n, sky).map(({ x, y }): Bird => ({
-    hx: x, hy: y, x, y, t: 0,
-    rx: DRIFT.x * (0.65 + 0.35 * rnd()), ry: DRIFT.y * (0.6 + 0.4 * rnd()),
-    w: [0.2 + 0.12 * rnd(), 0.15 + 0.1 * rnd()],
-    p: [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28, rnd() * 6.28],
-    ph: rnd() * 6.28, s: SIZE,
-  }));
-  for (const b of birds) drift(b, 0);
-  return birds;
+  return spots(n, sky).map(({ x, y, rx, ry }, i): Bird => {
+    const b: Bird = { hx: x, hy: y, rx, ry, x, y, a: rnd() * 6.28, dir: i % 2 ? 1 : -1, v: SPEED * (0.92 + 0.16 * rnd()), t: 0, p: [rnd() * 6.28, rnd() * 6.28, rnd() * 6.28], ph: rnd() * 6.28 };
+    drift(b, 0);
+    return b;
+  });
 }
 
-/** Move a bird along its drift by `dt` seconds. Its path is a sum of slow sines, so it never leaves its radius. */
+/** Move a bird `dt` seconds on round its spot: the same speed all the way round, so it is never all but still at an end. */
 export function drift(b: Bird, dt: number) {
   b.t += dt;
-  b.x = b.hx + b.rx * (0.7 * Math.sin(b.w[0] * b.t + b.p[0]) + 0.3 * Math.sin(1.7 * b.w[0] * b.t + b.p[1]));
-  b.y = b.hy + b.ry * (0.7 * Math.sin(b.w[1] * b.t + b.p[2]) + 0.3 * Math.sin(1.9 * b.w[1] * b.t + b.p[3]));
-  b.ph += 2.2 * dt;
+  const wide = b.rx * (0.9 + 0.1 * Math.sin(0.13 * b.t + b.p[0])), tall = b.ry * (0.9 + 0.1 * Math.sin(0.17 * b.t + b.p[1]));
+  const reach = Math.max(1, Math.hypot(wide * Math.sin(b.a), tall * Math.cos(b.a)));
+  // A round too small for the speed is gone round more slowly, not in a spin.
+  b.a += (b.dir * b.v * dt) / Math.max(reach, b.v / 1.2);
+  b.x = b.hx + wide * Math.cos(b.a);
+  b.y = b.hy + tall * Math.sin(b.a);
+  b.ph += 4.4 * dt;
 }
 
-/** The dots a bird lights, as grid cells: two bent wings mirrored about its middle, up or down with its flap. */
-export function birdCells(b: Pick<Bird, 'x' | 'y' | 'ph' | 's'>, pitch: number): [number, number][] {
-  const flap = Math.sin(b.ph), s = b.s;
+/** How far up its wings are, -1 to 1: a few beats, then a glide. `energy` 0 is wings held level. */
+export function wings(b: Bird, energy = 1): number {
+  const beating = Math.min(1, Math.max(0, 1.6 * Math.sin(0.55 * b.t + b.p[2]) + 0.9));
+  return Math.sin(b.ph) * beating * energy;
+}
+
+/** The dots a bird lights, as grid cells: two bent wings mirrored about its middle, `up` -1 to 1. */
+export function birdCells(b: { x: number; y: number; s: number; up: number }, pitch: number): [number, number][] {
+  const { s, up } = b;
   const seg = (qx: number, qy: number, ax: number, ay: number, bx: number, by: number) => {
     const pax = qx - ax, pay = qy - ay, bax = bx - ax, bay = by - ay;
     const k = Math.min(1, Math.max(0, (pax * bax + pay * bay) / (bax * bax + bay * bay)));
     return Math.hypot(pax - bax * k, pay - bay * k);
   };
-  const m = [0.45 * s, 0.3 * s + 0.22 * s * flap], tip = [s, 0.5 * s + 0.3 * s * flap];
+  const m = [0.45 * s, 0.3 * s + 0.22 * s * up], tip = [s, 0.5 * s + 0.3 * s * up];
   const out: [number, number][] = [];
   for (let cx = Math.floor((b.x - s * 1.3) / pitch); cx < (b.x + s * 1.3) / pitch; cx++) {
     for (let cy = Math.floor((b.y - s) / pitch); cy < (b.y + s) / pitch; cy++) {
@@ -81,53 +97,80 @@ export function boxIn(el: Element | null, frame: HTMLElement, pad = 0): Box | nu
   return { x: (r.left - f.left) * k - pad, y: (r.top - f.top) * k - pad, w: r.width * k + pad * 2, h: r.height * k + pad * 2 };
 }
 
-/** The most that fly at once. */
-export const MAX_BIRDS = 4;
-/** How often they move. Each update is a pixel or two, so nothing is animated in between:
- *  a picture sliding 60 times a second would redraw the window that often. */
-const TICK_MS = 125;
-/** A tick this much later than planned is the computer struggling, not a bird. */
-const SLOW_GAP = 2.5;
-/** This many late ticks, not made up since, and the flock rests. */
-const SLOW_TICKS = 20;
-const REST_MS = 30_000;
+/* -------------------------------- keeping time ------------------------------- */
+
+/** Nobody at the window for this long, and they settle until somebody is. */
+export const AWAY_MS = 180_000;
+/** How long to wait between updates, then the wait each one is drawn after: thirty a second, fifteen, then eight. */
+const WAITS = [24, 57, 112];
+/** An update this many times later than it should be is the computer falling behind. */
+const LATE = 2.5;
+/** This many, not made up since, and they are updated less often. */
+const LATE_MANY = 12;
+/** This many on time, and they are updated more often again. */
+const WELL_MANY = 90;
+/** Falling behind even at the slowest: they settle for this long. */
+const SETTLE_MS = 10_000;
+/** How long easing to a stop, or out of one, takes to get most of the way. */
+const EASE_S = 0.7;
+
+/** `step` is the place in WAITS; `energy` is 1 flying and 0 settled, and eases between. `last` 0 is an update with none before it to count from. */
+export type Clock = { step: number; late: number; well: number; seen: number; last: number; energy: number; settledUntil: number };
+export const newClock = (now: number): Clock => ({ step: 0, late: 0, well: 0, seen: now, last: 0, energy: 1, settledUntil: 0 });
+
+/** Somebody is at the window: the pointer, a key, a scroll, or it was brought into view. */
+export function here(c: Clock, now: number) { c.seen = now; }
+
+/** An update at `now`: how far their own time moves, in seconds, and how long to wait for the next; null until somebody is here. */
+export function beat(c: Clock, now: number): { dt: number; wait: number | null } {
+  const gap = c.last ? now - c.last : 0;
+  c.last = now;
+  const settled = now < c.settledUntil;
+  if (gap && !settled) {
+    if (gap > (WAITS[c.step] + 10) * LATE) { c.late += 1; c.well = 0; } else { c.late = Math.max(0, c.late - 0.5); c.well += 1; }
+    if (c.late >= LATE_MANY) {
+      c.late = 0; c.well = 0;
+      if (c.step < WAITS.length - 1) c.step += 1; else c.settledUntil = now + SETTLE_MS;
+    } else if (c.well >= WELL_MANY && c.step > 0) { c.step -= 1; c.well = 0; }
+  }
+  const flying = now >= c.settledUntil && now - c.seen <= AWAY_MS;
+  const seconds = Math.min(gap, 100) / 1000;
+  c.energy += ((flying ? 1 : 0) - c.energy) * (1 - Math.exp(-Math.min(gap, 1000) / 1000 / EASE_S));
+  if (flying && c.energy > 0.995) c.energy = 1;
+  if (!flying && c.energy < 0.02) {
+    c.energy = 0;
+    const back = c.settledUntil - now;
+    c.last = 0;
+    return { dt: 0, wait: now - c.seen > AWAY_MS ? null : Math.max(back, 0) };
+  }
+  return { dt: seconds * c.energy, wait: WAITS[c.step] };
+}
+
+/* ---------------------------------- drawing ---------------------------------- */
+
 /** Re-read where the words are, and the card's size, this often. */
-const LOOK_MS = 500;
-/** Typing or scrolling, and the flock waits this long after the last of it. */
-const BUSY_MS = 1500;
-/** Nobody at the computer for this long, and it rests until they are back. */
-const IDLE_MS = 90_000;
-const CELL_W = 48, CELL_H = 36, CELL_S = 14;
-
-/** One more tick that came `gap` ms after the last; a late one counts up, a good one counts back down. */
-export function lateness(late: number, gap: number): number {
-  return gap > TICK_MS * SLOW_GAP ? late + 1 : Math.max(0, late - 0.5);
-}
-
-/** Why the flock is not moving at `now`, if it is not. */
-export function flockWaits(now: number, { busyUntil, lastInput, late }: { busyUntil: number; lastInput: number; late: number }): 'busy' | 'idle' | 'slow' | null {
-  if (late >= SLOW_TICKS) return 'slow';
-  if (now < busyUntil) return 'busy';
-  return now - lastInput > IDLE_MS ? 'idle' : null;
-}
+const LOOK_MS = 1000;
+/** Look this often for the card coming into view. */
+const OUT_OF_VIEW_MS = 120;
+const CELL_W = 48, CELL_H = 36;
+/** The wing positions drawn, down to up. */
+const POSES = [-1, -0.5, 0, 0.5, 1];
 
 const sprites = new Map<string, string>();
-/** The bird's three wing positions, one under the other, drawn once per ink. */
+/** The bird's wing positions, one under the other, drawn once per ink. */
 function sprite(ink: Rgb, pitch: number): string {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const key = `${ink.join(',')}@${dpr}@${pitch}`;
   const had = sprites.get(key);
   if (had !== undefined) return had;
   const c = document.createElement('canvas');
-  c.width = CELL_W * dpr; c.height = CELL_H * 3 * dpr;
+  c.width = CELL_W * dpr; c.height = CELL_H * POSES.length * dpr;
   const g = c.getContext('2d');
   if (!g) { sprites.set(key, ''); return ''; }
   g.scale(dpr, dpr);
   g.fillStyle = `rgb(${ink.join(',')})`;
-  // Wings down, level, up: where sin(ph) sits at each end and in the middle.
-  [-Math.PI / 2, 0, Math.PI / 2].forEach((ph, frame) => {
-    const b = { x: CELL_W / 2, y: CELL_H / 2, ph, s: CELL_S };
-    for (const [cx, cy] of birdCells(b, pitch)) {
+  POSES.forEach((up, frame) => {
+    for (const [cx, cy] of birdCells({ x: CELL_W / 2, y: CELL_H / 2, s: SIZE, up }, pitch)) {
       const y = cy * pitch;
       if (y >= 0 && y < CELL_H) g.fillRect(cx * pitch, frame * CELL_H + y, pitch - 0.2, pitch - 0.2);
     }
@@ -137,110 +180,95 @@ function sprite(ink: Rgb, pitch: number): string {
   return url;
 }
 
-const FRAMES = [-Math.PI / 2, 0, Math.PI / 2];
-/** Which of the sprite's wing positions a bird shows now. */
-export const wingFrame = (b: Bird): number => (Math.sin(b.ph) > 0.35 ? 2 : Math.sin(b.ph) < -0.35 ? 0 : 1);
+/** Which of POSES a bird's wings are nearest. */
+export const pose = (up: number): number => Math.round(((Math.min(1, Math.max(-1, up)) + 1) / 2) * (POSES.length - 1));
 
 /**
- * Puts up to MAX_BIRDS birds over `layer`, which lies over the card, and drifts
- * each about its own spot until the returned function is called. Each is a
- * small picture moved by transform, so nothing is repainted. `sky` says where
- * they may be, and is asked twice a second.
+ * Puts up to MAX_BIRDS birds over `layer`, which lies over the card, and flies
+ * them until the returned function is called. Each is a small picture moved by
+ * transform, so nothing is repainted. `sky` says where they may be, or null
+ * while the card is out of view.
  */
-export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sky }: { ink: Rgb; n?: number; pitch?: number; sky: (W: number, H: number) => Omit<BirdSky, 'W' | 'H'> }): () => void {
+export function flyBirds(layer: HTMLElement, { ink, n = MAX_BIRDS, pitch = 3, sky }: { ink: Rgb; n?: number; pitch?: number; sky: (W: number, H: number) => Omit<BirdSky, 'W' | 'H'> | null }): () => void {
   const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   Object.assign(layer.style, { position: 'absolute', inset: '0', overflow: 'hidden', pointerEvents: 'none' });
-  let W = 0, H = 0, birds: Bird[] = [], els: { wrap: HTMLElement; wing: HTMLElement }[] = [];
-  let world: BirdSky = { W, H, top: 0, bottom: 0, avoid: null };
-  let timer = 0, last = 0, looked = 0, late = 0, resting = false, gone = false;
-  let busyUntil = 0, lastInput = performance.now();
+  let birds: Bird[] = [], aims: Spot[] = [], els: { wrap: HTMLElement; wing: HTMLElement; pose: number }[] = [];
+  let timer = 0, raf = 0, looked = 0, gone = false;
+  const clock = newClock(performance.now());
 
-  /** Read the card's size and where the words are, and move the spots with them. */
+  /** Read the card's size and where the words are; the spots move there by degrees. False while out of view. */
   const look = () => {
-    W = layer.clientWidth; H = layer.clientHeight;
-    if (!W || !H) return false;
-    const before = world;
-    world = { W, H, ...sky(W, H) };
-    const spots = birds.length ? perches(birds.length, world) : [];
-    if (spots.length && (before.W !== W || before.H !== H || before.top !== world.top || before.avoid?.y !== world.avoid?.y || before.avoid?.x !== world.avoid?.x)) birds.forEach((b, i) => { b.hx = spots[i].x; b.hy = spots[i].y; });
+    looked = performance.now();
+    const W = layer.clientWidth, H = layer.clientHeight;
+    const area = W && H ? sky(W, H) : null;
+    if (!area) return false;
+    const world = { W, H, ...area };
+    if (!birds.length) hatch(world);
+    aims = spots(birds.length, world);
     return true;
   };
-  const hatch = () => {
-    if (!look()) return false;
+  const hatch = (world: BirdSky) => {
     const url = sprite(ink, pitch);
     birds = seedBirds(Math.min(n, MAX_BIRDS), world);
     els = birds.map(() => {
       const wrap = document.createElement('div'), wing = document.createElement('i');
       Object.assign(wrap.style, { position: 'absolute', left: '0', top: '0', width: `${CELL_W}px`, height: `${CELL_H}px`, overflow: 'hidden', willChange: 'transform' });
-      Object.assign(wing.style, { display: 'block', width: `${CELL_W}px`, height: `${CELL_H * FRAMES.length}px`, background: `url(${url}) 0 0 / ${CELL_W}px ${CELL_H * FRAMES.length}px no-repeat` });
+      Object.assign(wing.style, { display: 'block', width: `${CELL_W}px`, height: `${CELL_H * POSES.length}px`, background: `url(${url}) 0 0 / ${CELL_W}px ${CELL_H * POSES.length}px no-repeat` });
       wrap.appendChild(wing);
       layer.appendChild(wrap);
-      return { wrap, wing };
+      return { wrap, wing, pose: -1 };
     });
-    return true;
   };
   const put = () => {
+    const dpr = window.devicePixelRatio || 1, snap = (v: number) => Math.round(v * dpr) / dpr;
     birds.forEach((b, i) => {
-      els[i].wrap.style.transform = `translate3d(${(b.x - CELL_W / 2).toFixed(1)}px, ${(b.y - CELL_H / 2).toFixed(1)}px, 0)`;
-      els[i].wing.style.transform = `translateY(${-wingFrame(b) * CELL_H}px)`;
+      els[i].wrap.style.transform = `translate3d(${snap(b.x - CELL_W / 2)}px, ${snap(b.y - CELL_H / 2)}px, 0)`;
+      const now = pose(wings(b, still ? 0 : clock.energy));
+      if (now !== els[i].pose) { els[i].pose = now; els[i].wing.style.transform = `translateY(${-now * CELL_H}px)`; }
     });
   };
-  const rest = () => {
-    resting = true;
-    layer.replaceChildren();
-    els = []; birds = [];
-    timer = window.setTimeout(() => { resting = false; late = 0; start(); }, REST_MS);
+  /** Toward the spots the last look found: a window made smaller brings them in rather than throwing them. */
+  const steer = (dt: number) => {
+    const k = 1 - Math.exp(-dt / 0.8);
+    birds.forEach((b, i) => {
+      const to = aims[i];
+      if (!to) return;
+      b.hx += (to.x - b.hx) * k; b.hy += (to.y - b.hy) * k; b.rx += (to.rx - b.rx) * k; b.ry += (to.ry - b.ry) * k;
+    });
   };
-  const tick = () => {
-    timer = 0;
-    if (gone || document.hidden || !document.hasFocus()) { last = 0; return; }
-    const now = performance.now();
-    if (last) late = lateness(late, now - last);
-    last = now;
-    const waits = flockWaits(now, { busyUntil, lastInput, late });
-    if (waits === 'slow') { rest(); return; }
-    if (waits === 'idle') { last = 0; return; }
-    if (waits === 'busy') { last = 0; timer = window.setTimeout(tick, busyUntil - now + 20); return; }
-    if (now - looked > LOOK_MS) { looked = now; look(); }
-    for (const b of birds) drift(b, TICK_MS / 1000);
+  const after = (ms: number) => { timer = window.setTimeout(() => { timer = 0; raf = requestAnimationFrame(step); }, ms); };
+  const step = (now: number) => {
+    raf = 0;
+    if (gone || document.hidden) { clock.last = 0; return; }
+    if (now - looked > LOOK_MS || !birds.length) {
+      if (!look()) { clock.last = 0; looked = 0; after(OUT_OF_VIEW_MS); return; }
+    }
+    const { dt, wait } = beat(clock, now);
+    if (dt) { steer(dt); for (const b of birds) drift(b, dt); }
     put();
-    timer = window.setTimeout(tick, TICK_MS);
+    if (wait !== null && !still) after(wait);
   };
-  const go = () => { if (!timer && !resting && !gone) { last = 0; timer = window.setTimeout(tick, TICK_MS); } };
-  const start = () => {
-    if (gone || resting || document.hidden) return;
-    if (!birds.length && !hatch()) return;
-    put();
-    if (!still) go();
+  const go = () => { if (!timer && !raf && !gone && !document.hidden) raf = requestAnimationFrame(step); };
+  const onSign = () => { here(clock, performance.now()); go(); };
+  const onVisible = () => {
+    clock.last = 0;
+    if (document.hidden) { clearTimeout(timer); cancelAnimationFrame(raf); timer = 0; raf = 0; } else onSign();
   };
-  const halt = () => { if (timer && !resting) { clearTimeout(timer); timer = 0; } last = 0; };
-  const onVisible = () => { if (document.hidden) halt(); else start(); };
-  const onBlur = () => halt();
-  const onFocus = () => start();
-  const onMove = () => { lastInput = performance.now(); if (!timer && !resting && !gone && birds.length) go(); };
-  const onBusy = () => { lastInput = performance.now(); busyUntil = lastInput + BUSY_MS; if (!timer) start(); };
-  const onResize = () => { looked = 0; if (look()) put(); };
-  const resized = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null;
+  const signs = ['pointermove', 'keydown', 'wheel', 'focus'] as const;
 
-  const ready = window.setTimeout(() => {
-    start();
-    if (still) return;
-    window.addEventListener('blur', onBlur); window.addEventListener('focus', onFocus);
+  go();
+  if (!still) {
+    for (const s of signs) window.addEventListener(s, onSign, { passive: true, capture: true });
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('pointermove', onMove, { passive: true });
-    window.addEventListener('keydown', onBusy, { passive: true, capture: true });
-    window.addEventListener('wheel', onBusy, { passive: true, capture: true });
-    resized?.observe(layer);
-  }, 600);
+  }
+  const resized = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { looked = 0; go(); }) : null;
+  resized?.observe(layer);
   return () => {
     gone = true;
     resized?.disconnect();
-    clearTimeout(ready); clearTimeout(timer);
-    window.removeEventListener('blur', onBlur); window.removeEventListener('focus', onFocus);
+    clearTimeout(timer); cancelAnimationFrame(raf);
+    for (const s of signs) window.removeEventListener(s, onSign, true);
     document.removeEventListener('visibilitychange', onVisible);
-    window.removeEventListener('pointermove', onMove);
-    window.removeEventListener('keydown', onBusy, true);
-    window.removeEventListener('wheel', onBusy, true);
     layer.replaceChildren();
   };
 }

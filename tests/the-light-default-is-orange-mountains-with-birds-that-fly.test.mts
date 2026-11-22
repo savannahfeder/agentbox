@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { shownSkyId, skyTheme } from '../renderer/src/home/sky.ts';
 import { mountainDots, type Mountains } from '../renderer/src/home/mountains.ts';
-import { seedBirds, drift, birdCells } from '../renderer/src/home/birds.ts';
+import { seedBirds, drift, birdCells, pose, wings } from '../renderer/src/home/birds.ts';
 
 const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const seeded = (seed: number) => { let s = seed; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; };
@@ -62,9 +62,12 @@ describe('the birds', () => {
     const at = { x: b.x, y: b.y };
     for (let i = 0; i < 40; i++) drift(b, 0.125);
     expect(Math.hypot(b.x - at.x, b.y - at.y)).toBeGreaterThan(1);
-    const up = JSON.stringify(birdCells({ ...b, ph: Math.PI / 2 }, 3));
-    const down = JSON.stringify(birdCells({ ...b, ph: -Math.PI / 2 }, 3));
-    expect(up).not.toBe(down);
+    const cells = (up: number) => JSON.stringify(birdCells({ x: 24, y: 18, s: 14, up }, 3));
+    expect(new Set([-1, -0.5, 0, 0.5, 1].map(cells)).size).toBeGreaterThanOrEqual(4);
+    const beats = new Set<number>();
+    for (let i = 0; i < 300; i++) { drift(b, 1 / 30); beats.add(pose(wings(b))); }
+    expect(beats.size).toBe(5);
+    expect(pose(wings(b, 0))).toBe(2);
   });
   it('hold still for someone who asked for less motion, and rest while the window is hidden', () => {
     const src = read('renderer/src/home/birds.ts');
