@@ -36,7 +36,7 @@ describe('a cloud run', () => {
     });
 
     it(`hands a live preview to their computer instead of a public tunnel, ${name}`, () => {
-      expect(note).toContain(`${HAND_BACK} a live preview on your computer`);
+      expect(note).toContain(`\`${HAND_BACK} a live preview\``);
       expect(note).toMatch(/do not put it on a public tunnel/);
     });
 
