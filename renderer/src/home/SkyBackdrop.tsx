@@ -3,6 +3,7 @@ import { paintSky, type SkyArt } from './sky';
 import { followTheCard } from './sky-follows-the-card';
 import { useSidebarShrinks } from '../sidebar-shrinks';
 import { boxIn, flyBirds } from './birds';
+import { frost } from './frost';
 
 /** Home's words, kept clear of birds: the greeting down to the writing box, across the column. */
 function homeWords(wrap: HTMLElement) {
@@ -30,6 +31,7 @@ export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?:
     const canvas = document.createElement('canvas');
     wrap.appendChild(canvas);
     host.insertBefore(wrap, host.firstChild);
+    const soft = art.mountains ? frost(wrap, canvas) : null;
     const stop = followTheCard(host, wrap, canvas, {
       card: () => {
         const b = getComputedStyle(host, '::before');
@@ -38,7 +40,10 @@ export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?:
         const w = host.offsetWidth - L - R, h = host.offsetHeight - T - B;
         return w > 0 && h > 0 ? { left: L, top: T, width: w, height: h } : null;
       },
-      paint: () => ({ key: '', draw: () => paintSky(canvas, art, { from, span, dpr: Math.min(2, window.devicePixelRatio || 1) }) }),
+      paint: () => ({ key: '', draw: () => {
+        paintSky(canvas, art, { from, span, dpr: Math.min(2, window.devicePixelRatio || 1) });
+        soft?.paint();
+      } }),
     }, { folds });
     let land = () => {};
     if (art.birds) {
@@ -46,9 +51,13 @@ export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?:
       birds.className = 'home-birds';
       wrap.appendChild(birds);
       // Under the first page, which covers Home and has birds of its own, they wait.
-      land = flyBirds(birds, { ink: art.birds, sky: (_W, H) => (document.querySelector('.ob-welcome') ? null : { top: H * 0.06, bottom: H * 0.42, avoid: homeWords(wrap) }) });
+      land = flyBirds(birds, { ink: art.birds, sky: (_W, H) => {
+        if (document.querySelector('.ob-welcome')) return null;
+        soft?.fit();
+        return { top: H * 0.06, bottom: H * 0.42, avoid: homeWords(wrap) };
+      } });
     }
-    return () => { land(); stop(); wrap.remove(); };
+    return () => { land(); soft?.stop(); stop(); wrap.remove(); };
   }, [art, from, span, folds]);
   return null;
 }

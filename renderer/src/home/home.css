@@ -17,12 +17,13 @@
   --line: rgba(40, 28, 16, .07); --line-strong: rgba(40, 28, 16, .14); --wash: rgba(40, 28, 16, .04); --wash-strong: rgba(40, 28, 16, .08);
   --film-strong: rgba(40, 28, 16, .07); --select: rgba(238, 96, 24, .16);
 }
-/* The mountains rise behind the cards, so the cards are clear enough to show them, frosted. */
+/* The mountains rise behind the cards, so the cards are clear enough to show them, frosted.
+   The frost is drawn once under them (frost.ts): the browser's own is drawn again each time a bird moves. */
 :root[data-theme="light"][data-sky-frame="mountains"] .hm-glass,
 :root[data-theme="light"][data-sky-frame="mountains"] .hm-start .tc-card.tc-inline,
 :root[data-theme="light"][data-sky-frame="mountains"] .hm-door {
   background: linear-gradient(180deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, .42));
-  backdrop-filter: blur(9px) saturate(1.25); -webkit-backdrop-filter: blur(9px) saturate(1.25);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 
 .app.home-shown > .topbar { visibility: hidden; border-bottom-color: transparent; }
