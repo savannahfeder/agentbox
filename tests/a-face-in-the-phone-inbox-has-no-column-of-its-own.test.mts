@@ -6,6 +6,8 @@
 // amount of space", "we either shouldn't show them, or maybe we show them
 // somewhere smaller, where they don't take up really critical screen real
 // estate". Measured by reading app/index.tsx: `size={36}` beside `gap: 12`.
+// Later the same day every row took one shape (`Shape`), which holds the
+// name's line, so the face is handed to it as the row's mark.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
@@ -15,8 +17,8 @@ const fn = (name: string) => inbox.slice(inbox.indexOf(`function ${name}(`), inb
 describe.each(['MentionRow', 'QuestionRow'])('%s', (name) => {
   const row = fn(name);
   it('draws its face small, on the line with the name', () => {
-    const lead = row.match(/<View style=\{nameLine\}>\s*<(Face|TeammateMark) [^>]*\/>\s*<T numberOfLines=\{1\}/);
-    expect(lead, 'the face leads the name on one line').not.toBeNull();
+    expect(row, 'the face is the mark on the name\'s line').toMatch(/<Shape mark=\{<(Face|TeammateMark) [^>]*\/>\} who=/);
+    expect(fn('Shape')).toMatch(/\{mark\}\s*<T numberOfLines=\{1\}[^>]*>\{who\}<\/T>/);
     expect(row).not.toMatch(/size=\{(2[1-9]|[3-9]\d)\}/);
   });
   it('starts its words and the line under them at the row\'s own edge', () => {
@@ -31,7 +33,7 @@ describe.each(['MentionRow', 'QuestionRow'])('%s', (name) => {
 
 describe('the face on the name\'s line', () => {
   it('is 20 or under and sits level with the name', () => {
-    expect(inbox).toMatch(/const nameLine = \{ flexDirection: 'row', alignItems: 'center', gap: 7 \} as const;/);
+    expect(fn('Shape')).toMatch(/<View style=\{\{ flexDirection: 'row', alignItems: 'center', minHeight: 20, gap: 7 \}\}>\s*\{mark\}/);
     expect(inbox).toMatch(/const FACE = (1[6-9]|20);/);
     expect(fn('MentionRow')).toMatch(/<Face name=\{m\.byName \|\| 'Someone'\} size=\{FACE\} \/>/);
     expect(fn('QuestionRow')).toMatch(/<TeammateMark t=\{mate\} size=\{FACE\} \/>/);
@@ -39,8 +41,8 @@ describe('the face on the name\'s line', () => {
 });
 
 describe('a thread\'s row', () => {
-  it('is as it was: a teammate\'s small mark before the title, and no other face', () => {
-    expect(fn('ThreadRow')).toMatch(/\{mate && <View style=\{\{ marginRight: 7 \}\}><TeammateMark t=\{mate\} \/><\/View>\}/);
+  it('wears a teammate\'s small mark or its agent\'s, and no person\'s face', () => {
+    expect(fn('ThreadRow')).toMatch(/mark=\{mate \? <TeammateMark t=\{mate\} size=\{FACE\} \/> : <AgentMark /);
     expect(fn('ThreadRow')).not.toMatch(/<Face /);
   });
 });

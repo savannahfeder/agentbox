@@ -30,7 +30,8 @@ describe('the tabs', () => {
 describe('a row', () => {
   it.each(['ThreadRow', 'MentionRow', 'QuestionRow', 'RepeatRows'])('%s says its project and age in plain small words', (name) => {
     expect(fn(name)).not.toMatch(/uppercase|font\.mono/);
-    expect(fn(name)).toMatch(/const meta = metaWords\(\)/);
+    expect(fn(name)).toMatch(/<Shape [^\n]* when=\{/);
+    expect(fn('Shape')).toMatch(/const meta = metaWords\(\)/);
   });
   it('is parted from the next by a line that stops short of both edges', () => {
     expect(inbox).toMatch(/const Parted = [^\n]*left: size\.inset, right: size\.inset, height: 1, backgroundColor: color\.rowLine/);
@@ -38,14 +39,15 @@ describe('a row', () => {
   });
   it('has a heavier title while it is unread, beside its dot', () => {
     expect(fn('ThreadRow')).toMatch(/fontFamily: unread \? font\.semibold : font\.regular/);
-    expect(fn('ThreadRow')).toMatch(/unread && <View style=\{\{ position: 'absolute', left: 7,[^\n]*backgroundColor: color\.accent/);
+    expect(fn('ThreadRow')).toMatch(/\{unread && <Unread \/>\}/);
+    expect(inbox).toMatch(/const Unread = \(\) => <View style=\{\{ position: 'absolute', left: 7,[^\n]*backgroundColor: color\.accent/);
   });
   it('gives a person who wrote to you a small face on their name\'s line, their words under it', () => {
     expect(fn('MentionRow')).toMatch(/<Face name=\{m\.byName \|\| 'Someone'\} size=\{FACE\} \/>/);
     expect(fn('QuestionRow')).toMatch(/<TeammateMark t=\{mate\} size=\{FACE\} \/>/);
   });
   it('says what waits on you in a label of its own', () => {
-    expect(fn('ThreadRow')).toMatch(/aside && <><Chip mine=\{!row\.held\}>\{aside\}<\/Chip>/);
+    expect(fn('ThreadRow')).toMatch(/aside && <Chip mine=\{!row\.held\}>\{aside\}<\/Chip>/);
   });
 });
 

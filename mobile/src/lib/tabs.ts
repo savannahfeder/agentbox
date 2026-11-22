@@ -7,12 +7,12 @@
 // one module both read is the follow-up that retires this file.
 
 import {
-  belongsInInbox, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
+  asideBesides, belongsInInbox, clipToSentence, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowSummary, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
 } from '../../../renderer/src/list-rules';
 import { backWords, boardColumns, DEFAULT_DISPLAY, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { searchThreads } from '../../../renderer/src/threads/search';
 import { parseQuery, splitHits } from '../../../renderer/src/search';
-import { stamp } from '../../../renderer/src/format';
+import { firstRealLine, stamp } from '../../../renderer/src/format';
 import { isUrgentRow } from '../../../renderer/src/urgent-arrival';
 import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
@@ -67,6 +67,10 @@ export interface Row {
   priority: 'high' | 'urgent' | null;
   /** "Claude Code" or "Codex", only when a row of the same title runs on the other one. */
   agent: string | null;
+  /** The line the desktop prints under the title, or nothing when it only says the title again. */
+  summary: string;
+  /** Whose row it is when no person wrote it: Claude Code's unless it is marked Codex. */
+  harness: Harness;
   item: WorkItem;
 }
 
@@ -115,6 +119,15 @@ const DELIVERED_THROUGH = 0;
 /** The moment a thread's row is dated by, in the list and in search: when it was closed, else when you last wrote. */
 export const rowTime = (i: WorkItem): number => (i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i));
 
+/** The line under a row's title. The desktop reads title and summary as one sentence; the phone sets them on two lines, so the tail of the title's own sentence gives way to what the agent last told you. */
+function summaryUnder(i: WorkItem, tab: TabId): string {
+  const view = tab === 'done' ? 'done' : 'inbox';
+  const said = asideBesides(rowTitle(i), rowSummary(i, view)) ?? '';
+  const cutFromTitle = said !== rowSummary({ ...i, title: '' }, view);
+  if (!cutFromTitle || !/^[\p{Ll},;:]/u.test(said)) return said;
+  return clipToSentence(firstRealLine(i.note ?? ''));
+}
+
 export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const items: WorkItem[] = view.items;
   const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
@@ -158,6 +171,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
     when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(rowTime(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
     held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id) && !stranded.has(i.id), away: stranded.has(i.id), item: i,
     priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)), agent: agentOf(i),
+    summary: summaryUnder(i, tab), harness: harnessOf(i),
   });
   const drawn = (list: WorkItem[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map((i) => row(i, tab));
   return { inbox: drawn(inbox, 'inbox'), progress: drawn(progress, 'progress'), snoozed: drawn(snoozed, 'snoozed'), done: drawn(done, 'done') };

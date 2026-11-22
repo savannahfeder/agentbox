@@ -26,7 +26,7 @@ import type { RoomMention as MentionRowData, Teammate, WorkItem } from '../../..
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { Magnifier, StateGlyph, ViewButton, ViewMenu } from '../ui/Filters';
-import { Cloud, Gear, More, Pen, Pin, Repeat, Tick } from '../ui/icons';
+import { AgentMark, Cloud, Gear, More, Pen, Pin, Repeat, Tick } from '../ui/icons';
 import { LaterSheet } from '../ui/Later';
 import { inLater, pickedActs, pickedPriority, pickedResume } from '../lib/picked';
 import { priorityIdOf, priorityLabelOf } from '../../../renderer/src/priority';
@@ -54,16 +54,37 @@ const Picking = createContext<{ picked: Set<string> | null; toggle: (key: string
 
 /** The line over every row but the first, short of both edges. */
 const Parted = ({ first }: { first: boolean }) => (first ? null : <View style={{ position: 'absolute', top: 0, left: size.inset, right: size.inset, height: 1, backgroundColor: color.rowLine }} />);
-const rowBox = (pressed: boolean) => ({ minHeight: 68, paddingVertical: 14, paddingLeft: size.inset, paddingRight: size.inset, backgroundColor: pressed ? color.fill : 'transparent' });
-const rowTitle = { flexShrink: 1, fontSize: 16.5, lineHeight: 22, letterSpacing: -0.2 };
-// A face rides the name's line, so a row's words keep the whole width.
+const rowBox = (pressed: boolean) => ({ flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: 14, paddingHorizontal: size.inset, backgroundColor: pressed ? color.fill : 'transparent' });
+// One line height for every line of a row's words, so two lines are as tall whatever they say.
+const LINE = 21;
+const rowHead = { fontSize: 16, lineHeight: LINE, letterSpacing: -0.2 };
+const rowWords = () => ({ fontSize: 15, lineHeight: LINE, color: color.dim });
 const FACE = 20;
-const nameLine = { flexDirection: 'row', alignItems: 'center', gap: 7 } as const;
-/** A row's small second line: project, who, how long ago. */
-const metaWords = () => ({ fontSize: 13.5, lineHeight: 18, color: color.faint });
+/** A row's small words: where it is from, how long ago. */
+const metaWords = () => ({ fontSize: 13.5, lineHeight: 20, color: color.faint });
 const Dot = () => <T style={metaWords()}>·</T>;
 /** What a row waits on, as the website writes a status: `mine` is what waits on you, in the orange. */
 const Chip = ({ children, mine = false }: { children: string; mine?: boolean }) => <Caps tint={mine ? color.accent : color.dim} style={{ lineHeight: 18 }}>{children}</Caps>;
+/** The unread dot in the margin, level with who the row is from. */
+const Unread = () => <View style={{ position: 'absolute', left: 7, top: 21, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />;
+
+/** Every row of the inbox: who and when on one line, then room for two lines of words, so no row is taller than the next. */
+function Shape({ mark, who, where, when, ends, children }: { mark: ReactNode; who: string; where?: string; when: string; ends?: ReactNode; children: ReactNode }) {
+  const meta = metaWords();
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 20, gap: 7 }}>
+        {mark}
+        <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.medium, fontSize: 14, lineHeight: 20 }}>{who}</T>
+        {!!where && <><Dot /><T numberOfLines={1} style={{ ...meta, flexShrink: 2 }}>{where}</T></>}
+        <View style={{ flex: 1, minWidth: 4 }} />
+        {ends}
+        <T style={meta}>{when}</T>
+      </View>
+      <View style={{ minHeight: LINE * 2, marginTop: 4 }}>{children}</View>
+    </View>
+  );
+}
 
 function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unread: boolean; mate: Teammate | null }) {
   const pick = useContext(Picking);
@@ -71,7 +92,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
   const on = !!pick.picked?.has(row.key);
   // "not started" or "2 tasks to approve" (Pages.tsx `RowCells`).
   const aside = row.held ? 'not started' : row.toApprove;
-  const meta = metaWords();
+  const detail = !!aside || row.queued || row.away || !!row.summary;
   const acts = useContext(RowActs);
   return (
     <Swiped off={picking} onClose={() => acts.close(row.item)} onLater={() => acts.later(row.item)}>
@@ -79,31 +100,27 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
       accessibilityLabel={picking ? `${row.title}, ${on ? 'selected' : 'not selected'}` : unread ? `${row.title}, unread` : undefined} accessibilityState={picking ? { checked: on } : undefined}
       style={({ pressed }) => rowBox(pressed)}>
       <Parted first={first} />
-      {/* The unread dot in the margin, level with the title's first line. */}
-      {unread && <View style={{ position: 'absolute', left: 7, top: 22, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />}
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {picking && <View style={{ width: 22, height: 22, marginRight: 12, borderWidth: 1.5, borderRadius: 11, borderColor: on ? color.text : color.lineStrong, backgroundColor: on ? color.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{on && <Tick size={13} tint={color.bg} />}</View>}
-        {row.running && <View style={{ marginRight: row.cloud ? 6 : 8 }}><RunningMark cloud={row.cloud}><Cloud /></RunningMark></View>}
-        {/* A thread a teammate's run sent you says whose it is before its title (teammates/row-lead.tsx). */}
-        {mate && <View style={{ marginRight: 7 }}><TeammateMark t={mate} /></View>}
-        <T numberOfLines={2} style={{ ...rowTitle, fontFamily: unread ? font.semibold : font.regular }}>
-          {mate ? <Text style={{ color: color.dim }}>{`${mate.name}  `}</Text> : null}
-          {row.title}
-        </T>
-        {/* A closed thread keeps no pin. */}
-        {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin /></View>}
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
-        {!!aside && <><Chip mine={!row.held}>{aside}</Chip><Dot /></>}
-        {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
-        {row.queued && <><T style={{ ...meta, color: color.dim }}>Queued</T><Dot /></>}
-        {row.away && <><T style={{ ...meta, color: color.dim }}>Computer offline</T><Dot /></>}
-        {row.priority && <View accessibilityLabel={row.priority === 'urgent' ? 'Urgent' : 'High priority'}><PriorityBars level={row.priority === 'urgent' ? 4 : 3} /></View>}
-        {row.agent && <><T style={{ ...meta, color: color.dim }}>{row.agent}</T><Dot /></>}
-        <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
-        <Dot />
-        <T style={meta}>{row.when}</T>
-      </View>
+      {unread && <Unread />}
+      {picking && <View style={{ width: 22, height: 22, marginRight: 12, borderWidth: 1.5, borderRadius: 11, borderColor: on ? color.text : color.lineStrong, backgroundColor: on ? color.text : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{on && <Tick size={13} tint={color.bg} />}</View>}
+      {/* A thread a teammate's run sent you is named for the teammate; any other for the agent that ran it. */}
+      <Shape mark={mate ? <TeammateMark t={mate} size={FACE} /> : <AgentMark harness={row.harness} size={FACE} />} who={mate ? mate.name : row.harness === 'codex' ? 'Codex' : 'Claude Code'} where={row.projectName} when={row.when}
+        ends={<>
+          {/* A closed thread keeps no pin. */}
+          {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned"><Pin /></View>}
+          {row.priority && <View accessibilityLabel={row.priority === 'urgent' ? 'Urgent' : 'High priority'}><PriorityBars level={row.priority === 'urgent' ? 4 : 3} /></View>}
+          {row.running && <RunningMark cloud={row.cloud}><Cloud /></RunningMark>}
+        </>}>
+        <T numberOfLines={detail ? 1 : 2} style={{ ...rowHead, fontFamily: unread ? font.semibold : font.regular }}>{row.title}</T>
+        {detail && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: LINE, gap: 8 }}>
+            {!!aside && <Chip mine={!row.held}>{aside}</Chip>}
+            {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
+            {row.queued && <Chip>Queued</Chip>}
+            {row.away && <Chip>Computer offline</Chip>}
+            {!!row.summary && <T numberOfLines={1} style={{ ...rowWords(), flex: 1 }}>{row.summary}</T>}
+          </View>
+        )}
+      </Shape>
     </Pressable>
     </Swiped>
   );
@@ -111,51 +128,34 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
 
 /** A message in a group that names you, at the top of Needs you until you read the group past it (team/rooms/MentionRows.tsx). */
 function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean; now: number; open: () => void }) {
-  const meta = metaWords();
   return (
     <Pressable onPress={open} accessibilityLabel={`${m.byName || 'Someone'} mentioned you in ${m.roomName}, unread`}
       style={({ pressed }) => rowBox(pressed)}>
       <Parted first={first} />
-      <View style={{ position: 'absolute', left: 7, top: 22, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
-      <View style={nameLine}>
-        <Face name={m.byName || 'Someone'} size={FACE} />
-        <T numberOfLines={1} style={{ ...rowTitle, fontFamily: font.semibold }}>{m.byName || 'Someone'}</T>
-      </View>
-      <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 2 }}>{m.body}</T>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
-        <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{`# ${m.roomName}`}</T>
-        <Dot />
-        <T style={meta}>{updatedWords(m.at, now)}</T>
-      </View>
+      <Unread />
+      <Shape mark={<Face name={m.byName || 'Someone'} size={FACE} />} who={m.byName || 'Someone'} where={`# ${m.roomName}`} when={updatedWords(m.at, now)}>
+        <T numberOfLines={2} style={{ ...rowWords(), color: color.text }}>{m.body}</T>
+      </Shape>
     </Pressable>
   );
 }
 
 /** An AI teammate asking you something, at the top of Needs you with the mentions, until you answer it. */
 function QuestionRow({ mate, text, at, first, now, open }: { mate: Teammate; text: string; at: number; first: boolean; now: number; open: () => void }) {
-  const meta = metaWords();
   return (
     <Pressable onPress={open} accessibilityLabel={`${mate.name} asks you: ${text}`}
       style={({ pressed }) => rowBox(pressed)}>
       <Parted first={first} />
-      <View style={{ position: 'absolute', left: 7, top: 22, width: 7, height: 7, borderRadius: 4, backgroundColor: color.accent }} />
-      <View style={nameLine}>
-        <TeammateMark t={mate} size={FACE} />
-        <T numberOfLines={1} style={{ ...rowTitle, fontFamily: font.semibold }}>{mate.name}</T>
-      </View>
-      <T numberOfLines={2} style={{ fontSize: 15, lineHeight: 21, color: color.dim, marginTop: 2 }}>{text}</T>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
-        <Chip mine>Asks you</Chip>
-        <Dot />
-        <T style={meta}>{updatedWords(at, now)}</T>
-      </View>
+      <Unread />
+      <Shape mark={<TeammateMark t={mate} size={FACE} />} who={mate.name} when={updatedWords(at, now)}>
+        <T numberOfLines={2} style={{ ...rowWords(), color: color.text }}>{text}</T>
+      </Shape>
     </Pressable>
   );
 }
 
 /** Repeating tasks above what is put off, as the desktop's Later tab has them (List.tsx). */
 function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: WorkItem[]; now: number }) {
-  const meta = metaWords();
   return (
     <View style={{ paddingBottom: 8 }}>
       <Caps style={{ paddingHorizontal: size.inset, paddingTop: 16, paddingBottom: 2 }}>Repeating</Caps>
@@ -166,18 +166,10 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: Wo
           <Pressable key={`${r.product}/${r.id}`} onPress={() => router.push({ pathname: '/repeat/[product]/[id]', params: { product: r.product, id: r.id } })}
             style={({ pressed }) => rowBox(pressed)}>
             <Parted first={i === 0} />
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ marginRight: 9 }}><Repeat /></View>
-              <T numberOfLines={2} style={{ ...rowTitle, flex: 1 }}>{r.title}</T>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 5, gap: 7 }}>
-              <Chip>{repeatTag(r)}</Chip>
-              <Dot />
-              {r.waiting && <><T style={{ ...meta, color: color.dim }}>Queued</T><Dot /></>}
-              <T numberOfLines={1} style={{ ...meta, color: color.dim, flexShrink: 1 }}>{r.productName}</T>
-              <Dot />
-              <T numberOfLines={1} style={{ ...meta, flexShrink: 1 }}>{`Next ${words.when}`}</T>
-            </View>
+            <Shape mark={<View style={{ width: FACE, height: FACE, alignItems: 'center', justifyContent: 'center' }}><Repeat /></View>} who={repeatTag(r)} where={r.productName} when={`Next ${words.when}`}>
+              <T numberOfLines={r.waiting ? 1 : 2} style={rowHead}>{r.title}</T>
+              {r.waiting && <View style={{ minHeight: LINE, justifyContent: 'center' }}><Chip>Queued</Chip></View>}
+            </Shape>
           </Pressable>
         );
       })}

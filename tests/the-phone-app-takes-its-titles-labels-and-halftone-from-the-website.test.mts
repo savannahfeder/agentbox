@@ -34,7 +34,7 @@ describe('a screen\'s name', () => {
   });
   it('leaves a row\'s title alone: heavy while unread, no tight tracking', () => {
     expect(inbox).toMatch(/fontFamily: unread \? font\.semibold : font\.regular/);
-    expect(inbox).toMatch(/const rowTitle = \{[^}]*letterSpacing: -0\.2 \}/);
+    expect(inbox).toMatch(/const rowHead = \{[^}]*letterSpacing: -0\.2 \}/);
   });
 });
 
@@ -72,11 +72,11 @@ describe('what a row waits on', () => {
   it('is written in the orange when it waits on you, with no grey pill under it', () => {
     expect(chip).toMatch(/<Caps tint=\{mine \? color\.accent : color\.dim\}/);
     expect(chip).not.toMatch(/backgroundColor: color\.picked/);
-    expect(cut(inbox, 'function QuestionRow(')).toMatch(/<Chip mine>Asks you<\/Chip>/);
     expect(cut(inbox, 'function ThreadRow(')).toMatch(/<Chip mine=\{!row\.held\}>\{aside\}<\/Chip>/);
   });
-  it('stays grey for what does not: a thread not started, a repeat\'s tag', () => {
-    expect(cut(inbox, 'function RepeatRows(')).toMatch(/<Chip>\{repeatTag\(r\)\}<\/Chip>/);
+  it('stays grey for what does not: a thread not started, one still queued', () => {
+    expect(cut(inbox, 'function ThreadRow(')).toMatch(/\{row\.queued && <Chip>Queued<\/Chip>\}/);
+    expect(cut(inbox, 'function RepeatRows(')).toMatch(/<Chip>Queued<\/Chip>/);
   });
 });
 

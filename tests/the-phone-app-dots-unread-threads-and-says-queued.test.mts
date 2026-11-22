@@ -49,7 +49,7 @@ describe('Queued on a row', () => {
 
   it('the inbox draws the word', async () => {
     const fs = await import('node:fs');
-    expect(fs.readFileSync('mobile/src/app/index.tsx', 'utf8')).toMatch(/row\.queued && <>.*Queued/);
+    expect(fs.readFileSync('mobile/src/app/index.tsx', 'utf8')).toMatch(/row\.queued && <Chip>Queued<\/Chip>/);
   });
 });
 

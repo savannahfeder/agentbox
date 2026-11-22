@@ -1,6 +1,8 @@
 // The desktop's own glyphs (renderer/src/threads/Pages.tsx, team/SignInPage.tsx,
 // phone.css), drawn the same way.
+import { View } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import { CLAUDE_MARK, OPENAI_MARK } from '../../../renderer/src/engine-marks';
 import { color } from './theme';
 
 type P = { size?: number; tint?: string };
@@ -112,3 +114,14 @@ export const AppleMark = ({ size = 16, tint = color.text }: P) => (
     <Path d="M16.37 12.73c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.27-1.6 2.78-.41 6.9 1.15 9.16.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.96-.74 1.39 0 1.78.74 2.99.72 1.24-.02 2.02-1.12 2.77-2.23.88-1.28 1.24-2.52 1.26-2.59-.03-.01-2.42-.93-2.44-3.67zM14.1 5.98c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.1 1.76-.96 2.8 1.01.08 2.05-.52 2.68-1.28z" />
   </Svg>
 );
+
+/** Claude Code's or Codex's own mark in a round tile the size of a face, for a row no person wrote. */
+export function AgentMark({ harness, size: s = 20 }: { harness: 'claude' | 'codex'; size?: number }) {
+  return (
+    <View style={{ width: s, height: s, borderRadius: s / 2, borderWidth: 1, borderColor: color.lineStrong, backgroundColor: color.film, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={s * 0.58} height={s * 0.58} viewBox="0 0 24 24">
+        {harness === 'codex' ? <Path d={OPENAI_MARK} fill={color.text} fillRule="evenodd" /> : <Path d={CLAUDE_MARK} fill="#D97757" />}
+      </Svg>
+    </View>
+  );
+}
