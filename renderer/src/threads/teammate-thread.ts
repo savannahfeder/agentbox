@@ -48,6 +48,17 @@ export function keyInTheBox(e: { key: string; ctrlKey?: boolean; metaKey?: boole
 }
 
 /**
+ * What folds behind "Show earlier messages" and what is drawn under the newest
+ * answer: anything said after it, so a reply you just sent is never folded.
+ * `answer` is the event lifted out, or null when the answer is the row's result.
+ */
+export function aroundTheAnswer<E extends { at: number }>(events: readonly E[], answer: E | null, answerAt: number | null): { before: E[]; after: E[] } {
+  const rest = events.filter((e) => e !== answer);
+  if (answerAt == null) return { before: rest, after: [] };
+  return { before: rest.filter((e) => e.at <= answerAt), after: rest.filter((e) => e.at > answerAt) };
+}
+
+/**
  * Where an ask on you goes among the owner's messages: after the message `after`
  * (an index into `events`), above them all, or at the foot under the outcome.
  */

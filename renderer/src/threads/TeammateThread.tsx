@@ -29,7 +29,7 @@ import type { AgentEvent, AgentSaid, FileElsewhere, FileLine, FileMarkLink, File
 import { AskBar } from '../team/AskBar';
 import { MessagePerson, TeammateStanding, TeammateSummary, ThreadCrumb } from './Summary';
 import { ThreadMenu } from './ThreadMenu';
-import { askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
+import { aroundTheAnswer, askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
 import { HAND_BACK_EVENT, type AskVerdict } from '../thread-commands';
 import { canContinue } from './continue-thread';
 import { readDraft, saveDraft } from '../drafts';
@@ -333,7 +333,11 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const said = events.filter((e): e is AgentSaid => !e.kind);
   const lastIt = !built.outcome ? [...said].reverse().find((e) => e.who === 'it') ?? null : null;
   const newest = built.outcome ? { at: built.outcome.at, text: built.outcome.text } : lastIt ? { at: lastIt.at, text: lastIt.text } : null;
-  const before = lastIt ? events.filter((e: AgentEvent) => e !== lastIt) : events;
+  const { before, after } = aroundTheAnswer(events, lastIt, newest?.at ?? null);
+  // The ask is drawn where it came in, so what you said since it came sits under it.
+  const askAt = ask && onHandBack ? ask.createdAt ?? 0 : null;
+  const underAnswer = askAt == null ? after : after.filter((e: AgentEvent) => e.at <= askAt);
+  const underAsk = askAt == null ? [] : after.filter((e: AgentEvent) => e.at > askAt);
   const [earlierOpen, setEarlierOpen] = useState(false);
   useEffect(() => { setEarlierOpen(false); }, [personId, threadId]);
   const earlierCount = before.filter((e: AgentEvent) => !e.kind).length;
@@ -417,8 +421,13 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
               <Thread events={before} name={`${owner}'s agent`} landOn={threadId} onWhole={() => {}} md={md} />
             </FileMarkOpener.Provider>}
             {newest && <QueueAnswer text={options.length ? stripOptionsSection(newest.text) : newest.text} md={md} name={title} />}
-            {/* The ask is the newest thing said here, so it comes last, as a message. */}
+            {underAnswer.length > 0 && <FileMarkOpener.Provider value={openMark}>
+              <Thread events={underAnswer} name={`${owner}'s agent`} landOn={`${threadId}:after`} onWhole={() => {}} md={md} />
+            </FileMarkOpener.Provider>}
             {ask && onHandBack && <AskBar key={`${ask.product}/${ask.id}`} task={ask} owner={person} onHandBack={handBack} onOpenChange={(src) => onOpenDoc(ask.product, src)} />}
+            {underAsk.length > 0 && <FileMarkOpener.Provider value={openMark}>
+              <Thread events={underAsk} name={`${owner}'s agent`} landOn={`${threadId}:after-ask`} onWhole={() => {}} md={md} />
+            </FileMarkOpener.Provider>}
             {(handedToYou || (ended && !ask)) && <p className="th-work-note tp-ask-ended">
               {askEndedWords(firstName(person) || 'Someone', !!handedToYou)}
               {/* The ask's own words leave with it, so what was asked stays said here. */}
