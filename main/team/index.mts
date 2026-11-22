@@ -21,7 +21,8 @@ import { askBody, askIsOpen, askOf, withoutAskLead, type AskKind } from '../../s
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
 import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
-import { findFileToSend } from './carry-files.mts';
+import { findFileToSend, looksSecret } from './carry-files.mts';
+import { artifactRoots, resolveArtifact } from '../artifact-path.mts';
 import { readableSharedThreads } from '../everything-found.mts';
 import { plainRef } from '../../shared/carried-files.mts';
 import { listSharedProjects, joinSharedProject, linkSharedFolders, markShared, makeDirect } from './projects.mts';
@@ -377,7 +378,7 @@ import { filmPiece, linkAddress, linkSiteFor } from '../file-link.mts';
 import { noticeLinkComments } from './link-comments.mts';
 import type { LinkComment } from './link-comments.mts';
 import { bringLinkEditsHome, type LinkEdit } from './link-edits.mts';
-import { shownName } from '../../shared/artifact-marks.mts';
+import { filesInLines, otherFilesInLines, shownName, threadFiles, viewKind } from '../../shared/artifact-marks.mts';
 
 const LINK_COMMENTS_EVERY_MS = 60_000;
 const LINK_EDITS_EVERY_MS = 60_000;
@@ -545,10 +546,11 @@ export function createTeamService({
     return products().find((p) => p.dir === made.dir) ?? { slug: made.slug, dir: made.dir };
   }
 
-  // WHAT A THREAD HANDS ON: its words, and every file its messages name that sits
-  // in the project. A repository's files stay out: a coding thread names dozens
-  // in passing.
-  function briefOfThread(row: TeamRow, product: TeamProduct) {
+  // WHAT A THREAD HANDS ON: its words, the files its Files button lists, found
+  // where its owner's copy opens them (its checkout first), and every file its
+  // messages name that sits in the project. A repository's code stays out: a
+  // coding thread names dozens in passing.
+  async function briefOfThread(row: TeamRow, product: TeamProduct) {
     const said = store.readThread(product.slug, row.id).map((t) => t.text).filter(Boolean);
     // A one-line thread has only a title, and a rename must not lose those words.
     const brief = row.body || row.title;
@@ -571,13 +573,29 @@ export function createTeamService({
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];
     const tooBig: string[] = [];
-    for (const rel of referencedFiles(brief, row.result, ...said, { dir: product.dir })) {
-      if (rel === 'project.json' || files.length >= MAX_FILES_HANDED_ON) continue;
-      let real: string;
-      try { real = fs.realpathSync(path.join(product.dir, rel)); } catch { continue; }
-      if (!real.startsWith(root + path.sep) || !fs.statSync(real).isFile()) continue;
+    const taken = new Set<string>();
+    const take = (rel: string, real: string) => {
+      if (files.length >= MAX_FILES_HANDED_ON || taken.has(real) || taken.has(rel.toLowerCase()) || !fs.statSync(real).isFile()) return;
+      taken.add(real).add(rel.toLowerCase());
       if (fs.statSync(real).size > MAX_MESSAGE_FILE_BYTES) tooBig.push(path.basename(rel));
       else files.push({ rel, name: shownName(rel), srcPath: real });
+    };
+    const roots = artifactRoots(product).flatMap((r) => { try { return [fs.realpathSync(r)]; } catch { return []; } });
+    const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
+    const named = [...filesInLines(lines), ...otherFilesInLines(lines).filter((f) => viewKind(f.path) === 'table')];
+    for (const family of threadFiles(named)) {
+      const rel = family.versions[family.versions.length - 1].path;
+      if (looksSecret(rel)) continue;
+      const found = await resolveArtifact({ src: rel, product: product.slug, products: [product], accountRoot, storeRoot: store.config?.storeRoot, thread: row.id });
+      let real: string;
+      try { real = found.ok ? fs.realpathSync(found.path) : ''; } catch { continue; }
+      if (real && roots.some((r) => real.startsWith(r + path.sep))) take(rel, real);
+    }
+    for (const rel of referencedFiles(brief, row.result, ...said, { dir: product.dir })) {
+      if (rel === 'project.json') continue;
+      let real: string;
+      try { real = fs.realpathSync(path.join(product.dir, rel)); } catch { continue; }
+      if (real.startsWith(root + path.sep)) take(rel, real);
     }
     return { words, files, tooBig };
   }
@@ -1402,7 +1420,7 @@ export function createTeamService({
       const person = state.people.find((p) => p.id === to);
       if (!person) throw new Error('that person is not on your team');
       if (to === state.me.id) throw new Error('that thread is yours already');
-      const { words, files, tooBig } = briefOfThread(row, product);
+      const { words, files, tooBig } = await briefOfThread(row, product);
       const title = shownTitle(row);
       const change = changeOfThread(product, id, title);
       const giver = state.me.name?.split(/\s+/)[0] || 'the giver';
@@ -1418,7 +1436,7 @@ export function createTeamService({
         title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         keepTitle: true,
-        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...change.files, ...files],
+        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...files, ...change.files],
       });
       // The asks on it end with it: what they say back would come to a thread you no longer hold.
       for (const r of store.listItems()) {
@@ -1452,7 +1470,7 @@ export function createTeamService({
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const title = shownTitle(row) || 'A thread';
       const link = threadLink(state.me.id, id);
-      const files = [...changeOfThread(product, id, title).files, ...briefOfThread(row, product).files];
+      const files = [...(await briefOfThread(row, product)).files, ...changeOfThread(product, id, title).files];
       const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', helper: person.name?.split(/\s+/)[0] || null, note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,
