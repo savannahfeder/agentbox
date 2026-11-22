@@ -2159,6 +2159,10 @@ body {
   animation: phone-shimmer 1.3s linear infinite;
 }
 .inline-image.arriving { display: block; width: 100%; aspect-ratio: 4 / 3; }
+/* A picture more than a screen away is not fetched yet, and a moving
+   background is restyled and repainted every frame, so its box holds still
+   until it is on its way (tests/a-picture-not-yet-on-its-way-does-not-shimmer). */
+.arriving[data-far] { animation: none; }
 
 /* A sound or a film a worker named: its name, then the player, one per line
    even when five were written on one line (ArtifactMedia in Focus.tsx). */

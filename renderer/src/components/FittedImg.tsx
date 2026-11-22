@@ -94,8 +94,9 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
   if (failed === src) return <img {...img} src={src} />;
   if (drawn?.for !== src) {
     // An empty picture holding the place: what draws it, and the viewer, read `data-full`.
+    // `data-far` keeps it still until it is on its way (styles.css).
     const { onError: _e, onLoad: _l, alt: _a, ...still } = img;
-    return <img {...still} ref={place} className={`${img.className ?? ''} arriving`} alt="" aria-hidden="true" data-full={src} />;
+    return <img {...still} ref={place} className={`${img.className ?? ''} arriving`} alt="" aria-hidden="true" data-full={src} data-far={near ? undefined : ''} />;
   }
   return <img {...img} src={drawn.url} data-full={src} />;
 }
