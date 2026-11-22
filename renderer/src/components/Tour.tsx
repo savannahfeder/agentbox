@@ -248,6 +248,8 @@ export function Tour({ tour, practice = false, practiceId = null, practiceOpen =
   const walked = useRef(false);
   // The urgent tip has gone but its lesson is not written yet (urgentCountsNow).
   const urgentGone = useRef(false);
+  // Since when the open thread has shown no Done button while the close tip is wanted.
+  const closedSince = useRef(0);
   const pressedAt = useRef(0);
   useEffect(() => {
     const note = (e: KeyboardEvent) => { pressedAt.current = Date.now(); if (/^(ArrowUp|ArrowDown|j|k)$/.test(e.key)) walked.current = true; };
@@ -296,8 +298,12 @@ export function Tour({ tour, practice = false, practiceId = null, practiceOpen =
       const rawStep = told === 'urgent' && urgentGone.current ? null : told;
       // Told to go and explore, nobody is then asked to come back and watch.
       const wanted = rawStep === 'working' && tried ? null : rawStep;
-      // Already closed, by its agent: nothing is left for the close tip to point at.
-      if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }
+      // Already closed, by its agent: nothing is left for the close tip to point at. A thread just
+      // opened draws its title a moment before its Done button, so the absence has to last.
+      const closedByItsAgent = wanted === 'close' && !!document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done');
+      if (!closedByItsAgent) closedSince.current = 0;
+      else if (!closedSince.current) closedSince.current = Date.now();
+      else if (Date.now() - closedSince.current >= SETTLE_MS) { onChange(finishLesson(tour, 'close')); return; }
       // A screen still arriving (the inbox before its rows land) must not flash a
       // tip, and the one before it no longer points at anything.
       if (wanted !== settling.current.step) settling.current = { step: wanted, since: Date.now() };

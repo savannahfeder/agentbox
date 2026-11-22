@@ -114,6 +114,16 @@ describe('the thread tips', () => {
   });
 });
 
+describe('a thread its agent closed', () => {
+  // Round five, 2026-11-22: Back from Settings reopened the practice thread at 4 of 5, its title
+  // drew a moment before its Done button, and that moment was read as the agent having closed it.
+  it('is told only once its Done button has stayed away for as long as a tip waits to settle', () => {
+    const tour = read('renderer/src/components/Tour.tsx');
+    expect(tour).toContain("const closedByItsAgent = wanted === 'close' && !!document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done');");
+    expect(tour).toMatch(/if \(!closedByItsAgent\) closedSince\.current = 0;\n\s*else if \(!closedSince\.current\) closedSince\.current = Date\.now\(\);\n\s*else if \(Date\.now\(\) - closedSince\.current >= SETTLE_MS\) \{ onChange\(finishLesson\(tour, 'close'\)\); return; \}/);
+  });
+});
+
 describe('the end of the walkthrough', () => {
   // Round two and three, 2026-11-22: E on the practice thread is held for Z, and when it also
   // ended the walkthrough the practice project went first, so the held close wrote to a project
