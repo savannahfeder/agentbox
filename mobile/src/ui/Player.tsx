@@ -37,8 +37,8 @@ export function Player({ link, film, style }: { link: string; film: boolean; sty
   const face = filmFace({ status, tapped });
   return (
     <View style={[{ overflow: 'hidden' }, style]}>
-      <VideoView player={player} nativeControls={face === 'controls'} contentFit="contain" fullscreenOptions={{ enable: true }} allowsPictureInPicture={false}
-        style={{ flex: 1 }} />
+      {face !== 'error' && <VideoView player={player} nativeControls={face === 'controls'} contentFit="contain" fullscreenOptions={{ enable: true }} allowsPictureInPicture={false}
+        style={{ flex: 1 }} />}
       {face !== 'controls' && (
         <Pressable accessibilityRole="button" accessibilityLabel={face === 'play' ? 'Play' : face === 'error' ? 'This film cannot be played' : 'Loading'}
           disabled={face !== 'play'} onPress={() => { setTapped(true); player.play(); }}

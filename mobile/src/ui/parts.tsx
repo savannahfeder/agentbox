@@ -1,6 +1,6 @@
 // The pieces every screen is made of, sized from the phone site as it draws
 // (renderer/src/phone.css and the styles under it).
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { Animated, Easing, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type PanResponderGestureState, type TextProps, type ViewStyle } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -104,6 +104,8 @@ function SheetBody({ close, slide, children }: { close: () => void; slide: Anima
   const [box, setBox] = useState(0);
   const [inner, setInner] = useState(0);
   const over = inner > box + 1;
+  const rows = useRef<ComponentRef<typeof ScrollView>>(null);
+  useEffect(() => { if (over) rows.current?.flashScrollIndicators(); }, [over]);
   const follow = useMemo(() => ({
     onPanResponderMove: (_: unknown, g: PanResponderGestureState) => drag.setValue(sheetPull(g.dy)),
     onPanResponderRelease: (_: unknown, g: PanResponderGestureState) => {
@@ -139,7 +141,7 @@ function SheetBody({ close, slide, children }: { close: () => void; slide: Anima
             <View {...grip.panHandlers} style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: color.lineStrong }} />
             </View>
-            <ScrollView style={{ flexGrow: 0, flexShrink: 1 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 10, paddingBottom: Platform.OS === 'android' ? 14 : Math.max(14, inset.bottom - 8), gap: 2 }}
+            <ScrollView ref={rows} style={{ flexGrow: 0, flexShrink: 1 }} scrollEnabled={over} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 10, paddingBottom: Platform.OS === 'android' ? 14 : Math.max(14, inset.bottom - 8), gap: 2 }}
               onLayout={(e) => setBox(e.nativeEvent.layout.height)} onContentSizeChange={(_, h) => setInner(h)}
               scrollEventThrottle={16} onScroll={(e) => { atTop.current = e.nativeEvent.contentOffset.y <= 0; }}>
               {children}

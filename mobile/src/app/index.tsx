@@ -266,6 +266,7 @@ function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; cle
 }
 
 /** The board: a column a swipe, each scrolling on its own (phone.css `.th-board`). */
+const SHADE = 16;
 function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; foot: number; inset?: number }) {
   const { width } = useWindowDimensions();
   const c0 = useCloud();
@@ -277,7 +278,7 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
     <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={col + 12} decelerationRate="fast"
       contentContainerStyle={{ paddingHorizontal: inset, gap: 12 }} style={{ flex: 1 }}>
       {columns.map((c) => (
-        <ScrollView key={c.state} style={{ width: col }} contentContainerStyle={{ paddingBottom: Math.max(88 + foot, room + 16) }} showsVerticalScrollIndicator={false}>
+        <ScrollView key={c.state} style={{ width: col + SHADE * 2, marginHorizontal: -SHADE }} contentContainerStyle={{ paddingHorizontal: SHADE, paddingBottom: Math.max(88 + foot, room + 16) }} showsVerticalScrollIndicator={false}>
           <View style={{ height: 38, paddingTop: 8, flexDirection: 'row', alignItems: 'center' }}>
             <StateGlyph state={c.state} />
             <T style={{ fontFamily: font.semibold, fontSize: 14, color: color.text }}>{c.label}</T>
