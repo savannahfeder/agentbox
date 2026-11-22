@@ -182,7 +182,7 @@ async function measure() {
     const windowUse = async () => {
       const { metrics } = await cdp.send('Performance.getMetrics');
       const of = (name) => metrics.find((m) => m.name === name)?.value ?? 0;
-      return { heap: Math.round(of('JSHeapUsedSize') / 1048576), nodes: of('Nodes') };
+      return { heap: Math.round(of('JSHeapUsedSize') / 1048576), nodes: of('Nodes'), busyMs: Math.round(of('TaskDuration') * 1000) };
     };
     await page.goto(url);
     await step('loaded', null, 6000);
@@ -199,7 +199,7 @@ async function measure() {
     }
     log({ window: await windowUse() });
     await step('idle', null, Number(flag('idle', 30)) * 1000);
-    log({ step: 'end' });
+    log({ step: 'end', window: await windowUse() });
   } finally {
     await browser.close();
     stop();
@@ -242,8 +242,10 @@ function reportMemory(lines, runtime) {
   const busy = share(at('loaded') + 6000, at('idle'));
   const idle = share(at('idle'), at('end'));
   if (busy !== null) console.log(`Its share of one core: ${busy}% while the keys ran${idle === null ? '' : `, ${idle}% sitting idle`}`);
-  const win = lines.find((l) => l.window)?.window;
-  if (win) console.log(`The window when the keys stop: ${win.heap} MB of heap in use, ${win.nodes} elements on the page`);
+  const [win, after] = lines.filter((l) => l.window);
+  if (!win) return;
+  console.log(`The window when the keys stop: ${win.window.heap} MB of heap in use, ${win.window.nodes} elements on the page`);
+  if (after && after.t > win.t) console.log(`The window's main thread sitting idle: busy ${Math.round(((after.window.busyMs - win.window.busyMs) / (after.t - win.t)) * 100)}% of the time`);
 }
 
 function report(lines, runtime) {
