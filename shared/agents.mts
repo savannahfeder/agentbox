@@ -479,11 +479,21 @@ export function agentPreview(agent: AgentLike): string {
 }
 
 /** The page's answer: the ask in bold and the agent's own words, or the message as it is. */
+/**
+ * Whether a press on one of its choices can answer it. A choice is sent as a
+ * reply, which a session at its prompt takes; whether Claude Code takes one as
+ * the answer to its own question tool has not been measured, so those choices
+ * are read, not pressed.
+ */
+export function choicesArePressed(agent: AgentLike): boolean {
+  return !replyIsSwallowed(agent) && agentLayout(agent).from !== 'tool';
+}
+
 export function agentAnswer(agent: AgentLike): string {
   const l = agentLayout(agent);
   const md = layoutMarkdown(l, agent.lastSaid ?? '');
   // Choices nothing here can send stay in the words, where she reads them before answering in the tool.
-  if (l.choices.length && replyIsSwallowed(agent)) return `${md}\n\n${l.choices.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
+  if (l.choices.length && !choicesArePressed(agent)) return `${md}\n\n${l.choices.map((c, i) => `${i + 1}. ${c}`).join('\n')}`;
   return md;
 }
 

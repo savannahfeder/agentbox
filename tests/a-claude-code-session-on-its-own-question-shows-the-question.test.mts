@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { foldHistory, type Facts } from '../main/agents.mts';
-import { agentLayout, answeredWhereItRuns, reachesInbox, progressAfterReply } from '../shared/agents.mts';
+import { agentAnswer, agentLayout, answeredWhereItRuns, choicesArePressed, reachesInbox, progressAfterReply } from '../shared/agents.mts';
 
 let dir: string;
 let file: string;
@@ -38,6 +38,16 @@ describe("Claude Code's own question", () => {
     const l = agentLayout({ lastSaid: f.lastSaid, question: f.question });
     expect(l.bold).toBe('Which date library should I use?');
     expect(l.choices).toEqual(['date-fns', 'Luxon']);
+  });
+  it('its choices are read, not pressed: a typed reply answering the tool is not measured yet', () => {
+    const agent = { lastSaid: 'I looked at both.', question: [{ question: 'Which date library should I use?', options: ['date-fns', 'Luxon'] }], waitingFor: 'input needed', status: 'waiting' };
+    expect(choicesArePressed(agent)).toBe(false);
+    expect(agentAnswer(agent)).toBe('**Which date library should I use?**\n\nI looked at both.\n\n1. date-fns\n2. Luxon');
+  });
+  it('choices written in its message, at its prompt, are pressed and sent as a reply', () => {
+    const agent = { lastSaid: 'Three apps use the old name. I can either:\n1. Keep both\n2. Switch\n\nWhich do you want?', status: 'idle' };
+    expect(choicesArePressed(agent)).toBe(true);
+    expect(agentLayout(agent).choices).toEqual(['Keep both', 'Switch']);
   });
   it('once answered it is gone', () => {
     expect(read([user(0, 'x'), asks(6, 'q1'), answered(9, 'q1')]).question).toEqual([]);

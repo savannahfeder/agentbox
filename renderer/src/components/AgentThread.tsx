@@ -9,7 +9,7 @@ import { api } from '../api';
 import { Thread, ThreadWaiting } from './Thread';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
 import { OptionsOffer } from './OptionsOffer';
-import { agentAnswer, agentContext, agentLayout, replyIsSwallowed } from '../../../shared/agents.mts';
+import { agentAnswer, agentContext, agentLayout, choicesArePressed } from '../../../shared/agents.mts';
 import { theirWords } from '../../../shared/session-layout.mts';
 import type { AgentEvent, AgentSession } from '../types';
 
@@ -54,7 +54,7 @@ export function AgentThread({ agent, title, movedAt, md, onPick }: {
 
   const [sel, setSel] = useState<number | null>(null);
   const selRef = useRef<HTMLButtonElement>(null);
-  const choices = replyIsSwallowed(agent) ? [] : layout.choices.map((text, i) => ({ n: i + 1, text, recommended: false }));
+  const choices = choicesArePressed(agent) ? layout.choices.map((text, i) => ({ n: i + 1, text, recommended: false })) : [];
   const head = laidOut && (
     <QueueSummary title={title} context={agentContext(agent, theirWords(agent.lastAsked))} earlier={0}
       open={full} onToggle={() => setFull((f) => !f)} fold={FOLD} />
