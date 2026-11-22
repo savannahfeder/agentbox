@@ -15,6 +15,8 @@ export interface Fleet {
   sessions?: Map<string, RunningSession>;
   /** `supervisor.queued`: a tick spawns these as soon as a slot frees. */
   queued?: string[];
+  /** `supervisor.settingUp`: of those, the ones whose folder is being made now. */
+  settingUp?: string[];
   /** `supervisor.remoteHeld`: sessions of ours open between Remote Control turns. */
   remoteHeld?: string[];
   /** `supervisor.runNow`: the queued ones pushed to the front. */
