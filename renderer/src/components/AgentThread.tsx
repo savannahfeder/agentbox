@@ -26,7 +26,7 @@ export function AgentThread({ agent, title, movedAt, md, onPick }: {
 }) {
   const { pid, sessionId, cwd, name, engine } = agent;
   const layout = agentLayout(agent);
-  const laidOut = !!(agent.lastSaid || agent.question?.length);
+  const laidOut = !!(agent.lastSaid || agent.question?.length || agent.approval);
   const [full, setFull] = useState(!laidOut);
   const [whole, setWhole] = useState(false);
   useEffect(() => { setWhole(false); setFull(!laidOut); }, [pid, sessionId, cwd]); // eslint-disable-line react-hooks/exhaustive-deps

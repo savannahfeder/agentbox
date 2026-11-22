@@ -205,3 +205,43 @@ describe('closing and reading it', () => {
     expect(theirWords(one('s4').lastAsked)).toBe('make the heading smaller');
   });
 });
+
+describe('a command Codex asks permission to run', () => {
+  // Measured on Codex 0.171 in a terminal (2026-11-22): the pending call carries
+  // sandbox_permissions "require_escalated" and Codex's own justification, and
+  // nothing else in the transcript says it is waiting.
+  const asking = (at: number, id: string, escalated = true) => line(at, 'response_item', {
+    type: 'custom_tool_call', status: 'completed', call_id: id, name: 'exec',
+    input: `text(await tools.exec_command({cmd:"rg --files -g cart.js"${escalated ? ',sandbox_permissions:"require_escalated",justification:"May I locate cart.js using a read-only command outside the sandbox?"' : ''}}))\n`,
+  });
+  const output = (at: number, id: string) => line(at, 'response_item', { type: 'custom_tool_call_output', call_id: id, output: [{ type: 'input_text', text: 'ok' }] });
+  const start = (t0: number) => [meta('p1', t0, { originator: 'codex-tui' }), line(t0, 'event_msg', { type: 'task_started' }), ...hers(t0 + 10, 'look at cart.js')];
+
+  it('waiting on it: Needs you, its reason in bold, the command under it', () => {
+    const t0 = NOW - 60_000;
+    write('p1', [...start(t0), asking(t0 + 2_000, 'c1')], t0 + 2_000);
+    const a = one('p1');
+    expect(a.status).toBe('waiting');
+    expect(a.waitingFor).toBe('permission prompt');
+    expect(reachesInbox(a, NOW, 'waiting')).toBe(true);
+    expect(agentAnswer(a)).toBe('**May I locate cart.js using a read-only command outside the sandbox?**\n\n```\nrg --files -g cart.js\n```');
+  });
+  it('approved and running: working again, nothing asked', () => {
+    const t0 = NOW - 60_000;
+    write('p1', [...start(t0), asking(t0 + 2_000, 'c1'), output(t0 + 9_000, 'c1')], t0 + 9_000);
+    const a = one('p1');
+    expect(a.status).toBe('busy');
+    expect(a.approval).toBeNull();
+  });
+  it('a command inside the sandbox asks nothing, however long it runs', () => {
+    const t0 = NOW - 60_000;
+    write('p1', [...start(t0), asking(t0 + 2_000, 'c1', false)], t0 + 2_000);
+    expect(one('p1').status).toBe('busy');
+  });
+  it('the older shell call with escalated permissions in JSON is read too', () => {
+    const t0 = NOW - 60_000;
+    const call = line(t0 + 2_000, 'response_item', { type: 'function_call', name: 'shell', call_id: 'c2', arguments: JSON.stringify({ command: ['npm', 'install'], with_escalated_permissions: true, justification: 'Install the packages from the network?' }) });
+    write('p1', [...start(t0), call], t0 + 2_000);
+    expect(one('p1').approval).toEqual({ command: 'npm install', reason: 'Install the packages from the network?' });
+  });
+});

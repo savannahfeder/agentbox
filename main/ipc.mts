@@ -569,6 +569,14 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // seeing the same agent again is a fresh fact about the app being used.
   const seenAgents = new Set<string>();
 
+  // Every Codex home a person's sessions can be in, as the import reads them, worked out once a minute.
+  let codexHomes: { at: number; dirs: string[] } = { at: 0, dirs: [] };
+  const codexHomesNow = () => {
+    if (Date.now() - codexHomes.at > 60_000) {
+      try { codexHomes = { at: Date.now(), dirs: appSessionFolders({ config, supervisor }).codexDirs }; } catch { codexHomes = { at: Date.now(), dirs: [] }; }
+    }
+    return codexHomes.dirs;
+  };
   const liveAgents = () => {
     try {
       const claude = agents.listAgents({
@@ -579,7 +587,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       });
       let codexRead: typeof claude = [];
       let codexOk = true;
-      try { codexRead = readCodexLive({ products: store.listProducts() }); } catch { codexRead = []; codexOk = false; }
+      try { codexRead = readCodexLive({ products: store.listProducts(), codexDirs: codexHomesNow() }); } catch { codexRead = []; codexOk = false; }
       // One list, decorated once, and swept only on real readings of both:
       // the schedule forgets a key it is not shown, which would reopen closed rows.
       const live = agentSchedule.decorate([...claude, ...codexRead], Date.now(), { sweep: agents.measured() && codexOk });

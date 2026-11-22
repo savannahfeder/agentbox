@@ -1149,6 +1149,8 @@ export interface AgentSession {
   question?: { question: string; options: string[] }[];
   /** Where it runs, in words: "Codex app", "Codex in a terminal". */
   app?: string | null;
+  /** A command it is waiting on permission to run, with its own reason. */
+  approval?: { command: string; reason: string } | null;
   // the app's own workers, folded out of everything she sees: they are already in
   // her inbox as work items, and a second row about the same agent is a
   // rejected duplicate picture.

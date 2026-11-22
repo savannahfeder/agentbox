@@ -52,6 +52,8 @@ export interface AgentLike {
   question?: ToolQuestion[];
   /** Where it runs, in words: "Codex app", "Codex in a terminal". */
   app?: string | null;
+  /** A command it is waiting on permission to run, with its own reason. */
+  approval?: { command: string; reason: string } | null;
 }
 
 /** How many of her own sessions the inbox takes. */
@@ -390,7 +392,7 @@ export function agentRow(agent: AgentLike, now: number = Date.now()): { title: s
   if (isCodex(agent)) {
     const title = agentTitle(agent, now);
     if (answeredWhereItRuns(agent)) return { title, body: `**You answered it in Codex, and it is working on it.**\n\nIt comes back to your inbox when it stops.` };
-    if (agent.lastSaid || agent.question?.length) return { title, body: agentAnswer(agent) };
+    if (agent.lastSaid || agent.question?.length || agent.approval) return { title, body: agentAnswer(agent) };
     return { title, body: '**Codex has not answered yet.**' };
   }
   const waited = howLong(now - (agent.lastActiveAt ?? agent.startedAt ?? now));
@@ -452,6 +454,14 @@ export function progressAfterReply(agent: AgentLike, now: number = Date.now(), m
 
 /** How the session's newest message reads in Agentbox's layout, from its own words. */
 export function agentLayout(agent: AgentLike) {
+  const a = agent.approval;
+  if (a && (a.reason || a.command)) {
+    return {
+      ...sessionLayout(''), kind: 'asks' as const, from: 'tool' as const,
+      bold: a.reason || `${agent.name ?? 'It'} is asking to run a command`,
+      after: a.command ? `\`\`\`\n${a.command}\n\`\`\`` : null,
+    };
+  }
   return sessionLayout(agent.lastSaid ?? '', agent.question ?? []);
 }
 

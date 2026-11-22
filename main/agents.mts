@@ -82,6 +82,8 @@ export interface Agent {
   startedByZero: boolean;
   engine: 'claude' | 'codex';
   app?: string | null;
+  /** A command the session is waiting on permission to run, in its own words. */
+  approval?: { command: string; reason: string } | null;
 }
 
 export interface RefreshOptions {

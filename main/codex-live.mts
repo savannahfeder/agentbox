@@ -32,7 +32,7 @@ interface Part { type?: string; text?: string }
 interface Payload {
   id?: string; session_id?: string; cwd?: string; timestamp?: string; originator?: string; source?: unknown; thread_source?: string;
   type?: string; role?: string; message?: string; last_agent_message?: string; content?: Part[];
-  name?: string; arguments?: string; call_id?: string; phase?: string;
+  name?: string; arguments?: string; input?: string; call_id?: string; phase?: string;
   item?: { type?: string; content?: Part[]; phase?: string; questions?: unknown };
 }
 interface Line { type?: string; timestamp?: string; payload?: Payload }
@@ -75,7 +75,29 @@ function questionsOf(raw: unknown): ToolQuestion[] {
   });
 }
 
+/** A command Codex has asked permission to run, in its own words, until it is answered. */
+export interface CodexApproval { callId: string; command: string; reason: string }
+
+const unquote = (s: string) => { try { return JSON.parse(`"${s}"`) as string; } catch { return s; } };
+/** The command and Codex's reason, when a tool call asks to run outside the sandbox. Null for one that needs no permission. */
+export function approvalAsked(callId: string, text: string): CodexApproval | null {
+  if (!/require_escalated|with_escalated_permissions["']?\s*:\s*true/.test(text)) return null;
+  let command = '';
+  let reason = '';
+  try {
+    const j = JSON.parse(text) as { cmd?: unknown; command?: unknown; justification?: unknown };
+    const c = j.cmd ?? j.command;
+    command = Array.isArray(c) ? c.map(String).join(' ') : String(c ?? '');
+    reason = String(j.justification ?? '');
+  } catch {
+    command = unquote(text.match(/\bcmd:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? '');
+    reason = unquote(text.match(/\bjustification:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? '');
+  }
+  return { callId, command: command.trim(), reason: reason.trim() };
+}
+
 export interface CodexFold {
+  approval: CodexApproval | null;
   turnStartedAt: number;
   turnEndedAt: number;
   lastSaid: string;
@@ -88,7 +110,7 @@ export interface CodexFold {
   sawEventTurns: boolean;
 }
 
-export const freshFold = (): CodexFold => ({ turnStartedAt: 0, turnEndedAt: 0, lastSaid: '', saidAt: 0, asked: [], question: [], pendingCall: '', lastActiveAt: 0, events: [], sawEventTurns: false });
+export const freshFold = (): CodexFold => ({ approval: null, turnStartedAt: 0, turnEndedAt: 0, lastSaid: '', saidAt: 0, asked: [], question: [], pendingCall: '', lastActiveAt: 0, events: [], sawEventTurns: false });
 
 const said = (parts: Part[] | undefined, kinds: string[]) => (Array.isArray(parts) ? parts : [])
   .filter((c) => c && kinds.includes(String(c.type)) && typeof c.text === 'string').map((c) => c.text).join('\n').trim();
@@ -110,7 +132,7 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
     if (last && last.text === t && Math.abs(last.at - at) < 5_000) return;
     acc.asked.push({ at, text: t });
     if (acc.asked.length > 24) acc.asked.splice(1, 1);
-    acc.question = []; acc.pendingCall = '';
+    acc.question = []; acc.pendingCall = ''; acc.approval = null;
     acc.events.push({ who: 'you', at, text: t });
   };
   const its = (text: string) => {
@@ -124,6 +146,7 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
     if (p.type === 'task_started') acc.turnStartedAt = at;
     else if (p.type === 'task_complete' || p.type === 'turn_aborted') {
       acc.turnEndedAt = at;
+      acc.approval = null;
       const last = cleanAnswer(p.last_agent_message ?? '');
       if (last) { acc.lastSaid = last; acc.saidAt = at; }
     } else if (p.type === 'user_message') hers(String(p.message ?? ''), true);
@@ -149,6 +172,12 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
     if (qs.length) { acc.question = qs; acc.pendingCall = String(p.call_id ?? 'pending'); }
   } else if (p.type === 'function_call_output' && acc.pendingCall && p.call_id === acc.pendingCall) {
     acc.pendingCall = ''; acc.question = [];
+  }
+  if (p.type === 'function_call' || p.type === 'custom_tool_call') {
+    const asked = approvalAsked(String(p.call_id ?? ''), String(p.arguments ?? p.input ?? ''));
+    if (asked) acc.approval = asked;
+  } else if ((p.type === 'function_call_output' || p.type === 'custom_tool_call_output') && acc.approval && p.call_id === acc.approval.callId) {
+    acc.approval = null;
   }
 }
 
@@ -184,6 +213,7 @@ export function readCodexSession(file: string, { whole = false }: { whole?: bool
 /** Where a session stands. Waiting means stopped on its own question; idle means its turn ended and it is your move. */
 export function codexStatus(fold: CodexFold, mtime: number, now: number): 'busy' | 'waiting' | 'idle' {
   if (fold.pendingCall) return 'waiting';
+  if (fold.approval && fold.turnStartedAt > fold.turnEndedAt) return 'waiting';
   const running = fold.turnStartedAt > fold.turnEndedAt && now - mtime < CODEX_STALE_TURN_MS;
   if (running) return 'busy';
   return fold.question.length ? 'waiting' : 'idle';
@@ -235,7 +265,8 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
         startedAt: meta.startedAt,
         status,
         statusAt: Math.max(fold.turnStartedAt, fold.turnEndedAt),
-        waitingFor: null,
+        waitingFor: status === 'waiting' && fold.approval ? 'permission prompt' : null,
+        approval: status === 'waiting' && fold.approval ? { command: fold.approval.command, reason: fold.approval.reason } : null,
         socket: '',
         lastActiveAt: Math.max(fold.lastActiveAt, st.mtimeMs),
         lastSaid: fold.lastSaid,
