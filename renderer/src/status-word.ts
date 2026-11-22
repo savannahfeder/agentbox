@@ -165,6 +165,7 @@ export function factsFor(fleet: Fleet, id: string): LiveFacts {
   return {
     session: fleet.sessions?.get(id) ?? null,
     queued: fleet.queued,
+    settingUp: fleet.settingUp,
     remoteHeld: !!fleet.remoteHeld?.includes(id),
     runNow: fleet.runNow,
     signInNeeded: fleet.signInNeeded,

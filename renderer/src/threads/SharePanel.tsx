@@ -1,6 +1,6 @@
 // The panels Share… opens under the thread's dots, drawn with the menu's own
 // parts (.th-menu, .row-i) so they sit where its rows were.
-import { useContext, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { Face, TeamContext } from '../team/people';
 import type { Person } from '../types';
 import { firstName, matchPeople, type SeenBy } from './share-rules';
@@ -184,6 +184,7 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
   start?: GiveMode;
 }) {
   const [own, setOwn] = useState('');
+  const noteBox = useRef<HTMLTextAreaElement>(null);
   const note = kept ?? own;
   const setNote = onNote ?? setOwn;
   const fixed = only === 'help' || only === 'review' || only === 'give';
@@ -202,14 +203,14 @@ export function GiveSheet({ to, onGive, onAsk, step = null, start = 'help', onBa
       <div className="sh-to"><span className="sh-label">To</span><span className="sh-chip sh-chip-set"><Face person={team?.byId.get(to.id) ?? { id: to.id, email: '', name: to.name, avatarUrl: null }} size={18} />{first}</span></div>
       {onAsk && !fixed && <div className="sh-modes">
         <div className="sh-switch" role="radiogroup" aria-label="What you want from them">
-          {choices.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => { setMode(x.id); onMode?.(x.id); }}>{x.label}</button>)}
+          {choices.map((x) => <button key={x.id} type="button" role="radio" aria-checked={mode === x.id} className={`sh-mode${mode === x.id ? ' on' : ''}`} onClick={() => { setMode(x.id); onMode?.(x.id); noteBox.current?.focus(); }}>{x.label}</button>)}
         </div>
         <p className="sh-mode-says">{m.detail(first)}</p>
       </div>}
       {(!onAsk || fixed) && <p className="sh-mode-says sh-mode-alone">{m.detail(first)}</p>}
       {/* The whole thread goes, so it is drawn by its name with the message as where to look. */}
       {threadName ? <div className="sh-thread"><div className="sh-thread-head"><ThreadMark /><span>{threadName}</span></div>{quote}</div> : quote}
-      <textarea className="sh-note" autoFocus placeholder={m.ask(first)} value={note} aria-label={m.ask(first)} rows={2}
+      <textarea ref={noteBox} className="sh-note" autoFocus placeholder={m.ask(first)} value={note} aria-label={m.ask(first)} rows={2}
         onChange={(e) => setNote(e.target.value)}
         onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); go(); } }} />
       <div className="sh-foot">

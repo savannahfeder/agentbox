@@ -476,6 +476,10 @@ async function createWindow() {
     ensurePersonalProject(config.accountRoot);
   } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
+  try {
+    const closed = store.closeShippedThreads();
+    if (closed) console.log(`zero: closed ${closed} shipped thread(s) that only offered closing`);
+  } catch (err) { console.warn(`zero: could not close shipped threads: ${(err as Error).message}`); }
   // Where the window's own pictures may come from (main/img-scheme.mts). The
   // account root holds every product's docs, attachments, designs and the
   // `.staging` folder a pasted screenshot lands in; a product's repo is where a

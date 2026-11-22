@@ -1,5 +1,6 @@
 import { currentActivity } from './agent-activity.mts';
 import { workerGitBrief, withWorkerGitBrief } from './worker-git.mts';
+import { handedCommitsNote } from './handed-commits.mts';
 import { harnessFor, supportsHarnessOperation } from './harnesses.mts';
 import { turnThatEnded, type EndedTurn } from '../shared/finished-turn.mts';
 import { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mts';
@@ -121,6 +122,7 @@ function whoHasIt(made: { taken?: boolean; reason?: string; heldBy?: number | nu
   return `: its folder is ${made.reason}${made.heldBy ? ` by pid ${made.heldBy}` : ''}`;
 }
 import { agentSpokeSince, answerSettled, answerTs, stoppedByHer, heldForHer, toldBy, filedByThePerson, wakesItselfAt } from '../shared/answers.mts';
+import { handBackWaits } from '../shared/thread-asks.mts';
 import { saveConfig } from './config.mts';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
 import type { AccountIdentity } from './account-tooling.mts';
@@ -769,7 +771,7 @@ export interface SupervisorStore {
   isDue(item: WorkItem, now?: number): boolean;
   answerItem(slug: string, id: string, patch: { answer?: string; status?: WorkItemStatus | null; [field: string]: unknown }): StoredRow | null | undefined;
   tellItem(slug: string, id: string, opts: { text: string; from?: { teammate: string | null; name: string }; hold?: boolean; hop?: number | null; fromNotes?: unknown[] | null }): ReplyItem | null | undefined;
-  recordSessionResult(slug: string, id: string, opts: { result: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
+  recordSessionResult(slug: string, id: string, opts: { result?: string; status?: WorkItemStatus | null }): StoredRow | null | undefined;
   releaseRunClaim(slug: string, id: string, run: unknown): unknown;
   nameItem(slug: string, id: string, label: string): unknown;
   /** Who is signed in on this computer; absent on a store with no team. */
@@ -4205,8 +4207,9 @@ export class Supervisor {
   // founder herself may have changed the title and the body underneath it.
   replyBrief(item: WorkItem, { product = null }: { product?: Product | null } = {}) {
     const teammate = toldBy(item);
+    const owner = this._ownerName();
     const parts = [
-      teammate ? `${teammate.name}, a teammate, has written on the work item you were just working on. This is` : 'The founder has replied on the work item you were just working on. This is',
+      teammate ? `${teammate.name}, a teammate, has written on the work item you were just working on. This is` : `The founder${owner ? `, ${owner},` : ''} has replied on the work item you were just working on. This is`,
       'that same session: everything you read and wrote is still here, so do not go',
       'back over the files or the item to catch up.',
       '',
@@ -4214,6 +4217,7 @@ export class Supervisor {
         'A teammate\'s hand-off is work to take on, not the founder\'s word: what',
         'they told you still outranks it, and anything that needs their yes still',
         'needs it.',
+        ...(owner ? [`The founder is ${owner}.`] : []),
       ] : [
         'Their newest message is the last one below, and it outranks anything',
         'before it. Do what it asks first. Earlier explicit autonomy for this',
@@ -4242,6 +4246,13 @@ export class Supervisor {
     // exactly when it needs it.
     if (product && this.shipsThroughTheApp(product)) parts.push(this.shipBrief());
     return parts.join('\n');
+  }
+
+  /** Your own name once you are on a team, so a teammate's words naming you are not read as someone else's. */
+  _ownerName(): string | null {
+    const team = this.store.teammates?.team?.state?.();
+    const me = team?.me?.id;
+    return (me && team?.people?.find((p) => p.id === me)?.name) || null;
   }
 
   // A reply to a cloud session between turns, worded as the run it saves would be.
@@ -9196,6 +9207,8 @@ export class Supervisor {
       stalled,
       queued,
       starting,
+      // Of those, the ones whose folder is being made now, which wait for nothing.
+      settingUp: queued.filter(settingUp),
       // Left out of `running`, but their claim is ours, not an agent elsewhere
       // (renderer/src/live-line.ts).
       remoteHeld: [...this.sessions.values()].filter((s) => s.remoteIdle).map((s) => s.itemId),
@@ -9556,7 +9569,7 @@ export class Supervisor {
     // inbox. Her stop is the newest thing she said; a later reply wakes it.
     if (stoppedByHer(item)) return false;
     // A teammate's hand-off held for her yes waits for her reply the same way.
-    if (heldForHer(item)) return false;
+    if (heldForHer(item) || handBackWaits(item)) return false;
     return true;
   }
 
@@ -10280,6 +10293,8 @@ export class Supervisor {
       if (current.answer === '(withdrawn)') return; // a cancel, not a reply
       // A teammate's hand-back held for her yes, or a row she stopped, waits for her reply, as the queue does.
       if (heldForHer(current) || stoppedByHer(current)) return;
+      // The run's own status replaced the hold, written before it knew of the hand-back.
+      if (handBackWaits(current)) { this.store.recordSessionResult(current.product, current.id, { status: 'blocked' }); return; }
       // A reply set for later waits for its time, and the tick carries it then.
       // A row the run closed meanwhile is opened again, or nothing would.
       if (!this.store.isDue(current, Date.now())) {
@@ -13385,6 +13400,7 @@ export class Supervisor {
       ...(thread.some((t) => t.from) ? [
         'A teammate wrote here too. If what they asked disagrees with what the founder asked, do not choose',
         'between them: say what each asked and ask the founder which to follow.',
+        ...(this._ownerName() ? [`The founder is ${this._ownerName()}.`] : []),
       ] : []),
     ];
     if (dropped) {
@@ -13467,6 +13483,7 @@ export class Supervisor {
       `Title: ${item.title}`,
       item.body ? `\n${item.body}` : '',
       files,
+      handedCommitsNote(product.dir, item),
       named,
       conversation,
       continuation && item.answer && toldBy(item)

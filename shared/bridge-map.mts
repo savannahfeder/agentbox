@@ -183,6 +183,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   gitHubCloudSignIn: 'zero:github-cloud-sign-in',
   // The answer to a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
   signInAnswer: 'zero:sign-in-answer',
+  signInKeep: 'zero:sign-in-keep',
   // A file or a one-time code a cloud run asked for (shared/cloud-needs.mts).
   cloudSendFile: 'zero:cloud-send-file',
   cloudSendCode: 'zero:cloud-send-code',

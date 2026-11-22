@@ -69,7 +69,7 @@ describe('the wiring in App.tsx', () => {
 
   it('every row the window lists comes through the rule, the board and the counts included', () => {
     expect(app).toMatch(/const listed = useMemo\(\(\) => withoutWithdrawnSends\(itemsWithOlder, undoMarks\)/);
-    expect(app).toMatch(/const items = listed;/);
+    expect(app).toMatch(/const items = useMemo\(\(\) => withLevelsForYou\(listed,/);
     // The marks are read again whenever an undo leaves one.
     expect(app).toMatch(/addEventListener\(UNDO_MARKS_EVENT/);
   });

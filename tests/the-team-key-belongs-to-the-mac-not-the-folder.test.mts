@@ -31,6 +31,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadCloudConfig, teamConfigOnThisMac } from '../main/team/session.mts';
+import { CLOUD_ADDRESS } from '../shared/cloud-address.mts';
 
 const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `team-key-${name}-`));
 const KEY = { url: 'https://hers.test', anonKey: 'anon' };
@@ -75,12 +76,13 @@ describe('a folder with no key of its own', () => {
     expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
   });
 
-  // THE CASE EITHER SIDE: no key anywhere is still the single-person app, which
-  // is what a public checkout must stay.
-  it('is the single-person app when the Mac has no key either', () => {
+  // THE CASE EITHER SIDE: with no key anywhere, an installed build with none
+  // baked in has no team, and a checkout uses the one that ships (reversed
+  // 2026-11-22, tests/a-copy-from-github-signs-in-to-the-team-that-ships).
+  it('uses the team that ships from a checkout when the Mac has no key either', () => {
     const { home, appDir } = aMac();
     expect(loadCloudConfig(appDir, { packaged: true, home, env })).toBeNull();
-    expect(loadCloudConfig(appDir, { packaged: false, home, env })).toBeNull();
+    expect(loadCloudConfig(appDir, { packaged: false, home, env })?.url).toBe(CLOUD_ADDRESS.supabaseUrl);
   });
 
   // A file that is there but says nothing usable is no key.
