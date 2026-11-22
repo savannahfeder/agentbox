@@ -365,8 +365,8 @@ export interface TeamServiceOptions {
 interface TaskFile extends AttachmentFile { rel?: string }
 
 // "View the change" opens the first .change, so a thread's own goes before one it was handed.
-function sentInOrder<T extends { name: string }>(files: readonly T[], own: readonly T[]): T[] {
-  const isChange = (f: T) => f.name.toLowerCase().endsWith('.change');
+function sentInOrder(files: readonly TaskFile[], own: readonly TaskFile[]): TaskFile[] {
+  const isChange = (f: TaskFile) => String(f.name ?? '').toLowerCase().endsWith('.change');
   return [...files.filter((f) => !isChange(f)), ...own, ...files.filter(isChange)];
 }
 
