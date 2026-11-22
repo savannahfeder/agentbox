@@ -23,8 +23,14 @@
 // That is the difference this file draws. Deciding for her that an explicit
 // path is wrong would break every link into the app's own repo, which is not a
 // product at all.
+import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fsDefault from 'node:fs';
+import type { FSWatcher } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
+import { taskBranch } from './task-folders.mts';
 import { performance } from 'node:perf_hooks';
 import { machineryDir } from './store/home.mts';
 import { writtenFileNamed } from './store/written-elsewhere.mts';
@@ -92,7 +98,7 @@ const SKIP = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'session
 // mentions the moment it opens, so the walk has to outlive that burst; a
 // picture that lands later is found by the next look, which comes after this.
 export const HUNT_FRESH_MS = 5000;
-interface WalkEntry { at: number; fs: ArtifactFs; value: Promise<unknown>; running: boolean; took: number; again?: Promise<unknown> }
+interface WalkEntry { at: number; fs: ArtifactFs; value: Promise<unknown>; running: boolean; took: number; again?: Promise<unknown>; watched?: boolean; dirty?: boolean }
 const walks = new Map<string, WalkEntry>();
 // How many of a walk's folder reads wait on the disk at once. The app's other
 // disk reads share four threads with these, and a walk that asked for every
@@ -105,9 +111,18 @@ export const WALK_GIVES_UP_MS = 60_000;
 // of the four disk threads until it returns, so later walks skip the folder
 // rather than spending another thread on it.
 const stuck = new Set<string>();
-// Every file name in one tree, read without holding the main process.
-async function walkNames(tree: string, fs: ArtifactFs): Promise<Map<string, string[]>> {
-    const names = new Map<string, string[]>();
+// Every file name in one tree, read without holding the main process. A file is
+// kept as its name and its folder's index, not a joined path, which made the
+// index ten times the size.
+interface TreeNames { dirs: string[]; at: Map<string, number | number[]> }
+const pathsNamed = (names: TreeNames, base: string): string[] => {
+    const at = names.at.get(base);
+    if (at === undefined)
+        return [];
+    return (typeof at === 'number' ? [at] : at).map((i) => path.join(names.dirs[i]!, base));
+};
+async function walkNames(tree: string, fs: ArtifactFs): Promise<TreeNames> {
+    const names: TreeNames = { dirs: [], at: new Map() };
     const queue: { dir: string; depth: number }[] = [{ dir: tree, depth: 0 }];
     const out = new Set<string>();
     let reading = 0;
@@ -136,18 +151,24 @@ async function walkNames(tree: string, fs: ArtifactFs): Promise<Map<string, stri
             catch { /* gone or unreadable */ }
             out.delete(dir);
             stuck.delete(dir);
+            let here = -1;
             for (const e of entries) {
                 if (e.name.startsWith('.'))
                     continue;
-                const full = path.join(dir, e.name);
                 if (e.isDirectory()) {
                     if (!SKIP.has(e.name) && depth < 6)
-                        queue.push({ dir: full, depth: depth + 1 });
+                        queue.push({ dir: path.join(dir, e.name), depth: depth + 1 });
+                    continue;
                 }
-                else if (names.has(e.name))
-                    names.get(e.name)!.push(full);
+                if (here < 0)
+                    here = names.dirs.push(dir) - 1;
+                const had = names.at.get(e.name);
+                if (had === undefined)
+                    names.at.set(e.name, here);
+                else if (typeof had === 'number')
+                    names.at.set(e.name, [had, here]);
                 else
-                    names.set(e.name, [full]);
+                    had.push(here);
             }
             reading -= 1;
             waiting.splice(0).forEach((r) => r());
@@ -171,32 +192,87 @@ const whole = (fs: ArtifactFs): typeof fsDefault => fs as typeof fsDefault;
 // in that time is not found.
 const SLOW_WALK_KEEPS = 10;
 export const HUNT_KEPT_AT_MOST_MS = 30_000;
+const timedFor = (k: WalkEntry) => Math.min(HUNT_KEPT_AT_MOST_MS, Math.max(HUNT_FRESH_MS, k.took * SLOW_WALK_KEEPS));
+// A changed folder still waits out the timed window: one something keeps writing
+// into (a render's frames) would otherwise be walked again on every look.
+const keptFor = (k: WalkEntry) => k.watched && !k.dirty ? WATCHED_WALK_KEPT_MS : timedFor(k);
 // One walk per tree at a time: a name asked while it runs waits on it, even past
 // its window. A look that must be current waits for it and then walks again,
 // since the running walk may have read a folder before the file was there.
 // Each key is only ever read by the one caller that wrote it, so its value comes back as that caller's T.
-function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T | Promise<T>, fresh = false): Promise<T> {
+function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T | Promise<T>, fresh = false, watched = false): Promise<T> {
     const kept = walks.get(key);
     if (kept && kept.fs === fs && kept.running && fresh) {
-        kept.again ??= kept.value.then(() => freshly(key, fs, now, read, true));
+        kept.again ??= kept.value.then(() => freshly(key, fs, now, read, true, watched));
         return kept.again as Promise<T>;
     }
-    const keptFor = (k: WalkEntry) => Math.min(HUNT_KEPT_AT_MOST_MS, Math.max(HUNT_FRESH_MS, k.took * SLOW_WALK_KEEPS));
     if (kept && kept.fs === fs && (kept.running || (!fresh && now - kept.at < keptFor(kept))))
         return kept.value as Promise<T>;
     const started = performance.now();
-    const entry: WalkEntry = { at: now, fs, value: Promise.resolve(), running: true, took: 0 };
+    const entry: WalkEntry = { at: now, fs, value: Promise.resolve(), running: true, took: 0, watched, dirty: false };
     const value = Promise.resolve(read()).finally(() => {
         entry.running = false;
         entry.took = performance.now() - started;
+        // A walk past its window answers nobody, so its index is not kept in memory.
+        setTimeout(() => {
+            if (walks.get(key) !== entry)
+                return;
+            walks.delete(key);
+            watchers.get(key)?.close();
+            watchers.delete(key);
+        }, keptFor(entry)).unref?.();
     });
     entry.value = value;
     walks.set(key, entry);
-    if (walks.size > 32)
-        walks.delete(walks.keys().next().value!);
+    if (walks.size > 32) {
+        const oldest = walks.keys().next().value!;
+        walks.delete(oldest);
+        watchers.get(oldest)?.close();
+        watchers.delete(oldest);
+    }
     return value;
 }
-const namesIn = (tree: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<Map<string, string[]>> => freshly(tree, fs, now, () => walkNames(tree, fs), fresh);
+// On a Mac one FSEvents watch per tree is cheap, so a tree's list is kept until
+// something the walk would see changes, and redone after this long regardless.
+// Elsewhere a recursive watch is one watcher per folder, so the timed rule stays.
+export const WATCHED_WALK_KEPT_MS = 10 * 60_000;
+const watchers = new Map<string, FSWatcher>();
+// Whether a change at `rel` (inside the tree) can change what walkNames lists.
+function walkSees(rel: string): boolean {
+    const parts = rel.split(path.sep);
+    return parts.length <= 7 && !parts.some((p) => p.startsWith('.') || SKIP.has(p));
+}
+function watchTree(tree: string, fs: ArtifactFs): boolean {
+    if (fs !== fsDefault || process.platform !== 'darwin')
+        return false;
+    if (watchers.has(tree))
+        return true;
+    const dirty = () => { const kept = walks.get(tree); if (kept) kept.dirty = true; };
+    try {
+        const w = fsDefault.watch(tree, { recursive: true, persistent: false }, (_event, file) => {
+            if (file == null || walkSees(String(file)))
+                dirty();
+        });
+        w.on('error', () => {
+            w.close();
+            watchers.delete(tree);
+            dirty();
+        });
+        watchers.set(tree, w);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+/** Closes every folder watch; for tests and quitting. */
+export function stopWatchingFolders(): void {
+    for (const w of watchers.values())
+        w.close();
+    watchers.clear();
+    walks.clear();
+}
+const namesIn = (tree: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<TreeNames> => freshly(tree, fs, now, () => walkNames(tree, fs), fresh, watchTree(tree, fs));
 // Hunt the file down by NAME inside one product's trees, newest match wins.
 // Workers write links relative to whatever directory they were standing in, so
 // a fixed root list will always miss some of them, and every miss cost her a
@@ -206,7 +282,7 @@ async function huntByName(base: string, trees: readonly string[], fs: ArtifactFs
     let best: { full: string; m: number; fits: boolean } | null = null;
     const tail = raw.includes('/') ? `${path.sep}${raw.split('/').join(path.sep)}` : null;
     for (const tree of trees) {
-        for (const full of (await namesIn(tree, fs, now, fresh)).get(base) ?? []) {
+        for (const full of pathsNamed(await namesIn(tree, fs, now, fresh), base)) {
             let m;
             try {
                 m = (await fs.promises.stat(full)).mtimeMs;
@@ -261,6 +337,92 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
     const ids = (await freshly(`checkouts:${root}`, fs, now, list, fresh)).filter((id) => THREAD_ID.test(id));
     const hits = (await Promise.all(ids.map(within))).filter((hit) => hit !== null).sort((a, b) => b.at - a.at);
     return hits.find((hit) => threadNames(own.dir, hit.id, base))?.file ?? null;
+}
+// A finished thread's folder is given back, and work that came home from the
+// cloud may never have had one. Until its branch is merged, the file there is
+// newer than the checkout's copy of the same name. A copy is read out for viewing.
+const readFromGit = promisify(execFile);
+const gitOut = async (repoPath: string, args: string[]): Promise<Buffer> => (await readFromGit('git', ['-C', repoPath, ...args], { encoding: 'buffer', timeout: 5_000, maxBuffer: 64 * 1024 * 1024, windowsHide: true })).stdout;
+// One git call per repository per look, however many threads ask.
+function unmergedTips(repoPath: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<Map<string, string>> {
+    const branches = `refs/heads/${path.posix.dirname(taskBranch('w-0'))}/`;
+    return freshly(`unmerged:${repoPath}`, fs, now, async () => {
+        const out = await gitOut(repoPath, ['for-each-ref', '--no-merged=HEAD', '--format=%(objectname) %(refname:lstrip=2)', branches]).catch(() => Buffer.alloc(0));
+        return new Map(String(out).split('\n').filter(Boolean).map((line) => {
+            const [tip, name] = line.split(' ');
+            return [name, tip] as [string, string];
+        }));
+    }, fresh);
+}
+// A full path into `<repo>/.claude/worktrees/<id>/…` whose folder is gone.
+// The repo is matched through its real path: links say /private/tmp for /tmp.
+function givenBackFolder(repoPath: string, raw: string): { id: string; rel: string } | null {
+    const mark = `${path.sep}.claude${path.sep}worktrees${path.sep}`;
+    const at = raw.indexOf(mark);
+    if (at < 0)
+        return null;
+    const [id, ...rest] = raw.slice(at + mark.length).split(path.sep);
+    if (!THREAD_ID.test(id) || !rest.length || rest.includes('..'))
+        return null;
+    const real = (p: string) => { try { return fsDefault.realpathSync(p); } catch { return null; } };
+    const repo = real(repoPath);
+    if (!repo || real(raw.slice(0, at)) !== repo || fsDefault.existsSync(path.join(repo, '.claude', 'worktrees', id)))
+        return null;
+    return { id, rel: rest.join('/') };
+}
+// Keyed by commit, so a copy never goes stale.
+const branchCopies = new Map<string, Promise<string | null>>();
+async function fileOnThreadBranch(repoPath: string | null | undefined, raw: string, thread: unknown, fs: ArtifactFs, now: number, fresh: boolean): Promise<string | null> {
+    if (!repoPath || path.isAbsolute(raw) || raw.split('/').includes('..') || !thread || !THREAD_ID.test(String(thread)))
+        return null;
+    const tip = (await unmergedTips(repoPath, fs, now, fresh)).get(taskBranch(thread));
+    if (!tip)
+        return null;
+    const key = `${repoPath}\0${tip}\0${raw}`;
+    const kept = await branchCopies.get(key);
+    if (kept && fsDefault.existsSync(kept))
+        return kept;
+    if (branchCopies.size > 256)
+        branchCopies.clear();
+    const copying = copyFromCommit(repoPath, tip, raw, String(thread));
+    branchCopies.set(key, copying);
+    return copying;
+}
+async function copyFromCommit(repoPath: string, tip: string, raw: string, thread: string): Promise<string | null> {
+    try {
+        // Only a file the thread's own commits touched: the rest of its branch is
+        // main as it was when the thread began, older than the checkout's copy.
+        // An answer names a file it committed by its name as often as by its path.
+        const changed = String(await gitOut(repoPath, ['log', '--format=', '--name-only', '-z', `HEAD..${tip}`])).split('\0').map((f) => f.trim()).filter(Boolean);
+        const file = changed.find((f) => f === raw) ?? changed.find((f) => f.endsWith(`/${raw}`));
+        // A fetched branch can carry a tree entry named "..", which git lists as
+        // part of the path and path.join would climb out of the copies with.
+        if (!file || file.split('/').some((p) => p === '' || p === '.' || p === '..'))
+            return null;
+        const bytes = await gitOut(repoPath, ['show', `${tip}:${file}`]);
+        const copy = path.join(fsDefault.realpathSync(os.tmpdir()), 'agentbox-branch-files', createHash('sha1').update(repoPath).digest('hex').slice(0, 12), thread, tip.slice(0, 12), file);
+        // A link planted on the way in a shared tmp would carry the write elsewhere.
+        const unlinked = (dir: string) => fsDefault.realpathSync(dir) === dir;
+        let there = path.dirname(copy);
+        while (!fsDefault.existsSync(there))
+            there = path.dirname(there);
+        if (!unlinked(there))
+            return null;
+        await fsDefault.promises.mkdir(path.dirname(copy), { recursive: true });
+        if (!unlinked(path.dirname(copy)))
+            return null;
+        const out = await fsDefault.promises.open(copy, fsDefault.constants.O_WRONLY | fsDefault.constants.O_CREAT | fsDefault.constants.O_TRUNC | fsDefault.constants.O_NOFOLLOW);
+        try {
+            await out.writeFile(bytes);
+        }
+        finally {
+            await out.close();
+        }
+        return copy;
+    }
+    catch {
+        return null;
+    }
 }
 function threadNames(dir: string, id: string, base: string): boolean {
     try {
@@ -328,6 +490,15 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
     if (path.isAbsolute(raw)) {
         // Said in full, so taken at its word.
         candidates.push(raw);
+        // A thread's folder is given back once its work lands, and its answer
+        // still links the file there: its branch has it, or main once merged.
+        const given = own?.repoPath ? givenBackFolder(own.repoPath, raw) : null;
+        if (given) {
+            const onBranch = await fileOnThreadBranch(own!.repoPath, given.rel, given.id, fs, now, fresh);
+            if (onBranch)
+                return withCarry({ ok: true, path: onBranch });
+            candidates.push(path.join(own!.repoPath!, given.rel));
+        }
         // Workers also write an absolute path with a segment missing (the account
         // root straight onto reports/, no product slug). The remainder is a guess,
         // so it is retried under THIS product's roots and no other.
@@ -361,6 +532,11 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
         ? path.join(own.repoPath, '.claude', 'worktrees', String(thread)) : null;
     if (mine)
         candidates.unshift(path.join(mine, raw));
+    if (mine && !fs.existsSync(mine)) {
+        const onBranch = await fileOnThreadBranch(own?.repoPath, raw, thread, fs, now, fresh);
+        if (onBranch)
+            return withCarry({ ok: true, path: onBranch });
+    }
     for (const full of candidates) {
         if (fs.existsSync(full))
             return withCarry({ ok: true, path: full });

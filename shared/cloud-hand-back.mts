@@ -9,6 +9,20 @@ export function handsBack(result: string | null | undefined): boolean {
   return String(result ?? '').split('\n').some((line) => line.trimStart().startsWith(HAND_BACK));
 }
 
+/** A reply without its marked line, for drawing: that line is the app's to read. */
+export function withoutHandBack(result: string): string {
+  if (!handsBack(result)) return result;
+  return result.split('\n').filter((line) => !line.trimStart().startsWith(HAND_BACK)).join('\n').trim();
+}
+
+// THE OTHER WAY:a run on this computer whose request needs the cloud
+// (Supervisor#_noteSentToCloud). Told only where the cloud could take it.
+export const SEND_TO_CLOUD = 'AGENTBOX-NEEDS-THE-CLOUD:';
+
+export function asksForCloud(result: string | null | undefined): boolean {
+  return String(result ?? '').split('\n').some((line) => line.trimStart().startsWith(SEND_TO_CLOUD));
+}
+
 /** What the run said it was missing, cut to fit a card; null when it said nothing. */
 export function handBackWhat(result: string | null | undefined, max = 90): string | null {
   const line = String(result ?? '').split('\n').map((l) => l.trimStart()).find((l) => l.startsWith(HAND_BACK));

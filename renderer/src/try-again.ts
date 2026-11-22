@@ -6,7 +6,8 @@
 // tests/a-stuck-thread-offers-try-again.test.mts
 
 import { liveLine, type LiveFacts } from './live-line';
-import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
+import { saysARunGotNowhere, saysTheModelIsForAnotherEngine } from '../../shared/spawn-trouble.mts';
+import { FIRST_RUN_LABEL } from './onboarding';
 import type { WorkItem } from './types';
 
 // Queued, Up next and Shipping come on their own. Signed out waits for a
@@ -15,18 +16,20 @@ import type { WorkItem } from './types';
 const STUCK = new Set(['idle', 'silent', 'limit']);
 
 export function offersTryAgain(item: WorkItem, facts: LiveFacts & { practice?: boolean } = {}): boolean {
-  if (item.agent || item.status === 'done' || facts.session || facts.practice) return false;
+  if (item.agent || item.status === 'done' || facts.session || facts.practice || (item.labels ?? []).includes(FIRST_RUN_LABEL)) return false;
   // Without the fleet this window knows nothing about what is coming.
   if (!Array.isArray(facts.queued)) return false;
   if (facts.asking || facts.shipping || facts.remoteHeld) return false;
   if ((facts.scheduledUntil ?? 0) > (facts.now ?? Date.now())) return false;
-  if (facts.stalled) return true;
+  if (facts.stalled && !facts.signInNeeded?.[item.id]) return true;
   const live = liveLine(item, facts);
   if (live) return STUCK.has(live.state);
   // Out of In progress, the newest word on it is the app's own note that a run
   // stopped, and no start is queued for it yet.
   return item.status === 'open' && !facts.queued.includes(item.id)
-    && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result);
+    && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result)
+    // Another try is refused the same way; a model it can run is the way on.
+    && !saysTheModelIsForAnotherEngine(item.result);
 }
 
 export interface TryAgainOutcome { resumed?: number; queued?: number; working?: number; missing?: number; failed?: number; why?: string }

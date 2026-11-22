@@ -67,7 +67,7 @@ describe('the corner buttons on a touch screen', () => {
 
   it('are big enough for a thumb, and nothing that only works on the computer', () => {
     expect(phone).toMatch(/\.pv-icon \{ width: 44px; height: 44px; \}/);
-    expect(view).toMatch(/\{!onPhone\(\) && <button[^\n]*aria-label="Open in Preview"/);
+    expect(view).toMatch(/\{(?:onPreview && )?!onPhone\(\) && <button[^\n]*aria-label="Open in Preview"/);
   });
 
   it('the view keeps the fingers, and the strip still scrolls', () => {

@@ -70,6 +70,6 @@ describe('the app', () => {
   });
 
   it('still keeps you on the thread after a reply to a person', () => {
-    expect(app).toMatch(/const stay = staysOnTheTask\(item, text, engine\) \|\| talking \|\| !movesOn\(item\);/);
+    expect(app).toMatch(/const stay = staysOnTheTask\(item, text, engine\) \|\| talking \|\| !movesOn\(item\)( \|\| isTourPractice\(tourRef\.current, item\))?;/);
   });
 });

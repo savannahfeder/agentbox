@@ -87,6 +87,9 @@ export function pressureFrom(
   return 'normal';
 }
 
+/** Windows has no unix socket for the hook to ask on, so there the check is off. */
+export const memoryGateWorksOn = (platform: NodeJS.Platform = process.platform): boolean => platform !== 'win32';
+
 /** One heavy slot per 8 GB, at least one; two on a machine it cannot read. */
 export function autoSlots(memBytes: unknown): number {
   const gb = Math.round((Number(memBytes) || 0) / 1024 ** 3);
@@ -255,6 +258,13 @@ export class MemoryGate {
     const r = this.running.get(String(id));
     if (!r || !Number.isFinite(mb)) return;
     r.peakMb = Math.max(r.peakMb ?? 0, mb);
+  }
+
+  /** The peak so far was not this command's alone: start again from `mb`. */
+  restartPeak(id: unknown, mb: number) {
+    const r = this.running.get(String(id));
+    if (!r || !Number.isFinite(mb)) return;
+    r.peakMb = mb;
   }
 
   /**

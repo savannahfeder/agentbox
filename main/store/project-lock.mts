@@ -32,6 +32,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { alive } from '../process-alive.mts';
 
 // How long a lock may be held before another process may break it. Far longer
 // than any legitimate critical section here (all of which are a read, a JSON
@@ -55,9 +56,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Is this pid gone? Signal 0 checks existence without delivering anything.
 // Only the FALSE answer here is trustworthy (see the header): a live pid may be
 // a recycled number, but a missing one is definitely not our holder.
+// A zombie is gone too: it has exited, and only its number is left (../process-alive.mts).
 function pidGone(pid: unknown): boolean {
   if (!Number.isInteger(pid) || (pid as number) <= 0) return true;
-  try { process.kill(pid as number, 0); return false; } catch (err) { return (err as NodeJS.ErrnoException).code === 'ESRCH'; }
+  return !alive(pid as number);
 }
 
 function readHolder(file: string): LockHolder | null {

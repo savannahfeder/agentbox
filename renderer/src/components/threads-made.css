@@ -1,23 +1,13 @@
 /* THE THREADS A THREAD MADE (./ThreadsMade.tsx, w-2e8aa16f0f). A bordered list,
    square, one 1px line between rows; the title in the reading face and the state
    in the app's mono capitals, quieter once it is done. */
-.made { margin: 22px 0 6px; --made-ease: cubic-bezier(.2, .7, .2, 1); }
+.made { margin: 22px 0 6px; }
 /* INSIDE THE CONVERSATION it is part of the turn above it rather than a section
    under the whole thread (w-2e13752a85), so it sits close to the words that
    came back with it and the thread's own 22px column sets the gap below. */
 .thread-block .made { margin: 12px 0 0; }
 .made-label { display: flex; align-items: center; margin-bottom: 8px; padding-right: 11px; font: 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 .made-list { border: 1px solid var(--line); border-radius: var(--radius); }
-
-/* NOTHING SNAPS (w-fcb5fdc2e5): "Everything immediately shades, which is not
-   the best UX. You typically want those little transitions." Every colour a
-   cursor changes here fades. */
-.made-row, .made-open, .made-title, .made-state, .made-acts button {
-  transition: background-color .18s var(--made-ease), color .18s var(--made-ease);
-}
-@media (prefers-reduced-motion: reduce) {
-  .made-row, .made-open, .made-title, .made-state, .made-acts button { transition: none; }
-}
 
 /* The row. Its right-hand padding is all that stands between the state word
    and the list's edge. 10px rather than the 14 it opened with: "should be

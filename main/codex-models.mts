@@ -169,6 +169,17 @@ export function codexModelsAcross(homes: string[], { read = readJson }: { read?:
   return lists.flat().filter((m) => !seen.has(m.id) && seen.add(m.id));
 }
 
+const SMALL = /\b(fast|small|affordable|cost-efficient|lightweight)\b|-mini\b/i;
+
+/**
+ * The model a small call (naming, routing) runs on with Codex: the newest one
+ * this login lists as fast or small. Codex has no alias like Claude Code's
+ * `haiku`, so the list's own descriptions say which. Null lets Codex choose.
+ */
+export function codexSmallModel({ home = codexHome(), read = readJson }: { home?: string; read?: ReadJson } = {}): string | null {
+  return codexModels({ home, read }).find((m) => SMALL.test(m.description) || SMALL.test(m.id))?.id ?? null;
+}
+
 /**
  * Every slug in the cache, hidden ones included: what Codex would accept if it
  * were handed the word, which is a different question from what she may pick.

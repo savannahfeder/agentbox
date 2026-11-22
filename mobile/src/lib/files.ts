@@ -75,6 +75,12 @@ export function linkToShare(o: Opening): string | null {
   return o.link;
 }
 
+/** The viewer's title: the name the message showed, since a sent file's address is a hash of what is in it. */
+export function fileTitleOf(src: string, name?: string | null): string {
+  const said = String(name ?? '').trim();
+  return said && !said.includes('/') ? said : (src.split('/').pop() ?? src);
+}
+
 /** A picture's link: undefined while it is on its way, null when the phone will not have it. */
 export function pictureLink(places: Places, links: Links, product: string, src: string): string | null | undefined {
   const at = fileOnPhone(places, links, product, src);

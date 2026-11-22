@@ -24,7 +24,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const css = read('renderer/src/styles.css');
 const app = read('renderer/src/App.tsx');
-const px = (rule, prop) => Number(rule.match(new RegExp(`${prop}:\\s*(\\d+)px`))?.[1] ?? NaN);
+// The card's width is a variable that only narrows it, so its fallback is the widest it gets.
+const px = (rule, prop) => Number(rule.match(new RegExp(`${prop}:\\s*(?:var\\([^,]+,\\s*)?(\\d+)px`))?.[1] ?? NaN);
 
 describe('the toast while an approval is waiting', () => {
   const rule = css.match(/\n\.app\.asking \.toast \{[^}]*\}/)?.[0] ?? '';

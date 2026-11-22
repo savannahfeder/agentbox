@@ -2,7 +2,7 @@
 // window reads (`TeamView`). Built once per snapshot in App and handed down
 // through `TeamContext`, so no component has to know where the team came from.
 // The pure rules (names, due days, who a row is from) are in ./company.ts.
-import { createContext, type CSSProperties, type ReactNode } from 'react';
+import { createContext, useContext, type CSSProperties, type ReactNode } from 'react';
 import type { Person, Product, TeamState, WorkItem } from '../types';
 import { isShared } from '../../../shared/team-rules.mts';
 import { visibilityOf } from '../../../shared/thread-cards.mts';
@@ -37,6 +37,14 @@ export function teamView(state: TeamState | null | undefined, products: Product[
   };
 }
 
+/** A first name alone ("Theo") gives the teammate's full name, so a face reads the same wherever a caller only had the first. */
+export function fullName(name: string | undefined, team: Pick<TeamView, 'byId'> | null): string | undefined {
+  const said = name?.trim();
+  if (!said || /\s/.test(said) || !team) return name;
+  const hits = [...team.byId.values()].filter((p) => (p.name ?? '').trim().split(/\s+/)[0] === said);
+  return hits.length === 1 ? hits[0].name ?? name : name;
+}
+
 /** Letter size for a face `px` wide: big enough to read at 16, never shouting at 72. */
 const lettersAt = (px: number) => Math.round(Math.min(px * 0.45, 6 + px * 0.2) * 2) / 2;
 
@@ -58,7 +66,8 @@ export function Face({ person, name, url, me, agent, size, children }: {
     : undefined;
   const photo = url ?? person?.avatarUrl;
   if (photo && !agent) return <img className={`${cls} tm-ph`} src={photo} style={box} alt="" referrerPolicy="no-referrer" />;
-  const letters = name !== undefined ? initialsOf(name) : firstName(person).slice(0, 2);
+  const team = useContext(TeamContext);
+  const letters = initialsOf(fullName(name, team) ?? (person?.name || person?.email || 'Someone'));
   return <span className={cls} style={box} aria-hidden="true">{children ?? letters}</span>;
 }
 

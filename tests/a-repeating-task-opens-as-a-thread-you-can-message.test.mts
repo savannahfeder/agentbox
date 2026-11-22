@@ -11,17 +11,9 @@
 // to that one sentence with an empty body, in one Save.
 //
 // So a repeating task now opens as its latest run, an ordinary thread: the
-// Reply box messages that run's agent like any other. The instruction is one
-// more line in that thread's summary, under a heading that says what it is,
-// and the schedule is one more property with Stop repeating in its menu.
-// `runToOpen` picks the run; the summary is drawn with react-dom/server so
-// these are the real components.
+// Reply box messages that run's agent like any other. `runToOpen` picks the run.
 import { describe, it, expect } from 'vitest';
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { runToOpen } from '../shared/repeats.mts';
-import { SummaryPanel } from '../renderer/src/threads/Summary.tsx';
-globalThis.React = React;
 
 const H = 3_600_000;
 const NOW = Date.UTC(2026, 9, 13, 17, 0);
@@ -65,40 +57,5 @@ describe('which run a repeating task opens on', () => {
 
   it('has nothing to open before the first run', () => {
     expect(runToOpen(rule({ lastOccurrence: undefined, served: '' }), [])).toBeNull();
-  });
-});
-
-const draw = (el) => renderToStaticMarkup(el);
-const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, '\'').replace(/\s+/g, ' ').trim();
-const thread = run('r-aaaa-20261013', 1, { problem: 'Signups were flat.' });
-
-describe('the run\'s summary carries the instruction and the schedule', () => {
-  const html = draw(React.createElement(SummaryPanel, {
-    item: thread, team: null, onFinish: null,
-    repeat: { rule: rule(), onSave: async () => true, onEnd: () => {} },
-  }));
-
-  it('draws what every run is told, under a heading that says so', () => {
-    expect(text(html)).toContain('Every run is told');
-    expect(text(html)).toContain('Daily signups report');
-    expect(text(html)).toContain('Count yesterday\'s signups and say what moved.');
-  });
-
-  // In the words the Later list's chip already uses (List.tsx repeatTag).
-  it('draws the schedule as a property you can open', () => {
-    expect(text(html)).toMatch(/Repeats\s+Every day at 10am/);
-    expect(html).toContain('title="Stop it repeating"');
-  });
-
-  it('keeps the thread\'s own lines and properties as they were', () => {
-    expect(text(html)).toContain('Context');
-    expect(text(html)).toContain('Signups were flat.');
-    expect(text(html)).toContain('Project');
-  });
-
-  it('adds nothing to a thread that is not a run of a repeating task', () => {
-    const plain = text(draw(React.createElement(SummaryPanel, { item: thread, team: null, onFinish: null })));
-    expect(plain).not.toContain('Every run is told');
-    expect(plain).not.toContain('Repeats');
   });
 });

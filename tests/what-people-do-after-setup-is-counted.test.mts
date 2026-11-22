@@ -99,7 +99,7 @@ describe('the corner tag', () => {
     expect(cornerTagTurnedOff({})).toBe(false);
     const ipc = read('main/ipc.mts');
     const at = ipc.indexOf("ipcMain.handle('zero:settings-set-workspace',");
-    expect(ipc.slice(at, at + 500)).toMatch(/if \(cornerTagTurnedOff\(payload\)\) analytics\.track\('tag_turned_off'\)/);
+    expect(ipc.slice(at, at + 700)).toMatch(/if \(cornerTagTurnedOff\(payload\)\) analytics\.track\('tag_turned_off'\)/);
     expect(read('main/main.mts')).toMatch(/createCornerTag\(\{[\s\S]{0,300}count: \(name, props\) => analytics\.track\(name, props\)/);
   });
 });

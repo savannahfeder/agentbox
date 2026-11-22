@@ -16,10 +16,10 @@ import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mts';
 import { answerFor, describeFor } from './first-run.mts';
 import { checkProjectFolder } from '../shared/project-folder-check.mts';
 import { SAME_PROJECT, carriedLines, leftByAMove, movedAway, movedHere, ranHere, splitForCompose, whatMoves, whyItCannotMove, type CarriedLine } from '../shared/move-thread.mts';
-import { agentSpokeSince, answerTs } from '../shared/answers.mts';
+import { agentSpokeSince, answerTs, laterHerWordLifts } from '../shared/answers.mts';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import {
-  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
+  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_CONTEXT, PRACTICE_DONE, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
   PRACTICE_REPLY_ANSWER, PRACTICE_TASK_TRACE,
 } from '../shared/first-run-practice.mts';
 import { NOTE_NAME } from './rail-note.mts';
@@ -35,7 +35,7 @@ import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mts';
-import { buildClaimLine, buildReleaseLine, GIVEN_TASK } from '../shared/work-items.mts';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mts';
 import { notShipped } from '../shared/not-shipped.mts';
@@ -45,6 +45,7 @@ import { machineryPath, removeMachinery } from './store/home.mts';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
 import { hopOf, HOP_LABEL_PREFIX } from '../shared/teammates.mts';
+import { writesToReopen, type WasBeforeClose } from '../shared/reopen-as-it-was.mts';
 import {
   answerMode as readAnswerMode, answerModes, clearAnswerMode as clearAnswerModeFile, setAnswerMode,
   touchAnswerMode as touchAnswerModeFile,
@@ -62,6 +63,11 @@ const ROW_ID = /^(w-[0-9a-f]{6,}|r-[0-9a-f]{6,}-\d{8})$/;
 // a thousand times reads the disk once, short enough that nothing a person can
 // do lands inside it.
 const PRODUCTS_KEPT_NS = 1_000_000n;
+// While the store's watchers are up, any project folder made, removed or
+// renamed and any project.json written clears the kept list, so the stamps only
+// have to catch what they cannot see: a code folder gaining its first file and
+// an archived project's project.json, which is not watched.
+const PRODUCTS_WATCHED_KEPT_NS = 5_000_000_000n;
 const stampable = (file: string): fs.Stats | null => { try { return fs.statSync(file); } catch { return null; } };
 const markOf = (st: fs.Stats | null): string => (st ? `${st.mtimeMs}:${st.size}` : 'gone');
 export interface StoreConfig {
@@ -119,6 +125,8 @@ export interface AnswerInput {
 
 export interface ComposeInput {
   id?: string | null;
+  /** On a task to a person: help or a review asked on the giver's thread. */
+  ask?: Record<string, unknown>;
   title?: string;
   body?: string;
   kind?: string;
@@ -187,6 +195,7 @@ interface ProductsRead {
   repos: string[];
   stamp?: string;
   writes?: number;
+  seen?: number;
   at?: bigint;
 }
 
@@ -203,6 +212,8 @@ export class Store {
   declare onChange: (() => void) | null;
   declare _debounce: NodeJS.Timeout | null;
   declare _products: ProductsRead | null;
+  declare _projectsWatched: boolean;
+  declare _projectEvents: number;
 
   constructor(config: StoreConfig) {
     this.config = config;
@@ -212,6 +223,8 @@ export class Store {
     this.onChange = null; // set by ipc layer; called on any store file change
     this._debounce = null;
     this._products = null; // the kept project list (_productsNow)
+    this._projectsWatched = false;
+    this._projectEvents = 0;
   }
 
   async init() {
@@ -269,11 +282,17 @@ export class Store {
    *  is another process making a project folder, and the app waits 150 ms on
    *  its watcher before it redraws on one of those anyway.
    *
+   *  While the store watches its folders the millisecond becomes five seconds,
+   *  and what the watchers see forgets the list instead: a stamp of 48
+   *  projects is about 140 stats, and taken every millisecond it was the
+   *  app's biggest share of the holds on a swapping Mac on 2026-11-12.
+   *
    *  The clock is hrtime, not Date.now: a test with a fake clock would
    *  otherwise hold the window open for its whole run. */
   _productsNow(): ProductsRead {
-    const kept = this._products?.writes === projectWrites() ? this._products : null;
-    if (kept && process.hrtime.bigint() - kept.at! < PRODUCTS_KEPT_NS) return kept;
+    const kept = this._products?.writes === projectWrites() && this._products.seen === this._projectEvents ? this._products : null;
+    const keep = this._projectsWatched ? PRODUCTS_WATCHED_KEPT_NS : PRODUCTS_KEPT_NS;
+    if (kept && process.hrtime.bigint() - kept.at! < keep) return kept;
     const stamped = this._stampProducts(kept?.repos ?? []);
     if (!stamped) return { live: [], all: [], repos: [] }; // the account root is unreadable
     if (kept && stamped.stamp === kept.stamp) {
@@ -375,7 +394,7 @@ export class Store {
       if (!project.archived) live.push({ slug, ...rest });
     }
     const byName = (a: ProductRow, b: ProductRow) => a.name.localeCompare(b.name);
-    return { live: live.sort(byName), all: all.sort(byName), repos, stamp, writes: projectWrites(), at: process.hrtime.bigint() };
+    return { live: live.sort(byName), all: all.sort(byName), repos, stamp, writes: projectWrites(), seen: this._projectEvents, at: process.hrtime.bigint() };
   }
 
   /** ARCHIVE A PROJECT, OR BRING ONE BACK. One flag in its project.json and
@@ -588,6 +607,13 @@ export class Store {
     if (engine !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { engine: engine ?? '' }, { source: 'founder' });
     if (model !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { model: model ?? '' }, { source: 'founder' });
     if (effort !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { effort: effort ?? '' }, { source: 'founder' });
+    // Her word ends the Later she set, so a run finishing cannot bring it back.
+    // Written before the answer so a reply set for later can set its own time after.
+    if (answer && answer !== '(withdrawn)') {
+      const lifts = laterHerWordLifts(workItemsDisk.readWorkItem(dir, id));
+      if (lifts.runAt) item = workItemsDisk.updateWorkItem(dir, id, { runAt: 0 }, { source: 'founder' });
+      if (lifts.snoozedUntil) item = workItemsDisk.updateWorkItem(dir, id, { snoozedUntil: 0 }, { source: 'founder' });
+    }
     if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}), ...(voice ? { voice } : {}), ...(forAgent ? { forAgent } : {}), ...(fromNotes?.length ? { fromNotes } : {}), ...(fromNotes?.length && typed ? { typed } : {}) }, { source: 'founder' });
     // A REPLY ON A RUN THAT FINISHED QUIETLY MAKES IT NEWS AGAIN (w-5e3f2e047f).
     // A quiet run is kept out of her inbox, and a repeating task now opens on
@@ -599,8 +625,9 @@ export class Store {
     }
     // The pane may still show a running row after Stop or a provider result.
     // Resolve omitted reply status against the ledger that was just written.
+    // Except an ask handed back (shared/thread-asks.mts): a thank-you there is a message, not more work.
     if (status == null && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)'
-      && (item?.status === 'blocked' || item?.status === 'done')) status = 'open';
+      && (item?.status === 'blocked' || item?.status === 'done') && !(item?.ask && item?.verdict)) status = 'open';
     // WHAT THE ANSWER ITSELF MAY DO does not go on the ledger. It is a grant,
     // the ledger is an append-only file every worker writes, and every line on
     // it names its own author with nothing checking the name. It goes in the
@@ -614,6 +641,14 @@ export class Store {
     if (priority != null) item = workItemsDisk.updateWorkItem(dir, id, { priority }, { source: 'founder' });
     if (status) item = workItemsDisk.updateWorkItem(dir, id, { status }, { source: 'founder' });
     if (typeof putAway === 'boolean') item = workItemsDisk.updateWorkItem(dir, id, { putAway }, { source: 'founder' });
+    return item;
+  }
+
+  /** Z on a close: the status the row had before it (shared/reopen-as-it-was.mts). */
+  reopenAsItWas(slug: string, id: string, was: WasBeforeClose | null | undefined) {
+    const dir = this.productDir(slug);
+    let item: StoreItem | null = null;
+    for (const { status, source } of writesToReopen(was)) item = this.modules.workItemsDisk.updateWorkItem(dir, id, { status }, { source });
     return item;
   }
 
@@ -679,12 +714,16 @@ export class Store {
   }
 
   // The person's answer, or the app's when it caught the browser coming back, to the sign-in a thread is open on.
-  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
+  answerSignIn(slug: string, id: string, answer: { id: unknown; said: unknown; url?: unknown; code?: unknown }, { source = 'founder', now = Date.now() }: { source?: 'founder' | 'system'; now?: number } = {}) {
     const item = this.readItem(slug, id);
     const ask = openSignIn(item);
     if (!ask || ask.id !== answer.id) throw new Error('That sign-in is no longer open.');
     const clean = cleanSignInAnswer({ ...answer, at: now });
-    if (!clean) throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.' : 'That answer is not one the agent can take.');
+    if (!clean) {
+      throw new Error(answer.said === 'landed' ? 'That is not a web address. Paste the whole address from the browser.'
+        : answer.said === 'code' ? 'Paste the code first.'
+        : 'That answer is not one the agent can take.');
+    }
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signInAnswer: clean }, { source, now });
   }
 
@@ -701,6 +740,11 @@ export class Store {
 
   releaseRunClaim(slug: string, id: string, run?: Parameters<StoreModules['workItemsDisk']['releaseRunClaim']>[2]) {
     return this.modules.workItemsDisk.releaseRunClaim(this.productDir(slug), id, run);
+  }
+
+  /** Who is signed in on this computer, or null: whose words a new line is. */
+  author(): string | null {
+    return this.modules.workItemsDisk.currentAuthor();
   }
 
   // THE WRITTEN NAME THE LIST DRAWS. Written by the app rather than by a
@@ -856,7 +900,7 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
-  composeItem(slug: string, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent }: ComposeInput) {
+  composeItem(slug: string, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent, ask }: ComposeInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -871,6 +915,8 @@ export class Store {
     if (allLabels.includes(GIVEN_TASK) && (visibility === 'team' || (visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length))) {
       Object.assign(first, { visibility, ...(visibility === 'people' ? { visibleTo: [...new Set((visibleTo ?? []).map(String))] } : {}) });
     }
+    // So is what the task asks on the giver's thread (shared/thread-asks.mts).
+    if (allLabels.includes(GIVEN_TASK) && ask) Object.assign(first, { ask });
     // A thread the cloud started from the phone keeps the id it ran under there.
     const created = id
       ? workItemsDisk.createWorkItemIfAbsent(dir, id, first, { source: 'system' }).item
@@ -950,7 +996,7 @@ export class Store {
     const to = this.listProducts().find((p) => p.slug === toSlug);
     if (!to) throw new Error(`no such project: ${toSlug}`);
     const item = this.readItem(fromSlug, id);
-    const why = whyItCannotMove(item, { live: false });
+    const why = whyItCannotMove(item);
     if (why) throw new Error(why);
 
     // Where it came from, in the thread rather than only in a toast, because a
@@ -1112,13 +1158,18 @@ export class Store {
   // (main/team/link-comments.mts). Said as a note; a closed thread comes back
   // to wait on her as `closedBeforeItShipped` brings one, and a thread still
   // going is left going.
-  commentOnASharedFile(slug: string, id: string, note: string, linkComment: { name: string; file: string; text: string } | null = null) {
+  commentOnASharedFile(slug: string, id: string, note: string, linkComment: LinkComment | null = null) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const item = workItemsDisk.updateWorkItem(dir, id, { note, ...(linkComment ? { linkComment } : {}) }, { source: 'system' });
     if (item?.status !== 'done') return item;
     workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: 'founder' });
     return workItemsDisk.updateWorkItem(dir, id, { status: 'blocked' }, { source: 'system' });
+  }
+
+  repliedOnALink(slug: string, id: string, linkReply: { file: string; text: string }) {
+    if (!this.readItem(slug, id)) return null;
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { linkReply }, { source: 'founder' });
   }
 
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN, because laying it into the
@@ -1248,6 +1299,7 @@ export class Store {
       name: PRACTICE_NAME,
       createdAt: new Date().toISOString(),
       [PRACTICE_FLAG]: true,
+      seenBy: 'private',
     }, null, 2));
     // AND THE SIDEBAR NOTE IS WRITTEN WITH IT.
     //
@@ -1519,7 +1571,7 @@ export class Store {
    *  It is best effort: a practice project whose sessions folder will not take a
    *  file is not a reason to fail the beat that stages the rows. The thread
    *  simply draws the ledger, which is what it did before this existed. */
-  writePracticeTrace(slug: string, id: string, lines: unknown, startedAt: number) {
+  writePracticeTrace(slug: string, id: string, lines: unknown, startedAt: number, everyMs = 9_000) {
     if (!Array.isArray(lines) || !lines.length) return null;
     try {
       const dir = this.machineryFile(slug, path.join('sessions', id));
@@ -1535,7 +1587,7 @@ export class Store {
       // A few seconds apart, in order, so the run reads as a run. Nine seconds
       // is the measured pace of a real one (renderer/src/components/ItemThread.tsx).
       const text = lines
-        .map((line, i) => `${clockAt(began + i * 9_000)}  ${line}`)
+        .map((line, i) => `${clockAt(began + i * everyMs)}  ${line}`)
         .join('\n');
       const file = path.join(dir, `${began}.log`);
       fs.writeFileSync(file, `${text}\n`);
@@ -1558,7 +1610,7 @@ export class Store {
   // was for. Only when a line was really found: the sentence that says a folder
   // has no readme in it is a true answer and it is not a description, so it is
   // never written under the project's name.
-  finishFirstRunTask(slug: string, id: string, round = 0) {
+  finishFirstRunTask(slug: string, id: string, round = 0, { asked }: { asked?: number } = {}) {
     const { workItemsDisk } = this.modules;
     const product = this.listProducts().find((p) => p.slug === slug) ?? null;
     // A REPLY TO IT IS ANSWERED HERE TOO (2026-10-06). The first answer offers
@@ -1584,16 +1636,16 @@ export class Store {
     // earn.
     if (product?.practice) {
       const item = workItemsDisk.updateWorkItem(
-        this.productDir(slug), id, { result: PRACTICE_ANSWER }, { source: 'agent' },
+        this.productDir(slug), id, { result: PRACTICE_ANSWER, problem: PRACTICE_CONTEXT, progress: PRACTICE_DONE }, { source: 'agent' },
       );
-      // AND THE RUN IT DID, so beat eleven opens onto a conversation. What she
-      // opened on 2026-08-24 was the words "Nothing has been said here yet."
-      // under the title of the first task anybody sends in Agentbox: the row had
-      // a result and no thread at all. Backdated a few seconds so the run reads
-      // as having happened before the answer rather than after it.
-      this.writePracticeTrace(
-        slug, id, PRACTICE_TASK_TRACE, Date.now() - PRACTICE_TASK_TRACE.length * 9_000,
-      );
+      // AND THE RUN IT DID, so the thread opens onto a conversation rather than
+      // a result with nothing before it. Dated between the ask and the answer,
+      // a second apart: dated back from the answer it stood above the ask.
+      const now = Date.now();
+      const from = Math.min(Math.floor((asked ?? item?.createdAt ?? now) / 1000) * 1000 + 1_000, Math.floor(now / 1000) * 1000);
+      // With no room for a second between steps, they share one: still in order, never after the answer.
+      const every = now - from >= (PRACTICE_TASK_TRACE.length - 1) * 1_000 ? 1_000 : 0;
+      this.writePracticeTrace(slug, id, PRACTICE_TASK_TRACE, from, every);
       return { item, line: PRACTICE_ANSWER, oneLiner: null };
     }
     const folder = product?.repoPath ?? null;
@@ -1999,9 +2051,12 @@ export class Store {
         this.watchers.push(watcher);
       } catch {}
     }
+    let watchedAll = true;
     for (const dir of dirs) {
+      const isRoot = dir === this.config.accountRoot;
       try {
         const watcher = fs.watch(dir, (event, file) => {
+          if (isRoot || !file || file === 'project.json') this._projectEvents += 1;
           if (file && !/work-items\.jsonl|dashboard\.jsonl|project\.json/.test(file)) return;
           this._notify();
         });
@@ -2009,12 +2064,14 @@ export class Store {
         // EMFILE). An unhandled error takes down the app, outside this catch.
         // Reads still work without a watcher; release only the failed one.
         watcher.on('error', () => {
+          this._projectsWatched = false;
           try { watcher.close(); } catch {}
           this.watchers = this.watchers.filter((w) => w !== watcher);
         });
         this.watchers.push(watcher);
-      } catch {}
+      } catch { watchedAll = false; }
     }
+    this._projectsWatched = watchedAll;
   }
 
   _notify() {
@@ -2023,6 +2080,7 @@ export class Store {
   }
 
   unwatch() {
+    this._projectsWatched = false;
     for (const w of this.watchers) try { w.close(); } catch {}
     this.watchers = [];
   }

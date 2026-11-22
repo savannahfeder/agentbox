@@ -12,6 +12,8 @@
     "eas-build-post-install": "node scripts/check-prebuilt-frameworks.mjs"
   },
   "dependencies": {
+    "@dicebear/core": "9.4.2",
+    "@dicebear/notionists": "9.4.2",
     "@expo-google-fonts/geist": "^0.4.2",
     "@expo-google-fonts/geist-mono": "^0.4.3",
     "@expo/metro-runtime": "~58.0.14",
@@ -37,6 +39,7 @@
     "mdast-util-from-markdown": "^2.1.0",
     "mdast-util-gfm": "^3.1.0",
     "micromark-extension-gfm": "^3.0.0",
+    "obscenity": "0.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",

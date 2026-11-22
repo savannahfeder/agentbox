@@ -9,8 +9,10 @@
 // refused to move her stuck agents: 12 of 15 threads sat on a personal login at
 // its session limit while her work plan had room.
 //
-// What stays true: work runs on ONE account at a time, the one she picks, and
-// nothing moves work on its own. What this guards is the other half. Picking
+// What stays true: work runs on ONE account at a time. Since 2026-11-10 the app
+// also makes the switch itself when that account is at its limit and another
+// has room (an-account-at-its-limit-hands-the-work-to-your-other-one). What
+// this guards is the person's own pick. Picking
 // her other plan while the first is capped takes effect at once, the capped
 // login's chats are let go to the account she picked, and no file in the app
 // says the pick is not allowed.
@@ -63,7 +65,7 @@ describe('picking your other plan while one is at its limit', () => {
   });
 
   // THE CASE THAT MUST NOT MATCH: with no pick, a capped login that IS the
-  // account in use keeps its threads. Nothing moves work by itself.
+  // account in use keeps its threads; only the tick's switch moves them.
   it('does not move anything when you have not picked another plan', () => {
     const s = bare({ activeAccount: { claude: PERSONAL } });
     ranOut(s, PERSONAL);

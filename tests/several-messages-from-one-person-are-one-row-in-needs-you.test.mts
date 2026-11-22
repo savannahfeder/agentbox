@@ -54,7 +54,7 @@ describe('mention rows', () => {
 describe('a mention row', () => {
   it('shows the newest words and who wrote them, not a count', () => {
     const html = draw(mentionRows([said(3), said(2), said(1)]));
-    expect(html).toContain('<b class="th-msg-who">Maya C.</b><span class="th-msg-text">message 3</span>');
+    expect(html).toMatch(/<\/span>message 3<span class="th-who-name">Maya C\.<\/span>/);
     expect(html).not.toContain('sent you');
   });
 });

@@ -1,8 +1,7 @@
 // THE ONBOARDING, FROM ⌘K, ON AN INSTALL THAT IS ALREADY SET UP.
 //
-// `?firstrun=1` has always walked it a second time, and a downloaded app has no
-// address bar, so until this landed the only way back to the welcome screen was
-// to throw the install away. Two things are pinned here, and the second one
+// A downloaded app has no address bar, so until this landed the only way back
+// to the welcome screen was to throw the install away. Two things are pinned here, and the second one
 // matters more than the first: the row exists and can be found by the words she
 // would type, and it DELETES NOTHING. The walk keeps two keys in localStorage
 // and this forgets both of them; her store, her projects and her settings are
@@ -15,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NAME } from '../shared/product-name.mjs';
 import {
-  DONE_KEY, KEY, START, finishFirstRun, firstRunDone, readFirstRun, restartFirstRun, saveFirstRun,
+  DONE_KEY, KEY, finishFirstRun, firstRunDone, restartFirstRun,
 } from '../renderer/src/onboarding.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -34,15 +33,14 @@ const store = (seed = {}) => {
 };
 
 describe('walking the onboarding again', () => {
-  it('forgets that it was ever finished, and where it got to', () => {
-    const s = store();
-    saveFirstRun(s, { ...START, step: 'command', name: 'Zero' });
+  it('forgets that it was ever finished', () => {
+    const s = store({ [KEY]: '{"step":"done"}' });
     finishFirstRun(s);
     expect(firstRunDone(s)).toBe(true);
 
     restartFirstRun(s);
     expect(firstRunDone(s)).toBe(false);
-    expect(readFirstRun(s)).toEqual(START);
+    expect(s.map.has(KEY)).toBe(false);
   });
 
   it('touches nothing else in the store', () => {
@@ -80,7 +78,8 @@ describe('walking the onboarding again', () => {
     expect(app).toContain('onFirstRun={walkAgain}');
     const fn = app.slice(app.indexOf('const walkAgain = useCallback'), app.indexOf('\n  }, [', app.indexOf('const walkAgain = useCallback')));
     expect(fn).toContain('restartFirstRun(localStorage)');
-    expect(fn).toContain('setRun({ ...RUN_START })');
+    // The setup a new install meets since w-fbe5e95dea (tests/setting-up-again-is-the-setup-a-new-install-meets).
+    expect(fn).toContain('noteOnboarding(); setFresh(true);');
     // Nothing in it may reach the store or the main process.
     expect(fn).not.toMatch(/api\./);
     expect(fn).not.toMatch(/localStorage\.clear/);

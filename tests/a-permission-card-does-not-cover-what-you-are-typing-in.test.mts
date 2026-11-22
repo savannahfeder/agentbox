@@ -5,7 +5,7 @@
 // "Company", the project, not the thread that was asking.
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { cardLift, CARD_FOOT } from '../renderer/src/room-for-the-card.ts';
+import { cardPlace, CARD_FOOT, SIDE_GAP } from '../renderer/src/room-for-the-card.ts';
 import { approvalReads, approvalAsker, approvalShown } from '../renderer/src/approval-card.ts';
 
 const card = { left: 978, right: 1418, height: 233 };
@@ -13,31 +13,31 @@ const VIEW = 900;
 
 describe('where the card stands', () => {
   it('stands above a Reply box it would have covered', () => {
-    expect(cardLift(card, [{ left: 280, right: 1165, top: 811, bottom: 854 }], VIEW)).toBe(VIEW - 811 + 8);
+    expect(cardPlace(card, [{ left: 280, right: 1165, top: 811, bottom: 854 }], VIEW).lift).toBe(VIEW - 811 + 8);
   });
 
   it('stands in its corner with nothing to type in', () => {
-    expect(cardLift(card, [], VIEW)).toBe(CARD_FOOT);
+    expect(cardPlace(card, [], VIEW).lift).toBe(CARD_FOOT);
   });
 
   it('stays in its corner when the box ends one pixel left of it', () => {
-    expect(cardLift(card, [{ left: 280, right: 978, top: 811, bottom: 854 }], VIEW)).toBe(CARD_FOOT);
+    expect(cardPlace(card, [{ left: 280, right: 978, top: 811, bottom: 854 }], VIEW).lift).toBe(CARD_FOOT);
   });
 
-  it('moves when the box reaches one pixel under it', () => {
-    expect(cardLift(card, [{ left: 280, right: 979, top: 811, bottom: 854 }], VIEW)).toBe(97);
+  it('narrows rather than moves when the box reaches one pixel under it', () => {
+    expect(cardPlace(card, [{ left: 280, right: 979, top: 811, bottom: 854 }], VIEW)).toEqual({ lift: CARD_FOOT, width: 1418 - 979 - SIDE_GAP });
   });
 
   it('stays in its corner when the box is wholly above it', () => {
-    expect(cardLift(card, [{ left: 280, right: 1165, top: 100, bottom: 140 }], VIEW)).toBe(CARD_FOOT);
+    expect(cardPlace(card, [{ left: 280, right: 1165, top: 100, bottom: 140 }], VIEW).lift).toBe(CARD_FOOT);
   });
 
   it('never climbs off the top of the window', () => {
-    expect(cardLift({ ...card, height: 800 }, [{ left: 280, right: 1165, top: 300, bottom: 854 }], VIEW)).toBe(VIEW - 800 - 8);
+    expect(cardPlace({ ...card, height: 800 }, [{ left: 280, right: 1165, top: 300, bottom: 854 }], VIEW).lift).toBe(VIEW - 800 - 8);
   });
 
   it('ignores a box with no size, which is not on screen', () => {
-    expect(cardLift(card, [{ left: 0, right: 0, top: 0, bottom: 0 }], VIEW)).toBe(CARD_FOOT);
+    expect(cardPlace(card, [{ left: 0, right: 0, top: 0, bottom: 0 }], VIEW).lift).toBe(CARD_FOOT);
   });
 });
 

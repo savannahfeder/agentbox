@@ -27,15 +27,17 @@ const pictureOf = (s: Shot) => {
 /**
  * The pictures stepped through from the one at `at`: those in its own part of
  * the thread, in reading order, each picture once at the newest version drawn,
- * with the clicked one open.
+ * with the clicked one open. `drawn` is every path that part drew, versions too.
  */
-export function picturesBeside(shots: Shot[], at: number): { pictures: Picture[]; start: number } {
+export function picturesBeside(shots: Shot[], at: number): { pictures: Picture[]; start: number; drawn: string[] } {
   const here = shots[at];
-  if (!here) return { pictures: [], start: 0 };
+  if (!here) return { pictures: [], start: 0, drawn: [] };
   const place = new Map<string, number>();
   const pictures: Picture[] = [];
+  const drawn: string[] = [];
   for (const s of shots) {
     if (s.section !== here.section) continue;
+    if (!drawn.includes(s.path)) drawn.push(s.path);
     const key = pictureOf(s);
     const was = place.get(key);
     const pick = { path: s.path, url: s.url };
@@ -44,7 +46,7 @@ export function picturesBeside(shots: Shot[], at: number): { pictures: Picture[]
     const later = fileOf(s) !== kept;
     if (key === pictureOf(here) ? later && fileOf(s) === fileOf(here) : later) pictures[was] = pick;
   }
-  return { pictures, start: place.get(pictureOf(here)) ?? 0 };
+  return { pictures, start: place.get(pictureOf(here)) ?? 0, drawn };
 }
 
 /** The pictures to read ahead of a step: the next one first, then the one before. */

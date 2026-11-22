@@ -58,9 +58,10 @@ describe('the app', () => {
   // is asked once, there, for the same reason keys.ts exists.
   it('asks the rule whether a task was open, in the one place that advances', () => {
     expect(app).toMatch(/import \{ advanceAfter, [^}]*nextAfterAdvance[^}]*\} from '\.\/advance'/);
-    expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: !!focused, index, id: item\.id \}\)/);
+    // An ask's page counts as a task open: the task is shown as its teammate's thread.
+    expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: \(!!focused \|\| isTheAskOn\(item, openCard\)\)( && !isTourPractice\(tourRef\.current, item\))?, index, id: item\.id \}\)/);
     // And the answer has to be able to change when she opens or leaves a task,
     // or narrows the inbox (the filtered inbox, w-27759abd33).
-    expect(app).toMatch(/const noteAdvance = useCallback\([\s\S]*?\}, \[shownInbox, focused\]\);/);
+    expect(app).toMatch(/const noteAdvance = useCallback\([\s\S]*?\}, \[shownInbox, focused, openCard\]\);/);
   });
 });

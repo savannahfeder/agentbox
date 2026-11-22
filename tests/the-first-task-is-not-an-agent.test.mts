@@ -25,7 +25,7 @@ import {
 import { answerFor, countFolder, describeFor, readDescription, readReadme } from '../main/first-run.mts';
 import { howLongAgo, mainLanguage, projectSentence } from '../shared/first-run-shape.mts';
 import { Supervisor } from '../main/supervisor.mts';
-import { ANSWER_AFTER_MS, FIRST_RUN_LABEL, coach, walkRows } from '../renderer/src/onboarding.ts';
+import { ANSWER_AFTER_MS, FIRST_RUN_LABEL } from '../renderer/src/onboarding.ts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -308,42 +308,9 @@ describe('the supervisor, run for real against the walk s row', () => {
   });
 });
 
-describe('what the sentence beside the row says', () => {
-  it('names the thing that is running, in her words', () => {
-    // IT IS TWO LINES FROM ROUND FOUR ON.
-    expect(coach('working', 0)).toEqual({
-      quiet: 'Your agent is running.',
-      lead: 'It comes back in a few seconds.',
-      key: null,
-      tail: '',
-    });
-  });
-
-  it('still has something to say if the answer somehow does not land', () => {
-    expect(coach('working', 20_000).lead).toMatch(/^Still reading\./);
-    expect(coach('working', 20_000).quiet).toBe('Your agent is running.');
-  });
-
+describe('how long the practice thread works', () => {
   it('promises a few seconds, and the walk waits about two', () => {
     expect(ANSWER_AFTER_MS).toBe(2_000);
-  });
-});
-
-describe('the list while the walk is running', () => {
-  const rows = [{ id: 'w-walk' }, { id: 'w-directive' }, { id: 'w-other' }];
-  const run = (step, item) => ({ step, item, folder: null, name: '', product: 'agentbox', sentAt: null });
-
-  it('holds one row, and it is the row being pointed at', () => {
-    expect(walkRows(rows, run('working', 'w-walk'))).toEqual([{ id: 'w-walk' }]);
-  });
-
-  it('is empty before the task exists, because nothing has been introduced yet', () => {
-    expect(walkRows(rows, run('command', null))).toEqual([]);
-  });
-
-  it('gives everything back the moment the walk ends', () => {
-    expect(walkRows(rows, run('landed', 'w-walk'))).toEqual(rows);
-    expect(walkRows(rows, null)).toEqual(rows);
   });
 });
 
@@ -417,13 +384,7 @@ describe('the wiring, which is the half a pure test cannot see', () => {
   // is what lets this one task into the practice project, which every other
   // task there is refused (compose-says.ts practiceRefusal).
   it('composes the example task with the mark on it', () => {
-    // `walkCard` is the beat that opens the card and the beat that sends it,
-    // so the task, the project and the label are decided in one place. AND THE
-    // OPENING BEAT IS IN IT SINCE 2026-10-06: the card reads its words once,
-    // when it mounts, and it mounts on `make`, so leaving `make` out opened it
-    // with an empty box under "Press ⌘↵ or click Send".
-    expect(app).toMatch(/const walkCard = run\?\.step === 'make' \|\| run\?\.step === 'task';/);
-    expect(app).toMatch(/scripted=\{walkCard \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
+    expect(app).toMatch(/scripted=\{tourTask \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
     const card = src('threads', 'ThreadComposer.tsx');
     expect(card).toMatch(/\.\.\.\(scripted \? \{ labels: scripted\.labels \} : \{\}\)/);
     expect(card).toMatch(/practiceRefusal\(product, \{ scripted: !!scripted \}\)/);
@@ -431,27 +392,21 @@ describe('the wiring, which is the half a pure test cannot see', () => {
 
   it('says nothing about a queue and offers no undo on it', () => {
     const sent = app.slice(app.indexOf('onSent={async (made, how) => {'));
-    const branch = sent.slice(sent.indexOf("if (runRef.current?.step === 'task')"), sent.indexOf("if (how?.kind === 'message')"));
+    const branch = sent.slice(sent.indexOf('if (tourTask && made?.id && made.product === tourTask'), sent.indexOf("if (how?.kind === 'message')"));
+    expect(branch).toMatch(/setTour\(withPractice\(/);
     expect(branch).not.toMatch(/showToast/);
     expect(branch).not.toMatch(/noteNewTask/);
-    expect(branch).toMatch(/fire\(\{ t: 'sent'/);
   });
 
   it('writes the answer itself, after the wait', () => {
-    // `round` since 2026-10-06: a reply to it is answered the same way.
-    expect(app).toMatch(/api\.firstRunAnswer\(\{ product, id, round \}\)/);
-    expect(app).toMatch(/\}, ANSWER_AFTER_MS\);/);
+    // `round`: a reply to it is answered the same way.
+    expect(app).toMatch(/api\.firstRunAnswer\(\{ product: p\.slug, id: p\.item!, round: p\.replies \}\)/);
+    expect(app).toMatch(/\}, p\.replies \? ANSWER_AFTER_MS : PRACTICE_RUN_MS\);/);
   });
 
   it('draws the row as working while it does, since no supervisor can', () => {
     expect(app).toMatch(/const runningRows = useMemo\(/);
     expect(app).toMatch(/running=\{runningRows\}/);
-  });
-
-  it('holds the supervisor for as long as the walk is up, and lets go after', () => {
-    const hold = app.slice(app.indexOf('const walking = !!run'), app.indexOf('const walking = !!run') + 320);
-    expect(hold).toMatch(/api\.firstRunWalking\(true\)/);
-    expect(hold).toMatch(/return \(\) => \{ api\.firstRunWalking\(false\); \};/);
   });
 
   it('keeps the found line under the project name in the sidebar, and only that', () => {

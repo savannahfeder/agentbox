@@ -25,8 +25,9 @@ const ALLOWED = {
   'main/first-run.mts': [1, 'once, during the walk'],
   'main/supervisor.mts': [1, 'once per Mac, behind a flag file'],
   'main/start-hold.mts': [1, 'sysctl once before a restart brings agents back, two second deadline'],
-  'main/task-folders.mts': [2, 'when a task folder is made or put away'],
+  'main/task-folders.mts': [3, 'when a task folder is made or put away, or the one made ahead is checked, on the folder worker thread'],
   'main/worktree-include.mts': [3, 'when a task folder is made'],
+  'main/private-folder.mts': [1, 'when a task folder is made, on the folder worker thread (main/task-folders-offthread.mts)'],
   'main/harnesses/instructions-file.mts': [1, 'when a run starts'],
   'main/task-terminals.mts': [1, "when a task's terminal closes, two second deadline"],
   'main/git-change.mts': [1, 'a change card reading git; 0.8 s seen in the freeze log, next to move'],
@@ -35,7 +36,7 @@ const ALLOWED = {
   'scripts/brand-electron.mjs': [1, 'codesign, just before the app restarts itself from source'],
 };
 // Scripts the app's own process imports (main/main.mts, main/source-updater.mts).
-const IMPORTED_SCRIPTS = ['scripts/brand-electron.mjs', 'scripts/linux-launcher.mjs'];
+const IMPORTED_SCRIPTS = ['scripts/brand-electron.mjs', 'scripts/linux-launcher.mjs', 'scripts/windows-launcher.mjs'];
 
 function files(dir) {
   return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) => {

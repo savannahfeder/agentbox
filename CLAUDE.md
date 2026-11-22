@@ -11,6 +11,14 @@ starts this checkout. The Mac app, the dmg, and the Darwin paths
 stay. Read the code and git for the current state; this file only holds the
 rules that are not obvious from them.
 
+The skills, their tests and the plans (`docs/cloud`, `docs/mobile`,
+`docs/team`) are a private repository checked out at `.claude/skills`
+(`.agentbox/private.json`). Its notes are as binding as this file. A change
+there is committed and pushed in that folder, not in this repository. On a
+cloud run without it, `sh .agentbox/private-folder.sh` clones it.
+
+@.claude/skills/CLAUDE.md
+
 ## Every change lands with tests, and you run all of them
 
 - Write the test first and watch it fail, then fix.
@@ -62,6 +70,15 @@ picture of the real tray over a dark window and a light one. A bug fix in
 those files still counts as a change to the look. Never move the fingerprints in
 `tests/fixtures/the-trays-approved-look.json` without that approval. Taking
 those pictures puts windows on their screen, so ask before you do it.
+
+## THE DESIGN IS ROUNDED (2026-11-10)
+
+A button, card, tip, key cap or ring with a border has rounded corners. Square
+ones kept coming back, so the founder had to point them out by hand.
+`tests/the-design-is-rounded-and-square-boxes-only-go-down` allows none in the
+first run, the setup, the walkthrough and the sign-in page, and elsewhere the
+count may only go down. Round what you touch; never raise a number in
+`tests/fixtures/square-boxes.json`.
 
 ## NOTHING RETRIES FOR EVER, NOTHING WAITS FOR EVER, NOTHING FAILS IN SILENCE (2026-10-19)
 
@@ -120,28 +137,10 @@ nowhere else. That folder follows the public main on its own:
 Whether you ask before shipping is set by the person's own instructions, not
 by this file.
 
-## SYNTHETIC USERS, AND THE THREAD THAT SETS THE STANDARD (2026-11-01)
-
-When a change wants synthetic users before it ships, they are `power-test`,
-with the people the change is for. Team and Rooms changes get several testers
-at once on one team. The phone app's testers are `product-loop`.
-
-Synthetic users run on Codex, never Claude Code (2026-11-08): the person keeps
-a Codex plan for testing only. Both skills start every tester as `codex exec`
-on the Codex login with the best plan; never run one as a subagent
-(`tests/every-synthetic-tester-runs-on-codex`).
-
-The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
-used the multiplayer build for whole workdays, logged what broke, agents
-fixed it on the branch, and the team tested the fixes. The person only chose
-between finished screens. Run a big change the same way: real use for
-hours, real people from `power-test/people/`, fixes tested again by the same
-testers, and screenshots of the result.
-
 ## RELEASING IS ONE COMMAND: `npm run deploy` (2026-10-26)
 
 A release (the Mac app, npm, the agentbox.ac download and update feed, the
-cloud server) is `cd ~/Desktop/dev/agentbox-team && npm run deploy`, run by
+cloud server) is `npm run deploy` in the folder the app runs from, run by
 the person, because it signs with their Apple account. Hand them that line
 and nothing else. Do not write out the steps it runs: hand-written release
 steps went wrong in a dozen ways, which is why it exists. To see what it would
@@ -158,15 +157,19 @@ refuses any push that carries the old history. Carry your own commits across
 instead, then ship as usual:
 `git fetch origin && git rebase --onto refs/remotes/origin/main $(git merge-base HEAD 99b8b0e5b04fbbc976003851ebdbb7bb58c2bf89)`
 
-## NO WORKER EVER DRIVES THE USER'S OWN BROWSER
+## NO WORKER EVER DRIVES THE USER'S OWN BROWSER UNTIL THEY TURN IT ON (2026-11-11)
 
 Claude Code can attach a session to the browser a person is signed into with
-`--chrome`. That flag must never appear in anything this app spawns, because
-that browser is signed into every account its owner holds.
-`tests/no-worker-drives-her-own-browser.test.mts` fails if it ever does. A
-browser an agent may drive has to carry nothing; the app's own pane on the
-`persist:junk` partition is the only candidate. `--ide` is the user's to switch
-on, never ours.
+`--chrome`, and that browser is signed into every account its owner holds. It
+follows the person's own Claude Code: a worker gets it only when the account it
+runs on has "Claude in Chrome enabled by default" on (`/chrome`, kept as
+`claudeInChromeDefaultEnabled: true` in that account's `.claude.json`), which
+Claude Code itself ignores in a `-p` run. There is no Agentbox switch for it.
+Only `main/your-chrome.mts` may put `--chrome` on a worker's line: never in the
+cloud, and never on a run that skips permissions (that also skips Chrome's
+per-site asks).
+`tests/no-worker-drives-her-own-browser.test.mts` fails if the flag appears
+anywhere else. `--ide` is the user's to switch on, never ours.
 
 Nor does an agent start the person's Google Chrome headless: the Mac files that
 copy as their Chrome, and their own Chrome then opens no window. Every hidden

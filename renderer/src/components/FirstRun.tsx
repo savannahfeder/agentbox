@@ -14,17 +14,22 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { LAST_PRODUCT_KEY } from '../compose-project';
 import {
-  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, foundLine, installGate, listKey, previousScreen, projectsToMake, readyEngines, setupWord, runningSetup, signedOutEngines,
+  ENGINE_NAME, FIRST_RUN_STEP, chatChoices, chatsHeadline, footWord, foundLine, installGate, listKey, previousScreen, projectsToMake, knownSignedOut, offeredEngines, setupWord, runningSetup, unsureEngines,
   type Engine, type Screen,
   inHomeFolder,
 } from '../first-run';
+import { heldPress } from '../setup-split';
 import { SetupSplit } from './SetupSplit';
 import './first-run.css';
+import { WelcomeSky } from './WelcomeSky';
+import { useDarkWindow } from '../home/home-settings';
 
 type Project = { slug: string; name: string };
 
 const SEND = MAC ? ['⌘', '↵'] : ['Ctrl', '↵'];
 const LEAVE_MS = 260;
+/** How many more times an agent whose sign-in check did not answer is asked before the welcome goes on without it. */
+const ASKS_AGAIN = 3;
 const bare = (folder: string) => folder.replace(/\/+$/, '');
 
 const Key = ({ k }: { k: string }) => <span className={`ob-key${[...k].length === 1 ? ' ob-k1' : ''}`}>{k}</span>;
@@ -57,7 +62,7 @@ const said = (when: number) => {
   return /^\d/.test(a) ? `${a} ago` : a;
 };
 
-export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false, onLook, onSetup, onProject }: {
+export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false, onLook, onSetup, onProject, onLeave }: {
   snap: Snapshot | null;
   home: string;
   /** The look worn now and how to change it, for the setup's look step. */
@@ -70,8 +75,11 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   onSetup?: () => void;
   /** Called once, when the first run hands over to the inbox, with how many chats it brought in. */
   onDone: (brought: number) => void;
+  /** Set up again from ⌘K, with the app behind it to go back to. */
+  onLeave?: () => void;
 }) {
   const [screen, setScreen] = useState<Screen | 'setup'>('welcome');
+  const dark = useDarkWindow();
   const [leaving, setLeaving] = useState(false);
   const [ready, setReady] = useState<Engine[] | undefined>(undefined);
   const hasReady = !!ready?.length;
@@ -87,13 +95,17 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   useEffect(() => {
     let live = true;
     (async () => {
-      const [claude, codex] = await Promise.all([
+      let readings: (Awaited<ReturnType<typeof api.engineSetup>> | null)[] = await Promise.all([
         api.engineSetup('ready', 'claude').catch(() => null),
         api.engineSetup('ready', 'codex').catch(() => null),
       ]);
+      for (let again = 0; again < ASKS_AGAIN && unsureEngines(readings).length; again += 1) {
+        if (!live) return;
+        readings = await Promise.all(readings.map((r) => (unsureEngines(readings).includes(r?.engine as Engine) ? api.engineSetup('ready', r!.engine).catch(() => r) : r)));
+      }
       if (!live) return;
-      setReady(readyEngines([claude, codex]));
-      setSignedOut(signedOutEngines([claude, codex]));
+      setReady(offeredEngines(readings));
+      setSignedOut(knownSignedOut(readings));
     })();
     api.agentThreads().then((t) => { if (live) setThreads(t); }).catch(() => { if (live) setThreads([]); });
     return () => { live = false; };
@@ -206,14 +218,15 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
     const by = new Map<string, string[]>();
     for (const t of picked) by.set(bare(t.folder), [...(by.get(bare(t.folder)) ?? []), t.id]);
     let n = 0;
-    for (const [folder, ids] of by) {
-      const p = await projectFor(folder, n++ > 0);
-      if (!p) continue;
-      await api.importThreads({ product: p.slug, threads: ids, land: 'inbox' }).catch(() => null);
-      // The first thread goes to where the newest chat ran, not to My Workspace.
-      if (n === 1) { try { localStorage.setItem(LAST_PRODUCT_KEY, p.slug); } catch { /* the box asks instead */ } onProject?.(p.slug); }
-    }
-    setBusy(false);
+    try {
+      for (const [folder, ids] of by) {
+        const p = await projectFor(folder, n++ > 0);
+        if (!p) continue;
+        await api.importThreads({ product: p.slug, threads: ids, land: 'inbox' }).catch(() => null);
+        // The first thread goes to where the newest chat ran, not to My Workspace.
+        if (n === 1) { try { localStorage.setItem(LAST_PRODUCT_KEY, p.slug); } catch { /* the box asks instead */ } onProject?.(p.slug); }
+      }
+    } finally { setBusy(false); }
     return picked.length;
   }, [busy, picked, projectFor, onProject]);
 
@@ -222,6 +235,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
     const onKey = (e: KeyboardEvent) => {
       // The setup beside the app hears its own keys.
       if (screen === 'setup') return;
+      if (heldPress(e)) { e.preventDefault(); e.stopPropagation(); return; }
       e.stopPropagation();
       if (leaving) return;
       if ((e.target as Element | null)?.closest('.ob-back') && (e.key === 'Enter' || e.key === ' ')) return;
@@ -231,6 +245,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
         else if (!hasReady && gate.again && e.key === 'Enter') { e.preventDefault(); signInAgain(); }
         else if (!hasReady && !gate.running && e.key === '1') startSetup('claude');
         else if (!hasReady && !gate.running && e.key === '2') startSetup('codex');
+        else if (onLeave && e.key === 'Escape') { e.preventDefault(); onLeave(); }
         return;
       }
       const k = listKey(e);
@@ -247,14 +262,14 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [screen, leaving, hasReady, gate.running, gate.again, chats, cursor, start, startSetup, stopSetup, signInAgain, bringIn, leave]);
+  }, [screen, leaving, hasReady, gate.running, gate.again, chats, cursor, start, startSetup, stopSetup, signInAgain, bringIn, leave, onLeave]);
 
   const cls = `ob-screen${leaving ? ' ob-leaving' : ''}`;
 
   if (screen === 'setup') {
-    return <SetupSplit snap={snap} chats={chats} ticks={chatTicks} nameOf={nameOf}
+    return <SetupSplit snap={snap} chats={chats} engines={ready ?? []} ticks={chatTicks}
       onToggle={(id) => setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
-      bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} />;
+      bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} onBack={() => go('welcome')} />;
   }
 
   return (
@@ -263,9 +278,14 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
         <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m9.5 3-5 5 5 5" /></svg>
         Back
       </button>}
+      {screen === 'welcome' && onLeave && <button type="button" className="ob-back" disabled={leaving} onClick={onLeave}>
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m9.5 3-5 5 5 5" /></svg>
+        Back
+      </button>}
       {screen === 'welcome' && (
-        <div className={cls} key="welcome">
-          <div className="ob-col ob-mid ob-center">
+        <div className={`${cls} ob-welcome`} key="welcome">
+          <WelcomeSky dark={dark} />
+          <div className="ob-col ob-mid ob-hero">
             <Mark />
             {ready && !hasReady ? (
               <>
@@ -282,7 +302,8 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
               </>
             ) : (
               <>
-                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>Give your agents an inbox</h1>
+                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>An inbox for hundreds of agents.</h1>
+                <p className="ob-lede ob-in" style={{ animationDelay: '1.45s' }}>Start as many as you like. Each works on its own, and comes back to you only when it needs you.</p>
                 <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 40 }}>
                   <button type="button" className="ob-btn" disabled={!hasReady || !threads} onClick={start}>Get started <Key k="↵" /></button>
                 </div>
@@ -293,7 +314,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
             {setup && setup.phase !== 'ready' ? (
               <>
                 <span className="ob-sq ob-live" />{ENGINE_NAME[setup.engine]}
-                <b>{setup.phase === 'failed' ? (setup.error ?? 'did not finish') : setup.phase === 'signing-in' ? 'finish in your browser' : 'installing'}</b>
+                <b>{footWord(setup, signedOut)}</b>
               </>
             ) : ready?.length ? (
               <><span className="ob-sq" />{ready.map((engine) => ENGINE_NAME[engine]).join(' and ')} <b>ready</b></>

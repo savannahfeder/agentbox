@@ -6,9 +6,8 @@
 // way out was to type it again in the right project. Measured through the
 // store and the rule ⌘K draws from.
 //
-// The branch and task folder stay where they are. It is refused while an agent
-// is in it, and when it changed code in its old project, which a move would
-// strand. What it carries is tests/a-moved-thread-keeps-its-answer-and-leaves-no-copy-in-done.
+// The branch and task folder stay where they are. It is refused when it
+// changed code in its old project, which a move would strand. What it carries is tests/a-moved-thread-keeps-its-answer-and-leaves-no-copy-in-done.
 import { beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -42,10 +41,6 @@ describe('which threads may move', () => {
   it('one an agent has answered', () => {
     expect(whyItCannotMove({ status: 'open', epoch: 2, result: 'Done.' })).toBe(null);
     expect(whyItCannotMove({ status: 'blocked', epoch: 1, note: 'Reading the repo.' })).toBe(null);
-  });
-
-  it('not while an agent is in it', () => {
-    expect(whyItCannotMove({ status: 'open', epoch: 1 }, { live: true })).toMatch(/Stop it first/);
   });
 
   it('not one whose work did not ship, which would leave it behind', () => {
@@ -104,6 +99,7 @@ describe('the door it goes through', () => {
 
   it('reads the thread’s task folder for code it changed before moving it', () => {
     expect(handler).toMatch(/whereTheWorkStands\(/);
-    expect(handler).toMatch(/CHANGED_HERE/);
+    // The refusal itself: tests/a-thread-whose-agent-is-working-can-move.
+    expect(handler).toMatch(/moveThread\(/);
   });
 });

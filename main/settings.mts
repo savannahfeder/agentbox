@@ -12,7 +12,9 @@
 // place a grant is reviewed; what changed is that she edits them as fields on
 // the project they belong to instead of in a text editor.
 
+import { isPackagedElectron } from './team/session.mts';
 import { teammatesOn } from '../shared/teammates.mts';
+import { roomsOnFor } from '../shared/rooms-on.mts';
 import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mts';
 import fs from 'node:fs';
 import { harnessFor } from './harnesses.mts';
@@ -31,16 +33,16 @@ import { readPlan } from './claude-plan.mts';
 import { effectiveProfiles, troubleForProfile } from './account-discovery.mts';
 import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
-import { autoSlots } from './memory-gate.mts';
+import { autoSlots, memoryGateWorksOn } from './memory-gate.mts';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mts';
 import { isEngine } from '../shared/engines.mts';
 import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mts';
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
-import { isPackagedElectron } from './team/session.mts';
 import { claudeModels } from './claude-models.mts';
 import { forgetCodexBin, INSTALL_URL as CODEX_INSTALL_URL } from './codex-bin.mts';
+import { filesSettingsOf, OFF_AFTER_DAYS } from './files-cloud.mts';
 
 export interface SettingsConfig {
   home?: string;
@@ -48,6 +50,8 @@ export interface SettingsConfig {
   accountRoot?: string;
   claudeBin?: string | null;
   claudeFound?: boolean | null;
+  /** Claude Code's own sign-in check (main/engine-setup.mts); unset until it gives a real yes or no. */
+  claudeSignedIn?: boolean | null;
   claudeCertain?: boolean;
   claudeBinConfigured?: string | null;
   claudeFrom?: string | null;
@@ -88,7 +92,7 @@ export interface SettingsConfig {
   posthogHost?: string;
   alphaTeammates?: unknown;
   alphaMultiplayer?: boolean | null;
-  alphaBackForward?: boolean | null;
+  alphaGlass?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -161,6 +165,8 @@ export interface SettingsDeps {
   config: SettingsConfig;
   supervisor: SettingsSupervisor;
   store: SettingsStore;
+  /** Whether this person is signed in and on a team, which Rooms is read with. */
+  onTeam?: () => boolean;
 }
 
 // Her Claude Code sessions in her inbox: all of them, only the ones stopped on
@@ -610,16 +616,19 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
   return { ok: true, state };
 }
 
-// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Off unless someone turned them
-// on in Settings; only a real `true` counts. Multiplayer, the team version, is
-// the exception in a checkout, where it was always on. Back and forward is the
-// same: on where the app is being built, so its maker lives with it first.
-export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron() }: { packaged?: boolean } = {}) {
+// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Teammates and Glass are off
+// unless someone turned them on; only a real `true` counts. Multiplayer is on
+// unless turned off: the first run offers a team, so it cannot wait behind a
+// switch. Rooms is on for someone on a team with Multiplayer on, unless they
+// turned it off, since a team without it gets no Team page
+// (shared/rooms-on.mts); a caller that does not know about the team reads it
+// as no team.
+export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron(), onTeam = false }: { packaged?: boolean; onTeam?: boolean } = {}) {
   return {
-    rooms: config?.alphaRooms === true,
+    rooms: roomsOnFor(config, onTeam),
     teammates: teammatesOn(config),
-    multiplayer: packaged ? config?.alphaMultiplayer === true : config?.alphaMultiplayer !== false,
-    backForward: packaged ? config?.alphaBackForward === true : config?.alphaBackForward !== false,
+    multiplayer: config?.alphaMultiplayer !== false,
+    glass: config?.alphaGlass === true,
   };
 }
 
@@ -631,7 +640,7 @@ export function workspaceSessionArgs(config: SettingsConfig, supervisor?: Settin
 }
 
 // `search: false` is for a read on a timer (`knownEngine`).
-export function readSettings({ config, supervisor, store }: SettingsDeps, { search = true }: { search?: boolean } = {}) {
+export function readSettings({ config, supervisor, store, onTeam }: SettingsDeps, { search = true }: { search?: boolean } = {}) {
   const products = store.listProducts();
   const status = supervisor.status();
   const sessions = [...supervisor.sessions.values()];
@@ -685,6 +694,12 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       profile,
       email: identity?.email ?? null,
       accountUuid: identity?.accountUuid ?? null,
+      // Claude Code's own `auth status` answer speaks only for the login it checked: the default,
+      // unless the app names another folder. A no from it or a run's sign-out beats the email on file;
+      // with no email, only its yes counts.
+      signedIn: trouble?.cause !== 'signed-out' && (profile === 'default' && !process.env.CLAUDE_CONFIG_DIR && typeof config.claudeSignedIn === 'boolean'
+        ? config.claudeSignedIn
+        : !!identity?.email),
       // WHICH ONE RUNS, AND ONE OF THEM ALWAYS DOES (w-dac993a554). This was
       // false on every row until somebody picked, because until then every
       // account really did take a share of the work. One account runs it now,
@@ -722,7 +737,9 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // Read here rather than kept, because Claude Code refreshes its own
       // profile as it runs and this page is opened by hand a few times a day.
       // `null` when the file cannot be read, and then no screen says anything.
-      plan: plan.known ? { label: plan.label, max: plan.max } : null,
+      // A refusal outranks the file, which goes on naming the plan after it ends.
+      plan: trouble?.cause === 'subscription-ended' ? { label: 'Subscription ended', max: false }
+        : plan.known ? { label: plan.label, max: plan.max } : null,
     };
   });
 
@@ -796,7 +813,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       agentsNudge: Math.max(0, Math.round(Number(config.agentsNudge) || 0)),
       // What Automatic would say right now, so a manual number can be compared
       // with it without turning Automatic back on to find out.
-      agentsAutoTotal: autoAgents({ gated: !!config.memoryGate, nudge: config.agentsNudge }),
+      agentsAutoTotal: autoAgents({ gated: !!config.memoryGate && memoryGateWorksOn(), nudge: config.agentsNudge }),
       // WHAT WE SUGGEST FOR THIS MAC, AND WHY. Not a ceiling: `slotsMax` is the
       // control's own range and is the same number on every machine, while
       // `slotsSuggested` is what main worked out from the hardware
@@ -824,6 +841,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       permissionArgs: workspaceArgs,
       cloudPermission: config.cloudPermission ?? CLOUD_CLAUDE_DEFAULT,
       cloudCodexMode: config.cloudCodexMode ?? CLOUD_CODEX_DEFAULT,
+      files: filesSettingsOf(config as { filesInCloud?: unknown; filesOffAfterDays?: unknown }),
       // ONE SWITCH FOR EVERYTHING THAT LEAVES THE MACHINE, and it is on when
       // Agentbox is installed (legal/privacy.html, section 10). Off stops the
       // counts AND the crash reports; there is deliberately no partial mode and
@@ -837,7 +855,7 @@ export function readSettings({ config, supervisor, store }: SettingsDeps, { sear
       // unless she turned it on, so only `true` means on.
       adhdMode: config.adhdMode === true,
       importNew: config.importNew === true,
-      alpha: alphaFeatures(config),
+      alpha: alphaFeatures(config, { onTeam: onTeam?.() ?? false }),
       // The corner tag over other apps (w-dafae58a23). On unless she turned it
       // off here, which is the only place it turns off for good.
       cornerTag: config.cornerTag !== false,
@@ -1179,6 +1197,7 @@ export function addClaudeAccount({ config, supervisor }: { config: SettingsConfi
  * right now while it is on.
  */
 export function memoryGateSettings({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
+  if (!memoryGateWorksOn()) return null;
   const on = !!config.memoryGate;
   const slots = Number.isFinite(config.memoryGateSlots) ? config.memoryGateSlots : null;
   // What Auto works out to on this Mac, whether or not somebody picked.
@@ -1213,7 +1232,7 @@ export function memoryGateSettings({ config, supervisor }: { config: SettingsCon
  */
 export function memoryReading({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
   const out: { heavy: number | null; waiting: number | null; pressure: string | null; usedPct: number | null; asked: number | null; waited: number | null; refused: number | null; holding?: boolean } = { heavy: null, waiting: null, pressure: null, usedPct: null, asked: null, waited: null, refused: null };
-  if (!config.memoryGate) return out;
+  if (!config.memoryGate || !memoryGateWorksOn()) return out;
   // The supervisor's own hold on new agents (main/start-hold.mts), which does
   // not depend on which copy of the app is coordinating the command queue.
   try { out.holding = !!supervisor.startHoldStatus?.()?.holding; } catch { out.holding = false; }
@@ -1395,6 +1414,16 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       supervisor.onChange?.();
       break;
     }
+    // Settings › Files: whether files are kept in the cloud, and how long a
+    // film or picture stays here unopened (main/files-cloud.mts).
+    case 'filesInCloud':
+    case 'filesOffAfterDays': {
+      if (key === 'filesOffAfterDays' && !(OFF_AFTER_DAYS as readonly number[]).includes(Number(value))) throw new Error(`files stay ${OFF_AFTER_DAYS.join(', ')} days`);
+      const patch = key === 'filesInCloud' ? { filesInCloud: !!value } : { filesOffAfterDays: Number(value) };
+      saveConfig(config, patch);
+      Object.assign(config, patch);
+      break;
+    }
     case 'cleanupLeftovers':
       saveConfig(config, value ? { cleanupLeftovers: true, cleanupLeftoversSince: Date.now() } : { cleanupLeftovers: false });
       supervisor.setLeftoverCleanup?.(!!value)?.catch?.((e) => console.warn('zero: leftovers:', e.message));
@@ -1438,8 +1467,8 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       saveConfig(config, { alphaMultiplayer: !!value });
       supervisor.onChange?.();
       break;
-    case 'alphaBackForward':
-      saveConfig(config, { alphaBackForward: !!value });
+    case 'alphaGlass':
+      saveConfig(config, { alphaGlass: !!value });
       supervisor.onChange?.();
       break;
     // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so

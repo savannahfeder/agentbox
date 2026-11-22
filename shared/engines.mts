@@ -193,7 +193,9 @@ export function engineFor(
 ): string {
   if (homeEngine(found) !== DEFAULT_ENGINE) return homeEngine(found);
   if (enabled !== ENGINE_CHOICE_ENABLED) return DEFAULT_ENGINE;
-  const wanted = isEngine(item?.engine) && !engineChoiceOnRowIsStale(item, config) ? item.engine : null;
+  const wanted = isEngine(item?.engine)
+    ? (engineChoiceOnRowIsStale(item, config) ? null : item.engine)
+    : (isCodexModel(item?.model) ? 'codex' : null);
   const fallback = isEngine(config?.engine) && !engineDefaultIsStale(config) ? config.engine : DEFAULT_ENGINE;
   const pick = wanted ?? fallback;
   if (pick === DEFAULT_ENGINE) return DEFAULT_ENGINE;
@@ -214,11 +216,21 @@ export function enginePicked(id: unknown): boolean {
  * reach `claude --model` when `engineFor` falls back to Claude Code. This is the
  * mirror of `codexModelRefusal`. Null means "no model for this run", and
  * main/supervisor.mts decides what to do with it. A row naming no engine keeps
- * its model.
+ * its model, unless that model is a Codex slug and the run is not Codex.
  */
 export function modelForEngine(item: EngineRow | null | undefined, engine: string | null): string | null {
   const model = typeof item?.model === 'string' && item.model ? item.model : null;
   if (!model) return null;
   if (isEngine(item?.engine) && item.engine !== engine) return null;
+  if (!isEngine(item?.engine) && isCodexModel(model) && engine !== 'codex') return null;
   return model;
+}
+
+/**
+ * A Codex model slug, the same shapes shared/model-words.mts accepts for one.
+ * Agents set a thread's model alone (the store tool says "For Codex: its model
+ * slug"), so on a row naming no engine the slug is the choice of Codex.
+ */
+export function isCodexModel(model: unknown): boolean {
+  return typeof model === 'string' && /^(gpt|o\d|codex)[a-z0-9._-]*$/i.test(model);
 }

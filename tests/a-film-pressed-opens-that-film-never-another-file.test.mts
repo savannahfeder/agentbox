@@ -73,6 +73,7 @@ describe('the file in hand when its version goes', () => {
 
   it('the big view keeps the path it was opened on', () => {
     const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
-    expect(view).toContain('threadFiles(files, numbers, { keep: open.path })');
+    expect(view).toContain('threadFiles(files, numbers, { keep: kept })');
+    expect(view).toMatch(/const kept = useMemo\(\(\) => \[open\.path, /);
   });
 });

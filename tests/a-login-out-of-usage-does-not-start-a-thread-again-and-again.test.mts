@@ -28,7 +28,8 @@ let root; let said;
 
 function supervisor() {
   const sup = new Supervisor(
-    { storeRoot: root, home: path.join(root, 'home'), maxConcurrentSessions: 3, authProfiles: ['default'] },
+    // codexHome keeps this Mac's own Codex usage reading out of the test.
+    { storeRoot: root, home: path.join(root, 'home'), codexHome: path.join(root, 'codex'), maxConcurrentSessions: 3, authProfiles: ['default'] },
     {
       listItems: () => [], listProducts: () => [],
       recordSessionResult: (product, id, patch) => { said.push({ product, id, ...patch }); },

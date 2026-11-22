@@ -27,7 +27,7 @@ describe('reading the link', () => {
   it('is the file when the link is live, and asks nothing more', async () => {
     const { rpc, asked } = rpcOf({ file_link_view: [ROW] });
     const shown = await readSharedFile(rpc, TOK);
-    expect(shown).toEqual({ state: 'file', file: { name: 'plan.md', kind: 'markdown', type: 'text/markdown', body: '# Plan', version: 2, createdAt: Date.parse('2026-11-04T10:00:00Z'), updatedAt: Date.parse('2026-11-04T10:00:00Z'), ownerName: 'Maya Chen', ownerAvatar: null, mine: false } });
+    expect(shown).toEqual({ state: 'file', file: { name: 'plan.md', kind: 'markdown', type: 'text/markdown', body: '# Plan', version: 2, createdAt: Date.parse('2026-11-04T10:00:00Z'), updatedAt: Date.parse('2026-11-04T10:00:00Z'), ownerName: 'Maya Chen', ownerAvatar: null, mine: false, can: 'comment', rev: 0, changedByName: null, anyone: true } });
     expect(asked).toEqual([['file_link_view', { tok: TOK }]]);
   });
   it('says stopped for a link that was stopped, and does not work for one that never was', async () => {
@@ -91,8 +91,8 @@ describe('the words on the page', () => {
     expect(saidOf(new Error('sign in to comment'))).toBe('Sign in to comment.');
     expect(saidOf(new TypeError('Failed to fetch'))).toBe('That did not go through. Try again.');
   });
-  it('draw a face from the first letter of a name', () => {
-    expect(initialOf('maya chen')).toBe('M');
+  it('draw a face from the first letters of the first and last name', () => {
+    expect(initialOf('maya chen')).toBe('MC');
     expect(initialOf('  ')).toBe('?');
   });
 });

@@ -45,7 +45,11 @@ function hooksOf(sup) {
   const file = sup.writeWorkerSettings({ dir: null }, `t-${Math.random()}`);
   const rules = JSON.parse(fs.readFileSync(file, 'utf8'));
   fs.unlinkSync(file);
-  return rules.hooks;
+  // Only the memory check's own hooks; every worker carries others too.
+  const mine = Object.entries(rules.hooks ?? {})
+    .map(([event, groups]) => [event, groups.filter((g) => g.hooks.some((h) => h.command.includes('memory-gate-hook.sh')))])
+    .filter(([, groups]) => groups.length);
+  return mine.length ? Object.fromEntries(mine) : undefined;
 }
 
 describe('with the switch off', () => {

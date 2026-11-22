@@ -144,6 +144,6 @@ describe('the card', () => {
 
   it('the draft takes a pick on its own, so a card with only a time still comes back', () => {
     const draft = card.slice(card.indexOf('/* ------------------------------ draft'), card.indexOf('A LAYOUT EFFECT'));
-    expect(draft).toMatch(/\}, \[text, attachments, prio, when\]\);/);
+    expect(draft).toMatch(/\}, \[text, attachments, prio, when, pick\]\);/);
   });
 });

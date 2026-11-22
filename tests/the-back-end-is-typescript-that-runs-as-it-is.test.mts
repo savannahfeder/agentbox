@@ -94,10 +94,19 @@ describe('a script plain Node starts can load the back end', () => {
   const imports = (file) => [...fs.readFileSync(path.join(root, file), 'utf8').matchAll(SPEC)]
     .map((m) => path.normalize(path.join(path.dirname(file), m[1])))
     .filter((p) => fs.existsSync(path.join(root, p)) && fs.statSync(path.join(root, p)).isFile());
+  // A child started as spawnSync('node', ['scripts/x.mjs']) inherits NODE_OPTIONS
+  // and nothing else, so it counts as part of the script that starts it.
+  const SPAWN = /['"]node['"]\s*,\s*\[\s*['"](scripts\/[\w/.-]+\.mjs)['"]/g;
+  const spawned = (file) => file.startsWith('scripts/')
+    ? [...fs.readFileSync(path.join(root, file), 'utf8').matchAll(SPAWN)].map((m) => m[1])
+    : [];
   const reachesTypeScript = (start) => {
     const seen = new Set([start]);
     const stack = [start];
-    while (stack.length) for (const next of imports(stack.pop())) if (!seen.has(next)) { seen.add(next); stack.push(next); }
+    while (stack.length) {
+      const file = stack.pop();
+      for (const next of [...imports(file), ...spawned(file)]) if (!seen.has(next)) { seen.add(next); stack.push(next); }
+    }
     return [...seen].some((f) => f.endsWith('.mts'));
   };
   const plainNodeRuns = (text) => [...text.matchAll(/\bnode\s+(?:"\$[\w]+"\s+)?(scripts\/[\w/.-]+\.mjs)/g)].map((m) => m[1]);
@@ -118,6 +127,14 @@ describe('a script plain Node starts can load the back end', () => {
   it('sees the scripts that do reach it', () => {
     expect(reachesTypeScript('scripts/dev.mjs')).toBe(true);
     expect(plainNodeRuns(pkg.scripts.dev)).toEqual(['scripts/run.mjs']);
+  });
+
+  // 2026-11-12: `npm run deploy` on Node 22.14 died at the Mac build with
+  // ERR_UNKNOWN_FILE_EXTENSION for main/cloud/config.mts. deploy.mjs imports no
+  // TypeScript itself; the release.mjs it starts does.
+  it('sees a script that reaches it only through a child it starts', () => {
+    expect(reachesTypeScript('scripts/deploy.mjs')).toBe(true);
+    expect(plainNodeRuns(pkg.scripts.deploy)).toEqual(['scripts/run.mjs']);
   });
 
   it('includes the store server, whose launcher passes the flag', () => {

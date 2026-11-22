@@ -136,7 +136,7 @@ describe('the selected row is underlined, and nothing else', () => {
   it('answers hover with the same mechanism at a lower strength', () => {
     // One idea at two weights, so a row under both the pointer and the
     // keyboard is read once, not twice.
-    expect(css).toMatch(/\.row:hover \.subject \{ text-decoration-color: var\(--line-strong\)/);
+    expect(css).toMatch(/\.row\.pointed \.subject \{ text-decoration-color: var\(--line-strong\)/);
   });
 
   it('keeps the rule off the accent, in both themes', () => {

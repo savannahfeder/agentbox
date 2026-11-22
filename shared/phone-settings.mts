@@ -56,7 +56,7 @@ export interface SettingsModel {
     slotsMax?: number;
     slotsSuggested?: number;
     running?: number;
-    memoryGate?: { on?: boolean; slots?: number | null; slotsAuto?: number | null; slotsMax?: number | null; now?: string | null; reading?: unknown };
+    memoryGate?: { on?: boolean; slots?: number | null; slotsAuto?: number | null; slotsMax?: number | null; now?: string | null; reading?: unknown } | null;
     leftovers?: { on?: boolean; now?: string | null };
     accounts?: ClaudeAccountModel[];
     cloudPermission?: unknown;
@@ -69,6 +69,18 @@ export interface SettingsModel {
   cloud?: CloudModel | null;
   usage?: { claude?: unknown; codex?: unknown } | null;
   links?: readonly (LinkModel | null | undefined)[];
+  /** When the window last opened each thread, by id (renderer `seenAt`). */
+  seen?: unknown;
+}
+
+export const SEEN_SENT = 500;
+/** The newest threads this computer's window has opened, id to when; Mark Unread's 0 stays home. */
+export function phoneSeenOf(seen: unknown): Record<string, number> {
+  if (!seen || typeof seen !== 'object') return {};
+  return Object.fromEntries(Object.entries(seen as Record<string, unknown>)
+    .filter((e): e is [string, number] => /^[\w-]{1,80}$/.test(e[0]) && typeof e[1] === 'number' && Number.isFinite(e[1]) && e[1] > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, SEEN_SENT));
 }
 
 /** One usage limit as shared/usage.mts reads it; only its numbers and reset times travel. */
@@ -111,6 +123,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 interface ClaudeAccountModel {
   profile?: string | null;
   email?: string | null;
+  signedIn?: boolean;
   chosen?: boolean;
   state?: string;
   trouble?: { note?: string | null; resetsAt?: number | null } | null;
@@ -123,9 +136,14 @@ interface CodexAccountModel {
   email?: string | null;
   name?: string | null;
   plan?: string | null;
+  planNamed?: boolean;
   signedIn?: boolean;
   chosen?: boolean;
 }
+
+/** A plan id with no proper name is Codex's word, quoted, as the desktop's `accountSay` says it. */
+const codexPlanLine = (a: CodexAccountModel): string | null =>
+  !a.plan ? null : a.planNamed === false ? `Codex says “${a.plan}”` : a.plan;
 
 /** The window's own IPC channel for a change, and what it is handed: an object, or a bare value such as Pause's boolean. */
 export type SettingRoute = [string, unknown];
@@ -198,10 +216,12 @@ const THREAD: Record<string, Rule> = {
   priority: (v: unknown) => v === null || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 9),
   shippedAt: (v: unknown) => v === null || (Number.isInteger(v) && (v as number) >= 0),
   visibility: oneOf(['team', 'private']),
-  onMac: (v: unknown) => v === true || v === null,
+  onMac: (v: unknown) => typeof v === 'boolean' || v === null,
   resume: yes,
   redeliver: yes,
   moveTo: (v: unknown) => typeof v === 'string' && SLUG.test(v),
+  // When the phone opened it, so the window's unread dot goes too.
+  seen: (v: unknown) => Number.isInteger(v) && (v as number) > 0,
 };
 const THREAD_ID = /^[\w-]{1,120}$/;
 
@@ -209,10 +229,12 @@ function threadRoute(p: SettingChange): SettingRoute {
   const at = { product: p.product, id: p.item };
   switch (p.key) {
     case 'pinned': return ['zero:set-thread-pins', { pins: { [p.item!]: p.value === true ? true : null } }];
-    case 'onMac': return ['zero:set-thread-on-mac', { onMac: { [p.item!]: p.value === true ? true : null } }];
+    // False sends the thread to the cloud (Supervisor#setThreadOnMac).
+    case 'onMac': return ['zero:set-thread-on-mac', { onMac: { [p.item!]: typeof p.value === 'boolean' ? p.value : null } }];
     case 'resume': return ['zero:resume-items', { ids: [p.item] }];
     case 'redeliver': return ['zero:redeliver', at];
     case 'moveTo': return ['zero:move-item', { ...at, to: p.value }];
+    case 'seen': return ['zero:phone-seen', { ...at, at: p.value }];
     // The desktop's "Not shipped after all" writes 0.
     case 'shippedAt': return ['zero:thread-edit', { ...at, patch: { shippedAt: p.value ?? 0 } }];
     default: return ['zero:thread-edit', { ...at, patch: { [p.key]: p.value } }];
@@ -431,6 +453,7 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
   return {
     v: SETTINGS_VERSION,
     version: String(version ?? ''),
+    ...(model.seen ? { seen: phoneSeenOf(model.seen) } : {}),
     workspace: {
       // What the web app gives a paid plan, dictation (renderer/src/web-speech.ts).
       plan: typeof w.cloudPlan === 'string' ? w.cloudPlan : null,
@@ -468,15 +491,16 @@ export function phoneSettingsOf(model: SettingsModel | null | undefined, { versi
       slotsMax: w.slotsMax,
       slotsSuggested: w.slotsSuggested,
       running: w.running,
-      memoryGate: { on: !!gate.on, slots: gate.slots ?? null, slotsAuto: gate.slotsAuto ?? null, slotsMax: gate.slotsMax ?? null, now: gate.now ?? null, reading: memoryReadingOf(gate.reading) },
+      memoryGate: w.memoryGate ? { on: !!gate.on, slots: gate.slots ?? null, slotsAuto: gate.slotsAuto ?? null, slotsMax: gate.slotsMax ?? null, now: gate.now ?? null, reading: memoryReadingOf(gate.reading) } : null,
       leftovers: { on: !!w.leftovers?.on, now: w.leftovers?.now ?? null },
       accounts: (w.accounts ?? []).map((a) => ({
-        id: accountIdOf(a.profile), email: a.email ?? null, chosen: !!a.chosen, state: a.state,
+        // Main's answer. The address stands in only for a row that carries none.
+        id: accountIdOf(a.profile), email: a.email ?? null, signedIn: a.signedIn ?? !!a.email, chosen: !!a.chosen, state: a.state,
         note: a.trouble?.note ?? null, resetsAt: a.trouble?.resetsAt ?? null, plan: a.plan?.label ?? null, running: a.running ?? 0,
         usage: usageFor(model.usage?.claude, a.profile),
       })),
       codexAccounts: (w.codex?.accounts ?? []).map((a) => ({
-        id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: a.plan ?? null, signedIn: !!a.signedIn, chosen: !!a.chosen,
+        id: accountIdOf(a.profile), email: a.email ?? null, name: a.name ?? null, plan: codexPlanLine(a), signedIn: !!a.signedIn, chosen: !!a.chosen,
         usage: usageFor(model.usage?.codex, a.profile),
       })),
       // Not `source`: it names the file on this computer.

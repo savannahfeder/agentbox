@@ -6,13 +6,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { enterIsTheButtons } from '../focused-button';
 import {
   COPY, LOOK_AGAIN_FOR_MS, LOOK_AGAIN_MS, afterCheck, afterFound, enginesFor, foundHead, foundLede,
   foundRows, litRow, planName, planNote, planRows, readLog, readyEngines, setupLede, setupRows,
   worthLookingAgain,
   type AskRow, type BarWords, type Engine, type EngineSetupState, type Plan, type StepRow,
 } from '../plan-setup';
-import { Cap } from './Onboarding';
+import { Cap } from './Cap';
 import { hoverLit } from '../onboarding';
 
 const Mark = ({ letter }: { letter: string }) => <span className="ps-mark" aria-hidden="true">{letter}</span>;
@@ -72,6 +73,7 @@ export function AskList({ rows, label, onPick, busy = false, start = 0 }: {
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
+      if (enterIsTheButtons(e)) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); setLit((n) => Math.min(rows.length - 1, n + 1)); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); setLit((n) => Math.max(0, n - 1)); }
       else if (e.key === 'Enter') { e.preventDefault(); choose(lit); }

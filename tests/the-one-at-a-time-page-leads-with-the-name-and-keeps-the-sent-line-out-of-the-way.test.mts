@@ -73,7 +73,7 @@ describe('the sent line', () => {
     expect(focus).toMatch(/<span className="ts-top">\{sentUp && aboveDock\}\{queue && <QueueNav/);
   });
   it('and not above the reply box, where it took a row of reading', () => {
-    expect(focus).toMatch(/\{!sentUp && aboveDock\}\s*<div className="dock-card">/);
+    expect(focus).toMatch(/\{!sentUp && aboveDock\}\s*\{outWithThem \? .*: <div className="dock-card">/);
   });
   it('drawn small enough for the bar', () => {
     expect(rule('.ts-top > .sent-line')).toMatch(/margin: 0 16px 0 0/);

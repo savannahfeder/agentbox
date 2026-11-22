@@ -91,7 +91,7 @@ const LIGHT_PICTURES = ['frost-haze', 'slate-haze', 'peach-haze', 'peach-haze-2'
 export function normalizeSavedLook(store: {
   getItem(k: string): string | null;
   setItem(k: string, v: string): void;
-}, machine: 'light' | 'dark' = 'dark'): void {
+}, _machine: 'light' | 'dark' = 'dark'): void {
   const theme = store.getItem(THEME_KEY);
   const skin = store.getItem(SKIN_KEY);
   const put = (look: Look) => {
@@ -99,9 +99,8 @@ export function normalizeSavedLook(store: {
     if (theme !== l.theme) store.setItem(THEME_KEY, l.theme);
     if (skin !== l.skin) store.setItem(SKIN_KEY, String(l.skin));
   };
-  // A new Mac gets the default, whatever its own light or dark setting says.
-  // A new install starts in the computer's own light or dark, then keeps it.
-  if (theme === null && skin === null) return put(machine === 'dark' ? DEFAULT_SKIN : 'light');
+  // A new install follows the computer's own light or dark until somebody picks a look.
+  if (theme === null && skin === null) return put('match');
   if (skin && LIGHT_PICTURES.includes(skin)) return put('light');
   if (skin && skin !== 'none') return put('ember-grid');
   if (theme === 'light') return put('light');
@@ -257,7 +256,11 @@ export function storeTune(stored: string | null | undefined, skin: SkinId, tune:
 export function applyTune(tune: SkinTune, root: { style: { setProperty(k: string, v: string): void } } = document.documentElement): void {
   root.style.setProperty('--skin-panel-opacity', tune.panelOpacity === undefined ? '' : String(tune.panelOpacity));
   root.style.setProperty('--skin-background-blur', `${tune.backgroundBlur ?? 0}px`);
-  root.style.setProperty('--skin-blur', `${tune.blur}px`);
+  // Chromium draws blur(0px) as a real filter, and the one under the workspace
+  // card redraws the whole window every frame. `initial` makes each
+  // blur(var(--skin-blur)) invalid, which computes to none
+  // (tests/a-look-with-no-blur-draws-no-backdrop-filter).
+  root.style.setProperty('--skin-blur', tune.blur > 0 ? `${tune.blur}px` : 'initial');
   root.style.setProperty('--skin-dim', String(tune.dim));
 }
 
@@ -290,9 +293,10 @@ export const WALK_PICTURE: SkinChoice = 'gouache-valley';
 export function seedFirstRunLook(store: {
   getItem(k: string): string | null;
   setItem(k: string, v: string): void;
-}, themeKey: string, machine: 'light' | 'dark' = 'dark'): { theme: 'light' | 'dark' | 'match'; skin: SkinChoice } | null {
+}, themeKey: string, _machine: 'light' | 'dark' = 'dark'): { theme: 'light' | 'dark' | 'match'; skin: SkinChoice } | null {
   if (store.getItem(themeKey) !== null || store.getItem(SKIN_KEY) !== null) return null;
-  const look = lookMeans(machine === 'dark' ? DEFAULT_SKIN : 'light');
+  // Match, so the window follows the Mac until somebody picks a look.
+  const look = lookMeans('match');
   store.setItem(themeKey, look.theme);
   store.setItem(SKIN_KEY, String(look.skin));
   return look;

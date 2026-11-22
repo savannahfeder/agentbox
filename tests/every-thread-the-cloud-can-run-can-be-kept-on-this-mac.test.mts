@@ -64,11 +64,18 @@ describe('the menu row on a thread that is on this Mac now', () => {
     expect(threadPlace(row('coded'), null, cloud)).toBe('here');
   });
 
-  it('is not there on a project the cloud never takes, or with the cloud off', () => {
+  it('is not there on a project the cloud never takes', () => {
     const cloud = build().cloudStatus();
     expect(threadPlace(row('nowhere'), null, cloud)).toBe(null);
     expect(threadPlace(row('mine'), null, cloud)).toBe(null);
-    expect(threadPlace(row('notes'), null, build({ cloudRuns: false }).cloudStatus())).toBe(null);
+  });
+
+  // It used to vanish with the cloud off, and nothing said the cloud was off
+  // (tests/a-thread-says-the-cloud-is-off-and-it-is-never-turned-off-by-accident).
+  it('says the cloud is off, with the cloud off', () => {
+    const offNow = build({ cloudRuns: false }).cloudStatus();
+    expect(threadPlace(row('notes'), null, offNow)).toBe('off');
+    expect(threadPlace(row('nowhere'), null, offNow)).toBe(null);
   });
 
   it('still says where a thread is when it is in the cloud or kept here', () => {

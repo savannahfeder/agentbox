@@ -125,23 +125,21 @@ describe('a place counts once it stays on screen', () => {
   });
 });
 
-describe('the switch', () => {
-  it('is on in a checkout and off in the downloaded app, until someone flips it', () => {
-    expect(alphaFeatures({}, { packaged: false }).backForward).toBe(true);
-    expect(alphaFeatures({}, { packaged: true }).backForward).toBe(false);
-    expect(alphaFeatures({ alphaBackForward: false }, { packaged: false }).backForward).toBe(false);
-    expect(alphaFeatures({ alphaBackForward: true }, { packaged: true }).backForward).toBe(true);
+// It left Alpha features on 2026-11-10: "we are good to remove 'this is an
+// alpha feature' and we're just going to build it into the main app itself".
+describe('the arrows are part of the app', () => {
+  it('have no switch, in a checkout or the downloaded app', () => {
+    expect(alphaFeatures({}, { packaged: true })).not.toHaveProperty('backForward');
+    expect(alphaFeatures({ alphaBackForward: false }, { packaged: false })).not.toHaveProperty('backForward');
+    expect(read('renderer/src/components/Settings.tsx')).not.toMatch(/alphaBackForward|label="Back and forward"/);
+    expect(read('main/settings.mts')).not.toMatch(/alphaBackForward/);
   });
 
-  it('is in Settings, Alpha features, and saves', () => {
-    expect(read('renderer/src/components/Settings.tsx')).toMatch(/alphaBackForward/);
-    expect(read('main/settings.mts')).toMatch(/case 'alphaBackForward'/);
-  });
-
-  it('the app walks the trail with ⌘[ and ⌘] and draws the arrows only while it is on', () => {
+  it('are on on a computer and off on a phone, and walk the trail with ⌘[ and ⌘]', () => {
     const app = read('renderer/src/App.tsx');
     expect(app).toMatch(/useBackAndForward\(/);
-    expect(app).toMatch(/alpha\?\.backForward/);
+    expect(app).toMatch(/const backForwardOn = !onPhone\(\);/);
+    expect(app).not.toMatch(/alpha\?\.backForward/);
     const hook = read('renderer/src/back-and-forward.ts');
     expect(hook).toMatch(/'\['/);
     expect(hook).toMatch(/'\]'/);

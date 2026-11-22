@@ -1,8 +1,8 @@
 // The pieces every screen is made of, sized from the phone site as it draws
 // (renderer/src/phone.css and the styles under it).
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextProps, type ViewStyle } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextProps, type ViewStyle } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useCloud } from '../state/cloud';
 import { color, corner, font, size } from './theme';
@@ -33,10 +33,11 @@ export function T({ style, ...rest }: TextProps) {
 
 /** The top bar: 56px over the wall with its line, the title on the left. What
  * goes `below` (the inbox's tabs) sits inside it, over the same one line. */
-export function TopBar({ left, title, right, below }: { left?: ReactNode; title?: ReactNode; right?: ReactNode; below?: ReactNode }) {
+export function TopBar({ left, title, right, below, noReview = false }: { left?: ReactNode; title?: ReactNode; right?: ReactNode; below?: ReactNode; noReview?: boolean }) {
   const inset = useSafeAreaInsets();
   const { view, minimizedApproval, setMinimizedApproval } = useCloud();
-  const aside = view.approvals.findIndex((a: { id: string }) => a.id === minimizedApproval) === 0;
+  // A thread's bar has no room for it; the inbox's bar still brings the card back.
+  const aside = !noReview && view.approvals.findIndex((a: { id: string }) => a.id === minimizedApproval) === 0;
   return (
     <View style={{ paddingTop: inset.top, borderBottomWidth: 1, borderBottomColor: color.line }}>
       {/* The line is inside the 56px, as the website's border-box bar has it. */}
@@ -79,17 +80,26 @@ export function Ghost({ title, onPress, disabled }: { title: string; onPress: ()
 
 /** Every picker is a sheet from the bottom, a row per choice in words (phone.css `.tc-menu`). */
 export function Sheet({ open, close, onGone, children }: { open: boolean; close: () => void; /** iOS: the sheet has finished leaving. */ onGone?: () => void; children: ReactNode }) {
+  const body = <SheetBody close={close}>{children}</SheetBody>;
+  return (
+    <Modal visible={open} transparent animationType="fade" onRequestClose={close} onDismiss={onGone}>
+      {/* Android draws a modal as its own window under the navigation bar; the app's insets are not that window's. */}
+      {Platform.OS === 'android' ? <SafeAreaProvider>{body}</SafeAreaProvider> : body}
+    </Modal>
+  );
+}
+function SheetBody({ close, children }: { close: () => void; children: ReactNode }) {
   const inset = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={close} onDismiss={onGone}>
+    <>
       <Pressable style={{ flex: 1, backgroundColor: color.scrim }} onPress={close} accessibilityLabel="Close" />
       <View style={{ maxHeight: height * 0.72, backgroundColor: color.pop, borderTopWidth: 1, borderTopColor: color.lineStrong, borderTopLeftRadius: corner.card, borderTopRightRadius: corner.card, overflow: 'hidden' }}>
         <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingTop: 10, paddingHorizontal: 8, paddingBottom: 16 + inset.bottom, gap: 1 }}>
           {children}
         </ScrollView>
       </View>
-    </Modal>
+    </>
   );
 }
 export const SheetHead = ({ children }: { children: string }) => (
@@ -108,7 +118,8 @@ export function SheetRow({ label, on, aside, lead, onPress }: { label: string; o
 }
 
 /** A priority as the desktop draws it (`.prio-bars`): three bars, four for Urgent. */
-export function PriorityBars({ level }: { level: 1 | 2 | 3 | 4 }) {
+/** `level` 0 is Agent decides: three bars, none filled (components/Priority.tsx `PriorityIcon`). */
+export function PriorityBars({ level }: { level: 0 | 1 | 2 | 3 | 4 }) {
   const heights = level === 4 ? [4, 7, 10, 13] : [4, 7.5, 11];
   const inked = (i: number) => (level >= 3 ? color.text : i < level ? color.dim : color.lineStrong);
   return (
@@ -143,6 +154,15 @@ export function RunningMark({ cloud, children }: { cloud?: boolean; children?: R
         </Svg>
       )}
     </Animated.View>
+  );
+}
+
+/** The dotted word as a view of its own: Android folds a press nested in a Text into the one text, out of a screen reader's and a tap's reach. */
+export function ChoiceButton({ children, said, onPress, style }: { children: string; said: string; onPress: () => void; style?: object }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={said} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+      <T style={[{ textDecorationLine: 'underline', textDecorationStyle: 'dotted', textDecorationColor: color.faint }, style]}>{children}</T>
+    </Pressable>
   );
 }
 

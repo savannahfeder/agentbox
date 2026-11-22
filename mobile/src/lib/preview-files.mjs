@@ -61,6 +61,41 @@ export const PREVIEW_ATTACHED = {
   files,
   folders: { [`${ROUND}/`]: SHOTS.map(([name]) => `${ROUND}/${name}.png`) },
 };
+/** What the plan's copy names: only its picture of the inbox. */
+export const PREVIEW_PLAN_ATTACHED = { dir: '~/docs/agentbox', files: { 'designs/w-1a2b3c4d5e/inbox.png': files['designs/w-1a2b3c4d5e/inbox.png'] } };
+
+const poster = svg('<rect width="1200" height="750" fill="#141312"/><circle cx="860" cy="250" r="320" fill="#ee6018" opacity="0.18"/><text x="90" y="420" font-family="Helvetica, Arial, sans-serif" font-size="120" font-weight="600" fill="#efebe7">Agentbox</text><text x="96" y="500" font-family="Helvetica, Arial, sans-serif" font-size="40" fill="#a09994">Your agents, on your phone.</text>');
+const SCRIPT = '# Launch film, 60 seconds\n\n## Open\n\nThe inbox on a phone. One thread needs you.\n\n## Middle\n\nA reply from the lock screen, and the agent carries on.\n\n## Close\n\nThe logo, and the line: your agents, on your phone.\n';
+const meter = svg('<rect width="1200" height="750" fill="#1c1b1a"/><text x="80" y="140" font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#e8e2dc">Usage</text>' + [['Claude Max', 0.62, '6:19pm'], ['Codex Pro', 0.35, 'Fri 9am'], ['Claude Pro', 0.88, '11:40pm']].map(([name, used, reset], i) => `<text x="80" y="${260 + i * 150}" font-family="Helvetica, Arial, sans-serif" font-size="30" fill="#c4bdb8">${name}</text><text x="1120" y="${260 + i * 150}" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="26" fill="#a09994">resets ${reset}</text><rect x="80" y="${285 + i * 150}" width="1040" height="18" rx="9" fill="#34312e"/><rect x="80" y="${285 + i * 150}" width="${1040 * used}" height="18" rx="9" fill="#ee6018" opacity="0.85"/>`).join(''));
+const listed = (dir, entries) => {
+  const out = {};
+  for (const [key, seed, ext, s, link] of entries) {
+    out[key] = { n: nameOf(seed, ext), s };
+    PREVIEW_LINKS.set(nameOf(seed, ext), link);
+  }
+  return { dir, files: out };
+};
+/** The launch film's copies: the cut and its poster, and the script. */
+export const PREVIEW_FILM_ATTACHED = listed('~/docs/launch-film', [
+  ['cut/launch-60s.mp4', 'f1', 'mp4', 4_393, FILM],
+  ['cut/poster.png', 'f2', 'png', 182_000, poster],
+]);
+export const PREVIEW_SCRIPT_ATTACHED = listed('~/docs/launch-film', [['script/launch-script.md', 'f3', 'md', SCRIPT.length, `data:text/markdown;charset=utf-8,${encodeURIComponent(SCRIPT)}`]]);
+/** The website's copy: the meter it shipped. */
+export const PREVIEW_SITE_ATTACHED = listed('~/docs/website', [['designs/limits-meter.png', 'f4', 'png', 71_000, meter]]);
+const FIZZ = JSON.stringify({
+  plus: 13, minus: 1, files: [
+    { path: 'src/fizz.js', plus: 2, minus: 1, hunks: [{ said: 'fizz(15) hit the Fizz branch first, so the FizzBuzz case goes on top.', nums: [[1, 1], [null, 2], [2, 3], [3, 4], [4, null], [null, 5], [5, 6]], rows: [
+      ['=', 'export function fizz(n) {'], ['+', '  if (n % 15 === 0) return "FizzBuzz";'],
+      ['=', '  if (n % 3 === 0) return "Fizz";'], ['=', '  if (n % 5 === 0) return "Buzz";'], ['-', '  return n;'], ['+', '  return String(n);'], ['=', '}'],
+    ] }] },
+    { path: 'test/fizz.test.js', plus: 11, minus: 0, hunks: [{ said: 'A test for each case, 15 first.', nums: Array.from({ length: 11 }, (_, i) => [null, i + 1]), rows: [
+      'import { fizz } from "../src/fizz.js";', '', 'test("15 is FizzBuzz", () => {', '  expect(fizz(15)).toBe("FizzBuzz");', '});', 'test("9 is Fizz", () => {', '  expect(fizz(9)).toBe("Fizz");', '});', 'test("7 is 7", () => {', '  expect(fizz(7)).toBe("7");', '});',
+    ].map((l) => ['+', l]) }] },
+  ],
+});
+/** The fizz thread's copy: the change its run saved, as main/phone-inbox.mts sends it. */
+export const PREVIEW_FIZZ_ATTACHED = listed('~/docs/website', [['runs/w-5e6f7a8b9d/the-change-it-made.change', 'f5', 'change', FIZZ.length, `data:application/json;charset=utf-8,${encodeURIComponent(FIZZ)}`]]);
 
 /** A link for every name; one the preview does not carry is the first picture. */
 export const previewLink = (n) => PREVIEW_LINKS.get(n) ?? PREVIEW_LINKS.values().next().value;

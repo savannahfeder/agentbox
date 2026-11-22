@@ -58,8 +58,18 @@ export function readLooseDraft(ref: TravellingRef, store?: DraftStore): CommentD
   }
 }
 
-/** The file's own draft wins, so a pinned comment is never covered by the notes you carried. */
-export function openCommentDraft(ref: TravellingRef, store?: DraftStore): CommentDraft & { holding: Holding } {
+/** A comment being written on version `from`, which a save replaced with the one being opened. */
+export interface MovedDraft { from: string; holding: Holding; draft: CommentDraft }
+
+/**
+ * The file's own draft wins, so a pinned comment is never covered by the notes
+ * you carried. A `moved` comment wins over both and leaves the version it was on.
+ */
+export function openCommentDraft(ref: TravellingRef, store?: DraftStore, moved?: MovedDraft | null): CommentDraft & { holding: Holding } {
+  if (moved && moved.from !== ref.file && (moved.draft.words.trim() || moved.draft.place)) {
+    keepCommentDraft({ ...ref, file: moved.from }, NONE, moved.holding, store);
+    return { ...moved.draft, holding: keepCommentDraft(ref, moved.draft, openCommentDraft(ref, store).holding, store) };
+  }
   const own = readCommentDraft(ref, store);
   if (own.words) return { ...own, holding: 'file' };
   return { ...readLooseDraft(ref, store), holding: 'loose' };

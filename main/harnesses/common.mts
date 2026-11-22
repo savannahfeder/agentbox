@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import { instructionsFor } from './instructions-file.mts';
+import { windowsRoot } from '../shell-path.mts';
 import type { InstructionsContext, InstructionsAnswer } from './instructions-file.mts';
 import type { OpenCodeProperties } from '../opencode.mts';
 import type { ToolingResult } from '../account-tooling.mts';
@@ -50,6 +51,7 @@ export interface HarnessDefinition {
   commandRoute: string;
   casks: readonly string[];
   installer: { shell: string; url: string; pipe: string };
+  windowsInstaller: { url?: string; page: string };
   loginArgs: readonly string[];
   statusArgs: readonly string[];
   credentialFiles: readonly string[];
@@ -97,6 +99,8 @@ export interface SignInFilesWhere {
 export interface HarnessCommand {
   file: string;
   args: string[];
+  /** Set when the command needs other variables than the caller's. */
+  env?: Env;
 }
 
 export interface HarnessItem {
@@ -168,6 +172,8 @@ export interface HarnessReaders {
   summarize(...args: never[]): unknown;
   trace(...args: never[]): unknown;
   activity(...args: never[]): unknown;
+  /** The agent has begun answering, so the words it was started with are in its conversation. */
+  took(...args: never[]): boolean;
 }
 
 /** One operation of a harness as the registry hands it out: every name is a function, declined or absent ones refuse before doing anything. */
@@ -175,7 +181,7 @@ export interface Harness extends Omit<HarnessDefinition, 'instructions'> {
   discover(configured?: unknown, where?: unknown): HarnessBinaryFound;
   binary(config: HarnessConfig | null | undefined): string | null;
   workerArgs(options?: WorkerArgsOptions): string[];
-  install(): HarnessCommand;
+  install(platform?: NodeJS.Platform, env?: Env): HarnessCommand;
   signIn(bin: string): HarnessCommand;
   signInStatus(bin: string): HarnessCommand;
   signInFiles(where: SignInFilesWhere): string[];
@@ -204,7 +210,11 @@ export interface Harness extends Omit<HarnessDefinition, 'instructions'> {
   approvalChanged(sup: HarnessSupervisor, ...args: unknown[]): unknown;
   memoryGate(sup: HarnessSupervisor, item?: HarnessItem): unknown;
   updatePlan(options: UpdatePlanOptions): UpdatePlanResult | null;
-  smallModelArgs(prompt: string, model?: string | null): string[];
+  smallModelArgs(prompt: string, model?: string | null, pictures?: readonly string[]): string[];
+  /** What a small call writes to stdin, for an engine that takes pictures there; null when nothing. */
+  smallModelInput?(prompt: string, pictures?: readonly string[]): string | null;
+  /** The answer inside what a small call printed, for an engine that wraps it. */
+  smallModelReply?(out: string, pictures?: readonly string[]): string;
   updateSettings(options: { home: string }): UpdateSettings;
   runCommand(sup: HarnessSupervisor, options: Record<string, unknown>): Promise<unknown>;
   instructions(context: InstructionsContext): InstructionsAnswer;
@@ -253,6 +263,24 @@ export function workerArgsFrom(run: HarnessRun | null | undefined, { prompt, gra
   return args as string[];
 }
 
+// Windows has no /bin/bash, so it runs the vendor's documented PowerShell line.
+// Windows PowerShell by its full path, so a powershell.exe earlier on PATH is
+// never the one run.
+function windowsInstall(definition: HarnessDefinition, env: Env): HarnessCommand {
+  const { url, page } = definition.windowsInstaller;
+  if (!url) throw Error(`${definition.label} has no installer the app can run on Windows yet. Install it from ${page}, then try again.`);
+  // An allowlist: anything PowerShell could read as more than an address is refused.
+  if (!/^https:\/\/[A-Za-z0-9.-]+(\/[A-Za-z0-9._~\/-]*)?$/.test(url)) throw Error(`${definition.label}'s Windows installer address is not a plain https address.`);
+  return {
+    file: path.win32.join(windowsRoot(env), 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `irm ${url} | iex`],
+    // Started from PowerShell 7, the app inherits a PSModulePath that names 7's
+    // modules first; Windows PowerShell then cannot load its own
+    // Get-FileHash, which Claude Code's installer needs. Unset, it builds its own.
+    env: Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== 'psmodulepath')),
+  };
+}
+
 export function definitionMethods(definition: HarnessDefinition) {
   const scrub = definition.scrubPatterns.map(pattern => new RegExp(pattern));
   return {
@@ -266,7 +294,10 @@ export function definitionMethods(definition: HarnessDefinition) {
     // would say so.
     instructions: (context?: InstructionsContext) => instructionsFor(definition, context),
     launchEnv: (_bin: string | null | undefined, env: Env): Env => ({ ...env }),
-    install: () => ({ file: definition.installer.shell, args: ['-c', `curl -fsSL ${definition.installer.url} | ${definition.installer.pipe}`] }),
+    install: (platform: NodeJS.Platform = process.platform, env: Env = process.env): HarnessCommand => {
+      if (platform === 'win32') return windowsInstall(definition, env);
+      return { file: definition.installer.shell, args: ['-c', `curl -fsSL ${definition.installer.url} | ${definition.installer.pipe}`] };
+    },
     signIn: (bin: string): HarnessCommand => ({ file: bin, args: [...definition.loginArgs] }),
     signInStatus: (bin: string): HarnessCommand => ({ file: bin, args: [...definition.statusArgs] }),
     accountKey: (profile: string | null | undefined) => `${definition.accountPrefix}${profile}`,

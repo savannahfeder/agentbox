@@ -6,15 +6,17 @@ import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { Face, TeamContext } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
-import type { FileNote, NotePlace, Person, TableCell, WorkItem } from '../types';
+import type { FileElsewhere, FileNote, NotePlace, Person, TableCell, WorkItem } from '../types';
 import { isTablePath } from '../table-file';
-import { notedFilesInLines, threadFiles, versionForPath, whoseIsTheFile } from '../../../shared/artifact-marks.mts';
+import { whoseIsTheFile } from '../../../shared/artifact-marks.mts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { notePictures, noteWithPictures } from '../note-pictures';
 import { canPaintQuotes, cellAround, paintQuotes } from '../paint-quotes';
-import { notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
-import { pinLabel, pinsToDraw } from '../artifact-pins';
+import { fileFamilyFor, notesBesideCount, notesCanPoint, noteAttachments, sentTimes, sidebarNotes } from '../notes-sidebar';
+import { noteBoxKey, noteSendWords, pinLabel, pinsToDraw, sentWithTheNote, whereANoteGoes, whoTalksOnFile } from '../artifact-pins';
 import { AttachRow } from './AttachRow';
+import { LinkNotes, linkReplyWords, useLinkNotes, type LinkReplyTo } from './LinkNotes';
+import { canShareFile } from './ShareLink';
 import { NotePictureShown } from './FileNoteCard';
 import { NoteGlyph } from './NoteGlyphs';
 import { PinMarks, spotIn } from './PinMarks';
@@ -61,6 +63,31 @@ export function NotesToggle({ open, waiting, onToggle }: { open: boolean; waitin
   );
 }
 
+/**
+ * Beside the chat, where notes are not drawn: the same corner mark, counting the
+ * file's notes, every copy's included, and pressing it opens them full screen.
+ */
+export function NotesBesideMark({ item, src, onOpen }: { item: WorkItem; src: string; onOpen: () => void }) {
+  const [lines, setLines] = useState<LedgerLine[]>([]);
+  useEffect(() => {
+    let live = true;
+    const read = () => { void api.itemHistory({ product: item.product, id: item.id }).then((r) => { if (live) setLines(r?.lines ?? []); }); };
+    read();
+    const off = api.onChanged(read);
+    return () => { live = false; off?.(); };
+  }, [item.product, item.id]);
+  const { fileIds, copies } = useMemo(() => fileFamilyFor(lines, src), [lines, src]);
+  const copiesKey = JSON.stringify(copies);
+  const [elsewhere, setElsewhere] = useState<FileElsewhere[]>([]);
+  useEffect(() => {
+    if (!copies.length) { setElsewhere([]); return undefined; }
+    let live = true;
+    void api.fileElsewhere({ product: item.product, id: item.id, copies }).then((all) => { if (live) setElsewhere(all); });
+    return () => { live = false; };
+  }, [item.product, item.id, copiesKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <NotesToggle open={false} waiting={notesBesideCount(item.artifacts?.notes ?? [], fileIds, elsewhere)} onToggle={onOpen} />;
+}
+
 type Quote = { text: string; cell?: TableCell };
 
 const Quoted = ({ quote }: { quote: Quote }) => (
@@ -105,25 +132,20 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
 
-  // The version this document is on the thread's file line, or a line of its own when no message named it.
-  const { version, fileIds, files } = useMemo(() => {
-    const asked = src.replace(/^\.\//, '');
-    const said = notedFilesInLines(lines);
-    const named = versionForPath(threadFiles(said), asked);
-    const all = named ? said : [...said, { path: asked, by: null, at: 0 }];
-    const families = threadFiles(all);
-    const v = named ?? versionForPath(families, asked);
-    const family = v ? families.find((f) => f.versions.some((x) => x.id === v.id)) : null;
-    return { version: v, fileIds: family ? family.versions.map((x) => x.id) : [], files: all };
-  }, [lines, src]);
+  const { version, agent, fileIds, files } = useMemo(() => fileFamilyFor(lines, src), [lines, src]);
 
   const [pending, setPending] = useState<FileNote[]>([]);
   const stored = item.artifacts?.notes ?? [];
   const all = [...stored, ...pending.filter((p) => !stored.some((n) => n.id === p.id))];
   const { waiting, said } = sidebarNotes(all, fileIds, people);
-  const canSend = typeof version?.agent === 'string';
+  const canSend = agent !== null;
   const sentAt = useMemo(() => sentTimes(lines), [lines]);
   const authors = [...new Set([...waiting, ...said].map((n) => n.by))].slice(0, 3);
+  const noteTo = {
+    people, me, agentMade: canSend, toAgent: canSend,
+    owner: version ? whoseIsTheFile(files, version.id) : null, threadOwner: item.runner ?? item.createdBy ?? null,
+    talking: whoTalksOnFile(all, fileIds, me),
+  };
 
   const aside = useRef<HTMLElement | null>(null);
   const page = useRef<HTMLElement | null>(null);
@@ -192,7 +214,11 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     highlights?.delete('av-quote'); highlights?.delete('av-quote-on');
   }, []);
 
-  const goTo = (note: FileNote) => {
+  // The file's words go to the agent; these came from the link page and are answered there.
+  const linkNotes = useLinkNotes(canShareFile(src) ? { product: item.product, thread: item.id, src } : null);
+  const [toLink, setToLink] = useState<LinkReplyTo | null>(null);
+
+  const goTo = (note: Pick<FileNote, 'id' | 'place'>) => {
     setActiveId(note.id);
     if (note.place.kind === 'pin' && pinsHere) {
       const box = pinsHere.parentElement;
@@ -203,10 +229,12 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
   };
   const pointAt = (q: Quote | null, s: { x: number; y: number } | null) => {
     setQuote(q); setSpot(s); setPinning(false);
+    if (q || s) setToLink(null);
     if (q || s) requestAnimationFrame(() => box.current?.focus());
   };
 
   const [words, setWords] = useState('');
+  const sendWords = noteSendWords({ ...noteTo, text: words, nameOf: whoSaid });
   const [pictures, setPictures] = useState<PendingAttachment[]>([]);
   const { attaching, collect } = useAttaching();
   const [sending, setSending] = useState(false);
@@ -232,7 +260,18 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     if (got.length) setPictures((was) => [...was, ...got]);
   };
 
-  const add = async () => {
+  const sendToLink = async () => {
+    const typed = words.trim();
+    if (!toLink || !typed || sending) return;
+    setSending(true);
+    const ok = await linkNotes.reply(typed);
+    setSending(false);
+    if (!ok) { setTrouble('That reply did not reach the link page.'); return; }
+    setWords(''); setToLink(null); setTrouble(null);
+  };
+
+  const add = async (now = false) => {
+    if (toLink) { void sendToLink(); return; }
     const typed = words.trim();
     if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     setSending(true);
@@ -246,24 +285,29 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     const place: NotePlace = spot ? { kind: 'pin', x: spot.x, y: spot.y } : quote ? { kind: 'quote', ...quote } : { kind: 'whole' };
     const id = newId();
     const owner = whoseIsTheFile(files, version.id);
+    const goes = whereANoteGoes({ ...noteTo, text: typed });
+    const mentions = goes.to === 'person' ? [goes.person] : [];
+    const withIt = now && canSend ? sentWithTheNote(goes, waiting.filter((n) => !n.saving).map((n) => n.id), id) : [];
     const kept = { words, quote, spot, pictures };
     const pin = spot ? { pin: pinNotes.length + 1 } : {};
-    setPending((was) => [...was, { id, file: version.id, place, text, by: me, ts: Date.now(), mentions: [], owner: null, uid: null, wait: true, saving: true, ...pin }]);
+    setPending((was) => [...was, { id, file: version.id, v: version.n, place, text, by: me, ts: Date.now(), mentions, owner: null, uid: null, wait: true, saving: true, ...pin }]);
     setWords(''); setQuote(null); setSpot(null); setPictures([]); setTrouble(null);
-    const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, place, text, wait: true, ...(owner ? { owner } : {}) } })
+    const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'note', id, file: version.id, v: version.n, place, text, wait: true, ...(mentions.length ? { mentions } : {}), ...(owner ? { owner } : {}) } })
       .catch((err: Error) => ({ ok: false, error: err.message }));
     setSending(false);
     // Kept, so Send can take it before the thread's own copy catches up.
-    if (out.ok) setPending((was) => was.map((n) => (n.id === id ? { ...n, saving: false } : n)));
-    else {
+    if (out.ok) {
+      setPending((was) => was.map((n) => (n.id === id ? { ...n, saving: false } : n)));
+      if (withIt.length) await sendNotes(withIt);
+    } else {
       setPending((was) => was.filter((n) => n.id !== id));
       setWords(kept.words); setQuote(kept.quote); setSpot(kept.spot); setPictures(kept.pictures);
       setTrouble(out.error ?? 'That note did not save.');
     }
   };
 
-  const send = async () => {
-    const on = waiting.filter((n) => !n.saving).map((n) => n.id);
+  const send = () => sendNotes(waiting.filter((n) => !n.saving).map((n) => n.id));
+  const sendNotes = async (on: string[]) => {
     if (!on.length) return;
     const out = await api.fileMark({ product: item.product, id: item.id, mark: { do: 'toagent', on } }).catch((err: Error) => ({ ok: false, error: err.message }));
     setTrouble(out.ok ? null : out.error ?? 'Those notes did not reach the agent.');
@@ -286,6 +330,8 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
           <NotesSection word={canSend ? 'Sent' : 'Notes'} />
           {said.map(note)}
         </>}
+        <LinkNotes comments={linkNotes.comments} activeId={activeId} replyingTo={toLink?.id ?? null} onGo={(place, id) => goTo({ id, place })}
+          onReply={(to) => { setToLink(to); pointAt(null, null); requestAnimationFrame(() => box.current?.focus()); }} />
       </div>
       {trouble && <p className="sb-trouble" role="alert">{trouble}</p>}
       <form className="sb-foot" onSubmit={(e) => { e.preventDefault(); void add(); }}>
@@ -293,14 +339,20 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
           onClick={(e) => { if (e.target === e.currentTarget) box.current?.focus(); }}
           onDragOver={canAttach ? (e) => e.preventDefault() : undefined}
           onDrop={canAttach ? (e) => { e.preventDefault(); void addFiles(e.dataTransfer.files); } : undefined}>
+          {toLink && (
+            <div className="sb-write-quote">
+              <span className="sb-quote">{linkReplyWords(toLink)}</span>
+              <button type="button" className="sb-icon" aria-label="Write a note instead" title="Write a note instead" onClick={() => { setToLink(null); box.current?.focus(); }}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
+            </div>
+          )}
           {(quote || spot) && (
             <div className="sb-write-quote">
               {spot ? <span className="sb-pin-draft"><span className="av-pin-tag sb-pin">{pinNotes.length + 1}</span></span> : quote && <Quoted quote={quote} />}
               <button type="button" className="sb-icon" aria-label={`Note the whole ${table ? 'table' : 'page'} instead`} title={`Note the whole ${table ? 'table' : 'page'} instead`} onClick={() => pointAt(null, null)}><Glyph d="M4 4l8 8M12 4l-8 8" /></button>
             </div>
           )}
-          <textarea ref={box} rows={1} value={words} aria-label="Note"
-            placeholder={spot ? 'Your note on this spot' : quote ? 'Your note on these words' : pinning ? 'Click a spot on the page'
+          <textarea ref={box} rows={1} value={words} aria-label={toLink ? linkReplyWords(toLink) : 'Note'}
+            placeholder={toLink ? 'Your reply' : spot ?'Your note on this spot' : quote ? 'Your note on these words' : pinning ? 'Click a spot on the page'
               : pinsHere ? 'Add a note, select words or pin a spot' : table ? 'Add a note, or right-click a cell'
               : page.current || points.words ? 'Add a note, or select words in the page' : 'Add a note'}
             onChange={(e) => setWords(e.target.value)}
@@ -311,24 +363,30 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
               if (got.length) setPictures((was) => [...was, ...got]);
             } : undefined}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void add(); }
+              if (toLink && (e.key === 'Enter' || e.key === 'Escape') && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                if (e.key === 'Enter') void sendToLink(); else setToLink(null);
+                return;
+              }
+              const does = noteBoxKey({ key: e.key, chord: e.metaKey || e.ctrlKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, typed: !!words.trim() || !!pictures.length, waiting: canSend ? waiting.length : 0 });
+              if (does !== 'leave') { e.preventDefault(); void (does === 'send waiting' ? send() : add(does === 'note and send')); }
               // The app ignores Escape inside a box, so letting go of it is what lets the next one leave full screen.
               else if (e.key === 'Escape') { e.preventDefault(); if (quote || spot || pinning) pointAt(null, null); else e.currentTarget.blur(); }
             }} />
           <AttachRow attachments={pictures} attaching={attaching} onRemove={(i) => setPictures((was) => was.filter((_, j) => j !== i))} />
           <div className="sb-write-foot">
-            {canAttach && <>
+            {canAttach && !toLink && <>
               <button type="button" className="sb-icon" title="Attach files" aria-label="Attach files" onClick={() => fileInput.current?.click()}><Glyph d="M10.5 4.5 5.2 9.8a1.6 1.6 0 0 0 2.3 2.3l5.6-5.6a3 3 0 0 0-4.2-4.2L3.3 7.9a4.4 4.4 0 0 0 6.2 6.2l4-4" /></button>
               <input ref={fileInput} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />
             </>}
-            {pinsHere && (
+            {pinsHere && !toLink && (
               <button type="button" className={`sb-icon${pinning ? ' is-on' : ''}`} aria-pressed={pinning}
                 title={pinning ? 'Click a spot on the page' : 'Pin a spot'} aria-label="Pin a spot" onClick={() => setPinning(!pinning)}>
                 <Glyph d="M8 9.2V14M3.5 7a4.5 4.5 0 0 1 9 0M10.2 7a2.2 2.2 0 1 1-4.4 0 2.2 2.2 0 0 1 4.4 0" />
               </button>
             )}
             <span className="sb-spring" />
-            <button type="submit" className="sb-add" title="Add note (return)" aria-label="Add note"
+            <button type="submit" className="sb-add" title={`${toLink ? 'Reply' : sendWords} (return)`} aria-label={toLink ? 'Reply' : sendWords}
               disabled={(!words.trim() && !pictures.length) || sending || attaching.length > 0 || !!attachProblem(pictures)}>
               <ReturnGlyph />
             </button>

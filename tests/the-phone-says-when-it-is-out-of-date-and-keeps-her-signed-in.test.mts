@@ -29,8 +29,8 @@ describe('the line over her inbox', () => {
   });
 
   it('says when her computer was last online, once it has been away a while', () => {
-    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 3 * 24 * 60 * MIN }, NOW)).toBe('Your computer was last online 3 days ago. What you send waits for it.');
-    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 40 * MIN }, NOW)).toBe('Your computer was last online 40 minutes ago. What you send waits for it.');
+    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 3 * 24 * 60 * MIN }, NOW)).toBe('Agentbox on your computer was last online 3 days ago. Open it to run what you send.');
+    expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - 40 * MIN }, NOW)).toBe('Agentbox on your computer was last online 40 minutes ago. Open it to run what you send.');
     expect(phoneStatusLine({ error: null, fetchedAt: NOW, macSeen: NOW - MIN }, NOW)).toBe(null);
     // No computer has ever put anything here: the inbox asks for one instead
     // (tests/the-web-app-says-when-no-computer-has-connected.test.mts).

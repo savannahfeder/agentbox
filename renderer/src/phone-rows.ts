@@ -4,7 +4,7 @@
 // one copy of every rule.
 
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
-import { madeHere, phoneChoices, WAIT_STATES } from '../../shared/phone-snapshot.mts';
+import { madeHere, phoneChoices, WAIT_STATES, type PhoneChange } from '../../shared/phone-snapshot.mts';
 import { runOfClaim } from '../../shared/cloud-kit.mts';
 import { isCarried } from '../../shared/cloud-carry.mts';
 import { Name } from '../../shared/product-name.mjs';
@@ -12,6 +12,7 @@ import { statusForReply } from './list-rules';
 import { cloudPlaces, type Attached } from './cloud-files';
 import type { RunningSession, WorkItem } from './types';
 import type { LedgerLine } from './thread-history';
+import type { TraceSession } from './notes';
 import type { SettingsRow } from './phone-settings-view';
 
 /** A thread's copy as her computer wrote it (shared/phone-snapshot.mts threadSnapshot), read back as JSON. */
@@ -20,10 +21,12 @@ export interface PhoneSnapshot {
   item?: WorkItem;
   history?: LedgerLine[];
   olderLines?: number;
+  runs?: TraceSession[];
   approvals?: { id?: string; at?: number; tool?: string; card?: string | null; input?: Record<string, unknown> }[];
   live?: { at: number; since?: number; where?: string; movable?: boolean; doing?: { label?: string; startedAt?: number }[] } | null;
   wait?: { state: string; tool?: string; until?: number } | null;
   attached?: Attached;
+  change?: PhoneChange;
 }
 /** What a command carries, as JSON from the database: which fields depend on `kind`. */
 export interface CommandPayload {
@@ -132,15 +135,16 @@ export const realItem = (aliases: Aliases, product: string, id: string) => (alia
  * hers in the thread, marked as waiting. What her computer turned down says
  * why, for a day after it did (second review, finding 9).
  */
-export function phoneView(rows: PhoneRows, now = Date.now()) {
+export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly { device: string; name: string }[] = []) {
   const names = new Map(rows.projects.map((p) => [phoneSlug(p.device, p.project), p.name]));
   // Each project's stand-in folders, so a path in a message finds its file here (cloud-files.ts).
   const places = cloudPlaces(rows.threads, phoneSlug);
   // Two computers' projects of the same name, told apart by which computer.
   const twice = new Set(rows.projects.map((p) => p.name).filter((n, i, all) => all.indexOf(n) !== i));
+  const computerOf = (device: string) => computers.find((c) => c.device === device)?.name || device.slice(0, 4);
   const products = rows.projects.map((p) => {
     const slug = phoneSlug(p.device, p.project);
-    return { slug, name: twice.has(p.name) ? `${p.name} (${p.device.slice(0, 4)})` : p.name, dir: places.get(slug)?.dir ?? '', oneLiner: '', repoPath: places.get(slug)?.repo ?? '' };
+    return { slug, name: twice.has(p.name) ? `${p.name} (${computerOf(p.device)})` : p.name, dir: places.get(slug)?.dir ?? '', oneLiner: '', repoPath: places.get(slug)?.repo ?? '' };
   });
   const items = new Map<string, PhoneItem>();
   const screenId = new Map<string, string>();
@@ -156,6 +160,8 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
   const used = new Set<string>();
   const running: RunningSession[] = [];
   const waits = new Map<string, { state: string; tool?: string; until?: number }>();
+  // What each thread's last run changed, by `${product}/${id}` as the phone names them.
+  const changes: Record<string, PhoneChange> = {};
   const threads =[...rows.threads].sort((a, b) => `${a.device}/${a.project}`.localeCompare(`${b.device}/${b.project}`));
   for (const t of threads) {
     const slug = phoneSlug(t.device, t.project);
@@ -193,6 +199,8 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
     // Why the computer has not started it, in its own words (shared/phone-snapshot.mts phoneWaitsOf).
     const wait = t.snapshot.wait;
     if (wait && typeof wait === 'object' && WAIT_STATES.includes(wait.state)) waits.set(id, wait);
+    const change = t.snapshot.change;
+    if (change && typeof change === 'object' && Array.isArray(change.files)) changes[`${slug}/${id}`] = change;
   }
   const waiting: Waiting[] = [];
   // Threads that start when the computer takes what was sent, or that the
@@ -250,8 +258,11 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
       said(String(c.payload?.text ?? ''));
       if (!refused && takenAt === null && !cloud) queue(id as string);
       // Answered, as the window marks a row the moment she sends, so it is In
-      // progress until her Mac takes it and its own copy says what happened.
-      if (row && !refused && (!sent || copyAt < takenAt!)) items.set(key, { ...row, status: statusForReply(row.status) ?? row.status, answer: String(c.payload?.text ?? ''), wrote: { ...row.wrote, answer: { ts: at, source: 'founder' } }, updatedAt: at });
+      // progress until her Mac takes it and its own copy says what happened:
+      // her words, or the agent answering after them. A copy stamped later can
+      // still be one built before her answer landed.
+      const answeredSince = Number(row?.wrote?.result?.ts) > at;
+      if (row && !refused && (!sent || copyAt < takenAt! || !answeredSince)) items.set(key, { ...row, status: statusForReply(row.status) ?? row.status, answer: String(c.payload?.text ?? ''), wrote: { ...row.wrote, answer: { ts: at, source: 'founder' } }, updatedAt: at });
     }
     else if (refused && c.item && (c.kind === 'close' || c.kind === 'snooze')) {
       said(c.kind === 'close' ? 'Close this thread' : Number(c.payload?.until) > 0 ? 'Move to Later' : 'Bring back from Later');
@@ -276,7 +287,18 @@ export function phoneView(rows: PhoneRows, now = Date.now()) {
       } as PhoneItem);
     }
   }
-  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards };
+  // Threads on a computer that is away while another of yours is online: the
+  // banner reads the newest heartbeat, so nothing else says these will not run.
+  const seen = new Map<string, number>();
+  for (const p of rows.projects) seen.set(p.device, Math.max(seen.get(p.device) ?? 0, Date.parse(p.updated_at ?? '') || 0));
+  const online = new Set([...seen].filter(([, at]) => !macAway(at, now)).map(([d]) => d));
+  const carried = new Set(rows.projects.filter((p) => p.cloud === true).map((p) => phoneSlug(p.device, p.project)));
+  const live = new Set(running.map((r) => `${r.product}/${r.itemId}`));
+  const stranded = online.size === 0 ? [] : [...items.values()].filter((i) => {
+    const where = splitSlug(i.product);
+    return !!where && !online.has(where.device) && !carried.has(i.product) && !live.has(`${i.product}/${i.id}`);
+  }).map((i) => i.id);
+  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards, changes, stranded };
 }
 
 /** What one thread's live line is told of the computer's queue, off the view (the phone app's thread page). */
@@ -359,11 +381,29 @@ export function approvalCommand(cards: Cards, p: { id: string; allow: boolean; n
   return { device: c.device, project: c.project, item: c.item, kind: 'approve', payload: { approval: p.id, allow: p.allow === true, ...(typeof p.note === 'string' && p.note ? { note: p.note } : {}), card: c.card } };
 }
 
-/** The thread's lines as her computer sent them, for the thread view. */
-export function phoneHistory(rows: PhoneRows, product: string, id: string, aliases: Aliases = {}) {
+const snapshotOf = (rows: PhoneRows, product: string, id: string, aliases: Aliases) => {
   const item = realItem(aliases, product, id);
-  const t = rows.threads.find((r) => phoneSlug(r.device, r.project) === product && r.item === item);
-  return { ok: true, lines: Array.isArray(t?.snapshot?.history) ? t.snapshot.history.map((l: LedgerLine) => ({ ...l, id })) : [] };
+  return rows.threads.find((r) => phoneSlug(r.device, r.project) === product && r.item === item)?.snapshot ?? null;
+};
+
+/** The logs of the thread's newest runs as her computer sent them, read as the desktop reads its own. */
+export function phoneRuns(rows: PhoneRows, product: string, id: string, aliases: Aliases = {}): TraceSession[] {
+  const runs = snapshotOf(rows, product, id, aliases)?.runs;
+  return Array.isArray(runs) ? runs.filter((r) => r && Number.isFinite(r.startedAt) && typeof r.text === 'string') : [];
+}
+
+/**
+ * The thread's lines as her computer sent them, for the thread view. The copy
+ * leaves out pickups, and a run is drawn under the pickup that started it
+ * (thread-history.ts withRuns), so each run sent gets one at its start.
+ */
+export function phoneHistory(rows: PhoneRows, product: string, id: string, aliases: Aliases = {}) {
+  const snapshot = snapshotOf(rows, product, id, aliases);
+  const lines: LedgerLine[] = Array.isArray(snapshot?.history) ? snapshot.history.map((l: LedgerLine) => ({ ...l, id })) : [];
+  const runs = phoneRuns(rows, product, id, aliases);
+  if (!runs.length) return { ok: true, lines };
+  const pickups: LedgerLine[] = runs.map((r) => ({ id, ts: r.startedAt, source: 'agent', claim: { holder: 'run', leaseUntil: r.startedAt } }));
+  return { ok: true, lines: [...lines, ...pickups].sort((a, b) => a.ts - b.ts) };
 }
 
 /** What one press on the phone leaves for her Mac, or null for a press that is not one of the four. */
@@ -428,7 +468,7 @@ export const macAway = (macSeen: number, now = Date.now()) => !!macSeen && now -
 /** The line over her inbox when what it shows may be out of date, or null. */
 export function phoneStatusLine({ error, fetchedAt, macSeen, cloud = false }: { error: string | null; fetchedAt: number; macSeen: number; cloud?: boolean }, now = Date.now()): string | null {
   if (error) return `Can't reach your inbox online.${fetchedAt ? ` This is how it was ${ago(now - fetchedAt)}.` : ''}`;
-  if (macAway(macSeen, now)) return cloud ? `Your computer is off. Replies carry on in ${Name} Cloud.` : `Your computer was last online ${ago(now - macSeen)}. What you send waits for it.`;
+  if (macAway(macSeen, now)) return cloud ? `Your computer is off. Replies carry on in ${Name} Cloud.` : `${Name} on your computer was last online ${ago(now - macSeen)}. Open it to run what you send.`;
   return null;
 }
 /**

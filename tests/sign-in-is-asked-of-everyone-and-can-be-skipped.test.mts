@@ -93,3 +93,27 @@ describe('what is drawn', () => {
     expect(app).toMatch(/onSignIn=\{signInAsked\.sidebar \? askToSignIn : undefined\}/);
   });
 });
+
+describe('a new install, during its first run', () => {
+  // The founder, trying the new first run (w-fbe5e95dea, 2026-11-09): "it's
+  // opening with authentication, but logically should probably do so later in
+  // flow ... this is the kinda page that many will churn at." The setup asks
+  // for sign-in at its invite step instead, and finishing it counts as a skip.
+  it('is not stopped by the sign-in page, and the walk does not wait for it', () => {
+    expect(ask(team({ configured: true }), { firstRun: true })).toMatchObject({ page: false, walkWaits: false });
+  });
+  it('is still asked once the first run is behind it', () => {
+    expect(ask(team({ configured: true }), { firstRun: false }).page).toBe(true);
+  });
+  it('the phone with the computer shut still needs the account', () => {
+    expect(ask(team({ configured: true }), { firstRun: true, canSkip: false }).page).toBe(true);
+  });
+  it('the window asks the rule with whether this is a first run', () => {
+    expect(read('renderer/src/App.tsx')).toMatch(/signInAsk\(\{[^}]*firstRun: newInstall/);
+  });
+  // Then: "we are making login required". The setup's sign-in step cannot be
+  // skipped, and finishing the setup no longer counts as Skip for now.
+  it('finishing the first run is not a skip', () => {
+    expect(read('renderer/src/App.tsx')).not.toMatch(/const finishFresh[\s\S]{0,400}skipSignIn\(\)/);
+  });
+});

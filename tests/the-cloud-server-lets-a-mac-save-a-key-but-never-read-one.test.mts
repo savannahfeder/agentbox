@@ -87,3 +87,39 @@ describe('a run\'s start', () => {
     expect(sent.find((p) => p.action === 'start').keys.map((k) => k.name)).toEqual(['C_KEY']);
   });
 });
+
+// A key the person allows while a run waits (main/cloud/key-asks.mts) goes as
+// a file delivery to a run already going. Stand-in power test, 2026-11-08: it
+// reached the sandbox as a bare name, and the run said the key "did not reach
+// this machine".
+describe('a key handed to a run while it goes', () => {
+  const hand = (url, key = 'POSTHOG_PERSONAL_KEY') => ({ sessionId: 'run-1', payload: { action: 'files', resource: true, runId: 'r1', n: 3, files: [{ key, url, path: `/tmp/agentbox-resources/x/keys/${key}` }] } });
+  async function going() {
+    const s = setup();
+    await s.call('POST', '/v1/invoke', { sessionId: 'run-1', payload: { action: 'start', runId: 'r1', login: { engine: 'claude', id: 'L1', url: 'agentbox-login:logins/claude/L1.json' } } });
+    s.sent.length = 0;
+    return s;
+  }
+
+  it('is linked in the person\'s own space, like a run\'s keys at its start', async () => {
+    const { sent, call } = await going();
+    await call('POST', '/v1/invoke', hand('agentbox-login:logins/keys/0b7a9c1e-1111-4111-8111-111111111111.json'));
+    expect(sent.at(-1).files).toEqual([{ key: 'POSTHOG_PERSONAL_KEY', url: `https://b/get/logins/u-${A}/keys/0b7a9c1e-1111-4111-8111-111111111111.json`, path: '/tmp/agentbox-resources/x/keys/POSTHOG_PERSONAL_KEY' }]);
+  });
+
+  it('is never a sign-in, a plain link or anything outside the saved keys', async () => {
+    for (const url of ['agentbox-login:logins/claude/L1.json', `https://b/get/logins/u-${B}/keys/theirs.json`, 'agentbox-login:runs/r1/out.bundle']) {
+      const { sent, call } = await going();
+      const out = await call('POST', '/v1/invoke', hand(url));
+      expect(out.status).toBe(400);
+      expect(sent).toEqual([]);
+    }
+  });
+
+  it('leaves every other file delivery as it was', async () => {
+    const { sent, call } = await going();
+    const files = [{ path: '/tmp/agentbox-resources/x/abc/notes.md', url: 'https://b/get/cache/abc' }];
+    await call('POST', '/v1/invoke', { sessionId: 'run-1', payload: { action: 'files', resource: true, runId: 'r1', n: 1, files } });
+    expect(sent.at(-1).files).toEqual(files);
+  });
+});

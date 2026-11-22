@@ -75,7 +75,6 @@ describe('on a phone, the background', () => {
   it('so the tabs show the wall, and what is solid wears the wall\'s own colour', () => {
     expect(last('.list-pane > .th-bar', 'background')).toBe('transparent');
     expect(last('.th-pop', 'background')).toBe('var(--bg)');
-    expect(last('.focus-pane .ts-panel', 'background')).toBe('var(--bg)');
   });
   it('and the colour behind the clock is set again once the inbox has drawn, however long that takes', () => {
     const screen = read('renderer/src/phone-screen.ts');

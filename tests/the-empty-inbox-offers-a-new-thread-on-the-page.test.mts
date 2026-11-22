@@ -91,11 +91,14 @@ describe('the box, on the page and in the dialog', () => {
     expect(page).not.toContain('tc-head');
   });
 
-  it('on the page carries To and Model as chips ahead of the project', () => {
+  // With nobody but the agent to send to, there is no To chip: the model
+  // picks the program (2026-11-15).
+  it('on the page carries Model as a chip ahead of the project, and no To', () => {
     const page = draw(true);
     const bar = page.slice(page.indexOf('tc-bar'));
-    expect(bar.indexOf('Agent')).toBeGreaterThan(-1);
-    expect(bar.indexOf('Agent')).toBeLessThan(bar.indexOf('Northwind'));
+    expect(bar.indexOf('Opus')).toBeGreaterThan(-1);
+    expect(bar.indexOf('Opus')).toBeLessThan(bar.indexOf('Northwind'));
+    expect(bar).not.toMatch(/tc-word-text">Agent</);
     expect(bar).not.toContain('tc-label');
   });
 

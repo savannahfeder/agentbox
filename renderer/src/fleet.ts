@@ -6,7 +6,9 @@
 // row can say what is happening without four more props threaded through two
 // components that have nothing to do with agents.
 import { createContext } from 'react';
-import type { RunningSession, WhyNotCloud } from './types';
+import type { RunningSession, WhyNotCloud, WorkItem } from './types';
+import { DEFAULT_ENGINE } from '../../shared/engines.mts';
+import { CODEX_LABELS } from './box-filter';
 
 export interface Fleet {
   /** The run on each thread an agent is on right now, by thread id. */
@@ -36,6 +38,25 @@ export interface Fleet {
   paused?: boolean;
   /** `supervisor.whyNotCloud`: why a thread runs locally or waits, with the cloud on Everything. */
   whyNotCloud?: Record<string, WhyNotCloud>;
+  /** The inbox's sign-in bar is up (`PlanBar`): no agent is signed in. */
+  signInBar?: boolean;
+  /** `snapshot.engines`: what a thread nothing is running on would start on, `byItem[id] ?? workspace`. */
+  engines?: { workspace: string; byItem: Record<string, string> };
+}
+
+/** The harness a thread is on, read as the row's byline reads it (List.tsx `agentRest`, byline.ts `agentAtWork`). */
+export function harnessOn(item: Pick<WorkItem, 'id' | 'labels'>, fleet: Fleet): string {
+  if ((item.labels ?? []).some((l) => CODEX_LABELS.has(l))) return 'codex';
+  return fleet.sessions?.get(item.id)?.engine ?? fleet.engines?.byItem[item.id] ?? fleet.engines?.workspace ?? DEFAULT_ENGINE;
+}
+
+/**
+ * The threads nothing will start until a person acts, for the lists: the ones
+ * the supervisor stopped, and the ones waiting on a sign-in. A thread whose
+ * run died on the sign-out and one that was never started read the same.
+ */
+export function stoppedIds(fleet: Pick<Fleet, 'stalled' | 'signInNeeded'>): Set<string> {
+  return new Set([...(fleet.stalled ?? []), ...Object.keys(fleet.signInNeeded ?? {})]);
 }
 
 export const FleetContext = createContext<Fleet>({});

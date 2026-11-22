@@ -35,6 +35,6 @@ describe('what the subject sends', () => {
     expect(card).toMatch(/api\.teamMessage\(toMany[^\n]*messageSubject\(subject\)/);
   });
   it('turns off the line saying the message continues the conversation', () => {
-    expect(card).toMatch(/convo && onOpenConversation && sendAs === 'message' && !messageSubject\(subject\)/);
+    expect(card).toMatch(/convo && onOpenConversation && sendAs === 'message' && goes === 'direct' && !messageSubject\(subject\)/);
   });
 });

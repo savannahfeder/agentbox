@@ -77,7 +77,7 @@ type Given = { assignee?: string; createdBy?: string | null; status: string };
 
 /** What you are waiting on a person for: tasks you gave them that are not done. */
 export function youWaitOn<T extends Given>(items: readonly T[], me: string | null, personId: string): T[] {
-  return items.filter((i) => i.assignee === personId && i.status !== 'done' && (!i.createdBy || i.createdBy === me));
+  return items.filter((i) => i.assignee === personId && i.status !== 'done' && !!me && i.createdBy === me);
 }
 
 const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -87,6 +87,14 @@ export function nowAndFinished<T>(rows: readonly T[], { done, at, now }: { done:
   const on = rows.filter((r) => !done(r)).sort((a, b) => at(b) - at(a));
   const finished = rows.filter((r) => done(r) && at(r) >= now - WEEK).sort((a, b) => at(b) - at(a));
   return { now: on, finished };
+}
+
+type Shared = { personId: string; visible: boolean; state: string; updatedAt: number };
+
+/** A person's page's In progress and Done this week: the shared threads you can read, running ones first. */
+export function personThreads<C extends Shared>(cards: readonly C[], personId: string, { now, skip = () => false }: { now: number; skip?: (c: C) => boolean }): { now: C[]; finished: C[] } {
+  const split = nowAndFinished(cards.filter((c) => c.personId === personId && c.visible && !skip(c)), { done: (c) => c.state === 'done', at: (c) => c.updatedAt, now });
+  return { now: split.now.sort((a, b) => Number(b.state === 'running') - Number(a.state === 'running')), finished: split.finished };
 }
 
 /** You, the team's chat, people, then AI teammates (yours, less paused ones, then everyone else's). Nobody to show when you are alone. */

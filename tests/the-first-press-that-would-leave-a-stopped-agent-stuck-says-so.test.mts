@@ -57,7 +57,7 @@ const busy = { id: 'agent:72', product: '', agent: { status: 'busy', waitingFor:
 // a reply would wait behind that box, so this row is not the lesson.
 const atAPrompt = { id: 'agent:73', product: '', agent: { status: 'waiting', waitingFor: 'permission prompt' } };
 
-const hold = (rows, over = {}) => holdForStoppedAgent({ rows, key: 'E', warned: false, walking: false, ...over });
+const hold = (rows, over = {}) => holdForStoppedAgent({ rows, key: 'E', warned: false, ...over });
 
 describe('which rows are an agent stopped, waiting on you', () => {
   it('a live offer is one, because the screen is showing the answers it wants', () => {
@@ -129,13 +129,6 @@ describe('the first press that would leave one stuck says so instead', () => {
     expect(held).toBeTruthy();
     expect(held.goes).toEqual({ product: '', id: 'agent:71' });
   });
-
-  it('the walk keeps its own lesson, so a walk never spends the one nudge', () => {
-    // `closingRefused` has the practice rows while the walk is on, and it
-    // refuses them every time rather than once. A press inside the walk must
-    // not be the press that uses this up.
-    expect(hold([stopped], { walking: true })).toBe(null);
-  });
 });
 
 describe('the nudge is remembered once, ever', () => {
@@ -169,7 +162,7 @@ describe('the nudge is remembered once, ever', () => {
 
 describe('every way a stopped row could leave the inbox goes past the nudge', () => {
   it('the single close does', () => {
-    expect(app).toMatch(/const markDone[\s\S]{0,1400}?nudgeOnStopped\(\[item\], 'E'\)/);
+    expect(app).toMatch(/const markDone[\s\S]{0,1800}?nudgeOnStopped\(\[item\], 'E'\)/);
   });
 
   it('a ticked selection does, so E over four ticks cannot take one out unwarned', () => {
@@ -189,9 +182,10 @@ describe('every way a stopped row could leave the inbox goes past the nudge', ()
     // showToast's second argument is what turns the pill into a button with
     // "Open it" on its end (App.tsx, `.toast-goes`). The sentence without it
     // would be advice with no way in. `rememberWarned` beside it is what makes
-    // the next press land.
+    // the next press land. `warns` keeps O from opening it once the pill has
+    // gone (o-still-opens-what-you-sent-after-its-note-has-gone).
     expect(app).toMatch(
-      /const nudgeOnStopped[\s\S]{0,500}?holdForStoppedAgent\([\s\S]{0,400}?rememberWarned\(localStorage\)[\s\S]{0,200}?showToast\(held\.say, held\.goes\)/,
+      /const nudgeOnStopped[\s\S]{0,500}?holdForStoppedAgent\([\s\S]{0,400}?rememberWarned\(localStorage\)[\s\S]{0,200}?showToast\(held\.say, \{ \.\.\.held\.goes, warns: true \}\)/,
     );
   });
 });

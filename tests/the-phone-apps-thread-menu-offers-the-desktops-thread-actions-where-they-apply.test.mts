@@ -131,9 +131,10 @@ describe('Keep on your computer', () => {
     expect(offersOf(item({ status: 'done' }), facts({ cloud: true })).place).toBeNull();
     expect(offersOf(item({ status: 'claimed' }), facts({ cloud: true, session: session({ movable: true }), inProgress: true })).place).toBeNull();
   });
-  it('sends the keep, and the let go', () => {
+  // False sends it to the cloud, so its replies start there (tests/a-thread-sent-to-the-cloud-starts-its-replies-there).
+  it('sends the keep, and the send to the cloud', () => {
     expect(planFor({ kind: 'keep-here', keep: true }, item(), NOW)).toEqual({ steps: [{ door: 'setThreadOnMac', payload: { onMac: { 'w-1': true } } }], toast: 'This thread now runs only on your computer' });
-    expect(planFor({ kind: 'keep-here', keep: false }, item(), NOW)).toEqual({ steps: [{ door: 'setThreadOnMac', payload: { onMac: { 'w-1': null } } }], toast: 'This thread can run on the cloud again' });
+    expect(planFor({ kind: 'keep-here', keep: false }, item(), NOW)).toEqual({ steps: [{ door: 'setThreadOnMac', payload: { onMac: { 'w-1': false } } }], toast: 'This thread can run on the cloud again' });
   });
 });
 
@@ -141,8 +142,9 @@ describe('Move to another project', () => {
   it('on a thread nothing has run on', () => {
     expect(offersOf(item({ status: 'open' }), facts()).move).toBe(true);
   });
-  it('not while it runs, once it changed code, once closed, or before the computer has it', () => {
-    expect(offersOf(item({ status: 'claimed' }), facts({ session: session(), inProgress: true })).move).toBe(false);
+  // A running one moves too: the computer stops its agent first (tests/a-thread-whose-agent-is-working-can-move).
+  it('while it runs, but not once it changed code, once closed, or before the computer has it', () => {
+    expect(offersOf(item({ status: 'claimed' }), facts({ session: session(), inProgress: true })).move).toBe(true);
     const failed = item({ note: 'It did not ship, and it went back to its agent: tests failed', wrote: { note: { ts: NOW - MIN, source: 'system' } } });
     expect(offersOf(failed, facts()).move).toBe(false);
     expect(offersOf(item({ status: 'done' }), facts()).move).toBe(false);

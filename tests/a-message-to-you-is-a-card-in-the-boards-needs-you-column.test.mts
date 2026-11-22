@@ -37,14 +37,17 @@ describe('the board with a message to you', () => {
     expect(column(html, 'In progress')).not.toContain('Maya Chen');
   });
 
+  // An empty column is blank: "Nothing here." in every column was noise (2026-11-21).
   it('leaves an empty Needs you empty when there is no message', () => {
-    expect(column(board(undefined), 'Needs you')).toContain('Nothing here');
+    expect(column(board(undefined), 'Needs you')).not.toContain('th-card');
+    expect(column(board(undefined), 'Needs you')).not.toContain('Nothing here');
   });
 });
 
 describe('in the app', () => {
   it('draws no strip of rows above the board', () => {
     expect(app).not.toContain('{leadCount > 0 && <div className="list th-table">{leadRowsDrawn(allLeads)}</div>}');
-    expect(app).toContain('lead={leadCount ? { count: leadCount, cards: leadCardsDrawn(allLeads) } : undefined}');
+    expect(app).toContain('<InboxBoard items={items} lead={boardLead}');
+    expect(app).toContain('count: fromPeopleAbove');
   });
 });

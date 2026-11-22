@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { keysOf, needId, type Need } from '../../../shared/cloud-needs.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { keyLabel, keyWords } from '../../../shared/cloud-keys.mts';
+import type { KeySource } from '../../../shared/cloud-key-sources.mts';
 import { codeLooksWrong, keyLooksWrong } from '../key-asks';
 import { DARK_INK, logoOf } from '../connections/logos';
 import './need-card.css';
@@ -19,14 +20,22 @@ export const NeedPlace = createContext<{
   // Every need of the message, in order: the facts are said on its first
   // sign-in or key and the way out once, under its last card.
   needs: Need[];
+  // `from`: read on this computer, where the run said the key is, instead of a pasted value.
   // `late`: given from a card already answered in words, so the thread is told it came after all.
-  saveKeys: (fields: { name: string; value: string; label: string }[], need: Need, words?: string, late?: boolean) => Promise<string | null>;
+  saveKeys: (fields: { name: string; value: string; label: string; from?: KeySource }[], need: Need, words?: string, late?: boolean) => Promise<string | null>;
   // false: the person closed the file panel, so nothing was sent.
   sendFile: (path: string | null, need: Need, late?: boolean) => Promise<string | null | false>;
   sendCode: (about: string, code: string) => Promise<string | null>;
   fileInfo?: (path: string) => Promise<{ ok: boolean; size?: number; error?: string }>;
   onComputer: () => void;
   openLink: (href: string) => void;
+  // GitHub's own sign-in through gh on this computer; absent where there is no app to run it.
+  gitHubSignIn?: {
+    start: () => Promise<{ code: string; url: string } | { error: string }>;
+    token: () => Promise<{ token: string } | { error: string }>;
+    // In the person's own browser, where they are already signed in to GitHub.
+    open: (url: string) => void;
+  };
 } | null>(null);
 
 /** Per thread, the files sent while another ask on the same message was open, with the words that go when the last is given. */
@@ -82,8 +91,33 @@ export function fileWhy(path: string, why: string, info: { ok: boolean; size?: n
 const fileName = (p: string) => p.split('/').filter(Boolean).pop() ?? p;
 const folderOf = (p: string) => { const parts = p.split('/').filter(Boolean); return parts.length > 1 ? parts[parts.length - 2] : null; };
 
-/** Fields for a sign-in or a key, kept for every cloud thread. */
-function KeyFields({ need, fields, plain, late }: { need: Need; fields: { name: string; label: string }[]; plain: string; late: boolean }) {
+// The title is keyWords(what); a `what` that is no more than that is not said again under it.
+const saysOnlyTheTitle = (what: string) => (keyWords(what) ?? '').toLowerCase() === what.replace(/^\s*(your|an?|the)\s+/i, '').replace(/[.\s]+$/, '').toLowerCase();
+const placeName = (src: KeySource) => (src.place === 'keychain' ? 'your Keychain' : src.place === 'shell' ? 'your shell' : fileName(src.from));
+const placeItem = (src: KeySource) => (src.place === 'shell' ? `$${src.from}` : src.entry ? `${src.entry} in ${src.from}` : src.from);
+
+/** The key where the run said it is on this computer, read and saved in one press. */
+function FromHere({ need, name, label, src, late }: { need: Need; name: string; label: string; src: KeySource; late: boolean }) {
+  const place = useContext(NeedPlace)!;
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const go = async () => {
+    setBusy(true); setSaid(null);
+    const out = await place.saveKeys([{ name, value: '', label, from: src }], need, undefined, late);
+    setBusy(false);
+    if (out) setSaid(out); else focusNextAsk();
+  };
+  return <>
+    <div className="need-acts need-here">
+      <button type="button" className="need-btn need-main" disabled={busy} onClick={() => void go()}>{busy ? 'Reading' : `Use the one in ${placeName(src)}`}</button>
+      <span className="need-from" title={placeItem(src)}>{placeItem(src)}</span>
+    </div>
+    {said && <p className="need-said" role="status">{said}</p>}
+  </>;
+}
+
+/** Fields for a sign-in or a key, kept for every cloud thread. `second` when a press above already offers the key. */
+function KeyFields({ need, fields, plain, late, second = false }: { need: Need; fields: { name: string; label: string }[]; plain: string; late: boolean; second?: boolean }) {
   const place = useContext(NeedPlace)!;
   const [values, setValues] = useState<Record<string, string>>({});
   const [said, setSaid] = useState<string | null>(null);
@@ -110,13 +144,51 @@ function KeyFields({ need, fields, plain, late }: { need: Need; fields: { name: 
     {fields.map((f, i) => (
       <div className="need-row" key={f.name}>
         <input className="need-input" type="password" onKeyDown={giveBackKeys} onFocus={(e) => e.currentTarget.select()} autoComplete="off" spellCheck={false} aria-label={f.label}
-          placeholder={`Paste the ${fields.length > 1 ? lower(f.label) : plain}`}
+          placeholder={second ? 'Or paste it' : `Paste the ${fields.length > 1 ? lower(f.label) : plain}`}
           value={values[f.name] ?? ''} onChange={(e) => { setValues((v) => ({ ...v, [f.name]: e.target.value })); setSaid(null); }} />
-        {i === fields.length - 1 && <button type="submit" className="need-btn need-main" disabled={busy || !some}>{busy ? 'Saving' : anyway ? 'Save anyway' : 'Save'}</button>}
+        {i === fields.length - 1 && <button type="submit" className={second ? 'need-btn' : 'need-btn need-main'} disabled={busy || !some}>{busy ? 'Saving' : anyway ? 'Save anyway' : 'Save'}</button>}
       </div>
     ))}
     {said && <p className="need-said" role="status">{said}</p>}
   </form>;
+}
+
+/** GitHub's device sign-in, whose token is saved as the card's GH_TOKEN. */
+function GitHubOwnSignIn({ need, late, paste }: { need: Need; late: boolean; paste: () => void }) {
+  const place = useContext(NeedPlace)!;
+  const [device, setDevice] = useState<{ code: string; url: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const begin = async () => {
+    const own = place.gitHubSignIn!;
+    setBusy(true); setSaid(null);
+    const started = await own.start();
+    setBusy(false);
+    if ('error' in started) { setSaid(started.error); return; }
+    setDevice(started);
+    own.open(started.url);
+    const got = await own.token();
+    if ('error' in got) { setDevice(null); setSaid(got.error); return; }
+    const out = await place.saveKeys([{ name: 'GH_TOKEN', value: got.token, label: 'GitHub token' }], need, undefined, late);
+    if (out) { setDevice(null); setSaid(out); return; }
+    focusNextAsk();
+  };
+  return <>
+    {device ? <>
+      <div className="need-code-box">
+        <span className="need-code-label">Enter this code</span>
+        <span className="need-code-value">{device.code}</span>
+        <button type="button" className="need-link" onClick={() => { void navigator.clipboard?.writeText(device.code); }}>Copy</button>
+      </div>
+      <div className="need-acts">
+        <button type="button" className="need-btn need-main" onClick={() => place.gitHubSignIn!.open(device.url)}>Open GitHub<span className="need-btn-arrow">{I.arrow}</span></button>
+      </div>
+    </> : <div className="need-acts">
+      <button type="button" className="need-btn need-main" disabled={busy} onClick={() => void begin()}>{busy ? 'Starting' : 'Sign in with GitHub'}<span className="need-btn-arrow">{I.arrow}</span></button>
+      <button type="button" className="need-link need-skip" onClick={paste}>Paste a token instead</button>
+    </div>}
+    {said && <p className="need-said" role="status">{said}</p>}
+  </>;
 }
 
 function Footer() {
@@ -138,6 +210,7 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
   const [replacing, setReplacing] = useState(false);
   const [late, setLate] = useState(false);
   const [sentLate, setSentLate] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const box = useRef<HTMLDivElement | null>(null);
   const live = !!place?.saved && !!need && place.live && !older;
   const taking = live || late;
@@ -183,6 +256,8 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     const article = /^[aeiou]/i.test(plain) ? 'an' : 'a';
     const getIt = tokenUrl && <>Get {article} {plain} from <a href={tokenUrl} onClick={(e) => { e.preventDefault(); open(tokenUrl); }}>{name}'s own page</a></>;
     const mark = <Mark id={svc ? svc.id : null} fallback={I.key} />;
+    const own = svc?.id === 'github' && !!place.gitHubSignIn && !pasting;
+    const getItShown = own ? null : getIt;
     if ((saved && !replacing) || !taking) {
       return <div className="need need-done" data-need={svc ? svc.id : key!.name} ref={box} onKeyDown={keepKeys}>
         <div className="need-body">{mark}<div className="need-col">
@@ -196,13 +271,15 @@ export function NeedCard({ source, fallback }: { source: string; fallback: React
     return <div className="need" data-need={svc ? svc.id : key!.name} ref={box} onKeyDown={keepKeys}>
       <div className="need-body">{mark}<div className="need-col">
         <div className="need-title">{title}</div>
-        {why ? <div className="need-why">{withLinks(why, open)}</div> : key?.what && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
+        {why ? <div className="need-why">{withLinks(why, open)}</div> : key?.what && !saysOnlyTheTitle(key.what) && <div className="need-why">{withLinks(sentence(key.what), open)}</div>}
         {showFacts ? <div className="need-facts">
-          {getIt && <div>{I.arrow}<span>{getIt}</span></div>}
+          {getItShown && <div>{I.arrow}<span>{getItShown}</span></div>}
           <div>{I.lock}<span>Kept encrypted in your {Name} Cloud</span></div>
           <div>{I.cloud}<span>Every thread can use it from now on</span></div>
-        </div> : getIt && <div className="need-why need-also">{getIt}. Kept the same way.</div>}
-        <KeyFields need={need} fields={fields} plain={plain} late={!live} />
+        </div> : getItShown && <div className="need-why need-also">{getItShown}. Kept the same way.</div>}
+        {key?.from && <FromHere need={need} name={key.name} label={fields[0].label} src={key.from} late={!live} />}
+        {own ? <GitHubOwnSignIn need={need} late={!live} paste={() => setPasting(true)} />
+          : <KeyFields need={need} fields={fields} plain={plain} late={!live} second={!!key?.from} />}
       </div></div>
       {showFoot && live && <Footer />}
     </div>;

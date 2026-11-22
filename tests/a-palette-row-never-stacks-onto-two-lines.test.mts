@@ -85,14 +85,15 @@ describe('no row says four times what its neighbours say', () => {
     expect(over).toEqual([]);
   });
 
-  it('still says both tools and both ways of finding a chat, in English', () => {
+  // "Recent or by name" left the hint on 2026-11-21, when every hint became
+  // four words or fewer; the card the row opens offers both ways.
+  it('still says both tools, in English', () => {
     const row = palette.slice(palette.indexOf("id: 'import-agents'"), palette.indexOf("id: 'import-agents'") + 700);
     const label = row.match(/label: '([^']+)'/)[1];
     const hint = row.match(/hint: '([^']+)'/)[1];
     expect(label).toMatch(/import/i);
     expect(`${label} ${hint}`).toMatch(/Claude Code/);
     expect(`${label} ${hint}`).toMatch(/Codex/);
-    expect(hint).toMatch(/name/i);
     // The thing this row grew a field for: it is not only the recent ones.
     expect(hint).not.toMatch(/last ten days/i);
   });

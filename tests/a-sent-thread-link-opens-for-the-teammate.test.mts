@@ -118,7 +118,7 @@ describe('the window', () => {
     expect(app).toContain('if (await copyText(link)) return true;');
   });
   it('publishes the thread before its link is sent', () => {
-    expect(app).toMatch(/await api\.teamSync\(\)\.catch\(\(\) => \{\}\);\n\s+const out = await api\.teamMessage\(/);
+    expect(app).toMatch(/await api\.teamSync\(\)\.catch\(\(\) => \{\}\);\n\s+const words = sentWords\(rowTitle\(item\), link, note\);\n\s+const out = oneChat && to\.length === 1\n\s+\? await roomsUi\.startChat\([\s\S]{0,200}?: await api\.teamMessage\(/);
   });
   it('asks Share… and Send the same question the team list does', () => {
     expect(focus).toContain('const seen: SeenBy = seenNow(item, teamCtx.products.get(item.product), teamCtx.state.since ?? null);');

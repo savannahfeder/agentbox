@@ -2,12 +2,8 @@
 // a Mac that runs Claude Code all day that it could not find it, and a false
 // claim like that is worse than saying nothing.
 //
-// Two halves, and this file is the pin on both.
-//
-// WHERE it may appear: one place, the finish card, which is the last thing in
-// the walk. It used to be a footnote under the folder card, the second screen
-// anybody sees. Those screens are rendered here rather than grepped, so the
-// count is of what a person would actually read.
+// The old walk's finish card, the one screen of setup that drew it, went with
+// that walk (2026-11-21). What is left is the Settings row and the search itself.
 //
 // WHEN it may appear: only after the search has done everything it can and come
 // back sure. Every row in the table below is a real Mac. Fifteen of them are
@@ -21,16 +17,11 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { findClaudeBin, candidatePaths, evidencePaths, askShell, shellProbes } from '../main/claude-bin.mts';
-import { Onboarding } from '../renderer/src/components/Onboarding.tsx';
-import { COPY, RUN_START } from '../renderer/src/onboarding.ts';
 import { NAME, Name } from '../shared/product-name.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
-const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 const HOME = '/Users/stranger';
 const only = (...paths) => (p) => paths.includes(p);
@@ -218,114 +209,6 @@ describe('what "thoroughly validated" is made of', () => {
   });
 });
 
-/* ========================================================================== */
-/* WHERE: one screen in the whole walk, and it is the last one                 */
-/* ========================================================================== */
-
-const STEPS = ['welcome', 'folder', 'name', 'make', 'task', 'working', 'open', 'answer', 'clear', 'command', 'done'];
-
-const drawWalk = (step, claude) => renderToStaticMarkup(createElement(Onboarding, {
-  run: { ...RUN_START, step, folder: '/Users/stranger/code/cascade', product: 'cascade', name: 'Cascade' },
-  claude,
-  home: HOME,
-  onEvent: () => {}, onStep: () => {}, onSkipToApp: () => null, onDone: () => {},
-}));
-
-describe('where the line can appear in the walk', () => {
-  const saying = { missing: true, url: 'https://code.claude.com/docs/en/setup' };
-
-  it('appears on exactly one of the eleven screens', () => {
-    const on = STEPS.filter((s) => drawWalk(s, saying).includes(COPY.missing));
-    expect(on).toEqual(['done']);
-  });
-
-  it('and that one is the last one, the finish card', () => {
-    const html = drawWalk('done', saying);
-    expect(html).toContain(COPY.missing);
-  });
-
-  // AND ON THAT CARD IT IS NO LONGER A FOOTNOTE UNDER A BUTTON.It is the
-  // card's own line now, under a headline that names it, with the celebration
-  // gone. The full rule and the gate it belongs to are pinned in
-  // tests/the-inbox-does-not-open-without-claude-code.test.mts.
-  it('is the card, not a note at the bottom of one', () => {
-    const html = drawWalk('done', saying);
-    expect(html).toContain(COPY.gateHead);
-    expect(html.indexOf(COPY.missing)).toBeGreaterThan(html.indexOf(COPY.gateHead));
-    expect(html).not.toContain(COPY.finishHead);
-    expect(html).not.toContain('fr-warn');
-  });
-
-  it('is on no screen at all, the finish card included, when nothing is certain', () => {
-    const quiet = { missing: false, url: '' };
-    for (const step of STEPS) expect(drawWalk(step, quiet)).not.toContain(COPY.missing);
-  });
-
-  it('leaves the folder screen with nothing on it but the folder question', () => {
-    // This is the screen it lived under until 2026-08-23, and the screen where
-    // the false claim was seen.
-    const html = drawWalk('folder', saying);
-    // w-ec62ab6b38 (2026-09-28): the folder screen was rebuilt; its question is now the heading and lede.
-    expect(html).toContain(COPY.folderHead);
-    expect(html).toContain(COPY.folderLede);
-    expect(html).not.toContain(COPY.folderQ);
-    expect(html).not.toMatch(/Claude Code/);
-  });
-
-  it('carries the install link with it, so the one time it appears it is useful', () => {
-    const html = drawWalk('done', saying);
-    expect(html).toContain(COPY.missingLink);
-    expect(html).toContain('https://code.claude.com/docs/en/setup');
-  });
-
-  it('does not let a keystroke close the card out from under it', () => {
-    // The finish card ends on any key when there is nothing on it to read, and
-    // it took ⌘↵ while this line was a footnote on it. Now the card carrying
-    // this line has NO key that ends the walk at all, because there is no way
-    // into the inbox on it to reach. The listener is not
-    // registered on a blocked card.
-    //
-    // AND IT IS NOT REGISTERED ON A CARD WITH THE USER'S AGENTS ON IT EITHER. That
-    // card is <ImportAgents> now and it owns the keyboard: ⌘↵ is its first
-    // door and Escape steps back off its second screen. Two listeners on one
-    // card is the fault this walk already has a rule about.
-    //
-    // AND SINCE 2026-08-28 THE LISTENER IS GONE OUTRIGHT. Every Mac that is
-    // not blocked gets <ImportAgents> now, empty or full, so there is no state
-    // left in which this component wants a key of its own. What is asserted
-    // has not changed: no keystroke registered here can end the walk while
-    // this line is on the screen.
-    const walk = strip(read('renderer/src/components/Onboarding.tsx'));
-    const fin = walk.slice(walk.indexOf('function Finished('), walk.indexOf('export function Landed('));
-    expect(fin).not.toContain("addEventListener('keydown'");
-    expect(fin).not.toContain('const holds =');
-  });
-});
-
-describe('when the walk even asks the question', () => {
-  const app = strip(read('renderer/src/App.tsx'));
-
-  it('does not ask until the walk has reached its last step', () => {
-    // The read used to fire on the first render of the walk, which is also the
-    // least time the search has ever had to run in.
-    expect(app).toMatch(/const atEnd = !!run && run\.step === 'done';/);
-    expect(app).toMatch(/if \(!atEnd\) return;/);
-  });
-
-  it('still only believes an answer that arrived and is sure', () => {
-    expect(app).toMatch(/const sure = s\.ok !== false && s\.workspace\?\.claudeCertain === true;/);
-    expect(app).toMatch(/missing: sure && !s\.workspace\?\.claudeFound/);
-  });
-
-  it('starts saying nothing, so a read that never lands never draws it', () => {
-    expect(app).toMatch(/useState\(\{ missing: false, url:/);
-  });
-});
-
-/* ========================================================================== */
-/* THE OTHER SCREEN THAT SAYS IT: settings                                    */
-/* ========================================================================== */
-
 /*
  * THE ROW MOVED AND GREW A BUTTON, so the two
    claims below are asked of its new shape. What it used to be: a row labelled
@@ -340,8 +223,7 @@ describe('when the walk even asks the question', () => {
    rewritten rather than deleted. An unsure search still may not say "could not
    find", and the download link still appears only where that sentence is true.
    tests/settings-says-whether-claude-code-is-connected.test.mts holds the rest
-   of the new screen; this pair stays here, beside the walk's copy of the same
-   rule, because it is one rule on two surfaces.
+   of the new screen; this pair stays here, beside the search the rule is about.
 
    THE CARD IS SHARED WITH CODEX SINCE 2026-09-05 and the three states are drawn
    from a copy table handed in rather than from `CLAUDE` by name

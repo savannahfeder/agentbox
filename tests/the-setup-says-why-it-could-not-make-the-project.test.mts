@@ -21,11 +21,12 @@
 // points at second time round is one they already made a project for. That is
 // the normal case for anybody testing their own onboarding.
 //
-// So this file holds four things shut:
+// So this file holds three things shut:
 //   1. the store really does refuse, and this is the sentence it refuses with
 //   2. that sentence becomes one she can act on, never a mystery
-//   3. the card shows it, and App.tsx hands it back instead of toasting it
-//   4. NOTHING the app has to say can be painted under the setup screens again
+//   3. NOTHING the app has to say can be painted under the setup screens again
+// (The old walk's name card that drew it is gone, 2026-11-21; a project made
+// from New project says it in the toast.)
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -33,7 +34,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from '../main/store.mts';
-import { COPY, START, advance, firstRunNeeded, stepTo, whyNotMade } from '../renderer/src/onboarding.ts';
+import { COPY, firstRunNeeded, whyNotMade } from '../renderer/src/onboarding.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -50,9 +51,9 @@ describe('a second walk over a store that already has that project', () => {
     // This is what makes the collision ordinary rather than exotic. If this
     // ever becomes false, the rest of this file is about a case nobody hits.
     const app = read('renderer/src/App.tsx');
-    const walkAgain = app.slice(app.indexOf('const walkAgain'), app.indexOf('const walkAgain') + 400);
+    const walkAgain = app.slice(app.indexOf('const walkAgain'), app.indexOf('\n  }, [', app.indexOf('const walkAgain')));
     expect(walkAgain).toContain('restartFirstRun');
-    expect(walkAgain).toContain('setRun(');
+    expect(walkAgain).toContain('setFresh(true)');
     expect(walkAgain).not.toContain('firstRunNeeded');
     // And the automatic path, which is the one that DOES wait, still does.
     expect(firstRunNeeded({ products: 20, done: false })).toBe(false);
@@ -117,60 +118,6 @@ describe('what the screen says when it will not go on', () => {
     // And Electron's plumbing is not read out to her.
     expect(whyNotMade("Error invoking remote method 'zero:create-product': Error: disk is full", 'X'))
       .not.toMatch(/invoking remote method/);
-  });
-});
-
-describe('the walk stays where it is when the project was not made', () => {
-  it('only a project that really exists moves it off the name screen', () => {
-    let s = advance(advance({ ...START }, { t: 'start' }), { t: 'folder', path: '/tmp/x' });
-    s = advance(stepTo(s, 'name'), { t: 'name', name: 'Cascade' });
-    expect(s.step).toBe('name');
-
-    // Everything this screen can raise, except the one thing that did not
-    // happen. Retyping the name, re-pressing Submit and going back for another
-    // folder all leave her on the screen she is looking at.
-    for (const event of [
-      { t: 'start' }, { t: 'folder', path: '/tmp/y' }, { t: 'name', name: 'Cascade II' },
-    ]) {
-      expect(advance(s, event).step, JSON.stringify(event)).toBe('name');
-    }
-    expect(advance(s, { t: 'made', product: 'cascade' }).step).not.toBe('name');
-    // And what was typed survives the refusal, so the user edits a name rather than
-    // typing one again.
-    expect(advance(s, { t: 'folder', path: '/tmp/y' }).name).toBe('Cascade');
-  });
-});
-
-describe('the reason reaches the one surface she can see', () => {
-  const app = read('renderer/src/App.tsx');
-  const card = read('renderer/src/components/Onboarding.tsx');
-
-  it('App hands the reason back to the walk instead of toasting it', () => {
-    const from = app.indexOf('onSkipToApp={');
-    const handler = app.slice(from, app.indexOf('onDone={', from));
-    expect(handler).toContain('return whyNotMade(');
-    // The toast is what she could not see. It may not come back here.
-    expect(handler).not.toContain('showToast');
-  });
-
-  it('the name card draws it, and typing again clears it', () => {
-    expect(card).toContain('fr-notmade');
-    expect(card).toMatch(/if \(why\) setNotMade\(why\)/);
-    // Cleared on the next keystroke, so a message about the last name is never
-    // sitting under a different one.
-    expect(card).toMatch(/onChange=\{\(e\) => \{ setNotMade\(null\);/);
-    expect(card).toMatch(/setNotMade\(null\);\s*\n?\s*try \{|setBusy\(true\);\s*\n\s*setNotMade\(null\);/);
-  });
-
-  it('draws it inside the name step, not somewhere she is not looking', () => {
-    // The name step used to end on the row of counting dots and this read up to
-    // them; they came off on 2026-08-25. The name step is the last block this
-    // component renders, so what is held instead is that the line is drawn once
-    // and that the one place it is drawn is inside that block.
-    const at = card.indexOf("run.step === 'name' &&");
-    expect(at).toBeGreaterThan(0);
-    expect(card.split('fr-notmade').length - 1).toBe(1);
-    expect(card.indexOf('fr-notmade')).toBeGreaterThan(at);
   });
 });
 

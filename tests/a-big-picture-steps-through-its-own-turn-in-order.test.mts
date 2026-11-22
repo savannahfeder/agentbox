@@ -122,7 +122,8 @@ describe('a click hands the big view its turn', () => {
 
   it('reads the pressed picture\'s turn off the page, as the small view does', () => {
     expect(focus).toMatch(/opensBig\(href\)\) \{ openBig\(href, from\); return; \}/);
-    expect(focus).toMatch(/steps: picturesFor\(paneRef\.current, path, from\)\.pictures\.map/);
+    expect(focus).toMatch(/const turn = picturesFor\(paneRef\.current, path, from\)/);
+    expect(focus).toMatch(/steps: turn\.pictures\.map\(\(p\) => p\.path\), drawn: turn\.drawn/);
   });
 
   it('a link in the words says where it was clicked', () => {

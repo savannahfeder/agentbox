@@ -11,6 +11,15 @@
   padding-left: 84px;
 }
 :root[data-window="flat"] .av-top { padding-left: 16px; }
+/* The view cuts the whole window out of the drag region, so this bar is the
+   only place left to move the window from. Every child is cut again so its
+   controls and the Share panel hanging below take clicks; the name and the
+   spring hold none, so they drag too. */
+.av-top { -webkit-app-region: drag; }
+.av-top * { -webkit-app-region: no-drag; }
+.av-top .av-name, .av-top .av-spring { -webkit-app-region: drag; }
+/* Short of the Windows buttons, which sit over the other corner. */
+:root[data-window-buttons="right"] .av-top { padding-right: 150px; }
 /* The side pane's corner marks (direct-review.css), which only reach inside the main layout. */
 .av-top .doc-marks { gap: 6px; }
 .av-top :is(.doc-mark, .focus-bare) {
@@ -25,6 +34,21 @@
 /* The glyph, not its hit area, lines up with the content edge. */
 .av-top > .av-back { margin: 0 -4px 0 -6px; }
 .av-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+/* A name that renames takes clicks, so it cannot drag the window. */
+.av-top .av-name:is(.av-name-edit, .av-name-box) { -webkit-app-region: no-drag; }
+.av-name-edit {
+  height: 28px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: var(--radius);
+  background: none; font: inherit; text-align: left; cursor: text;
+}
+.av-name-edit:hover { background: var(--wash); }
+.av-name-box {
+  height: 28px; box-sizing: border-box; margin: 0 -6px; padding: 0 5px; max-width: 50vw;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg);
+  font: inherit; outline: none;
+}
+.av-name-box:focus { border-color: var(--underline); }
+/* Gives way before the name does. */
+.av-label { flex: 0 4 auto; min-width: 0; max-width: 60ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
 .av-versions { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
 .av-of { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; padding: 0 2px; white-space: nowrap; }
 .av-newest { flex: none; height: 24px; margin-left: 4px; padding: 0 6px; background: none; border: 0; border-radius: var(--radius); font: inherit; font-size: 13px; color: var(--text); white-space: nowrap; }
@@ -126,7 +150,6 @@
 .link-pop.selection-bar { z-index: 9450; gap: 2px; padding: 4px; }
 .selection-bar .link-pop-btn { padding: 4px 8px; color: var(--text-dim); }
 .selection-bar-comment { display: inline-flex; align-items: center; gap: 6px; }
-
 
 .av-side { flex: none; width: 340px; display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
 .av-verdict { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
@@ -249,31 +272,83 @@
 /* The link holds an older copy than the file on screen. */
 .av-share .is-behind { position: relative; }
 .av-share .is-behind::after { content: ''; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
-.av-share-stop.is-asking { color: var(--text); }
-.av-share-comments { margin: 2px 0 0; padding: 10px 0 0; list-style: none; border-top: 1px solid var(--line); max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-.av-share-who { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.av-share-box {
+  position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: 340px; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-sm);
+}
+.av-share-box p { margin: 0; font-size: 13px; line-height: 18px; color: var(--text); }
+.av-share-box .av-share-title { padding: 12px 14px 4px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-share-title span { font-weight: 400; color: var(--text-dim); }
+/* Who can open it: one row, as it is before sharing and after. */
+.av-share-who-sees { display: flex; align-items: center; gap: 10px; padding: 8px 14px 12px; }
+.av-share-icon { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--radius); background: var(--wash); color: var(--text-dim); }
+.av-share-icon.is-open { color: var(--text); }
+.av-share-access { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.av-share-access b { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--text); }
+.av-share-access i { font-style: normal; font-size: 12px; line-height: 16px; color: var(--text-faint); }
+.av-share-stop { flex: none; align-self: center; background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+.av-share-stop:hover:not(:disabled), .av-share-stop.is-asking { color: var(--text); }
+.av-share-comments { margin: 0; padding: 10px 14px; list-style: none; border-top: 1px solid var(--line); max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.av-share-who { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; }
 .av-share-who b { font-weight: 600; color: var(--text); }
-.av-share-who time { font-size: 11.5px; color: var(--text-faint); }
+.av-share-who em { font-style: normal; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.av-share-who time { margin-left: auto; font-size: 11.5px; color: var(--text-faint); }
 .av-share-box .av-share-comments p { margin: 2px 0 0; font-size: 13px; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-dim); }
+.av-share-reply { padding: 0 14px 12px; display: flex; gap: 6px; }
+.av-share-send { flex: none; width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--wash); color: var(--text); cursor: pointer; }
+.av-share-send:disabled { opacity: 0.4; cursor: default; }
 .av-share-reply input {
   width: 100%; height: 30px; box-sizing: border-box; padding: 0 9px;
   font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); outline: none;
 }
 .av-share-reply input:focus { border-color: var(--text-faint); }
-.av-share-box {
-  position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: 340px; box-sizing: border-box; padding: 14px;
-  display: flex; flex-direction: column; gap: 10px;
-  background: var(--pop); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-sm);
-}
-.av-share-box p { margin: 0; font-size: 13px; line-height: 18px; color: var(--text); }
-.av-share-url {
-  height: 28px; box-sizing: border-box; padding: 0 8px; width: 100%;
-  font: 12px var(--mono); color: var(--text); background: none; border: 1px solid var(--line-strong); border-radius: var(--radius);
-}
-.av-share-box .av-share-meta { display: flex; gap: 12px; font: 11.5px var(--mono); color: var(--text-dim); }
-.av-share-meta a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; }
+.av-share-box .av-share-said { padding: 0 14px 10px; font-size: 12.5px; color: var(--text-dim); }
 .av-share-acts { display: flex; align-items: center; gap: 8px; }
-.av-share-stop { background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; color: var(--text-dim); }
-.av-share-stop:hover:not(:disabled) { color: var(--text); }
-.av-share-box .av-share-said { font-size: 12.5px; color: var(--text-dim); }
+/* A shared file says so on its mark, so it is not forgotten once the panel shuts. Beats both headers' corner-mark rules. */
+.av-share .doc-mark.av-share-on,
+.av-top .doc-mark.av-share-on,
+:root[data-code-review] .workspace-layout .doc-marks .doc-mark.av-share-on {
+  width: auto; min-width: 0; padding: 0 10px 0 8px; gap: 6px;
+  border: 1px solid var(--line-strong); border-radius: var(--pill); background: transparent;
+  color: var(--text); font: inherit; font-size: 13px; white-space: nowrap;
+}
+:root[data-code-review] .workspace-layout .doc-marks .doc-mark.av-share-on:is(:hover, :active),
+.av-top .doc-mark.av-share-on:is(:hover, :active) { background: var(--wash); }
+.av-share-confirm { display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 12px; border-top: 1px solid var(--line); }
+/* Who can open the link and what they can do: the two lines of the row, each a list to pick from. */
+.av-share-pick {
+  align-self: flex-start; max-width: 100%; height: 18px; padding: 0 16px 0 0; border: 0; background: none; color: var(--text-faint); font: inherit; font-size: 12px; line-height: 16px;
+  appearance: none; -webkit-appearance: none; cursor: pointer; text-overflow: ellipsis;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+  background-position: calc(100% - 8px) 50%, calc(100% - 4px) 50%; background-size: 4px 4px; background-repeat: no-repeat;
+}
+.av-share-pick.is-main { font-size: 13px; line-height: 18px; font-weight: 500; color: var(--text); }
+.av-share-pick:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; border-radius: var(--radius); }
+.av-share-pick:disabled { opacity: 0.6; cursor: default; }
+.av-share-pick option { background: var(--pop); color: var(--text); }
+.av-share-add { padding: 0 14px 10px; }
+.av-share-add input {
+  width: 100%; height: 30px; box-sizing: border-box; padding: 0 9px;
+  font: inherit; font-size: 13px; color: var(--text); background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); outline: none;
+}
+.av-share-add input:focus { border-color: var(--text-faint); }
+.av-share-people { margin: -4px 0 0; padding: 0 14px 10px; list-style: none; max-height: 168px; overflow-y: auto; }
+.av-share-people li { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 28px; }
+.av-share-people .av-share-pick { align-self: center; color: var(--text-dim); }
+.av-share-person { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-dim); }
+.av-share-person b { font-weight: 500; color: var(--text); }
 .av-share-box .av-share-said.is-bad { color: var(--text); }
+/* Where it stands, and the one thing to press. */
+.av-share-foot { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 14px; border-top: 1px solid var(--line); }
+.av-share-when { flex: 1; min-width: 0; font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.av-share-out { flex: none; width: 28px; height: 28px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer; }
+.av-share-out:hover { color: var(--text); background: var(--wash); }
+.av-share-copy {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; min-width: 98px; padding: 0 10px; box-sizing: border-box;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--wash);
+  font: inherit; font-size: 12.5px; font-weight: 500; color: var(--text); cursor: pointer;
+}
+.av-share-copy:hover:not(:disabled) { background: var(--wash-strong, var(--wash)); }
+.av-share-copy:disabled { opacity: 0.6; cursor: default; }
+.av-share-copy.is-copied .av-glyph { color: var(--accent); }

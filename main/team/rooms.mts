@@ -12,8 +12,10 @@ import type { GroupRow } from '../../shared/room-needs-you.mts';
 import { ROOM_FILE_NAME, FILE_EXISTS } from './rooms-shape.mts';
 import { carryIntoRoom } from './carry-files.mts';
 import type { FoundToSend } from './carry-files.mts';
-import { readRoomMessage } from '../../shared/agent-voice.mts';
+import { readRoomMessage, roomBody } from '../../shared/agent-voice.mts';
+import { Name } from '../../shared/product-name.mjs';
 import { cleanMark } from '../../shared/artifact-marks.mts';
+import { isPairRoom, pairRooms } from '../../shared/pair-room.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
 import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mts';
 
@@ -143,6 +145,8 @@ export interface RoomsBackend {
   putPresence(device: string, fields: Record<string, unknown>): Promise<void>;
   roomMessages(roomId: string, options?: { before?: number | null; limit?: number }): Promise<RoomMessage[]>;
   roomMentions(options?: { limit?: number }): Promise<RoomMessage[]>;
+  /** My own newest messages in every room I am in, however busy the room is. */
+  myRoomMessages?(options?: { limit?: number }): Promise<RoomMessage[]>;
   sendRoomMessage(roomId: string, message: { body: string; inReplyTo: string | null; mentions: string[] }): Promise<RoomMessage>;
   editRoomMessage(messageId: string, message: { body: string; mentions: string[] }): Promise<RoomMessage>;
   deleteRoomMessage(messageId: string): Promise<void>;
@@ -253,6 +257,8 @@ const FILES_HELD = 40;
 const FILE_CHARS_HELD = 64_000_000;
 const HEARTBEAT_MS = 5 * 60_000;
 const SETTLE_MS = 400;
+/** How long a sync pass trusts the live connection before it reads the chats again; a socket can drop without a word. */
+export const ROOMS_RECHECK_MS = 60_000;
 
 // Pins, mutes, rooms marked unread, the first-room pin and each group's Mark
 // done are this Mac's, kept per person.
@@ -326,6 +332,7 @@ export function createRooms({
   let fileMarks = new Map<string, RoomFileMark[]>(); // roomId -> [{ id, by, mark, at }]
   const sending = new Map<string, { done: number; total: number }>(); // `${roomId}/${name}` -> { done, total } parts
   let mentioned: RoomMessage[] = []; // my newest mentions, which may be older than the messages held
+  let saidByMe: RoomMessage[] = []; // and my own newest words, so an answer older than those messages still counts
   let unsubscribe: (() => void) | null = null;
   let started: RoomsBackend | null = null; // the backend rooms were started on
   let setUp = false; // my profile made, Coworking joined if I have nowhere else, realtime on
@@ -335,6 +342,7 @@ export function createRooms({
   let again = false;
   let gen = 0; // bumped by every change made here, see refresh
   let settle: ReturnType<typeof setTimeout> | null = null;
+  let readAt = 0; // when the chats were last read whole from the cloud
 
   const meId = () => me()?.id ?? null;
 
@@ -361,7 +369,8 @@ export function createRooms({
       const everyone = called?.map((n) => ({ id: n.person_id, name: n.has_card ? n.name : displayNameOf(n.name), avatarUrl: n.avatar_url ?? null })) ?? null;
       const nameOf = (id: string | null) => profiles.get(id as string)?.display_name || everyone?.find((p) => p.id === id)?.name || '';
       const row = groupRow({
-        roomId: r.id, roomName: r.name, messages: held, mentioned: mentioned.filter((m) => m.roomId === r.id), me: who, readAt,
+        roomId: r.id, roomName: r.name, messages: held, mentioned: [...mentioned, ...saidByMe].filter((m) => m.roomId === r.id), me: who, readAt,
+        pair: isPairRoom(r),
         people: [...(called?.map((n) => ({ id: n.person_id, name: n.name })) ?? []), { id: who as string, name: me()?.name ?? '' }, { id: who as string, name: profiles.get(who as string)?.display_name ?? '' }],
         doneAt: p.doneAt[r.id] ?? 0, nameOf,
         answeredAt: Math.max(0, ...(fileMarks.get(r.id) ?? []).filter((m) => m.by === who).map((m) => m.at)),
@@ -424,7 +433,8 @@ export function createRooms({
       lookAsked = true;
       try {
         await b.putRoomFile(room.id, TEAM_LOOK, Buffer.from(TEAM_LOOK_TEMPLATE).toString('base64'));
-        await api.send(room.id, TEAM_LOOK_POSTED);
+        // In the app's name: the person whose copy happened to look first never wrote it.
+        await api.send(room.id, roomBody({ name: Name }, TEAM_LOOK_POSTED));
         text = TEAM_LOOK_TEMPLATE;
       } catch (err) {
         if ((err as { code?: string })?.code !== FILE_EXISTS) throw err;
@@ -445,7 +455,7 @@ export function createRooms({
     const lead = [...(f.running ?? [])].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
     if (!lead) return { workingOn: null, agents: 0 };
     const item = (f.items ?? []).find((i) => i.id === lead.itemId);
-    return { workingOn: (String(item?.label ?? '').trim() || String(item?.title ?? '')).slice(0, 64) || null, agents: f.running!.length };
+    return { workingOn: (String(item?.label ?? '').trim() || String(item?.title ?? '')).slice(0, 64) || null, workingThread: lead.itemId, agents: f.running!.length };
   }
   const local = () => { gen += 1; };
 
@@ -475,10 +485,11 @@ export function createRooms({
         named.set(r.id, called);
       }));
       const everyone = [...new Set([meId(), ...[...ids.values()].flat()])].filter(Boolean) as string[];
-      const [profileRows, presenceRows, readRows, mine, invites, ranks, mentionRows] = await Promise.all([
+      const [profileRows, presenceRows, readRows, mine, invites, ranks, mentionRows, myRows] = await Promise.all([
         b.roomProfiles(everyone), b.roomPresence(everyone), b.roomReads(), b.myRoomProfile(),
         b.pendingRoomInvites().catch(() => []), b.agentboxRanks(everyone).catch(() => ({})),
         b.roomMentions({ limit: 50 }).catch(() => []),
+        b.myRoomMessages ? b.myRoomMessages({ limit: 50 }).catch(() => []) : Promise.resolve([] as RoomMessage[]),
       ]);
       const held = new Map<string, RoomMessage[]>();
       const reacted = new Map<string, Map<string, RoomReaction>>();
@@ -505,7 +516,9 @@ export function createRooms({
       decisions = marked;
       fileMarks = onFiles;
       reads = new Map(readRows.map((r): [string, number] => [r.roomId, r.readAt]));
+      readAt = now();
       mentioned = mentionRows;
+      saidByMe = myRows;
       autoPin(rooms);
       state = { ...state, ready: true, rawRooms: rooms, me: mine, invites, ranks, error: null };
     } catch (err) {
@@ -515,6 +528,14 @@ export function createRooms({
     changed();
     writeDocs();
     keepTeamLook().catch((err) => log(`rooms: team look: ${err.message}`));
+  }
+
+  // Asked of the cloud, not of the last pull: the other person's Mac may have
+  // made the group seconds ago.
+  async function pairRoomIn(b: RoomsBackend, personId: string) {
+    const rows = (await b.myRooms()).filter((r) => r.kind === 'group' && !r.teamId && r.members === 2);
+    const people = new Map(await Promise.all(rows.map(async (r) => [r.id, await b.roomPeople(r.id)] as const)));
+    return pairRooms(rows, personId, (r) => people.get(r.id) ?? [])[0]?.id ?? null;
   }
 
   function merge(old: RoomMessage[] = [], fresh: RoomMessage[] = []) {
@@ -646,7 +667,7 @@ export function createRooms({
     started = null;
     setUp = false;
     lastSent = null;
-    people = new Map(); names = new Map(); profiles = new Map(); presence = []; messages = new Map(); reads = new Map(); mentioned = [];
+    people = new Map(); names = new Map(); profiles = new Map(); presence = []; messages = new Map(); reads = new Map(); mentioned = []; saidByMe = [];
     reactions = new Map(); decisions = new Map(); files = new Map(); fileMarks = new Map(); sending.clear();
     state = { ...EMPTY, on: !!enabled() };
     if (b) await b.putPresence(device(), { gone: true, agents_running: 0, working_on: null, working_private: false, activity: [] }).catch(() => {});
@@ -660,6 +681,8 @@ export function createRooms({
     if (!want && started) return stop();
     if (!want) return;
     if (!setUp) { await setUpOnce(started!); if (setUp) await refresh(); }
+    // Live messages are only heard while the socket is up, so the pass reads them again now and then.
+    if (setUp && now() - readAt >= ROOMS_RECHECK_MS) await refresh();
     await syncName().catch((err) => log(`rooms: name: ${err.message}`));
     await syncStatus().catch((err) => log(`rooms: status: ${err.message}`));
     await publish().catch((err) => log(`rooms: presence: ${err.message}`));
@@ -921,6 +944,20 @@ export function createRooms({
       return got.length;
     },
 
+    // My card follows a name or photo I changed in Settings, keeping whether
+    // it shows my full name. Its photo is a link of up to 500 characters.
+    async followMe({ was, name, avatarUrl }: { was: string; name?: string; avatarUrl?: string | null }) {
+      const mine = state.me;
+      if (!mine || !backend() || !started) return null;
+      const patch: Record<string, unknown> = {};
+      if (name !== undefined) {
+        const full = mine.display_name === displayNameOf(was, { full: true }) && displayNameOf(was, { full: true }) !== displayNameOf(was);
+        patch.display_name = displayNameOf(name, { full }) || mine.display_name;
+      }
+      if (avatarUrl !== undefined) patch.avatar_url = avatarUrl && /^https:\/\//.test(avatarUrl) && avatarUrl.length <= 500 ? avatarUrl : null;
+      return Object.keys(patch).length ? api.saveProfile(patch) : null;
+    },
+
     // My card: what it says and who sees what.
     async saveProfile(fields: Record<string, unknown> = {}) {
       const b = need();
@@ -964,7 +1001,10 @@ export function createRooms({
     async create({ name, kind = 'room', listed = false, inviteOnly = false, people: who = [] }: { name: unknown; kind?: string; listed?: boolean; inviteOnly?: boolean; people?: string[] }) {
       const mates = new Set((team()?.people ?? []).map((p) => p.id));
       if (kind !== 'group' || listed || !who.length || who.some((id) => id !== meId() && !mates.has(id))) throw new Error('A group is only ever people on your team');
-      const id = await need().createRoom({ name: String(name ?? '').trim(), kind, listed, inviteOnly, people: who });
+      const b = need();
+      const others = who.filter((p) => p !== meId());
+      const id = (others.length === 1 ? await pairRoomIn(b, others[0]) : null)
+        ?? await b.createRoom({ name: String(name ?? '').trim(), kind, listed, inviteOnly, people: who });
       prefs.set(meId(), { pinned: [...new Set([...prefs.get(meId()).pinned, id])] });
       await refresh();
       return id;

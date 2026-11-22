@@ -175,11 +175,10 @@ describe('the tray draws nothing to resize it by', () => {
     expect(page).toContain('bridge?.press(e.screenX, e.screenY)');
   });
 
-  it('says in Settings that size is set from the list, not by dragging', () => {
+  it('never says in Settings that a corner drag resizes it', () => {
     const row = settings.match(/label="Show the Agent Tray"\s+desc="([^"]*)"/)?.[1] ?? '';
-    expect(row).toMatch(/Drag it anywhere/);
-    expect(row).toMatch(/Size/);
-    expect(row).not.toMatch(/corner to make it/);
+    expect(row).toMatch(/tag over your other apps/);
+    expect(row).not.toMatch(/corner to make it|resize/i);
   });
 });
 

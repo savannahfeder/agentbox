@@ -41,12 +41,9 @@
 // `rate limit reset credit detail request timed out`. Local state does not time
 // out and has no snapshots to fail to return.
 //
-// SO IT IS A NEW NETWORK CALL, and CLAUDE.md's privacy rule is not negotiable:
-// "Anything that leaves the machine... a new network call of any kind" means
-// `legal/privacy.html` and `legal/terms.html` are edited IN THE SAME SESSION.
-// Those pages live outside this repo, so that obligation
-// cannot be discharged from here -- and shipping the call without it breaks a
-// stated law rather than bending one.
+// SO IT IS A NETWORK CALL. Since 2026-11-15 the person's Refresh press on
+// Settings › Codex makes it, and nothing else may
+// (tests/refresh-asks-codex-for-the-live-usage-and-nothing-else-does).
 //
 // THE COST OF NOT HAVING IT WAS MEASURED AND IS SMALL. The figures arrive free
 // as `account/rateLimits/updated` during every turn, so the corner fills a beat

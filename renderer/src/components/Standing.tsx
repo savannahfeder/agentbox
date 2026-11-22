@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { NAME } from '../../../shared/product-name.mjs';
+import { closesOnPress } from '../press';
 
 type Save = 'idle' | 'saving' | 'saved' | 'failed';
 
@@ -132,7 +133,7 @@ export function Standing({ kind = STANDING, onClose }: { kind?: Instructions; on
   // that are English sentences. What is left is text on the card and one line
   // of English under it, which is the new-task card's whole grammar.
   return (
-    <div className="modal-backdrop compose-backdrop" onClick={close}>
+    <div className="modal-backdrop compose-backdrop" {...closesOnPress(close)}>
       <div className="modal compose rules-card" onClick={(e) => e.stopPropagation()}>
         <textarea
           ref={ref}

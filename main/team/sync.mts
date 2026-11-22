@@ -32,6 +32,7 @@ import { whatATeammateMaySet, whatYourOtherCopyMaySet } from '../../shared/team-
 import type { CloudProject, SharedProjectRef } from './projects.mts';
 import { MAX_CARRIED_BYTES, namedFiles, wordsOfLine } from '../../shared/carried-files.mts';
 import { createFileCarrier } from './carry-files.mts';
+import type { LinkPlace } from './link-edits.mts';
 
 /** A ledger line as it is written and pushed; other keys pass through. */
 export interface LedgerLine {
@@ -62,8 +63,8 @@ export interface CarryPending { ref: string; id: string; meant: boolean; since: 
 export interface SyncState {
   get(projectId: string): SyncCursor;
   set(projectId: string, value: SyncCursor): void;
-  getCardsHash(): string | null;
-  setCardsHash(hash: string): void;
+  getCardsSent(): CardsSent | null;
+  setCardsSent(sent: CardsSent): void;
   getTeam(personId: string): string | null;
   setTeam(personId: string, teamId: string | null): void;
   getSince(personId: string): number | null;
@@ -73,9 +74,15 @@ export interface SyncState {
   /** When the newest comment on this person's links already noted was made. */
   getLinkComments(personId: string): number | null;
   setLinkComments(personId: string, at: number): void;
+  /** Where a shared link's file is on this computer, by the link's source (main/team/link-edits.mts). */
+  getLinkPlace(source: string): LinkPlace | null;
+  setLinkPlace(source: string, place: LinkPlace): void;
 }
 
 type FsForState = Pick<typeof fs, 'readFileSync' | 'writeFileSync' | 'renameSync'>;
+
+/** The cards this Mac last sent, as a fingerprint of each by thread. */
+export interface CardsSent { teamId: string; cards: Record<string, string> }
 
 /** What the cloud holds of a thread, as it is published for the team. */
 export interface SyncCard { threadId: string; personId?: string; state?: string; visible?: boolean; title?: unknown; updatedAt?: unknown; [key: string]: unknown }
@@ -97,7 +104,8 @@ export interface SyncBackend {
   listProjects(): Promise<CloudProject[]>;
   pushLines(projectId: string, lines: LedgerLine[]): Promise<number>;
   pullLines(projectId: string, afterSeq: number, limit: number): Promise<{ seq: number; line: LedgerLine | null }[]>;
-  putCards(teamId: string, cards: SyncCard[]): Promise<void>;
+  /** Every card still listed, and the ones among them to write; all of them when `changed` is left out. */
+  putCards(teamId: string, cards: SyncCard[], changed?: ReadonlySet<string>): Promise<void>;
   hasFiles?(projectId: string, names: string[]): Promise<string[]>;
   getFile?(projectId: string, name: string): Promise<unknown>;
   putFile?(projectId: string, name: string, data: string): Promise<boolean>;
@@ -193,12 +201,14 @@ export const diskFiles: SyncFiles = {
 
 // Where each shared project's cursors stand, kept between runs.
 export function memorySyncState(): SyncState {
-  const map = new Map<string, Partial<SyncCursor> & { hash?: string | null; keys?: string[]; [personId: string]: unknown }>();
+  const places = new Map<string, LinkPlace>();
+  const map =new Map<string, Partial<SyncCursor> & { keys?: string[]; [personId: string]: unknown }>();
+  let cardsSent: CardsSent | null = null;
   return {
     get: (projectId) => ({ pushedTo: 0, pulledSeq: 0, ...(map.get(projectId) || {}) }),
     set: (projectId, value) => { map.set(projectId, { ...value }); },
-    getCardsHash: () => map.get('__cards__')?.hash ?? null,
-    setCardsHash: (hash) => { map.set('__cards__', { hash }); },
+    getCardsSent: () => cardsSent,
+    setCardsSent: (sent) => { cardsSent = sent; },
     getTeam: (personId) => map.get('__teams__')?.[personId] as string | null | undefined ?? null,
     setTeam: (personId, teamId) => { map.set('__teams__', { ...(map.get('__teams__') || {}), [personId]: teamId }); },
     getSince: (personId) => map.get('__since__')?.[personId] as number | null | undefined ?? null,
@@ -207,17 +217,23 @@ export function memorySyncState(): SyncState {
     markHandedOver: (key) => { map.set('__handed__', { keys: [...(map.get('__handed__')?.keys ?? []), key] }); },
     getLinkComments: (personId) => map.get('__links__')?.[personId] as number | null | undefined ?? null,
     setLinkComments: (personId, at) => { map.set('__links__', { ...(map.get('__links__') || {}), [personId]: at }); },
+    getLinkPlace: (source) => places.get(source) ?? null,
+    setLinkPlace: (source, place) => { places.set(source, place); },
   };
 }
 
 export function fileSyncState(file: string, fs: FsForState): SyncState {
   let data: {
     projects?: Record<string, SyncCursor>;
+    // `cardsHash`, one fingerprint for every card at once, is what a copy from
+    // before 2026-11-21 left here. It is read as nothing sent.
     cardsHash?: string | null;
+    cardsSent?: CardsSent | null;
     teams?: Record<string, string | null>;
     since?: Record<string, number | null>;
     handedOver?: string[];
     linkComments?: Record<string, number>;
+    linkPlaces?: Record<string, LinkPlace>;
   } = {};
   try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { data = {}; }
   const save = () => {
@@ -228,8 +244,8 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
   return {
     get: (projectId) => ({ pushedTo: 0, pulledSeq: 0, ...(data.projects?.[projectId] || {}) }),
     set: (projectId, value) => { data.projects = { ...(data.projects || {}), [projectId]: { ...value } }; save(); },
-    getCardsHash: () => data.cardsHash ?? null,
-    setCardsHash: (hash) => { data.cardsHash = hash; save(); },
+    getCardsSent: () => data.cardsSent ?? null,
+    setCardsSent: (sent) => { delete data.cardsHash; data.cardsSent = sent; save(); },
     // WHICH TEAM THIS MAC IS IN, per person: once in one, it stays there
     // until that person says otherwise (main/team/index.mts).
     getTeam: (personId) => data.teams?.[personId] ?? null,
@@ -244,6 +260,8 @@ export function fileSyncState(file: string, fs: FsForState): SyncState {
     // The newest comment on this person's shared links already put on a thread (main/team/link-comments.mts).
     getLinkComments: (personId) => data.linkComments?.[personId] ?? null,
     setLinkComments: (personId, at) => { data.linkComments = { ...(data.linkComments || {}), [personId]: at }; save(); },
+    getLinkPlace: (source) => data.linkPlaces?.[source] ?? null,
+    setLinkPlace: (source, place) => { data.linkPlaces = { ...(data.linkPlaces || {}), [source]: place }; save(); },
   };
 }
 
@@ -460,16 +478,22 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
     return pulled;
   }
 
-  // YOUR THREADS AS THE TEAM SEES THEM. Published only when they changed, so a
-  // quiet Mac costs the cloud nothing on each pass.
+  // YOUR THREADS AS THE TEAM SEES THEM. Only the cards that changed are
+  // written, because every row written is a realtime message to each Mac
+  // listening, and a running thread's card changes each time it checks in.
   async function publishCards() {
     const teamId = teamIdOf?.();
     if (!teamId) return false;
     const cards = (listCards() || []).slice().sort((a, b) => a.threadId.localeCompare(b.threadId));
-    const hash = crypto.createHash('sha256').update(teamId + JSON.stringify(cards)).digest('hex');
-    if (hash === state.getCardsHash()) return false;
-    await backend.putCards(teamId, cards);
-    state.setCardsHash(hash);
+    const before = state.getCardsSent();
+    const had = before?.teamId === teamId ? before.cards : null;
+    const now: Record<string, string> = {};
+    for (const c of cards) if (c.visible === true) now[c.threadId] = crypto.createHash('sha256').update(JSON.stringify(c)).digest('hex');
+    const changed = new Set(Object.keys(now).filter((id) => had?.[id] !== now[id]));
+    const gone = !had || Object.keys(had).some((id) => !(id in now));
+    if (!changed.size && !gone) return false;
+    await backend.putCards(teamId, cards, changed);
+    state.setCardsSent({ teamId, cards: now });
     return true;
   }
 

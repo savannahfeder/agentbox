@@ -1,4 +1,4 @@
-import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles, unsentReplies, type FileMarks, type FileNote, type FileVersion, type Mark, type NotePerson } from '../shared/artifact-marks.mts';
+import { agentOfVersion, answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles, unsentReplies, type FileMarks, type FileNote, type FileVersion, type Mark, type NotePerson } from '../shared/artifact-marks.mts';
 import { heldByAPerson, type TeamRow } from '../shared/team-rules.mts';
 import { readItemHistory } from './store/work-items.mts';
 import { submitReply, type ReplyItem, type ReplySupervisor } from './live-replies.mts';
@@ -128,7 +128,7 @@ function notesWords({ store, product, id, item, ids, nameOf, people }: {
     if (note.resolved || (note.sent && !later.length) || noteGoesTo(note, people).to !== 'agent') continue;
     const family = families.find((f) => f.versions.some((v) => v.id === note.file));
     const version = family?.versions.find((v) => v.id === note.file);
-    if (typeof version?.agent !== 'string') continue;
+    if (!version || agentOfVersion(family!.versions, version.id) === null) continue;
     // `version` was found in `family`.
     if (note.sent) {
       words.push(repliesForTheAgent(note, later, version, family!.versions.length, { nameOf }));
@@ -169,8 +169,8 @@ async function handOn({ store, supervisor, product, id, text, sent, handOffMs }:
   return true;
 }
 
-// Approving a file the agent made is the go-ahead it was waiting for. A closed
-// thread is left closed: approving there is a record, not a request.
+// Approving a file this thread's agent made is the go-ahead it was waiting for.
+// A closed thread is left closed: approving there is a record, not a request.
 async function approvalToItsAgent({ store, supervisor, product, id, mark }: {
   store: NoteReplyStore;
   supervisor: NotesSupervisor;
@@ -186,6 +186,8 @@ async function approvalToItsAgent({ store, supervisor, product, id, mark }: {
   if (typeof version?.agent !== 'string') return false;
   const given = (item.artifacts?.approvals ?? []).filter((a) => a.file === mark.file).sort((a, b) => b.ts - a.ts)[0];
   if (!given) return false;
+  // A teammate's version is theirs to act on; approving it tells this agent nothing.
+  if (version.by && version.by !== given.by && version.by !== (item.runner ?? item.createdBy ?? null)) return false;
   const text = `Approved ${version.path}. Proceed as you proposed.`;
   // fromNotes keeps the thread from drawing this reply beside the approval it already shows.
   await submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: [approvalId(given)] }));

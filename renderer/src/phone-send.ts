@@ -84,8 +84,8 @@ export function phoneSender({ client, rows, setRows, aliases, changed }: {
       for (const [key, value] of Object.entries(p?.patch ?? {})) await onThread(p.product, real(p), key, value);
       return { ok: true };
     },
-    setThreadOnMac: async (p: { onMac: Record<string, true | null> }) => {
-      for (const [id, keep] of Object.entries(p?.onMac ?? {})) await onThread(undefined, id, 'onMac', keep === true ? true : null);
+    setThreadOnMac: async (p: { onMac: Record<string, boolean | null> }) => {
+      for (const [id, keep] of Object.entries(p?.onMac ?? {})) await onThread(undefined, id, 'onMac', typeof keep === 'boolean' ? keep : null);
       return { ok: true };
     },
     resumeItems: async (p: { ids: string[] }) => {

@@ -1,7 +1,7 @@
 {
   "name": "agentbox-app",
   "productName": "Agentbox",
-  "version": "0.1.22",
+  "version": "0.1.31",
   "description": "A desktop GUI for running dozens of Claude Code and Codex agents in parallel, each in its own git worktree.",
   "author": "Savannah Feder",
   "repository": {
@@ -55,6 +55,7 @@
     "scripts/approval-server.sh",
     "scripts/cloud-shim.pl",
     "scripts/memory-gate-hook.sh",
+    "scripts/safety-check-hook.sh",
     "worker-permissions.json",
     "LICENSE",
     "README.md"
@@ -71,9 +72,11 @@
     "pack": "node scripts/run.mjs scripts/release.mjs --no-sign",
     "pack:side": "node scripts/run.mjs scripts/pack-side.mjs",
     "release": "node scripts/run.mjs scripts/release.mjs",
-    "deploy": "node scripts/deploy.mjs",
+    "deploy": "node scripts/run.mjs scripts/deploy.mjs",
     "setup:feedback": "node scripts/set-up-feedback.mjs",
+    "feedback": "node scripts/run.mjs scripts/read-feedback.mjs",
     "fresh": "node scripts/run.mjs scripts/fresh-user.mjs",
+    "accounts": "node scripts/run.mjs scripts/accounts.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "check:public": "node scripts/check-before-public.mjs --all",
     "ship": "node scripts/ship.mjs",
@@ -87,6 +90,8 @@
     "app": "vite build renderer --logLevel warn && node scripts/prepare-terminal.mjs && node scripts/brand-electron.mjs && electron ."
   },
   "devDependencies": {
+    "@dicebear/core": "9.4.2",
+    "@dicebear/notionists": "9.4.2",
     "@electric-sql/pglite": "^0.5.8",
     "@fontsource-variable/source-sans-3": "^5.3.0",
     "@tiptap/core": "^3.32.1",
@@ -156,6 +161,11 @@
     "appId": "ac.astral.app",
     "productName": "Agentbox",
     "copyright": "Copyright © 2026 Agentbox",
+    "electronFuses": {
+      "runAsNode": true,
+      "enableNodeCliInspectArguments": false,
+      "enableNodeOptionsEnvironmentVariable": false
+    },
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -172,6 +182,7 @@
       "scripts/approval-server.sh",
       "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
+      "scripts/safety-check-hook.sh",
       "mcp/connection-proxy.mts",
       "renderer/dist/**/*",
       "package.json"
@@ -181,6 +192,7 @@
       "scripts/approval-server.sh",
       "scripts/cloud-shim.pl",
       "scripts/memory-gate-hook.sh",
+      "scripts/safety-check-hook.sh",
       "node_modules/node-pty/**",
       "main/native/**/*.node"
     ],

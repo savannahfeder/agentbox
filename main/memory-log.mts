@@ -29,6 +29,7 @@ import type { PressureReading } from './memory-gate.mts';
 
 /** Days of files kept, today included. */
 export const KEEP_DAYS = 7;
+const LIST_EVERY_QUIET_MS = 10 * 60_000;
 const FILE = /^memory-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
 type Owner = { item: string; product: string | null } | 'app' | null;
@@ -40,6 +41,8 @@ export interface MemoryLogOptions {
   readPressure?: () => Promise<PressureReading> | PressureReading;
   now?: () => number;
   facts?: () => Record<string, unknown> | null | undefined;
+  /** The app's own memory and CPU (main/own-use.mts), on every line. */
+  own?: () => unknown;
   keepDays?: number;
   footprints?: () => Promise<Map<number, number>> | Map<number, number>;
 }
@@ -64,13 +67,56 @@ export function footprintsFromTop(out: string): Map<number, number> {
 export function readFootprints(platform: string = process.platform): Promise<Map<number, number>> {
   if (platform !== 'darwin') return Promise.resolve(new Map());
   return new Promise((resolve) => {
-    execFile('/usr/bin/top', ['-l', '1', '-stats', 'pid,mem'], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024 },
+    execFile('/usr/bin/top', ['-l', '1', '-stats', 'pid,mem'], { timeout: 15_000, maxBuffer: 8 * 1024 * 1024, windowsHide: true },
       (_err, stdout) => resolve(footprintsFromTop(String(stdout ?? ''))));
   });
 }
 
 const name = (exe: unknown) => String(exe ?? '').split('/').filter(Boolean).pop() || String(exe ?? '');
-const top = (list: ProcessRecord[], n: number) => [...list].sort((a, b) => b.mb - a.mb).slice(0, n).map((p) => ({ name: name(p.exe), mb: Math.round(p.mb) }));
+const INTERPRETER = /^(node|python[\d.]*|bun|deno|ruby|Electron)$/;
+
+/**
+ * A program's name, and for an interpreter the file name of the script it runs,
+ * so "node" at 4 GB says whether it is a typecheck, a test run or a tester.
+ * Arguments after the script are left out: they can carry tokens.
+ */
+export function programName(p: { exe?: string | null; cmd?: string | null }): string {
+  const base = name(p.exe);
+  if (!INTERPRETER.test(base)) return base;
+  const cmd = String(p.cmd ?? '').trim();
+  const renamed = /^\S+ \([^)]*\)/.exec(cmd);
+  if (renamed) return renamed[0].slice(0, 60);
+  const words = cmd.split(/\s+/).filter(Boolean);
+  if (!words.length) return base;
+  if (name(words[0]) !== base) {
+    const said: string[] = [];
+    for (const w of words) {
+      if (said.length === 3 || /^-|[/=]/.test(w)) break;
+      said.push(w);
+    }
+    return said.length ? said.join(' ') : base;
+  }
+  const script = words.slice(1).find((w) => !w.startsWith('-'));
+  return script ? `${base} ${name(script)}` : base;
+}
+
+const top = (list: ProcessRecord[], n: number) => [...list].sort((a, b) => b.mb - a.mb).slice(0, n).map((p) => ({ name: programName(p), mb: Math.round(p.mb) }));
+
+/** The pressure half of a minute's line. Pure. */
+export function summarizeReading(reading: PressureReading = {}, at = Date.now()) {
+  const level = Number.isFinite(reading?.level) ? reading.level : null;
+  const freePct = Number.isFinite(reading?.freePct) ? reading.freePct : null;
+  const swapInMbps = Number.isFinite(reading?.swapInMbps) ? reading.swapInMbps : null;
+  const swapMb = Number.isFinite(reading?.swapMb) ? reading.swapMb : null;
+  return {
+    at: new Date(at).toISOString(),
+    pressure: level === null && freePct === null && swapInMbps === null ? null : pressureFrom({ level, freePct, swapInMbps }),
+    level,
+    freePct,
+    swapInMbps,
+    swapMb,
+  };
+}
 
 /** One minute's line, from one listing. Pure. */
 export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, at = Date.now(), reading = {} }: { appPid?: number; at?: number; reading?: PressureReading } = {}) {
@@ -102,19 +148,10 @@ export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, 
     } else others.push(p);
   }
   const sum = (list: ProcessRecord[]) => Math.round(list.reduce((n, p) => n + (Number(p.mb) || 0), 0));
-  const level = Number.isFinite(reading?.level) ? reading.level : null;
-  const freePct = Number.isFinite(reading?.freePct) ? reading.freePct : null;
-  const swapInMbps = Number.isFinite(reading?.swapInMbps) ? reading.swapInMbps : null;
-  const swapMb = Number.isFinite(reading?.swapMb) ? reading.swapMb : null;
   return {
-    at: new Date(at).toISOString(),
-    pressure: level === null && freePct === null && swapInMbps === null ? null : pressureFrom({ level, freePct, swapInMbps }),
-    level,
-    freePct,
-    swapInMbps,
-    swapMb,
+    ...summarizeReading(reading, at),
     totalMb: sum(procs),
-    app: { mb: sum(app), procs: app.length },
+    app: { mb: sum(app), procs: app.length, top: top(app, 3) },
     tasks: [...tasks.values()]
       .map((t) => ({ item: t.item, product: t.product, mb: sum(t.list), procs: t.list.length, top: top(t.list, 3) }))
       .sort((a, b) => b.mb - a.mb),
@@ -134,18 +171,20 @@ export class MemoryLog {
   declare readPressure: NonNullable<MemoryLogOptions['readPressure']>;
   declare now: () => number;
   declare facts: NonNullable<MemoryLogOptions['facts']>;
+  declare own: MemoryLogOptions['own'];
   declare keepDays: number;
   declare footprints: NonNullable<MemoryLogOptions['footprints']>;
   declare _pruned: string | null;
   declare _busy?: boolean;
+  declare _listedAt?: number;
 
   constructor({
     dir, appPid = process.pid, list = listProcesses, readPressure = readMacPressure,
-    now = Date.now, facts = () => ({}), keepDays = KEEP_DAYS,
+    now = Date.now, facts = () => ({}), own, keepDays = KEEP_DAYS,
     // Footprints are by pid of this Mac, so they only belong over its own listing.
     footprints = list === listProcesses ? readFootprints : () => new Map(),
   }: MemoryLogOptions) {
-    Object.assign(this, { dir, appPid, list, readPressure, now, facts, keepDays, footprints });
+    Object.assign(this, { dir, appPid, list, readPressure, now, facts, own, keepDays, footprints });
     this._pruned = null;
   }
 
@@ -154,16 +193,25 @@ export class MemoryLog {
     if (this._busy) return;
     this._busy = true;
     try {
-      const [listed, reading, fp] = await Promise.all([
-        Promise.resolve().then(() => this.list()).catch(() => []),
-        Promise.resolve().then(() => this.readPressure()).catch(() => ({})),
-        Promise.resolve().then(() => this.footprints()).catch(() => new Map<number, number>()),
-      ]);
-      const procs = fp.size ? listed.map((p) => (fp.has(p.pid) ? { ...p, mb: fp.get(p.pid)! } : p)) : listed;
+      const reading: PressureReading = await Promise.resolve().then(() => this.readPressure()).catch(() => ({}));
       const at = this.now();
       let facts: Record<string, unknown> = {};
       try { facts = this.facts() ?? {}; } catch { /* the line goes without them */ }
-      const line = { ...summarizeMemory(procs, { appPid: this.appPid, at, reading }), measure: fp.size ? 'footprint' : 'rss', ...facts };
+      // With nothing running and memory normal, a listing names nobody worth
+      // naming, and on a Mac it starts ps three times, lsof and top.
+      const quiet = !facts.running && pressureFrom(reading) === 'normal' && at - (this._listedAt ?? -Infinity) < LIST_EVERY_QUIET_MS;
+      let line: Record<string, unknown>;
+      if (quiet) line = { ...summarizeReading(reading, at), measure: 'reading', ...facts };
+      else {
+        const [listed, fp] = await Promise.all([
+          Promise.resolve().then(() => this.list()).catch(() => []),
+          Promise.resolve().then(() => this.footprints()).catch(() => new Map<number, number>()),
+        ]);
+        this._listedAt = at;
+        const procs = fp.size ? listed.map((p) => (fp.has(p.pid) ? { ...p, mb: fp.get(p.pid)! } : p)) : listed;
+        line = { ...summarizeMemory(procs, { appPid: this.appPid, at, reading }), measure: fp.size ? 'footprint' : 'rss', ...facts };
+      }
+      if (this.own) { try { line.own = this.own() ?? null; } catch { line.own = null; } }
       fs.mkdirSync(this.dir, { recursive: true });
       fs.appendFileSync(path.join(this.dir, `memory-${dayOf(at)}.jsonl`), `${JSON.stringify(line)}\n`);
       this._prune(at);

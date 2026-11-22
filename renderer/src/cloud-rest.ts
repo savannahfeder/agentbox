@@ -25,6 +25,11 @@ type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 const SESSION_KEY = 'agentbox-cloud-session';
 const VERIFIER_KEY = 'agentbox-cloud-verifier';
 const RESET_KEY = 'agentbox-cloud-reset';
+// The email of a sign-in the cloud refused to renew, so the sign-in page can say it ran out.
+const LAPSED_KEY = 'agentbox-cloud-lapsed';
+// The cloud lets a spent renewal token be asked again for about 10 seconds.
+// After that it takes the second ask for theft and ends the whole sign-in.
+const RENEW_DEADLINE_MS = 8_000;
 
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
@@ -42,6 +47,13 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
   const keep = (s: CloudSession | null) => {
     session = s;
     try { if (s) storage.setItem(SESSION_KEY, JSON.stringify(s)); else storage.removeItem(SESSION_KEY); } catch { /* private mode: this tab only */ }
+    try { storage.removeItem(LAPSED_KEY); } catch { /* as above */ }
+  };
+  const lapse = () => {
+    const email = session?.user?.email || '';
+    gen += 1;
+    keep(null);
+    try { storage.setItem(LAPSED_KEY, email); } catch { /* as above */ }
   };
 
   // `anyone`: asked as whoever is signed in, and as nobody when nobody is.
@@ -68,7 +80,7 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
         session = { ...session, expires_at: 0 };
         return call(path, init, false);
       }
-      if (res.status === 401 && init.auth !== false && gen === mine) { gen += 1; keep(null); }
+      if (res.status === 401 && init.auth !== false && gen === mine && session) lapse();
       const said = (body && typeof body === 'object' && (body.msg || body.message || body.error_description || body.error)) || `the cloud answered ${res.status}`;
       throw Object.assign(new Error(String(said)), { status: res.status });
     }
@@ -122,12 +134,20 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     if (!renewing) {
       const mine = gen;
       const refresh = session!.refresh_token;
+      const ask = async () => {
+        const stop = new AbortController();
+        const timer = setTimeout(() => stop.abort(new Error('The cloud took too long to renew your sign-in.')), RENEW_DEADLINE_MS);
+        try {
+          return await fetchImpl(`${base}/auth/v1/token?grant_type=refresh_token`, { method: 'POST', signal: stop.signal, headers: { apikey: cfg.anonKey, 'content-type': 'application/json' }, body: JSON.stringify({ refresh_token: refresh }) });
+        } finally { clearTimeout(timer); }
+      };
       renewing = (async () => {
         try {
-          const res = await fetchImpl(`${base}/auth/v1/token?grant_type=refresh_token`, { method: 'POST', headers: { apikey: cfg.anonKey, 'content-type': 'application/json' }, body: JSON.stringify({ refresh_token: refresh }) });
+          // An ask with no answer may still have spent the token, so it is asked again inside the cloud's window.
+          const res = await ask().catch(() => (gen === mine ? ask() : Promise.reject(new Error('signed out'))));
           const body = await res.json().catch(() => null);
           if (!res.ok) {
-            if ((res.status === 400 || res.status === 401) && gen === mine) { gen += 1; keep(null); }
+            if ((res.status === 400 || res.status === 401) && gen === mine) lapse();
             throw new Error(body?.error_description || body?.msg || body?.message || 'Your sign-in ran out. Sign in again.');
           }
           return took(body, mine).access_token;
@@ -143,6 +163,8 @@ export function cloudClient(cfg: CloudConfig, { storage, fetchImpl, now = () => 
     session: () => session,
     signedIn: () => !!session,
     email: () => session?.user?.email ?? null,
+    /** The email of a sign-in that ran out on its own ('' when it had none), null otherwise. */
+    lapsed: (): string | null => { try { return storage.getItem(LAPSED_KEY); } catch { return null; } },
     /** Moves on at every sign-in and sign-out; a read begun under an older one is stale. */
     generation: () => gen,
 

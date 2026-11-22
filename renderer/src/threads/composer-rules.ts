@@ -18,6 +18,7 @@ import type { Person } from '../types';
 import { projectSeenBy } from '../../../shared/thread-cards.mts';
 import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repeats.mts';
 import { clockWords, dayDeadline } from '../../../shared/team-tasks.mts';
+import { threadOfLink } from '../../../shared/thread-link.mts';
 
 export type Harness = 'claude' | 'codex';
 
@@ -149,7 +150,7 @@ export const sameModel = (a: ModelPick | null | undefined, b: ModelPick | null |
 
 type EngineRow = { id: string; label: string };
 
-/** The agents To offers, or nothing where there is only one. */
+/** The agents a model row is tagged with, or nothing where there is only one. */
 export function agentChoices(engines?: readonly EngineRow[]): { id: Harness; label: string }[] {
   const rows = engines ?? [];
   if (rows.length < 2) return [];
@@ -158,10 +159,10 @@ export function agentChoices(engines?: readonly EngineRow[]): { id: Harness; lab
     .map((e) => ({ id: e.id as Harness, label: e.label }));
 }
 
-/** The word on the To field: the agent's name, or "Agent" where there is one. */
-export function agentWordFor(engines: readonly EngineRow[] | undefined, engine: Harness): string {
-  const rows = agentChoices(engines);
-  return rows.find((e) => e.id === engine)?.label ?? 'Agent';
+/** Whether To is drawn. The model picks the agent, so To is only there when
+ *  someone besides the agent could get the thread. */
+export function toOffered({ people, auto, mates, chosen }: { people: boolean; auto: boolean; mates: boolean; chosen: boolean }): boolean {
+  return people || auto || mates || chosen;
 }
 
 /**
@@ -365,9 +366,11 @@ export function projectOnScreen({ filter, open }: { filter: string | null; open:
  */
 export function cardProject<T extends ProjectLike>(
   offered: readonly T[],
-  { picked, defaultProduct, remembered }: { picked: string | null; defaultProduct?: string | null; remembered?: string | null },
+  { picked, defaultProduct, remembered, mustChoose = false }: { picked: string | null; defaultProduct?: string | null; remembered?: string | null; mustChoose?: boolean },
 ): T | null {
-  return offered.find((p) => p.slug === picked) ?? startingProject(offered, { defaultProduct, remembered });
+  const hit = offered.find((p) => p.slug === picked);
+  if (hit || mustChoose) return hit ?? null;
+  return startingProject(offered, { defaultProduct, remembered });
 }
 
 // Projects carry no colour of their own yet, so the swatch is read off the slug:
@@ -409,12 +412,29 @@ export function findInvited(
   return (sent ?? []).map((s) => s.email).filter((e) => !joined.has(e.toLowerCase()) && e.toLowerCase().startsWith(q));
 }
 
+/** The rows under the people that the To search leaves: Auto and the agents
+ *  by name, an AI teammate by name or role. `agent` is the lone Agent row of
+ *  a Mac with one agent. Someone new only shows with nothing typed. */
+export function findInTo<A extends { label: string }, M extends { name: string; role?: string | null }>(
+  query: string, { auto, agents, mates }: { auto: boolean; agents: readonly A[]; mates: readonly M[] },
+): { auto: boolean; agents: A[]; agent: boolean; mates: M[]; someoneNew: boolean } {
+  const q = (query ?? '').trim().toLowerCase();
+  const hit = (...words: (string | null | undefined)[]) => !q || words.some((w) => !!w && w.toLowerCase().includes(q));
+  return {
+    auto: auto && hit('Auto'),
+    agents: agents.filter((a) => hit(a.label)),
+    agent: hit('Agent'),
+    mates: mates.filter((t) => hit(t.name, t.role)),
+    someoneNew: !q,
+  };
+}
+
 export type ToSection = 'people' | 'auto' | 'agents' | 'mates';
 
 /** The To menu, top to bottom: the people on the team first, then the agents and AI teammates. */
-export function toSections({ people, auto, mates, adding }: { people: boolean; auto: boolean; mates: boolean; adding: boolean }): ToSection[] {
+export function toSections({ people, auto, agents = true, mates, adding }: { people: boolean; auto: boolean; agents?: boolean; mates: boolean; adding: boolean }): ToSection[] {
   if (adding) return people ? ['people'] : [];
-  return [...(people ? ['people' as const] : []), ...(auto ? ['auto' as const] : []), 'agents', ...(mates ? ['mates' as const] : [])];
+  return [...(people ? ['people' as const] : []), ...(auto ? ['auto' as const] : []), ...(agents ? ['agents' as const] : []), ...(mates ? ['mates' as const] : [])];
 }
 
 /** What the reply box on an open thread asks: the people in a conversation, the agent where one runs, else a note. */
@@ -691,7 +711,9 @@ export function tabAfterSending({ team, kind, first = false, later, view, covere
 
 /* ----------------------------- hand to an agent ----------------------------- */
 
-const FILE_LINK = /!?\[([^\]]*)\]\((attachments\/[^)\s]+)\)/g;
+// A plain name only, as the sync fetches: a teammate's words keep their link
+// targets as written, and `attachments/../..` would hand on any folder of yours.
+const FILE_LINK = /!?\[([^\]]*)\]\((attachments\/[A-Za-z0-9][^)\s/\\]*)\)/g;
 
 /** What the card opens on for the message pressed: its words, who wrote them, and its files. */
 export function handOffStart({ product, id, message, nameOf, dir }: {
@@ -712,23 +734,64 @@ export function handOffStart({ product, id, message, nameOf, dir }: {
   };
 }
 
+type NamedProject = ProjectLike & { name: string };
+const ESCAPED = /[.*+?^${}()|[\]\\]/g;
+
+/**
+ * The project a handed-on task runs in: the one the thread it came from is in,
+ * else the one its words name, else none, so the card asks. Only one of yours.
+ */
+export function handOffProject({ words, cards, offered }: {
+  words: string;
+  cards: readonly { personId: string; threadId: string; project: string | null }[];
+  offered: readonly NamedProject[];
+}): string | null {
+  const mine = offered.filter((p) => !p.practice && !isDirect(p) && p.name.trim());
+  const called = (name: string) => {
+    const hits = mine.filter((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase());
+    return (hits.find((p) => p.team) ?? hits[0])?.slug ?? null;
+  };
+  for (const m of words.matchAll(/https:\/\/[^\s)]+/g)) {
+    const link = threadOfLink(m[0]);
+    const card = link ? cards.find((c) => c.personId === link.owner && c.threadId === link.id) : null;
+    if (!card?.project) continue;
+    // Handed from a thread in a project you do not have: the work is about that project, so ask.
+    return called(card.project);
+  }
+  const plain = words.replace(/\]\([^)]*\)/g, ']');
+  const said = new Set(mine.filter((p) => new RegExp(`(?<![\\w])${p.name.trim().replace(ESCAPED, '\\$&')}(?![\\w])`, 'i').test(plain)).map((p) => p.name.trim().toLowerCase()));
+  return said.size === 1 ? called([...said][0]) : null;
+}
+
+/** The project a hand-off opens on, or the card asks for one. */
+const projectOrAsk = (slug: string | null) => (slug ? { product: slug } : { chooseProject: true as const });
+
 /** The same for a task, whose files come from its brief because a new thread cannot read the record. */
-export function taskHandOff({ from, brief, message, nameOf, handFrom }: {
+export function taskHandOff({ from, brief, message, nameOf, handFrom, offered = [], cards = [] }: {
   from: string | null | undefined;
-  brief: { body: string; files: { name: string; srcPath: string }[] };
+  brief: { title?: string; body: string; files: { name: string; srcPath: string }[] };
   message: { text?: string; by?: string | null } | null;
   nameOf: (person: string) => string | null | undefined;
   /** The task, so the task can say which agent has it. */
   handFrom?: HandFrom;
+  offered?: readonly NamedProject[];
+  cards?: readonly { personId: string; threadId: string; project: string | null }[];
 }) {
   const attachments = brief.files.map((f) => ({ ...f, image: /\.(png|jpe?g|gif|webp)$/i.test(f.name) }));
   const pressed = (message?.text ?? '').replace(FILE_LINK, '').trim();
   const from_ = handFrom ? { handFrom } : {};
+  const where = projectOrAsk(handOffProject({ words: `${brief.title ?? ''}\n${brief.body}\n${pressed}`, cards, offered }));
   if (pressed && pressed !== brief.body.trim()) {
     const who = message?.by ? nameOf(message.by) : null;
-    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_ };
+    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_, ...where };
   }
-  return { to: 'agent', body: from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`, attachments, ...from_ };
+  // The thread is called what the task is called; who asked is its first words.
+  const name = String(brief.title ?? '').trim();
+  // A hand-over carries the giver's agent's edits as a .change file; the agent starts from them rather than over.
+  const change = brief.files.find((f) => /\.change$/i.test(f.name));
+  const start = change ? `Start from the edits in ${change.name}, attached: they are ${from ? `${from}'s` : 'the'} agent's work so far, not yet on this computer.\n\n` : '';
+  const asked = from ? `${from} asked:\n\n${brief.body}\n\n${start}` : `${brief.body}\n\n${start}`;
+  return { to: 'agent', body: name && from ? `${name}\n\n${asked}` : asked, ...(name && from ? { named: name } : {}), attachments, ...from_, ...where };
 }
 
 export const handedFromLabel = (product: string, id: string) => `handed-from:${product}:${id}`;

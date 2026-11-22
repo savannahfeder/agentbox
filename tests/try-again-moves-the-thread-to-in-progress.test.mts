@@ -94,7 +94,6 @@ describe('the lists move it', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toMatch(/const liveIds = useMemo\(\(\) => agentOnOrComing\(\{ running: runningRows, starting: snap\?\.supervisor\.starting \}\)/);
     expect(app).toMatch(/<LiveContext\.Provider value=\{runningIds\}>/);
-    expect(app).toMatch(/whyItCannotMove\(target as never, \{ live: runningIds\.has\(target\.id\) \}\)/);
   });
 });
 

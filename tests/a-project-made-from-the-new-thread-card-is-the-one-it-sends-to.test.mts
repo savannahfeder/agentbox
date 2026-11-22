@@ -24,7 +24,8 @@ describe('the slug of a project just made reaches the open card', () => {
   const card = src('threads', 'ThreadComposer.tsx');
 
   it('is handed to the card as a prop', () => {
-    expect(app).toMatch(/<ThreadComposer[\s\S]{0,4000}?selectProject=\{pickProject\}/);
+    // Not while the box holds the walkthrough's practice thread, which only goes to Practice.
+    expect(app).toMatch(/<ThreadComposer[\s\S]{0,4000}?selectProject=\{tourTask \? null : pickProject\}/);
   });
 
   it('is what App.tsx sets when the project is made from the card', () => {

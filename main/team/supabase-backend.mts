@@ -10,7 +10,8 @@ import { cleanConnections } from '../../shared/team-connections.mts';
 import { cleanMates } from '../../shared/team-departures.mts';
 import { roomsSupabase } from './rooms-supabase.mts';
 import type { LedgerLine } from './sync.mts';
-import type { FileLinkShare, TeamHandover } from './index.mts';
+import { cleanPlace, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
+import type { FileLinkShare, LinkAccess, LinkCan, TeamHandover } from './index.mts';
 
 const PAGE = 500;
 const PUSH_BATCH = 200;
@@ -95,17 +96,23 @@ export interface CardToPut {
   task?: unknown;
 }
 
-interface FileLinkRow { token: string; version: number; hash: string | null; created_at?: string; updated_at: string; comments: number }
-interface LinkViewRow { name: string; kind: string; type: string; body: string; version: number; created_at?: string; updated_at: string; owner_name: string | null; owner_avatar: string | null; mine: boolean }
+// The columns after `comments` came with 20261112120000_a_link_says_who_can_open_it_and_what_they_can_do.sql.
+interface FileLinkRow { token: string; version: number; hash: string | null; created_at?: string; updated_at: string; comments: number; access?: string; can?: string; rev?: number; changed_on_web?: boolean; changed_by_name?: string | null }
+interface LinkViewRow { name: string; kind: string; type: string; body: string; version: number; created_at?: string; updated_at: string; owner_name: string | null; owner_avatar: string | null; mine: boolean; rev?: number }
+interface LinkPersonRow { email: string; can: string; name: string | null; avatar: string | null }
+interface LinkChangedRow { token: string; source: string; name: string; rev: number; hash: string | null; version: number; changed_by_name: string | null }
 interface MyFileLinkRow { token: string; source: string; name: string; kind: string; created_at: string; updated_at: string; comments: number }
-interface LinkCommentRow { id: string; by_name: string; by_avatar: string | null; body: string; created_at: string; mine: boolean; by_owner: boolean }
-interface NewLinkCommentRow { token: string; source: string; name: string; by_name: string; body: string; created_at: string }
+interface LinkCommentRow { id: string; by_name: string; by_avatar: string | null; body: string; created_at: string; mine: boolean; by_owner: boolean; place?: unknown }
+interface NewLinkCommentRow { token: string; source: string; name: string; by_name: string; body: string; created_at: string; place?: unknown }
 
 const PERSON_COLS = 'id,email,name,avatar_url,status_text,status_until';
 const personOut = (p: PersonRow | undefined): CloudPerson | undefined => p && ({
   id: p.id, email: p.email, name: p.name, avatarUrl: p.avatar_url ?? null,
   status: p.status_text ? { text: p.status_text, until: p.status_until ? Date.parse(p.status_until) : null } : null,
 });
+
+const linkAccessOf = (v: unknown): LinkAccess => (v === 'people' ? 'people' : 'anyone');
+const linkCanOf = (v: unknown): LinkCan => (v === 'view' || v === 'edit' ? v : 'comment');
 
 function must<T>({ data, error }: CloudAnswer, what: string): T {
   if (error) throw new Error(`${what}: ${error.message}`);
@@ -125,6 +132,8 @@ const commandOut = (r: CommandRow): CloudPhoneCommand => ({ id: r.id, owner: r.o
 
 // A time as text or as a Date, to the millisecond (Date.parse of a Date drops them).
 const msOf = (v: string | Date) => new Date(v).getTime();
+/** Storage's refusal of an upload for its size: 413, "exceeded the maximum allowed size". */
+export const isTooBig = (error: Partial<StorageFailure> | null | undefined) => String(error?.statusCode ?? error?.status ?? '') === '413' || /maximum allowed size|payload too large|too large/i.test(`${error?.message ?? ''} ${error?.error ?? ''}`);
 const commentOut = (r: CommentRow) => ({ id: r.id, owner: r.owner, threadId: r.thread_id, by: r.by_person, text: r.body, at: Date.parse(r.created_at) });
 
 export function supabaseBackend(client: SupabaseClient) {
@@ -175,12 +184,61 @@ export function supabaseBackend(client: SupabaseClient) {
       return clean ? { text: clean, until: clean && until ? until : null } : null;
     },
 
+    // Your name and photo. people_update_self keeps the row yours; only these
+    // two columns are granted (20261001000500_security.sql).
+    async setProfile({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
+      const me = await myId();
+      const patch: Record<string, unknown> = {};
+      if (name !== undefined) patch.name = name;
+      if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
+      must(await client.from('people').update(patch).eq('id', me), 'saving your name and photo');
+    },
+
+    // A picture in the public `pictures` bucket (20261120000000), named for its
+    // bytes, so the same picture twice is already there.
+    async putPicture(name: string, bytes: Buffer, type: string) {
+      await myId();
+      const bucket = client.storage.from('pictures');
+      const { error }: { error: StorageFailure | null } = await bucket.upload(name, bytes, { contentType: type, upsert: false });
+      if (error && !/exists|duplicate/i.test(`${error.message} ${error.statusCode ?? ''}`) && String(error.statusCode) !== '409') throw new Error(`saving the picture: ${error.message}`);
+      return bucket.getPublicUrl(name).data.publicUrl as string;
+    },
+
+    async setTeamLogo(teamId: string, logoUrl: string | null) {
+      await myId();
+      const rows = must<{ id: string }[]>(await client.from('teams').update({ logo_url: logoUrl }).eq('id', teamId).select('id'), 'saving the team’s logo');
+      if (!rows.length) throw new Error('only the team’s owner can change its logo');
+    },
+
+    // The team's name and logo, read again on every pass so a teammate's
+    // change reaches this Mac. A cloud from before the logo answers without it.
+    async teamInfo(teamId: string) {
+      await myId();
+      const withLogo = await client.from('teams').select('id,name,logo_url').eq('id', teamId).limit(1);
+      if (!withLogo.error) {
+        const [r] = (withLogo.data ?? []) as { id: string; name: string; logo_url: string | null }[];
+        return r ? { id: r.id, name: r.name, logoUrl: r.logo_url ?? null } : null;
+      }
+      const [r] = must<{ id: string; name: string }[]>(await client.from('teams').select('id,name').eq('id', teamId).limit(1), 'reading your team');
+      return r ? { id: r.id, name: r.name, logoUrl: null } : null;
+    },
+
     // THE INVITES WAITING FOR YOU, to the email Google confirmed. Nothing is
     // joined by reading them: joining is acceptInvite, one team, on a yes.
     async pendingInvites() {
       await myId();
       const rows = must<{ team_id: string; team_name: string; invited_by: string | null; invited_by_name: string | null }[]>(await client.rpc('pending_invites'), 'reading your invites') ?? [];
       return rows.map((r) => ({ teamId: r.team_id, teamName: r.team_name, invitedBy: r.invited_by ?? null, invitedByName: r.invited_by_name ?? null }));
+    },
+
+    async hasMultiplayer() {
+      await myId();
+      return must<boolean>(await client.rpc('i_have_multiplayer'), 'asking whether this team has multiplayer') === true;
+    },
+
+    async teamPays() {
+      await myId();
+      return must<boolean>(await client.rpc('my_team_pays'), 'asking whether your team has Pro') === true;
     },
 
     async acceptInvite(teamId: string) {
@@ -330,14 +388,16 @@ export function supabaseBackend(client: SupabaseClient) {
     },
 
     // YOUR CARDS: one per thread worth showing the team (shared/thread-cards.mts).
-    // Upserted whole, and any card of yours the Mac no longer lists is removed,
-    // so a thread made private or finished yesterday leaves the board. A card
-    // not marked visible never goes up at all, whatever the Mac handed over.
-    async putCards(teamId: string, all: CardToPut[]) {
+    // The ones in `changed` are upserted whole (all of them without it), and
+    // any card of yours the Mac no longer lists is removed, so a thread made
+    // private or finished yesterday leaves the board. A card not marked
+    // visible never goes up at all, whatever the Mac handed over.
+    async putCards(teamId: string, all: CardToPut[], changed?: ReadonlySet<string>) {
       const me = await myId();
       const cards = all.filter((c) => c.visible === true);
-      if (cards.length) {
-        const rows = cards.map((c) => ({
+      const writing = changed ? cards.filter((c) => changed.has(c.threadId)) : cards;
+      if (writing.length) {
+        const rows = writing.map((c) => ({
           person_id: me, team_id: teamId, thread_id: c.threadId, visible: !!c.visible,
           // WHO IT REACHES: the chosen people, or no list at all for the whole
           // team (w-41ff964775). The read rule on the table does the enforcing.
@@ -422,7 +482,37 @@ export function supabaseBackend(client: SupabaseClient) {
       await myId();
       const rows = must<FileLinkRow[] | null>(await client.rpc('my_file_link', { src: source }), 'asking for the file\'s link');
       const r = rows?.[0];
-      return r ? { token: r.token, version: r.version, hash: r.hash ?? '', createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), comments: r.comments } : null;
+      return r ? {
+        token: r.token, version: r.version, hash: r.hash ?? '', createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), comments: r.comments,
+        access: linkAccessOf(r.access), can: linkCanOf(r.can), rev: Number(r.rev) || 1, changedOnWeb: r.changed_on_web === true, changedByName: r.changed_by_name ?? null,
+      } : null;
+    },
+
+    async setFileLinkAccess(token: string, access: string, can: string) {
+      await myId();
+      must(await client.rpc('set_file_link_access', { tok: token, acc: access, c: can }), 'changing who can open the link');
+    },
+
+    async fileLinkPeople(token: string) {
+      await myId();
+      const rows = must<LinkPersonRow[] | null>(await client.rpc('file_link_people_of', { tok: token }), 'reading who the link is shared with');
+      return (rows ?? []).map((p) => ({ email: p.email, can: linkCanOf(p.can), name: p.name ?? null, avatar: p.avatar ?? null }));
+    },
+
+    async setFileLinkPerson(token: string, email: string, can: string | null) {
+      await myId();
+      must(await client.rpc('set_file_link_person', { tok: token, mail: email, c: can }), can ? 'sharing the link with them' : 'taking them off the link');
+    },
+
+    async linksChangedOnWeb() {
+      await myId();
+      const rows = must<LinkChangedRow[] | null>(await client.rpc('my_links_changed_on_web'), 'reading edits made on your links');
+      return (rows ?? []).map((r) => ({ token: r.token, source: r.source, name: r.name, rev: r.rev, hash: r.hash ?? '', version: r.version, byName: r.changed_by_name || 'Someone' }));
+    },
+
+    async fileLinkBroughtHome(token: string, rev: number, version: number) {
+      await myId();
+      must(await client.rpc('file_link_brought_home', { tok: token, r: rev, v: version }), 'marking the edit as on this computer');
     },
 
     async stopFileLink(token: string) {
@@ -466,7 +556,7 @@ export function supabaseBackend(client: SupabaseClient) {
       const rows = must<LinkViewRow[] | null>(await client.rpc('file_link_view', { tok: token }), 'reading the shared file');
       const r = rows?.[0];
       if (!r) return { stopped: must<boolean>(await client.rpc('file_link_stopped', { tok: token }), 'reading the shared file') === true, file: null };
-      return { stopped: false, file: { name: r.name, kind: r.kind, type: r.type, body: r.body, version: r.version, createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), ownerName: r.owner_name ?? null, ownerAvatar: r.owner_avatar ?? null, mine: !!r.mine } };
+      return { stopped: false, file: { name: r.name, kind: r.kind, type: r.type, body: r.body, version: r.version, createdAt: msOf(r.created_at ?? r.updated_at), updatedAt: msOf(r.updated_at), ownerName: r.owner_name ?? null, ownerAvatar: r.owner_avatar ?? null, mine: !!r.mine, ...(r.rev != null ? { rev: Number(r.rev) } : {}) } };
     },
 
     async linkPiece(name: string) {
@@ -481,7 +571,7 @@ export function supabaseBackend(client: SupabaseClient) {
     async fileLinkComments(token: string) {
       await myId();
       const rows = must<LinkCommentRow[] | null>(await client.rpc('file_link_comments_of', { tok: token }), 'reading the comments');
-      return (rows ?? []).map((c) => ({ id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: msOf(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner }));
+      return (rows ?? []).map((c) => { const place = cleanPlace(c.place as RawPlace | null); return { id: c.id, byName: c.by_name, byAvatar: c.by_avatar ?? null, text: c.body, at: msOf(c.created_at), mine: !!c.mine, byOwner: !!c.by_owner, ...(place ? { place } : {}) }; });
     },
 
     async myFileLinks() {
@@ -493,12 +583,12 @@ export function supabaseBackend(client: SupabaseClient) {
     async newLinkComments(since: number) {
       await myId();
       const rows = must<NewLinkCommentRow[] | null>(await client.rpc('new_comments_on_my_links', { since: new Date(since).toISOString() }), 'reading new comments on your links');
-      return (rows ?? []).map((c) => ({ token: c.token, source: c.source, name: c.name, byName: c.by_name, text: c.body, at: msOf(c.created_at) }));
+      return (rows ?? []).map((c) => { const place = cleanPlace(c.place as RawPlace | null); return { token: c.token, source: c.source, name: c.name, byName: c.by_name, text: c.body, at: msOf(c.created_at), ...(place ? { place } : {}) }; });
     },
 
-    async commentOnFileLink(token: string, text: unknown) {
+    async commentOnFileLink(token: string, text: unknown, place: NotePlace | null = null) {
       await myId();
-      return must<unknown>(await client.rpc('comment_on_file_link', { tok: token, b: text }), 'sending your comment');
+      return must<unknown>(await client.rpc('comment_on_file_link', { tok: token, b: text, ...(place ? { p: place } : {}) }), 'sending your comment');
     },
 
     async getThreadFile(owner: string, threadId: string, name: string) {
@@ -531,15 +621,21 @@ export function supabaseBackend(client: SupabaseClient) {
     },
 
     // Row level security holds who reads a folder and a place (20261102000000_a_teams_folders.sql).
-    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; at: number }) {
+    // `gone` is 20261121000000_a_folder_can_be_removed.sql; a folder that was never removed does not name it.
+    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, gone, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; gone?: boolean; at: number }) {
       await myId();
-      must(await client.from('file_folders').upsert({ id, team_id: teamId, project, name, parent, people, at }, { onConflict: 'id' }), 'saving a folder');
+      must(await client.from('file_folders').upsert({ id, team_id: teamId, project, name, parent, people, at, ...(gone === undefined ? {} : { gone }) }, { onConflict: 'id' }), 'saving a folder');
     },
 
     async fileFolders() {
       await myId();
-      const rows = must<{ id: string; team_id: string; project: string; name: string; parent: string | null; people: string[] | null; created_by: string; at: number | string }[]>(await client.from('file_folders').select('id,team_id,project,name,parent,people,created_by,at'), 'reading folders');
-      return rows.map((r) => ({ id: r.id, teamId: r.team_id, project: r.project, name: r.name, parent: r.parent, people: r.people, by: r.created_by, at: Number(r.at) }));
+      type Row = { id: string; team_id: string; project: string; name: string; parent: string | null; people: string[] | null; created_by: string; gone?: boolean | null; at: number | string };
+      const columns = 'id,team_id,project,name,parent,people,created_by,at';
+      let read = await client.from('file_folders').select(`${columns},gone`);
+      // A database the migration has not reached yet has no column to read.
+      if (read.error && /gone/.test(read.error.message ?? '')) read = await client.from('file_folders').select(columns);
+      const rows = must<Row[]>(read, 'reading folders');
+      return rows.map((r) => ({ id: r.id, teamId: r.team_id, project: r.project, name: r.name, parent: r.parent, people: r.people, by: r.created_by, gone: r.gone === true, at: Number(r.at) }));
     },
 
     async placeFile(owner: string, threadId: string, { project, family, folder = null, at }: { project: unknown; family: string; folder?: string | null; at: number }) {
@@ -653,7 +749,9 @@ export function supabaseBackend(client: SupabaseClient) {
     async putPhoneFile({ owner, device, name, data, type }: { owner?: string; device: string; name: string; data: Buffer; type: string | null }) {
       const me = await myId();
       const { error }: { error: StorageFailure | null } = await client.storage.from('phone-files').upload(`${owner ?? me}/${device}/${name}`, data, { contentType: type ?? 'application/octet-stream', upsert: false });
-      if (error && !/exists|duplicate/i.test(`${error.message} ${error.statusCode ?? ''}`) && String(error.statusCode) !== '409') throw new Error(`sending a file to your phone: ${error.message}`);
+      if (error && !/exists|duplicate/i.test(`${error.message} ${error.statusCode ?? ''}`) && String(error.statusCode) !== '409') {
+        throw Object.assign(new Error(`sending a file to your phone: ${error.message}`), { tooBig: isTooBig(error) });
+      }
     },
     // A picture her phone put in this computer's folder for a reply; null when it is not there.
     async getPhoneFile({ owner, device, name }: { owner?: string; device: string; name: string }) {

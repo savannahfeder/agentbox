@@ -85,7 +85,7 @@ let lineAuthor: string | null = null;
 export function setLineAuthor(personId: string | null | undefined): void {
   lineAuthor = typeof personId === 'string' && personId ? personId : null;
 }
-function currentAuthor(): string | null {
+export function currentAuthor(): string | null {
   return lineAuthor ?? (process.env.AGENTBOX_PERSON_ID || null);
 }
 const newLineUid = () => `l-${crypto.randomBytes(8).toString('hex')}`;

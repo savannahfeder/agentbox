@@ -23,7 +23,7 @@ const rooms = read('renderer/src/team/rooms/rooms.css');
 
 describe('the group chat\'s box', () => {
   it('grows as you write, up to the group box’s ceiling', () => {
-    expect(rooms).toMatch(/\.rm-compose-input \{[^}]*max-height: 200px; overflow-y: auto;/);
+    expect(rooms).toMatch(/\.rm-compose-input \{[^}]*max-height: min\(40vh, 360px\); overflow-y: auto;/);
   });
   it('offers no @ where there is nobody to mention', () => {
     expect(bar({ mention: false })).not.toMatch(/Mention someone/);
@@ -33,7 +33,7 @@ describe('the group chat\'s box', () => {
     expect(bar()).toMatch(/Mention someone/);
   });
   it('is not used for the job and voice fields, which stay plain text fields', () => {
-    expect(page).toMatch(/<textarea className="tq-field" rows=\{6\}/);
+    expect(page).toMatch(/<textarea className="tq-field" rows=\{whole \? 14 : 6\}/);
     expect(page).toMatch(/<textarea className="tq-field tq-voice-own"/);
   });
 });

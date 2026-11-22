@@ -121,7 +121,7 @@ describe('on screen', () => {
   });
 
   it('its About sheet shows the voice it has and changes it', () => {
-    expect(fn('Details')).toMatch(/<dt>How it writes<\/dt>[\s\S]*<VoicePick [^\n]*voiceOf\(t\)|<VoicePick [^\n]*t\.voice/);
-    expect(fn('Details')).toMatch(/keep\(/);
+    expect(fn('AboutFields')).toMatch(/<dt>How it writes<\/dt>[\s\S]*<VoicePick [^\n]*voiceOf\(t\)|<VoicePick [^\n]*t\.voice/);
+    expect(fn('AboutFields')).toMatch(/keep\(/);
   });
 });

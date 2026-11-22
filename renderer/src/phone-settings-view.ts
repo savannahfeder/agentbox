@@ -41,7 +41,7 @@ export interface PhoneWorkspaceCopy {
   slotsMax: number;
   slotsSuggested: number;
   running: number;
-  memoryGate: { on: boolean; slots: number | null; slotsAuto: number; slotsMax: number; now: string | null };
+  memoryGate: { on: boolean; slots: number | null; slotsAuto: number; slotsMax: number; now: string | null } | null;
   leftovers: { on: boolean; now: string | null };
   accounts: { id: string; email: string | null; chosen: boolean; state?: string; note: string | null; resetsAt: number | null; plan: string | null; running: number }[];
   codexAccounts: { id: string; email: string | null; name: string | null; plan: string | null; signedIn: boolean; chosen: boolean }[];
@@ -61,6 +61,8 @@ export interface PhoneSettingsCopy {
   projects: PhoneProjectCopy[];
   repeats?: RepeatRule[];
   teammates?: { list: Partial<Teammate>[]; chat: TeamChatLine[]; runs: TeamRunLine[]; trouble?: string };
+  /** When the computer's window last opened each thread, by id (shared/phone-settings.mts phoneSeenOf). */
+  seen?: Record<string, number>;
 }
 export interface SettingsRow { device: string; name: string; updated_at: string; settings: PhoneSettingsCopy }
 export interface Reading { value: unknown; waiting: boolean; refused: string | null }

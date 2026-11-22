@@ -1,29 +1,9 @@
 // SHARE… ON A THREAD: send it by link, put it in a teammate's inbox, and,
 // last and small, who can open it (w-d19fcb9309, approved send-0, -2, -3, -4).
-import { shownToTeam, visibilityOf, type ProjectSeen } from '../../../shared/thread-cards.mts';
+import { threadOfLink, type SeenBy } from '../../../shared/thread-link.mts';
 
-export type SeenBy = 'team' | 'people' | 'private';
+export { LINK_SITE, openTo, seenNow, sentWords, threadLink, threadOfLink, type SeenBy } from '../../../shared/thread-link.mts';
 export interface SharePerson { id: string; name?: string | null; email?: string | null }
-
-// The address people pass around reads as ours, as a file's link does (main/file-link.mjs).
-export const LINK_SITE = 'https://app.agentbox.ac';
-const OUR_HOSTS = new Set(['app.agentbox.ac', 'agentbox-phone.pages.dev']);
-const PART = /^[\w-]{1,80}$/;
-
-/** A thread's address; inside Agentbox it opens the thread, for whoever can read its card. */
-export function threadLink(owner: string | null | undefined, id: string, site = LINK_SITE): string | null {
-  if (!owner || !PART.test(owner) || !PART.test(id)) return null;
-  return `${site.replace(/\/+$/, '')}/t/${owner}/${id}`;
-}
-
-/** Whose thread a link of ours names, or null for any other address. */
-export function threadOfLink(href: string | null | undefined): { owner: string; id: string } | null {
-  let u: URL;
-  try { u = new URL(String(href ?? '')); } catch { return null; }
-  if (u.protocol !== 'https:' || !OUR_HOSTS.has(u.hostname)) return null;
-  const m = /^\/t\/([^/]+)\/([^/]+)\/?$/.exec(u.pathname);
-  return m && PART.test(m[1]) && PART.test(m[2]) ? { owner: m[1], id: m[2] } : null;
-}
 
 /** The thread a plain click on this link opens in the app; a ⌘, Ctrl or Shift click is the browser's. */
 export function threadToOpen(href: string | null | undefined, keys: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): { owner: string; id: string } | null {
@@ -37,20 +17,41 @@ export function sendFirst<P extends SharePerson>(people: readonly P[], last: str
   return people.find((p) => p.id === last) ?? people[0] ?? null;
 }
 
+/** What the Share button wears: who can open the thread, or Share while only you can. */
+export interface ShareFace<P extends SharePerson = SharePerson> {
+  mark: 'share' | 'team' | 'people';
+  words: string;
+  /** The faces drawn, at most three; someone who has left the team is counted but has none. */
+  people: P[];
+}
+
+export function shareFace<P extends SharePerson>({ seen, chosen = [], people, me = null, teamName = null }: {
+  seen: SeenBy;
+  chosen?: readonly string[];
+  /** The team, to find each chosen person's name and face. */
+  people: readonly P[];
+  me?: string | null;
+  teamName?: string | null;
+}): ShareFace<P> {
+  if (seen === 'team') {
+    const name = String(teamName ?? '').trim();
+    return { mark: 'team', words: name ? `Everyone at ${name}` : 'Your team', people: [] };
+  }
+  // A private thread keeps the names it had, and none of them can open it.
+  const ids = seen === 'people' ? [...new Set(chosen)].filter((id) => id && id !== me) : [];
+  if (!ids.length) return { mark: 'share', words: 'Share', people: [] };
+  const known = ids.map((id) => people.find((p) => p.id === id)).filter((p): p is P => !!p);
+  const words = ids.length === 1 ? (known[0] ? String(known[0].name || firstName(known[0])) : '1 person')
+    : ids.length === 2 && known.length === 2 ? `${firstName(known[0])} and ${firstName(known[1])}`
+      : `${ids.length} people`;
+  return { mark: 'people', words, people: known.slice(0, 3) };
+}
+
 /** What the Who can open it row says it is now. */
 export function seenWord(seen: SeenBy, teamName: string | null | undefined, chosen = 0): string {
   if (seen === 'private') return 'Only you';
   if (seen === 'people') return chosen === 1 ? '1 person' : `${chosen} people`;
   return String(teamName ?? '').trim() || 'Team';
-}
-
-/**
- * Who can open it now, by the rule that publishes its card: a thread from
- * before you began sharing that nobody marked is still only yours.
- */
-export function seenNow(item: { createdAt?: number; visibility?: string; visibleTo?: readonly string[] } | null | undefined, product: ProjectSeen, since: number | null): SeenBy {
-  if (!shownToTeam(item as Parameters<typeof shownToTeam>[0], since, product)) return 'private';
-  return visibilityOf(item, product) ?? 'team';
 }
 
 interface CopyDoc {
@@ -79,16 +80,6 @@ export function matchPeople<P extends SharePerson>(people: readonly P[], typed: 
     && (!q || [p.name, p.email].some((s) => String(s ?? '').toLowerCase().split(/[\s@.]+/).some((w) => w.startsWith(q)))));
 }
 
-/**
- * What sending puts on the thread, so it is open to the people it went to:
- * a Team thread stays Team, anything else adds them to its chosen people.
- */
-export function openTo(seen: SeenBy, visibleTo: readonly string[] | undefined, to: readonly string[]): { visibility: 'team' | 'people'; visibleTo: string[] } {
-  // Whoever a private thread named before it went private is not let back in.
-  const kept = seen === 'private' ? [] : visibleTo ?? [];
-  return { visibility: seen === 'team' ? 'team' : 'people', visibleTo: [...new Set([...kept, ...to])] };
-}
-
 /** Chosen people…: the person picked is added to who can open it, or taken off; nobody left is Only you. */
 export function choose(seen: SeenBy, visibleTo: readonly string[] | undefined, id: string): { visibility: 'people' | 'private'; visibleTo: string[] } {
   const now = seen === 'people' ? [...new Set(visibleTo ?? [])] : [];
@@ -104,12 +95,6 @@ export interface ShareActs {
   send: (item: { product: string; id: string }, to: string[], note: string) => void;
   see: (item: { product: string; id: string }, to: SeenBy) => void;
   choose: (item: { product: string; id: string }, id: string) => void;
-}
-
-/** The message a teammate gets in their Needs you: the thread's name as its link, then the note. */
-export function sentWords(title: string, link: string, note: string): string {
-  const name = String(title || 'A thread').replace(/[[\]]/g, '').trim();
-  return note.trim() ? `[${name}](${link})\n\n${note.trim()}` : `[${name}](${link})`;
 }
 
 /** Whether an open file is one of this teammate thread's copies (main/team/thread-share.mjs names their folder). */

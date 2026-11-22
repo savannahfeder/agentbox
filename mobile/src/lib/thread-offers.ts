@@ -8,12 +8,11 @@ import { liveLine, livePlace, shortSpan, shortWord, type LiveFacts } from '../..
 import { priorityIdOf, type PriorityId } from '../../../renderer/src/priority';
 import { offersRunNow } from '../../../renderer/src/run-now';
 import { splitSlug, type PhoneItem } from '../../../renderer/src/phone-rows';
-import { updatedWord } from '../../../renderer/src/threads/summary-rules';
 import { offersTryAgain } from '../../../renderer/src/try-again';
 import { whyItCannotMove } from '../../../shared/move-thread.mts';
 import { shownPriority } from '../../../shared/rank.mts';
+import { stoppedByHer } from '../../../shared/answers.mts';
 import { ruleIdOf } from '../../../shared/repeats.mts';
-import { doneSteps, summaryOf } from '../../../shared/thread-cards.mts';
 import type { RunningSession, WorkItem } from '../../../renderer/src/types';
 
 export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string; where?: string; movable?: boolean }
@@ -71,7 +70,7 @@ export function offersOf(item: PhoneItem, { session, inProgress, now, cloud = fa
     // your answer, and putting an agent back on it without one is not what this menu is for.
     resume: (made && !tryAgain && !session && !inProgress && item.status === 'done' ? 'done' : null) as 'done' | null,
     place: open ? placeOf(item, session, cloud) : null,
-    move: made && whyItCannotMove(item, { live: !!session }) === null,
+    move: made && whyItCannotMove(item) === null,
     // In the open reply box's send slot while nothing is typed (Focus.tsx `stopButton`).
     stop: inProgress && !item.agent,
     runNow: offersRunNow(item, { session: session as RunningSession | null, queued: [], runNow: [], inProgress }),
@@ -112,6 +111,9 @@ export function liveOf(item: WorkItem, { session, inProgress, now, cloud: _cloud
     const line = item.answer && item.answer !== '(withdrawn)' ? STOPPED.waiting : STOPPED.line;
     return { state: 'stalled' as const, working: false, line, word: STOPPED.word, more: 0, span: null, rows: [] };
   }
+  if (!session && !item.agent && stoppedByHer(item)) {
+    return { state: 'stopped' as const, working: false, line: 'You stopped the agent. Reply to redirect it, or send it back.', word: 'You stopped this', more: 0, span: null, rows: [] };
+  }
   const live = liveLine(item, { session: session as RunningSession | null, inProgress, now, ...waits });
   if (!live) return null;
   const working = live.state === 'working';
@@ -138,7 +140,3 @@ export const waitingWords = (n: number): string => `${n} proposal${n === 1 ? '' 
 
 /** The level a thread shows is the level it runs at. */
 export const shownLevel = (item: Pick<WorkItem, 'priority'>): PriorityId => priorityIdOf(shownPriority(item));
-
-export function summaryParts(item: WorkItem, now: number) {
-  return { steps: doneSteps(summaryOf(item).progress) as string[], updated: updatedWord(item, { me: null, now }) };
-}

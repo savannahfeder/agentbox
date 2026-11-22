@@ -58,7 +58,7 @@ RUN useradd --create-home --home-dir /opt/agent --shell /bin/bash agent \
  && printf '[global]\nbreak-system-packages = true\n' > /etc/pip.conf \
  && mkdir -p /var/lib/agentbox
 
-COPY server.mjs mcp-stub.mjs usage.mjs sudo.mjs key-names.mjs /opt/agentbox/
+COPY server.mjs mcp-stub.mjs usage.mjs memory-guard.mjs sudo.mjs key-names.mjs /opt/agentbox/
 RUN chmod 755 /opt/agentbox/sudo.mjs && ln -s /opt/agentbox/sudo.mjs /usr/local/bin/sudo
 
 ENV AGENTBOX_RUN_AS=agent

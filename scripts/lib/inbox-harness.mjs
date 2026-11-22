@@ -7,7 +7,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { startableChrome, guard, sweep } from './chrome-guard.mjs';
+import { startableChrome, guard, sweep, KEEPS_OFF_THE_KEYCHAIN } from './chrome-guard.mjs';
 import { foldWorkItems } from '../../shared/work-items.mts';
 import { STORE_ROOT } from './machine-paths.mjs';
 
@@ -64,7 +64,7 @@ export async function openInbox({ dist, width = 1440, height = 944, snapshot }) 
   const profile = fs.mkdtempSync('/tmp/shot-profile-');
   const chrome = spawn(startableChrome(), [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-sandbox',
-    '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run',
+    '--force-device-scale-factor=2', '--hide-scrollbars', '--no-first-run', ...KEEPS_OFF_THE_KEYCHAIN,
     `--window-size=${width},${height}`, 'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   guard(chrome, profile);

@@ -75,7 +75,7 @@ openai_api_key = "env(OPENAI_API_KEY)"
 
 # Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
 # are monitored, and you can view the emails that would have been sent from the web interface.
-[inbucket]
+[local_smtp]
 enabled = true
 # Port to use for the email testing server web interface.
 port = 54324
@@ -194,7 +194,7 @@ sender_name = "Agentbox"
 # Authentication › Emails › Confirm signup; this file is what it should say.
 [auth.email.template.confirm]
 subject = "Confirm your email for Agentbox"
-content_path = "./templates/confirm.html"
+content_path = "./supabase/templates/confirm.html"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -306,6 +306,16 @@ inspector_port = 8083
 # Feedback from the app's Feedback card (functions/feedback). Anyone using
 # Agentbox may send it, signed in or not, so it takes no sign-in token.
 [functions.feedback]
+verify_jwt = false
+
+# The founder's thank-you note (functions/founder-note). Called by the
+# database's daily job, which knocks with its own key instead of a sign-in.
+[functions.founder-note]
+verify_jwt = false
+
+# The email an invited person gets (functions/team-invite). Called by the
+# database when someone is invited, with its own key instead of a sign-in.
+[functions.team-invite]
 verify_jwt = false
 
 [analytics]

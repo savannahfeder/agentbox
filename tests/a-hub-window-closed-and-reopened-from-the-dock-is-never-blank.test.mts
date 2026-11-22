@@ -52,6 +52,7 @@ vi.mock('electron', () => ({
   Notification: { isSupported: () => false },
   dialog: { showErrorBox() {} },
   nativeImage: null,
+  nativeTheme: { shouldUseDarkColors: true, on() {} },
   powerMonitor: { on() {} },
   shell: { openExternal() {} },
 }));
@@ -105,6 +106,6 @@ describe('a hub window closed and reopened from the dock is never blank', () => 
     expect(fake.state.quit).toBe(0);
     expect(fake.state.windows).toHaveLength(1);
     expect(showsItsHub(fake.state.windows[0])).toBe(true);
-    expect([...fake.state.handlers.keys()].sort()).toEqual(['hub:open', 'zero:badge', 'zero:notify', 'zero:notify-test']);
+    expect([...fake.state.handlers.keys()].sort()).toEqual(['hub:open', 'zero:badge', 'zero:notify', 'zero:notify-settings', 'zero:notify-test']);
   });
 });

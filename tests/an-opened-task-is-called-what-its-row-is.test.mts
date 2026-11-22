@@ -35,8 +35,9 @@ const opening = (events) => events.find((e) => e.field === 'body') ?? events.fin
 describe('the header', () => {
   it('prints the name the row prints, with her title on hover', () => {
     // A conversation with a person is named for the person (2026-10-01); every
-    // other thread prints the name its row prints.
-    expect(focus).toMatch(/className="keep-line-title" title=\{item\.title\}>\{direct && !givenTask && !audience && talkFull \? talkFull : rowTitle\(item\)\}</);
+    // other thread prints the name its row prints, except a teammate's, whose
+    // row reads as its latest message (a-teammate-threads-name-stays-put-as-answers-arrive).
+    expect(focus).toMatch(/className="keep-line-title" title=\{item\.title\}>\{direct && !givenTask && !audience && talkFull \? talkFull : pageTitle\(item\)\}</);
   });
 });
 
@@ -52,9 +53,16 @@ describe('her title is said in the opening when the header no longer says it', (
     expect(o.words).toBe(body);
   });
 
-  it('leaves a row with no label alone, because the header still says the title', () => {
+  // Until the app names a thread its header is a few words cut from the title
+  // (shownTitle), so a long first sentence was on no screen (2026-11-12).
+  it('says it on a row with no label yet, when the header cuts it short', () => {
     const o = opening(threadEvents(born(PIC)));
-    expect(o.words).toBe(PIC);
+    expect(o.words).toBe(`${TITLE}\n\n${PIC}`);
+  });
+
+  it('leaves a row with no label alone when the header says the whole title', () => {
+    const short = [{ id: 'w-1', ts: T, source: 'system', patch: { title: 'Fix the header', kind: 'directive' } }, { id: 'w-1', ts: T + 1, source: 'founder', patch: { title: 'Fix the header', body: PIC } }];
+    expect(opening(threadEvents(short)).words).toBe(PIC);
   });
 
   it('says a title-only row once it has a label', () => {

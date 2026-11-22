@@ -26,19 +26,36 @@ export function peopleShown(room: Pick<Room, 'members' | 'wall'>): { cards: Room
 // Where their thread is kept from you, the line they wrote about themselves.
 const onWords = (c: RoomCard) => c.away ? `Hasn’t opened ${Name} yet` : c.agents ? c.workingOn ?? c.bio ?? 'Private thread' : c.status;
 
-export function PeoplePanel({ room, onPerson }: { room: Pick<Room, 'members' | 'wall'> & Partial<Pick<Room, 'teamId' | 'listed'>>; onPerson: (id: string) => void }) {
+export function PeoplePanel({ room, onPerson, threadOf }: {
+  room: Pick<Room, 'members' | 'wall'> & Partial<Pick<Room, 'teamId' | 'listed'>>; onPerson: (id: string) => void;
+  /** Opens the shared thread a person's line names, or null when there is none you can read. */
+  threadOf?: (c: RoomCard) => (() => void) | null;
+}) {
   const { cards, working, more } = peopleShown(room);
   return <aside className="gr-side">
     <div className="gr-ph"><span className="gr-pt">{peopleHeading(room)}</span>{working > 0 && <span className="gr-pn">{working} working now</span>}</div>
-    {cards.map((c) => <button type="button" key={c.id} className="gr-prow" title={`Open ${cardName(c)}'s page`} onClick={() => onPerson(c.id)}>
-      <Face name={c.name} url={c.avatarUrl} size={32} />
-      <span className="gr-pw">
-        <span className="gr-l1"><span className="rm-one">{cardName(c)}</span>
-          {c.teammate && !c.me && !room.teamId && <span className="gr-mate">Your team</span>}</span>
-        {onWords(c) && <span className={`gr-l2 rm-one${c.agents ? '' : ' idle'}`}>{onWords(c)}</span>}
-      </span>
-      {c.agents ? <span className="gr-ag"><LiveMark /><span>{c.agents} {c.agents === 1 ? 'agent' : 'agents'}</span></span> : null}
-    </button>)}
+    {cards.map((c) => {
+      const toPage = `Open ${cardName(c)}'s page`;
+      const name = <><span className="rm-one">{cardName(c)}</span>{c.teammate && !c.me && !room.teamId && <span className="gr-mate">Your team</span>}</>;
+      const agents = c.agents ? <span className="gr-ag"><LiveMark /><span>{c.agents} {c.agents === 1 ? 'agent' : 'agents'}</span></span> : null;
+      const openThread = threadOf?.(c) ?? null;
+      if (openThread) return <div key={c.id} className="gr-prow gr-split">
+        <button type="button" className="gr-plink" title={toPage} onClick={() => onPerson(c.id)}><Face name={c.name} url={c.avatarUrl} size={28} /></button>
+        <span className="gr-pw">
+          <button type="button" className="gr-l1 gr-plink" title={toPage} onClick={() => onPerson(c.id)}>{name}</button>
+          <button type="button" className="gr-l2 rm-one gr-plink" title="Open this thread" onClick={openThread}>{onWords(c)}</button>
+        </span>
+        {agents}
+      </div>;
+      return <button type="button" key={c.id} className="gr-prow" title={toPage} onClick={() => onPerson(c.id)}>
+        <Face name={c.name} url={c.avatarUrl} size={28} />
+        <span className="gr-pw">
+          <span className="gr-l1">{name}</span>
+          {onWords(c) && <span className={`gr-l2 rm-one${c.agents ? '' : ' idle'}`}>{onWords(c)}</span>}
+        </span>
+        {agents}
+      </button>;
+    })}
     {more > 0 && <div className="gr-pmore">{more} more not working now</div>}
   </aside>;
 }

@@ -441,32 +441,19 @@ describe('seedFirstRunLook', () => {
     };
   };
 
-  it('writes the default picture into an empty store, both keys', () => {
+  // Match since w-fbe5e95dea (2026-11-10), so a new install follows the Mac
+  // until somebody picks a look (tests/a-new-install-follows-the-mac-until-a-look-is-picked).
+  it('writes Match my system into an empty store, both keys', () => {
     const s = store();
-    expect(seedFirstRunLook(s, THEME_KEY)).toEqual({ theme: 'dark', skin: DEFAULT_SKIN });
-    expect(s.getItem(SKIN_KEY)).toBe('ember-grid');
-    // The theme is written even though `resolveTheme` already answers dark for
-    // an empty store, because the empty store is the state that tester's Mac fell
-    // through in and an explicit answer is what cannot fall through. A picture
-    // is dark, so this is also the only answer that agrees with the skin.
-    expect(s.getItem(THEME_KEY)).toBe('dark');
+    expect(seedFirstRunLook(s, THEME_KEY)).toEqual({ theme: 'match', skin: 'none' });
+    expect(s.getItem(THEME_KEY)).toBe('match');
+    expect(s.getItem(SKIN_KEY)).toBe('none');
   });
 
-  it('is the same answer resolveSkin and resolveTheme then give back', () => {
+  it('is the same answer resolveSkin then gives back', () => {
     const s = store();
     seedFirstRunLook(s, THEME_KEY);
-    expect(resolveSkin(s.getItem(SKIN_KEY))).toBe(DEFAULT_SKIN);
-    expect(lookOf('dark', resolveSkin(s.getItem(SKIN_KEY)))).toBe(DEFAULT_SKIN);
-  });
-
-  // AND WHAT IT SEEDS IS A PICTURE THIS BUILD ACTUALLY HAS. The seed names an id
-  // and the id has to be on the list, or a brand new Mac boots wearing a
-  // `data-skin` nothing in the stylesheet matches, which reads as plain dark and
-  // logs nothing at all.
-  it('seeds a picture that is in SKINS', () => {
-    const s = store();
-    seedFirstRunLook(s, THEME_KEY);
-    expect(SKINS.some((sk) => sk.id === s.getItem(SKIN_KEY))).toBe(true);
+    expect(resolveSkin(s.getItem(SKIN_KEY))).toBe('none');
   });
 
   it('never touches a store that has already chosen anything', () => {

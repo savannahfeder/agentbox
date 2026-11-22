@@ -34,6 +34,9 @@
 .sf-file { min-width: 0; }
 .sf-doc { container-type: inline-size; }
 .sf-doc .doc-prose { user-select: text; -webkit-user-select: text; }
+/* Words a comment quotes, marked in the document; the one being written or picked, washed. */
+::highlight(sf-quoted) { text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
+::highlight(sf-quoted-on) { background-color: rgba(232, 131, 107, 0.24); color: var(--text); }
 .sf-doc .doc-prose img { max-width: 100%; }
 .sf-image { display: grid; place-items: center; }
 .sf-image img { display: block; max-width: 100%; max-height: calc(100vh - 220px); object-fit: contain; border-radius: var(--artifact-corner); }
@@ -42,8 +45,11 @@
 .sf-pdf { height: calc(100vh - 230px); min-height: 520px; display: flex; }
 .sf-pdf > * { flex: 1; min-width: 0; }
 .sf-table { height: calc(100vh - 230px); min-height: 420px; display: flex; flex-direction: column; }
-.sf-video { display: grid; place-items: center; }
-.sf-video video { display: block; max-width: 100%; max-height: calc(100vh - 220px); border-radius: var(--artifact-corner); background: #000; }
+.sf-video { height: calc(100vh - 230px); min-height: 360px; display: flex; }
+.sf-video .film-stage { margin: 0 0 12px; }
+.sf-video .film-bar { padding: 10px 0 0; }
+.sf-pinbox { position: relative; line-height: 0; }
+.sf-pinbox.can-pin { cursor: crosshair; }
 /* Its pieces arriving: the frame a film will fill, and a line across its foot. */
 .sf-video.is-loading { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: calc(100vh - 220px); overflow: hidden; border-radius: var(--artifact-corner); background: var(--bg-raised); }
 .sf-video.is-loading i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--text-dim); transition: width 0.3s ease; }
@@ -52,12 +58,19 @@
 /* The comments: a panel over the page's right edge, opened from the bar. */
 .sf-panel {
   position: fixed; z-index: 4; top: 52px; right: 0; bottom: 0; width: 380px; box-sizing: border-box;
-  padding: 18px 24px 24px; overflow-y: auto;
+  padding: 18px 24px 20px; display: flex; flex-direction: column;
   background: var(--bg); border-left: 1px solid var(--line);
 }
-@media (min-width: 1180px) { .sf-page.has-panel { padding-right: 380px; } }
+@media (min-width: 1000px) {
+  .sf-page.has-panel { padding-right: 380px; }
+  .sf-page.has-panel .sf-bar { margin-right: -380px; }
+}
+.sf-comments { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.sf-comments .sf-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -24px; padding: 0 24px; }
+.sf-comments:not(:has(.sf-list)) { justify-content: flex-end; }
 .sf-panel-head { display: flex; align-items: center; justify-content: space-between; height: 28px; margin-bottom: 4px; }
 .sf-panel-head h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.sf-panel-head h2 span { margin-left: 8px; font-weight: 400; color: var(--text-faint); }
 .sf-panel-close { width: 28px; height: 28px; margin-right: -6px; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-dim); cursor: pointer; }
 .sf-panel-close:hover { color: var(--text); background: var(--wash); }
 .sf-panel-close svg { width: 14px; height: 14px; }
@@ -82,11 +95,23 @@
 .sf-comment:hover:has(.sf-remove) time, .sf-comment:focus-within:has(.sf-remove) time { display: none; }
 .sf-remove:hover { color: var(--text); }
 @media (hover: none) { .sf-remove { display: block; margin-left: 0; } }
+.sf-comment { cursor: default; }
+.sf-comment.is-on { background: var(--wash); margin: 0 -24px; padding-left: 24px; padding-right: 24px; }
+/* Where it points, in the app's words; a press goes there. */
+.sf-at { flex: none; padding: 0; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.sf-at:hover, .sf-quote:hover { color: var(--text); }
+.sf-quote { display: block; max-width: 100%; margin: 4px 0 0; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; line-height: 19px; color: var(--text-dim); text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sf-said p { margin: 4px 0 0; font-size: 14px; line-height: 21px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 252px; overflow-y: auto; }
 .sf-remove.is-asking { display: block; color: var(--text); }
 .sf-comment:has(.sf-remove.is-asking) time { display: none; }
 
 .sf-write { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; margin-top: 14px; }
+.sf-where { align-self: stretch; display: flex; align-items: center; gap: 6px; min-height: 22px; margin: 0 0 -4px; font: 12px var(--mono); color: var(--text-faint); }
+.sf-where span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-where.is-set { color: var(--text-dim); }
+.sf-where button { flex: none; width: 20px; height: 20px; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer; }
+.sf-where button:hover { color: var(--text); background: var(--wash); }
+.sf-where svg { width: 12px; height: 12px; }
 .sf-write textarea {
   width: 100%; box-sizing: border-box; min-height: 84px; padding: 10px 11px; resize: vertical;
   border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgba(0, 0, 0, 0.18);
@@ -112,6 +137,35 @@
 :root[data-theme="light"] .sf-error { border-color: rgba(176, 58, 31, 0.3); background: rgba(176, 58, 31, 0.07); color: #9d3318; }
 .sf-offer { margin: 14px 0 0; font-size: 13px; line-height: 19px; color: var(--text-dim); }
 .sf-offer a { color: var(--text); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+
+/* A document an editor types into: the same column and type as reading it. */
+.sf-editing .ProseMirror { outline: none; min-height: 240px; }
+.sf-head .sf-unsaved { color: #f5a894; }
+:root[data-theme="light"] .sf-head .sf-unsaved { color: #9d3318; }
+
+/* The history: one line per version, the one on screen marked. */
+.sf-history .sf-dots { margin: 18px 0; }
+.sf-versions { margin: 6px -10px 0; padding: 0; list-style: none; }
+.sf-version {
+  width: 100%; display: grid; gap: 2px; padding: 10px; text-align: left;
+  border: 0; border-radius: var(--radius); background: none; color: var(--text); font: inherit; cursor: pointer;
+}
+.sf-version:hover { background: var(--wash); }
+.sf-version.is-on { background: var(--wash-strong); }
+.sf-version b { font-size: 13.5px; font-weight: 600; }
+.sf-version span { font-size: 13px; color: var(--text-dim); }
+.sf-version em { font-style: normal; font-size: 12px; color: var(--text-faint); }
+
+/* An earlier version shown in place of the file, with the way back and the way to restore it. */
+.sf-peek {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  margin: -24px 0 32px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg-raised);
+}
+.sf-peek p { margin: 0; font-size: 13.5px; color: var(--text-dim); }
+.sf-peek p b { color: var(--text); font-weight: 600; }
+.sf-peek-acts { display: flex; gap: 8px; }
+.sf-peek .sf-quiet-btn, .sf-peek .sf-send { height: 32px; }
+.sf-peek .sf-error { flex-basis: 100%; margin: 0; }
 
 .sf-state { flex: 1; display: grid; align-content: center; justify-items: center; gap: 14px; padding: 80px 24px; text-align: center; }
 .sf-state p { margin: 0; font-size: 16px; line-height: 22px; color: var(--text-dim); }

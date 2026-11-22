@@ -33,8 +33,9 @@ describe('one heading and one set of sections', () => {
 });
 
 describe('Unsent with Send, then Sent', () => {
-  it('puts this file\'s notes Send would tell the agent under Unsent, with Send on that line', () => {
-    expect(side).toMatch(/<NotesSection word="Unsent" send=\{\{ count: sendNotes\.length, onSend: \(\) => void pressSend\(\) \}\} \/>/);
+  // A document's Send all sits beside Approve instead (send-all-sits-beside-approve-on-a-document).
+  it('puts this file\'s notes Send would tell the agent under Unsent, with Send on that line on a film or a picture', () => {
+    expect(side).toMatch(/<NotesSection word="Unsent" send=\{sendBeside \? undefined : \{ count: sendNotes\.length, onSend: \(\) => void pressSend\(\) \}\} \/>/);
     expect(view).toContain('const waitingHere = offers.comment ? openNotes.filter((n) => sendNotes.includes(n.id)) : [];');
   });
   it('no longer draws the old "not sent" line over the list', () => {
@@ -55,9 +56,9 @@ describe('Unsent with Send, then Sent', () => {
 
 describe('the box', () => {
   it('asks for a note, as the sidebar does', () => {
-    expect(view).toContain("placeholder={canTag ? 'Add a note, or @ your agent' : 'Add a note'}");
+    expect(view).toContain("canTag ? 'Add a note, or @ your agent' : 'Add a note'}");
   });
   it('adds a plain note with the return mark, and keeps the words when it goes to someone', () => {
-    expect(view).toMatch(/sendWords === 'Comment' \? <ReturnGlyph \/> : <><NoteGlyph name="send" \/>\{sendWords\}<\/>/);
+    expect(view).toMatch(/buttonWords === 'Comment' \? <ReturnGlyph \/> : <><NoteGlyph name="send" \/>\{buttonWords\}<\/>/);
   });
 });

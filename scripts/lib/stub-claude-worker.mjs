@@ -45,6 +45,7 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readWorld, worldTurn, worldAnswer, titleIn, stepEvery, workStep, asksForAChange, standInEdit } from './stand-in-world.mjs';
 import { makeArtifacts } from './stand-in-artifacts.mjs';
+import { keyPlaceIn } from './stand-in-key-place.mjs';
 
 const argv = process.argv.slice(2);
 // The app's question about a task's level (main/task-priority.mts) passes no output
@@ -168,9 +169,19 @@ async function askTheFounder({ tool_name: toolName, input }) {
   try { return JSON.parse(text); } catch { return { behavior: 'deny', message: `unreadable answer: ${text}` }; }
 }
 
+function toldItIsInTheCloud() {
+  const at = argv.indexOf('--append-system-prompt');
+  return `${at >= 0 ? argv[at + 1] ?? '' : ''}\n${promptText}`.includes('# You are running on a cloud machine');
+}
+
 // The store server: one of its own carries the account, a shared one is reached by its address.
 function storeServer() {
-  return Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && (s?.env?.STORE_ACCOUNT_ID || (s?.type === 'http' && /\/store$/.test(s.url ?? ''))))?.[1];
+  // On a cloud machine the store is the computer's, over the bridge, which is where its cloud tools are.
+  // A stand-in cloud on this Mac hands the stand-in the computer's own config, so the bridge is named here.
+  // Only for a run told it is on one: a test suite run on a real cloud machine inherits that machine's bridge.
+  if (process.env.AGENTBOX_BRIDGE_SOCK && mcpServers().agentbox && toldItIsInTheCloud()) return { command: process.execPath, args: [IMAGE_STUB, 'agentbox'] };
+  return Object.entries(mcpServers()).find(([name, s]) => name !== 'zero-approvals' && (s?.env?.STORE_ACCOUNT_ID || (s?.type === 'http' && /\/store$/.test(s.url ?? ''))
+    || (name === 'agentbox' && s?.args?.[0] === IMAGE_STUB)))?.[1];
 }
 
 // A server the app shares between runs (main/tool-host.mts), spoken to over
@@ -203,9 +214,14 @@ function httpSession(server) {
   };
 }
 
+// In a stand-in cloud the run's tools are named by the image's path; this checkout's copy is the same stub.
+const IMAGE_STUB = '/opt/agentbox/mcp-stub.mjs';
+const toolStub = (args = []) => (args[0] === IMAGE_STUB && !fs.existsSync(IMAGE_STUB)
+  ? [path.resolve(path.dirname(process.argv[1]), '..', '..', 'cloud', 'sandbox', 'mcp-stub.mjs'), ...args.slice(1)] : args);
+
 function mcpSession(server) {
   if (server.type === 'http') return httpSession(server);
-  const child = spawn(server.command, server.args ?? [], {
+  const child = spawn(server.command, toolStub(server.args ?? []), {
     env: { ...process.env, ...(server.env ?? {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -228,13 +244,14 @@ function mcpSession(server) {
   const call = (method, params, ms = 20_000) => new Promise((resolve) => {
     const id = nextId++;
     waiting.set(id, resolve);
-    setTimeout(() => { if (waiting.delete(id)) resolve({ error: { message: `${method} had no answer in ${ms / 1000} s` } }); }, ms).unref();
+    setTimeout(() => { if (waiting.delete(id)) resolve({ error: { message: `${method} had no answer in ${Math.round(ms / 1000)} s` } }); }, ms).unref();
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
   });
 
   const ready = call('initialize', { protocolVersion: '2024-11-05', clientInfo: { name: 'agentbox-proof-stub', version: '1.0.0' }, capabilities: {} });
   return {
-    call: async (name, args, ms) => { await ready; return call('tools/call', { name, arguments: args }, ms); },
+    // request_cloud_key waits up to 15 minutes for a person's answer.
+    call: async (name, args, ms) => { await ready; return call('tools/call', { name, arguments: args }, ms ?? (name === 'request_cloud_key' ? 16 * 60_000 : 20_000)); },
     close: () => { try { child.kill(); } catch { /* done with it */ } },
   };
 }
@@ -286,6 +303,63 @@ async function actAsTeammate(brief, prompt, answer) {
 }
 
 let said = plan.say ?? 'the stub worker ran';
+
+// A THREAD STUCK ON A CAUSE, PLAYED: it waits on the cause's row and says so.
+async function actStuck(stuck) {
+  const server = storeServer();
+  if (!server || !process.env.ZERO_ITEM) return null;
+  const session = mcpSession(server);
+  try {
+    const out = await session.call('wait_on_cause', stuck);
+    let id = null;
+    try { id = JSON.parse(out?.result?.content?.[0]?.text ?? '{}').waitingOn ?? null; } catch { id = null; }
+    return id ? `Waiting on: ${stuck.cause}.` : `Could not wait on: ${stuck.cause}.`;
+  } finally {
+    session.close();
+  }
+}
+
+// A LEAD ON A CAUSE ROW, PLAYED (shared/causes.mts): asked first, it names the
+// threads waiting and asks the person once; started again after their reply,
+// it closes the row, which is what starts every thread behind it.
+const LEAD_MARK = 'You are the lead on this cause';
+async function actAsLead(first) {
+  const server = storeServer();
+  const me = process.env.ZERO_ITEM;
+  if (!server || !me) return null;
+  const session = mcpSession(server);
+  try {
+    // Started again by a thread joining: answer again with everyone. By the
+    // person's reply: check, as a real lead must, and close only if it is fixed.
+    // The thread's history holds every join; the person's reply is what matters when there is one.
+    const joinedNow = !/signed in/i.test(promptText.split('is waiting on this too').at(-1)) && promptText.includes('is waiting on this too');
+    if (!first && !joinedNow) {
+      if (world.stuck?.cause) return 'Checked, and a push still fails, so nothing has gone out yet. Run `gh auth status` to see which account git is using, then reply again.\n\n## Options\n1. Signed in, carry on';
+      await session.call('update_work_item', { id: me, status: 'done' });
+      return 'Checked that a push works again. Every thread that was waiting on this carries on by itself.';
+    }
+    let rows = [];
+    try { rows = JSON.parse((await session.call('list_work_items', {}))?.result?.content?.[0]?.text ?? '[]'); } catch { rows = []; }
+    const behind = rows.filter((r) => Array.isArray(r.blockedBy) && r.blockedBy.includes(me));
+    const n = behind.length;
+    return [
+      `**Sign in to GitHub on your Mac once, and ${n === 1 ? 'one thread carries' : `${n} threads carry`} on.**`,
+      '',
+      'Git on your Mac can\'t sign in to GitHub, so nothing can be pushed. These are finished and waiting on it:',
+      '',
+      ...behind.map((r) => `- ${r.label || r.title}`),
+      '',
+      '1. In Terminal on your Mac, run `gh auth login` and follow its prompts.',
+      '2. Then run `gh auth setup-git`.',
+      '3. Reply "Signed in". I\'ll check a push works, then they all carry on.',
+      '',
+      '## Options',
+      '1. Signed in, carry on',
+    ].join('\n');
+  } finally {
+    session.close();
+  }
+}
 
 // [[stub:act:<name>]] makes the store-tool calls its plan lists under
 // acts.<name> ({ calls: [{ tool, args }], say }), so a proof can have an agent
@@ -385,6 +459,12 @@ const FILE_ASK = /\b(film|video|footage|recording|\.mov|\.mp4)\b|\bfrom my (movi
 const FILM = '~/Movies/launch-film-original.mov';
 const CODE_ASK = /\bnpm\b.*\bpublish|\bpublish\b.*\bnpm\b|one-time|\botp\b|\b2fa\b|verification code/i;
 const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
+const KEYS = [
+  [/posthog/i, 'POSTHOG_PERSONAL_KEY', 'the PostHog personal API key'],
+  [/resend/i, 'RESEND_API_KEY', 'the Resend API key'],
+  [/openrouter/i, 'OPENROUTER_API_KEY', 'the OpenRouter API key'],
+  [/mixpanel/i, 'MIXPANEL_API_SECRET', 'the Mixpanel API secret'],
+];
 {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   // Only a cloud run is told it may ask; on the computer the person's own sign-ins and files are there.
@@ -423,6 +503,23 @@ const COMPUTER_ASK = /\bxcode\b|simulator|testflight/i;
     said = lines.length
       ? [`**I need ${what.length > 1 ? `${what.slice(0, -1).join(', ')} and ${what.at(-1)}` : what[0]} to finish.**`, '', 'Everything that does not need it is done.', '', ...lines].join('\n')
       : `Finished "${title}" with ${[...services.map((x) => `your saved ${x[2]} sign-in`), ...(wantsFile ? [named ? `the ${named} you sent` : 'the film you sent'] : []), ...(wantsCode ? ['the code you sent'] : [])].join(', ')}. It is done.`;
+  }
+  // A KEY KEPT ON THEIR COMPUTER (main/cloud/key-asks.mts): asked of the computer
+  // with request_cloud_key when the task says where it is, and on the ask line,
+  // with that place, when that does not get it.
+  const key = told && !onComputer && !COMPUTER_ASK.test(task) ? KEYS.find(([re]) => re.test(task)) : null;
+  if (key) {
+    const [, name, what] = key;
+    const where = keyPlaceIn(`${task}\n${asked}`);
+    let answer = null;
+    if (!process.env[name] && where) {
+      const server = storeServer();
+      const session = server && mcpSession(server);
+      try { answer = JSON.parse((await session?.call('request_cloud_key', { name, what, ...where }))?.result?.content?.[0]?.text ?? 'null'); } catch { answer = null; } finally { session?.close(); }
+    }
+    if (process.env[name] || ['saved', 'already'].includes(answer?.status)) said = `Finished "${title}" with ${what}${answer?.path ? ', which your computer handed over' : ''}. It is done.`;
+    else if (answer?.status === 'denied') said = `**You said no to ${what}, so "${title}" stops short of it.**\n\nEverything that does not need it is done.`;
+    else said = [`**I need ${what} to finish.**`, '', 'Everything that does not need it is done.', '', `AGENTBOX-NEEDS: key ${name} | ${what}${where ? ` | ${[where.place, where.from, where.entry].filter(Boolean).join(' ')}` : ''}`].join('\n');
   }
 }
 // A TASK THAT SAYS TO SIGN IN OR CONNECT TO A SERVICE signs in the way a real
@@ -534,8 +631,13 @@ if (slow > 0) {
 try {
   const brief = (() => { const at = argv.indexOf('--append-system-prompt'); return at >= 0 ? argv[at + 1] ?? '' : ''; })();
   if (brief.includes('team_post') && process.env.ZERO_ITEM) await actAsTeammate(brief, promptText, said);
-  const act = directive('stub:act')?.[1];
-  if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
+  // [[stub:act-first:<name>]] acts on the first start only, as a thread that got
+  // stuck once and is fine when it is started again.
+  const act = directive('stub:act')?.[1] ?? (attempt === 1 ? directive('stub:act-first')?.[1] : null);
+  if ((brief.includes(LEAD_MARK) || promptText.includes(LEAD_MARK)) && process.env.ZERO_ITEM) said = (await actAsLead(attempt === 1)) ?? said;
+  else if (act && plan.acts?.[act]) said = await actFromPlan(plan.acts[act]);
+  // A lead on a cause row is never itself stuck on the cause.
+  else if (turn.stuck) said = (await actStuck(turn.stuck)) ?? said;
   if (plan.approval) {
     const decision = await askTheFounder(plan.approval);
     say({ type: 'assistant', message: { content: [{ type: 'text', text: `the founder said: ${decision.behavior}` }] } });

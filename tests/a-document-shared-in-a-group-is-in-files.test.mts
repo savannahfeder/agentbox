@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { appFilesPlace } from '../main/files-place.mts';
+import { appFilesPlace, linkPath } from '../main/files-place.mts';
 import { filesShown } from '../renderer/src/files/files-shown.ts';
 import { filesInLines, shownName, threadFiles } from '../shared/artifact-marks.mts';
 
@@ -74,20 +74,21 @@ describe('a file in a group, in Files', () => {
   it('opens with each version where it is on this computer', async () => {
     const view = await place({ messages }).open((await place({ messages }).list()).files[0].key);
     expect(view.versions.map((v) => v.n)).toEqual([1, 2]);
-    expect(filesInLines(view.lines).map((f) => f.path)).toEqual([first, kept]);
+    expect(filesInLines(view.lines).map((f) => f.path)).toEqual([first, kept].map((p) => linkPath(p)));
   });
 
   it('carries the comments made in the group, and a new one goes back there', async () => {
     const list = await place({ messages }).list();
+    // The group names v2 `team-look.md#2`; Files names it by the path it opens from.
     const fileId = (await place({ messages }).open(list.files[0].key)).versions[1].id;
-    const marks = [{ id: 'm1', by: 'dev', at: 300, mark: { do: 'note', id: 'n1', file: fileId, place: { kind: 'whole' }, text: 'Which copper?' } }];
+    const marks = [{ id: 'm1', by: 'dev', at: 300, mark: { do: 'note', id: 'n1', file: 'team-look.md#2', place: { kind: 'whole' }, text: 'Which copper?' } }];
     const written = [];
     const here = place({ messages, marks, written });
     const view = await here.open(list.files[0].key);
     expect(view.marks.notes.map((n) => n.text)).toEqual(['Which copper?']);
     const out = await here.mark(list.files[0].key, { do: 'note', id: 'n2', file: fileId, place: { kind: 'whole' }, text: 'This one.' });
     expect(out).toEqual({ ok: true });
-    expect(written).toEqual([{ roomId: ROOM, mark: expect.objectContaining({ id: 'n2' }) }]);
+    expect(written).toEqual([{ roomId: ROOM, mark: expect.objectContaining({ id: 'n2', file: 'team-look.md#2' }) }]);
   });
 
   it('does not download anything to draw the list', async () => {

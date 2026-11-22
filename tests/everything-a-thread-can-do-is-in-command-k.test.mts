@@ -5,8 +5,9 @@
 // menu makes that very thread private. Measured by setting ⌘K's thread rows
 // (App.tsx itemCommands) beside the thread's other controls: the summary panel
 // (Visible to, the name, Stop repeating), the three-dot menu (Pin thread,
-// where it runs, View code changes), the S key, a conversation's Add people
-// and the strip a teammate's task opens with. None of those were in ⌘K.
+// where it runs, View code changes), a conversation's Add people and the
+// strip a teammate's task opens with. None of those were in ⌘K. The side
+// summary and its S key went in 2026-11 (w-d143fcb40a).
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
@@ -94,22 +95,15 @@ describe('what the three-dot menu does', () => {
   });
 
   it('opens the code a run changed, only on an open thread that has one', () => {
-    const rows = threadCommands({ open: { change: true, summary: null } });
+    const rows = threadCommands({ open: { change: true } });
     for (const q of ['code', 'diff', 'changes']) expect(ids(type(q, rows)), q).toEqual(['code']);
     expect(rows[0].label).toBe('View code changes');
-    expect(ids(threadCommands({ open: { change: false, summary: null } }))).toEqual([]);
+    expect(ids(threadCommands({ open: { change: false } }))).toEqual([]);
     expect(ids(threadCommands({ open: null }))).toEqual([]);
   });
 });
 
-describe('what the summary panel does', () => {
-  it('shows and hides the summary, with its key, and says which', () => {
-    const closed = threadCommands({ open: { change: false, summary: 'closed' } });
-    expect(closed).toEqual([expect.objectContaining({ id: 'summary', label: 'Show summary', keyHint: 'S', does: { act: 'summary' } })]);
-    expect(threadCommands({ open: { change: false, summary: 'open' } })[0].label).toBe('Hide summary');
-    expect(ids(threadCommands({ open: { change: false, summary: null } }))).toEqual([]);
-  });
-
+describe('what the thread page does', () => {
   it('renames the thread', () => {
     const rows = threadCommands({ rename: true });
     expect(ids(type('rename', rows))).toEqual(['rename']);
@@ -147,7 +141,7 @@ describe('on a team', () => {
 
 describe('the rows sit with the rest of ⌘K', () => {
   const every = threadCommands({
-    seen: 'team', teammates: true, pinned: false, place: 'here', open: { change: true, summary: 'open' },
+    seen: 'team', teammates: true, pinned: false, place: 'here', open: { change: true },
     rename: true, repeats: true, addPeople: true, routes: [{ route: 'me', label: 'Do it myself' }],
   });
 
@@ -172,6 +166,11 @@ describe('the rows sit with the rest of ⌘K', () => {
   it('reach the name and the people list on the thread itself', () => {
     const focus = read('renderer/src/components/Focus.tsx');
     expect(focus).toMatch(/<ThreadCrumb[^>]*renameAsk=/);
-    expect(focus).toMatch(/<SummaryPanel[^>]*peopleAsk=/);
+    // The people list is the thread menu's Share → Chosen people, which ⌘K opens by event.
+    const app = read('renderer/src/App.tsx');
+    expect(app.slice(app.indexOf("case 'people':"), app.indexOf("case 'pin':"))).toContain("new Event('zero:choose-people')");
+    const menu = read('renderer/src/threads/ThreadMenu.tsx');
+    expect(menu).toMatch(/const askToChoose = \(\) => \{ setSharing\('choose'\); setOpen\(true\); \};/);
+    expect(menu).toContain("window.addEventListener('zero:choose-people', askToChoose)");
   });
 });

@@ -121,7 +121,9 @@ describe('the tabs on the phone app', () => {
     expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{onEverything \? 'everything' : tab\} counts=\{counts\} pick=\{setPlace\} team=\{teamMode\} \/>\}/);
     // And under Chats' own bar while it is open, never along the foot.
     expect(inbox).toMatch(/<ChatsPlace tabs=\{<Tabs on="chats"/);
-    expect(inbox.match(/<Tabs /g)).toHaveLength(2);
+    // And Files' own bar (2026-11-15).
+    expect(inbox).toMatch(/<FilesPlace tabs=\{<Tabs on="files"/);
+    expect(inbox.match(/<Tabs /g)).toHaveLength(3);
   });
   it('draw no line of their own; the picked word is underlined, as at the bottom', () => {
     // The look itself is in the-phone-apps-tabs-at-the-top-keep-the-bottom-bars-look.
@@ -129,7 +131,7 @@ describe('the tabs on the phone app', () => {
     expect(tabs).toMatch(/borderBottomWidth: 2, borderBottomColor: on === t\.id \? color\.accent/);
   });
   it('are 15pt, start where the title does, and scroll on a phone set larger still', () => {
-    expect(tabs).toMatch(/fontSize: 15,/);
+    expect(tabs).toMatch(/fontSize: 15 \* fit\.scale,/);
     expect(tabs).toMatch(/paddingLeft: size\.inset/);
     expect(tabs).toMatch(/<ScrollView horizontal/);
   });

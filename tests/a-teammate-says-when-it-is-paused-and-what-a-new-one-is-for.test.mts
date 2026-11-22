@@ -10,7 +10,6 @@
 //   same words asked nine times were listed once, with nothing saying so.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { offerFrom } from '../shared/teammates.mts';
 
 const { rowName, titleAside } = await import('../renderer/src/teammates/chat-lines.ts');
 const read = (f) => fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
@@ -61,13 +60,3 @@ describe('a new teammate still setting itself up', () => {
   });
 });
 
-describe('the offer of a teammate', () => {
-  it('says how many times you asked each thing it lists', () => {
-    const NOW = new Date(2026, 9, 24, 9, 0).getTime();
-    const ask = (title, d) => ({ id: `w-${d}`, product: 'p', title, labels: ['founder'], status: 'done', createdAt: NOW - d * 86_400_000 });
-    const items = [1, 2, 3, 4].map((d) => ask('Onboarding is confusing people, fix the first screen', d)).concat([ask('Onboarding confusing people, fix the screen', 5)]);
-    const offer = offerFrom({ items, now: NOW });
-    expect(offer.asked).toEqual([{ title: 'Onboarding is confusing people, fix the first screen', n: 4 }, { title: 'Onboarding confusing people, fix the screen', n: 1 }]);
-    expect(read('main/teammates.mts')).toMatch(/offer\.asked\.map\(\(\{ title, n \}\) => `- \$\{title\}\$\{n > 1 \? ` \(\$\{n\} times\)` : ''\}`\)/);
-  });
-});

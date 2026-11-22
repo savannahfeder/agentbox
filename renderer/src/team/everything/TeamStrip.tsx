@@ -3,6 +3,7 @@
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { Product, ThreadCard, WorkItem } from '../../types';
 import { Face, TeamContext } from '../people';
+import { MateFace } from '../../teammates/MateFace';
 import { linkWords } from '../../threads/summary-rules';
 import { LiveMark } from '../../components/LiveMark';
 import { RowCells, ThreadCells } from '../../threads/Pages';
@@ -16,9 +17,9 @@ import './everything.css';
 
 const agentsWords = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'} working`;
 
-/** A person's photo or initials, an AI teammate's dashed letter, a chat's faces. */
+/** A person's photo or initials, an AI teammate's face, a chat's faces. */
 export function MemberFace({ m, size }: { m: Member; size: number }) {
-  if (m.kind === 'mate') return <span className="ev-ai" style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }} aria-hidden="true">{m.letter}</span>;
+  if (m.kind === 'mate') return <MateFace seed={m.face ?? m.name} className="ev-ai" style={{ width: size, height: size }} />;
   if (m.kind === 'chat') {
     const faces = m.faces ?? [];
     if (!faces.length) return <span className="ev-hash" style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }} aria-hidden="true">#</span>;
@@ -168,15 +169,14 @@ const CARD_MARK: Record<ThreadCard['state'], StatusCell['mark']> = { waiting: 'n
 function CardRow({ c, who, now, onOpen, items = [], products = [] }: { c: ThreadCard; who?: { name: string; url: string | null }; now: number; onOpen: (card: ThreadCard) => void; items?: readonly WorkItem[]; products?: readonly Product[] }) {
   const team = useContext(TeamContext);
   const waits = c.state !== 'done' ? linkWords(c.blockedBy, team?.byId) : null;
-  // A task says what the Tasks tab says of it.
+  // A task says what its own row says of it.
   const task = cardTaskWord(c, { items, products, cards: team?.state.cards ?? [], me: team?.me ?? null, nameOf: (id) => (team?.byId.get(id)?.name ?? 'Someone').split(/\s+/)[0] });
   // The Status column's word for a running thread, as on the inbox's own rows beside it.
   const status: StatusCell = { word: c.shippedAt ? 'Shipped' : task ? task : waits ? `Waits on ${waits}` : c.state === 'running' ? 'Working' : c.state === 'waiting' && who ? `Waiting on ${who.name.split(/\s+/)[0]}` : STATE_WORD[c.state], mark: CARD_MARK[c.state], agent: c.state === 'running', live: c.state === 'running', cloud: false };
-  const title = who ? <><span className="tq-from"><Face name={who.name} url={who.url} size={18} /><b>{who.name}</b></span>{c.title ?? 'A thread'}</> : c.title ?? 'A thread';
   return <div className="row" role="button" tabIndex={0} onClick={() => onOpen(c)}
     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onOpen(c); } }}>
     <span className="mark" aria-hidden="true" />
-    <RowCells status={status} title={title} where={cardPlace(c)} priority={c.priority} updatedAt={c.updatedAt} now={now} />
+    <RowCells status={status} who={who ? { face: <Face name={who.name} url={who.url} />, name: who.name } : undefined} title={c.title ?? 'A thread'} where={cardPlace(c)} priority={c.priority} updatedAt={c.updatedAt} now={now} />
   </div>;
 }
 

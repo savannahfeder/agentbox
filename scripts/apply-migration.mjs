@@ -4,8 +4,8 @@
 //   node scripts/apply-migration.mjs cloud/supabase/migrations/<file>.sql [...]
 //
 // The project comes from the team cloud's address (cloud/team.config.json or
-// ~/.agentbox/team.config.json); the key is the Supabase CLI's own sign-in in
-// the macOS keychain (`npx supabase login` once). Every migration here is
+// ~/.agentbox/team.config.json); the key is SUPABASE_ACCESS_TOKEN, or else the
+// Supabase CLI's own sign-in in the macOS keychain (`npx supabase login` once). Every migration here is
 // written to be run twice without harm, so a file applied again is fine.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,16 +27,20 @@ export function cliToken(raw) {
   return text.startsWith('go-keyring-base64:') ? Buffer.from(text.slice('go-keyring-base64:'.length), 'base64').toString('utf8') : text;
 }
 
-export async function applyMigration(file, { ref, token, fetchImpl = fetch }) {
+export async function runSql(query, { ref, token, fetchImpl = fetch, label = 'query' }) {
   const res = await fetchImpl(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0' },
-    body: JSON.stringify({ query: fs.readFileSync(file, 'utf8') }),
+    body: JSON.stringify({ query }),
     signal: AbortSignal.timeout(CALL_MS),
   });
   const said = await res.text();
-  if (!res.ok) throw new Error(`${path.basename(file)}: the database said ${res.status}: ${said.slice(0, 500)}`);
+  if (!res.ok) throw new Error(`${label}: the database said ${res.status}: ${said.slice(0, 500)}`);
   return said;
+}
+
+export function applyMigration(file, { ref, token, fetchImpl = fetch }) {
+  return runSql(fs.readFileSync(file, 'utf8'), { ref, token, fetchImpl, label: path.basename(file) });
 }
 
 async function main(files) {
@@ -44,9 +48,11 @@ async function main(files) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const ref = projectRef(loadCloudConfig(root, { packaged: false, env: {} })?.url);
   if (!ref) { console.error('no team cloud address found (cloud/team.config.json or ~/.agentbox/team.config.json)'); process.exit(1); }
-  let raw;
-  try { raw = execFileSync('security', ['find-generic-password', '-s', 'Supabase CLI', '-w'], { encoding: 'utf8' }); } catch {
-    console.error('no Supabase CLI sign-in in the keychain; run `npx supabase login` once'); process.exit(1);
+  let raw = process.env.SUPABASE_ACCESS_TOKEN;
+  if (!raw) {
+    try { raw = execFileSync('security', ['find-generic-password', '-s', 'Supabase CLI', '-w'], { encoding: 'utf8' }); } catch {
+      console.error('no Supabase CLI sign-in in the keychain; run `npx supabase login` once'); process.exit(1);
+    }
   }
   const token = cliToken(raw);
   for (const file of files) {

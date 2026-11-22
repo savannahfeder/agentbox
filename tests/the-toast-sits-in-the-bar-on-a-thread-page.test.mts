@@ -33,7 +33,7 @@ describe('on a thread\'s page', () => {
 
 describe('anywhere else', () => {
   it('the card keeps its corner', () => {
-    expect(app).toMatch(/className=\{`toast toast-goes\$\{about \? '' : ' toast-plain'\}\$\{toastInBar \? ' toast-in-bar' : ''\}`\}/);
+    expect(app).toMatch(/className=\{`toast toast-goes\$\{aboutTitle \? '' : ' toast-plain'\}\$\{toastInBar \? ' toast-in-bar' : ''\}`\}/);
     expect(styles).toMatch(/\.toast \{\n  position: fixed;\n  bottom: 30px;\n  right: 30px;/);
   });
 });

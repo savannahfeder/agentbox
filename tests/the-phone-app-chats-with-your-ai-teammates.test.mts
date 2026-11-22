@@ -149,8 +149,8 @@ describe('a teammate\'s chat as the phone draws it', () => {
 });
 
 describe('Chats on the phone', () => {
-  it('is the last tab while a team is on, holding your groups too', () => {
-    expect(bottomTabs(true).map((t) => t.label)).toEqual(['Needs you', 'Everything else', 'Chats']);
+  it('is the tab before Files while a team is on, holding your groups too', () => {
+    expect(bottomTabs(true).map((t) => t.label)).toEqual(['Needs you', 'Everything else', 'Chats', 'Files']);
     expect(bottomTabs(false).map((t) => t.label)).not.toContain('Chats');
   });
   it('lists teammates, then your groups, and opens a teammate\'s chat', () => {
@@ -200,7 +200,7 @@ describe('a teammate\'s answer on its thread', () => {
 describe('what else the web app had', () => {
   it('group messages that name you lead Needs you and count in it', () => {
     const src = read('mobile/src/app/index.tsx');
-    expect(src).toMatch(/mentionRows\(groups\.state\.mentions\)/);
+    expect(src).toMatch(/mentionRows\(groups\.state\.mentions, groups\.state\)/);
     expect(src).toMatch(/inbox: shown\.rows\.inbox\.length \+ mentions\.length/);
   });
   it('Mark unread brings the dot back until you open it again', () => {

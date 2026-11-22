@@ -73,17 +73,19 @@ export class SwapMeter {
 
 const meter = new SwapMeter();
 
-function sysctl(): Promise<string> {
+function sysctl(platform: NodeJS.Platform): Promise<string> {
+  // Only macOS has these names; elsewhere sysctl answers none of them.
+  if (platform !== 'darwin') return Promise.resolve('');
   // A name this Mac lacks makes sysctl exit non-zero after printing the rest,
   // so its output is kept whatever the exit.
   return new Promise((resolve) => {
-    execFile('/usr/sbin/sysctl', NAMES, { timeout: 5_000 }, (_err, stdout) => resolve(String(stdout ?? '')));
+    execFile('/usr/sbin/sysctl', NAMES, { timeout: 5_000, windowsHide: true }, (_err, stdout) => resolve(String(stdout ?? '')));
   });
 }
 
 /** This Mac's pressure now. Nulls for whatever it cannot read; never throws. */
-export async function readMacPressure(): Promise<PressureReading> {
-  const r = readingFromSysctl(await sysctl());
+export async function readMacPressure(platform: NodeJS.Platform = process.platform): Promise<PressureReading> {
+  const r = readingFromSysctl(await sysctl(platform));
   const rate = r.swapInBytes === null ? null : meter.add(r.swapInBytes, Date.now());
   return {
     level: r.level,

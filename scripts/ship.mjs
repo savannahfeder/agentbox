@@ -28,8 +28,9 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { racedWithAnotherPush, notReadyToShip, startedWhenBusy } from './lib/ship-rules.mjs';
+import { racedWithAnotherPush, notReadyToShip, runsEveryTest, startedWhenBusy } from './lib/ship-rules.mjs';
 import { deployAfterShip } from './lib/web-app-deploy.mjs';
+import { pushPrivateFolder } from './lib/private-folder.mjs';
 
 // THE FOLDER IT SHIPS IS THE ONE IT RUNS IN. `npm run ship` runs in the
 // package root, so a person or agent in a worktree ships that worktree as
@@ -46,13 +47,18 @@ const gitOrThrow = (args, opts) => {
 const root = (() => { try { return gitOrThrow(['rev-parse', '--show-toplevel'], { cwd: process.cwd() }); } catch { return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'); } })();
 const PUBLIC = 'origin';
 const ATTEMPTS = 3;
-// The ship queue stops a ship at 20 minutes (main/ship-queue.mts); the web app's deploy ends before that.
+// The ship queue stops a ship at 20 minutes, or 60 once this script says the
+// hook runs every test (main/ship-queue.mts); the web app's deploy ends before that.
 const began = Date.now();
-const SHIP_ENDS_BY = began + 18 * 60_000;
+let shipEndsBy = began + 18 * 60_000;
 
 const say = (msg) => console.log(`ship: ${msg}`);
-const git = (...args) => gitOrThrow(args, { cwd: root });
-const gitSoft = (...args) => runGit(args, { cwd: root });
+// A repository nested in the task folder is a worker's to write, settings and
+// all, and git runs those when it looks inside one. `dirty` still sees a
+// nested repository's commit move; only reading its files is skipped.
+const OWN_SETTINGS_ONLY = ['-c', 'core.fsmonitor=false', '-c', 'diff.ignoreSubmodules=dirty'];
+const git = (...args) => gitOrThrow([...OWN_SETTINGS_ONLY, ...args], { cwd: root });
+const gitSoft = (...args) => runGit([...OWN_SETTINGS_ONLY, ...args], { cwd: root });
 // process.exit drops whatever a pipe has not yet taken, and the ship queue
 // reads this script through one: the end of the hook's output, where the
 // failing test is named, was what got dropped. Exits once both have drained.
@@ -74,6 +80,10 @@ const why = notReadyToShip({
 });
 if (why) await stop(why);
 
+const privately = pushPrivateFolder(root, { message: `Changes from ${branch}`, trusted: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..') });
+if (privately.pushed) say(`pushed ${privately.commits} commit(s) in ${privately.path} to its own repository.`);
+else if (privately.why) say(`${privately.why}. Push it from there by hand.`);
+
 async function mergeWhatMoved() {
   if (git('rev-list', '--count', `HEAD..${PUBLIC}/main`) === '0') return;
   say(`${PUBLIC}/main has moved. Merging it in.`);
@@ -87,6 +97,10 @@ async function mergeWhatMoved() {
 
 for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
   await mergeWhatMoved();
+  if (runsEveryTest(git('diff', '--name-status', `${PUBLIC}/main`, 'HEAD'))) {
+    say('the hook runs every test for this push, because it deletes code or changes what every test depends on.');
+    shipEndsBy = began + 118 * 60_000;
+  }
   say(`pushing to ${PUBLIC} main (attempt ${attempt} of ${ATTEMPTS}). The hook runs the tests and the public check now.`);
   // ROOM FOR THE WHOLE TEST RUN TO COME BACK THROUGH HERE. The only test run a
   // ship has is the hook's, inside this push, so this buffer now carries every
@@ -103,7 +117,7 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
     say('the app folder follows on its own: git fetch origin && git merge --ff-only refs/remotes/origin/main');
     say(`check the run: gh run list -R savannahfeder/agentbox -L 3`);
     // Shipped whatever happens here; a deploy that did not work says so.
-    try { await deployAfterShip({ root, say, until: SHIP_ENDS_BY }); } catch (err) { say(`the web app was not updated: ${err?.message ?? err}. Put it up with: npm run phone:deploy`); }
+    try { await deployAfterShip({ root, say, until: shipEndsBy }); } catch (err) { say(`the web app was not updated: ${err?.message ?? err}. Put it up with: npm run phone:deploy`); }
     await exit(0);
   }
   if (!racedWithAnotherPush(`${pushed.stdout ?? ''}${pushed.stderr ?? ''}`)) {

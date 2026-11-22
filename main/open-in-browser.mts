@@ -27,6 +27,13 @@ function systemOpener(platform: NodeJS.Platform): string | null {
   return null;
 }
 
+/** What a launcher outside Electron runs to open an address. Windows gets no shell, so a `&` in it stays in it. */
+export function browserLauncher(url: string, platform: NodeJS.Platform = process.platform): { cmd: string; args: string[] } {
+  if (platform === 'darwin') return { cmd: 'open', args: [url] };
+  if (platform === 'win32') return { cmd: 'rundll32.exe', args: ['url.dll,FileProtocolHandler', url] };
+  return { cmd: 'xdg-open', args: [url] };
+}
+
 const reason = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 export async function openInBrowser(url: string, {

@@ -99,9 +99,14 @@ describe('the chats offered', () => {
     expect(got.map((t) => t.folder)).not.toContain(`${HOME}/Downloads`);
     expect(got.map((t) => t.folder)).not.toContain('');
   });
-  it('stop at eight', () => {
-    const many = Array.from({ length: 12 }, (_, i) => thread(`${HOME}/dev/n`, i));
-    expect(chatChoices(many, { home: HOME })).toHaveLength(8);
+  // Fifty since w-fbe5e95dea (2026-11-10). The founder asked what twenty chats
+  // would look like, and expected to see them all by scrolling; the setup
+  // showed the eight newest. The list scrolls inside its card.
+  it('are every chat that is there, up to fifty', () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => thread(`${HOME}/dev/n`, i));
+    expect(chatChoices(twenty, { home: HOME })).toHaveLength(20);
+    const many = Array.from({ length: 60 }, (_, i) => thread(`${HOME}/dev/n`, i));
+    expect(chatChoices(many, { home: HOME })).toHaveLength(50);
   });
 });
 

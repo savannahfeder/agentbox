@@ -92,6 +92,12 @@ export function said(text: string): string {
   return text.replace(/[^\S\n]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/** A message as `traceLines` keeps it, which drops every line after the first that opens with `#` (a "## Options" heading). */
+export function asTraced(text: string): string {
+  const [first = '', ...rest] = said(text).split('\n');
+  return said([first, ...rest.filter((line) => !line.startsWith('#'))].join('\n'));
+}
+
 /**
  * Every line one session typed, in the order it typed them.
  *

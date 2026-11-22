@@ -106,7 +106,7 @@ describe('the window hands the running sessions to both lists', () => {
     // was widened to allow it rather than relaxed: a row still asking you
     // something is never hidden by either (`stillAsksYou`, w-fe48447cab). The
     // behaviour this file is about is every assertion above, all unchanged.
-    expect(app).toMatch(/const inboxCandidates = [\s\S]{0,1200}if \(liveIds\.has\(i\.id\) && !stillAsksYou\(i\)( && ![^)]+\(i\))*\) return false;\s*(\/\/[^\n]*\n\s*)*(if \(shippingIds\.has\(i\.id\) && !stillAsksYou\(i\)( && ![^)]+\(i\))*\) return false;\s*)?if \(owedAnAnswer/);
+    expect(app).toMatch(/const inboxCandidates = [\s\S]{0,1400}if \(liveIds\.has\(i\.id\) && !stillAsksYou\(i\)( && ![^)]+\(i\))*\) return false;\s*(\/\/[^\n]*\n\s*)*(if \(shippingIds\.has\(i\.id\) && !stillAsksYou\(i\)( && ![^)]+\(i\))*\) return false;\s*)?if \(owedAnAnswer/);
     expect(app).toMatch(/belongsInProgress\(i, \{[^}]*live: liveIds\.has\(i\.id\)/);
     expect(app).toMatch(/belongsOnTheRail\(i, \{[^}]*live: liveIds\.has\(i\.id\)/);
   });

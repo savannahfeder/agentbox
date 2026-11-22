@@ -53,6 +53,12 @@ describe('what you wait on a person for', () => {
     expect(youWaitOn(items, 'p-me', 'p-dev').map((i) => i.id)).toEqual(['a']);
   });
 
+  // A tester's page listed a teammate's own threads under "Tasks you gave Lena": rows that name no maker.
+  it("is not a thread of theirs that names nobody as its maker", () => {
+    expect(youWaitOn([...items, { id: 'e', assignee: 'p-dev', status: 'open' }], 'p-me', 'p-dev').map((i) => i.id)).toEqual(['a']);
+    expect(youWaitOn(items, null, 'p-dev')).toEqual([]);
+  });
+
   it('is not a task someone else gave them, nor one given to another person', () => {
     expect(youWaitOn(items, 'p-me', 'p-dev').some((i) => i.id === 'c' || i.id === 'd')).toBe(false);
   });

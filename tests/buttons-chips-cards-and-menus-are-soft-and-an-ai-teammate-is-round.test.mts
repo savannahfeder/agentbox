@@ -64,7 +64,7 @@ describe('what you press or type in takes the small corner', () => {
     ['.av-btn', 'a viewer button'], ['.av-pin-tag', 'a pin\'s tag'], ['.av-reply-write textarea', 'a reply to a comment'],
     ['.cn-button', 'a Connections button'], ['.cn-input', 'a Connections field'],
     ['.approval-actions button', 'Allow and Deny'], ['.rm-input', 'a group\'s field'], ['.rm-search', 'Find groups'],
-    ['.gc-find', 'find in a chat'], ['.th-follow', 'Follow'], ['.tm-seg', 'a team switch'], ['.rm-btn', 'a group button'], ['.tq-sent-line', 'a thread a teammate sent you'],
+    ['.gc-find', 'find in a chat'], ['.tm-seg', 'a team switch'], ['.rm-btn', 'a group button'], ['.tq-sent-line', 'a thread a teammate sent you'],
   ])('%s (%s)', (sel) => {
     const v = cornerOf(sel.includes(',') ? sel.split(',')[0].trim() : sel);
     expect(v, sel).toMatch(SMALL);
@@ -90,8 +90,9 @@ describe('an AI teammate is round, and still told apart by its dashed ring', () 
   it('rounds the mark all the way, like a person', () => {
     expect(styles).toMatch(/--mate-corner:\s*50%;/);
   });
+  // The agent's own face is a faint solid ring since 2026-11-20 (w-585619d660).
   it('keeps it dashed', () => {
-    for (const sel of ['.agent-face', '.ev-ai', '.tq']) {
+    for (const sel of ['.ev-ai', '.tq']) {
       const dashed = rules.some((r) => r.selectors.includes(sel) && /border: 1px dashed/.test(r.body));
       expect(dashed, sel).toBe(true);
     }

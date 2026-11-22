@@ -2,14 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { View } from './types';
 
 /** A place the arrows can take you back to. Pages the trail does not know
- *  (Team, Rooms, search) are not recorded rather than recorded wrongly. */
+ *  (search, Today) are not recorded rather than recorded wrongly. */
 export type Stop =
   | { at: 'home' }
   | { at: 'list'; view: View }
   | { at: 'thread'; product: string; id: string }
   | { at: 'files'; project: string | null }
   | { at: 'connections' }
-  | { at: 'settings'; pane: string | null };
+  | { at: 'settings'; pane: string | null }
+  /** The Team page: 'team' is the Standup, `mate:<id>` and `person:<id>` a member's page. */
+  | { at: 'team'; place: string }
+  /** `inbox`: opened from Needs you, and drawn in the inbox rather than as the Team page. */
+  | { at: 'group'; id: string; inbox?: true }
+  | { at: 'teammate'; id: string }
+  /** A teammate's thread, which is a card from their Mac rather than one of your rows. */
+  | { at: 'card'; person: string; thread: string };
 
 export type Trail = { stops: Stop[]; at: number };
 
@@ -21,8 +28,43 @@ export function sameStop(a: Stop, b: Stop): boolean {
   if (a.at === 'list' && b.at === 'list') return a.view === b.view;
   if (a.at === 'thread' && b.at === 'thread') return a.product === b.product && a.id === b.id;
   if (a.at === 'files' && b.at === 'files') return a.project === b.project;
+  if (a.at === 'team' && b.at === 'team') return a.place === b.place;
+  if (a.at === 'group' && b.at === 'group') return a.id === b.id && !!a.inbox === !!b.inbox;
+  if (a.at === 'teammate' && b.at === 'teammate') return a.id === b.id;
+  if (a.at === 'card' && b.at === 'card') return a.person === b.person && a.thread === b.thread;
   // Settings is one place: its pages are where you are inside it.
   return true;
+}
+
+/** What is on screen, in the order one covers another. */
+export type Screen = {
+  settings: { pane: string | null } | null;
+  thread: { product: string; id: string } | null;
+  card: { person: string; thread: string } | null;
+  home: boolean;
+  files: { project: string | null } | null;
+  connections: boolean;
+  group: string | null;
+  groupInInbox?: boolean;
+  teammate: string | null;
+  teamPlace: string | null;
+  /** A page the trail does not know. */
+  unrecorded: boolean;
+  view: View;
+};
+
+export function stopOnScreen(s: Screen): Stop | null {
+  if (s.settings) return { at: 'settings', pane: s.settings.pane };
+  if (s.thread) return { at: 'thread', product: s.thread.product, id: s.thread.id };
+  if (s.card) return { at: 'card', person: s.card.person, thread: s.card.thread };
+  if (s.home) return { at: 'home' };
+  if (s.files) return { at: 'files', project: s.files.project };
+  if (s.connections) return { at: 'connections' };
+  if (s.group) return s.groupInInbox ? { at: 'group', id: s.group, inbox: true } : { at: 'group', id: s.group };
+  if (s.teammate) return { at: 'teammate', id: s.teammate };
+  if (s.teamPlace) return { at: 'team', place: s.teamPlace };
+  if (s.unrecorded) return null;
+  return { at: 'list', view: s.view };
 }
 
 export function arrive(trail: Trail, stop: Stop): Trail {
@@ -47,13 +89,13 @@ function step(trail: Trail, by: 1 | -1, exists: (s: Stop) => boolean): { trail: 
 export const stepBack = (trail: Trail, exists: (s: Stop) => boolean = () => true) => step(trail, -1, exists);
 export const stepForward = (trail: Trail, exists: (s: Stop) => boolean = () => true) => step(trail, 1, exists);
 
-/** The most recent thread on the trail up to where you are now. */
-export function lastThreadIn(trail: Trail): { product: string; id: string } | null {
-  for (let i = Math.min(trail.at, trail.stops.length - 1); i >= 0; i--) {
-    const s = trail.stops[i];
-    if (s.at === 'thread') return { product: s.product, id: s.id };
-  }
-  return null;
+export type ThreadRef = { product: string; id: string };
+
+/** The last thread you stood on, once you have stood on `stop`. Kept apart
+ *  from the trail: back moves the trail's place to before the thread you
+ *  just left, and that thread is still the last one you were in. */
+export function lastThreadAfter(last: ThreadRef | null, stop: Stop): ThreadRef | null {
+  return stop.at === 'thread' ? { product: stop.product, id: stop.id } : last;
 }
 
 const stopKey = (s: Stop | null) => (s ? JSON.stringify(s) : '');
@@ -87,6 +129,7 @@ export function useBackAndForward({ on, here, go, exists }: {
   exists: (stop: Stop) => boolean;
 }) {
   const [trail, setTrail] = useState<Trail>(EMPTY_TRAIL);
+  const [lastThread, setLastThread] = useState<ThreadRef | null>(null);
   const trailRef = useRef(trail);
   trailRef.current = trail;
   // The place a step is on its way to, so arriving there is not recorded as a
@@ -98,6 +141,7 @@ export function useBackAndForward({ on, here, go, exists }: {
   const recorder = useRef<ReturnType<typeof settledPlaces> | null>(null);
   if (!recorder.current) {
     recorder.current = settledPlaces((s) => {
+      setLastThread((was) => lastThreadAfter(was, s));
       const going = travelling.current;
       travelling.current = null;
       if (going && sameStop(going, s)) return;
@@ -149,6 +193,6 @@ export function useBackAndForward({ on, here, go, exists }: {
     forward,
     backTo: on ? stepBack(trail, exists)?.stop ?? null : null,
     forwardTo: on ? stepForward(trail, exists)?.stop ?? null : null,
-    lastThread: on ? lastThreadIn(trail) : null,
+    lastThread: on ? lastThread : null,
   };
 }

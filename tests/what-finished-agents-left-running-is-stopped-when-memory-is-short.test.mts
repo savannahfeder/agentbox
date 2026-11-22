@@ -14,7 +14,8 @@
 //     leftovers are only reported;
 //   - a task's programs may be stopped only after its run has explicitly ended
 //     in this app (or its worker is verified gone), 2 minutes after the task is
-//     closed, or 10 minutes after the run while memory is tight, never earlier
+//     closed, or 10 minutes after the run while memory is critical (tight
+//     until w-543aa8a608), never earlier
 //     than when the switch went on (it was 2 hours after the run until
 //     w-7b5b89d886; see a-task-keeps-what-it-runs-until-you-close-it);
 //   - starting a run on the task cancels it at once, inside the app, before the
@@ -138,8 +139,8 @@ describe('the cleaner', () => {
     expect(h.signals.map(([pid, s]) => `${pid}:${s}`).sort()).toEqual(['30788:SIGTERM', '31907:SIGTERM']);
   });
 
-  it('after ten minutes instead while memory is tight', async () => {
-    const h = harness(night(), { pressure: 'tight' });
+  it('after ten minutes instead while memory is critical', async () => {
+    const h = harness(night(), { pressure: 'critical' });
     h.cleaner.ended('w-done');
     h.advance(9 * MIN); await h.settle();
     expect(h.signals.length).toBe(2);

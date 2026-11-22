@@ -3,14 +3,15 @@
 // App.tsx only places them beside the narrow sidebar (GroupsSidebar.tsx).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../../api';
-import type { ArtifactMark, Person, Room, RoomMention, RoomsState } from '../../types';
+import type { ArtifactMark, Person, Room, RoomCard, RoomMention, RoomMessage, RoomsState, TeamMessageFile } from '../../types';
+import { listedIn, oneConversation, pairRooms } from '../../../../shared/pair-room.mts';
 import './rooms.css';
-import { boardPeople, boardPicked, cardName, chatPeople, groupInTab, mentionRows, noticeShown, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
+import { boardPeople, boardPicked, cardName, chatPeople, groupInTab, mentionRows, noticeShown, personOpens, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
-import { landed, sameMessages } from './room-chat-rules';
+import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
 import { RoomPage, type RoomPane } from './RoomPage';
-import { RoomChat } from './RoomChat';
+import { FirstChatBox, RoomChat, type ChatAlong, type RoomChatCalls } from './RoomChat';
 import type { RoomFileOpening } from './RoomFileView';
 import { I } from './icons';
 import type { Conversation } from './MessagesPage';
@@ -25,13 +26,11 @@ import { GroupFinder, GroupsColumn, GroupsHead } from './GroupsColumn';
 import { directPeople } from './direct-people';
 import { decisionsOf, decisionRows } from '../decisions';
 import { DecisionsList } from '../TeamLists';
+import { ThreadCrumb } from '../../threads/Summary';
 
 type Direct = Conversation & { people: string[] };
 
-/** A named group's name, or the people in a chat. */
-const nameOf = (r: Room) => (r.kind === 'group' ? r.wall.filter((c) => !c.me).map(cardName).join(', ') || r.name : r.name);
-
-export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team = [], directs = [], now, toast, onOpenDirect, onTeamMessage, onLeavePage, renderBoard, inline = false }: {
+export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team = [], directs = [], now, toast, onOpenDirect, onTeamMessage, onLeavePage, renderBoard, threadOf, onTeammate, inline = false }: {
   rooms: RoomsState | null | undefined; on: boolean; meId: string | null; myName: string; fullName?: string; hasTeam: boolean;
   /** Everyone on your team, for a teammate in a direct record who is not on Groups yet. */
   team?: Person[];
@@ -46,6 +45,10 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   onLeavePage: () => void;
   /** The room's board, for these people's threads. */
   renderBoard?: (people: string[], opts: { later: boolean }) => ReactNode;
+  /** Opens the shared thread a person's "working on" line names, when you can read it. */
+  threadOf?: (c: RoomCard) => (() => void) | null;
+  /** Opens a teammate's own page, where their threads are. */
+  onTeammate?: (id: string) => void;
   /** Drawn under Everything else's cards (w-b5f23cff71), which list the groups and the team instead. */
   inline?: boolean;
 }) {
@@ -53,6 +56,8 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const all = live ? rooms!.rooms : [];
   const list = all.filter((r) => r.kind !== 'group');
   const [openId, setOpenId] = useState<string | null>(null);
+  // Opened from Needs you, so drawn where the inbox's list was rather than as the Team page.
+  const [inInbox, setInInbox] = useState(false);
   const [pane, setPane] = useState<RoomPane>('wall');
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [boardPicks, setBoardPicks] = useState<Record<string, string[]>>(() => readBoardPicks());
@@ -70,6 +75,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   // One group's or one project's decisions, over whatever is on screen.
   const [listing, setListing] = useState<{ roomId: string; project: string | null; title: string } | null>(null);
   const open = openId ? all.find((r) => r.id === openId) ?? null : null;
+  const nameOf = (r: Room) => roomTitle(r, meId);
   const invisibleUntil = Date.parse(rooms?.me?.invisible_until ?? '');
 
   // A room I left, or was removed from, closes. One just joined or made may
@@ -88,9 +94,10 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   }, []);
 
   const [openingFile, setOpeningFile] = useState<(RoomFileOpening & { roomId: string }) | null>(null);
-  // Every group opens as the Groups page, which then holds it.
-  const openRoom = (id: string) => {
+  // Every group opens as the Groups page, which then holds it, or in the inbox.
+  const openRoom = (id: string, from: 'inbox' | null = null) => {
     onLeavePage(); setEmpty(false); setFinderOpen(false); setOpenId(id); setPane('wall'); setBoardOn(false);
+    setInInbox(from === 'inbox');
     setLastId(id); writeRoomTab(id);
   };
   // One step back: from everyone's threads or a person's page to the group; from the group out.
@@ -146,7 +153,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     const cards = new Map((from ?? open)?.wall.map((c) => [c.id, c]) ?? []);
     if (people.every((id) => cards.get(id)?.teammate)) { onTeamMessage(people); return; }
     const want = new Set([meId, ...people]);
-    const group = all.find((r) => r.kind === 'group' && r.members === want.size && r.wall.every((c) => want.has(c.id)) && people.every((id) => r.wall.some((c) => c.id === id)));
+    const group = people.length === 1 ? pairRooms(all, people[0], listedIn)[0] : all.find((r) => r.kind === 'group' && r.members === want.size && r.wall.every((c) => want.has(c.id)) && people.every((id) => r.wall.some((c) => c.id === id)));
     let id = group?.id ?? null;
     if (!id) {
       const name = people.map((p) => cards.get(p)?.name ?? 'Someone').join(', ').slice(0, 40);
@@ -231,6 +238,43 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     }),
   });
 
+  // A pair who both started their chat in the same moment have two groups.
+  // Their chat reads both; new words go to the one both Macs pick, and a
+  // reply, an edit or a reaction to the room its message is in.
+  const pairChat = (r: Room): { room: Room; rooms: string[]; messages: RoomMessage[]; calls: RoomChatCalls } => {
+    const other = listedIn(r).find((id) => id !== meId);
+    const twins = other ? pairRooms(all, other, listedIn) : [];
+    const held = (t: Room) => rooms?.messages[t.id] ?? [];
+    if (twins.length < 2 || !twins.includes(r)) return { room: r, rooms: [r.id], messages: held(r), calls: { onSend: send(r.id), onRead: read(r), ...chatCalls(r) } };
+    const home = twins[0];
+    const messages = oneConversation(twins.map(held));
+    const roomOfMessage = (id: string) => twins.find((t) => t.id === messages.find((m) => m.id === id)?.roomId) ?? home;
+    const of = (id: string) => chatCalls(roomOfMessage(id));
+    const first = async <T,>(get: (t: Room) => Promise<T | null>) => {
+      for (const t of twins) { const got = await get(t); if (got != null) return got; }
+      return null;
+    };
+    const base = chatCalls(home);
+    return { room: home, rooms: twins.map((t) => t.id), messages, calls: {
+      ...base,
+      openingFile: openingFile && twins.some((t) => t.id === openingFile.roomId) ? openingFile : null,
+      onSend: (body, opts) => send(opts.inReplyTo ? roomOfMessage(opts.inReplyTo).id : home.id)(body, opts),
+      onRead: () => { for (const t of twins) read(t)(); },
+      onReact: (id, emoji, on) => of(id).onReact(id, emoji, on),
+      onEdit: (id, body, mentions) => of(id).onEdit(id, body, mentions),
+      onDelete: (id) => of(id).onDelete(id),
+      marks: new Map(twins.flatMap((t) => [...decisionsOf(decisionsIn(t.id))])),
+      onDecide: (id, kind, on) => of(id).onDecide?.(id, kind, on),
+      files: {
+        ...base.files,
+        marks: twins.flatMap((t) => rooms?.fileMarks?.[t.id] ?? []),
+        find: (name) => first((t) => chatCalls(t).files.find(name)),
+        readText: (name) => first((t) => chatCalls(t).files.readText(name)),
+      },
+      loadFile: (name) => first((t) => chatCalls(t).loadFile(name)),
+    } };
+  };
+
   // Every group and every chat, a teammate's direct record among them, each its own.
   const conversations: Conversation[] = live ? [...roomConversations(rooms), ...directs] : [];
   const pinned = new Set(all.filter((r) => r.teamId || r.pinned).map((r) => `room:${r.id}`));
@@ -256,6 +300,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       const res = await call('leave', r.id);
       toast(res.ok ? `You left ${nameOf(r)}` : res.error ?? 'Could not leave');
       if (!res.ok) return;
+      if (inInbox) { setOpenId(null); return; }
       const next = groupInTab(all.filter((x) => x.id !== r.id), null);
       if (next) openRoom(next.id); else { setOpenId(null); setEmpty(true); }
     }
@@ -264,6 +309,11 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const answerNotice = (id: string) => { const next = [...answered, id]; setAnswered(next); writeNoticeSeen(next); };
 
   const meInChat = meId ? { id: meId, name: rooms?.me?.display_name || myName, avatarUrl: rooms?.me?.avatar_url ?? null, me: true } : null;
+  const openPerson = (id: string, wall: readonly RoomCard[], profile: () => void) => {
+    const c = wall.find((x) => x.id === id);
+    if (c && personOpens(c) === 'page' && onTeammate) { onTeammate(id); return; }
+    profile();
+  };
   const backTitle = (title: string) => <h1 className="workspace-title">
     <button type="button" className="rm-backt" title="Back (esc)" onClick={close}>{I.back()}<span>{title}</span></button></h1>;
   // A page of its own takes the top bar's title and hides the state tabs.
@@ -296,18 +346,30 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     heading = { title: <h1 className="workspace-title">Groups</h1> };
     page = <div className="rm-empty gr-none"><span className="t">You are not in any groups yet.</span></div>;
   } else if (open && rooms && onChat) {
-    page = <GroupPage key={open.id} inline={inline}
+    const bare = inline || inInbox;
+    page = <GroupPage key={open.id} inline={bare}
       notice={<><GroupWaits row={rooms.mentions.find((m) => m.roomId === open.id) ?? null} onDone={() => void call('markDone', open.id).then((res) => { if (!res.ok) toast(res.error ?? 'Not marked done'); })} />
         {rooms.me && noticeShown(open, answered) ? <OpenGroupNotice me={rooms.me}
           onLeave={() => void groupAction(open, 'leave', new DOMRect())}
           onHide={() => void call('saveProfile', { show_working: 'team' })} onOk={() => answerNotice(open.id)} /> : null}</>}
-      chat={<RoomChat room={open} messages={rooms.messages[open.id] ?? []} people={withMe(chatPeople(open, meId), meInChat)} meId={meId} now={now}
-        full hang head={<></>} onSend={send(open.id)} onRead={read(open)} {...chatCalls(open)} />}
-      people={inline && (open.teamId || open.members <= 2) ? null : <PeoplePanel room={open} onPerson={(id) => setPane(`person:${id}`)} />}      list={<GroupsColumn rows={rows} current={`room:${open.id}`} now={now} onOpen={pickGroup} />} />;
+      chat={(() => {
+        const c = pairChat(open);
+        return <RoomChat room={c.room} messages={c.messages} people={withMe(chatPeople(c.room, meId), meInChat)} meId={meId} now={now}
+          full hang head={<></>} {...c.calls} />;
+      })()}
+      people={bare && (open.teamId || open.members <= 2) ? null : <PeoplePanel room={open} onPerson={(id) => openPerson(id, open.wall, () => setPane(`person:${id}`))} threadOf={threadOf} />}      list={<GroupsColumn rows={rows} current={`room:${open.id}`} now={now} onOpen={pickGroup} />} />;
     heading = { title: <GroupsHead current={currentRow} onFind={() => setFinderOpen(true)} /> };
     if (inline) heading = null;
+    // The bar a thread opened from the inbox has, so Back and Esc go to the list.
+    if (inInbox) heading = { title: <div className="workspace-task-header"><ThreadCrumb from="Inbox" name={nameOf(open)} onBack={close} /></div> };
   } else if (open && rooms) {
     heading = { title: backTitle(nameOf(open)) };
+    // One step in from a chat in the inbox, its bar stays the thread's, and Back goes to the chat.
+    if (inInbox) {
+      const person = pane.startsWith('person:') ? open.wall.find((c) => c.id === pane.slice('person:'.length)) ?? null : null;
+      const here = person ? cardName(person) : pane === 'ranks' ? 'Agent hours' : 'Everyone’s threads';
+      heading = { title: <div className="workspace-task-header"><ThreadCrumb from={nameOf(open)} name={here} onBack={close} /></div> };
+    }
     page = <RoomPage room={open} rooms={list} ranks={rooms.ranks ?? {}} me={rooms.me} now={now}
       pane={pane} onPane={setPane} chat={null} board={board}
       picked={picked} onPick={(ids) => setPicked(new Set(ids))} onMessage={(ids) => void message(ids, open)}
@@ -323,7 +385,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
       onTakeBack={(d) => { void decide(listing.roomId, { messageId: d.messageId, kind: d.kind, on: false }); }} />}
     {finderOpen && <GroupFinder rows={rows} current={open ? `room:${open.id}` : null} now={now} onOpen={pickGroup} onClose={() => setFinderOpen(false)} />}
     {membersRoom && members && <MembersMenu room={membersRoom} at={members.at} onClose={() => setMembers(null)}
-      onPerson={(id) => { setMembers(null); openRoom(membersRoom.id); setPane(`person:${id}`); }} />}
+      onPerson={(id) => { setMembers(null); openRoom(membersRoom.id, inInbox && membersRoom.id === openId ? 'inbox' : null); setPane(`person:${id}`); }} />}
   </>;
 
   const invisible = live && rooms?.me ? {
@@ -341,38 +403,64 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     comeBack={() => { void call('comeBack'); }} /> : live ? <RoomsNotReady error={rooms?.error ?? null} /> : undefined;
 
   // Needs you counts these rows too, so a group counts once.
-  const mentions: RoomMention[] = live ? mentionRows(rooms!.mentions) : [];
+  const mentions: RoomMention[] = live ? mentionRows(rooms!.mentions, rooms!) : [];
   const faces = new Map(all.flatMap((r) => r.wall.map((c) => [c.id, c.avatarUrl] as const)));
-  const openMention = (m: RoomMention) => {
+  const openMention = (m: RoomMention, from: 'inbox' | null = null) => {
     if (m.note || m.file) setOpeningFile({ roomId: m.roomId, note: m.note, file: m.file, at: Date.now() });
-    openRoom(m.roomId);
+    openRoom(m.roomId, from);
   };
 
   // A chat drawn somewhere other than Groups: a person's place on the home.
-  const chatIn = (roomId: string): ReactNode => {
+  const chatIn = (roomId: string, along?: (messages: RoomMessage[], rooms: string[]) => ChatAlong): ReactNode => {
     const r = all.find((x) => x.id === roomId);
     if (!r || !rooms) return null;
-    return <div className="gr-chat"><RoomChat key={r.id} room={r} messages={rooms.messages[r.id] ?? []} people={withMe(chatPeople(r, meId), meInChat)} meId={meId} now={now}
-      full hang head={<></>} onSend={send(r.id)} onRead={read(r)} {...chatCalls(r)} /></div>;
+    const c = pairChat(r);
+    return <div className="gr-chat"><RoomChat key={c.room.id} room={c.room} messages={c.messages} people={withMe(chatPeople(c.room, meId), meInChat)} meId={meId} now={now}
+      full hang head={<></>} along={along?.(c.messages, c.rooms)} {...c.calls} /></div>;
   };
   // A two-person group with them, made if there is none, without leaving the page you are on.
-  const startChat = async (personId: string, name: string, first?: string): Promise<string | null> => {
-    const want = new Set([meId, personId]);
-    const had = all.find((r) => r.kind === 'group' && r.members === 2 && r.wall.every((c) => want.has(c.id)) && r.wall.some((c) => c.id === personId));
-    let id = had?.id ?? null;
-    if (!id) {
-      const res = await call<string>('create', { name: name.slice(0, 40), kind: 'group', people: [personId] });
-      if (!res.ok || !res.value) return res.error ?? 'Could not start the chat';
-      id = res.value;
+  const chatWith = async (personId: string, name: string): Promise<{ id: string } | { error: string }> => {
+    const id = pairRooms(all, personId, listedIn)[0]?.id;
+    if (id) return { id };
+    const res = await call<string>('create', { name: name.slice(0, 40), kind: 'group', people: [personId] });
+    return res.ok && res.value ? { id: res.value } : { error: res.error ?? 'Could not start the chat' };
+  };
+  const startChat = async (personId: string, name: string, first?: string, files: readonly TeamMessageFile[] = []): Promise<string | null> => {
+    const got = await chatWith(personId, name);
+    if ('error' in got) return got.error;
+    const { id } = got;
+    const put: { name: string; stored: string }[] = [];
+    for (const f of files) {
+      const stored = storedName(f.name);
+      const res = f.srcPath ? await call('putFileFrom', id, { name: stored, srcPath: f.srcPath })
+        : f.dataBase64 ? await call('putFile', id, { name: stored, dataBase64: f.dataBase64 })
+          : { ok: false, error: `${f.name} could not be read` };
+      if (!res.ok) return res.error ?? `${f.name} did not send`;
+      put.push({ name: f.name, stored });
     }
-    if (first) return send(id)(first, { inReplyTo: null, mentions: [] });
+    const body = withFileLinks(first ?? '', put);
+    if (body) return send(id)(body, { inReplyTo: null, mentions: [] });
     return null;
+  };
+  const firstChat = (person: { id: string; name: string; avatarUrl: string | null }, placeholder: string): ReactNode => {
+    const put = async (op: 'putFile' | 'putFileFrom', roomId: string, file: object) => {
+      const res = await call(op, roomId, file);
+      return res.ok ? null : res.error ?? 'That file did not send';
+    };
+    return <FirstChatBox key={person.id} person={{ ...person, me: false }} placeholder={placeholder}
+      open={async () => { const got = await chatWith(person.id, person.name); if ('error' in got) throw new Error(got.error); return got.id; }}
+      send={(roomId, body, mentions) => send(roomId)(body, { inReplyTo: null, mentions })}
+      putFile={(roomId, name, dataBase64) => put('putFile', roomId, { name, dataBase64 })}
+      putFileFrom={(roomId, name, srcPath) => put('putFileFrom', roomId, { name, srcPath })}
+      sending={rooms?.sending} onNotice={toast} />;
   };
 
   return {
-    chatIn, startChat,
+    chatIn, startChat, firstChat,
     live, openId: !live ? null : open ? openId : empty ? 'groups' : null,
-    open: (id: string) => openRoom(id), close, leave, page, dialogs, join, invisible, settingsPane,
+    /** The open group was opened from Needs you, and is drawn in the inbox. */
+    inInbox: live && !!open && inInbox,
+    open: (id: string, from: 'inbox' | null = null) => openRoom(id, from), close, leave, page, dialogs, join, invisible, settingsPane,
     /** The sidebar's Groups: the group open last, or none. */
     openTab,
     mentions, openMention, faces, heading,
@@ -403,7 +491,7 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     /** Who is in a direct record's chat, listed the way a group lists its people. */
     chatPeople: (people: string[]) => {
       const { members, wall, roomOf } = directPeople({ people, rooms: all, team, meId });
-      return <PeoplePanel room={{ members, wall }} onPerson={(id) => { if (!roomOf[id]) return; openRoom(roomOf[id]); setPane(`person:${id}`); }} />;
+      return <PeoplePanel room={{ members, wall }} onPerson={(id) => openPerson(id, wall, () => { if (!roomOf[id]) return; openRoom(roomOf[id]); setPane(`person:${id}`); })} threadOf={threadOf} />;
     },
   };
 }

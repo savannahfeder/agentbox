@@ -11,7 +11,7 @@
 // stand-in too, since the stand-in is the Mac's folder under a home of its own.
 import { DOC_SCHEMES, IMG_SCHEMES } from '../../shared/schemes.mts';
 
-export interface FileEntry { n?: string; s: number; big?: boolean; w?: number; h?: number }
+export interface FileEntry { n?: string; s: number; big?: boolean; soon?: boolean; w?: number; h?: number }
 /** A copy's list of its files, as JSON the Mac wrote (main/phone-uploads.mts). */
 export interface Attached { dir?: unknown; repo?: unknown; files?: Record<string, unknown>; folders?: Record<string, unknown> }
 export interface Place { device: string; dir: string; repo: string; files: Map<string, FileEntry>; folders: Map<string, string[]> }
@@ -44,7 +44,7 @@ export function cloudPlaces(threads: { device: string; project: string; snapshot
     }
     for (const [key, entry] of Object.entries(a.files ?? {})) {
       const e = entry as FileEntry;
-      if (!place.files.has(key) && e && typeof e.s === 'number' && (e.big || (typeof e.n === 'string' && /^[0-9a-f]{64}\.[a-z0-9]{1,8}$/.test(e.n)))) place.files.set(key, e);
+      if (!place.files.has(key) && e && typeof e.s === 'number' && (e.big || e.soon === true || (typeof e.n === 'string' && /^[0-9a-f]{64}\.[a-z0-9]{1,8}$/.test(e.n)))) place.files.set(key, e);
     }
     for (const [key, keys] of Object.entries(a.folders ?? {})) if (!place.folders.has(key) && Array.isArray(keys)) place.folders.set(key, keys.filter((k) => typeof k === 'string'));
   }

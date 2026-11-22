@@ -1,6 +1,7 @@
 // PURE. What the Files place shows of the list main/files-place.mts hands it.
 import type { FileFolder, FileKind, PlacedFile } from '../types';
 import { PLAIN_AGENT } from '../../../shared/agent-voice.mts';
+import { MAC } from '../this-keyboard';
 
 export const KIND_ORDER: FileKind[] = ['markdown', 'image', 'film', 'deck', 'pdf', 'page', 'table', 'code'];
 export const KIND_PLURAL: Record<FileKind, string> = { markdown: 'Documents', image: 'Pictures', film: 'Films', deck: 'Decks', pdf: 'PDFs', page: 'Pages', table: 'Tables', code: 'Code' };
@@ -90,18 +91,41 @@ export const missingWords = (who: string | null) => (who ? `On ${who}'s computer
 const MACHINE_NAME = /^page-\d{4}-\d{2}-\d{2}T[\d-]+Z?(?:[-_ ]v\d+)?\.\w+$|^screen ?shot[ -]\d{4}-\d{2}-\d{2}\b.*\.\w+$|^(?:[0-9a-f]{12,}|\d{10,})\.\w+$/i;
 
 /** What a tile calls a file. The viewer keeps the real name. */
-export function shownName(f: Pick<PlacedFile, 'name' | 'sentIn'>) {
+export function shownName(f: Pick<PlacedFile, 'name' | 'sentIn' | 'title'>) {
+  if (f.title) return f.title;
   if (!MACHINE_NAME.test(f.name)) return f.name;
   return f.sentIn.find((s) => s.kind !== 'chat' && s.title)?.title ?? f.name;
 }
 
 export const needsReview = (f: Pick<PlacedFile, 'open' | 'approvedBy'>) => f.open > 0 && f.approvedBy.length === 0;
 
-export type FileSort = 'recent' | 'name';
-export function sortFiles<T extends Pick<PlacedFile, 'name' | 'sentIn' | 'at'>>(files: T[], by: FileSort): T[] {
+export type FileSort = 'recent' | 'name' | 'size';
+export function sortFiles<T extends Pick<PlacedFile, 'name' | 'sentIn' | 'at' | 'onMac'>>(files: T[], by: FileSort): T[] {
   return [...files].sort(by === 'name'
     ? (a, b) => shownName(a).localeCompare(shownName(b), undefined, { sensitivity: 'base', numeric: true })
-    : (a, b) => b.at - a.at);
+    : by === 'size' ? (a, b) => (b.onMac ?? 0) - (a.onMac ?? 0) || b.at - a.at
+      : (a, b) => b.at - a.at);
+}
+
+// The app runs on Linux too, where "this Mac" would be untrue.
+export const MACHINE = MAC ? 'Mac' : 'computer';
+
+/** A size as a person reads it: 625 MB, 2.1 MB, 4 KB, 4.8 GB. */
+/** The page's total says something only once it reaches a megabyte. */
+export const showsTotal = (bytes: number): boolean => bytes >= 1024 * 1024;
+
+export function sizeWords(bytes: number): string {
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let n = bytes / 1024;
+  let u = 0;
+  while (n >= 1000 && u < units.length - 1) { n /= 1024; u += 1; }
+  if (n < 1) return '1 KB';
+  return `${n >= 100 || u === 0 ? Math.round(n) : Math.round(n * 10) / 10} ${units[u]}`;
+}
+
+/** What the files here take on this computer, all versions; and what their older versions take. */
+export function onMacOf(files: readonly Pick<PlacedFile, 'onMac' | 'older'>[]): { onMac: number; older: number } {
+  return files.reduce<{ onMac: number; older: number }>((s, f) => ({ onMac: s.onMac + (f.onMac ?? 0), older: s.older + (f.older ?? 0) }), { onMac: 0, older: 0 });
 }
 
 type Place = { project: string | null; folder: string | null };
@@ -146,3 +170,20 @@ export function apartScratch(files: PlacedFile[]) {
 }
 
 export const scratchLine = (n: number) => (n === 1 ? '1 check picture an agent took' : `${n} check pictures agents took`);
+
+// Every tile at once on a store of thousands froze the whole app.
+export const TILES_AT_ONCE = 60;
+
+/** The first `drawn` tiles: the files, then the check pictures with what is left. */
+export function drawnOf<T>(shown: T[], scratch: T[], drawn: number): { shown: T[]; scratch: T[] } {
+  return { shown: shown.slice(0, drawn), scratch: scratch.slice(0, Math.max(0, drawn - shown.length)) };
+}
+
+export const moreTiles = (drawn: number, total: number) => (drawn >= total ? drawn : Math.min(drawn + TILES_AT_ONCE, total));
+
+/** `items` in the order `before` had them, anything new after the rest in its own order. */
+export function inOrderOf<T>(items: T[], before: readonly string[], keyOf: (t: T) => string): T[] {
+  const at = new Map(before.map((k, i) => [k, i]));
+  const rank = (t: T) => at.get(keyOf(t)) ?? before.length;
+  return [...items].sort((a, b) => rank(a) - rank(b));
+}

@@ -102,7 +102,7 @@
 /* The max keeps BOARD_LEAST (room-rules) for the board when the window narrows. */
 .rm-chat { width: var(--rm-chat-w, 41%); min-width: 300px; max-width: min(720px, calc(100% - 620px)); flex: none; border-left: 1px solid var(--rm-line); display: flex; flex-direction: column; min-height: 0; position: relative; }
 .rm-chat-grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 7px; z-index: 6; cursor: col-resize; }
-.rm-chat-grip::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: transparent; transition: background .12s; }
+.rm-chat-grip::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: transparent; }
 .rm-chat-grip:hover::after, .rm-chat.dragging .rm-chat-grip::after { background: var(--accent); }
 .rm-chat.dragging, .rm-chat.dragging * { user-select: none; }
 .rm-chat-head { display: flex; align-items: center; gap: 8px; padding: 0 12px 0 14px; height: 40px; flex: none; border-bottom: 1px solid var(--rm-line); }
@@ -127,6 +127,8 @@
 .rm-cm.cont .tx { margin-top: 0; }
 .rm-cm .rep { display: flex; align-items: center; gap: 3px; margin-top: 5px; font: 10px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; }
 .rm-cm .rep:hover { color: var(--text-dim); }
+.rm-cm .rm-there { display: block; max-width: 100%; margin-top: 3px; padding: 0; border: 0; background: none; font-family: inherit; font-size: 12px; line-height: 18px; color: var(--text-faint); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.rm-cm .rm-there:hover { color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; }
 .rm-cm .act { display: none; margin-left: auto; font: 10px var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); background: none; border: 0; padding: 0; }
 .rm-cm:hover .act { display: inline; }
 .rm-cm.root { padding-bottom: 12px; margin-bottom: 4px; }
@@ -134,15 +136,15 @@
 .rm-day .rm-label { font: inherit; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-faint); }
 .rm-compose { position: relative; margin: 8px 20px 20px; flex: none; border: 1px solid var(--line-strong); background: var(--control-face); display: flex; flex-direction: column; }
 .rm-compose > .rm-picker { position: absolute; bottom: calc(100% + 6px); left: 0; }
-/* THE DIRECT CHAT'S BOX: the words, what is attached, then the bar and Send. */
-.rm-compose-input { min-height: 40px; max-height: 200px; overflow-y: auto; padding: 10px 12px 4px; box-sizing: border-box; color: var(--text); font-size: 13.5px; line-height: 20px; }
-.rm-compose .attach-row { padding: 2px 12px 8px; }
-.rm-compose .attach-thumb img { height: 48px; max-width: 120px; }
-.rm-compose-bar { display: flex; align-items: center; gap: 10px; padding: 4px 8px 6px 8px; }
+/* EVERY CHAT'S BOX IS SLACK'S: the words across the whole box, then what is
+   attached, then the tools with Send at the right. The bar's odd padding puts
+   the first glyph's ink on the words' edge. */
+.rm-compose-input { min-height: 34px; max-height: min(40vh, 360px); overflow-y: auto; padding: 11px 12px 3px; box-sizing: border-box; color: var(--text); font-size: 13.5px; line-height: 20px; }
+.rm-compose .attach-row { padding: 6px 12px 4px; }
+.rm-compose .compose-note { padding: 2px 12px; }
+.rm-compose .fmt-marks { padding: 6px 8px 0 3px; }
+.rm-compose-bar { display: flex; align-items: center; gap: 8px; padding: 4px 8px 8px 4px; }
 .rm-compose-bar .fmt-bar { margin-right: auto; min-width: 0; }
-.rm-compose-bar .dock-send { padding: 4px 12px; }
-.rm-compose-bar .dock-send:disabled { color: var(--text-faint); background: none; border-color: var(--line-strong); cursor: default; }
-.rm-chat .rm-compose-bar .fmt-mark, .rm-chat .rm-compose-bar .fmt-gap { display: none; }
 
 /* What a direct chat's message wears, worn by a room's too. */
 .rm-cm { position: relative; }
@@ -152,9 +154,17 @@
 .rm-cm .h, .rm-cm .tx { user-select: text; -webkit-user-select: text; }
 .rm-cm .tm-av { user-select: none; -webkit-user-select: none; }
 .rm-cm .tx p { margin: 0; white-space: pre-line; }
+/* Markdown leaves a line break between its paragraphs; kept, it drew as a blank line on top of the gap. */
+.rm-cm .tx:has(> p, > ul, > ol, > pre, > blockquote) { white-space: normal; }
 .rm-cm .tx p + p { margin-top: 8px; }
 .rm-cm .tx a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .rm-cm .tx code { font-family: var(--mono); font-size: .88em; background: var(--wash-strong); padding: 1px 4px; }
+/* A list, a quote and a block of code arrive as the box drew them while they were written (chat.css .rich-reply). */
+.rm-cm .tx ul, .rm-cm .tx ol { margin: 2px 0; padding-left: 22px; }
+.rm-cm .tx li p { margin: 0; }
+.rm-cm .tx blockquote { margin: 4px 0; padding-left: 12px; border-left: 2px solid var(--line-strong); color: var(--text-dim); }
+.rm-cm .tx pre { margin: 4px 0; padding: 8px 10px; background: var(--wash); border-radius: var(--artifact-corner-small); font-family: var(--mono); font-size: .88em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rm-cm .tx pre code { background: none; padding: 0; font-size: inherit; }
 .rm-cm .tx .rm-at { font-weight: 400; background: var(--wash-strong); padding: 0 3px; }
 .rm-cm .tx .rm-at.me { box-shadow: inset 0 -2px 0 var(--accent); }
 .rm-cm .tx .inline-image { display: block; max-width: min(100%, 360px); max-height: 240px; margin-top: 6px; }
@@ -178,10 +188,11 @@
 .rm-film-name { padding: 7px 10px; font-size: 12.5px; color: var(--text); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-cm .tx p:has(> .rm-film ~ .inline-image-open) > .rm-film,
 .rm-cm .tx p:has(> .inline-image-open ~ .rm-film) > .rm-film { width: calc(50% - 4px); }
-.rm-cm .rm-file { display: inline-block; margin-top: 4px; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); font-size: 12.5px; color: var(--text-dim); }
+.rm-cm .rm-file { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); font-size: 12.5px; color: var(--text-dim); }
 /* Every chat page draws a file the same quiet way, never as the browser's own button. */
 .rm-file { display: inline-flex; align-items: center; gap: 8px; margin: 6px 0 2px; padding: 7px 12px; border: 1px solid var(--line-strong); border-radius: var(--artifact-corner-small); background: transparent; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
 .rm-file:hover { background: var(--wash); }
+.rm-file > svg { flex: none; color: var(--text-faint); }
 .rm-cm .chat-chips { margin-top: 6px; }
 .rm-cm .rm-edited, .rm-cm .h .rm-edited { font: normal 10.5px var(--mono); color: var(--text-faint); }
 .rm-cm .rm-gone { color: var(--text-faint); font-style: italic; }
@@ -431,6 +442,10 @@
 .gr-prow { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; align-items: center; width: calc(100% + 48px); box-sizing: border-box; margin: 0 -24px; padding: 10px 24px; border: 0; background: none; font: inherit; text-align: left; color: inherit; cursor: default; }
 .gr-prow:hover { background: var(--wash); }
 .gr-pw { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gr-plink { min-width: 0; max-width: 100%; padding: 0; border: 0; background: none; font: inherit; text-align: left; color: inherit; cursor: default; }
+.gr-split > .gr-plink { display: flex; }
+.gr-split .gr-pw { align-items: flex-start; }
+.gr-split .gr-l2.gr-plink:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
 .gr-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13.5px; line-height: 18px; color: var(--text); }
 .gr-mate, .gr-tag { flex: none; font-size: 11.5px; font-style: normal; font-weight: 400; color: var(--text-faint); letter-spacing: 0; }
 .gc-1 .gr-tag { margin-left: 8px; }
@@ -477,9 +492,34 @@
 /* A group's chat a size up from a thread's list (w-dcaa2c122e, round 11). */
 .gr-page .rm-full .rm-cm .h { font-size: 15px; }
 .gr-page .rm-full .rm-cm .h em { font-family: inherit; font-size: 12px; }
-.gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 25px; }
-.gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 10px; }
-.gr-page .rm-compose-input { font-size: 15px; line-height: 22px; }
+.gr-page .rm-full .rm-cm .tx { font-size: 16px; line-height: 24px; }
+/* A small face, its top level with the top of the name's line. */
+.gr-page .rm-full.hang .rm-cm { padding-left: 40px; }
+.gr-page .rm-full.hang .rm-cm .h { line-height: 20px; }
+.gr-page .rm-full.hang .rm-cm .h > .tm-av:first-child { top: 14px; }
+.gr-page .rm-compose-input { font-size: 15px; line-height: 22px; padding: 12px 14px 2px; }
+/* One sender's lines sit close; a new sender, a day or the New line sets them apart. */
+.gr-page .rm-full .rm-cm { padding-top: 14px; padding-bottom: 2px; }
+.gr-page .rm-full .rm-cm.cont { padding-top: 0; }
+.gr-page .rm-full .rm-day { margin: 22px 0 0; }
+.gr-page .rm-full .rm-chat-msgs > :first-child > .rm-day { margin-top: 18px; }
+.pl .rm-full .rm-chat-msgs > :first-child > .rm-day { margin-top: 0; }
+.gr-page .rm-full .rm-new { margin: 14px 0 0; }
+.gr-page .rm-full .rm-day + .rm-cm.cont, .gr-page .rm-full .rm-new + .rm-cm.cont { padding-top: 8px; }
+
+/* A thread that passed between you is a card that opens it. */
+.rm-thread-card { display: flex; flex-direction: column; gap: 2px; width: fit-content; max-width: min(100%, 520px); box-sizing: border-box; margin-top: 6px; padding: 9px 14px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: none; font: inherit; text-align: left; color: inherit; cursor: pointer; }
+.rm-thread-card:hover { background: var(--wash); border-color: var(--text-faint); }
+.rm-thread-title { font-size: 15px; line-height: 22px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-thread-what { font-size: 13px; line-height: 18px; color: var(--text-faint); }
+.rm-cm.cont > .rm-thread-card { margin-top: 2px; }
+.gr-page .rm-full .rm-cm:has(> .rm-thread-card) { padding-bottom: 8px; }
+
+/* A page's box, at the page's type size. */
+.gr-page .rm-compose .attach-row { padding: 8px 14px 4px; }
+.gr-page .rm-compose .compose-note { padding: 2px 14px; }
+.gr-page .rm-compose .fmt-marks { padding: 8px 8px 0 5px; }
+.gr-page .rm-compose-bar { padding: 4px 8px 8px 6px; }
 .gr-page .gr-pt, .gr-page .gr-l1 { font-size: 14.5px; line-height: 19px; }
 .gr-page .gr-l2 { font-size: 13.5px; line-height: 18px; }
 .gr-page .gr-pn, .gr-page .gr-ag { font-size: 13px; }
@@ -489,27 +529,8 @@
 .gt-inset.workspace-layout > .topbar { padding-left: 44px; padding-right: 28px; }
 .gt-inset .th-table .row.unread::before { left: 25px; }
 
-/* A thread's summary on the left, where the sidebar was, read first (round 15). */
-.gt-sumleft .focus-pane[data-summary="open"] > .focus-scroll,
-.gt-sumleft .focus-pane[data-summary="open"] > .focus-dock,
-.gt-sumleft .focus-pane[data-summary="open"] > .keep-line,
-.gt-sumleft .focus-pane[data-summary="open"] > .task-terminal { margin-right: 0; margin-left: var(--ts-panel-w); }
-.gt-sumleft .ts-panel { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--line); }
-.gt-sumleft.gt-inset .ts-panel { padding-left: 44px; }
-.gt-sumleft .focus-pane { --ts-panel-w: 368px; }
-/* Folded with S, it leaves its strip on the same side it was open on. */
-.gt-sumleft .focus-pane[data-summary="rail"] > .focus-scroll,
-.gt-sumleft .focus-pane[data-summary="rail"] > .focus-dock,
-.gt-sumleft .focus-pane[data-summary="rail"] > .keep-line,
-.gt-sumleft .focus-pane[data-summary="rail"] > .task-terminal,
-.gt-sumleft .focus-pane[data-summary="over"] > .focus-scroll,
-.gt-sumleft .focus-pane[data-summary="over"] > .focus-dock,
-.gt-sumleft .focus-pane[data-summary="over"] > .keep-line,
-.gt-sumleft .focus-pane[data-summary="over"] > .task-terminal { margin-right: 0; margin-left: var(--ts-rail-w); }
-.gt-sumleft .ts-rail { right: auto; left: 0; border-left: 0; border-right: 1px solid var(--line); }
-.gt-sumleft .ts-rail-ic svg, .gt-sumleft .ts-close svg { transform: scaleX(-1); }
-/* A thread's trail, its arrow on the 44-point edge the summary, a document's
-   conversation and its reply box all start on, and its corner where the Inbox's is. */
+/* A thread's trail, its arrow on the 44-point edge a document's
+   conversation and its reply box start on, and its corner where the Inbox's is. */
 .workspace-layout.gt-inset.workspace-task > .topbar { padding-left: 36px; }
 .workspace-layout.gt-inset[data-artifact-layout="beside"] .focus { padding-left: 44px; }
 .workspace-layout.gt-inset[data-artifact-layout="beside"] .focus-dock { padding-left: 44px; }
