@@ -113,7 +113,7 @@ describe('a starting thread bringing its files back', () => {
     const back: string[] = [];
     const team = { state: () => { asked += 1; return { me: { id: 'p-solo' }, people: [], cards: [] }; } };
     const keeper = {
-      status: () => ({ offBytes: 10 }), off: () => false, opened() {}, bringBack: async (h: string) => { back.push(h); return true; },
+      status: () => ({ offBytes: 10 }), off: () => false, offUnder: () => [], opened() {}, bringBack: async (h: string) => { back.push(h); return true; },
       wantsVersions: async () => false, pass: async () => {},
     };
     const place = appFilesPlace({ store: m.store, team, accountRoot: m.accountRoot, storeRoot: m.storeRoot, keeper } as unknown as Parameters<typeof appFilesPlace>[0]);

@@ -22,6 +22,7 @@ const DAY = 24 * 60 * 60_000;
 const sha = (b: string) => crypto.createHash('sha256').update(b).digest('hex');
 
 let storeRoot: string;
+let realRoot: string;
 let dir: string;
 let place: ReturnType<typeof appFilesPlace>;
 let keeper: ReturnType<typeof filesKeeper>;
@@ -42,7 +43,11 @@ const sent = (body: string) => held.has(`files/${sha(body)}`);
 
 beforeEach(async () => {
   disk._internals.forgetFolds();
-  storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'loose-files-'));
+  // Reached through a link, as a Mac's temporary folder is (/var is /private/var):
+  // the first ship of this change failed there and passed everywhere else.
+  realRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'loose-files-'));
+  storeRoot = `${realRoot}-link`;
+  fs.symlinkSync(realRoot, storeRoot);
   const accountRoot = path.join(storeRoot, 'accounts', 'a');
   dir = path.join(accountRoot, 'product');
   fs.mkdirSync(dir, { recursive: true });
@@ -68,7 +73,7 @@ beforeEach(async () => {
   place = appFilesPlace({ store, accountRoot, storeRoot, keeper });
   keptRoot = path.join(store.teammates?.dir?.() ?? storeRoot, '.file-versions', 'version-bytes');
 });
-afterEach(() => { fs.rmSync(storeRoot, { recursive: true, force: true }); });
+afterEach(() => { fs.rmSync(storeRoot, { force: true }); fs.rmSync(realRoot, { recursive: true, force: true }); });
 
 describe('a picture, film or sound file in a project folder that no thread names', () => {
   it('leaves the Mac for the cloud once it is a week old, from a closed thread, a thread no longer listed, or no thread', async () => {

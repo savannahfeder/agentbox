@@ -852,7 +852,16 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   // Files moves only what sits in a project's own documents or among the
   // version line's kept copies, never anything inside a code folder.
   interface Roots { allow: string[]; deny: string[] }
-  const realOr = (p: string): string => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+  // Through the nearest folder that exists: a root not made yet, such as the
+  // kept versions' before a first pass, still names the files later made in it.
+  const realOr = (p: string): string => {
+    const rest: string[] = [];
+    for (let at = path.resolve(p); ; at = path.dirname(at)) {
+      try { return path.join(fs.realpathSync(at), ...rest); } catch { /* not there yet */ }
+      if (path.dirname(at) === at) return path.resolve(p);
+      rest.unshift(path.basename(at));
+    }
+  };
   function rootsNow(): Roots {
     const products = store.listProducts();
     return {
