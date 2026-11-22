@@ -10,9 +10,10 @@ import './start-team.css';
 
 const plus = <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12" /></svg>;
 
-export function StartTeam({ me, multiplayer, onStarted, left = false }: { me: Person | null; multiplayer?: boolean | null; onStarted?: () => void;
+export function StartTeam({ me, multiplayer, onStarted, left = false, title = 'Bring your team in' }: { me: Person | null; multiplayer?: boolean | null; onStarted?: () => void;
   /** In Settings › Team's column, lined up with the page's other rows. */
-  left?: boolean }) {
+  left?: boolean;
+  title?: string }) {
   const letIn = multiplayer !== false;
   return (
     <div className={`st-empty${left ? ' st-left' : ''}`}>
@@ -21,7 +22,7 @@ export function StartTeam({ me, multiplayer, onStarted, left = false }: { me: Pe
         <span className="st-seat" aria-hidden="true">{plus}</span>
         <span className="st-seat" aria-hidden="true">{plus}</span>
       </div>
-      <h2 className="td-title st-title">{letIn ? 'Bring your team in' : NOT_LET_IN}</h2>
+      <h2 className="td-title st-title">{letIn ? title : NOT_LET_IN}</h2>
       {letIn
         ? <StartPro hasTeam={false} name={me?.name} className="th-new st-start" onStarted={onStarted} />
         : <AskForMultiplayer email={me?.email} className="th-new st-start" />}

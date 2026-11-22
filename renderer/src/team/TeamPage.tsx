@@ -80,7 +80,7 @@ function TeamSetup({ team, onDone, inviteFocus = false }: { team: TeamState; onD
       <p>Waiting for an invite from a teammate instead? Ask them to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : !team.team ? <>
       {/* Pro makes and names the team, so nothing here asks for a name (tests/invite-people-with-no-team-never-asks-for-a-team-name). */}
-      <StartTeam me={me} multiplayer={team.multiplayer} left />
+      <StartTeam me={me} multiplayer={team.multiplayer} left title={PRO_FOR_INVITES} />
       <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : <TeamSettings team={team} me={me} inviteFocus={inviteFocus} invited={invited} setInvited={setInvited} email={email} setEmail={setEmail} busy={busy} run={run} onDone={onDone} />}
     {error && <p className="tm-error">{error}</p>}
