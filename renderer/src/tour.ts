@@ -151,6 +151,12 @@ export function closesThread(e: { key: string; metaKey?: boolean; ctrlKey?: bool
 export const replyTeaches = (t: Tour | null, item: { product: string; id: string }): boolean =>
   tourLive(t) && (!t!.practice || isTourPractice(t, item));
 
+/** Where Back to the walkthrough goes when no tip has stood since the window opened: the screen its next tip is on. */
+export function walkBackTo(t: Tour | null): 'home' | 'list' | 'practice' {
+  if (!t?.practice?.item || t.done.includes('close')) return 'home';
+  return t.done.includes('open') ? 'practice' : 'list';
+}
+
 /** Off the walkthrough's pages: on one it has no tip for (`elsewhere`), or, while its tips are about the
  *  practice thread, on a real thread or on Home, whose tips are only the first and the last, or anywhere
  *  but that thread once it has been opened. */

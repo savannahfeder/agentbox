@@ -188,7 +188,7 @@ import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, replyTeaches, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, replyTeaches, walkBackTo, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, FIRST_RUN_LABEL, firstRunDone, firstRunNeeded, projectsOfTheirOwn, restartFirstRun,
   finishFirstRun, TASK_BODY, TASK_TITLE, practiceDraftLeft, whyNotMade, replyWritten,
@@ -6683,7 +6683,11 @@ export default function App() {
   useEffect(() => {
     if (tourNow && !walkAway) walkSpot.current = { view, home: homeOpen, item: focused };
   }, [tourNow]); // eslint-disable-line react-hooks/exhaustive-deps
-  const backToWalk = () => { const s = walkSpot.current; openView(s?.view ?? 'inbox'); if (!s || s.home) setHomeOpen(true); if (s?.item) setFocused(s.item); };
+  const backToWalk = () => {
+    const s = walkSpot.current;
+    if (!s) { const to = walkBackTo(tour); openView('inbox'); if (to === 'home') setHomeOpen(true); else if (to === 'practice' && practiceRow) setFocused(practiceRow); return; }
+    openView(s.view); if (s.home) setHomeOpen(true); if (s.item) setFocused(s.item);
+  };
 
   // BACK AND FORWARD, on every computer. Above the early returns below, because
   // it is a hook; `homeShown` is worked out again here for the same reason.

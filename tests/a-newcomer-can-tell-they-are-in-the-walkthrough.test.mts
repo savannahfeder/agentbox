@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { awayFromWalk, finishLesson, noteSent, replyTeaches, skipTour, startTour, tourStep, withPractice, type Lesson, type TourScreen } from '../renderer/src/tour.ts';
+import { awayFromWalk, finishLesson, noteSent, replyTeaches, skipTour, startTour, tourStep, walkBackTo, withPractice, type Lesson, type TourScreen } from '../renderer/src/tour.ts';
 import { TourFrame } from '../renderer/src/components/TourFrame.tsx';
 import { walkPlace } from '../renderer/src/setup-split.ts';
 
@@ -208,6 +208,20 @@ describe('its name in the command bar', () => {
   });
 });
 
+describe('the way back after a reload', () => {
+  // Founder round, 2026-11-22: at 3 of 5 a reload on Files lost where the last tip stood, and
+  // Back to the walkthrough went to Home, where nothing said what to do.
+  it('is worked out from where the walkthrough stands', () => {
+    expect(walkBackTo(withPractice(startTour(), { slug: 'practice' }))).toBe('home');
+    expect(walkBackTo(sent)).toBe('list');
+    expect(walkBackTo(finishLesson(sent, 'open'))).toBe('practice');
+    expect(walkBackTo(closed)).toBe('home');
+  });
+  it('is used when no tip has stood since the window opened', () => {
+    expect(read('renderer/src/App.tsx')).toContain("if (!s) { const to = walkBackTo(tour); openView('inbox'); if (to === 'home') setHomeOpen(true); else if (to === 'practice' && practiceRow) setFocused(practiceRow); return; }");
+  });
+});
+
 describe('the way back', () => {
   const app = read('renderer/src/App.tsx');
   it('is offered from the pages the walkthrough has no tip on', () => {
@@ -220,6 +234,6 @@ describe('the way back', () => {
     // Recorded when the tip changes only: a page change reaches the app before its tip has gone,
     // and Back from Files then went to Home (power test round two, 2026-11-22).
     expect(app).toMatch(/walkSpot\.current = \{ view, home: homeOpen, item: focused \};\n  \}, \[tourNow\]\);/);
-    expect(app).toMatch(/const backToWalk = \(\) => \{ const s = walkSpot\.current; openView\(s\?\.view \?\? 'inbox'\); if \(!s \|\| s\.home\) setHomeOpen\(true\); if \(s\?\.item\) setFocused\(s\.item\); \};/);
+    expect(app).toContain('openView(s.view); if (s.home) setHomeOpen(true); if (s.item) setFocused(s.item);');
   });
 });
