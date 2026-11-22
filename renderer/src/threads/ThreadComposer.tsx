@@ -86,6 +86,15 @@ import { nameWait } from '../../../shared/thread-waits.mts';
 import { continuedFromLabel } from '../../../shared/thread-continued.mts';
 import { closesOnPress } from '../press';
 
+/** PROPOSAL ROUND (w-83da0ab961): five clearer ways to say what a send to a
+ *  person is, read from localStorage `tc-person-kind`. Unset is today's
+ *  Message/Task toggle; this goes once one is chosen. */
+type PersonKind = 'date' | 'switch' | 'assign' | 'todo' | 'work';
+const PERSON_KINDS: readonly PersonKind[] = ['date', 'switch', 'assign', 'todo', 'work'];
+function readPersonKind(): PersonKind | null {
+  try { const v = localStorage.getItem('tc-person-kind'); return PERSON_KINDS.includes(v as PersonKind) ? v as PersonKind : null; } catch { return null; }
+}
+
 /** What went out, so the caller can say so and offer the way back. */
 export interface ThreadSent {
   kind: 'task' | 'repeat' | 'message';
@@ -109,7 +118,7 @@ export interface ThreadSent {
   given?: boolean;
 }
 
-type MenuKey = 'to' | 'model' | 'dueOn' | 'blockedBy' | 'project' | 'priority' | 'visibility' | 'later';
+type MenuKey = 'to' | 'model' | 'dueOn' | 'blockedBy' | 'project' | 'priority' | 'visibility' | 'later' | 'assign';
 
 /** What a card opens on. Project, model and priority need no field: the card
  *  reads them from what was last picked and from the saved draft. */
@@ -281,7 +290,12 @@ export function ThreadComposer({
   // An agent has no Send As, so going back to one puts both away rather than
   // leaving a day on a card that cannot carry it.
   useEffect(() => { if (!person) { setSendAs('message'); setDue(null); } setBlockedBy(null); }, [person]);
-  const rows = mate ? [] : headRows({ person: !!person, kind: sendAs });
+  const kindIdea = inline && person ? readPersonKind() : null;
+  // 'date': a message that becomes a to-do once it has a day. 'work': Home only gives to-dos.
+  useEffect(() => { if (kindIdea === 'date') setSendAs(due ? 'task' : 'message'); if (kindIdea === 'work' && person) setSendAs('task'); }, [kindIdea, due, person]);
+  const [assignPage, setAssignPage] = useState<'list' | 'due' | 'blocked' | 'sees'>('list');
+  const rows = mate ? [] : kindIdea === 'date' ? ['to', 'subject', 'dueOn'] as ReturnType<typeof headRows>
+    : kindIdea === 'work' ? ['to', 'dueOn', 'blockedBy'] as ReturnType<typeof headRows> : headRows({ person: !!person, kind: sendAs });
 
   /* ------------------------------ words --------------------------------- */
   const place = useRef(cardDraftPlace(initial)).current;
@@ -434,6 +448,7 @@ export function ThreadComposer({
     setOpen((o) => { const next = o === key ? null : key; if (next) onOpenMenu?.(next); return next; });
     setModelPage('recent');
     setLaterPage('list');
+    setAssignPage('list');
     // Who sees it opens on its three rows, even if the picker was last open.
     setVisPage('rows');
     setLaterText('');
@@ -708,14 +723,14 @@ export function ThreadComposer({
     }
   };
 
-  const sendMessage = async () => {
-    if (!canSend || !person) return;
+  const sendMessage = async (forceTask?: boolean) => {
+    if (!canSend || !person || (forceTask && extra.length > 0)) return;
     setSending(true);
     setError(null);
     // Handed over at once, as a task is, and the written-down copy kept until
     // the cloud answers (sendTask above).
     const taken = takeTheDraft();
-    const asTask = sendAs === 'task';
+    const asTask = forceTask ?? sendAs === 'task';
     const toMany = !asTask && extra.length ? [person.id, ...also] : undefined;
     onSending?.({ kind: 'message', to: person.id, ...(toMany ? { toMany } : {}) });
     if (inline) emptyForTheNext();
@@ -994,7 +1009,7 @@ export function ThreadComposer({
       {(['message', 'task'] as SendAs[]).map((k) => (
         <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={`Send as a ${k}`}
           onClick={() => { setSendAs(k); if (k === 'message') setDue(null); textRef.current?.focus(); }}>
-          {k === 'task' ? 'Task' : 'Message'}
+          {k === 'task' ? (kindIdea === 'todo' ? 'To-do' : 'Task') : 'Message'}
         </button>
       ))}
     </span>
@@ -1026,7 +1041,7 @@ export function ThreadComposer({
     </div>
   );
 
-  const blockOffers = person && rows.includes('blockedBy') ? blockChoicesFor?.(person.id) ?? [] : [];
+  const blockOffers = person && (rows.includes('blockedBy') || kindIdea === 'assign') ? blockChoicesFor?.(person.id) ?? [] : [];
   const typedBlock = nameWait(blockText);
   const blockLabel = !blockedBy ? NOT_BLOCKED : blockOffers.find((c) => c.id === blockedBy)?.label ?? (blockedBy.startsWith('name:') ? blockedBy.slice('name:'.length) : NOT_BLOCKED);
   const pickBlock = (id: string | null) => { setBlockedBy(id); setBlockText(''); close('text'); };
@@ -1418,18 +1433,89 @@ export function ThreadComposer({
       {onNewProject && stopper.action ? <button type="button" className="tc-why-do" onClick={onNewProject}>{stopper.action}</button> : stopper.action}
     </span>
   );
+  /* ---- PROPOSAL ROUND (w-83da0ab961): the person's half of the bar, five ways ---- */
+  const who = person ? firstName(person) : '';
+  const doesItSwitch = (
+    <button type="button" className={`tc-chip tc-does${sendAs === 'task' ? ' on' : ''}`} role="checkbox" aria-checked={sendAs === 'task'}
+      onClick={() => { const next: SendAs = sendAs === 'task' ? 'message' : 'task'; setSendAs(next); if (next === 'message') setDue(null); textRef.current?.focus(); }}>
+      <span className="tc-box" aria-hidden="true">{sendAs === 'task' && <CheckIcon />}</span>
+      <span className="tc-chip-text">{who} does it</span>
+    </button>
+  );
+  const chatButton = (
+    <button type="button" className="tc-chip" title={`Your chat with ${who}`} onClick={() => { if (convo && onOpenConversation) onOpenConversation(convo, text); }}>
+      <ChatIcon /><span className="tc-chip-text">Chat</span>
+    </button>
+  );
+  const assignMenu = (
+    <div className="tc-menu tc-drop tc-right tc-give-menu" role="menu" aria-label={`Assign to ${who}`} onKeyDown={menuKeys}>
+      {assignPage === 'list' ? (<>
+        <span className="tc-menu-head">Assigned to {who}</span>
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setAssignPage('due')}>
+          <CalendarIcon /><span className="tc-row-label">Due On</span><small>{dueWords(due)}</small>
+        </button>
+        {blockOffers.length > 0 && (
+          <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setAssignPage('blocked')}>
+            <WaitIcon /><span className="tc-row-label">Blocked By</span><small>{blockLabel}</small>
+          </button>
+        )}
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setAssignPage('sees')}>
+          {taskSees === 'private' ? <LockIcon /> : <PeopleIcon />}<span className="tc-row-label">Who sees it</span><small>{taskSees === 'team' ? 'Team' : taskSees === 'private' ? 'Private' : chosenWords(chosenHere, others)}</small>
+        </button>
+      </>) : (<>
+        <button type="button" data-item className="tc-row" onPointerMove={hover} onClick={() => setAssignPage('list')}>
+          <span className="tc-row-label">‹ Assigned to {who}</span>
+        </button>
+        <span className="tc-sep" />
+        {assignPage === 'due' && dueChoices().map((c) => (
+          <button key={c.key ?? 'none'} type="button" data-item className={`tc-row ${c.key === due?.slice(0, 10) || (!c.key && !due) ? 'on' : ''}`} onPointerMove={hover} onClick={() => { setDue(c.key); setAssignPage('list'); }}>
+            <span className="tc-row-label">{c.label}</span>
+          </button>
+        ))}
+        {assignPage === 'blocked' && [{ id: null as string | null, label: NOT_BLOCKED }, ...blockOffers].map((c) => (
+          <button key={c.id ?? 'none'} type="button" data-item className={`tc-row ${c.id === blockedBy ? 'on' : ''}`} onPointerMove={hover} onClick={() => { setBlockedBy(c.id); setAssignPage('list'); }}>
+            <span className="tc-row-label">{c.label}</span>
+          </button>
+        ))}
+        {assignPage === 'sees' && VISIBILITY_ROWS.filter((v) => v.id !== 'people').map((v) => (
+          <button key={v.id} type="button" data-item className={`tc-row ${v.id === taskSees ? 'on' : ''}`} onPointerMove={hover} onClick={() => { pickVisibility(v.id); setAssignPage('list'); }}>
+            {v.id === 'private' ? <LockIcon /> : <PeopleIcon />}<span className="tc-row-label">{v.label}</span>
+          </button>
+        ))}
+      </>)}
+    </div>
+  );
+  const assignButton = (
+    <span className="tc-give" ref={anchor('assign')}>
+      <button type="button" className="tc-give-main" disabled={!canSend || extra.length > 0} onClick={() => void sendMessage(true)}
+        title={extra.length ? 'A to-do goes to one person' : `It goes on ${who}'s list until ${who} marks it done`}>
+        Assign to {who}
+      </button>
+      <button type="button" data-trigger className={`tc-give-caret${due ? ' set' : ''}`} aria-label="Due date, what it waits on, who sees it" title="Due date, what it waits on, who sees it"
+        aria-haspopup="menu" aria-expanded={open === 'assign'} onClick={() => toggle('assign')} onKeyDown={triggerKeys('assign')}>
+        {due && <span className="tc-send-when">{dueWords(due)}</span>}
+        <CaretIcon />
+      </button>
+      {open === 'assign' && assignMenu}
+    </span>
+  );
+  const personLeft = kindIdea === 'switch' ? doesItSwitch : kindIdea === 'work' ? chatButton : kindIdea === 'date' || kindIdea === 'assign' ? null : sendAsChoice;
+  const personMarks = kindIdea === 'date' ? (<>{fieldNode('Subject')}{fieldNode('Due On')}</>)
+    : sendAs === 'task' && kindIdea !== 'assign' ? (<>{fieldNode('Due On')}{fieldNode('Blocked By')}{seesChip(taskSees)}</>) : fieldNode('Subject');
+
   // Who sees it sits before the level here, as in the approved picture.
   const quietBar = quiet && (
     <div className="tc-bar tc-fit" ref={fitBar}>
       {fieldNode('To')}
       {person ? (<>
-        {sendAsChoice}
+        {personLeft}
         {taskToMany && <span className="tc-why">A task goes to one person.</span>}
         <span className="tc-gap" />
-        {sendAs === 'task' ? (<>{fieldNode('Due On')}{fieldNode('Blocked By')}{seesChip(taskSees)}</>) : fieldNode('Subject')}
+        {personMarks}
         {priorityChip}
         {clipButton}
         {fileInput}
+        {kindIdea === 'assign' && assignButton}
         {sendSolo}
       </>) : (<>
         {fieldNode('Model')}
@@ -1508,7 +1594,7 @@ export function ThreadComposer({
             e.preventDefault();
             ideaList.current?.querySelector<HTMLButtonElement>('button')?.focus();
           }}
-          placeholder={mate === 'new' ? 'What should they do?' : mateRow ? `What should ${mateRow.name} do?` : person ? (sendAs === 'task' && !extra.length ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
+          placeholder={mate === 'new' ? 'What should they do?' : mateRow ? `What should ${mateRow.name} do?` : person ? (sendAs === 'task' && !extra.length && kindIdea !== 'date' ? `What should ${person.name.split(/\s+/)[0]} do?` : `Message ${names}`) : placeholderFor(null)}
           onPaste={async (e) => {
             const pasted = await fromPaste(e);
             if (pasted.length) { e.preventDefault(); setAttachments((a) => [...a, ...pasted]); }
@@ -1652,6 +1738,14 @@ const CalendarIcon = () => (
 const WaitIcon = () => (
   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M7.5 4.5h9M7.5 19.5h9M8.5 4.5c0 4 7 4.2 7 7.5s-7 3.5-7 7.5M15.5 4.5c0 4-7 4.2-7 7.5s7 3.5 7 7.5" />
+  </svg>
+);
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
+);
+const ChatIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V16h0a2.5 2.5 0 0 1-2-2.5z" />
   </svg>
 );
 const ClipIcon = () => (
