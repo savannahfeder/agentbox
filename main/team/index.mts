@@ -1004,7 +1004,18 @@ export function createTeamService({
   }
 
   return {
-    state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], threadTalk: threadShare?.talk() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
+    // The two lists read every shared thread from disk and most callers want
+    // only who you are, so each is worked out when first looked at, and kept.
+    state: () => {
+      let news: ReturnType<ThreadShare['fileNews']> | null = null;
+      let talk: ReturnType<ThreadShare['talk']> | null = null;
+      return {
+        ...state,
+        get sharedFileNews() { return (news ??= threadShare?.fileNews() ?? []); },
+        get threadTalk() { return (talk ??= threadShare?.talk() ?? []); },
+        ...(rooms ? { rooms: rooms.state() } : {}),
+      };
+    },
     rooms,
     /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mts). */
     phoneArrivals: (list: unknown[], needsYou: unknown[]) => phoneInbox?.arrivals(list, needsYou),

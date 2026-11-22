@@ -1408,8 +1408,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     async bringBackFor({ product, id, deadlineMs = 5 * 60_000 }: { product: string; id: string; deadlineMs?: number }): Promise<boolean> {
       if (!keeper || !keeper.status().offBytes) return true;
       const waits: Promise<boolean>[] = [];
+      const products = readable();
+      const sharedIn = new Map<string | null, boolean>();
       for (const whole of allFiles().filter((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.product === product && c.thread.ref.id === id)))) {
-        const { chain } = await lineChain(whole);
+        if (!sharedIn.has(whole.project)) sharedIn.set(whole.project, audienceOf(whole.project) !== 'private');
+        const { chain } = await lineChain(whole, sharedIn.get(whole.project), products);
         for (const v of chain) if (v.hash && !v.opened && keeper.off(v.hash)) waits.push(keeper.bringBack(v.hash));
       }
       if (!waits.length) return true;
