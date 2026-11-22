@@ -766,7 +766,15 @@ export function isQueued(item: { status?: string; start?: string } | null | unde
 export function isActiveRun(item: RunItem | null | undefined): boolean {
   if (!item || item.status === 'done') return false;
   if (isQueued(item)) return false;
+  if (item.status !== 'claimed' && answeredByItsAgent(item)) return false;
   return !waitingOnYou(item);
+}
+
+// Its agent spoke last and nobody is on it: finished, whether it waits on you
+// or was closed quietly on a row only you may close.
+function answeredByItsAgent(item: RunItem): boolean {
+  const r = item.wrote?.result;
+  return r?.source === 'agent' && (r.ts ?? 0) > (item.wrote?.answer?.ts ?? 0);
 }
 
 export function activeRunOf(teammateId: string, items: readonly RunItem[] | null | undefined): RunItem | null {
