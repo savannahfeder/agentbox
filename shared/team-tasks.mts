@@ -301,7 +301,7 @@ export function blockedWords(item: TaskRow, ctx: BlockLookup & { nameOf: (id: st
   const who = b.person && b.person !== ctx.me ? FIRST(ctx.nameOf(b.person)) : null;
   const named = b.title ? `“${b.title}”` : 'a thread';
   if (b.kind === 'person') return { word: `Blocked on ${who ?? 'you'}`, title: `Blocked on ${who ?? 'you'}`, on: who ?? 'you' };
-  // The status column is narrow: words past a few are on the hover and the Tasks page.
+  // The status column is narrow: words past a few are on the hover.
   if (b.kind === 'name') return { word: `Blocked on ${shortWords(b.title)}`, title: `Blocked on ${b.title}`, on: b.title };
   if (!who) return { word: `Blocked on ${named}`, title: `Blocked on ${named}`, on: named };
   return { word: `Blocked on ${who}`, title: `Blocked on ${who}’s ${named}`, on: `${who}’s ${named}` };

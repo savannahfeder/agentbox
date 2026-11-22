@@ -2,6 +2,7 @@
 // the rules the Groups place draws by, apart from the drawing.
 import { TABS, type TabId } from './tabs';
 import type { Room, RoomCard, RoomMessage } from '../../../renderer/src/types';
+import { Name } from '../../../shared/product-name.mjs';
 
 export type PlaceId = TabId | 'everything' | 'chats' | 'files';
 
@@ -89,9 +90,9 @@ export function dayWords(at: number, now: number): string {
 
 /** What the People list says under a name (renderer GroupPage `onWords`). */
 export function onWords(c: RoomCard): string {
-  if (c.away) return 'Not on Groups yet';
+  if (c.away) return `Hasn’t opened ${Name} yet`;
   if (c.agents) return c.workingOn ?? c.bio ?? 'Private thread';
-  return c.status ?? 'Not running';
+  return c.status ?? '';
 }
 
 /** A picked file's name as a chat keeps it: its own letters, made unique, so two IMG_0001.jpg never meet. */

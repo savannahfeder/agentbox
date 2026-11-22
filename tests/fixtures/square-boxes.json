@@ -15,6 +15,6 @@
   "renderer/src/teammates/teammates.css": 1,
   "renderer/src/threads/pages.css": 3,
   "renderer/src/threads/summary.css": 6,
-  "renderer/src/threads/thread-composer.css": 4,
+  "renderer/src/threads/thread-composer.css": 1,
   "renderer/src/workspace-navigation.css": 1
 }

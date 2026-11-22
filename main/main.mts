@@ -478,6 +478,9 @@ async function createWindow() {
   supervisor.hostRuns = runHostWorksOn();
   // And their store tools come from one shared process (main/tool-host.mts).
   supervisor.shareTools = true;
+  // The next thread's folder is made ahead, on a Mac, where the copy shares
+  // its blocks with the checkout. Elsewhere it would be a second full copy.
+  supervisor.spareFolders = process.platform === 'darwin';
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).
@@ -1167,6 +1170,7 @@ async function createWindow() {
       }
     };
     supervisor.start();
+    supervisor.warmTheStartPath();
     powerMonitor.on('suspend', () => supervisor.noteSleep());
     powerMonitor.on('resume', () => {
       supervisor.noteWake();

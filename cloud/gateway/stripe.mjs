@@ -68,15 +68,17 @@ export function stripeClient({ key, webhookSecret, managedPayments = false, fetc
 
   return {
     // `team`: a team's seats, `quantity` of them, which the webhook gives the whole team.
-    // `trialEnd` (ms): take the card now and charge from then.
-    async checkout({ person, plan, customer, successUrl, cancelUrl, team = null, quantity = 1, trialEnd = null }) {
+    // `trialDays`: take the card now and charge that many whole days later.
+    // Not an end time: Stripe's page words one as the days left when it draws,
+    // rounded down, so a week from now reads "6 days free".
+    async checkout({ person, plan, customer, successUrl, cancelUrl, team = null, quantity = 1, trialDays = null }) {
       const metadata = { person, ...(team ? { team } : {}) };
       const session = await call('POST', '/v1/checkout/sessions', {
         mode: 'subscription',
         line_items: [{ price: await priceOf(plan), quantity }],
         client_reference_id: person,
         // The webhook finds the person, or the team, on the subscription, whatever event it is.
-        subscription_data: { metadata, ...(trialEnd ? { trial_end: Math.floor(trialEnd / 1000) } : {}) },
+        subscription_data: { metadata, ...(trialDays ? { trial_period_days: trialDays } : {}) },
         metadata,
         ...(customer ? { customer } : {}),
         success_url: successUrl,

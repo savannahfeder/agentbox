@@ -96,9 +96,9 @@ describe('the trial', () => {
 
   for (const plan of ['pro', 'plus', 'max']) {
     it(`checks out ${plan} with 7 free days for someone who never had a subscription`, async () => {
-      const { call, checkouts, now } = setup();
+      const { call, checkouts } = setup();
       await call('POST', '/v1/checkout', { plan });
-      expect(checkouts()[0].form['subscription_data[trial_end]']).toBe(String(Math.floor((now() + 7 * DAY) / 1000)));
+      expect(checkouts()[0].form['subscription_data[trial_period_days]']).toBe('7');
     });
   }
 
@@ -114,7 +114,7 @@ describe('the trial', () => {
     await me();
     await stripeSays('sub_1', 'canceled', 'pro');
     await call('POST', '/v1/checkout', { plan: 'max' });
-    expect(checkouts()[0].form['subscription_data[trial_end]']).toBeUndefined();
+    expect(checkouts()[0].form['subscription_data[trial_period_days]']).toBeUndefined();
     expect((await me()).trialOffer).toBeUndefined();
   });
 
