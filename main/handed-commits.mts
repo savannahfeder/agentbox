@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { baseRef, repoRoot, taskBranch } from './task-folders.mts';
+import { machineryPath } from './store/home.mts';
 
 export interface HandedCommits { ref: string; tip: string; bundle: string }
 
@@ -15,6 +16,12 @@ const GIT_MS = 20_000;
 const REF = /^refs\/heads\/agentbox\/[\w.-]+$/;
 const SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 const CHANGE_LINK = /\]\((attachments\/[^)\s]+\.change)\)/gi;
+const HANDED_LABEL = 'handed-from:';
+
+// The thread's first message still says to start from the .change, which is right only when the commits did not come.
+export const HANDED_COMMITS_NOTE = 'The commits this thread was handed over with are already on its branch, so the .change attached to it is a record of that work: do not apply it again. Apply only edits in it that the branch does not have yet.';
+
+const markOf = (dir: string, id: string) => machineryPath(dir, `runs/${id}/commits-handed-over.json`);
 
 function git(cwd: string, args: string[]): string | null {
   try {
@@ -79,14 +86,24 @@ function branchFrom(root: string, branch: string, carried: HandedCommits): boole
 export function startFromHandedCommits({ repoPath, dir, id, body, labels }: {
   repoPath: string | null | undefined; dir: string | null | undefined; id: string; body?: string | null; labels?: readonly string[] | null;
 }): boolean {
-  if (!dir || !labels?.some((l) => l.startsWith('handed-from:'))) return false;
+  if (!dir || !labels?.some((l) => l.startsWith(HANDED_LABEL))) return false;
   const root = rootOf(repoPath);
   if (!root) return false;
   const branch = `refs/heads/${taskBranch(id)}`;
   if (git(root, ['rev-parse', '--verify', '-q', branch]) !== null) return false;
   for (const m of String(body ?? '').matchAll(CHANGE_LINK)) {
     const carried = commitsIn(path.join(dir, 'attachments', path.basename(m[1])));
-    if (carried && branchFrom(root, branch, carried)) return true;
+    if (!carried || !branchFrom(root, branch, carried)) continue;
+    const mark = markOf(dir, id);
+    fs.mkdirSync(path.dirname(mark), { recursive: true });
+    fs.writeFileSync(mark, JSON.stringify({ branch, tip: carried.tip }));
+    return true;
   }
   return false;
+}
+
+/** What a thread's first run is told when its branch was made from the commits it was handed over with. */
+export function handedCommitsNote(dir: string | null | undefined, item: { id: string; labels?: readonly string[] | null }): string {
+  if (!dir || !item.labels?.some((l) => l.startsWith(HANDED_LABEL))) return '';
+  try { return fs.existsSync(markOf(dir, item.id)) ? HANDED_COMMITS_NOTE : ''; } catch { return ''; }
 }

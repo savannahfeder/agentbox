@@ -1,5 +1,6 @@
 import { currentActivity } from './agent-activity.mts';
 import { workerGitBrief, withWorkerGitBrief } from './worker-git.mts';
+import { handedCommitsNote } from './handed-commits.mts';
 import { harnessFor, supportsHarnessOperation } from './harnesses.mts';
 import { turnThatEnded, type EndedTurn } from '../shared/finished-turn.mts';
 import { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/claude-stream.mts';
@@ -13477,6 +13478,7 @@ export class Supervisor {
       `Title: ${item.title}`,
       item.body ? `\n${item.body}` : '',
       files,
+      handedCommitsNote(product.dir, item),
       named,
       conversation,
       continuation && item.answer && toldBy(item)
