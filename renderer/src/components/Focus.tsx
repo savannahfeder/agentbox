@@ -2663,7 +2663,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               looks like it sends is the failure this codebase cares about most.
               What to do instead is in the message itself, per cause.
            */}
-          {update || trouble || codexAtWork ? null : replyBlocked ? (
+          {update || trouble ? null : replyBlocked ? (
             /*
              * NO REPLY BOX ON AN AGENT A REPLY CANNOT CLEAR. It is frozen on a
                box asking to approve something, and a message queues behind that
@@ -2674,7 +2674,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                THIS IS THE ONLY ONE. A quiet agent used to get this pill too,
                saying there was nothing there to answer, and that was false: it
                is sitting at its prompt and it is listening. w-9348b8d148. */
-            agent?.engine === 'codex' && agent.app === 'Codex app' && onReveal ? (
+            codexAtWork ? null : agent?.engine === 'codex' && agent.app === 'Codex app' && onReveal ? (
               <button type="button" className="dock-pill" onClick={onReveal}>
                 <span className="dock-pill-text">{codexVerb} in the Codex app</span>
               </button>

@@ -46,15 +46,11 @@ describe('closes survive the combined list', () => {
 describe('a session put off and then closed', () => {
   // A power tester put a Codex row off, then pressed Done; the toast said done
   // and the row stayed in Later at its moment (w-34f79ab66e, 2026-11-22).
-  it('leaves Later as well as Needs you', async () => {
-    const { inLater } = await import('../shared/agents.mts');
-    const later = { ...codex, runAt: NOW + 3_600_000 };
-    expect(inLater(later, NOW)).toBe(true);
-    expect(inLater({ ...later, doneThrough: NOW }, NOW)).toBe(false);
-    expect(inLater({ ...claude, runAt: NOW + 3_600_000, doneThrough: NOW }, NOW)).toBe(false);
-  });
-  it('a moment already past is not Later', async () => {
-    const { inLater } = await import('../shared/agents.mts');
-    expect(inLater({ ...codex, runAt: NOW - 1 }, NOW)).toBe(false);
+  it('is taken out of the list every tab is drawn from, Later included', async () => {
+    const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
+    expect(app).toContain('const agentList = useMemo(() => agentRows.filter((r) => !r.agent || !putAway(r.agent)), [agentRows]);');
+    const { putAway } = await import('../shared/agents.mts');
+    expect(putAway({ ...codex, runAt: NOW + 3_600_000, doneThrough: NOW, asked: [{ at: NOW - 60_000, text: 'x' }] })).toBe(true);
+    expect(putAway({ ...claude, runAt: NOW + 3_600_000, doneThrough: NOW })).toBe(true);
   });
 });
