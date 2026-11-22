@@ -255,8 +255,10 @@ const kept = new Map<string, { size: number; mtimeMs: number; value: ReturnType<
 /** Every Codex session a person started that was written to in the last day, as a live agent record. */
 export function readCodexLive({ home = os.homedir(), codexDirs = null, products = [], now = Date.now(), ours = new Set(), isRunning = commandRuns }: CodexLiveOptions = {}): Agent[] {
   const dirs = codexDirs ?? codexDataDirs({ home });
-  const owners = new Map<string, Owner>();
-  for (const p of products) if (p?.repoPath) owners.set(path.resolve(p.repoPath), p);
+  const roots = products.filter((p) => p?.repoPath).map((p) => ({ root: path.resolve(p.repoPath!), p }));
+  // The project a folder is in, the deepest one when projects nest.
+  const ownerOf = (cwd: string) => roots.filter(({ root }) => cwd === root || cwd.startsWith(`${root}${path.sep}`))
+    .sort((a, b) => b.root.length - a.root.length)[0]?.p ?? null;
   const byId = new Map<string, Agent>();
   for (const dir of dirs) {
     const names = readCodexIndex(dir);
@@ -269,11 +271,12 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
       kept.set(file, { size: st.size, mtimeMs: st.mtimeMs, value: read });
       if (!read) continue;
       const { meta, fold, firstSaid } = read;
-      if (ours.has(meta.id) || !meta.cwd || isScratchFolder(meta.cwd, home) || isTaskFolder(meta.cwd)) continue;
+      const owner = meta.cwd ? ownerOf(path.resolve(meta.cwd)) : null;
+      // A temp folder is nobody's work, unless it is one of the person's own projects.
+      if (ours.has(meta.id) || !meta.cwd || (isScratchFolder(meta.cwd, home) && !owner) || isTaskFolder(meta.cwd)) continue;
       if (!fold.asked.length && !firstSaid) continue;
       const prev = byId.get(meta.id);
       if (prev && prev.lastActiveAt >= Math.max(fold.lastActiveAt, st.mtimeMs)) continue;
-      const owner = owners.get(path.resolve(meta.cwd)) ?? null;
       const granted = !!fold.approval && isRunning(fold.approval.command);
       const status = codexStatus(granted ? { ...fold, approval: null } : fold, st.mtimeMs, now);
       const asked = fold.asked.length ? fold.asked : [{ at: meta.startedAt, text: firstSaid }];

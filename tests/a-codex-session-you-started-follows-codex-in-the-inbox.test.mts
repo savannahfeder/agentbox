@@ -167,6 +167,17 @@ describe('what is not hers, or not now', () => {
     expect(live()).toEqual([]);
   });
 
+  it('a session in a temp folder is left out, unless the folder is one of her projects, a subfolder included', () => {
+    const t0 = NOW - 60_000;
+    const tmpProject = fs.mkdtempSync(path.join(os.tmpdir(), 'proj-'));
+    try {
+      write('tmp', [meta('tmp', t0, { cwd: path.join(os.tmpdir(), 'scratch-x') }), ...turn(t0, 'x', 'y')], t0 + 21_000);
+      write('proj', [meta('proj', t0, { cwd: path.join(tmpProject, 'web') }), ...turn(t0, 'x', 'y')], t0 + 21_000);
+      const found = readCodexLive({ home, codexDirs: [codex], now: NOW, products: [{ slug: 'shop', name: 'Shop', repoPath: tmpProject }] });
+      expect(found.map((a) => [a.sessionId, a.product])).toEqual([['proj', 'shop']]);
+    } finally { fs.rmSync(tmpProject, { recursive: true, force: true }); }
+  });
+
   it("a session in one of Agentbox's task folders is the thread's, not hers", () => {
     const t0 = NOW - 60_000;
     write('task', [meta('task', t0, { cwd: path.join(home, '.claude', 'worktrees', 'w-34f79ab66e') }), ...turn(t0, 'x', 'y')], t0 + 21_000);
