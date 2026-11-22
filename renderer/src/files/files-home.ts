@@ -57,13 +57,29 @@ export function firstLine(text: string): string | null {
   return docBlocks(text, 6).find((b) => b.kind === 'p' || b.kind === 'li')?.text ?? null;
 }
 
+export interface DocTop { title: string | null; line: string | null }
+
+export function docTop(text: string): DocTop {
+  const head = docBlocks(text, 1)[0];
+  return { title: head?.kind === 'h1' ? head.text : null, line: firstLine(text) };
+}
+
+/** A name a person gave it, a document's own title, or its file name written out. */
+export function tileName(f: Pick<PlacedFile, 'name' | 'title' | 'kind' | 'sentIn'>, docTitle: string | null): string {
+  if (f.title) return f.title;
+  if (f.kind !== 'markdown') return shownName(f);
+  if (docTitle) return docTitle;
+  const words = f.name.replace(/\.[^.]+$/, '').replace(/-v\d+$/, '').replace(/(?<!\d)[-_]|[-_](?!\d)/g, ' ').replace(/\s+/g, ' ').trim();
+  return words ? words[0].toUpperCase() + words.slice(1) : f.name;
+}
+
 /** What any other file's tile says: the thread it came from. */
 export function tileLine(f: Pick<PlacedFile, 'kind' | 'sentIn'>): string {
   return f.sentIn.find((s) => s.kind !== 'chat' && s.title)?.title ?? (f.kind ? KIND_ONE[f.kind] : 'File');
 }
 
 export type Glyph = 'page' | 'table' | 'image' | 'film' | 'window' | 'slides' | 'code'
-  | 'tag' | 'compass' | 'people' | 'phone' | 'cloud' | 'binoculars' | 'chart' | 'palette' | 'chat' | 'box' | 'book' | 'shield';
+  | 'tag' | 'compass' | 'people' | 'phone' | 'cloud' | 'binoculars' | 'chart' | 'palette' | 'chat' | 'box' | 'book' | 'shield' | 'chip' | 'layers' | 'mobile';
 
 // A word that starts a part of the name picks the drawing; anything else is drawn by its kind.
 const BY_WORD: [RegExp, Glyph][] = [
@@ -79,11 +95,18 @@ const BY_WORD: [RegExp, Glyph][] = [
   [/^(release|ship)/, 'box'],
   [/^(guide|playbook|checklist|script|how)/, 'book'],
   [/^(security|privacy|audit)/, 'shield'],
+  [/^(engine|harness|model)/, 'chip'],
+  [/^(mobile|ios|iphone|android)$|^phone$/, 'mobile'],
+  [/^(team|teammate|version)$/, 'layers'],
 ];
 const BY_KIND: Record<string, Glyph> = { markdown: 'page', table: 'table', image: 'image', film: 'film', page: 'window', pdf: 'page', deck: 'slides', code: 'code' };
 
-export function glyphFor(f: Pick<PlacedFile, 'name' | 'title' | 'kind' | 'sentIn'>): Glyph {
-  const parts = partsOf(shownName(f).replace(/\.[^.]+$/, ''));
-  for (const [word, glyph] of BY_WORD) if (parts.some((p) => word.test(p))) return glyph;
-  return BY_KIND[f.kind ?? ''] ?? 'page';
+const byWord = (name: string): Glyph | null => {
+  const parts = partsOf(name.replace(/\.[^.]+$/, ''));
+  return BY_WORD.find(([word]) => parts.some((p) => word.test(p)))?.[1] ?? null;
+};
+
+/** Drawn by a word in its name, then by its folder's name, then by its kind. */
+export function glyphFor(f: Pick<PlacedFile, 'name' | 'title' | 'kind' | 'sentIn'>, folder: string | null = null): Glyph {
+  return byWord(shownName(f)) ?? (folder && !isPinned({ name: folder }) ? byWord(folder) : null) ?? BY_KIND[f.kind ?? ''] ?? 'page';
 }

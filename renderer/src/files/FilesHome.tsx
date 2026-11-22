@@ -5,8 +5,8 @@ import { useEffect, useRef, useState, type DragEvent, type MutableRefObject, typ
 import { api } from '../api';
 import { SearchIcon } from '../components/SearchIcon';
 import type { FileFolder, PlacedFile } from '../types';
-import { changedBy, shownName } from './files-shown';
-import { FILE_DRAG, firstLine, glyphFor, pinChangedLately, SHOWN_AT_FIRST, tileLine, whenWords, type Glyph, type Home } from './files-home';
+import { changedBy } from './files-shown';
+import { docTop, FILE_DRAG, glyphFor, pinChangedLately, SHOWN_AT_FIRST, tileLine, tileName, whenWords, type DocTop, type Glyph, type Home } from './files-home';
 import './files-home.css';
 
 type DropHandlers = { onDragOver: (e: DragEvent) => void; onDragLeave: () => void; onDrop: (e: DragEvent) => void };
@@ -41,6 +41,9 @@ const GLYPHS: Record<Glyph | 'folder', ReactNode> = {
   box: <><path d="M12 3.5l8 4v9l-8 4-8-4v-9z" /><path d="M4 7.5l8 4 8-4M12 11.5v9" /></>,
   book: <><path d="M3.5 6c2.8-1.4 5.7-1.4 8.5.4 2.8-1.8 5.7-1.8 8.5-.4v12c-2.8-1.4-5.7-1.4-8.5.4-2.8-1.8-5.7-1.8-8.5-.4z" /><path d="M12 6.4v12" /></>,
   shield: <path d="M12 3.5l7 3v5c0 4.2-3 7.6-7 9-4-1.4-7-4.8-7-9v-5z" />,
+  chip: <><rect x="6" y="6" width="12" height="12" rx="2" /><rect x="9.5" y="9.5" width="5" height="5" rx="1" /><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" /></>,
+  layers: <><path d="M12 3.5l8.5 4.5-8.5 4.5L3.5 8z" /><path d="M3.5 12l8.5 4.5 8.5-4.5M3.5 16l8.5 4.5 8.5-4.5" /></>,
+  mobile: <><rect x="7" y="2.8" width="10" height="18.4" rx="2.2" /><path d="M10.8 17.8h2.4" /></>,
   folder: <path d="M3.5 7c0-.8.7-1.5 1.5-1.5h4l1.6 1.8h8.4c.8 0 1.5.7 1.5 1.5v8.7c0 .8-.7 1.5-1.5 1.5H5c-.8 0-1.5-.7-1.5-1.5z" />,
 };
 
@@ -63,30 +66,30 @@ function useNear<T extends Element>(): [MutableRefObject<T | null>, boolean] {
   return [ref, near];
 }
 
-/** A document's first sentence, read once it is near. */
-function useFirstLine(file: PlacedFile, near: boolean): string | null {
-  const [line, setLine] = useState<string | null>(null);
+/** A document's title and first sentence, read once it is near. */
+function useDocTop(file: PlacedFile, near: boolean): DocTop {
+  const [top, setTop] = useState<DocTop>({ title: null, line: null });
   useEffect(() => {
     if (!near || file.kind !== 'markdown' || !file.opened) return;
     let live = true;
-    void api.readDoc({ product: file.sentIn[0]?.product ?? '', src: file.opened }).then((r) => { if (live && r.ok) setLine(firstLine(r.text ?? '')); });
+    void api.readDoc({ product: file.sentIn[0]?.product ?? '', src: file.opened }).then((r) => { if (live && r.ok) setTop(docTop(r.text ?? '')); });
     return () => { live = false; };
   }, [near, file.opened, file.versions, file.bytes]);
-  return line;
+  return top;
 }
 
 function Tile({ file, folder, me, nameOf, now, onOpen, tileMenu }: Shared & { file: PlacedFile; folder: FileFolder | null }) {
   const [ref, near] = useNear<HTMLDivElement>();
-  const read = useFirstLine(file, near);
-  const name = shownName(file);
+  const doc = useDocTop(file, near);
+  const name = tileName(file, doc.title);
   const who = changedBy(file, { me, nameOf });
-  const line = file.kind === 'markdown' ? read : tileLine(file);
+  const line = file.kind === 'markdown' ? doc.line : tileLine(file);
   return <div ref={ref} className="fh-tile" draggable={!!file.project} onDragStart={(e) => { e.dataTransfer.setData(FILE_DRAG, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
     <button type="button" className="fh-open" onClick={() => onOpen(file.key)} aria-label={`Open ${name}`} title={name === file.name ? undefined : file.name}>
-      <GlyphMark glyph={glyphFor(file)} />
+      <GlyphMark glyph={glyphFor(file, folder?.name ?? null)} />
       <span className="fh-name"><span>{name}</span>{folder && pinChangedLately(folder, file, now) && <i className="fh-dot" title="Changed this week" />}</span>
       <span className="fh-line">{line}</span>
-      <span className="fh-meta">{whenWords(file.at, now)}  ·  {who === 'You' ? 'you' : who}</span>
+      <span className="fh-meta">{whenWords(file.at, now)} · {who === 'You' ? 'you' : who}</span>
     </button>
     {tileMenu(file)}
   </div>;

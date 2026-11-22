@@ -38,7 +38,7 @@
 .fh-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fh-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .fh-line { margin-top: 3px; font-size: 13px; line-height: 19px; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.fh-meta { margin-top: auto; padding-top: 8px; font-size: 12px; line-height: 16px; color: var(--text-faint); white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+.fh-meta { margin-top: auto; padding-top: 8px; font-size: 12px; line-height: 16px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .fh-more, .fh-every { display: inline-flex; margin-top: 14px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: default; }
 .fh-more:hover, .fh-every:hover { color: var(--text-dim); }

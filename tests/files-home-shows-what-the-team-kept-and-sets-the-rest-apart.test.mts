@@ -14,7 +14,7 @@
 // showing, or the search box claiming ⌘K, which is the whole app's command bar.
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { firstLine, glyphFor, homeOf, isPinned, pinChangedLately, tileLine, whenWords } from '../renderer/src/files/files-home';
+import { docTop, firstLine, glyphFor, homeOf, isPinned, pinChangedLately, tileLine, tileName, whenWords } from '../renderer/src/files/files-home';
 
 const DAY = 86_400_000;
 const file = (over) => ({ key: over.name, project: 'Agentbox Team', name: 'a.md', kind: 'markdown', versions: 1, at: 1, by: null, open: 0, approvedBy: [], sentIn: [], opened: null, folder: null, ...over });
@@ -90,6 +90,15 @@ describe('what a tile says', () => {
     expect(firstLine('# Team look')).toBeNull();
     expect(firstLine('')).toBeNull();
   });
+  it('names a document by its title, then a name a person gave it, then its file name written out', () => {
+    expect(tileName(file({ name: 'positioning.md' }), 'Positioning')).toBe('Positioning');
+    expect(tileName(file({ name: 'positioning.md', title: 'Our pitch' }), 'Positioning')).toBe('Our pitch');
+    expect(tileName(file({ name: 'first-onboarding-call-2026-11-21-v18.md' }), null)).toBe('First onboarding call 2026-11-21');
+    expect(docTop('# Pricing\n\n$40 a seat.')).toEqual({ title: 'Pricing', line: '$40 a seat.' });
+  });
+  it('leaves a picture\'s name as it is', () => {
+    expect(tileName(file({ name: 'agentcloud-feed-1.png', kind: 'image' }), null)).toBe('agentcloud-feed-1.png');
+  });
   it('says Today, Yesterday, or the day it last changed', () => {
     const now = new Date(2026, 10, 22, 15, 0).getTime();
     expect(whenWords(new Date(2026, 10, 22, 0, 5).getTime(), now)).toBe('Today');
@@ -112,6 +121,17 @@ describe('a tile\'s icon', () => {
   it('needs the word to start a part of the name', () => {
     expect(glyphFor(file({ name: 'agentcloud-feed-1.png', kind: 'image' }))).toBe('image');
     expect(glyphFor(file({ name: 'cloud-costs.md' }))).toBe('cloud');
+  });
+  it('takes its folder\'s word when its own name has none, but never Pinned\'s', () => {
+    expect(glyphFor(file({ name: 'capout.md' }), 'Customers')).toBe('people');
+    expect(glyphFor(file({ name: 'pricing.md' }), 'Customers')).toBe('tag');
+    expect(glyphFor(file({ name: 'notes.md' }), 'Pinned')).toBe('page');
+  });
+  it('knows the product\'s own words', () => {
+    expect(glyphFor(file({ name: 'engines-and-harnesses.md' }))).toBe('chip');
+    expect(glyphFor(file({ name: 'Phone app.md' }))).toBe('mobile');
+    expect(glyphFor(file({ name: 'team-version.md' }))).toBe('layers');
+    expect(glyphFor(file({ name: 'Team look.md' }))).toBe('palette');
   });
   it('falls back to what kind of file it is', () => {
     expect(glyphFor(file({ name: 'notes.md' }))).toBe('page');
