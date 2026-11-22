@@ -52,10 +52,10 @@ const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyA
 });
 
 // The card is white and the sky fades into it, the way dark fades to black.
-// `frame` is the window around the card, a step below white so the card
-// stands off it, and no more tinted than plain Light.
+// `frame` is the window around the card: plain Light's own ground, with the
+// card's hairline setting the white off it.
 const LIGHT_SKIES: Sky[] = [
-  { id: 'sage', name: 'Light green sky', dark: false, frame: '#f0f1f2', art: light(
+  { id: 'sage', name: 'Light green sky', dark: false, frame: '#f8f8fa', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
 ];

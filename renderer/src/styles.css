@@ -241,12 +241,15 @@
      right-side details while the original font stays everywhere else. The body stays Avenir Next; only what reads var(--mono)
      takes Geist Mono. Its @font-face sits with Ember's block below. */
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
-  /* Three corners: the small one for what you press or type in, the artifact
-     one for cards, sheets, menus and what somebody made, and round for faces.
-     Rows, dividers, tabs and the window's panels stay square. --radius is the
-     small corner under its old name, so the Ember Grid skin can still square it. */
+  /* Four corners: the small one for what you press or type in, the artifact
+     one for cards, sheets, menus and what somebody made, the pane one for the
+     main card the app sits in, and round for faces. The pane corner is the
+     largest, so nothing inside the card is rounder than the card. Rows,
+     dividers and tabs stay square. --radius is the small corner under its old
+     name, so the Ember Grid skin can still square it. */
   --artifact-corner: 10px;
   --artifact-corner-small: 6px;
+  --pane-corner: 14px;
   --radius: var(--artifact-corner-small);
   --pill: 999px;
   /* An AI teammate is round like a person; its dashed ring tells it apart. */
