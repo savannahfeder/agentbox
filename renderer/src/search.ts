@@ -19,6 +19,7 @@ import { fold, withHumps, wordStart } from '../../shared/word-match.mts';
 import { rowSummary, SUMMARY_BUDGET } from './list-rules';
 import { ticketQuery } from './ticket-references';
 import { isCause } from '../../shared/causes.mts';
+import { openedBand } from '../../shared/opened-lately.mts';
 
 export interface Searchable {
   id: string;
@@ -41,6 +42,17 @@ export interface SearchHit<T> {
   item: T;
   // The sentence the query was found in, ready for the row's summary line.
   summary: string;
+  /** With `Lately`: 3 a ticket id, 2 opened in the last two hours, 1 in the last day, 0 neither. */
+  lead?: number;
+}
+
+/** What you opened lately (../../shared/opened-lately), which a search puts first. */
+export interface Lately {
+  /** When each thread was last opened, by id. */
+  opened: Readonly<Record<string, number>>;
+  now: number;
+  /** Threads whose words main found inside them (main/everything-found.mts), by id, with the line. */
+  inside?: ReadonlyMap<string, string>;
 }
 
 // The words decide what is kept. The phrase decides what comes first and what
@@ -180,18 +192,36 @@ export function searchScore(i: Searchable, query: string): number {
 // Best first, then newest. The list stops grouping by day while a query is up,
 // because a relevance sort would tear the day groups apart; each row still
 // shows its own time. An empty query returns every task, newest first.
-export function searchItems<T extends Searchable>(items: T[], query: string): Array<SearchHit<T>> {
+//
+// With `lately`, a ticket id still goes first, then what you opened lately
+// however loosely it matched, then the rest as above.
+export function searchItems<T extends Searchable>(items: T[], query: string, lately?: Lately): Array<SearchHit<T>> {
   const q = parseQuery(query);
   if (q.terms.length === 0) {
     return [...items]
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
       .map((item) => ({ item, summary: hitSummary(item, []) }));
   }
+  const updated = (i: T) => i.updatedAt ?? 0;
+  if (!lately) {
+    return items
+      .map((item) => ({ item, n: score(item, q) }))
+      .filter((r) => r.n > 0)
+      .sort((a, b) => b.n - a.n || updated(b.item) - updated(a.item))
+      .map(({ item }) => ({ item, summary: hitSummary(item, q.terms, q.phrase) }));
+  }
+  const opened = (i: T) => lately.opened[i.id] ?? 0;
   return items
-    .map((item) => ({ item, n: score(item, q) }))
+    .map((item) => {
+      const band = openedBand(opened(item), lately.now);
+      const n = score(item, q);
+      // Its words are only in what main read: an older message, a file, a comment.
+      const inside = n === 0 && band > 0 ? lately.inside?.get(item.id) : undefined;
+      return { item, n: inside ? 1 : n, lead: n >= 5 ? 3 : band, inside };
+    })
     .filter((r) => r.n > 0)
-    .sort((a, b) => b.n - a.n || (b.item.updatedAt ?? 0) - (a.item.updatedAt ?? 0))
-    .map(({ item }) => ({ item, summary: hitSummary(item, q.terms, q.phrase) }));
+    .sort((a, b) => b.lead - a.lead || b.n - a.n || (a.lead === 1 || a.lead === 2 ? opened(b.item) - opened(a.item) : 0) || updated(b.item) - updated(a.item))
+    .map(({ item, lead, inside }) => ({ item, summary: inside ?? hitSummary(item, q.terms, q.phrase), lead }));
 }
 
 // The sentence the words were found in. On a finished row the result is asked
