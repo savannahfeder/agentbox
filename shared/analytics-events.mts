@@ -54,6 +54,9 @@ export const EVENTS: Record<string, string> = {
   // only the person's own Mac could say until now
   // (tests/each-install-says-once-a-day-how-heavy-the-app-was.test.mts).
   app_health: 'How heavy the app was on a day',
+  // Sent as it happens, since somebody stuck in setup may never open the app
+  // again (tests/a-freeze-during-setup-or-an-import-is-counted-at-once.test.mts).
+  app_froze: 'The app froze during setup or an import',
 };
 
 export const EVENT_NAMES: string[] = Object.keys(EVENTS);
@@ -92,10 +95,14 @@ export const ALLOWED_PROPS: Set<string> = new Set([
   'freezeWhere',    // the app's own function that held the longest freeze, as `appCode` allows
   'freezeHours',    // how long it had been open then
   'freezeAgents',   // how many agents were running then
+  // `app_froze`'s, beside `seconds`, `count` (setup's step) and `freezeWhere`.
+  'during',         // -> DURING below, setup or an import
+  'heldPart',       // -> PARTS below, the main process or a window
 ]);
 
 // The parts of the app main/own-use.mts measures.
 export const PARTS: Set<string> = new Set(['main', 'windows', 'gpu', 'helpers']);
+export const DURING: Set<string> = new Set(['setup', 'import']);
 
 /**
  * A function in the app's own code, as main/freeze-recorder.mts names it:
@@ -107,8 +114,8 @@ export function appCode(where: unknown): where is string {
     && /^(\(anonymous\)|[A-Za-z_$][\w$]*) (main|shared|mcp|bin)\/[\w./-]+\.(mts|mjs|cjs|js|ts):\d+$/.test(where);
 }
 
-// `kind`, `engine`, `reason` and the two parts are closed lists. A value outside
-// one is dropped, not passed through.
+// `kind`, `engine`, `reason`, `during` and the parts are closed lists. A value
+// outside one is dropped, not passed through.
 export const KINDS: Set<string> = new Set(['task', 'question', 'review', 'directive', 'agent', 'digest']);
 export const ENGINES: Set<string> = new Set(['claude', 'codex']);
 export const WAIT_REASONS: Set<string> = new Set([
@@ -135,8 +142,12 @@ export function sanitize(name: string, props: Record<string, unknown> | null = {
       if (typeof value === 'string' && WAIT_REASONS.has(value)) out.reason = value;
       continue;
     }
-    if (key === 'peakPart' || key === 'cpuPeakPart') {
+    if (key === 'peakPart' || key === 'cpuPeakPart' || key === 'heldPart') {
       if (typeof value === 'string' && PARTS.has(value)) out[key] = value;
+      continue;
+    }
+    if (key === 'during') {
+      if (typeof value === 'string' && DURING.has(value)) out.during = value;
       continue;
     }
     if (key === 'freezeWhere') {

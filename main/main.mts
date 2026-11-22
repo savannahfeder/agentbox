@@ -39,6 +39,7 @@ import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
 import { ownUseReader } from './own-use.mts';
 import { sendLastDaysHealth } from './health-day.mts';
+import { setupFreezeCounter } from './setup-freezes.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { startMemoryRecorder } from './memory-recorder.mts';
 import { threadHeaps } from './thread-heaps.mts';
@@ -448,6 +449,7 @@ async function createWindow() {
     try { sendLastDaysHealth({ dir: path.join(userDir, 'memory-log'), track: (n, props) => analytics.track(n, props) }); }
     catch (err) { console.warn(`zero: could not count how heavy the app was: ${(err as Error).message}`); }
   });
+  const froze = setupFreezeCounter({ track: (n, props) => analytics.track(n, props) });
   // The seam is filled whenever there is somewhere to send to. Whether anything
   // actually goes is asked again inside, at every send, so her switch stops it
   // from the moment she moves it rather than at the next launch.
@@ -499,7 +501,11 @@ async function createWindow() {
   const freezes = startFreezeRecorder({
     dir: path.join(userDir, 'memory-log'),
     appDir,
-    onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
+    onFreeze: (f) => {
+      stalls.noteFreeze(f);
+      console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`);
+      froze.held({ ms: f.ms, where: f.where, part: 'main' });
+    },
   });
   powerMonitor.on('suspend', () => freezes.asleep());
   powerMonitor.on('resume', () => freezes.awake());
@@ -985,7 +991,7 @@ async function createWindow() {
   });
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
-    store, supervisor, config, window, analytics, docGrants, updater,
+    store, supervisor, config, window, analytics, docGrants, updater, froze,
     glass: (on) => applyGlass(window, process.platform, on, liquidGlass),
     host: filingHost,
     team,

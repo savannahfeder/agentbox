@@ -306,6 +306,8 @@ contextBridge.exposeInMainWorld('zero', {
   // something happened and can say nothing about what.
   // A number may ride with it (which setup step), and main keeps only a number.
   track: (name, count) => ipcRenderer.invoke('zero:track', { name, count }),
+  // How long this window's own thread held, a number and nothing else (renderer/src/window-holds.ts).
+  windowHeld: (ms) => ipcRenderer.invoke('zero:window-held', { ms }),
   onboardingArm: () => ipcRenderer.invoke('zero:onboarding-arm'),
   sessionTrace: (payload) => ipcRenderer.invoke('zero:session-trace', payload),
   // Everything that happened on one task, as the ledger lines it happened as.
