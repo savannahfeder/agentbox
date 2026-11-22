@@ -57,6 +57,15 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
   const [near, setNear] = useState(false);
   const [drawn, setDrawn] = useState<{ for: string; url: string } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // The open button around it holds the column's width while it waits (styles.css);
+  // before the room is measured below, so the measure is of that width.
+  const waiting = failed !== src && drawn?.for !== src;
+  useLayoutEffect(() => {
+    const door = waiting ? place.current?.parentElement : null;
+    if (!door?.classList.contains('inline-image-open')) return;
+    door.setAttribute('data-picture-arriving', '');
+    return () => door.removeAttribute('data-picture-arriving');
+  }, [waiting]);
   useLayoutEffect(() => {
     if (room) return;
     const el = place.current;

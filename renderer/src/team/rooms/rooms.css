@@ -173,7 +173,7 @@
 .rm-cm .tx p:has(> .inline-image-open),
 .rm-cm .tx p:has(> .inline-image) { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 6px; white-space: normal; }
 .rm-cm .tx p:has(> .inline-image-open) .inline-image { margin: 0; }
-:root:root:root:root .rm-cm .inline-image-open:has(> .inline-image[data-phone-img="loading"]) { width: min(100%, 360px); }
+:root:root:root:root .rm-cm .inline-image-open[data-picture-loading] { width: min(100%, 360px); }
 :root:root:root:root .rm-cm .inline-image[data-phone-img="loading"] { max-height: 240px; }
 /* Two or more are smaller tiles, so two options sit side by side. */
 .rm-cm .tx p:has(> .inline-image-open ~ .inline-image-open) > .inline-image-open { max-width: calc(50% - 4px); }
