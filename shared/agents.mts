@@ -8,6 +8,7 @@
 // in the session's own timezone and `ps -o lstart` prints local time, so a gap
 // of an exact whole number of hours counts as the same instant.
 import { NAME } from '../shared/product-name.mjs';
+import { sessionLayout, layoutMarkdown, type ToolQuestion } from './session-layout.mts';
 const HOUR = 3_600_000;
 
 export interface HerWords {
@@ -45,6 +46,12 @@ export interface AgentLike {
   doneThrough?: number;
   repliedAt?: number;
   statusAt?: number;
+  /** Which coding agent the session is. Claude Code when absent. */
+  engine?: 'claude' | 'codex';
+  /** The tool's own question it is stopped on, with its choices. */
+  question?: ToolQuestion[];
+  /** Where it runs, in words: "Codex app", "Codex in a terminal". */
+  app?: string | null;
 }
 
 /** How many of her own sessions the inbox takes. */
@@ -117,7 +124,26 @@ export function replyReaches(agent: AgentLike): boolean {
 // An idle session at its prompt does read a line written to its socket.
 // `reply` in main/agents.mts refuses the same case.
 export function replyIsSwallowed(agent: AgentLike | null | undefined): boolean {
-  return agent?.waitingFor === 'permission prompt';
+  return agent?.waitingFor === 'permission prompt' || agent?.engine === 'codex';
+}
+
+// Codex has no socket to type into, and a second writer to a thread the Codex
+// app has open could split it, so a Codex session is answered in Codex.
+export const isCodex = (agent: AgentLike | null | undefined) => agent?.engine === 'codex';
+
+export function isWorking(agent: AgentLike): boolean {
+  return agent.status === 'busy' || agent.status === 'shell';
+}
+
+// She answered it where it runs: it is working on a message she typed there
+// after it last stopped. That takes it out of Needs you and into In progress,
+// the same as a reply sent from here. A session busy on its own is not moved.
+export function answeredWhereItRuns(agent: AgentLike): boolean {
+  if (!isWorking(agent)) return false;
+  const stopped = agent.saidAt ?? 0;
+  if (!stopped) return false;
+  const hers = Math.max(0, ...(agent.asked ?? []).map((t) => Number(t?.at) || 0));
+  return hers > stopped;
 }
 
 // A replied-to agent sits in In progress until the session stops again (idle
@@ -163,7 +189,11 @@ export function putOff(agent: AgentLike, now: number = Date.now()): boolean {
 // timestamp, not a boolean, so `close(key, 0)` can undo it (`closeAgentRow` in
 // App.tsx).
 export function putAway(agent: AgentLike): boolean {
-  return (agent?.doneThrough ?? 0) > 0;
+  const through = agent?.doneThrough ?? 0;
+  if (through <= 0) return false;
+  // A Codex thread lives for weeks, so closing it lasts until it says something new.
+  if (isCodex(agent)) return (agent.saidAt ?? 0) <= through;
+  return true;
 }
 
 // The words. The row clips the summary at SUMMARY_BUDGET (112 characters) on
@@ -391,7 +421,7 @@ export function reachesInbox(agent: AgentLike, now: number = Date.now(), mode: A
   if (agent.startedByZero) return false;
   if (mode === 'off') return false;
   // A replied-to session is in In progress instead (`progressAfterReply`).
-  if (tookHerReply(agent)) return false;
+  if (tookHerReply(agent) || answeredWhereItRuns(agent)) return false;
   // An idle session with no title has nothing to show, and closing it does not
   // help: a throwaway session gets a fresh pid each time.
   if (!asksSomething(agent) && !whatItIs(agent)) return false;
@@ -406,7 +436,23 @@ export function reachesInbox(agent: AgentLike, now: number = Date.now(), mode: A
 export function progressAfterReply(agent: AgentLike, now: number = Date.now(), mode: AgentMode = 'all'): boolean {
   if (agent.startedByZero) return false;
   if (mode === 'off') return false;
-  return tookHerReply(agent);
+  return tookHerReply(agent) || (answeredWhereItRuns(agent) && !putAway(agent));
+}
+
+/** How the session's newest message reads in Agentbox's layout, from its own words. */
+export function agentLayout(agent: AgentLike) {
+  return sessionLayout(agent.lastSaid ?? '', agent.question ?? []);
+}
+
+/** The line under the title: where it runs and what she last asked, in her words. */
+export function agentContext(agent: AgentLike, theirAsk: string): string {
+  const where = agent.app || (isCodex(agent) ? 'Codex' : 'Claude Code');
+  return theirAsk ? `${where} · You asked: ${theirAsk}` : where;
+}
+
+/** The row's preview and the page's answer: the ask in bold and the agent's own words, or the message as it is. */
+export function agentAnswer(agent: AgentLike): string {
+  return layoutMarkdown(agentLayout(agent), agent.lastSaid ?? '');
 }
 
 export function listed(agent: AgentLike): boolean {

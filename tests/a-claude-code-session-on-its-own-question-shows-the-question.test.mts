@@ -1,0 +1,74 @@
+// A CLAUDE CODE SESSION STOPPED ON ITS OWN QUESTION SHOWS THAT QUESTION AND ITS CHOICES.
+//
+// Claude Code asks with a tool (AskUserQuestion) and its choices are in the
+// call, so the page takes them exactly rather than guessing from the text. In
+// the founder's own sessions the tool was used 17 times, 31 questions, every one
+// with choices (w-34f79ab66e, 2026-11-22). A question she has answered, or
+// moved past by typing something else, must not stay on the page.
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { foldHistory, type Facts } from '../main/agents.mts';
+import { agentLayout, answeredWhereItRuns, reachesInbox, progressAfterReply } from '../shared/agents.mts';
+
+let dir: string;
+let file: string;
+const T = Date.parse('2026-11-22T18:00:00Z');
+const at = (s: number) => new Date(T + s * 1000).toISOString();
+const fresh = (): Facts => ({ lastActiveAt: 0, lastSaid: '', saidAt: 0, saidOpen: false, about: '', lastAsked: '', touched: [], asked: [], question: [], questionId: '' });
+const user = (s: number, text: string) => ({ type: 'user', timestamp: at(s), message: { role: 'user', content: text } });
+const said = (s: number, text: string) => ({ type: 'assistant', timestamp: at(s), message: { role: 'assistant', content: [{ type: 'text', text }] } });
+const asks = (s: number, id: string) => ({ type: 'assistant', timestamp: at(s), message: { role: 'assistant', content: [{ type: 'tool_use', id, name: 'AskUserQuestion', input: { questions: [{ question: 'Which date library should I use?', header: 'Library', multiSelect: false, options: [{ label: 'date-fns', description: 'Small' }, { label: 'Luxon', description: 'Time zones' }] }] } }] } });
+const answered = (s: number, id: string) => ({ type: 'user', timestamp: at(s), toolUseResult: { answers: {} }, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'date-fns' }] } });
+
+function read(lines: object[]) {
+  fs.writeFileSync(file, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  return foldHistory({ file, size: fs.statSync(file).size, from: 0, first: true, acc: fresh() }).acc;
+}
+
+beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-tool-')); file = path.join(dir, 's.jsonl'); });
+afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+describe("Claude Code's own question", () => {
+  it('a pending question is read with its choices, and the page leads with it', () => {
+    const f = read([user(0, 'add dates to the receipts'), said(5, 'I looked at both libraries.'), asks(6, 'q1')]);
+    expect(f.question).toEqual([{ question: 'Which date library should I use?', options: ['date-fns', 'Luxon'] }]);
+    const l = agentLayout({ lastSaid: f.lastSaid, question: f.question });
+    expect(l.bold).toBe('Which date library should I use?');
+    expect(l.choices).toEqual(['date-fns', 'Luxon']);
+  });
+  it('once answered it is gone', () => {
+    expect(read([user(0, 'x'), asks(6, 'q1'), answered(9, 'q1')]).question).toEqual([]);
+  });
+  it('a new message from her clears it too', () => {
+    expect(read([user(0, 'x'), asks(6, 'q1'), user(20, 'actually use Temporal')]).question).toEqual([]);
+  });
+  it('another tool result does not clear it', () => {
+    expect(read([user(0, 'x'), asks(6, 'q1'), answered(9, 'other')]).question).toHaveLength(1);
+  });
+});
+
+describe('answered in the terminal', () => {
+  const stopped = { status: 'busy', saidAt: T, asked: [{ at: T - 60_000, text: 'first' }, { at: T + 30_000, text: 'go on' }], about: 'Receipts' };
+  it('working on a message she typed after it stopped: In progress, not Needs you', () => {
+    expect(answeredWhereItRuns(stopped)).toBe(true);
+    expect(reachesInbox(stopped, T, 'all')).toBe(false);
+    expect(progressAfterReply(stopped, T, 'all')).toBe(true);
+  });
+  it('stopped again: back in Needs you', () => {
+    const idle = { ...stopped, status: 'idle' };
+    expect(answeredWhereItRuns(idle)).toBe(false);
+    expect(reachesInbox(idle, T, 'all')).toBe(true);
+  });
+  it('busy with nothing typed since it stopped is left where it was', () => {
+    expect(answeredWhereItRuns({ ...stopped, asked: [{ at: T - 60_000, text: 'first' }] })).toBe(false);
+  });
+  it('a session that has never stopped is not moved', () => {
+    expect(answeredWhereItRuns({ ...stopped, saidAt: 0 })).toBe(false);
+  });
+  it('off stays off', () => {
+    expect(progressAfterReply(stopped, T, 'off')).toBe(false);
+  });
+});
