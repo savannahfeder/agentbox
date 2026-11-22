@@ -62,7 +62,7 @@ export function FileNoteCard({ note, answeredBy = null, wordsGone, product, acti
   const answered = !!note.replies?.length;
   // A teammate's note went inside their reply to the thread's owner, not to an agent (TeammateThread `notesWithYourReply`).
   const sentWords = !fromATeammatesCopy(note.uid) ? 'Sent to the agent'
-    : note.by === me ? 'Went with your reply' : `Came with ${whoSaid(note.by)}'s reply`;
+    : note.by === me ? 'Went with your reply' : person(note.by) ? `Came with ${whoSaid(note.by)}'s reply` : "Came with a teammate's reply";
   const facts = [
     wordsGone && <span key="gone" className="av-note-sent">Those words were edited</span>,
     note.in && <span key="in" className="av-note-sent">In {note.in}</span>,

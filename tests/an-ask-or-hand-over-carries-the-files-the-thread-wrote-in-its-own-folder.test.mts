@@ -96,6 +96,21 @@ describe('a doc the agent wrote in the thread\'s own checkout', () => {
     expect(carried(theTask(), files.find((f) => /clinic-checkout-v3\.html$/.test(f))!)).toBe('<h1>Visit checkout</h1>\n');
   });
 
+  // The third round: the review that came back said "Notes on bookings-empty-states.html:", the bare
+  // name was taken as the page's newest copy, nothing held it, and the page stayed "On Priya's computer".
+  it('goes with a hand-over when a review that came back names it in words', async () => {
+    const at = (id) => path.join(sam.dir, 'designs', id, 'bookings-empty-states.html');
+    const t = aThread((id) => `The two states:\n\n${at(id)}`);
+    write(at(t.id), '<h1>No bookings yet</h1>\n');
+    sam.store.tellItem('api', t.id, { text: 'Priya reviewed this.\n\nNotes on bookings-empty-states.html:\n- Pin 1: Say New booking.', from: { teammate: priya.personId, name: 'Priya Shah' }, hold: true });
+    await sam.service.syncNow();
+    await sam.service.handOn({ product: 'api', id: t.id, to: priya.personId });
+    await both();
+    const page = linked(theTask().body).find((f) => /bookings-empty-states\.html$/.test(f));
+    expect(page).toBeTruthy();
+    expect(carried(theTask(), page!)).toBe('<h1>No bookings yet</h1>\n');
+  });
+
   it('is said to be left behind when it is over the size a message carries', async () => {
     const t = aThread(() => 'Wrote [amount-errors.md](amount-errors.md).');
     write(checkout(t.id, 'amount-errors.md'), '');

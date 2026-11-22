@@ -93,7 +93,7 @@ describe('the thread', () => {
 // it, though it came to her inside Priya's reply, and could not tell whether her agent had it.
 describe('a note that went with a teammate\'s reply', () => {
   const card = (n: Partial<FileNote>, me: string) => renderToStaticMarkup(React.createElement(FileNoteCard, {
-    note: note({ sent: true, ...n }), wordsGone: false, active: false, settling: false, person: () => null, me, onGo() {}, onSettle() {},
+    note: note({ sent: true, ...n }), wordsGone: false, active: false, settling: false, person: (id: string | null) => (id === 'priya' ? { id: 'priya', name: 'Priya Shah' } : null), me, onGo() {}, onSettle() {},
     nameOf: (id: string | null) => (id === 'priya' ? 'Priya' : 'Someone'), replying: false, onReplying() {}, onReply: async () => true, canReply: true, held: null, product: 'web',
   } as never));
 
@@ -104,6 +104,11 @@ describe('a note that went with a teammate\'s reply', () => {
   });
   it('says it went with your reply, to the person who wrote it', () => {
     expect(card({ by: 'priya', uid: 'mark-1' }, 'priya')).toContain('Went with your reply');
+  });
+  // The third round: a hand-over carried a note by someone the receiver's copy could not name, and
+  // it read "Came with Someone's reply".
+  it('says a teammate\'s reply when it cannot name who wrote it', () => {
+    expect(card({ by: 'u-unknown', uid: 'mark-2' }, 'dana')).toMatch(/Came with a teammate(&#x27;|')s reply/);
   });
   it('still says Sent to the agent for a note of the owner\'s own', () => {
     expect(card({ by: 'lena', uid: 'l-1' }, 'lena')).toContain('Sent to the agent');
