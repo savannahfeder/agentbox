@@ -80,6 +80,9 @@ export function crumbParts(fullPath: string, roots: string[] = []): string[] {
   // A file that came with a message: its own path, not where this computer shelved it.
   const carried = /\/attachments\/carried\/[0-9a-f]{16}\/(.+)$/.exec(clean);
   if (carried) return carried[1].split('/');
+  // A teammate's thread's copy: only what is inside it, as on their computer.
+  const shared = /\/_team-threads\/(.+)$/.exec(clean);
+  if (shared) return withoutThreadIds(shared[1].split('/'));
   // The deepest root that actually contains the file wins, so `designs/` inside
   // the docs dir does not swallow the folder the drawing is in.
   let best = '';

@@ -15,6 +15,12 @@ describe("the path line over a teammate's file", () => {
     expect(crumbParts(`${shelf}/attachments/1-before-in-progress.png`, [shelf])).toEqual(['attachments', '1-before-in-progress.png']);
   });
 
+  it('leaves out the shelf all teammates\' threads sit on, when the pane has no root for it', () => {
+    expect(crumbParts(`${shelf}/attachments/1-before-in-progress.png`, [])).toEqual(['attachments', '1-before-in-progress.png']);
+    const kept = '/Users/you/Zero/accounts/00000000-0000-4000-8000-000000000000/_team-threads/aaaaaaaa-1111-4222-8333-444444444444/cccccccc-1111-4222-8333-444444444444/w-5c0ffee123';
+    expect(crumbParts(`${kept}/attachments/1-before-in-progress.png`, [])).toEqual(['attachments', '1-before-in-progress.png']);
+  });
+
   it('keeps a file whose own name is an id', () => {
     expect(crumbParts(`${shelf}/attachments/bbbbbbbb-1111-4222-8333-444444444444`, [shelf])).toEqual(['attachments', 'bbbbbbbb-1111-4222-8333-444444444444']);
   });
