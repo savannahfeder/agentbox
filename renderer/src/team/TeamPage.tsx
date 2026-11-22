@@ -79,7 +79,7 @@ function TeamSetup({ team, onDone, inviteFocus = false }: { team: TeamState; onD
       <div className="tm-field-row"><AskForMultiplayer email={me?.email} className="tm-btn" /></div>
       <p>Waiting for an invite from a teammate instead? Ask them to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : !team.team ? <>
-      {/* No name to type: Invite people lands here, and an email went in as the team's name. Pro makes and names the team. */}
+      {/* Pro makes and names the team, so nothing here asks for a name (tests/invite-people-with-no-team-never-asks-for-a-team-name). */}
       <StartTeam me={me} multiplayer={team.multiplayer} left />
       <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : <TeamSettings team={team} me={me} inviteFocus={inviteFocus} invited={invited} setInvited={setInvited} email={email} setEmail={setEmail} busy={busy} run={run} onDone={onDone} />}
