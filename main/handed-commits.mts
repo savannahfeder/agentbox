@@ -83,7 +83,14 @@ async function commitsIn(changeFile: string): Promise<HandedCommits | null> {
 // What a coding agent loads and starts as its run begins. Commits from someone
 // else that change these could run their commands as the person, so they come as
 // the .change for the agent to judge instead.
-const STARTS_SOMETHING = ['.mcp.json', '.claude', '.codex', '.gitmodules'];
+const STARTS_SOMETHING = new Set(['.mcp.json', '.claude', '.codex', '.gitmodules']);
+
+// A name as a Mac's or a Windows disk matches it: case folded (`.MCP.json`, the
+// long s `ſ`), invisible characters dropped, trailing dots and spaces cut. Git's
+// own pathspec match is exact, so it cannot be asked instead.
+const asADiskSeesIt = (name: string) => name.normalize('NFKC').toUpperCase().toLowerCase()
+  .replace(/[­​-‏‪-‮⁠-⁯﻿]/g, '').replace(/[. ]+$/, '');
+const startsSomething = (file: string) => file.split('/').some((part) => STARTS_SOMETHING.has(asADiskSeesIt(part)) || /~\d/.test(part));
 
 /** The commits a bundle says it builds on, read from its header (`-<sha>` lines). */
 function basesOf(bundle: Buffer): string[] {
@@ -103,8 +110,9 @@ function branchFrom(root: string, branch: string, carried: HandedCommits): Promi
     for (const b of bases) if (await git(root, ['merge-base', '--is-ancestor', b, main]) === null) return false;
     if (await git(root, ['bundle', 'verify', '-q', file]) === null) return false;
     if (await git(root, ['fetch', '-q', '--no-tags', file, `${carried.ref}:${branch}`]) === null) return false;
+    const changed = await git(root, ['diff', '--name-only', '--no-renames', '-z', `${main}...${branch}`]);
     const kept = await git(root, ['rev-parse', '--verify', '-q', `${branch}^{commit}`]) === carried.tip
-      && await git(root, ['diff', '--name-only', `${main}...${branch}`, '--', ...STARTS_SOMETHING]) === '';
+      && changed !== null && !changed.split('\0').some((f) => f && startsSomething(f));
     if (kept) return true;
     await git(root, ['update-ref', '-d', branch]);
     return false;
