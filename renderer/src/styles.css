@@ -9447,6 +9447,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .picture-view { position: fixed; inset: 0; z-index: 9400; outline: none; overflow: hidden;
   background: var(--read-ground); color: var(--read-paper); animation: pv-in .22s ease-out;
   -webkit-app-region: no-drag; touch-action: none; }
+/* Over the new thread box, which goes to 9480 while any picture is open; under the ⌘F box. */
+.picture-view.pv-over-its-box { z-index: 9490; }
 /* Fingers belong to the view (PictureView.tsx fingerDown); only the strip of pictures scrolls. */
 .pv-strip { touch-action: pan-x; }
 .pv-chrome button, .pv-tools button { touch-action: manipulation; }

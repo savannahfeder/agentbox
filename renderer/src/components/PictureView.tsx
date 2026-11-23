@@ -75,11 +75,13 @@ const CHEVRON_RIGHT = 'M9.5 5.5 16 12l-6.5 6.5';
 const BESIDE = 'M4.5 5.5h15v13h-15zM14 5.5v13';
 const OUTSIDE = 'M13.5 4.5h6v6M19.5 4.5l-8 8M17.5 13.5v6h-13v-13h6';
 
-export function PictureView({ pictures, start, resolve, onClose, onBeside, onPreview }: {
+export function PictureView({ pictures, start, resolve, onClose, onBeside, onPreview, overItsBox }: {
   pictures: Picture[];
   start: number;
   resolve: (path: string) => Promise<string | null>;
   onClose: () => void;
+  /** Opened from a box that may itself sit over a big view: drawn above it, and the box takes the caret back. */
+  overItsBox?: boolean;
   /** Left out for a picture that is not yet a file in the product, such as one waiting to be sent. */
   onBeside?: (path: string) => void;
   onPreview?: (path: string) => void;
@@ -171,7 +173,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
       if (startsAThread({ key: e.key, chord: e.altKey, inABox: typesInto(e.target) })) return;
       e.stopImmediatePropagation();
       wake();
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); requestAnimationFrame(() => focusTheReplyBox()); }
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); if (!overItsBox) requestAnimationFrame(() => focusTheReplyBox()); }
       else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setIndex((i) => stepTo(i, pictures.length, e.key === 'ArrowRight' ? 1 : -1)); }
       else if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'PageDown' || e.key === 'PageUp') {
         e.preventDefault();
@@ -330,7 +332,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
       tabIndex={-1}
       role="dialog"
       aria-label={name}
-      className={`picture-view${(idle && zoom === 1) || bare ? ' pv-idle' : ''}`}
+      className={`picture-view${overItsBox ? ' pv-over-its-box' : ''}${(idle && zoom === 1) || bare ? ' pv-idle' : ''}`}
       onPointerMove={fingerMove}
       onPointerDown={fingerDown}
       onPointerUp={fingerUp}
