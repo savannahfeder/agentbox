@@ -40,6 +40,9 @@ export function cursorAfterWait({ list, wait, moved, now }: { list: Row[]; wait:
   return at >= 0 ? { index: at, keep: null } : { index: -1, keep: wait };
 }
 
+/** For results that land a moment after the words, above a cursor still on the first row: it stays on the first row. */
+export const firstRowStaysFirst = (last: CursorMark | null): CursorMark | null => (last?.index === 0 ? null : last);
+
 /** Where the cursor belongs in `list`, given what was drawn last time. */
 export function cursorIndex({ list, selected, last }: { list: Row[]; selected: number; last: CursorMark | null }): number {
   const clamped = Math.min(selected, Math.max(0, list.length - 1));

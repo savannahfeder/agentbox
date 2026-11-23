@@ -23,7 +23,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { traceLines } from '../renderer/src/terminal.ts';
+import { traceLines } from '../shared/trace-lines.mts';
 import { itemThread } from '../renderer/src/item-thread.ts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -117,7 +117,7 @@ describe('the terminal at the top of a running task', () => {
   // The four helpers only that block called. A label with no caller is the same
   // dead weight as a component with no caller.
   it('left no labels behind it', () => {
-    const term = read('renderer/src/terminal.ts');
+    const term = read('shared/trace-lines.mts');
     expect(term).not.toMatch(/finishedSentence|showAllLabel|hideLabel|fewerLabel|export const WINDOW/);
     expect(term).toMatch(/export function traceLines/);
   });

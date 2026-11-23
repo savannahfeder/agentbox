@@ -116,15 +116,44 @@ describe('the stand-in team cloud', () => {
   });
 });
 
+// The founder opened a test window on the stand-in, pressed Continue with
+// Google in setup and met "the stand-in cloud has no Google sign-in", with
+// nothing on screen saying email worked (2026-11-22).
+describe('Continue with Google on the stand-in', () => {
+  const session = (url) => supabaseSession({ cloudConfig: { url, anonKey: 'x', standin: true }, packaged: false });
+  it('signs in as somebody made up, with no browser', async () => {
+    const { url } = await up();
+    const me = await session(url).signIn({ onUrl: () => { throw new Error('opened a browser'); }, log: () => {} });
+    const team = await me.createTeam('Lumen');
+    const [person] = await me.teamPeople(team.id);
+    expect(person.email).toMatch(/@example\.test$/);
+    expect(person.name).toBe('Alex Kim');
+  });
+  it('is the same person pressed twice, and somebody else in another copy', async () => {
+    const { url } = await up();
+    const mine = session(url);
+    const first = await mine.signIn();
+    await mine.signOut();
+    expect((await mine.signIn()).personId).toBe(first.personId);
+    expect((await session(url).signIn()).personId).not.toBe(first.personId);
+  });
+  it('leaves email as it was', async () => {
+    const { url } = await up();
+    const s = session(url);
+    expect((await s.signInWithPassword('maya@lumen.test', 'x')).personId).toBe((await person(url, 'maya')).personId);
+  });
+});
+
 describe('who may use it', () => {
-  it('a checkout pointed at it gets the stand-in session', () => {
-    const s = supabaseSession({ cloudConfig: { url: 'http://127.0.0.1:1', anonKey: 'x', standin: true }, packaged: false, testLogin: 'maya@lumen.test:x' });
+  it('a checkout pointed at it gets the stand-in session', async () => {
+    const { url } = await up();
+    const s = supabaseSession({ cloudConfig: { url, anonKey: 'x', standin: true }, packaged: false, testLogin: 'maya@lumen.test:x' });
     expect(s.configured).toBe(true);
-    expect(s.signIn.toString()).toMatch(/no Google sign-in/);
+    expect((await s.restore()).kind).toBe('standin');
   });
 
   it('an installed build never does', () => {
     const s = supabaseSession({ cloudConfig: { url: 'http://127.0.0.1:1', anonKey: 'x', standin: true }, packaged: true });
-    expect(s.signIn.toString()).not.toMatch(/no Google sign-in/);
+    expect(s.signIn.toString()).toMatch(/signInWithGoogle/);
   });
 });

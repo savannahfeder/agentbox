@@ -15,7 +15,7 @@ const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url),
 const tip = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
 
 const sent: Tour = { sent: true, skipped: false, done: ['compose'], practice: { slug: 'practice', item: 'w-1', replies: 0 } };
-const inThread = (more: Partial<TourScreen> = {}): TourScreen => ({ composer: 'none', view: 'inbox', rows: 0, running: 0, thread: true, options: false, covered: false, ...more });
+const inThread = (more: Partial<TourScreen> = {}): TourScreen => ({ composer: 'none', view: 'inbox', rows: 0, running: 0, thread: true, practiceThread: true, options: false, covered: false, ...more });
 
 describe('the tip on the open practice thread', () => {
   it('waits while its answer is on the way', () => {

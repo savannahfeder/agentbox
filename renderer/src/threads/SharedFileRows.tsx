@@ -6,11 +6,12 @@ import type { StatusCell } from '../status-word';
 import { Face, firstName, type TeamView } from '../team/people';
 import { RowCells } from './Pages';
 import { STATE_WORD } from './summary-rules';
+import { messageOnRow } from '../list-rules';
 
 const WAITING: StatusCell = { word: STATE_WORD.waiting, mark: 'need', agent: false, live: false, cloud: false };
 
 const whoNoted = (team: TeamView | null, n: SharedFileNews): Person => team?.byId.get(n.by) ?? { id: n.by, email: '', name: 'A teammate', avatarUrl: null };
-const newsWords = (n: SharedFileNews) => `named you on ${n.file.replace(/#\d+$/, '')}: ${n.text}`;
+const newsWords = (n: SharedFileNews) => messageOnRow(`named you on ${n.file.replace(/#\d+$/, '')}: ${n.text}`);
 
 export function SharedFileRows({ news, cards, team, now, onOpen }: {
   news: SharedFileNews[]; cards: ThreadCard[]; team: TeamView | null; now: number;
@@ -24,7 +25,7 @@ export function SharedFileRows({ news, cards, team, now, onOpen }: {
       onClick={() => onOpen(n, card)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(n, card); }}>
       <span className="mark" aria-hidden="true" />
       <RowCells status={WAITING}
-        who={{ face: <Face person={who} />, name: `${firstName(who)} on ${n.file.replace(/#\d+$/, '')}` }} title={n.text}
+        who={{ face: <Face person={who} />, name: `${firstName(who)} on ${n.file.replace(/#\d+$/, '')}` }} title={messageOnRow(n.text)}
         where={<span className="rm-where">{card.title ?? 'Shared thread'}</span>}
         priority={null} updatedAt={n.ts} now={now} />
     </div>;

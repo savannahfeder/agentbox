@@ -5,15 +5,36 @@
 // running task, with a window of three lines and a sentence it shut to. The
 // block is gone and its four label helpers went with it; what is left is the
 // reading, and item-thread.ts turns the result into thread events (a sentence
-// is a message, an action is a quiet line under it).
+// is a message, an action is a quiet line under it). Main reads it too, for
+// the files a run showed (shared/runs-said.mts).
 //
 // The reading is its own file because what is MISSING from a feed has no
 // symptom: a parser that quietly drops half the lines still draws a perfectly
 // plausible conversation. Same reason notes.ts is its own file, and the two
 // read the same trace for two different purposes — that one keeps the
 // SENTENCES the agent wrote, this one keeps every line it typed.
-import { momentOf, type TraceSession } from './notes';
-import { runStoppedLine } from '../../shared/spawn-trouble.mts';
+import { runStoppedLine } from './spawn-trouble.mts';
+
+export interface TraceSession { startedAt: number; text: string }
+
+// THE TRACE'S CLOCK IS UTC AND CARRIES NO DATE. The supervisor stamps every
+// line with `new Date.toISOString.slice(11, 19)` (supervisor.mts), so a step
+// she watched at 10:01pm is written "05:01:32", and printing those digits
+// straight out put her own evening seven hours into the morning: the fold on
+// read 5:01am, 6:39am, 12:15am, 4:29am for one continuous run. The session's
+// own startedAt supplies the missing date, and the moment comes back as a real
+// one; the day rolls forward when a run crosses midnight UTC.
+//
+// AGAINST THE START'S WHOLE SECOND, because the stamp has none smaller. A run
+// spawned at 18:30:28.097 whose only line read "18:30:28" was 97ms "before"
+// it began, so that line was put on the next day, and a message from tomorrow
+// sat under everything the next run wrote (2026-10-04). The store's practice
+// traces floored their start for the same reason; this is the reader's copy.
+export function momentOf(startedAt: number, h: number, m: number, s: number): number {
+  const began = new Date(startedAt);
+  const at = Date.UTC(began.getUTCFullYear(), began.getUTCMonth(), began.getUTCDate(), h, m, s);
+  return at < Math.floor(startedAt / 1000) * 1000 ? at + 86_400_000 : at;
+}
 
 export interface TraceLine {
   // "9:12:04", in the time zone she is sitting in.
