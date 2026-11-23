@@ -2496,6 +2496,9 @@ export class Supervisor {
       if (item.wrote?.blockedBy?.source === 'founder') continue;
       const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`) ?? causes.get(id));
       if (blockers.some((b) => !b || b.status !== 'done')) continue;
+      // A task an agent filed that you closed before saying yes was dismissed,
+      // not finished: what the thread waited for will not come.
+      if (blockers.some((b) => !isCause(b) && b!.wrote?.status?.source === 'founder' && !filedByThePerson(b!) && !(b!.answer && b!.answer !== '(withdrawn)'))) continue;
       const cleared = Math.max(...blockers.map((b) => b!.wrote?.status?.ts ?? 0));
       if (cleared <= (item.wrote?.blockedBy?.ts ?? 0) || cleared <= this._waitsSince) continue;
       // A wait somebody else wrote is theirs to show, not a reason to start a
