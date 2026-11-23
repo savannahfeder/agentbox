@@ -157,6 +157,19 @@ describe("the tool's own question", () => {
     expect(a.asked.map((x) => x.text)).not.toContain('{"accepted":true}');
   });
 
+  it('her pick on the question card answers it: the question is gone and the row moves on', () => {
+    // As Codex 0.171 wrote it in a power tester's terminal (2026-11-23): the pick is a tagged user message.
+    const t0 = NOW - 60_000;
+    const card = line(t0 + 2_000, 'event_msg', { type: 'item_completed', item: { type: 'AgentMessage', content: [{ type: 'Text', text: 'How would you like me to verify Teams pricing?' }], phase: 'final_answer', delivery: 'async', questions: [{ title: 'How would you like me to verify Teams pricing?', options: ['A) Pricing source only', 'B) The page too'] }] } });
+    const reply = '<send_user_message_question_reply>\n[{"answer":"A) Pricing source only","question":"How would you like me to verify Teams pricing?","questionItemId":"x"}]\n</send_user_message_question_reply>';
+    write('pk', [meta('pk', t0 - 60_000, { originator: 'codex-tui' }), ...turn(t0 - 60_000, 'check pricing', 'Looked.'), line(t0, 'event_msg', { type: 'task_started' }), ...hers(t0 + 10, 'verify the Teams price'), card, ...hers(t0 + 9_000, reply)], t0 + 9_000);
+    const a = one('pk');
+    expect(a.question).toEqual([]);
+    expect(a.status).toBe('busy');
+    expect(a.lastAsked).toBe('A) Pricing source only');
+    expect(progressAfterReply(a, NOW, 'all')).toBe(true);
+  });
+
   it("the Codex app's own question card is read with its options", () => {
     const t0 = NOW - 5 * 60_000;
     const q = line(t0 + 3_000, 'event_msg', { type: 'item_completed', item: { type: 'AgentMessage', content: [{ type: 'Text', text: 'Which should I build first?' }], phase: 'final_answer', delivery: 'async', questions: [{ title: 'Which should I build first?', options: ['A prototype', 'The design'] }] } });

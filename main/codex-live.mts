@@ -16,7 +16,7 @@ import { cleanAnswer, cleanPrompt, isInjected, listRolloutFiles, readCodexIndex 
 import { isScratchFolder, isTaskFolder, threadTitle } from './agent-sessions.mts';
 import { codexDataDirs } from './agent-homes.mts';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
-import type { ToolQuestion } from '../shared/session-layout.mts';
+import { theirWords, type ToolQuestion } from '../shared/session-layout.mts';
 import type { Agent, ThreadEvent } from './agents.mts';
 
 /** Sessions written to in this long are read; older ones have left the inbox. */
@@ -138,8 +138,10 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
   if (at > acc.lastActiveAt) acc.lastActiveAt = at;
   const p = j.payload ?? {};
   const hers = (text: string, fromEvent: boolean) => {
-    const t = cleanPrompt(text);
-    if (!t || isInjected(t)) return;
+    // Her pick on Codex's question card comes back as a tagged message, which is her answer, not Codex's own text.
+    const picked = /<send_user_message_question_reply>/.test(text) ? theirWords(text) : '';
+    const t = picked || cleanPrompt(text);
+    if (!t || (!picked && isInjected(t))) return;
     if (fromEvent) acc.sawEventTurns = true;
     else if (acc.sawEventTurns) return;
     const last = acc.asked[acc.asked.length - 1];
