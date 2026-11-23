@@ -14,6 +14,9 @@ import type { EngineSetupState } from './plan-setup';
 export type { AgentVoice };
 
 /** A comment on a thread's shared link, waiting for its owner (shared/work-items.mts `linkComments`). */
+/** A session started outside Agentbox, brought in as a thread (main/ipc.mts zero:bring-in-session). */
+export type BringInResult = { ok: true; product: string; id: string } | { ok: false; reason: string };
+
 export interface LinkCommentWaiting { name: string; file: string; text: string; ts: number; place?: NotePlace }
 
 export interface WorkItem {
@@ -1806,6 +1809,7 @@ declare global {
       track?(name: string, count?: number): Promise<boolean>;
       agentReply(p: { pid: number; text: string; engine?: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string }>;
       agentReveal(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<{ ok: boolean; name?: string; reason?: string }>;
+      bringInSession?(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<BringInResult>;
       agentConversation(p: { pid: number; sessionId: string | null; cwd: string; engine?: string }): Promise<AgentConversation>;
       dashboard(slug: string): Promise<ProductDashboard | null>;
       terminal<A extends TerminalAction>(p: TerminalAsk<A>): Promise<TerminalAnswer<A>>;

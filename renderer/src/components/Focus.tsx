@@ -757,7 +757,7 @@ const CHOICES_FOLDED = 'one.choicesFoldedOn';
 /** Out of the app, to the window the session runs in. */
 const GO_MARK = <span className="dock-pill-key" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6" /><path d="m20 4-9 9" /><path d="M18 14v5H5V6h5" /></svg></span>;
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, outside = 'all', onOutside, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, outside = 'all', onOutside, onBringIn, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
   /** `supervisor.outOfUsage`, for the reply box's model chip. */
   outOfUsage?: Record<string, { tool: string; until: number }>;
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
@@ -951,6 +951,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   /** How many sessions started outside Agentbox the inbox takes, changed from one of their pages. */
   outside?: AgentMode;
   onOutside?: (mode: AgentMode) => void;
+  /** Makes a session started outside Agentbox one of its threads. */
+  onBringIn?: () => void;
   // Putting something off had no button anywhere in the app: S, and only S.
   // Every other verb in this footer is clickable, so the one verb that is not
   // is the one a hand that has never read a shortcut list cannot reach.
@@ -2031,6 +2033,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onPriority={canFinish && !agent && !direct && onPriority ? (id) => onPriority(priorityValueOf(id)) : undefined}
       outside={agent ? outside : null}
       onOutside={agent ? onOutside : undefined}
+      onBringIn={agent?.product && agent.sessionId && onBringIn ? onBringIn : null}
     />
   );
 

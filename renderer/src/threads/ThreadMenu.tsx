@@ -48,7 +48,7 @@ import type { Person } from '../types';
 import { ChooseList, CopiedSheet, EveryoneMark, GiveSheet, PanelBack, SeeList, SendSheet, ShareList, pointsAtStep } from './SharePanel';
 import { readAskDraft, saveAskDraft, type AskDraft, type ItemRef } from '../drafts';
 import type { SeenBy, ShareFace } from './share-rules';
-import { OUTSIDE_ASK, OUTSIDE_MODES, OUTSIDE_TITLE, outsideLabel } from '../outside-agents';
+import { BRING_IN, OUTSIDE_ASK, OUTSIDE_MODES, OUTSIDE_TITLE, outsideLabel } from '../outside-agents';
 import type { AgentMode } from '../types';
 
 /** ⌘K asking a person: the thread's menu opens its sheet for them. */
@@ -248,6 +248,10 @@ function FollowMark() {
   return <svg {...mark}><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5h4" /></svg>;
 }
 /** An arrow turning off the line: carry it on from here. */
+/** An arrow down into a tray: in here from now on. */
+function BringInMark() {
+  return <svg {...mark}><path d="M12 3.5v9m-3.5-3.5 3.5 3.5 3.5-3.5" /><path d="M3.5 14.5h4.5l1.5 2.5h5l1.5-2.5h4.5V20h-17z" /></svg>;
+}
 function InboxMark() {
   return <svg {...mark}><path d="M3 13.5h5l1.5 2.5h5l1.5-2.5h5" /><path d="M5.5 5h13L21 13.5V19H3v-5.5z" /></svg>;
 }
@@ -311,7 +315,7 @@ function ShareButtonFace({ face }: { face?: ShareFace<Person> }) {
 
 /* ----------------------------------------------------------------- button */
 
-export function ThreadMenu({ thread = null, following = null, onFollow, onContinue = null, share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, outside = null, onOutside, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
+export function ThreadMenu({ thread = null, following = null, onFollow, onContinue = null, share = null, onCopyLink, onSendTo, onSee, onChoose, change = null, codeButton = null, codeOpen = false, onViewChange, addPeople = null, onAddPeople, terminal = null, onToggleTerminal, onFinish = null, onCloseTask = null, onStopRepeating = null, onReopen = null, handedTo = null, onRunNow = null, onLater = null, priority = null, onPriority, outside = null, onOutside, onBringIn = null, pinned = null, onPin, place = null, placeFacts = {}, onPlace, giveTo = [], onGive, onAsk, onRename = null, onMove = null, shipped = null, onShipped, waitChoices = [], waitsNow = false, onWait, blocks = false, files = null }: {
   /** On a teammate's thread: whether you are told when it is done, or null where you cannot be. */
   following?: boolean | null;
   onFollow?: () => void;
@@ -380,6 +384,8 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
   /** A session started outside Agentbox: the setting for all of those, and how to change it. */
   outside?: AgentMode | null;
   onOutside?: (mode: AgentMode) => void;
+  /** A session started outside Agentbox: makes it one of Agentbox's threads. */
+  onBringIn?: (() => void) | null;
   /** Whether the thread is pinned now, or null where it cannot be. */
   pinned?: boolean | null;
   onPin?: (pin: boolean) => void;
@@ -571,7 +577,7 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
     else onFinish?.();
   };
 
-  if (!rows.length && !done && !place && !onReopen && !files && !codeButton) return null;
+  if (!rows.length && !done && !place && !onReopen && !files && !codeButton && !onBringIn) return null;
   return (
     <span className="ts-more-wrap" ref={wrap}>
       {files}
@@ -587,6 +593,7 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
         onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); setShareDirect(true); }}>
         <ShareButtonFace face={share.face} />
       </button>}
+      {onBringIn && <button type="button" className="ts-done ts-bring-in" onClick={onBringIn}><BringInMark /><span>{BRING_IN}</span></button>}
       {done && (
         <button
           type="button"

@@ -344,6 +344,7 @@ contextBridge.exposeInMainWorld('zero', {
   // front" because nothing public can focus a pane inside another app.
   agentReply: (payload) => ipcRenderer.invoke('zero:agent-reply', payload),
   agentReveal: (payload) => ipcRenderer.invoke('zero:agent-reveal', payload),
+  bringInSession: (payload) => ipcRenderer.invoke('zero:bring-in-session', payload),
   agentConversation: (payload) => ipcRenderer.invoke('zero:agent-conversation', payload),
   scheduleAgent: (payload) => ipcRenderer.invoke('zero:schedule-agent', payload),
   closeAgent: (payload) => ipcRenderer.invoke('zero:close-agent', payload),

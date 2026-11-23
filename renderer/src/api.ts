@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { Person, PictureIn, TeamBillingDetails } from './types';
+import type { BringInResult, Person, PictureIn, TeamBillingDetails } from './types';
 import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, FilesTrashed, FilesCloudStatus, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { NotePlace } from '../../shared/artifact-marks.mts';
@@ -748,6 +748,11 @@ export const api = {
   async agentReveal(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<{ ok: boolean; name?: string; reason?: string }> {
     if (useFixtures) return { ok: true, name: p.engine === 'codex' ? 'Codex' : 'CNVS' };
     return window.zero?.agentReveal?.(p) ?? { ok: false, reason: `${Name} cannot tell which window it is running in.` };
+  },
+
+  async bringInSession(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<BringInResult> {
+    if (useFixtures) return { ok: true, product: 'storefront', id: 'w-brought' };
+    return window.zero?.bringInSession?.(p) ?? { ok: false, reason: `Quit and reopen ${Name} to bring sessions in.` };
   },
 
   // WHAT THE TWO OF THEM SAID, read only when she presses the line. The main

@@ -84,6 +84,7 @@ import { openFreshUser } from './fresh-user.mts';
 import { openDemo } from './demo.mts';
 import { AgentSchedule } from './agent-schedule.mts';
 import { agentKey, agentRowId } from '../shared/agents.mts';
+import { chatFromSession, rowForSession } from '../shared/bring-in.mts';
 import { machineryPath } from './store/home.mts';
 import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mts';
@@ -905,8 +906,39 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return { ok: true, repliedAt: mark };
   });
 
-  // For the agent a reply cannot reach: bring the app it is running inside to
-  // the front. Named honestly, because it is the app and not the pane.
+  // A session started outside Agentbox becomes one of its threads. The row it
+  // had leaves the inbox the way Done takes it out, so a session that moves on
+  // in its terminal afterwards still comes back.
+  ipcMain.handle('zero:bring-in-session', (_e, { pid, engine, sessionId }: { pid?: unknown; engine?: unknown; sessionId?: unknown } = {}) => {
+    const agent = liveAgents().find((a) => (engine === 'codex'
+      ? a.engine === 'codex' && a.sessionId === sessionId
+      : a.engine !== 'codex' && a.pid === Number(pid)));
+    if (!agent) return { ok: false, reason: 'That session has closed.' };
+    const product = agent.product ?? null;
+    if (!product) return { ok: false, reason: `Its folder is not one of your projects, so ${Name} has nowhere to put it.` };
+    const chat = chatFromSession(agent);
+    if (!chat) return { ok: false, reason: `${Name} cannot tell this session from another yet. Try again once it has said something.` };
+    let id: string | null = null;
+    try {
+      const had = rowForSession(store.listItems().filter((i) => i.product === product), agent);
+      if (had?.status !== 'done' && had?.id) id = had.id;
+      else {
+        const out = chat.source === 'codex'
+          ? store.importCodexThreads(product, [chat], { land: 'inbox' })
+          : store.importThreadRows(product, [chat], { land: 'inbox' });
+        id = out.ids[0] ?? rowForSession(store.listItems().filter((i) => i.product === product), agent)?.id ?? null;
+      }
+    } catch (err) {
+      return { ok: false, reason: `It could not be brought in: ${(err as Error).message}` };
+    }
+    if (!id) return { ok: false, reason: 'It could not be brought in.' };
+    agentSchedule.close(agentKey(agent), agent.lastActiveAt || Date.now());
+    push();
+    return { ok: true, product, id };
+  });
+
+  // For the agent a reply cannot reach: bring the window it runs in to the
+  // front, the very tab where the app can be told which.
   ipcMain.handle('zero:agent-reveal', async (_e, { pid, engine, sessionId }: { pid: unknown; engine?: unknown; sessionId?: unknown }) => {
     try {
       if (engine === 'codex') return await revealCodex(liveAgents().find((a) => a.engine === 'codex' && a.sessionId === sessionId) ?? null);

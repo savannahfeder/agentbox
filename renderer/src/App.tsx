@@ -264,7 +264,7 @@ import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
 import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
-import { OUTSIDE_SAID } from './outside-agents';
+import { BROUGHT_IN, OUTSIDE_SAID } from './outside-agents';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
@@ -3610,6 +3610,24 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
+  // The thread a session was just brought in as, opened the moment it is in the list.
+  const [movedIn, setMovedIn] = useState<{ product: string; id: string } | null>(null);
+  const bringIn = useCallback(async (item: WorkItem) => {
+    const agent = item.agent;
+    if (!agent) return;
+    const r = await api.bringInSession({ pid: agent.pid, engine: agent.engine, sessionId: agent.sessionId });
+    if (!r.ok) { showToast(r.reason); return; }
+    showToast(BROUGHT_IN);
+    setMovedIn({ product: r.product, id: r.id });
+  }, [showToast]);
+  useEffect(() => {
+    if (!movedIn) return;
+    const it = snap?.items.find((i) => i.product === movedIn.product && i.id === movedIn.id);
+    if (!it) return;
+    setMovedIn(null);
+    setFocused(it);
+    markSeen(it);
+  }, [snap, movedIn, markSeen]);
   // From one of those sessions' ⋯, the inbox's View and filters, or ⌘K. The
   // filters menu shows the list change under it, so it raises no toast.
   const chooseOutside = useCallback((mode: AgentMode, { say = true } = {}) => {
@@ -8007,6 +8025,7 @@ export default function App() {
                   onPriority={(value) => { void retag([focused], value); }}
                   outside={agentMode}
                   onOutside={chooseOutside}
+                  onBringIn={() => { void bringIn(focused); }}
                   session={snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null}
                   // WHAT THE FLEET IS DOING ABOUT THIS ROW, through `factsFor`,
                   // which is the builder every row already reads. Written out
@@ -8404,6 +8423,7 @@ export default function App() {
         onCloudMode={(mode) => { if (cloudOffAsks(mode)) { setModal('cloud-off'); return; } setModal(null); void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
         outside={agentMode}
         onOutside={(mode) => { setModal(null); chooseOutside(mode); }}
+        onBringIn={focused?.agent?.product && focused.agent.sessionId ? () => { setModal(null); void bringIn(focused); } : null}
         onFirstRun={walkAgain}
         onTutorial={startTutorial}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}

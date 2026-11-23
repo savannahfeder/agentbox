@@ -3,6 +3,7 @@
 // on one of those sessions, the inbox's View and filters, and ⌘K.
 
 import type { AgentMode } from './types';
+import { Name } from '../../shared/product-name.mjs';
 
 export const OUTSIDE_TITLE = 'Terminal sessions';
 /** Over the three choices, which answer it. */
@@ -25,6 +26,10 @@ export function outsideCommands(mode: AgentMode): { id: string; label: string; h
     to: o.value,
   }));
 }
+
+/** The press that makes one of those sessions a thread here, and what it says once it has. */
+export const BRING_IN = `Move to ${Name}`;
+export const BROUGHT_IN = `Moved to ${Name}. The session in its terminal is left as it was.`;
 
 /** What a toast says once it is changed from somewhere the inbox is not in view. */
 export const OUTSIDE_SAID: Record<AgentMode, string> = {
