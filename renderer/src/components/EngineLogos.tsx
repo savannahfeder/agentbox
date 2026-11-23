@@ -3,6 +3,7 @@
 // logos"). Shapes from the Lobe Icons set (MIT); the marks themselves are
 // Anthropic's, OpenAI's and OpenCode's, used only to name which kind of
 // account a row is, the way a sign-in button names its provider.
+import { useId } from 'react';
 import { AgentFace } from './AgentFace';
 import './harness-mark.css';
 
@@ -16,11 +17,16 @@ const OPENAI = 'M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357
 // OpenCode's mark, from the same set. A further harness with no mark here draws none.
 const OPENCODE = 'M16 6H8v12h8V6zm4 16H4V2h16v20z';
 
+/** Claude's in its orange, and Codex's in its purple to blue (Lobe Icons' codex-color). */
 export function EngineLogo({ engine, size = 18 }: { engine: string; size?: number }) {
+  const fill = useId();
   if (engine === 'opencode') return <svg className="engine-logo opencode" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" aria-hidden="true"><path clipRule="evenodd" d={OPENCODE} /></svg>;
   if (engine !== 'claude' && engine !== 'codex') return null;
   return engine === 'codex'
-    ? <svg className="engine-logo codex" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" aria-hidden="true"><path clipRule="evenodd" d={CODEX} /></svg>
+    ? <svg className="engine-logo codex" width={size} height={size} viewBox="0 0 24 24" fillRule="evenodd" aria-hidden="true">
+      <defs><linearGradient id={fill} gradientUnits="userSpaceOnUse" x1="12" x2="12" y1="0" y2="24"><stop stopColor="#B1A7FF" /><stop offset=".5" stopColor="#7A9DFF" /><stop offset="1" stopColor="#3941FF" /></linearGradient></defs>
+      <path clipRule="evenodd" fill={`url(#${fill})`} d={CODEX} />
+    </svg>
     : <svg className="engine-logo claude" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true"><path fill="#D97757" d={CLAUDE} /></svg>;
 }
 

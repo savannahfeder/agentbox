@@ -189,7 +189,7 @@ import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, replyTeaches, walkBackTo, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipFromPalette, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, FIRST_RUN_LABEL, firstRunDone, firstRunNeeded, projectsOfTheirOwn, restartFirstRun,
   finishFirstRun, TASK_BODY, TASK_TITLE, practiceDraftLeft, whyNotMade, replyWritten,
@@ -1221,7 +1221,7 @@ export default function App() {
     // through to whatever the Mac preferred and a light Mac turned the walk
     // white after the third screen.
     //
-    // WHAT IT SEEDS IS PLAIN DARK, NOT A PICTURE. The `else` branch that used
+    // WHAT IT SEEDS IS LIGHT, NOT A PICTURE. The `else` branch that used
     // to sit under this line put Gouache Valley on any Mac that had chosen no
     // picture, every time the walk ran, and that is how a look nobody
     // picked reached the window. It is deleted, and so is the function behind
@@ -1340,7 +1340,9 @@ export default function App() {
     if (!tourGone || !tour?.practice) return;
     // Skipped with the practice thread open: it goes with its project, and you land back on your list.
     if (focused?.product === tour.practice.slug) setFocused(null);
-    void api.firstRunPracticeEnd().then(() => refreshRef.current?.());
+    // E on the practice thread can be what ended it, and is still held for Z: it is written before its project goes.
+    const held = pendingRef.current?.item.product === tour.practice.slug ? flushPending().catch(() => {}) : Promise.resolve();
+    void held.then(() => api.firstRunPracticeEnd()).then(() => refreshRef.current?.());
   }, [tourGone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Starting a setup or the walkthrough from ⌘K hands it the whole window, so
@@ -4649,7 +4651,7 @@ export default function App() {
     return true;
   };
   const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick, runAt?: number) => {
-    if (tourLive(tourRef.current)) {
+    if (replyTeaches(tourRef.current, item)) {
       let t = finishLesson(tourRef.current!, 'reply');
       if (isTourPractice(t, item)) t = practiceReplied(t);
       setTour(t);
@@ -6848,6 +6850,20 @@ export default function App() {
   // opened from Needs you lands back on the Chats screen with another reply box.
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setOpenCard(null); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setChatsPlace(null); setHomeOpen(false); };
 
+  // THE WALKTHROUGH'S WAY BACK, from a page it has no tip on to where its last tip stood.
+  const walkElsewhere = settingsOpen || teamShown || filesShown || connectionsShown || teammatesShown || roomShown || chatsPlaceShown || search !== null;
+  const walkAway = awayFromWalk(tour, { elsewhere: walkElsewhere, home: homeOpen && !focused && !walkElsewhere, thread: !!focused, practiceThread: !!focused && focused.id === tourPractice?.item });
+  const walkSpot = useRef<{ view: View; home: boolean; item: WorkItem | null } | null>(null);
+  // Only when the tip changes: a change of page reaches here before its tip has gone.
+  useEffect(() => {
+    if (tourNow && !walkAway) walkSpot.current = { view, home: homeOpen, item: focused };
+  }, [tourNow]); // eslint-disable-line react-hooks/exhaustive-deps
+  const backToWalk = () => {
+    const s = walkSpot.current;
+    if (!s) { const to = walkBackTo(tour); openView('inbox'); if (to === 'home') setHomeOpen(true); else if (to === 'practice' && practiceRow) setFocused(practiceRow); return; }
+    openView(s.view); if (s.home) setHomeOpen(true); if (s.item) setFocused(s.item);
+  };
+
   // BACK AND FORWARD, on every computer. Above the early returns below, because
   // it is a hook; `homeShown` is worked out again here for the same reason.
   const backForwardOn = !onPhone();
@@ -8855,7 +8871,7 @@ export default function App() {
         // is one line however many projects she has (w-aa3fa4cbf0).
         onOpenFilter={() => setModal('filter')}
         onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
-        onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}
+        onEndTutorial={tourLive(tour) ? () => { setTour(skipFromPalette(tour!)); setModal(null); } : undefined}
         onView={(v) => { setModal(null); openView(v); }}
         teamLayout={!!teamTabs}
         onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
@@ -9047,7 +9063,7 @@ export default function App() {
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
-        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light' })} skies={homeOn}
+        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light', follows: theme === 'match' })} skies={homeOn}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
         onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
         onSetup={() => {
@@ -9055,11 +9071,11 @@ export default function App() {
           if (homeOn) setHomeOpen(true);
         }}
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
-      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
+      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} away={walkAway} onBack={backToWalk} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
       {finishing && <TourFinished covered={settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
-      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
+      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} practiceOpen={!!focused && focused.id === tourPractice?.item} view={view} thread={!!focused}
         answering={practiceAnswering}
-        covered={settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
+        covered={settingsOpen || teamOpen || newProject || walkElsewhere || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
         onChange={setTour}
         onStep={setTourNow}

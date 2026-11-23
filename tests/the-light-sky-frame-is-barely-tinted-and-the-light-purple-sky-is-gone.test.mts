@@ -31,8 +31,9 @@ const BARELY = 0.003;
 describe('the light sky frame', () => {
   const light = SKY_THEMES.filter((s) => !s.dark);
 
-  it('is the green sky only', () => {
-    expect(light.map((s) => s.id)).toEqual(['sage']);
+  // The orange mountains came after, as the light default (tests/the-light-default-is-orange-mountains-with-birds-that-fly).
+  it('is the orange mountains and the green sky only', () => {
+    expect(light.map((s) => s.id)).toEqual(['mountains', 'sage']);
   });
 
   it('is tinted no more than plain Light', () => {
@@ -61,8 +62,8 @@ describe('the light purple sky', () => {
     expect(lookChoices('match', true)).not.toContain('dusk-light');
   });
 
-  it('lands anyone still wearing it on the green sky in light, and the orange in dark', () => {
-    expect(shownSkyId('dusk-light', false)).toBe('sage');
+  it('lands anyone still wearing it on the light default in light, and the orange sky in dark', () => {
+    expect(shownSkyId('dusk-light', false)).toBe(shownSkyId(null, false));
     expect(shownSkyId('dusk-light', true)).toBe('ember');
   });
 

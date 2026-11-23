@@ -53,6 +53,8 @@ export interface TourScreen {
   waiting?: number;
   /** A thread is open. */
   thread: boolean;
+  /** The thread open is the walkthrough's practice thread. */
+  practiceThread?: boolean;
   /** The open thread's agent is still working on it. */
   busy?: boolean;
   /** The open practice thread's answer for this round is still on its way; nothing runs to show it working. */
@@ -83,6 +85,11 @@ export const tourOver = (t: Tour | null): boolean =>
 export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && !tourOver(t) && LESSONS.some((l) => !t.done.includes(l));
 export const madeUrgent = (t: Tour): Tour => ({ ...t, urgent: true });
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
+/** Skip walkthrough run from ⌘K: a use of ⌘K, so at the step that asks for one it finishes the walkthrough rather than skipping it. */
+export function skipFromPalette(t: Tour): Tour {
+  const used = finishLesson(t, 'palette');
+  return tourOver(used) ? used : skipTour(t);
+}
 export function finishLesson(t: Tour, l: Lesson): Tour {
   if (t.done.includes(l)) return t;
   const next = { ...t, done: [...t.done, l] };
@@ -145,6 +152,26 @@ export function closesThread(e: { key: string; metaKey?: boolean; ctrlKey?: bool
   return thread && !e.metaKey && !e.ctrlKey && !e.altKey && /^e$/i.test(e.key);
 }
 
+/** Whether a reply sent on this thread is the walkthrough's Write back: on its practice thread, when it has one. */
+export const replyTeaches = (t: Tour | null, item: { product: string; id: string }): boolean =>
+  tourLive(t) && (!t!.practice || isTourPractice(t, item));
+
+/** Where Back to the walkthrough goes when no tip has stood since the window opened: the screen its next tip is on. */
+export function walkBackTo(t: Tour | null): 'home' | 'list' | 'practice' {
+  if (!t?.practice?.item || t.done.includes('close')) return 'home';
+  return t.done.includes('open') ? 'practice' : 'list';
+}
+
+/** Off the walkthrough's pages: on one it has no tip for (`elsewhere`), or, while its tips are about the
+ *  practice thread, on a real thread or on Home, whose tips are only the first and the last, or anywhere
+ *  but that thread once it has been opened. */
+export function awayFromWalk(t: Tour | null, at: { elsewhere: boolean; home: boolean; thread: boolean; practiceThread: boolean }): boolean {
+  if (!tourLive(t) || !t) return false;
+  if (at.elsewhere) return true;
+  const onPractice = !!t.practice?.item && !t.done.includes('close');
+  return onPractice && !at.practiceThread && (at.home || at.thread || t.done.includes('open'));
+}
+
 /** The suggestions, in every New thread box until the tutorial is over or skipped. */
 export const showIdeas = (t: Tour | null): boolean => !!t && !t.skipped && !(t.done.includes('close') && t.done.includes('palette'));
 /** Before the first send: the box asks for a folder, and the empty inbox says to give a first task. */
@@ -188,6 +215,8 @@ export function tourStep(t: Tour | null, s: TourScreen): TourStep | null {
   if (s.preparing && todo('close')) return null;
   if (s.preparing) return todo('palette') && (t.sent || !todo('start')) ? 'palette' : !t.sent && todo('start') ? 'startHere' : null;
   if (s.thread) {
+    // Until the practice thread is closed, its tips teach on it and on no real thread beside it.
+    if (t.practice?.item && !s.practiceThread && todo('close')) return null;
     if (s.typing || s.answering) return null;
     if (s.busy) return todo('busy') ? 'busy' : null;
     if (s.options && todo('choose')) return 'choose';

@@ -82,12 +82,13 @@
 .first-run .ob-legend { position: absolute; left: 40px; bottom: 30px; display: flex; gap: 26px; color: var(--text-faint); font-size: 13px; }
 .first-run .ob-legend > span { display: flex; align-items: center; gap: 9px; }
 
-/* THE FIRST PAGE: the setup's sky behind it, the words on the left. */
+/* THE FIRST PAGE: the website's words over its mountains, the way agentbox.ac opens. */
 .first-run .ob-welcome .ob-sky { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
 .first-run .ob-welcome .ob-sky canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 :root[data-theme="light"] .first-run .ob-welcome { background: #fff; }
-.first-run .ob-welcome .ob-col.ob-hero { left: clamp(64px, 8.5vw, 140px); width: min(600px, 46vw); transform: translateY(-50%); z-index: 1; }
-.first-run .ob-welcome h1.ob-big { font-size: clamp(44px, 4.6vw, 66px); line-height: 1.06; letter-spacing: -0.035em; margin-top: 40px; }
-.first-run .ob-welcome .ob-lede { margin: 22px 0 0; max-width: 480px; font-size: 19px; line-height: 29px; color: var(--text-dim); }
-.first-run .ob-welcome .ob-actions { justify-content: flex-start; }
-.first-run .ob-welcome .ob-foot { left: clamp(64px, 8.5vw, 140px); right: auto; justify-content: flex-start; z-index: 1; }
+.first-run .ob-welcome .ob-col.ob-hero { left: 50%; top: clamp(96px, 18vh, 200px); width: min(920px, calc(100vw - 96px)); transform: translateX(-50%); z-index: 1;
+  display: flex; flex-direction: column; align-items: center; text-align: center; }
+.first-run .ob-welcome h1.ob-big { font-size: clamp(48px, 5vw, 72px); line-height: 1.03; letter-spacing: -0.04em; margin-top: 38px; text-wrap: balance; }
+.first-run .ob-welcome .ob-lede { margin: 22px 0 0; font-size: 19px; line-height: 28px; color: var(--text-dim); }
+.first-run .ob-welcome .ob-actions { justify-content: center; }
+.first-run .ob-welcome .ob-ready { margin-top: 30px; }

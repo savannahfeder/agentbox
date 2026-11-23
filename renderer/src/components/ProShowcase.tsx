@@ -20,7 +20,7 @@ export function ProShowcase({ agents, team }: { agents: string[]; team: string |
   const sky = useRef<HTMLCanvasElement>(null);
   const dark = useDarkWindow();
   useEffect(() => {
-    const k = skyTheme(dark ? 'ember' : 'sage');
+    const k = skyTheme(dark ? 'ember' : 'mountains');
     if (sky.current && k) drawSky(sky.current, k.art, { from: 0, span: 260 });
   }, [dark]);
   return (
