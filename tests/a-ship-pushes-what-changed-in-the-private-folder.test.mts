@@ -4,12 +4,15 @@
 // what is left there to the private repository's main, whatever the public
 // push then does.
 
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import type http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pushPrivateFolder } from '../scripts/lib/private-folder.mjs';
+import { gitServer } from './lib/a-git-server-that-asks-for-a-sign-in.mts';
 
 const made: string[] = [];
 afterEach(() => { for (const d of made.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
@@ -99,6 +102,51 @@ describe('the ship script', () => {
     const ship = fs.readFileSync(path.join(import.meta.dirname, '../scripts/ship.mjs'), 'utf8');
     expect(ship).toMatch(/import \{ pushPrivateFolder \} from '\.\/lib\/private-folder\.mjs'/);
     expect(ship.indexOf('pushPrivateFolder(root')).toBeGreaterThan(0);
-    expect(ship.indexOf('pushPrivateFolder(root')).toBeLessThan(ship.indexOf("runGit(['push', PUBLIC"));
+    expect(ship.indexOf('pushPrivateFolder(root')).toBeLessThan(ship.indexOf("signedIn(['push', PUBLIC"));
+  });
+});
+
+// The private repository is on GitHub, so its fetch and push need the sign-in
+// the public push has, through the same file no environment holds
+// (tests/a-shipping-branchs-code-cannot-find-the-push-token).
+describe('a private repository that asks for the sign-in', () => {
+  const TOKEN = 'ghp_dummy-private-folder-token';
+  let server: http.Server | null = null;
+  afterEach(async () => { if (server) await new Promise((r) => server!.close(r)); server = null; });
+
+  async function signedWorld() {
+    const w = world();
+    git(w.remote, 'config', 'http.receivepack', 'true');
+    server = gitServer(path.dirname(w.remote), { token: TOKEN, fetchToo: true });
+    await new Promise<void>((r) => server!.listen(0, '127.0.0.1', r));
+    const site = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    git(w.at, 'remote', 'set-url', 'origin', `${site}/private.git`);
+    put(path.join(w.at, 'unslop/SKILL.md'), 'two\n');
+    return { ...w, site };
+  }
+
+  // In a process of its own: git waiting here would hold up the server answering it.
+  const pushApart = (folder: string, site: string | null, childEnv: NodeJS.ProcessEnv) => new Promise<{ pushed: boolean }>((resolve, reject) => {
+    const lib = path.resolve(import.meta.dirname, '..', 'scripts', 'lib');
+    const code = `import { pushPrivateFolder } from ${JSON.stringify(path.join(lib, 'private-folder.mjs'))};
+import { signedGit } from ${JSON.stringify(path.join(lib, 'push-sign-in.mjs'))};
+const site = ${JSON.stringify(site)};
+const signIn = site ? signedGit({ token: ${JSON.stringify(TOKEN)}, site }) : null;
+process.stdout.write(JSON.stringify(pushPrivateFolder(${JSON.stringify(folder)}, { message: 'Signed', signIn })));`;
+    execFile(process.execPath, ['--input-type=module', '-e', code], { env: childEnv, encoding: 'utf8', timeout: 60_000 }, (err, out) => (err ? reject(err) : resolve(JSON.parse(out))));
+  });
+
+  it('fetches and pushes with the ship sign-in', async () => {
+    const w = await signedWorld();
+    const r = await pushApart(w.folder, w.site, env);
+    expect(r).toMatchObject({ pushed: true, commits: 1 });
+    expect(remoteLog(w.remote).split('\n')[0]).toBe('Signed');
+  });
+
+  it('cannot reach it without one', async () => {
+    const w = await signedWorld();
+    const r = await pushApart(w.folder, null, { ...env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' });
+    expect(r.pushed).toBe(false);
+    expect(remoteLog(w.remote)).toBe('first');
   });
 });

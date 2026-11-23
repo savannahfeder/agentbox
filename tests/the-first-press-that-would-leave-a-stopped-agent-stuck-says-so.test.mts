@@ -86,7 +86,7 @@ describe('the first press that would leave one stuck says so instead', () => {
   it('holds it, names the cost, and offers the row to open', () => {
     const held = hold([stopped]);
     expect(held).toBeTruthy();
-    expect(held.say).toContain('waiting on your answer');
+    expect(held.say).toContain('has answered and waits on you');
     expect(held.say).toContain('leaves it stuck');
     expect(held.goes).toEqual({ product: 'zero', id: 'w-stopped' });
   });
@@ -94,7 +94,7 @@ describe('the first press that would leave one stuck says so instead', () => {
   it('says the same thing about putting it off, in the same words', () => {
     const e = hold([stopped]).say;
     const l = hold([stopped], { key: 'L' }).say;
-    expect(l).toContain('waiting on your answer');
+    expect(l).toContain('has answered and waits on you');
     expect(l).toContain('leaves it stuck');
     // ONE LESSON, TWO VERBS. E and L say the same thing about this row, and two
     // wordings of it is two lessons; only the verb for what the key does may
