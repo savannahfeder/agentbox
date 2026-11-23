@@ -159,19 +159,20 @@ describe.skipIf(!browserAvailable)('a chat opened from the Team page', () => {
   });
 });
 
+// The arrows are on the inbox page alone, so only a chat opened there is on their trail.
 describe('back and forward', () => {
-  const screen = (over = {}) => stopOnScreen({
-    settings: null, thread: null, card: null, home: false, files: null, connections: false,
-    group: null, teammate: null, teamPlace: null, unrecorded: false, view: 'inbox', ...over,
-  });
-  it('keep a chat opened in the inbox as one in the inbox, and one on the Team page as before', () => {
-    expect(screen({ group: 'g1', groupInInbox: true })).toEqual({ at: 'group', id: 'g1', inbox: true });
+  const screen = (over = {}) => stopOnScreen({ thread: null, card: null, group: null, list: null, ...over });
+  it('keep a chat opened in the inbox as a place in the inbox', () => {
     expect(screen({ group: 'g1' })).toEqual({ at: 'group', id: 'g1' });
   });
-  it('tell the same chat in the inbox and on the Team page apart', () => {
-    expect(sameStop({ at: 'group', id: 'g1', inbox: true }, { at: 'group', id: 'g1' })).toBe(false);
-    expect(sameStop({ at: 'group', id: 'g1', inbox: true }, { at: 'group', id: 'g1', inbox: true })).toBe(true);
-    expect(sameStop({ at: 'group', id: 'g1', inbox: true }, { at: 'group', id: 'g2', inbox: true })).toBe(false);
+  it('are handed a chat only while it is open in the inbox, not on the Team page', () => {
+    expect(app).toContain("const groupInInbox = roomShown && roomsUi.inInbox && roomsUi.openId !== 'groups' ? roomsUi.openId : null;");
+    const at = app.indexOf('const screenHere: TrailScreen = {');
+    expect(app.slice(at, app.indexOf('\n  };', at))).toContain('\n    group: groupInInbox,');
+  });
+  it('tell two chats apart', () => {
+    expect(sameStop({ at: 'group', id: 'g1' }, { at: 'group', id: 'g1' })).toBe(true);
+    expect(sameStop({ at: 'group', id: 'g1' }, { at: 'group', id: 'g2' })).toBe(false);
   });
 });
 
@@ -206,8 +207,7 @@ describe('in the app', () => {
   });
 
   it('goes back and forward to it in the inbox, and a reload reopens it there', () => {
-    expect(app).toMatch(/groupInInbox: roomShown && roomsUi\.inInbox,/);
-    expect(app).toContain("else if (s.at === 'group') { openView(view); roomsUi.open(s.id, s.inbox ? 'inbox' : null); }");
+    expect(app).toContain("if (s.at === 'group') { openView(view); roomsUi.open(s.id, 'inbox'); }");
     expect(app).toContain('if (roomsUi.openId && roomsUi.openId !== \'groups\' && roomsUi.inInbox) place.roomInInbox = true;');
     expect(app).toContain("if (place.room) roomsUi.open(place.room, place.roomInInbox ? 'inbox' : null);");
   });
