@@ -7,6 +7,7 @@ import { Face } from '../team/people';
 import { clock } from '../thread-history';
 import type { FileNote, Person } from '../types';
 import { notePlaceWords } from '../artifact-pins';
+import { fromATeammatesCopy } from '../../../shared/artifact-marks.mts';
 import { NoteGlyph } from './NoteGlyphs';
 
 const clockAt = clock;
@@ -59,12 +60,15 @@ export function FileNoteCard({ note, answeredBy = null, wordsGone, product, acti
   const quote = note.place.kind === 'quote';
   // What became of the note itself: above its replies when it has some, so it is not read as theirs.
   const answered = !!note.replies?.length;
+  // A teammate's note went inside their reply to the thread's owner, not to an agent (TeammateThread `notesWithYourReply`).
+  const sentWords = !fromATeammatesCopy(note.uid) ? 'Sent to the agent'
+    : note.by === me ? 'Went with your reply' : person(note.by) ? `Came with ${whoSaid(note.by)}'s reply` : "Came with a teammate's reply";
   const facts = [
     wordsGone && <span key="gone" className="av-note-sent">Those words were edited</span>,
     note.in && <span key="in" className="av-note-sent">In {note.in}</span>,
     note.from && <span key="from" className="av-note-sent">{note.resolved ? <>From {note.from}</> : <>From {note.from}, still open</>}</span>,
     answeredBy && <span key="answered" className="av-note-done"><NoteGlyph name="check" />{answeredBy}</span>,
-    note.sent && !answeredBy && <span key="sent" className="av-note-sent"><NoteGlyph name="send" />Sent to the agent</span>,
+    note.sent && !answeredBy && <span key="sent" className="av-note-sent"><NoteGlyph name="send" />{sentWords}</span>,
     !note.sent && held && !note.resolved && <span key="held" className={`av-note-sent${held.went ? '' : ' is-waiting'}`}>{held.went && <NoteGlyph name="send" />}{held.words}</span>,
   ].filter(Boolean);
   return <article className={`av-note${active ? ' is-on' : ''}${note.resolved ? ' is-settled' : ''}${settling ? ' is-just-settled' : ''}${note.saving ? ' is-saving' : ''}`} id={`av-note-${note.id}`}>

@@ -48,10 +48,10 @@ describe('while it is still being written up', () => {
   // twenty seconds later, so the first look was still the raw chat.
   const read = (f) => fs.readFileSync(new URL(`../renderer/src/${f}`, import.meta.url), 'utf8');
   it('the page says so instead of drawing the raw answer', () => {
-    expect(read('components/ItemThread.tsx')).toContain('if (queue && catchUpDue(item)) {');
+    expect(read('components/ItemThread.tsx')).toContain('if (queue && gettingReady(item) && !earlierOpen) {');
   });
   it('the row says so, and the tutorial waits for it', () => {
-    expect(read('components/List.tsx')).toContain("data-catching-up={catchUpDue(item) ? '1' : undefined}");
+    expect(read('components/List.tsx')).toContain("data-catching-up={gettingReady(item) ? '1' : undefined}");
     expect(read('components/Tour.tsx')).toContain(".list-pane .row[data-item-id]:not([data-catching-up])");
   });
 });

@@ -17,7 +17,7 @@ import type { PipedChild } from '../claude-input.mts';
 import { claudeLaunchEnv } from '../claude-launch-env.mts';
 import { cloudClaudeMode, cloudPermissionArgs } from '../cloud-permission.mts';
 import { claudeActivity } from '../agent-activity.mts';
-import { captureStream, streamingText, summarizeStreamLine, traceStreamLine } from './claude-stream.mts';
+import { captureStream, streamingText, summarizeStreamLine, traceStreamLine, claudeTookTheWords } from './claude-stream.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
 import { chromeOnInClaudeCode, claudeJsonFor, yourChromeArgs } from '../your-chrome.mts';
 import type { BinKey, Env, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
@@ -101,9 +101,9 @@ export const claudeHarness = {
       ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
       ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) };
     if (host) return new HostedRun({ sockPath: host, runId: crypto.randomUUID(), start: { bin, argv, env: runEnv, cwd, spool: sup._runSpool() } });
-    return spawn(bin!, argv, { cwd, env: runEnv, stdio: ['pipe', 'pipe', 'pipe'] });
+    return spawn(bin!, argv, { cwd, env: runEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   },
-  readers: () => ({ capture: captureStream, stream: streamingText, summarize: summarizeStreamLine, trace: traceStreamLine, activity: claudeActivity }),
+  readers: () => ({ capture: captureStream, stream: streamingText, summarize: summarizeStreamLine, trace: traceStreamLine, activity: claudeActivity, took: claudeTookTheWords }),
   subscribe(child: { stdout: Readable }, _session: unknown, absorb: (line: string) => void): void {
     child.stdout.on('data', streamLines((line) => { if (line.trim()) absorb(line); }));
   },

@@ -9,6 +9,7 @@
 // safe: no node imports.
 
 import { checkSetting, type SettingChange } from './phone-settings.mts';
+import { carriedOnIn, heldOutside } from './carried-on-outside.mts';
 
 // How much of one thread goes up. The latest of a thread is what she reads on
 // a phone; the whole of it stays on the Mac. `bytes` is measured in UTF-8, as
@@ -84,24 +85,36 @@ interface ChangeSeen {
   knowsYou?: unknown;
 }
 
+// The phone's pass asks for every carried thread's change each time, and a
+// saved change is the same object until its file is rewritten
+// (main/code-change.mts readChangeSummary): read for secrets once, by home.
+const phoneChanges = new WeakMap<object, Map<string, PhoneChange | null>>();
+
 /** A saved change (main/code-change.mts readChangeSummary) as the phone gets it, or null when it touched no files. */
 export function phoneChangeOf(summary: ChangeSeen | null | undefined, { home = null }: Ctx = {}): PhoneChange | null {
   if (!summary || typeof summary !== 'object' || !Array.isArray(summary.files)) return null;
+  let byHome = phoneChanges.get(summary);
+  if (!byHome) phoneChanges.set(summary, byHome = new Map());
+  const made = byHome.get(home ?? '');
+  if (made !== undefined) return made;
   const count = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : 0);
   const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
-  const files = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
-    .filter((f) => f && typeof f.path === 'string' && f.path)
+  const named = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
+    .filter((f) => f && typeof f.path === 'string' && f.path);
+  // Only the paths that are kept: a generated change names thousands.
+  const files = named.slice(0, PHONE_CHANGE_FILES)
     .map((f) => ({ path: hideSecrets(f!.path, { home }), plus: count(f!.plus), minus: count(f!.minus) }));
-  if (!files.length) return null;
-  return {
+  const change: PhoneChange | null = files.length ? {
     plus: count(summary.plus),
     minus: count(summary.minus),
-    files: files.slice(0, PHONE_CHANGE_FILES),
-    ...(files.length > PHONE_CHANGE_FILES ? { more: files.length - PHONE_CHANGE_FILES } : {}),
+    files,
+    ...(named.length > PHONE_CHANGE_FILES ? { more: named.length - PHONE_CHANGE_FILES } : {}),
     committed: flag(summary.committed),
     uncommitted: flag(summary.uncommitted),
     knowsYou: flag(summary.knowsYou),
-  };
+  } : null;
+  byHome.set(home ?? '', change);
+  return change;
 }
 
 /** A row's fields as this file reads them, before they are picked. */
@@ -217,13 +230,15 @@ const ROW_FIELDS = [
   'fromPhone',
   // What the thread waits on, which puts it in Later (list-rules `waitsInLater`).
   'blockedBy', 'waitEnded',
+  // Carried on where it started, so In progress (shared/carried-on-outside.mts).
+  'carriedOn',
 ];
 // The fields a line in a thread's history may carry in its patch: what the
 // thread view draws as the conversation and its state changes.
 const LINE_FIELDS = [
   'title', 'label', 'body', 'kind', 'labels', 'priority', 'status', 'result',
   'note', 'answer', 'runAt', 'snoozedUntil', 'start', 'due', 'problem',
-  'progress', 'solution', 'inReplyTo',
+  'progress', 'solution', 'inReplyTo', 'saidOutside',
 ];
 const SOURCES: ReadonlySet<unknown> = new Set(['founder', 'agent', 'system']);
 
@@ -409,6 +424,8 @@ export function threadSnapshot(
 ): ThreadSnapshot {
   const ctx = { home };
   const row: ThreadSnapshot['item'] = pick(item, ROW_FIELDS, limits.textChars, ctx);
+  const held = item?.claim as { holder?: string } | null | undefined;
+  if (heldOutside(item as Parameters<typeof heldOutside>[0])) row.carriedOn = carriedOnIn(held?.holder) ?? '';
   // Who wrote each field, which is how the screens tell her words from an
   // agent's: the source and the moment, nothing else of it.
   if (item?.wrote && typeof item.wrote === 'object') {

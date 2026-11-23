@@ -6,15 +6,15 @@
 import { useContext, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Product, RepeatRule, RunningSession, ThreadCard, View, WorkItem } from '../types';
 import { ago, dayAndTime, dayLabel, stamp } from '../format';
-import { REST_HEADING, URGENT_HEADING, clickIntent, rowKeys, rowSummary, rowTitle, walkRowKeys } from '../list-rules';
+import { REST_HEADING, URGENT_HEADING, clickIntent, rowSummary, rowTitle } from '../list-rules';
 import { isUrgentRow } from '../urgent-arrival';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
+import { cameBackEmpty, cannotStartLine, cannotStartWord, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
-import { isTroubleRow, TROUBLE_ID } from '../trouble-row';
-import { isUpdateRow, UPDATE_ID } from '../update-row';
+import { isTroubleRow } from '../trouble-row';
+import { isUpdateRow } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
 import { Hits } from './Hits';
 import type { ThreadSearchDetails } from '../threads/search';
@@ -32,7 +32,8 @@ import { toApproveWords } from '../threads-made';
 import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mts';
-import { catchUpDue } from '../../../shared/agent-import.mts';
+import { shownPriority } from '../../../shared/rank.mts';
+import { gettingReady } from '../../../shared/agent-import.mts';
 import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
 /**
@@ -96,7 +97,7 @@ export function dayGroups(
   return groups;
 }
 
-export function List({ items, view, keyView, hoveredId, selected, seen, unread, lastThread = null, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, cannotStart, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, walk, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null, foot = null, pointer, stack, leadIn = null }: {
+export function List({ items, view, keyView, hoveredId, selected, seen, unread, lastThread = null, running, engineChoice, engines, stalled, queued, signInNeeded, atLimit, cannotStart, shipping, silent, paused, multiSel, snoozes, repeats, allItems, terms, phrase, summaries, searchDetails, ranked, emptyText, onSelect, onOpen, onOpenRepeat, onToggle, onRange, onHover: hoverTo, onAnswerImport, team = null, table = false, products = [], mixed = null, personCell, onOpenCard, selectedCard = null, onEnd, onReorder, lead = null, foot = null, pointer, stack, leadIn = null }: {
   /** The section the lead rows sit under instead of over the list: mentions and news are from people. */
   leadIn?: StackKey | null;
   /** Your threads as one list in sections (../threads/stack-rules): each section's header, and which section a row is in. */
@@ -186,14 +187,6 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   onOpenRepeat?: (rule: RepeatRule) => void;
   onToggle: (index: number) => void;
   onRange: (index: number) => void;
-  /**
-   * WHAT THE WALK LEAVES OF THE ROW HINTS: the key the beat on screen asks for
-   * and the rows that key is right for, or null when no walk is on and every
-   * row says exactly what it always said. See `walkRowKeys`: a row in the walk
-   * may promise the beat's own key and nothing else, because the walk swallows
-   * everything else and a hint for a swallowed key is a promise the app then
-   * breaks. */
-  walk?: { key: string | null; rows: string[] } | null;
   onHover?: (id: string | null) => void;
   // THE YES OR NO ON A CODEX CONVERSATION'S ROW, and the Import on one she
   // declined. A click on the keycap sends the same word the key does.
@@ -232,26 +225,6 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   const rules = !stack && view === 'snoozed' ? (repeats ?? []) : [];
   const laterRules = stack ? (repeats ?? []) : [];
   // The keys the rows in THIS list offer, drawn on the row under the pointer.
-  // One list, one set: they are a property of the view, not of the message.
-  // EXCEPT WHILE THE WALK IS ON, when they are also a property of the row,
-  // because the walk answers most of them itself and draws the ring somewhere
-  // else. `walkRowKeys` is the whole of that and it changes nothing when no
-  // walk is up.
-  const all = rowKeys(keyView ?? view, multiSel.size > 0);
-  // AND A KEY DRAWN ON A ROW HAS TO DO SOMETHING. The row that says nothing is
-  // running has nobody to reply to: there is no session on the other end of it
-  // and no ledger it lives in, so R would open a box that goes nowhere. It
-  // keeps E, which really does close it, and offers nothing else. The row that
-  // says a new version is ready is the same on both counts. A CODEX
-  // CONVERSATION'S ROW HAS NO HOVER HINT: its Y and N are drawn on the row all
-  // the time as buttons, and a hint swapping in over them at the moment the
-  // pointer arrives would take the buttons away exactly when she is about to
-  // press one.
-  const keysFor = (id: string) => (isImportRow(items.find((i) => i.id === id)) ? [] : walkRowKeys(
-    id === TROUBLE_ID || id === UPDATE_ID ? all.filter((k) => k.key !== 'R') : all,
-    walk ?? null,
-    id,
-  ));
   const rowsNow = useRowsDrawn(`${keyView ?? view}|${table}|${(terms ?? []).join(' ')}|${phrase ?? ''}`, table && mixed ? mixed.length : items.length);
   // NO EMPTY PAGE ANYWHERE IN THE APP.A view with nothing in it draws the
   // background and nothing else. Two sentences died here: "Nothing here." on
@@ -363,9 +336,9 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
         onClick={() => onOpenRepeat?.(rule)}>
         <span className="mark" aria-hidden="true" />
         <RowCells status={running?.live ? running : laterCell(null)}
-          lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
+          lead={<RepeatMark />} title={rule.title} line={{ text: repeatRow(rule, last).last }} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
-          priority={rule.priority ?? 5} updatedAt={rule.updatedAt ?? rule.createdAt}
+          priority={shownPriority(rule)} updatedAt={rule.updatedAt ?? rule.createdAt}
           when={nextRunWords(rule)} now={Date.now()} />
       </div>
     );
@@ -436,7 +409,8 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
               return (
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
-                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
+                  <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} who={{ face: <Face person={team?.byId.get(c.personId) ?? null} />, name: team?.byId.get(c.personId)?.name ?? undefined }} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
+                    line={c.problem ? { who: team?.byId.get(c.personId)?.name ?? undefined, text: c.problem } : null}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );
@@ -461,7 +435,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                    itself, by id, rather than at whatever is drawn first
                    (w-0b60195a14, 2026-08-21). Nothing else reads this. */
                 data-item-id={item.id}
-                data-catching-up={catchUpDue(item) ? '1' : undefined}
+                data-catching-up={gettingReady(item) ? '1' : undefined}
                 /*
                  * THE HOVER HINT, AND ONLY IN THE INBOX. `hint-plate.ts` says
                    ↵ Open task, E Mark done, S Schedule for later, which are the
@@ -474,7 +448,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                 {...(tab === 'inbox' && !isImportRow(item)
                   ? { 'data-hint': 'row', 'data-hint-text': '.subject' }
                   : {})}
-                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}${lastThread?.id === item.id && lastThread.product === item.product ? ' recent' : ''}`}
+                className={`row ${made ? 'trouble-row ' : ''}${index === selected && !selectedCard ? 'selected' : ''} ${checked ? 'checked' : ''}${!hoverTo ? ' hovers' : hoveredId === item.id ? ' pointed' : ''}${tab === 'inbox' && unread?.(item) ? ' unread' : ''}${lastThread?.id === item.id && lastThread.product === item.product ? ' recent' : ''}`}
                 /*
                  * ON MOUSE MOVE, NOT ON MOUSE ENTER. A pointer parked over the
                    list while she walks it with J and K would otherwise claim
@@ -525,7 +499,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                    column of them is a second alphabet to learn before you can read the
                    first.
                  */}
-                {table && !(walk && keysFor(item.id).length) && !isImportRow(item) ? (
+                {table && !isImportRow(item) ? (
                   // THE TABLE ROW (the team version): the same row, its select
                   // box and its keys, with the approved columns instead of a
                   // title over a summary.
@@ -568,51 +542,13 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                   {details?.kind === 'chat' ? <>
                     <span className="time">{stamp(item.updatedAt)}</span>
                   </> : <>
-                  {/* THE WALK'S OWN KEY, AND ONLY THE WALK'S.
-
-                      This slot used to swap the product and the time for two
-                      keycaps whenever the pointer rested on the row. In use,
-                      swapping the row's own contents after a pause felt slow,
-                      and something appearing around the row reads better than
-                      the row itself changing. Hovering now draws a
-                      plate beside the row (hint-plate.ts) and the row itself
-                      never changes.
-
-                      What is left here is the first-run walk, which is a
-                      different thing wearing the same drawing: the walk asks for
-                      ONE key on the rows of the beat it is on, while it holds
-                      the keyboard, and it is not a hover hint at all.
-                      `walkRowKeys` returns everything when no walk is up, so the
-                      `walk &&` guard is what keeps this out of the ordinary
-                      list.
-                   */}
                   {/* A CODEX CONVERSATION ASKING TO COME IN WEARS ITS YES AND
                       NO HERE ALL THE TIME (w-319289046e, 2026-09-14). The same
                       keycaps as the hints below, but at rest and clickable,
                       because the question is the row and the two answers are
                       the whole of what she does with it. The baseline look was
                       picked out of five. */}
-                  {/* AND IT IS A LABEL, NOT A BUTTON, WHICH IS A DECISION AND
-                      NOT AN OVERSIGHT (2026-10-01). It was made a button for an
-                      hour, so that the walk's two row beats could say "or click
-                      Done on the row" to the people who do not use shortcuts.
-                      It was taken back the same day: the tutorial must never
-                      teach a click the real app does not have.
-                      This chip is drawn ONLY while the walk is on, by the
-                      `walk &&` guard right here, so a clickable one teaches a
-                      control that disappears the moment the tutorial ends. The
-                      app has no click route to close a thread from the list at
-                      all; until it does, this says the key and nothing else,
-                      and so do the two cards (`coach` in onboarding.ts). */}
-                  {walk && keysFor(item.id).length ? (
-                    <span className="row-keys">
-                      {keysFor(item.id).map((k) => (
-                        <span className="row-key" key={k.key}>
-                          <kbd>{k.key}</kbd><span className="row-key-word">{k.word}</span>
-                        </span>
-                      ))}
-                    </span>
-                  ) : isImportRow(item) ? (
+                  {isImportRow(item) ? (
                     <span className="row-keys import-keys">
                       {IMPORT_KEYS.map((k) => (
                         <button type="button" className="row-key" key={k.key} title={k.word}
@@ -767,7 +703,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                         : shipping?.includes(item.id)
                           ? <span className="time" title="The app is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.">shipping</span>
                         : queued?.includes(item.id) && cannotStart?.[item.id] && cannotStartLine(cannotStart[item.id])
-                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>not started</span>
+                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>{cannotStartWord(cannotStart[item.id]).toLowerCase()}</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && tab === 'progress'

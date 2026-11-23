@@ -47,9 +47,13 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   teamSignOut: 'zero:team-sign-out',
   teamSignInEmail: 'zero:team-sign-in-email',
   teamSignUp: 'zero:team-sign-up',
+  teamConfirmation: 'zero:team-confirmation',
+  teamResendConfirmation: 'zero:team-resend-confirmation',
   teamCreate: 'zero:team-create',
   teamInvite: 'zero:team-invite',
   teamRename: 'zero:team-rename',
+  teamUpdateMe: 'zero:team-update-me',
+  teamSetLogo: 'zero:team-logo',
   teamRemoveMember: 'zero:team-remove-member',
   teamLeave: 'zero:team-leave',
   teamCancelInvite: 'zero:team-cancel-invite',
@@ -103,6 +107,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   teamMessageMate: 'zero:team-message-mate',
   teamGiveTask: 'zero:team-give-task',
   teamHandOn: 'zero:team-hand-on',
+  teamAsk: 'zero:team-ask',
+  teamHandBack: 'zero:team-hand-back',
   teamTaskBrief: 'zero:team-task-brief',
   rooms: 'zero:rooms',
   // Teammates: make, describe, start, edit, write to, and what they remember.
@@ -177,6 +183,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   gitHubCloudSignIn: 'zero:github-cloud-sign-in',
   // The answer to a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
   signInAnswer: 'zero:sign-in-answer',
+  signInKeep: 'zero:sign-in-keep',
   // A file or a one-time code a cloud run asked for (shared/cloud-needs.mts).
   cloudSendFile: 'zero:cloud-send-file',
   cloudSendCode: 'zero:cloud-send-code',
@@ -208,10 +215,14 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   blankCheck: 'zero:blank-check',
   // The appearance the desktop window's glass is drawn in; a tab has no glass.
   glassTone: 'zero:glass-tone',
+  windowButtons: 'zero:window-buttons',
   track: 'zero:track',
+  // How long the window's own thread held (renderer/src/window-holds.ts).
+  windowHeld: 'zero:window-held',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
   openArtifact: 'zero:open-artifact',
+  openWith: 'zero:open-with',
   folderPictures: 'zero:folder-pictures',
   readDoc: 'zero:read-doc',
   fileLink: 'zero:file-link',
@@ -281,6 +292,7 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
 export const WRAPPED_ARGS: Readonly<Record<string, string[]>> = {
   notify: ['arrivals', 'needsYou'],
   track: ['name', 'count'],
+  windowHeld: ['ms'],
   instructionWrite: ['id', 'text'],
   instructionVersion: ['id', 'at'],
 };

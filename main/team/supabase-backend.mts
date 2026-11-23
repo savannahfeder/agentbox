@@ -122,6 +122,18 @@ function must<T>({ data, error }: CloudAnswer, what: string): T {
 
 export type Must = typeof must;
 
+// PostgREST hands back at most its max_rows a read (1,000 on the hosted project) and says nothing of the rest.
+const MAX_ROWS = 1000;
+/** Every row, a page at a time; `read` must order by a unique key so no row falls between pages. */
+async function everyRow<T>(read: (from: number, to: number) => PromiseLike<CloudAnswer>, what: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += MAX_ROWS) {
+    const rows = must<T[] | null>(await read(from, from + MAX_ROWS - 1), what) ?? [];
+    out.push(...rows);
+    if (rows.length < MAX_ROWS) return out;
+  }
+}
+
 const COMMAND_COLUMNS = 'id,owner,device,project,item,kind,payload,created_at,claimed_at,taken_at,outcome';
 // Who claimed (`cloud:<run>`, 20261026000000_phone_carries_on_in_the_cloud.sql),
 // asked for only once the database has the column, so a computer that runs
@@ -184,12 +196,61 @@ export function supabaseBackend(client: SupabaseClient) {
       return clean ? { text: clean, until: clean && until ? until : null } : null;
     },
 
+    // Your name and photo. people_update_self keeps the row yours; only these
+    // two columns are granted (20261001000500_security.sql).
+    async setProfile({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
+      const me = await myId();
+      const patch: Record<string, unknown> = {};
+      if (name !== undefined) patch.name = name;
+      if (avatarUrl !== undefined) patch.avatar_url = avatarUrl;
+      must(await client.from('people').update(patch).eq('id', me), 'saving your name and photo');
+    },
+
+    // A picture in the public `pictures` bucket (20261120000000), named for its
+    // bytes, so the same picture twice is already there.
+    async putPicture(name: string, bytes: Buffer, type: string) {
+      await myId();
+      const bucket = client.storage.from('pictures');
+      const { error }: { error: StorageFailure | null } = await bucket.upload(name, bytes, { contentType: type, upsert: false });
+      if (error && !/exists|duplicate/i.test(`${error.message} ${error.statusCode ?? ''}`) && String(error.statusCode) !== '409') throw new Error(`saving the picture: ${error.message}`);
+      return bucket.getPublicUrl(name).data.publicUrl as string;
+    },
+
+    async setTeamLogo(teamId: string, logoUrl: string | null) {
+      await myId();
+      const rows = must<{ id: string }[]>(await client.from('teams').update({ logo_url: logoUrl }).eq('id', teamId).select('id'), 'saving the team’s logo');
+      if (!rows.length) throw new Error('only the team’s owner can change its logo');
+    },
+
+    // The team's name and logo, read again on every pass so a teammate's
+    // change reaches this Mac. A cloud from before the logo answers without it.
+    async teamInfo(teamId: string) {
+      await myId();
+      const withLogo = await client.from('teams').select('id,name,logo_url').eq('id', teamId).limit(1);
+      if (!withLogo.error) {
+        const [r] = (withLogo.data ?? []) as { id: string; name: string; logo_url: string | null }[];
+        return r ? { id: r.id, name: r.name, logoUrl: r.logo_url ?? null } : null;
+      }
+      const [r] = must<{ id: string; name: string }[]>(await client.from('teams').select('id,name').eq('id', teamId).limit(1), 'reading your team');
+      return r ? { id: r.id, name: r.name, logoUrl: null } : null;
+    },
+
     // THE INVITES WAITING FOR YOU, to the email Google confirmed. Nothing is
     // joined by reading them: joining is acceptInvite, one team, on a yes.
     async pendingInvites() {
       await myId();
       const rows = must<{ team_id: string; team_name: string; invited_by: string | null; invited_by_name: string | null }[]>(await client.rpc('pending_invites'), 'reading your invites') ?? [];
       return rows.map((r) => ({ teamId: r.team_id, teamName: r.team_name, invitedBy: r.invited_by ?? null, invitedByName: r.invited_by_name ?? null }));
+    },
+
+    async hasMultiplayer() {
+      await myId();
+      return must<boolean>(await client.rpc('i_have_multiplayer'), 'asking whether this team has multiplayer') === true;
+    },
+
+    async teamPays() {
+      await myId();
+      return must<boolean>(await client.rpc('my_team_pays'), 'asking whether your team has Pro') === true;
     },
 
     async acceptInvite(teamId: string) {
@@ -339,14 +400,16 @@ export function supabaseBackend(client: SupabaseClient) {
     },
 
     // YOUR CARDS: one per thread worth showing the team (shared/thread-cards.mts).
-    // Upserted whole, and any card of yours the Mac no longer lists is removed,
-    // so a thread made private or finished yesterday leaves the board. A card
-    // not marked visible never goes up at all, whatever the Mac handed over.
-    async putCards(teamId: string, all: CardToPut[]) {
+    // The ones in `changed` are upserted whole (all of them without it), and
+    // any card of yours the Mac no longer lists is removed, so a thread made
+    // private or finished yesterday leaves the board. A card not marked
+    // visible never goes up at all, whatever the Mac handed over.
+    async putCards(teamId: string, all: CardToPut[], changed?: ReadonlySet<string>) {
       const me = await myId();
       const cards = all.filter((c) => c.visible === true);
-      if (cards.length) {
-        const rows = cards.map((c) => ({
+      const writing = changed ? cards.filter((c) => changed.has(c.threadId)) : cards;
+      if (writing.length) {
+        const rows = writing.map((c) => ({
           person_id: me, team_id: teamId, thread_id: c.threadId, visible: !!c.visible,
           // WHO IT REACHES: the chosen people, or no list at all for the whole
           // team (w-41ff964775). The read rule on the table does the enforcing.
@@ -570,15 +633,21 @@ export function supabaseBackend(client: SupabaseClient) {
     },
 
     // Row level security holds who reads a folder and a place (20261102000000_a_teams_folders.sql).
-    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; at: number }) {
+    // `gone` is 20261121000000_a_folder_can_be_removed.sql; a folder that was never removed does not name it.
+    async putFileFolder(teamId: string, { id, project, name, parent = null, people = null, gone, at }: { id: string; project: unknown; name: unknown; parent?: string | null; people?: string[] | null; gone?: boolean; at: number }) {
       await myId();
-      must(await client.from('file_folders').upsert({ id, team_id: teamId, project, name, parent, people, at }, { onConflict: 'id' }), 'saving a folder');
+      must(await client.from('file_folders').upsert({ id, team_id: teamId, project, name, parent, people, at, ...(gone === undefined ? {} : { gone }) }, { onConflict: 'id' }), 'saving a folder');
     },
 
     async fileFolders() {
       await myId();
-      const rows = must<{ id: string; team_id: string; project: string; name: string; parent: string | null; people: string[] | null; created_by: string; at: number | string }[]>(await client.from('file_folders').select('id,team_id,project,name,parent,people,created_by,at'), 'reading folders');
-      return rows.map((r) => ({ id: r.id, teamId: r.team_id, project: r.project, name: r.name, parent: r.parent, people: r.people, by: r.created_by, at: Number(r.at) }));
+      type Row = { id: string; team_id: string; project: string; name: string; parent: string | null; people: string[] | null; created_by: string; gone?: boolean | null; at: number | string };
+      const columns = 'id,team_id,project,name,parent,people,created_by,at';
+      let read = await client.from('file_folders').select(`${columns},gone`);
+      // A database the migration has not reached yet has no column to read.
+      if (read.error && /gone/.test(read.error.message ?? '')) read = await client.from('file_folders').select(columns);
+      const rows = must<Row[]>(read, 'reading folders');
+      return rows.map((r) => ({ id: r.id, teamId: r.team_id, project: r.project, name: r.name, parent: r.parent, people: r.people, by: r.created_by, gone: r.gone === true, at: Number(r.at) }));
     },
 
     async placeFile(owner: string, threadId: string, { project, family, folder = null, at }: { project: unknown; family: string; folder?: string | null; at: number }) {
@@ -588,7 +657,8 @@ export function supabaseBackend(client: SupabaseClient) {
 
     async filePlaces() {
       await myId();
-      const rows = must<{ owner: string; thread_id: string; project: string; family: string; folder: string | null; by_person: string; at: number | string }[]>(await client.from('file_places').select('owner,thread_id,project,family,folder,by_person,at'), 'reading where files sit');
+      const rows = await everyRow<{ owner: string; thread_id: string; project: string; family: string; folder: string | null; by_person: string; at: number | string }>((a, z) => client.from('file_places').select('owner,thread_id,project,family,folder,by_person,at')
+        .order('owner').order('thread_id').order('family').range(a, z), 'reading where files sit');
       return rows.map((r) => ({ owner: r.owner, threadId: r.thread_id, project: r.project, family: r.family, folder: r.folder, by: r.by_person, at: Number(r.at) }));
     },
 
@@ -601,7 +671,8 @@ export function supabaseBackend(client: SupabaseClient) {
 
     async fileVersions(teamId: string) {
       await myId();
-      const rows = must<{ file: string; n: number | string; hash: string; name: string | null; by_person: string | null; at: number | string }[]>(await client.from('file_versions').select('file,n,hash,name,by_person,at').eq('team_id', teamId), 'reading the versions of files');
+      const rows = await everyRow<{ file: string; n: number | string; hash: string; name: string | null; by_person: string | null; at: number | string }>((a, z) => client.from('file_versions').select('file,n,hash,name,by_person,at').eq('team_id', teamId)
+        .order('file').order('n').range(a, z), 'reading the versions of files');
       return rows.map((r) => ({ file: r.file, n: Number(r.n), hash: r.hash, name: r.name, by: r.by_person, at: Number(r.at) }));
     },
 

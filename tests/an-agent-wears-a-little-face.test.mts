@@ -44,7 +44,7 @@ describe('the face itself', () => {
 describe('a person is not an agent', () => {
   it('still shows their initials in a solid square, with no eyes', () => {
     const html = renderToStaticMarkup(createElement(Face, { person: { id: 'p1', name: 'Jo Example' } }));
-    expect(html).toContain('>Jo<');
+    expect(html).toContain('>JE<');
     expect(html).not.toContain('agent-');
   });
 });

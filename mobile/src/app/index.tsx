@@ -8,7 +8,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { backWords, readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, emptyTabWords, readDisplay, rowPriorityId, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
 import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
@@ -43,13 +43,6 @@ import { skipWait, waitNotice, waitSkipped } from '../lib/computer-wait';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
 import { PEN } from '../lib/overlays';
-
-// The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
-const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
-  progress: 'Nothing is running.',
-  snoozed: 'Nothing is waiting for later. "Add it to Later" on a new thread writes one down without starting it.',
-  done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
-};
 
 const open = (product: string, id: string) => router.push({ pathname: '/thread/[product]/[id]', params: { product, id } });
 
@@ -288,14 +281,13 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
               </View>
             </Pressable>
           ))}
-          {c.rows.length + repeatsIn(c.state).length === 0 && <T style={{ fontSize: 13, color: color.faint, paddingVertical: 4, paddingHorizontal: 2 }}>Nothing here.</T>}
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
               style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
               <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
-                {e.priority !== null && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority)} /></View>}
+                {rowPriorityId(e.priority) && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority!)} /></View>}
                 {e.agent && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>
                 {c.state === 'scheduled' && e.item && !!backWords(e.item, c0.now) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{backWords(e.item, c0.now)}</T>}
@@ -460,7 +452,7 @@ export default function Threads() {
         </View> : undefined}
       ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
         : tab === 'inbox' ? <InboxClear />
-          : <T style={{ paddingHorizontal: size.inset, paddingTop: 28, fontSize: 15, lineHeight: 23, color: color.dim }}>{EMPTY[tab]}</T>}
+          : <T style={{ paddingHorizontal: 24, paddingTop: 32, textAlign: 'center', fontSize: 14, lineHeight: 21, color: color.faint }}>{emptyTabWords(tab, false, counts.inbox)}</T>}
       contentContainerStyle={{ paddingBottom: Math.max(picked ? 120 : 96, c.approvalRoom + 16) }}
     />
   );
@@ -477,7 +469,7 @@ export default function Threads() {
   return (
     <Picking.Provider value={picking}>
     <Wall>
-      <TopBar title={teamMode ? 'Inbox' : 'Threads'} right={<>
+      <TopBar title="Inbox" right={<>
         <IconButton label="Search threads" onPress={() => router.push('/search')}><Magnifier size={18} /></IconButton>
         {penUp && <IconButton label="New thread" onPress={() => router.push('/new')}><Pen size={18} tint={color.dim} /></IconButton>}
         <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />

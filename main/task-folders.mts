@@ -65,9 +65,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { Name, nameSlug } from '../shared/product-name.mjs';
 import { insideGitFolder } from '../shared/project-folder-check.mts';
-import { carryLocalFiles, copyTree, folderChildDeadline, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
+import { carryLocalFiles, copyTree, folderChildDeadline, localFilesIn, onlyTrackedContent, trackedTopLevel } from './worktree-include.mts';
+import { givePrivateFolder } from './private-folder.mts';
 import type { ExecFailure } from './worktree-include.mts';
 import { HOOK_FREE } from './hook-free-git.mts';
+import { alive } from './process-alive.mts';
 
 /** The answer of a git call that does not throw. */
 export interface GitResult {
@@ -90,7 +92,7 @@ export interface TaskFolderTaken {
   path: string;
   branch: string;
   created: boolean;
-  how: 'clone' | 'checkout' | 'kept';
+  how: 'clone' | 'checkout' | 'kept' | 'spare';
 }
 
 /** A folder somebody else has, or that could not be given. */
@@ -170,6 +172,7 @@ const git = (cwd: string, args: string[]): string => execFileSync('git', [
   ...args,
 ], {
   cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: folderChildDeadline(), killSignal: 'SIGKILL',
+  windowsHide: true,
 }).trim();
 
 /**
@@ -271,7 +274,7 @@ const keptOutOfBackups = new Set<string>();
 export function keepOutOfBackups(dir: string, {
   platform = process.platform,
   // Not waited on: nothing needs its answer, and a task folder is often made on the window's thread.
-  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000 }, () => { /* best effort */ }); },
+  run = (cmd: string, args: string[]) => { execFile(cmd, args, { timeout: 5_000, windowsHide: true }, () => { /* best effort */ }); },
 }: { platform?: string; run?: (cmd: string, args: string[]) => unknown } = {}): boolean {
   if (platform !== 'darwin' || keptOutOfBackups.has(dir)) return false;
   keptOutOfBackups.add(dir);
@@ -313,6 +316,15 @@ export function buildingFolderPath(repoPath: string, id: unknown): string {
 }
 
 export function taskBranch(id: unknown): string { return `${BRANCH_PREFIX}${safeTaskName(id)}`; }
+
+/**
+ * Where the next thread's folder waits once made ahead (`makeSpareFolder`).
+ * Named as an unfinished build, so nothing lists, shows or sweeps it, and with
+ * a dot after the marker, which no task name can start with.
+ */
+export function spareFolderPath(repoPath: string): string {
+  return path.join(real(repoPath), ...WORKTREES, `${BUILDING}.spare`);
+}
 
 /** The repository root, or null when this is not a checkout at all. */
 export function repoRoot(dir: string | null | undefined): string | null {
@@ -395,6 +407,7 @@ function sizeOfFirstCommit(root: string): number {
   const listed = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
     cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024,
     timeout: folderChildDeadline(), killSignal: 'SIGKILL',
+    windowsHide: true,
   });
   let total = 0;
   for (const file of listed.split('\0')) {
@@ -464,12 +477,6 @@ const lockReason = (pid: number) => `agentbox pid=${pid}`;
 const pidInReason = (reason: string | null | undefined) => {
   const found = /agentbox pid=(\d+)/.exec(reason ?? '');
   return found ? Number(found[1]) : null;
-};
-// Signal 0 asks the kernel whether a pid exists without touching it. EPERM
-// means it exists and belongs to somebody else, which still counts as alive.
-const alive = (pid: number | null) => {
-  if (!pid) return false;
-  try { process.kill(pid, 0); return true; } catch (error) { return (error as ExecFailure)?.code === 'EPERM'; }
 };
 
 /** Every worktree git knows about, as records rather than as text. */
@@ -668,6 +675,15 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
     } catch { return refused({ reason: 'in-the-way', heldBy: null }); }
   }
 
+  // A new thread takes the folder made ahead for it, when there is one still
+  // good. A thread with a branch of its own is made from that branch instead.
+  if (tryGit(root, ['rev-parse', '--verify', '-q', `refs/heads/${branch}`]).ok) letTheSpareGoOf(root, branch, pid);
+  else if (dependencies && takeTheSpare(root, dir, folder, branch, pid)) {
+    const held = acquireTaskFolder(root, folder, { pid });
+    if (!held.taken) return refused(held);
+    return { taken: true, heldBy: pid, path: folder, branch, created: true, how: 'spare' };
+  }
+
   // A registration whose directory somebody deleted by hand would refuse the
   // add below with "already registered", so clear those first. `prune` only
   // ever drops registrations whose folder is already gone.
@@ -691,7 +707,7 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   const branchExists = hasBranch();
   const from = branchExists ? branch : baseRef(root);
   let how: 'clone' | 'checkout' = 'clone';
-  if (!cloneCheckout(root, staging, branch, from, branchExists, pid)) {
+  if (!cloneCheckout(root, staging, from, branchExists ? [staging, branch] : ['-b', branch, staging, from], pid)) {
     how = 'checkout';
     // THE BRANCH IS ASKED ABOUT AGAIN, AND THAT IS NOT BELT AND BRACES.
     //
@@ -764,6 +780,8 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   if (dependencies) {
     try { carryLocalFiles(root, staging, { landsAt: folder }); }
     catch (error) { clearUnfinished(root, staging); throw Error(`Could not make a folder for ${name}: ${(error as ExecFailure).message}`); }
+    const given = givePrivateFolder(root, staging);
+    if (!given.given && given.why) console.warn(`[task-folders] ${name} has no private folder: ${given.why}`);
   }
 
   // `worktree move` rather than a rename, so git's own record of where this
@@ -796,6 +814,161 @@ export function ensureTaskFolder(dir: string, id: unknown, { pid = process.pid, 
   const held = acquireTaskFolder(root, folder, { pid });
   if (!held.taken) return refused(held);
   return { taken: true, heldBy: pid, path: folder, branch, created: true, how };
+}
+
+/** What a folder made ahead was made from, kept in its own git folder so it goes when the folder does. */
+interface SpareStamp { head: string; local: [string, number, number][] }
+
+/** Its stamp, and the file whose time is the moment before its local files were copied. */
+function spareFiles(spare: string): { stamp: string; since: string } | null {
+  const at = tryGit(spare, ['rev-parse', '--absolute-git-dir']);
+  return at.ok && at.out ? { stamp: path.join(at.out, 'agentbox-spare.json'), since: path.join(at.out, 'agentbox-spare.since') } : null;
+}
+
+/**
+ * Whether anything under these local files changed after `since` was written:
+ * a file rewritten in place deep in node_modules (a rebuild, a patch) changes
+ * no directory's time, but it changes its own status time. A `find` that
+ * cannot answer counts as a change.
+ */
+function changedSince(root: string, rels: string[], since: string): boolean {
+  if (!rels.length) return false;
+  try {
+    const out = execFileSync('find', [...rels.map((rel) => path.join(root, rel)), '-cnewer', since, '-print', '-quit'], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: folderChildDeadline(), killSignal: 'SIGKILL', maxBuffer: 1024 * 1024, windowsHide: true,
+    });
+    return out.trim() !== '';
+  } catch { return true; }
+}
+
+/** The checkout's local files a folder carries in, each with when it last changed and its size. */
+function localFilesNow(root: string): [string, number, number][] {
+  return localFilesIn(root).paths.slice().sort().map((rel) => {
+    const st = fs.lstatSync(path.join(root, rel), { throwIfNoEntry: false });
+    return [rel, st?.mtimeMs ?? -1, st?.size ?? -1];
+  });
+}
+
+/**
+ * Whether the folder made ahead is still exactly what a folder made now would
+ * be: finished, detached, on the commit a new thread starts from, carrying the
+ * local files as they stand now, with nothing changed in it, and ours or left
+ * by an app that has quit.
+ */
+function spareIsGood(root: string, spare: string, pid: number): boolean {
+  if (!fs.existsSync(spare) || !record(root, spare)) return false;
+  const owner = holder(root, spare, pid);
+  if (!owner.ok || owner.free) return false;
+  // On a branch means a take was cut off half way, and that branch is a thread's.
+  if (tryGit(spare, ['symbolic-ref', '-q', 'HEAD']).ok) return false;
+  const files = spareFiles(spare);
+  let stamp: SpareStamp | null = null;
+  try { stamp = files ? JSON.parse(fs.readFileSync(files.stamp, 'utf8')) : null; } catch { return false; }
+  if (!files || !stamp?.head || !fs.existsSync(files.since)) return false;
+  const head = tryGit(spare, ['rev-parse', 'HEAD']);
+  const base = tryGit(root, ['rev-parse', baseRef(root)]);
+  if (!head.ok || !base.ok || head.out !== stamp.head || base.out !== stamp.head) return false;
+  try { if (JSON.stringify(localFilesNow(root)) !== JSON.stringify(stamp.local)) return false; } catch { return false; }
+  if (changedSince(root, stamp.local.map(([rel]) => rel), files.since)) return false;
+  const status = tryGit(spare, ['status', '--porcelain']);
+  return status.ok && status.out === '';
+}
+
+/**
+ * A take cut off between giving the folder made ahead a thread's branch and
+ * moving it leaves that branch checked out there, where the ordinary build
+ * cannot have it. Detached again, or put away when that fails.
+ */
+function letTheSpareGoOf(root: string, branch: string, pid: number): void {
+  const spare = spareFolderPath(root);
+  if (record(root, spare)?.branch !== branch || !holder(root, spare, pid).ok) return;
+  if (!tryGit(spare, ['switch', '-q', '--detach']).ok) clearUnfinished(root, spare, pid);
+}
+
+/**
+ * THE FOLDER MADE AHEAD, TAKEN BY A NEW THREAD IN ONE MOVE (w-9993530556):
+ * claimed for this app first, so two apps over one checkout cannot both take
+ * it, then given the thread's branch on the commit it already stands on, so
+ * no file changes, then moved to the thread's path. Short of that it is put
+ * back detached and the folder is made the ordinary way.
+ */
+function takeTheSpare(root: string, dir: string, folder: string, branch: string, pid: number): boolean {
+  if (real(path.resolve(dir)) !== root) return false;
+  const spare = spareFolderPath(root);
+  if (!spareIsGood(root, spare, pid)) return false;
+  if (!acquireTaskFolder(root, spare, { pid }).taken) return false;
+  if (!tryGit(spare, ['switch', '-q', '-c', branch]).ok) return false;
+  const putBack = () => { tryGit(spare, ['switch', '-q', '--detach']); return false; };
+  if (fs.existsSync(folder)) return putBack();
+  if (!tryGit(root, ['worktree', 'move', '--force', '--force', spare, folder]).ok) return putBack();
+  try {
+    const files = spareFiles(folder);
+    if (files) { fs.rmSync(files.stamp, { force: true }); fs.rmSync(files.since, { force: true }); }
+  } catch { /* left behind, they are never read again */ }
+  // Given now rather than when it was made, so it is as fresh as a folder made on the spot.
+  const given = givePrivateFolder(root, folder);
+  if (!given.given && given.why) console.warn(`[task-folders] ${path.basename(folder)} has no private folder: ${given.why}`);
+  return true;
+}
+
+/**
+ * ONE FOLDER MADE AHEAD PER REPOSITORY, FOR THE NEXT NEW THREAD (w-9993530556).
+ *
+ * Made the way `ensureTaskFolder` makes one, but detached at the commit a new
+ * thread starts from and left at `spareFolderPath`, locked to this app. A
+ * folder that is not a repository yet is left alone: its first commit is made
+ * for the person's first thread there, not ahead of it. Only by the block
+ * clone: a checkout with edits in it would cost a full checkout each time
+ * main moved (960 MB on hers), for a folder that may never be wanted.
+ */
+export function makeSpareFolder(dir: string, { pid = process.pid }: { pid?: number } = {}): { made: boolean; path: string | null; why?: string } {
+  if (insideGitFolder(path.resolve(dir))) return { made: false, path: null, why: 'inside a .git folder' };
+  const root = repoRoot(dir);
+  if (!root) return { made: false, path: null, why: 'not a repository' };
+  // One per repository, so only a project at its top makes one.
+  if (real(path.resolve(dir)) !== root) return { made: false, path: null, why: 'not the top of its repository' };
+  const base = tryGit(root, ['rev-parse', '--verify', '-q', `${baseRef(root)}^{commit}`]);
+  if (!base.ok || !base.out) return { made: false, path: null, why: 'no commit yet' };
+  const spare = spareFolderPath(root);
+  if (spareIsGood(root, spare, pid)) {
+    // One an app that has quit left is written over to this one.
+    const held = acquireTaskFolder(root, spare, { pid });
+    return held.taken ? { made: false, path: spare, why: 'ready' } : { made: false, path: null, why: held.reason };
+  }
+  const cleared = clearUnfinished(root, spare, pid);
+  if (!cleared.cleared) return { made: false, path: null, why: cleared.reason };
+  tryGit(root, ['worktree', 'prune']);
+  fs.mkdirSync(path.dirname(spare), { recursive: true });
+  keepOutOfBackups(path.dirname(spare));
+  hideFromTheCheckout(root);
+  if (!cloneCheckout(root, spare, base.out, ['--detach', spare, base.out], pid)) {
+    clearUnfinished(root, spare, pid);
+    return { made: false, path: null, why: 'not clean at the commit a thread starts from' };
+  }
+  try {
+    const files = spareFiles(spare);
+    if (!files) throw Error('its git folder could not be found');
+    // Before the copy, so a change made while it runs reads as newer.
+    fs.writeFileSync(files.since, '');
+    carryLocalFiles(root, spare);
+    const stamp: SpareStamp = { head: base.out, local: localFilesNow(root) };
+    fs.writeFileSync(files.stamp, JSON.stringify(stamp));
+  } catch (error) {
+    clearUnfinished(root, spare, pid);
+    return { made: false, path: null, why: (error as Error).message };
+  }
+  return { made: true, path: spare };
+}
+
+/** The folder made ahead, put away, unless another running app made it. */
+export function dropSpareFolder(dir: string, { pid = process.pid }: { pid?: number } = {}): { dropped: boolean; why?: string } {
+  const root = repoRoot(dir);
+  if (!root) return { dropped: false, why: 'not a repository' };
+  if (real(path.resolve(dir)) !== root) return { dropped: false, why: 'not the top of its repository' };
+  const spare = spareFolderPath(root);
+  if (!fs.existsSync(spare) && !record(root, spare)) return { dropped: false, why: 'none' };
+  const cleared = clearUnfinished(root, spare, pid);
+  return cleared.cleared ? { dropped: true } : { dropped: false, why: cleared.reason };
 }
 
 /**
@@ -898,7 +1071,7 @@ function clearUnfinished(root: string, staging: string, pid: number = process.pi
  * shares blocks where the filesystem can and copies where it cannot, and `-c`
  * is not an option there at all.
  */
-function cloneCheckout(root: string, folder: string, branch: string, from: string, branchExists: boolean, pid: number = process.pid): boolean {
+function cloneCheckout(root: string, folder: string, from: string, addArgs: string[], pid: number = process.pid): boolean {
   // On NTFS the copy shares no blocks, so it writes everything the checkout
   // would, plus the ignored files inside tracked directories.
   if (process.platform === 'win32') return false;
@@ -914,9 +1087,7 @@ function cloneCheckout(root: string, folder: string, branch: string, from: strin
   if (!head.ok || !target.ok || head.out !== target.out) return false;
   if (!clean.ok || clean.out.length > 0) return false;
 
-  const add = branchExists
-    ? addOwned(root, folder, ['--no-checkout', folder, branch], pid)
-    : addOwned(root, folder, ['--no-checkout', '-b', branch, folder, from], pid);
+  const add = addOwned(root, folder, ['--no-checkout', ...addArgs], pid);
   if (!add.ok) return false;
 
   try {
@@ -1107,9 +1278,13 @@ function removeWorktree(root: string, folder: string): GitResult {
 
 function submodulesHoldNothingOfTheirOwn(folder: string): boolean {
   try {
+    // Before git looks inside any of them, since looking runs their settings.
+    const own = repositoriesOfItsOwn(folder);
+    if (!own || own.length) return false;
+    const home = projectGitFolder(folder);
+    if (!home || !everySubmoduleKeepsItsRepositoryOutside(folder, home)) return false;
     const status = tryGit(folder, ['status', '--porcelain', '--ignore-submodules=none']);
     if (!status.ok || status.out !== '') return false;
-    if (!everySubmoduleKeepsItsRepositoryOutside(folder)) return false;
     const gitDir = tryGit(folder, ['rev-parse', '--absolute-git-dir']);
     if (!gitDir.ok) return false;
     return repositoriesUnder(path.join(gitDir.out, 'modules')).every((repo) => {
@@ -1125,7 +1300,7 @@ function submodulesHoldNothingOfTheirOwn(folder: string): boolean {
  * deletes it with the files. Asked of every level, since a submodule can hold
  * its own.
  */
-function everySubmoduleKeepsItsRepositoryOutside(at: string): boolean {
+function everySubmoduleKeepsItsRepositoryOutside(at: string, home: string): boolean {
   const staged = tryGit(at, ['ls-files', '-s']);
   if (!staged.ok) return false;
   for (const line of staged.out.split('\n')) {
@@ -1133,9 +1308,45 @@ function everySubmoduleKeepsItsRepositoryOutside(at: string): boolean {
     const inner = path.join(at, line.slice(line.indexOf('\t') + 1));
     const dotGit = path.join(inner, '.git');
     if (!fs.existsSync(dotGit)) continue;
-    if (fs.lstatSync(dotGit).isDirectory() || !everySubmoduleKeepsItsRepositoryOutside(inner)) return false;
+    if (!keptInTheProjectsGit(dotGit, home) || !everySubmoduleKeepsItsRepositoryOutside(inner, home)) return false;
   }
   return true;
+}
+
+/** The project's own git folder, which no worker can write, resolved. */
+function projectGitFolder(folder: string): string | null {
+  const common = tryGit(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  try { return common.ok ? fs.realpathSync(common.out) : null; } catch { return null; }
+}
+
+/** A `.git` that is a file naming a repository inside the project's own git folder. */
+function keptInTheProjectsGit(dotGit: string, home: string): boolean {
+  try {
+    if (!fs.lstatSync(dotGit).isFile()) return false;
+    const named = /^gitdir: (.+)$/m.exec(fs.readFileSync(dotGit, 'utf8'));
+    if (!named) return false;
+    return fs.realpathSync(path.resolve(path.dirname(dotGit), named[1].trim())).startsWith(home + path.sep);
+  } catch { return false; }
+}
+
+/**
+ * Repositories in the folder, tracked or not, whose git a worker could have
+ * written: a Codex sandbox protects only the folder's top-level `.git`, and git
+ * runs a repository's settings whenever it looks inside one. Paths relative to
+ * the folder; null when git could not say.
+ */
+function repositoriesOfItsOwn(folder: string): string[] | null {
+  const home = projectGitFolder(folder);
+  const staged = tryGit(folder, ['ls-files', '-s', '-z']);
+  const loose = tryGit(folder, ['ls-files', '-o', '--exclude-standard', '-z']);
+  if (!home || !staged.ok || !loose.ok) return null;
+  const gitlinks = staged.out.split('\0').filter((l) => l.startsWith('160000 ')).map((l) => l.slice(l.indexOf('\t') + 1));
+  // An untracked repository is listed as its folder, with a trailing slash.
+  const nested = loose.out.split('\0').filter((p) => p.endsWith('/')).map((p) => p.slice(0, -1));
+  return [...gitlinks, ...nested].filter((rel) => {
+    const dotGit = path.join(folder, rel, '.git');
+    return fs.existsSync(dotGit) && !keptInTheProjectsGit(dotGit, home);
+  });
 }
 
 /** Every repository in a `modules` directory, nested ones included. Throws on one it cannot read. */
@@ -1228,8 +1439,11 @@ export function parkTaskFolder(dir: string, id: unknown, { pid = process.pid, pa
     // index there is exactly the old behaviour, and the old behaviour is better
     // than stranding the folder.
     const as = asTheApp(folder);
+    // `add` looks inside a repository it stages, and staging one makes every later status look too.
+    const own = repositoriesOfItsOwn(folder);
+    if (!own) return { parked: false, reason: 'refused', path: folder, detail: 'git could not list what is in the folder' };
     tryGit(folder, [...as, 'commit', '--no-verify', '--allow-empty', '-q', '-m', PARKED_INDEX]);
-    const staged = tryGit(folder, ['add', '-A']);
+    const staged = tryGit(folder, ['add', '-A', '--', '.', ...own.map((rel) => `:(exclude,literal)${rel}`)]);
     // `--no-verify`, because a repository's own commit hooks are written for a
     // person finishing a piece of work, and this is the app tidying up after
     // one. A hook that refuses here would strand the folder it is protecting.

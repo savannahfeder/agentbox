@@ -1,0 +1,308 @@
+// ASKING A TEAMMATE FOR SOMETHING ON YOUR THREAD, WITHOUT GIVING IT AWAY.
+//
+// An ask is a task to one person (team-rules GIVEN_TASK) whose `ask` names the
+// giver's thread. Two kinds:
+//   help    they jump in: what they write on the thread goes to its agent, as
+//           theirs, until they hand it back (main/team/asks.mts relays it)
+//   review  they look and comment; their answer comes back to you, and your
+//           agent hears it only when you next reply
+// Handing back is closing the task with words and a verdict. The thread stays
+// the owner's throughout: their computer runs it, and it comes back to their
+// Needs you saying what was said.
+import { toldBy } from './answers.mts';
+import { shownName } from './artifact-marks.mts';
+import { isTaskRow, taskGiver } from './team-rules.mts';
+import { handedFrom } from './thread-link.mts';
+import type { AskPatch, Verdict } from './work-items.mts';
+
+export type AskKind = AskPatch['kind'];
+export type Ask = AskPatch;
+
+export interface AskRow {
+  id: string;
+  status?: string;
+  assignee?: string | null;
+  createdBy?: string | null;
+  createdAt?: number;
+  updatedAt?: number;
+  labels?: readonly string[];
+  ask?: Ask | null;
+  verdict?: Verdict | null;
+  answer?: string | null;
+  product?: string;
+  wrote?: { ask?: { by?: string; ts?: number } | null; status?: { by?: string; ts?: number } | null; verdict?: { ts?: number } | null; answer?: { by?: string; ts?: number } | null } | null;
+}
+
+export function askOf(row: AskRow | null | undefined): Ask | null {
+  const a = row?.ask;
+  if (!row || !isTaskRow(row) || !a || (a.kind !== 'help' && a.kind !== 'review')) return null;
+  return a.owner && a.thread ? a : null;
+}
+
+/** An ask this person made. A line from the other side could carry any ask, so only the writer's own counts. */
+export function askIGave(row: AskRow | null | undefined, me: string | null): Ask | null {
+  const a = askOf(row);
+  if (!a || !me || a.owner !== me) return null;
+  const by = row?.wrote?.ask?.by ?? row?.createdBy;
+  return by === me ? a : null;
+}
+
+// Handed back is final: a thank-you on the task reopens the conversation, not the ask
+// (round three of the team test). Asking again is a new ask.
+export const askIsOpen = (row: Pick<AskRow, 'status' | 'verdict'>): boolean => row.status !== 'done' && !row.verdict;
+const isOpen = askIsOpen;
+
+/** The open help ask you gave this person on this thread: their words then go to its agent. */
+export function helpAskOpen(rows: readonly AskRow[], me: string | null, thread: string, helper: string): AskRow | null {
+  return rows.find((r) => {
+    const a = askIGave(r, me);
+    return !!a && a.kind === 'help' && a.thread === thread && r.assignee === helper && isOpen(r);
+  }) ?? null;
+}
+
+/**
+ * The help ask that covers words this helper wrote at `at`: asked before them
+ * and not handed back until after. Judged by when the words were written, not
+ * when this computer read them, so a late sync neither drops them nor sends
+ * older remarks to the agent.
+ */
+export function helpAskCovering(rows: readonly AskRow[], me: string | null, thread: string, helper: string, at: number): AskRow | null {
+  return rows.find((r) => {
+    const a = askIGave(r, me);
+    if (!a || a.kind !== 'help' || a.thread !== thread || r.assignee !== helper) return false;
+    const opened = r.wrote?.ask?.ts ?? r.createdAt ?? 0;
+    if (at < opened) return false;
+    // The helper may close the task but never open it: their copy can write its status.
+    if (r.status !== 'done' && r.wrote?.status?.by === helper) return false;
+    if (isOpen(r)) return true;
+    const closed = r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? r.updatedAt ?? 0;
+    return at <= closed;
+  }) ?? null;
+}
+
+/** What the helper said as they handed back: the task's answer only when they wrote it with the hand-back. */
+export function handBackSaid(r: AskRow): string {
+  const said = r.wrote?.answer;
+  const back = r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? 0;
+  if (!said || (said.by && said.by !== r.assignee) || (said.ts ?? 0) < back) return '';
+  return String(r.answer ?? '').trim();
+}
+
+export interface AskShown { row: AskRow; ask: Ask; to: string; open: boolean; verdict: Verdict | null; words: string; at: number; backAt: number | null }
+
+/** Every ask on one of your threads, newest first, for the line above its reply box. */
+export function asksOnThread(rows: readonly AskRow[], me: string | null, thread: string): AskShown[] {
+  const out: AskShown[] = [];
+  for (const r of rows) {
+    const a = askIGave(r, me);
+    if (!a || a.thread !== thread || !r.assignee) continue;
+    const open = isOpen(r);
+    out.push({
+      row: r, ask: a, to: r.assignee, open, verdict: open ? null : (r.verdict ?? 'done'),
+      words: open ? '' : handBackSaid(r),
+      at: r.createdAt ?? 0, backAt: open ? null : (r.wrote?.status?.ts ?? r.updatedAt ?? null),
+    });
+  }
+  return out.sort((x, y) => (y.backAt ?? y.at) - (x.backAt ?? x.at));
+}
+
+/** The open ask on a teammate's thread that is waiting on you, if there is one. */
+export function askOnMe(rows: readonly AskRow[], me: string | null, owner: string, thread: string): AskRow | null {
+  return rows.find((r) => {
+    const a = askOf(r);
+    return !!a && a.owner === owner && a.thread === thread && r.assignee === me && isOpen(r);
+  }) ?? null;
+}
+
+/**
+ * A task you sent out about one of your own threads: an ask, or the thread
+ * handed over for good. Your thread is the row for it, so the task stays off
+ * your In progress, Done and board; a reply on it still reaches Needs you.
+ */
+export function sentAwayByMe(row: (AskRow & { body?: string | null }) | null | undefined, me: string | null): boolean {
+  if (!row || !me) return false;
+  if (askIGave(row, me)) return true;
+  return isTaskRow(row as Parameters<typeof isTaskRow>[0]) && taskGiver(row as Parameters<typeof taskGiver>[0]) === me && !!handedFrom(row.body, me);
+}
+
+/** The thread an ask or a hand-over task is about, as one key, or null for any other row. */
+function threadKey(r: AskRow & { body?: string | null }): string | null {
+  const a = askOf(r);
+  if (a) return `${a.owner}/${a.thread}`;
+  if (!isTaskRow(r as Parameters<typeof isTaskRow>[0])) return null;
+  const giver = taskGiver(r as Parameters<typeof taskGiver>[0]);
+  const from = handedFrom(r.body, giver);
+  return from ? `${from.owner}/${from.id}` : null;
+}
+
+/**
+ * Rows with every ask or hand-over about one thread left out but the newest,
+ * so a thread you were asked about or handed often is one row. `all` is every
+ * row there is, so a done one gives way to a newer one still open elsewhere.
+ */
+export function newestAskPerThread<R extends AskRow & { body?: string | null }>(rows: readonly R[], all: readonly R[] = rows): R[] {
+  const newest = new Map<string, R>();
+  for (const r of all) {
+    const key = threadKey(r);
+    if (!key) continue;
+    const had = newest.get(key);
+    // One still open wins over any closed; otherwise the one sent last.
+    const rank = (x: R) => [x.status !== 'done' ? 1 : 0, x.createdAt ?? 0, x.updatedAt ?? 0];
+    const later = (a: number[], b: number[]) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; };
+    if (!had || later(rank(r), rank(had))) newest.set(key, r);
+  }
+  return rows.filter((r) => { const key = threadKey(r); return !key || newest.get(key) === r; });
+}
+
+/** Asks you gave that were handed back and not yet carried onto the thread. */
+export function handedBackAsks(rows: readonly AskRow[], me: string | null, done: ReadonlySet<string>): AskRow[] {
+  return rows.filter((r) => {
+    const a = askIGave(r, me);
+    return !!a && !isOpen(r) && !done.has(r.id) && r.wrote?.status?.by === r.assignee;
+  });
+}
+
+/** The part of an agent's message a teammate is asked about: the paragraph with its question, else its opening. */
+export function stepOf(text: string): string {
+  const plain = text.replace(/\*\*|__|`/g, '').trim();
+  const paras = plain.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const asked = paras.find((p) => /\?/.test(p)) ?? paras[0] ?? '';
+  return asked.length > 600 ? `${asked.slice(0, 600)}…` : asked;
+}
+
+/** Who handed this thread back to you, when their words are the newest thing on it and it waits for you. */
+export function handedBackBy(row: { status?: string; wrote?: Record<string, { ts?: number; teammate?: string } | undefined> | null } | null | undefined, askedSince = 0): string | null {
+  const answer = row?.wrote?.answer;
+  if (row?.status !== 'blocked' || !answer?.teammate) return null;
+  // A newer ask (still out, or taken back) makes an older hand-back old news.
+  const after = Math.max(row.wrote?.result?.ts ?? 0, row.wrote?.note?.ts ?? 0, askedSince);
+  return (answer.ts ?? 0) >= after ? answer.teammate : null;
+}
+
+/** On your thread's row once someone you asked handed it back: what they said, in a few words. */
+export function backWord(first: string, verdict: string | null): string {
+  return verdict === 'yes' ? `${first} says it looks good` : verdict === 'changes' ? `${first} asked for changes` : `Back from ${first}`;
+}
+
+/** On your thread's row while someone you asked has it: "Theo is reviewing", or null. */
+export function askedOutWord(rows: readonly AskRow[], me: string | null, thread: string, nameOf: (id: string) => string, seenAt?: (row: AskRow) => number): string | null {
+  const open = asksOnThread(rows, me, thread).filter((a) => a.open);
+  if (!open.length) return null;
+  const people = new Set(open.map((a) => a.to)).size;
+  const first = (nameOf(open[0].to) || 'Someone').split(/\s+/)[0];
+  const who = people === 1 ? first : `${people} people`;
+  const review = open.every((a) => a.ask.kind === 'review');
+  // Nobody has opened it yet: it is asked, not being worked on (round eleven).
+  if (seenAt && open.every((a) => seenAt(a.row) < (a.row.createdAt ?? 0))) return `Asked ${who} ${review ? 'for a review' : 'for help'}`;
+  return `${who} ${people === 1 ? 'is' : 'are'} ${review ? 'reviewing' : 'helping'}`;
+}
+
+/** The word under an ask's name in a list, where "Task" goes on any other. */
+export const askWord = (kind: AskKind): string => (kind === 'help' ? 'Help' : 'Review');
+
+/** "a", "a and b", "a, b and c". */
+const listed = (names: readonly string[]): string => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
+
+/** The files `by` approved between `from` and `to`, by the name they are shown under, oldest first. */
+export function approvedDuring(approvals: readonly { file: string; by: string | null; ts: number }[], { by, from, to = Infinity }: { by: string; from: number; to?: number }): string[] {
+  const named = approvals
+    .filter((a) => a.by === by && a.ts >= from && a.ts <= to)
+    .sort((a, b) => a.ts - b.ts)
+    .map((a) => shownName(a.file.replace(/[#@]\d+$/, '')));
+  return [...new Set(named.filter(Boolean))];
+}
+
+/** What the giver's thread says once the ask comes back. */
+export function handedBackWords({ kind, name, verdict, words, asked = null, approved = [] }: { kind: AskKind; name: string; verdict: Verdict | null; words: string; asked?: { by: string; note: string } | null; approved?: readonly string[] }): string {
+  const said = words.trim();
+  const head = kind === 'review'
+    ? verdict === 'yes' ? `${name} reviewed this and it looks good.` : verdict === 'changes' ? `${name} reviewed this and asked for changes.` : `${name} reviewed this.`
+    : `${name} handed this back.`;
+  // What was asked lived only on the task, so the thread lost it once the ask came back (round four of the team test).
+  const ask = asked?.note.trim() ? `${asked.by} had asked: “${asked.note.trim()}”` : '';
+  // Quoted, so `readHandBack` finds each name whatever it holds.
+  const files = approved.length ? `${name} approved ${listed(approved.map((n) => `“${n}”`))}.` : '';
+  // The question before the answer, as a reply reads (a walk-through read it backwards).
+  return [head, ask, files, said].filter(Boolean).join('\n\n');
+}
+
+// A hand-back is written on the thread as the helper's words to the agent are
+// (`from` on an answer), so only its head line tells the two apart.
+const HANDED_BACK = /^\S+ (?:handed this back|reviewed this(?: and it looks good| and asked for changes)?)\.(?:\n|$)/;
+
+/** Whether words on a thread are a hand-back `handedBackWords` wrote. */
+export const isHandBack = (text: string | null | undefined): boolean => HANDED_BACK.test(String(text ?? ''));
+
+export interface HandBackParts { name: string; kind: AskKind; verdict: Verdict; asked: { by: string; note: string } | null; approved: string[]; words: string }
+
+const HEAD = /^(\S+) (handed this back|reviewed this(?: and it looks good| and asked for changes)?)\.(?:\n\n|\n|$)/;
+const ASKED = /(?:^|\n\n)(\S+) had asked: “([\s\S]*?)”(?=\n\n|$)/;
+const APPROVED = /(?:^|\n\n)\S+ approved ((?:“[^”]+”(?:, | and )?)+)\.(?=\n\n|$)/;
+
+/** A stored hand-back taken apart, or null for any other words. */
+export function readHandBack(text: string | null | undefined): HandBackParts | null {
+  const head = HEAD.exec(String(text ?? ''));
+  if (!head) return null;
+  let rest = String(text).slice(head[0].length);
+  const asked = ASKED.exec(rest);
+  if (asked) rest = rest.replace(asked[0], '');
+  const files = APPROVED.exec(rest);
+  if (files) rest = rest.replace(files[0], '');
+  const approved = files ? [...files[1].matchAll(/“([^”]+)”/g)].map((m) => m[1]) : [];
+  // Sharing a thread carries each file a line names as a picture line of its own; those are the list, not words.
+  rest = rest.replace(/^!\[([^\]\n]+)\]\(attachments\/[^)\s]+\)$/gm, (line, name: string) => (approved.includes(name) ? '' : line));
+  const said = head[2];
+  return {
+    name: head[1],
+    kind: said === 'handed this back' ? 'help' : 'review',
+    verdict: said.endsWith('looks good') ? 'yes' : said.endsWith('changes') ? 'changes' : 'done',
+    asked: asked ? { by: asked[1], note: asked[2] } : null,
+    approved,
+    words: rest.trim(),
+  };
+}
+
+/**
+ * A hand-back as the message a person sends: the verdict, what they said, and
+ * the files they approved. The same words on both sides of an ask, under the
+ * helper's name; `link` draws a file's name as a link to it.
+ */
+export function handBackMessage({ kind, verdict, words, approved, link = (n) => n }: { kind: AskKind; verdict: Verdict | null; words: string; approved: readonly string[]; link?: (name: string) => string }): string {
+  const said = words.trim();
+  // A reply that handed it back says only what was written.
+  const head = verdict === 'yes' ? 'Looks good.' : verdict === 'changes' ? 'Needs changes.' : said ? '' : kind === 'help' ? 'Handed back.' : 'Reviewed.';
+  const files = approved.length ? `Approved ${listed(approved.map(link))}.` : '';
+  return [head, said, files].filter(Boolean).join('\n\n');
+}
+
+// Nothing runs on a teammate's hand-back until the owner replies, even once a
+// run's own status has replaced the hold (`heldForHer`).
+export const handBackWaits = (item: Parameters<typeof toldBy>[0] & { answer?: string | null }): boolean => !!toldBy(item) && isHandBack(item?.answer);
+
+/**
+ * A hand-back as one reader sees it: the stored words name both people, so the
+ * asker reads "You asked" and the helper "You reviewed this".
+ */
+export function handBackReadBy(text: string, reader: 'asker' | 'helper' | 'other', asker = ''): string {
+  if (!isHandBack(text)) return text;
+  if (reader === 'asker') return text.replace(/\n\n\S+ had asked: /, '\n\nYou asked: ');
+  const head = reader === 'helper' ? text.replace(/^\S+ (handed this back|reviewed this)/, 'You $1') : text;
+  return asker ? head.replace(/\n\nYou asked: /, `\n\n${asker} asked: `) : head;
+}
+
+/** The first lines of the task the helper gets: who asked, for what, and the step if one was picked. */
+const REVIEW_LEAD = 'Say whether it looks good or what to change.';
+const helpLead = (owner: string, helper: string | null) => `${helper ? `${helper}, write` : 'Write'} to ${owner}'s agent on ${owner}'s thread. A reply here goes to ${owner}.`;
+const LEAD = /(^|\n\n)(?:Say whether it looks good or what to change\.|(?:\S+, write|Write) to (\S+)'s agent on \2's thread\. A reply here goes to \2\.)(?=\n\n|$)/g;
+
+export function askBody({ kind, owner, helper = null, note, step }: { kind: AskKind; owner: string; helper?: string | null; note: string; step?: string | null }): string {
+  // The line over the message says who asked and what for; this says only what it means.
+  const lead = kind === 'help' ? helpLead(owner, helper) : REVIEW_LEAD;
+  const quoted = step?.trim() ? step.trim().split('\n').map((l) => `> ${l}`).join('\n') : '';
+  return [note.trim(), quoted, lead].filter(Boolean).join('\n\n');
+}
+
+/** An ask's words without the line `askBody` says only to the person asked: what an agent is handed. */
+export function withoutAskLead(text: string): string {
+  return text.replace(LEAD, '').replace(/^\n\n/, '');
+}

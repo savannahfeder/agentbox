@@ -7,7 +7,7 @@ import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
 import { ConfettiBurst } from './ConfettiBurst';
-import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyClosesFinish, keyEndsFinish, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
+import { THREAD_CLOSED, cursorOwed, finishedPlace, fitsBesideTabs, stillPreparing, closeLessons, closesThread, finishLesson, keyClosesFinish, keyEndsFinish, keyLearns, learnedBy, lessonOf, readTour, tourLive, tourOver, tourStep, urgentCountsNow, type Lesson, type Tour as TourState, type TourScreen, type TourStep } from '../tour';
 import './tour.css';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -141,7 +141,7 @@ function boxOf(step: TourStep, els: HTMLElement[]): Box | null {
   return { x, y, w: Math.max(...rs.map((r) => r.right)) - x, h: Math.max(...rs.map((r) => r.bottom)) - y };
 }
 
-function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean, answering: boolean, practiceId: string | null = null): TourScreen {
+function readScreen(view: string, thread: boolean, covered: boolean, palette: boolean, answering: boolean, practiceId: string | null = null, practiceOpen = false): TourScreen {
   const card = document.querySelector<HTMLElement>('.tc-card');
   return {
     composer: !card ? 'none' : card.classList.contains('tc-inline') ? 'inline' : 'card',
@@ -154,6 +154,7 @@ function readScreen(view: string, thread: boolean, covered: boolean, palette: bo
     practice: !!practiceId && !!practiceRow(practiceId),
     waiting: Number(needsYouTab()?.querySelector('b')?.textContent) || 0,
     thread,
+    practiceThread: thread && practiceOpen,
     preparing: stillPreparing({ thread, onPage: !!document.querySelector('.one-catching-up'), ready: document.querySelectorAll(ROWS).length, writing: document.querySelectorAll('.list-pane .row[data-catching-up]').length }),
     typing: thread && !!document.activeElement?.closest('.dock-card'),
     busy: thread && !!document.querySelector('.live-word.is-shimmering, .live-brief.live-queued'),
@@ -203,12 +204,14 @@ export function TourFinished({ covered, onDone }: { covered: boolean; onDone: ()
   );
 }
 
-export function Tour({ tour, practice = false, practiceId = null, answering = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
+export function Tour({ tour, practice = false, practiceId = null, practiceOpen = false, answering = false, view, thread, covered, palette, onChange, onPoint, onStep }: {
   tour: TourState | null;
   /** Home's box holds the walkthrough's practice task. */
   practice?: boolean;
   /** The practice thread's id once it is sent: the list tips are about its row and no other. */
   practiceId?: string | null;
+  /** The thread open is that practice thread. */
+  practiceOpen?: boolean;
   /** The practice thread on screen is waiting for its answer. */
   answering?: boolean;
   view: string;
@@ -243,10 +246,18 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
   const point = useRef(onPoint);
   point.current = onPoint;
   const walked = useRef(false);
+  // The urgent tip has gone but its lesson is not written yet (urgentCountsNow).
+  const urgentGone = useRef(false);
+  // Since when the open thread has shown no Done button while the close tip is wanted.
+  const closedSince = useRef(0);
+  const pressedAt = useRef(0);
   useEffect(() => {
-    const note = (e: KeyboardEvent) => { if (/^(ArrowUp|ArrowDown|j|k)$/.test(e.key)) walked.current = true; };
+    const note = (e: KeyboardEvent) => { pressedAt.current = Date.now(); if (/^(ArrowUp|ArrowDown|j|k)$/.test(e.key)) walked.current = true; };
+    const pointer = () => { pressedAt.current = Date.now(); };
+    const POINTER = ['pointerdown', 'pointerup'] as const;
     window.addEventListener('keydown', note, true);
-    return () => window.removeEventListener('keydown', note, true);
+    for (const p of POINTER) window.addEventListener(p, pointer, true);
+    return () => { window.removeEventListener('keydown', note, true); for (const p of POINTER) window.removeEventListener(p, pointer, true); };
   }, []);
 
   // THE END OF THE TUTORIAL: one burst of confetti, the way the old walk ended,
@@ -276,12 +287,23 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
   useEffect(() => {
     if (!live || !tour) { if (shown.current) { shown.current = null; setStep(null); } return undefined; }
     const read = () => {
-      const screen = readScreen(view, thread, covered, palette, answering, practiceId);
-      const rawStep = tourStep(tour, screen);
+      const screen = readScreen(view, thread, covered, palette, answering, practiceId, practiceOpen);
+      if (!tour.urgent || tour.done.includes('urgent')) urgentGone.current = false;
+      // Written once the press that ended the tip has done its own work, so nothing redraws under it.
+      else if (urgentGone.current && Date.now() - pressedAt.current >= SETTLE_MS && urgentCountsNow(tour, screen)) {
+        onChange(finishLesson(readTour(localStorage) ?? tour, 'urgent'));
+        return;
+      }
+      const told = tourStep(tour, screen);
+      const rawStep = told === 'urgent' && urgentGone.current ? null : told;
       // Told to go and explore, nobody is then asked to come back and watch.
       const wanted = rawStep === 'working' && tried ? null : rawStep;
-      // Already closed, by its agent: nothing is left for the close tip to point at.
-      if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }
+      // Already closed, by its agent: nothing is left for the close tip to point at. A thread just
+      // opened draws its title a moment before its Done button, so the absence has to last.
+      const closedByItsAgent = wanted === 'close' && !!document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done');
+      if (!closedByItsAgent) closedSince.current = 0;
+      else if (!closedSince.current) closedSince.current = Date.now();
+      else if (Date.now() - closedSince.current >= SETTLE_MS) { onChange(finishLesson(tour, 'close')); return; }
       // A screen still arriving (the inbox before its rows land) must not flash a
       // tip, and the one before it no longer points at anything.
       if (wanted !== settling.current.step) settling.current = { step: wanted, since: Date.now() };
@@ -317,7 +339,7 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
     read();
     const t = setInterval(read, 120);
     return () => clearInterval(t);
-  }, [live, tour, view, thread, covered, palette, answering, onChange, tried, practiceId]);
+  }, [live, tour, view, thread, covered, palette, answering, onChange, tried, practiceId, practiceOpen]);
 
   // THE CARD, beside the glow, kept inside the window.
   useEffect(() => {
@@ -382,12 +404,16 @@ export function Tour({ tour, practice = false, practiceId = null, answering = fa
   }, [step, tour, thread, onChange]);
 
   // The urgent tip goes after a while, or on the next key or click once it has been read.
+  // That press still reaches the app; the lesson is written by the reading above.
   useEffect(() => {
     if (step !== 'urgent' || !tour) return undefined;
     const since = Date.now();
-    const done = () => onChange(finishLesson(tour, 'urgent'));
+    const done = () => { urgentGone.current = true; };
     const t = setTimeout(done, URGENT_MS);
-    const any = () => { if (Date.now() - since >= SEEN_MS) setTimeout(done, 0); };
+    const any = (e: Event) => {
+      if (e instanceof KeyboardEvent && !keyEndsFinish(e.key)) return;
+      if (Date.now() - since >= SEEN_MS) done();
+    };
     window.addEventListener('keydown', any, true);
     window.addEventListener('pointerdown', any, true);
     return () => { clearTimeout(t); window.removeEventListener('keydown', any, true); window.removeEventListener('pointerdown', any, true); };

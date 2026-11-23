@@ -15,6 +15,7 @@ import type { FiledRow, Thread } from '../lib/thread';
 import { FILED_WORDS, waitingWords, type Live } from '../lib/thread-offers';
 import { Chevron as FoldArrow } from './icons';
 import { InlineMarkdown, type MessageFiles } from './Markdown';
+import { router } from '../lib/router';
 import { T } from './parts';
 import { color, corner, font } from './theme';
 
@@ -262,7 +263,8 @@ const figures = (c: { plus: number; minus: number }, size: number) => signed(c).
 ));
 
 /** What the last run changed: its figures, then each file (the desktop's change figures and the file bar of its code pane). */
-export function ChangeCard({ change }: { change: NonNullable<Thread['change']> }) {
+export function ChangeCard({ change, product, id }: { change: NonNullable<Thread['change']>; product: string; id: string }) {
+  const open = (path: string) => router.push({ pathname: '/change', params: { product, id, path } });
   return (
     <View style={{ marginTop: 22, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, overflow: 'hidden' }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingTop: 11, paddingHorizontal: 16, paddingBottom: 8 }}>
@@ -270,10 +272,11 @@ export function ChangeCard({ change }: { change: NonNullable<Thread['change']> }
         <T style={{ fontSize: 12.5, color: color.faint }}>in {fileCount(change)}</T>
       </View>
       {change.list.map((f) => (
-        <View key={f.path} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 6, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: color.rowLine }}>
+        <Pressable key={f.path} onPress={() => open(f.path)} accessibilityRole="button" accessibilityLabel={`See the code changed in ${f.path}`}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 6, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: color.rowLine, backgroundColor: pressed ? color.fill : 'transparent' })}>
           <T numberOfLines={1} ellipsizeMode="head" style={{ flex: 1, fontFamily: font.mono, fontSize: 12.5, color: color.dim }}>{f.path}</T>
           {figures(f, 12)}
-        </View>
+        </Pressable>
       ))}
       {change.more > 0 && (
         <View style={{ paddingVertical: 8, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: color.rowLine }}>

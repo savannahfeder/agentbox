@@ -3,9 +3,10 @@
 // Asked 2026-10-11 (w-e46f2e9cea): "Can you also confirm this works 100% of the
 // time during onboarding? That's the critical location."
 //
-// Setup's last card is drawn only when `finishCard` (renderer/src/onboarding.ts)
-// is handed at least one session that is not already in the inbox; otherwise
-// the walk skips it and the person never learns importing exists. Those
+// Setup offers chats to bring in only when it is handed at least one session
+// that is not already in the inbox; otherwise it skips them and the person never
+// learns importing exists. (This read the old walk's `finishCard` until that walk
+// went, 2026-11-21; the question it asked of the sessions is the same.) Those
 // sessions come from `zero:agent-threads`, which is `readImportableThreads`
 // (main/importable-threads.mts) plus `markImported`. This file runs that exact
 // chain, start to finish, on one made-up machine per way people actually run
@@ -65,9 +66,9 @@ function codexSession(codexDir, { id = 'x1', originator = 'codex_cli_rs', when =
 
 /** What setup's last card decides, given the app as a brand new user has it. */
 async function setupCard({ env = {}, shellEnv = {}, config = {}, supervisor = { _codexProfiles: () => ['default'], _codexProfileHome: () => path.join(home, '.codex') } } = {}) {
-  const { finishCard } = await import('../renderer/src/onboarding.ts');
   const threads = markImported(await readImportableThreads({ config, supervisor, env, shellEnv, home, now: NOW }), []);
-  return { threads, card: finishCard({ missing: false }, { read: true, some: false }, threads) };
+  const offered = threads.some((t) => !t.imported);
+  return { threads, card: { show: offered, skip: !offered } };
 }
 
 const shown = (card) => card.show === true && !card.skip;

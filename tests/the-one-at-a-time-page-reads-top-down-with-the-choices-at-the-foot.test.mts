@@ -133,7 +133,7 @@ describe('where the app wires it', () => {
   });
   it('the thread page takes the queue, and wears no summary panel in it', () => {
     expect(app).toMatch(/queue=\{queueSpot && !inChats \?/);
-    expect(focus).toMatch(/const summaryOffered = [^\n]*!page/);
+    expect(focus).not.toMatch(/SummaryPanel|SummaryRail/);
   });
   it('the choices go to the foot, apart from the reply box, without their heading', () => {
     expect(focus).toContain('{offerInPane && (page || closeAsk || answered ? null : (');

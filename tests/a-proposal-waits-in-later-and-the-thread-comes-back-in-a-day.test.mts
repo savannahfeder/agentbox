@@ -160,11 +160,11 @@ describe('where the two lists read it', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
 
   it('Later holds the proposals, beside what you parked yourself', () => {
-    expect(app).toMatch(/notStarted\(i\) \|\| isProposal\(i\)\s*\|\| \(\(hiddenAt\(i\) > now/);
+    expect(app).toMatch(/notStarted\(i\) \|\| isProposal\(i\)\s*\|\| putOffInLater\(i, \{ hiddenUntil: hiddenAt\(i\), now: listNow/);
   });
 
   it('the inbox lets a thread back in when it is owed an answer', () => {
-    expect(app).toMatch(/threadsOwedAnAnswer\(items, now\)/);
+    expect(app).toMatch(/threadsOwedAnAnswer\(items, listNow\)/);
     expect(app).toMatch(/if \(owedAnAnswer\.has\(i\.id\)\) return true;/);
   });
 
@@ -173,6 +173,6 @@ describe('where the two lists read it', () => {
   it('a shared project hides them too', () => {
     // A waiting thread is held back on the same line (w-5244c90c33), so the
     // line may go on after the proposal check; it may not drop it.
-    expect(app).toMatch(/if \(shared === true\) return i\.status !== 'done' && !\(hiddenAt\(i\) > now\) && !isProposal\(i\)( && [^;]+)?;/);
+    expect(app).toMatch(/if \(shared === true\) return i\.status !== 'done' && !\(hiddenAt\(i\) > listNow\) && !isProposal\(i\)( && [^;]+)?;/);
   });
 });

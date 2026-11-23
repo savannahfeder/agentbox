@@ -149,7 +149,8 @@ describe('the Claude stand-in, started the way the app starts it', () => {
   });
 });
 
-describe('the Codex stand-in model', () => {
+// The skills are a private checkout, absent on GitHub and in a public clone.
+describe.skipIf(!fs.existsSync(path.join(root, '.claude/skills/verify-agentbox')))('the Codex stand-in model', () => {
   it('refuses as a ChatGPT plan out of usage does when the world puts Codex out, and answers when it does not', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-world-'));
     const server = spawn(process.execPath, [path.join(root, '.claude/skills/verify-agentbox/scripts/stub-codex-server.mjs'), dir], { stdio: 'ignore' });

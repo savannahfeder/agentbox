@@ -2,7 +2,7 @@
 // opens in: its versions, comments, replies and Approve. The group's messages
 // stand in for a thread's lines, and its comments are kept in the room.
 import { useEffect, useMemo, useState } from 'react';
-import { filesInLines, lineAsThread, marksOf, otherFilesInLines, threadFiles } from '../../../../shared/artifact-marks.mts';
+import { filesInLines, lineAsThread, marksOf, otherFilesInLines, shownName, threadFiles } from '../../../../shared/artifact-marks.mts';
 import { api } from '../../api';
 import { ArtifactView } from '../../components/ArtifactView';
 import { markGoesTo, withElsewhere } from '../../components/ThreadArtifacts';
@@ -62,6 +62,15 @@ export function RoomFileView({ room, messages, people, meId, opening, files, onN
     const key = markGoesTo(mark, elsewhere);
     return key ? api.filesPlaceMark({ key, mark }) : files.write(mark);
   };
+  // No agent hears a chat's comments, so they go to a new thread of yours with the file.
+  // The comments name the file as people do; the copy on disk carries a saved prefix.
+  const handToAgent = (paths: string[]) => {
+    const name = shownName(paths[0] ?? '');
+    void files.find(nameIn(paths[0] ?? '')).then((srcPath) => {
+      onClose();
+      window.dispatchEvent(new CustomEvent('zero:hand-file-comments', { detail: { name, srcPath, notes: marks.notes } }));
+    });
+  };
   return <ArtifactView product="" draftsAcross={`room:${room.id}`} lines={allLines} numbers={numbered.numbers} marks={marks} me={meId} people={named}
-    open={open} ownerOfRow={null} write={write} onNewVersion={onNewVersion} onClose={onClose} files={stage} />;
+    open={open} ownerOfRow={null} write={write} onNewVersion={onNewVersion} onClose={onClose} files={stage} onHandToAgent={handToAgent} />;
 }

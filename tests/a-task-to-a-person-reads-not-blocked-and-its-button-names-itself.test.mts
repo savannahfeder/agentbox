@@ -42,15 +42,16 @@ describe('Blocked By', () => {
 });
 
 describe('Send As', () => {
+  // The second button says To-do (tests/a-send-to-a-teammate-is-a-message-or-a-to-do).
   it('names its buttons so neither can be taken for the Tasks tab', async () => {
     const html = await draw('task');
-    expect(html).toMatch(/aria-label="Send as a task"[^>]*>Task</);
+    expect(html).toMatch(/aria-label="Send as a to-do"[^>]*>To-do</);
     expect(html).toMatch(/aria-label="Send as a message"[^>]*>Message</);
   });
 
   it('still shows the one word on each button', async () => {
     const html = await draw('message');
-    expect(html).toMatch(/>Task<\/button>/);
+    expect(html).toMatch(/>To-do<\/button>/);
     expect(html).toMatch(/>Message<\/button>/);
   });
 });

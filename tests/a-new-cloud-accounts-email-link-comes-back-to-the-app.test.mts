@@ -171,8 +171,8 @@ describe('the check your email screen', () => {
 
   it('offers a way to send the link again and a way to fix the address', () => {
     expect(page()).toContain("method: 'resend'");
-    expect(page()).toContain('Send it again');
-    expect(page()).toContain('Use a different address');
+    expect(page()).toContain('Resend email');
+    expect(page()).toContain('Use a different email');
   });
 
   // F-62: Create account came up holding the password typed on Sign in, so an

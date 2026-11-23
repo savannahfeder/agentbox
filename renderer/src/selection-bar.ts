@@ -24,6 +24,18 @@ export function boxPickedIn(root: { contains(node: never): boolean } | null, el:
   return words.trim() ? words : null;
 }
 
+/** The comment key in code editors. A lone letter would replace the words selected in a document you can edit. */
+export const COMMENT_CHORD = '⌘/';
+
+type Press = { code?: string; key?: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean };
+
+/** By the character, since some keyboards need Shift to make a /. */
+export function isCommentChord(e: Press, mac: boolean): boolean {
+  if (e.altKey) return false;
+  if (mac ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey) return false;
+  return e.key === '/';
+}
+
 export const quoteFrom =(words: string) => words.replace(/\s+/g, ' ').trim().slice(0, MAX_QUOTE_CHARS);
 
 const GAP = 8;

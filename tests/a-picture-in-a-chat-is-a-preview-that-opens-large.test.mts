@@ -58,7 +58,7 @@ describe('a picture in a chat message', () => {
 
 describe('a picture in a chat, while it loads', () => {
   const loading = ':root:root:root:root .chat-msg .inline-image[data-phone-img="loading"]';
-  const button = ':root:root:root:root .chat-msg .inline-image-open:has(> .inline-image[data-phone-img="loading"])';
+  const button = ':root:root:root:root .chat-msg .inline-image-open[data-picture-loading]';
 
   it('holds a box no larger than the preview, not the whole column', () => {
     expect(widest(value(chat, button, 'width'))).toBeLessThanOrEqual(360);

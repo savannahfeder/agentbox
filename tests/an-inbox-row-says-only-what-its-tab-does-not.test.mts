@@ -9,7 +9,9 @@
 // progress", the tab again.
 //
 // Now the cell is left empty in each of those cases and the five cells stay,
-// so the columns still line up.
+// so the columns still line up. Medium came back on 2026-11-21, when the blank
+// it left read as a gap in the column
+// (a-thread-at-medium-says-medium-in-the-priority-column).
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -49,7 +51,8 @@ const draw = (item, product, tab, fleet = { queued: [] }) => renderToStaticMarku
 // The text inside one cell, tags removed.
 const cell = (html, name) => {
   const at = html.indexOf(`th-cell-${name}`);
-  const next = html.indexOf('<div class="th-cell-', at + 1);
+  // Up to the next cell or the row's second line (w-6714ad1360), which sits after the status.
+  const next = html.indexOf('<div class="th-', at + 1);
   return html.slice(html.indexOf('>', at) + 1, next < 0 ? undefined : next).replace(/<[^>]+>/g, '').trim();
 };
 const cells = (html) => html.match(/<div class="th-cell-[a-z]+/g);
@@ -90,29 +93,6 @@ describe('the Project column', () => {
     const html = draw(message(), withSofia, 'inbox');
     expect(cell(html, 'proj')).toBe('');
     expect(cells(html)).toEqual(FIVE);
-  });
-});
-
-describe('the Priority column', () => {
-  it('is empty at Medium, the level nobody set', () => {
-    const html = draw(thread({ priority: 5 }), company, 'inbox');
-    expect(cell(html, 'prio')).toBe('');
-    expect(cells(html)).toEqual(FIVE);
-  });
-
-  it('is empty on an untagged thread, which runs at Medium', () => {
-    expect(cell(draw(thread({ priority: null }), company, 'inbox'), 'prio')).toBe('');
-  });
-
-  it.each([[9, 'Urgent'], [7, 'High'], [2, 'Low']])('still says a level somebody set: %i is %s', (priority, word) => {
-    expect(cell(draw(thread({ priority }), company, 'inbox'), 'prio')).toBe(word);
-  });
-
-  it('just either side of Medium still shows', () => {
-    expect(cell(draw(thread({ priority: 7 }), company, 'inbox'), 'prio')).toBe('High');
-    expect(cell(draw(thread({ priority: 2 }), company, 'inbox'), 'prio')).toBe('Low');
-    expect(cell(draw(thread({ priority: 6 }), company, 'inbox'), 'prio')).toBe('');
-    expect(cell(draw(thread({ priority: 3 }), company, 'inbox'), 'prio')).toBe('');
   });
 });
 

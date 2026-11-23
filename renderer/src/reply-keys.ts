@@ -64,20 +64,41 @@ export const rowKey = (key: string): boolean => ROW_KEYS.has(key.toLowerCase());
 /** How long after a letter went to the box the next keys are still words, not shortcuts. */
 export const STILL_TYPING_MS = 1000;
 
-/** With a thread open and no box holding the keyboard. */
-export function keyOnAnOpenThread({ key, justChanged, hasOptions = false, stillTyping = false, boxOnScreen = true }: { key: string; justChanged: boolean; hasOptions?: boolean; stillTyping?: boolean; boxOnScreen?: boolean }): 'shortcut' | 'to the box' {
-  if (!boxOnScreen) return 'shortcut';
+/**
+ * How long an E or L pressed just after a screen change waits for a next
+ * letter. A slow typist's gap between letters is about this; any longer and
+ * the close feels late.
+ */
+export const WORD_FOLLOWS_MS = 350;
+
+/** Whether the key after a waiting E or L makes the two of them words. */
+export const aWordFollows = ({ key, repeat }: { key: string; repeat: boolean }): boolean => !repeat && key.length === 1;
+
+/**
+ * With a thread open and no box holding the keyboard. 'wait': E or L just after
+ * you opened the thread, which is a close unless a letter follows within
+ * WORD_FOLLOWS_MS. A thread the app moved you to is never closed by it.
+ */
+export function keyOnAnOpenThread({ key, justChanged, appMovedYou = false, hasOptions = false, stillTyping = false, boxOnScreen = true, sheetOpen = false, strayLately = false }: { key: string; justChanged: boolean; appMovedYou?: boolean; hasOptions?: boolean; stillTyping?: boolean; boxOnScreen?: boolean; sheetOpen?: boolean; strayLately?: boolean }): 'shortcut' | 'to the box' | 'wait' | 'the sheet' | 'nowhere' {
+  // A sheet over the thread has its own note; a letter meant for it must not land in the agent's box.
+  if (sheetOpen && printable(key)) return 'the sheet';
+  // "/" starts words somebody meant for a box, and the letters after it are those words.
+  if (!boxOnScreen) return key.length === 1 && (strayLately || key === '/') ? 'nowhere' : 'shortcut';
   if (stillTyping && key.length === 1) return 'to the box';
   if (!printable(key)) return 'shortcut';
   const k = key.toLowerCase();
   if (OPEN_THREAD_KEYS.has(k)) return 'shortcut';
-  if (ACTS.has(k)) return justChanged ? 'to the box' : 'shortcut';
+  if (ACTS.has(k)) return !justChanged ? 'shortcut' : appMovedYou ? 'to the box' : 'wait';
   if (/^[1-9]$/.test(k) && hasOptions) return 'shortcut';
   return 'to the box';
 }
 
-/** With the list on screen, where there is no box to put a letter in. */
-export function keyOnTheList({ key, justChanged, nothingToActOn = false }: { key: string; justChanged: boolean; nothingToActOn?: boolean }): 'shortcut' | 'held' | 'nowhere' {
+/**
+ * With the list on screen, where there is no box to put a letter in.
+ *  `stillTyping`: a letter went nowhere a moment ago, so this one is the next
+ *  letter of the same words. */
+export function keyOnTheList({ key, justChanged, nothingToActOn = false, stillTyping = false }: { key: string; justChanged: boolean; nothingToActOn?: boolean; stillTyping?: boolean }): 'shortcut' | 'held' | 'nowhere' {
+  if (stillTyping && key.length === 1) return 'nowhere';
   if (!printable(key)) return 'shortcut';
   const k = key.toLowerCase();
   if (nothingToActOn && ROW_KEYS.has(k)) return 'nowhere';

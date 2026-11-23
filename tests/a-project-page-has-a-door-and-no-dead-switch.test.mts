@@ -90,7 +90,7 @@ describe('the one switch a project still has', () => {
 describe('what the page says', () => {
   it('asks the question she could not answer, in words', () => {
     expect(page).toContain('Let agents start the tasks they file here');
-    expect(page).toContain('Questions and reviews always wait for you either way.');
+    expect(page).toContain('Questions and reviews still wait.');
   });
 
   it('names none of the three that went', () => {

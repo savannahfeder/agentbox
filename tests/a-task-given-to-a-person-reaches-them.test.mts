@@ -305,7 +305,7 @@ describe('giving it to an agent', () => {
   it('is offered to the person who holds it, and only that', async () => {
     await give();
     await dev.service.syncNow();
-    expect(teamRouteChoices(dev.row('Book Dr. Ames'), view(dev))).toEqual([{ route: 'agent', label: 'Give it to an agent' }]);
+    expect(teamRouteChoices(dev.row('Book Dr. Ames'), view(dev))).toEqual([{ route: 'agent', label: 'Carry on with an agent' }]);
     expect(teamRouteChoices(maya.row('Book Dr. Ames'), view(maya))).toEqual([]);
   });
 
@@ -426,11 +426,12 @@ describe('a thread can be handed on', () => {
   });
 
   it('lists people in the menu and the command bar', () => {
-    expect(threadMenuRows({ change: false, terminal: null, finish: true, give: true }).map((r) => r.label)).toContain('Give it to someone else…');
-    expect(threadMenuRows({ change: false, terminal: null, finish: true }).map((r) => r.label)).not.toContain('Give it to someone else…');
+    expect(threadMenuRows({ change: false, terminal: null, finish: true, give: true }).map((r) => r.label)).toContain('Ask or hand over…');
+    expect(threadMenuRows({ change: false, terminal: null, finish: true }).map((r) => r.label)).not.toContain('Ask or hand over…');
     const rows = threadCommands({ give: [{ id: 'u-dev', name: 'Dev' }, { id: 'u-jo', name: 'Jordan' }] });
-    expect(rows.map((r) => r.label)).toEqual(['Give it to Dev', 'Give it to Jordan']);
-    expect(rows[0].does).toEqual({ act: 'give', to: 'u-dev', name: 'Dev' });
+    expect(rows.map((r) => r.label)).toEqual(['Hand over to Dev…', 'Hand over to Jordan…']);
+    // A person gets the note step first, as from the menu (w-f702d60afe).
+    expect(rows[0].does).toEqual({ act: 'ask', kind: 'give', to: 'u-dev', name: 'Dev' });
   });
 
   it('offers no person on a conversation, a stranger\'s thread, or yourself', () => {

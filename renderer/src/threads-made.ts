@@ -3,7 +3,7 @@
 // and meant for the agent that answers in a chat with the tasks it opened.
 import type { ThreadStateWord, WorkItem } from './types';
 import { notStarted, statusForReply } from './list-rules';
-import { filedByThePerson } from '../../shared/answers.mts';
+import { filedByThePerson, RUN_IT } from '../../shared/answers.mts';
 
 type Row = Pick<WorkItem, 'id' | 'product' | 'createdAt'> & { parent?: string };
 
@@ -127,7 +127,7 @@ export function doItHereWords(child: Pick<WorkItem, 'id' | 'title'> & { body?: s
 type Write = { product: string; id: string; answer?: string; status?: 'open' | 'done' };
 
 /** The answer that starts a proposal (App.tsx `resolve`). */
-export const RUN_IT = 'Approved. Run it.';
+export { RUN_IT };
 
 /**
  * START ALL AND DISMISS ALL (w-fe64f35bdd): the writes that answer every

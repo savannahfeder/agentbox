@@ -37,8 +37,8 @@ describe("a teammate's thread page", () => {
     expect(pageTitle(run({ title: '  ' }))).toBe(rowTitle(run({ title: '' })));
   });
 
-  it('leaves the list row reading as its message', () => {
-    expect(rowTitle(run())).toBe("Four questions are in the team chat; answer them and I'm set up as Launch lead.");
+  it('is the name its list row has', () => {
+    expect(rowTitle(run())).toBe('Set up its job');
   });
 
   it('leaves every other thread named as the list names it', () => {
@@ -55,11 +55,12 @@ describe("a teammate's answer", () => {
     expect(html).toContain('<h1 class="one-q">Four questions are in the team chat; answer them and I&#x27;m set up as Launch lead.</h1>');
   });
 
-  it("is signed with the teammate's mark, name and time, above the bold line", () => {
+  // Since w-8ae9f6902e the mark is the teammate's face, not its letter.
+  it("is signed with the teammate's face, name and time, above the bold line", () => {
     const sign = html.indexOf('one-by');
     expect(sign).toBeGreaterThan(-1);
     expect(sign).toBeLessThan(html.indexOf('one-q'));
-    expect(html).toMatch(/class="one-by"><i class="tq tq-hd"[^>]*>L<\/i><span>Launch lead<\/span><em>[^<]*2:05pm<\/em>/);
+    expect(html).toMatch(/class="one-by"><i class="tq tq-hd mate-face"[^>]*><img src="data:image\/svg\+xml[^"]*"[^>]*\/><\/i><span>Launch lead<\/span><em>[^<]*2:05pm<\/em>/);
   });
 
   it('and an answer nobody signs has no signature', () => {
@@ -68,7 +69,7 @@ describe("a teammate's answer", () => {
 
   it('the page hands the summary and the answer the run name, and signs only a teammate run', () => {
     expect(thread).toMatch(/title=\{(talkName \?\? )?pageTitle\(item\)\}/);
-    expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{pageTitle\(item\)\} by=\{signer \? \{ t: signer, at: newest\.at \} : null\} \/>/);
+    expect(thread).toMatch(/<QueueAnswer text=\{clean\(newest\.text\)\} md=\{md\} name=\{pageTitle\(item\)\} by=\{signer \? \{ t: signer, at: newest\.at \} : null\}(?: person=\{helper \? \{ p: helper, at: newest\.at \} : null\})? \/>/);
     expect(thread).toMatch(/const signer = teammateId \? teammates\.get\(teammateId\) \?\? null : null;/);
   });
 });

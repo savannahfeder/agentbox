@@ -43,11 +43,11 @@ describe("the walkthrough's practice thread", () => {
 
 describe('the end of the setup', () => {
   it('starts the gold walkthrough on Home with a practice project of its own', () => {
-    const fn = body('finishFresh');
+    expect(body('finishFresh')).toMatch(/beginWalkthrough\(\)/);
+    const fn = body('beginWalkthrough');
     expect(fn).toMatch(/setTour\(startTour\(\)\)/);
     expect(fn).toMatch(/setHomeOpen\(homeOn\)/);
     expect(fn).toMatch(/api\.firstRunPractice\(\{ bare: true \}\)/);
-    expect(fn).not.toMatch(/startTutorial/);
   });
 });
 
@@ -65,8 +65,8 @@ describe('the window during the walkthrough', () => {
 describe("Home's box before the first send", () => {
   it('holds the practice task, addressed to the practice project', () => {
     expect(app).toMatch(/const tourTask = tourLive\(tour\) && !tour!\.sent && tour!\.practice && !tour!\.practice\.item \? tour!\.practice\.slug : null;/);
-    expect(app).toMatch(/initial=\{walkCard \? \{ body: `\$\{TASK_TITLE\}\\n\\n\$\{TASK_BODY\}` \} : tourTask \? \{ body: `\$\{TASK_TITLE\}\\n\\n\$\{TASK_BODY\}`, product: tourTask \} : composeInitial\}/);
-    expect(app).toMatch(/scripted=\{walkCard \|\| tourTask \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
+    expect(app).toMatch(/initial=\{tourTask \? \{ body: `\$\{TASK_TITLE\}\\n\\n\$\{TASK_BODY\}`, product: tourTask \} : composeInitial\}/);
+    expect(app).toMatch(/scripted=\{tourTask \? \{ labels: \[FIRST_RUN_LABEL\] \} : null\}/);
   });
 });
 
@@ -86,7 +86,11 @@ describe('the practice project', () => {
     expect(ipc).toMatch(/if \(opts\?\.bare\) return \{ \.\.\.made, examples: \[\], backdrop: \[\] \};/);
   });
   it('goes when the walkthrough ends or is skipped', () => {
-    expect(app).toMatch(/if \(tourGone && tour\?\.practice\) void api\.firstRunPracticeEnd\(\)/);
+    const at = app.indexOf('const tourGone =');
+    const effect = app.slice(at, app.indexOf('}, [tourGone]);', at));
+    expect(effect).toContain('if (!tourGone || !tour?.practice) return;');
+    // After any close on it still held for Z (tests/a-newcomer-can-tell-they-are-in-the-walkthrough).
+    expect(effect).toContain('void held.then(() => api.firstRunPracticeEnd())');
   });
 });
 
@@ -102,7 +106,7 @@ describe('marking the practice thread done', () => {
   // Walking it in a copy: E on the practice thread opened the next thread in
   // Needs you, a real chat brought in from the computer, with the next tip over it.
   it('goes back to where it was opened from, not on to a real thread', () => {
-    expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: !!focused && !isTourPractice\(tourRef\.current, item\), index, id: item\.id \}\);/);
+    expect(app).toMatch(/advanceRef\.current = advanceAfter\(\{ fromTask: \(!!focused \|\| isTheAskOn\(item, openCard\)\) && !isTourPractice\(tourRef\.current, item\), index, id: item\.id \}\);/);
   });
 });
 

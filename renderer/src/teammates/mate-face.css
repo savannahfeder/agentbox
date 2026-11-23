@@ -1,0 +1,12 @@
+/* Element and class, so it wins over the box a caller's class draws. */
+i.mate-face { box-sizing: border-box; border: none; border-radius: 50%; padding: 0; font-style: normal; }
+/* On a light page the white shirt would run into the page. */
+:root[data-theme="light"] i.mate-face:not(.mf-now) { box-shadow: 0 0 0 1px rgba(30, 22, 36, .1); }
+i.mate-face > img { display: block; width: 100%; height: 100%; border-radius: inherit; }
+/* Its first line's middle on the label's: 28px faces against a 20px line. */
+.mf-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0; }
+.mf-face { display: block; width: 28px; height: 28px; }
+.mf-now { box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 2.5px var(--text-dim); margin-right: 6px; }
+.mf-pick { padding: 0; margin: 0; border: none; background: none; border-radius: 50%; cursor: default; }
+.mf-pick:hover, .mf-pick:focus-visible { outline: none; box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 2.5px var(--line-strong); }
+.mf-more { margin-left: 6px; }

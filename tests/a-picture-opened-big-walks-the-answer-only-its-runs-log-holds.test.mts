@@ -14,7 +14,7 @@
 // kept as well.
 import { describe, it, expect } from 'vitest';
 import { filesInLines, latestPicturesSaid, nextStep, stepsThrough, threadFiles, whereAPressLands, withFilesAsked } from '../shared/artifact-marks.mts';
-import { withRunsSaid } from '../renderer/src/runs-said.ts';
+import { withRunsSaid } from '../shared/runs-said.mts';
 import { picturesBeside } from '../renderer/src/picture-view.ts';
 
 const D = '/Users/someone/store/designs/w-1';

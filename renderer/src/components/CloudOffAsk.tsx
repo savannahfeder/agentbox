@@ -2,6 +2,7 @@
 // ⌘K opens (approved designs/w-dd3b8c10c7/3-asks-before-turning-off-v3).
 import { useEffect, useRef } from 'react';
 import { CLOUD_OFF_ASK } from '../cloud-menu';
+import { closesOnPress } from '../press';
 
 export function CloudOffAsk({ onOff, onKeep }: { onOff: () => void; onKeep: () => void }) {
   const said = useRef({ onOff, onKeep });
@@ -18,7 +19,7 @@ export function CloudOffAsk({ onOff, onKeep }: { onOff: () => void; onKeep: () =
     return () => window.removeEventListener('keydown', keys, true);
   }, []);
   return (
-    <div className="modal-backdrop palette-backdrop" onClick={onKeep}>
+    <div className="modal-backdrop palette-backdrop" {...closesOnPress(onKeep)}>
       <div className="modal palette cloud-off-ask" role="alertdialog" aria-label={CLOUD_OFF_ASK.head} onClick={(e) => e.stopPropagation()}>
         <div className="cloud-off-ask-head">{CLOUD_OFF_ASK.head}</div>
         <div className="cloud-off-ask-line">{CLOUD_OFF_ASK.line}</div>

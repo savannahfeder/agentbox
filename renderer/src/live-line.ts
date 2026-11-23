@@ -36,6 +36,7 @@ import { openSignIn } from '../../shared/sign-in-ask.mts';
 import { MAC } from './this-keyboard';
 import { whyWords, type WhyCard } from './where-why';
 import { FIRST_RUN_LABEL } from './onboarding';
+import { heldOutside } from '../../shared/carried-on-outside.mts';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 
 // THE FIFTH STATE, AND IT IS THE ONE SOMEBODY OUTSIDE THIS BUILDING ASKED FOR.
@@ -78,6 +79,11 @@ export interface CannotStart {
   tool: string;
 }
 
+/** The word for a queued row nothing will start yet: what it waits for, where one word says it. */
+export function cannotStartWord({ why }: CannotStart): string {
+  return why === 'memory' ? 'Waiting for memory' : 'Not started';
+}
+
 /** The sentence for a queued row nothing will start yet, or null for a reason it does not carry. */
 export function cannotStartLine({ why, tool }: CannotStart): string | null {
   if (why === 'setup') return 'Agents wait while setup is open. This starts as soon as you finish or skip it.';
@@ -100,6 +106,8 @@ export interface LiveLine {
   state: LiveState;
   /** The whole sentence. Never drawn; it is what the line is announced as. */
   line: string;
+  /** The row's word, where it says more than the state's own (`shortWord`). */
+  word?: string;
 }
 
 export interface LiveFacts {
@@ -107,6 +115,8 @@ export interface LiveFacts {
   session?: RunningSession | null;
   /** `supervisor.queued`: the ids a tick will spawn as soon as a slot frees. */
   queued?: string[];
+  /** `supervisor.settingUp`: of those, the ones whose folder is being made now. */
+  settingUp?: string[];
   /** The walkthrough's practice thread, with the app's answer to it on its way. */
   answering?: boolean;
   /** On `supervisor.remoteHeld`: our own session, open between Remote Control turns. */
@@ -432,7 +442,8 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // out, at a limit, paused), none of which stops an agent somewhere else. A run
   // killed outright leaves its claim for up to a lease (LEASE_MS), so the
   // sentence does not promise the agent is busy this second.
-  if (item.status === 'claimed' && item.claim && !item.claimExpired && !facts.remoteHeld) {
+  // The phone's copy of a chat carried on where it started has no claim on it.
+  if ((item.status === 'claimed' && item.claim && !item.claimExpired && !facts.remoteHeld) || heldOutside(item)) {
     return {
       state: 'elsewhere',
       line: 'An agent is working on this outside this window, in a terminal or on another computer, so its steps do not show here.',
@@ -455,7 +466,13 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
 
   // QUEUED IS A PROMISE THAT AN AGENT IS COMING, and for these it is not.
   const notYet = queued.includes(item.id) && cannotStart[item.id] ? cannotStartLine(cannotStart[item.id]) : null;
-  if (notYet) return { state: 'cannot', line: notYet };
+  if (notYet) return { state: 'cannot', line: notYet, word: cannotStartWord(cannotStart[item.id]) };
+
+  // Its folder being made, with nothing to wait for: it reads as a run does
+  // (w-9993530556). "Queued" there for 19.7 s read as not connected.
+  if (queued.includes(item.id) && facts.settingUp?.includes(item.id)) {
+    return { state: 'working', line: 'The agent just started on this.' };
+  }
 
   if (queued.includes(item.id) && runNow.includes(item.id)) {
     return {

@@ -91,7 +91,8 @@ export const missingWords = (who: string | null) => (who ? `On ${who}'s computer
 const MACHINE_NAME = /^page-\d{4}-\d{2}-\d{2}T[\d-]+Z?(?:[-_ ]v\d+)?\.\w+$|^screen ?shot[ -]\d{4}-\d{2}-\d{2}\b.*\.\w+$|^(?:[0-9a-f]{12,}|\d{10,})\.\w+$/i;
 
 /** What a tile calls a file. The viewer keeps the real name. */
-export function shownName(f: Pick<PlacedFile, 'name' | 'sentIn'>) {
+export function shownName(f: Pick<PlacedFile, 'name' | 'sentIn' | 'title'>) {
+  if (f.title) return f.title;
   if (!MACHINE_NAME.test(f.name)) return f.name;
   return f.sentIn.find((s) => s.kind !== 'chat' && s.title)?.title ?? f.name;
 }
@@ -110,6 +111,9 @@ export function sortFiles<T extends Pick<PlacedFile, 'name' | 'sentIn' | 'at' | 
 export const MACHINE = MAC ? 'Mac' : 'computer';
 
 /** A size as a person reads it: 625 MB, 2.1 MB, 4 KB, 4.8 GB. */
+/** The page's total says something only once it reaches a megabyte. */
+export const showsTotal = (bytes: number): boolean => bytes >= 1024 * 1024;
+
 export function sizeWords(bytes: number): string {
   const units = ['KB', 'MB', 'GB', 'TB'];
   let n = bytes / 1024;
@@ -166,3 +170,20 @@ export function apartScratch(files: PlacedFile[]) {
 }
 
 export const scratchLine = (n: number) => (n === 1 ? '1 check picture an agent took' : `${n} check pictures agents took`);
+
+// Every tile at once on a store of thousands froze the whole app.
+export const TILES_AT_ONCE = 60;
+
+/** The first `drawn` tiles: the files, then the check pictures with what is left. */
+export function drawnOf<T>(shown: T[], scratch: T[], drawn: number): { shown: T[]; scratch: T[] } {
+  return { shown: shown.slice(0, drawn), scratch: scratch.slice(0, Math.max(0, drawn - shown.length)) };
+}
+
+export const moreTiles = (drawn: number, total: number) => (drawn >= total ? drawn : Math.min(drawn + TILES_AT_ONCE, total));
+
+/** `items` in the order `before` had them, anything new after the rest in its own order. */
+export function inOrderOf<T>(items: T[], before: readonly string[], keyOf: (t: T) => string): T[] {
+  const at = new Map(before.map((k, i) => [k, i]));
+  const rank = (t: T) => at.get(keyOf(t)) ?? before.length;
+  return [...items].sort((a, b) => rank(a) - rank(b));
+}

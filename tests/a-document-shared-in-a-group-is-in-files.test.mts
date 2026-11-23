@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { appFilesPlace } from '../main/files-place.mts';
+import { appFilesPlace, linkPath } from '../main/files-place.mts';
 import { filesShown } from '../renderer/src/files/files-shown.ts';
 import { filesInLines, shownName, threadFiles } from '../shared/artifact-marks.mts';
 
@@ -74,7 +74,7 @@ describe('a file in a group, in Files', () => {
   it('opens with each version where it is on this computer', async () => {
     const view = await place({ messages }).open((await place({ messages }).list()).files[0].key);
     expect(view.versions.map((v) => v.n)).toEqual([1, 2]);
-    expect(filesInLines(view.lines).map((f) => f.path)).toEqual([first, kept]);
+    expect(filesInLines(view.lines).map((f) => f.path)).toEqual([first, kept].map((p) => linkPath(p)));
   });
 
   it('carries the comments made in the group, and a new one goes back there', async () => {

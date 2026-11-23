@@ -36,6 +36,15 @@ describe('a rule typed into Repeat it', () => {
     expect(ruleFromWords('fridays 4pm')).toMatchObject({ rule: { every: 'week', on: 5, at: '16:00' } });
   });
 
+  // 2026-11-18 phone workday issue 34: "every Monday morning at 9am" was offered as Mondays at 8:00am.
+  it('keeps the stated time when "morning" sits between the day and the time', () => {
+    expect(ruleFromWords('every Monday morning at 9am')).toMatchObject({ rule: { every: 'week', on: 1, at: '09:00' } });
+    expect(ruleFromWords('every Monday morning 9am')).toMatchObject({ rule: { every: 'week', on: 1, at: '09:00' } });
+    expect(parseRepeat('Every friday morning at 10am, send the numbers')).toMatchObject({ rule: { every: 'week', on: 5, at: '10:00' } });
+    expect(ruleFromWords('every Monday morning')).toMatchObject({ rule: { every: 'week', on: 1, at: '08:00' } });
+    expect(parseRepeat('Every monday morning tidy the board')).toMatchObject({ rule: { every: 'week', on: 1, at: '08:00' } });
+  });
+
   it('lands a rule with no time on eight, as every other rule does', () => {
     expect(ruleFromWords('every tuesday')).toMatchObject({ rule: { every: 'week', on: 2, at: '08:00' } });
     expect(ruleFromWords('daily')).toMatchObject({ rule: { every: 'day', at: '08:00' } });

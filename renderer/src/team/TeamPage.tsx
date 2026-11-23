@@ -6,12 +6,17 @@
 // That half moved onto the Inbox (w-05ff3d1438, 2026-10-01): the Inbox and the
 // Team page were one question on two pages, so the faces at the end of the
 // Inbox's tab bar now pick whose threads are on it.
-import { Fragment, useState } from 'react';
-import type { Person, TeamCallResult, TeamState } from '../types';
+import { Fragment, useRef, useState } from 'react';
+import type { Person, PictureIn, TeamCallResult, TeamState } from '../types';
+import { shrinkPicture } from './shrink-picture';
 import { api } from '../api';
 import { Face } from './people';
 import { handoverAsk, handoverOf } from './handover';
 import { inviteWords } from './invite-words';
+import { AskForMultiplayer, NOT_LET_IN } from './ask-for-multiplayer';
+import { StartPro } from './StartPro';
+import { StartTeam } from './StartTeam';
+import { PRO_FOR_INVITES, askOwnerForPro } from './multiplayer-words';
 
 
 export function TeamPage({ team, inviteFocus = false }: {
@@ -51,7 +56,6 @@ function SignIn({ error }: { error: string | null }) {
 }
 
 function TeamSetup({ team, onDone, inviteFocus = false }: { team: TeamState; onDone?: () => void; inviteFocus?: boolean }) {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   // WHO YOU INVITED, SAID BACK (2026-10-01): an invite used to empty the field
   // and show nothing else, so there was no way to tell it had worked.
@@ -70,13 +74,13 @@ function TeamSetup({ team, onDone, inviteFocus = false }: { team: TeamState; onD
         <button className="tm-btn" disabled={busy} onClick={() => run(() => api.teamAcceptInvite(invite.teamId))}>Join</button>
         <button className="tm-btn" disabled={busy} onClick={() => setNotNow([...notNow, invite.teamId])}>Not now</button>
       </div>
+    </> : !team.team && team.multiplayer === false ? <>
+      <h2>{NOT_LET_IN}</h2>
+      <div className="tm-field-row"><AskForMultiplayer email={me?.email} className="tm-btn" /></div>
+      <p>Waiting for an invite from a teammate instead? Ask them to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : !team.team ? <>
-      <h2>Start your team</h2>
-      <p>Name it, then invite people by email. Anyone you invite is asked to join when they sign in with that email.</p>
-      <form className="tm-field-row" onSubmit={(e) => { e.preventDefault(); void run(() => api.teamCreate(name)); }}>
-        <input className="tm-input" placeholder="Team name" value={name} onChange={(e) => setName(e.target.value)} />
-        <button className="tm-btn" disabled={busy || !name.trim()}>Start team</button>
-      </form>
+      {/* Pro makes and names the team, so nothing here asks for a name (tests/invite-people-with-no-team-never-asks-for-a-team-name). */}
+      <StartTeam me={me} multiplayer={team.multiplayer} left title={PRO_FOR_INVITES} />
       <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : <TeamSettings team={team} me={me} inviteFocus={inviteFocus} invited={invited} setInvited={setInvited} email={email} setEmail={setEmail} busy={busy} run={run} onDone={onDone} />}
     {error && <p className="tm-error">{error}</p>}
@@ -113,6 +117,23 @@ function HandOver({ team, me, leaving, busy, onCancel, onRemove }: {
   </div>;
 }
 
+/** A quiet button that opens a picture from disk, shrinks it, and hands it on. */
+function PickPicture({ label, fit, busy, onPicked }: { label: string; fit: 'crop' | 'whole'; busy: boolean; onPicked: (photo: PictureIn) => unknown }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [unreadable, setUnreadable] = useState(false);
+  return <>
+    <button type="button" className="tm-line-act" disabled={busy} onClick={() => input.current?.click()}>{label}</button>
+    <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      setUnreadable(false);
+      try { onPicked(await shrinkPicture(file, { fit })); } catch { setUnreadable(true); }
+    }} />
+    {unreadable && <span className="tm-pic-note">That file is not a picture this can open.</span>}
+  </>;
+}
+
 /** TEAM SETTINGS (2026-10-01): an invite page and team settings beside it.
  *  The team's name, its people, the invites still
  *  out, and leaving. The owner renames, removes and cancels; anyone leaves.
@@ -123,6 +144,7 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
 }) {
   const name = team.team?.name ?? '';
   const [draft, setDraft] = useState(name);
+  const [myName, setMyName] = useState(me?.name ?? '');
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -132,7 +154,21 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
   const people = [mine, ...team.people.filter((p) => p.id !== me?.id)].filter((p): p is Person => !!p);
   const joined = (e: string) => team.people.some((p) => p.email?.toLowerCase() === e.toLowerCase());
   const out = [...new Set([...(team.sent ?? []).map((s) => s.email), ...invited])].filter((e) => !joined(e));
+  const logo = team.team?.logoUrl ?? null;
   return <>
+    {mine && <>
+      <div className="tm-section">You</div>
+      <div className="tm-pic-row">
+        <Face person={mine} me size={40} />
+        <PickPicture label="Change photo" fit="crop" busy={busy} onPicked={(photo) => run(() => api.teamUpdateMe({ photo }))} />
+        {mine.avatarUrl && <button type="button" className="tm-line-act" disabled={busy} onClick={() => void run(() => api.teamUpdateMe({ photo: null }))}>Remove</button>}
+      </div>
+      <form className="tm-field-row" onSubmit={(e) => { e.preventDefault(); void run(() => api.teamUpdateMe({ name: myName })); }}>
+        <input className="tm-input" value={myName} aria-label="Your name" maxLength={80} onChange={(e) => setMyName(e.target.value)} />
+        <button className="tm-btn" disabled={busy || !myName.trim() || myName.trim() === (mine.name ?? '')}>Save</button>
+      </form>
+    </>}
+
     <div className="tm-section">Team name</div>
     {owner ? (
       <form className="tm-field-row" onSubmit={(e) => { e.preventDefault(); void run(() => api.teamRename(draft)); }}>
@@ -140,6 +176,14 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
         <button className="tm-btn" disabled={busy || !draft.trim() || draft.trim() === name}>Rename</button>
       </form>
     ) : <h2>{name}</h2>}
+    {owner && <>
+      <div className="tm-section">Team logo</div>
+      <div className="tm-pic-row">
+        {logo ? <img className="tm-logo" src={logo} alt="" referrerPolicy="no-referrer" /> : <span className="th-mark tm-logo" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>}
+        <PickPicture label={logo ? 'Change logo' : 'Upload logo'} fit="whole" busy={busy} onPicked={(photo) => run(() => api.teamSetLogo(photo))} />
+        {logo && <button type="button" className="tm-line-act" disabled={busy} onClick={() => void run(() => api.teamSetLogo(null))}>Remove</button>}
+      </div>
+    </>}
 
     <div className="tm-section">People</div>
     {people.map((p) => (<Fragment key={p.id}>
@@ -171,10 +215,18 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
     ))}
 
     <div className="tm-section">Invite people</div>
-    <form className="tm-field-row" onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
+    {team.multiplayer === false ? <div className="tm-field-row">
+      <span className="tm-leave-ask">{NOT_LET_IN}.</span>
+      <AskForMultiplayer email={me?.email} className="tm-btn" />
+    </div> : team.pro === false ? <div className="tm-field-row">
+      {owner ? <>
+        <span className="tm-leave-ask">{PRO_FOR_INVITES}</span>
+        <StartPro hasTeam name={me?.name} className="tm-btn" autoFocus={inviteFocus} />
+      </> : <span className="tm-leave-ask">{askOwnerForPro(team.people.find((p) => p.role === 'owner')?.name)}</span>}
+    </div> : <form className="tm-field-row" onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
       <input className="tm-input" placeholder="Their email" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)} />
       <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
-    </form>
+    </form>}
 
     <div className="tm-section">Leave</div>
     {confirmLeave ? (

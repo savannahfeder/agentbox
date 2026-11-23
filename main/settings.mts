@@ -33,7 +33,7 @@ import { readPlan } from './claude-plan.mts';
 import { effectiveProfiles, troubleForProfile } from './account-discovery.mts';
 import { machineSlots, machineNote, autoAgents, MAX_SLOTS } from './machine.mts';
 import { NAME, Name } from '../shared/product-name.mjs';
-import { autoSlots } from './memory-gate.mts';
+import { autoSlots, memoryGateWorksOn } from './memory-gate.mts';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mts';
 import { isEngine } from '../shared/engines.mts';
 import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mts';
@@ -50,6 +50,8 @@ export interface SettingsConfig {
   accountRoot?: string;
   claudeBin?: string | null;
   claudeFound?: boolean | null;
+  /** Claude Code's own sign-in check (main/engine-setup.mts); unset until it gives a real yes or no. */
+  claudeSignedIn?: boolean | null;
   claudeCertain?: boolean;
   claudeBinConfigured?: string | null;
   claudeFrom?: string | null;
@@ -692,6 +694,12 @@ export function readSettings({ config, supervisor, store, onTeam }: SettingsDeps
       profile,
       email: identity?.email ?? null,
       accountUuid: identity?.accountUuid ?? null,
+      // Claude Code's own `auth status` answer speaks only for the login it checked: the default,
+      // unless the app names another folder. A no from it or a run's sign-out beats the email on file;
+      // with no email, only its yes counts.
+      signedIn: trouble?.cause !== 'signed-out' && (profile === 'default' && !process.env.CLAUDE_CONFIG_DIR && typeof config.claudeSignedIn === 'boolean'
+        ? config.claudeSignedIn
+        : !!identity?.email),
       // WHICH ONE RUNS, AND ONE OF THEM ALWAYS DOES (w-dac993a554). This was
       // false on every row until somebody picked, because until then every
       // account really did take a share of the work. One account runs it now,
@@ -729,7 +737,9 @@ export function readSettings({ config, supervisor, store, onTeam }: SettingsDeps
       // Read here rather than kept, because Claude Code refreshes its own
       // profile as it runs and this page is opened by hand a few times a day.
       // `null` when the file cannot be read, and then no screen says anything.
-      plan: plan.known ? { label: plan.label, max: plan.max } : null,
+      // A refusal outranks the file, which goes on naming the plan after it ends.
+      plan: trouble?.cause === 'subscription-ended' ? { label: 'Subscription ended', max: false }
+        : plan.known ? { label: plan.label, max: plan.max } : null,
     };
   });
 
@@ -803,7 +813,7 @@ export function readSettings({ config, supervisor, store, onTeam }: SettingsDeps
       agentsNudge: Math.max(0, Math.round(Number(config.agentsNudge) || 0)),
       // What Automatic would say right now, so a manual number can be compared
       // with it without turning Automatic back on to find out.
-      agentsAutoTotal: autoAgents({ gated: !!config.memoryGate, nudge: config.agentsNudge }),
+      agentsAutoTotal: autoAgents({ gated: !!config.memoryGate && memoryGateWorksOn(), nudge: config.agentsNudge }),
       // WHAT WE SUGGEST FOR THIS MAC, AND WHY. Not a ceiling: `slotsMax` is the
       // control's own range and is the same number on every machine, while
       // `slotsSuggested` is what main worked out from the hardware
@@ -1187,6 +1197,7 @@ export function addClaudeAccount({ config, supervisor }: { config: SettingsConfi
  * right now while it is on.
  */
 export function memoryGateSettings({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
+  if (!memoryGateWorksOn()) return null;
   const on = !!config.memoryGate;
   const slots = Number.isFinite(config.memoryGateSlots) ? config.memoryGateSlots : null;
   // What Auto works out to on this Mac, whether or not somebody picked.
@@ -1221,7 +1232,7 @@ export function memoryGateSettings({ config, supervisor }: { config: SettingsCon
  */
 export function memoryReading({ config, supervisor }: { config: SettingsConfig; supervisor: SettingsSupervisor }) {
   const out: { heavy: number | null; waiting: number | null; pressure: string | null; usedPct: number | null; asked: number | null; waited: number | null; refused: number | null; holding?: boolean } = { heavy: null, waiting: null, pressure: null, usedPct: null, asked: null, waited: null, refused: null };
-  if (!config.memoryGate) return out;
+  if (!config.memoryGate || !memoryGateWorksOn()) return out;
   // The supervisor's own hold on new agents (main/start-hold.mts), which does
   // not depend on which copy of the app is coordinating the command queue.
   try { out.holding = !!supervisor.startHoldStatus?.()?.holding; } catch { out.holding = false; }

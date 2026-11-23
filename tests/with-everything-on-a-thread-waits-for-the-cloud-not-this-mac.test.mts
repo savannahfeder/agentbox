@@ -199,7 +199,7 @@ describe('signed in to the cloud at all', () => {
     dirs.push(root);
     const sup = new Supervisor({ storeRoot: root, home: root, authProfiles: ['default'], cloudRuns: 'all' }, { listItems: () => [], listProducts: () => [], isDue: () => true }, root);
     const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
-    expect(src).toMatch(/mayRunOn\(state\) \|\| state === 'limited' \|\| state === 'renew'/);
+    expect(src).toMatch(/mayRunOn\(state\) \|\| state === 'limited' \|\| state === 'refused' \|\| state === 'renew'/);
     expect(typeof sup._cloudSignedInAtAll).toBe('function');
   });
 });
