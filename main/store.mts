@@ -16,10 +16,10 @@ import { CLEAN_LABEL, isCleanRun } from '../shared/repeats.mts';
 import { answerFor, describeFor } from './first-run.mts';
 import { checkProjectFolder } from '../shared/project-folder-check.mts';
 import { SAME_PROJECT, carriedLines, leftByAMove, movedAway, movedHere, ranHere, splitForCompose, whatMoves, whyItCannotMove, type CarriedLine } from '../shared/move-thread.mts';
-import { agentSpokeSince, answerTs } from '../shared/answers.mts';
+import { agentSpokeSince, answerTs, laterHerWordLifts } from '../shared/answers.mts';
 import { EXAMPLES, stampsFor } from '../shared/first-run-examples.mts';
 import {
-  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
+  PRACTICE_ANSWER, PRACTICE_BACKDROP, PRACTICE_CONTEXT, PRACTICE_DONE, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_NOTE, PRACTICE_ROWS, PRACTICE_SLUG,
   PRACTICE_REPLY_ANSWER, PRACTICE_TASK_TRACE,
 } from '../shared/first-run-practice.mts';
 import { NOTE_NAME } from './rail-note.mts';
@@ -29,15 +29,21 @@ import { projectWrites, projectWritten } from './store/projects-changed.mts';
 import { imgUrl } from './img-scheme.mts';
 import { teamOf, PERSONAL_FLAG } from './team/projects.mts';
 import {
-  agentImportRow, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL,
+  agentImportRow, AS_IT_GOES_LABEL, howTheChatEnded, agentsNeedingRows, threadImportRow, threadsNeedingRows, CATCH_UP_LABEL, THREAD_LABEL,
 } from '../shared/agent-import.mts';
+import { CLOSED_THERE, CUT_THERE, heldOutside, stoppedThere } from '../shared/carried-on-outside.mts';
+import { isShared } from '../shared/team-rules.mts';
+import { DONE_FOLLOWED_MOST, DONE_FOLLOWED_MS, notYetRead } from './chat-follow.mts';
+import type { FollowedChat, Ours } from './chat-follow.mts';
+import type { ChatEntry } from './agent-sessions.mts';
 import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mts';
-import { buildClaimLine, buildReleaseLine, GIVEN_TASK, type LinkComment } from '../shared/work-items.mts';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK, LEASE_MS, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mts';
+import { shipClosesIt, shippedButOpen } from '../shared/ship-closes-its-thread.mts';
 import { notShipped } from '../shared/not-shipped.mts';
 import { asksForGitHubSignIn, SHIPPING_AGAIN } from '../shared/github-push-sign-in.mts';
 import { cleanSignInAnswer, openSignIn } from '../shared/sign-in-ask.mts';
@@ -45,6 +51,7 @@ import { machineryPath, removeMachinery } from './store/home.mts';
 import { Teammates } from './teammates.mts';
 import type { WorkItem } from './supervisor.mts';
 import { hopOf, HOP_LABEL_PREFIX } from '../shared/teammates.mts';
+import { writesToReopen, type WasBeforeClose } from '../shared/reopen-as-it-was.mts';
 import {
   answerMode as readAnswerMode, answerModes, clearAnswerMode as clearAnswerModeFile, setAnswerMode,
   touchAnswerMode as touchAnswerModeFile,
@@ -124,6 +131,8 @@ export interface AnswerInput {
 
 export interface ComposeInput {
   id?: string | null;
+  /** On a task to a person: help or a review asked on the giver's thread. */
+  ask?: Record<string, unknown>;
   title?: string;
   body?: string;
   kind?: string;
@@ -169,6 +178,11 @@ export type FiledItem = {
 export interface ImportedChat extends CodexThreadLike {
   source?: string;
   waiting?: boolean;
+  /** Stopped in its own window, on this (Claude Code's `waitingFor`), open in this folder. */
+  stoppedOn?: string;
+  openIn?: string;
+  /** What was said in it, for one brought in as it goes (main/new-chats-watch.mts). */
+  entries?: ChatEntry[];
   name?: string;
 }
 
@@ -604,6 +618,13 @@ export class Store {
     if (engine !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { engine: engine ?? '' }, { source: 'founder' });
     if (model !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { model: model ?? '' }, { source: 'founder' });
     if (effort !== undefined) item = workItemsDisk.updateWorkItem(dir, id, { effort: effort ?? '' }, { source: 'founder' });
+    // Her word ends the Later she set, so a run finishing cannot bring it back.
+    // Written before the answer so a reply set for later can set its own time after.
+    if (answer && answer !== '(withdrawn)') {
+      const lifts = laterHerWordLifts(workItemsDisk.readWorkItem(dir, id));
+      if (lifts.runAt) item = workItemsDisk.updateWorkItem(dir, id, { runAt: 0 }, { source: 'founder' });
+      if (lifts.snoozedUntil) item = workItemsDisk.updateWorkItem(dir, id, { snoozedUntil: 0 }, { source: 'founder' });
+    }
     if (answer) item = workItemsDisk.updateWorkItem(dir, id, { answer, ...(inReplyTo ? { inReplyTo } : {}), ...(fromPhone ? { fromPhone } : {}), ...(voice ? { voice } : {}), ...(forAgent ? { forAgent } : {}), ...(fromNotes?.length ? { fromNotes } : {}), ...(fromNotes?.length && typed ? { typed } : {}) }, { source: 'founder' });
     // A REPLY ON A RUN THAT FINISHED QUIETLY MAKES IT NEWS AGAIN (w-5e3f2e047f).
     // A quiet run is kept out of her inbox, and a repeating task now opens on
@@ -615,8 +636,9 @@ export class Store {
     }
     // The pane may still show a running row after Stop or a provider result.
     // Resolve omitted reply status against the ledger that was just written.
+    // Except an ask handed back (shared/thread-asks.mts): a thank-you there is a message, not more work.
     if (status == null && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)'
-      && (item?.status === 'blocked' || item?.status === 'done')) status = 'open';
+      && (item?.status === 'blocked' || item?.status === 'done') && !(item?.ask && item?.verdict)) status = 'open';
     // WHAT THE ANSWER ITSELF MAY DO does not go on the ledger. It is a grant,
     // the ledger is an append-only file every worker writes, and every line on
     // it names its own author with nothing checking the name. It goes in the
@@ -630,6 +652,19 @@ export class Store {
     if (priority != null) item = workItemsDisk.updateWorkItem(dir, id, { priority }, { source: 'founder' });
     if (status) item = workItemsDisk.updateWorkItem(dir, id, { status }, { source: 'founder' });
     if (typeof putAway === 'boolean') item = workItemsDisk.updateWorkItem(dir, id, { putAway }, { source: 'founder' });
+    // A reply or a close here takes a chat back from where it started: the run
+    // a reply starts is refused a row somebody else holds (main/chat-follow.mts).
+    if ((answer && answer !== '(withdrawn)') || status) {
+      try { item = this.letGoOfChat(slug, id) ?? item; } catch (e) { console.warn(`zero: ${id} kept a terminal's hold: ${(e as Error)?.message ?? e}`); }
+    }
+    return item;
+  }
+
+  /** Z on a close: the status the row had before it (shared/reopen-as-it-was.mts). */
+  reopenAsItWas(slug: string, id: string, was: WasBeforeClose | null | undefined) {
+    const dir = this.productDir(slug);
+    let item: StoreItem | null = null;
+    for (const { status, source } of writesToReopen(was)) item = this.modules.workItemsDisk.updateWorkItem(dir, id, { status }, { source });
     return item;
   }
 
@@ -681,7 +716,21 @@ export class Store {
   shipped(slug: string, id: string, { sha, labels }: { sha: string | null; labels: string[] }) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
-    return workItemsDisk.updateWorkItem(dir, id, { labels, note: shippedNote(sha) }, { source: 'system' });
+    const closes = shipClosesIt(this.readItem(slug, id));
+    return workItemsDisk.updateWorkItem(dir, id, { labels, note: shippedNote(sha), ...(closes ? { status: 'done' } : {}) }, { source: 'system' });
+  }
+
+  /** Closes threads shipped before a ship closed its thread, by the same rule. How many it closed. */
+  closeShippedThreads(now = Date.now()): number {
+    let closed = 0;
+    for (const item of this.listItems(now)) {
+      if (!shippedButOpen(item)) continue;
+      const dir = this.productDir(item.product);
+      if (!dir) continue;
+      this.modules.workItemsDisk.updateWorkItem(dir, item.id, { status: 'done', note: item.note }, { source: 'system', now });
+      closed++;
+    }
+    return closed;
   }
 
   shipFailed(slug: string, id: string, { note, labels }: { note: string; labels: string[] }) {
@@ -708,6 +757,14 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signInAnswer: clean }, { source, now });
   }
 
+  // Whether the person wants a cloud sign-in saved for every cloud thread. Kept on the ask, so it holds however the sign-in ends.
+  chooseSignInKeep(slug: string, id: string, choice: { id: unknown; keep: boolean }, { now = Date.now() }: { now?: number } = {}) {
+    const ask = openSignIn(this.readItem(slug, id));
+    if (!ask || ask.id !== choice.id) throw new Error('That sign-in is no longer open.');
+    const { keep: _was, ...rest } = ask;
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { signIn: choice.keep ? rest : { ...rest, keep: false } }, { source: 'founder', now });
+  }
+
   // Every thread whose ship waited on a GitHub sign-in on this computer goes to the queue again.
   shipAgainAfterGitHubSignIn(now = Date.now()) {
     const { workItemsDisk } = this.modules;
@@ -721,6 +778,11 @@ export class Store {
 
   releaseRunClaim(slug: string, id: string, run?: Parameters<StoreModules['workItemsDisk']['releaseRunClaim']>[2]) {
     return this.modules.workItemsDisk.releaseRunClaim(this.productDir(slug), id, run);
+  }
+
+  /** Who is signed in on this computer, or null: whose words a new line is. */
+  author(): string | null {
+    return this.modules.workItemsDisk.currentAuthor();
   }
 
   // THE WRITTEN NAME THE LIST DRAWS. Written by the app rather than by a
@@ -876,7 +938,7 @@ export class Store {
     return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, allowed, { source: 'founder' });
   }
 
-  composeItem(slug: string, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent }: ComposeInput) {
+  composeItem(slug: string, { id = null, title, body, kind = 'directive', priority = 0, labels, runAt, start, engine, model, effort, assignee, due, people, visibility, visibleTo, blockedBy, fromPhone, voice, forAgent, ask }: ComposeInput) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     // The 'founder' label is the human-in-the-loop marker: only items the
@@ -891,6 +953,8 @@ export class Store {
     if (allLabels.includes(GIVEN_TASK) && (visibility === 'team' || (visibility === 'people' && Array.isArray(visibleTo) && visibleTo.length))) {
       Object.assign(first, { visibility, ...(visibility === 'people' ? { visibleTo: [...new Set((visibleTo ?? []).map(String))] } : {}) });
     }
+    // So is what the task asks on the giver's thread (shared/thread-asks.mts).
+    if (allLabels.includes(GIVEN_TASK) && ask) Object.assign(first, { ask });
     // A thread the cloud started from the phone keeps the id it ran under there.
     const created = id
       ? workItemsDisk.createWorkItemIfAbsent(dir, id, first, { source: 'system' }).item
@@ -1139,6 +1203,11 @@ export class Store {
     if (item?.status !== 'done') return item;
     workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: 'founder' });
     return workItemsDisk.updateWorkItem(dir, id, { status: 'blocked' }, { source: 'system' });
+  }
+
+  repliedOnALink(slug: string, id: string, linkReply: { file: string; text: string }) {
+    if (!this.readItem(slug, id)) return null;
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { linkReply }, { source: 'founder' });
   }
 
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN, because laying it into the
@@ -1540,7 +1609,7 @@ export class Store {
    *  It is best effort: a practice project whose sessions folder will not take a
    *  file is not a reason to fail the beat that stages the rows. The thread
    *  simply draws the ledger, which is what it did before this existed. */
-  writePracticeTrace(slug: string, id: string, lines: unknown, startedAt: number) {
+  writePracticeTrace(slug: string, id: string, lines: unknown, startedAt: number, everyMs = 9_000) {
     if (!Array.isArray(lines) || !lines.length) return null;
     try {
       const dir = this.machineryFile(slug, path.join('sessions', id));
@@ -1556,7 +1625,7 @@ export class Store {
       // A few seconds apart, in order, so the run reads as a run. Nine seconds
       // is the measured pace of a real one (renderer/src/components/ItemThread.tsx).
       const text = lines
-        .map((line, i) => `${clockAt(began + i * 9_000)}  ${line}`)
+        .map((line, i) => `${clockAt(began + i * everyMs)}  ${line}`)
         .join('\n');
       const file = path.join(dir, `${began}.log`);
       fs.writeFileSync(file, `${text}\n`);
@@ -1579,7 +1648,7 @@ export class Store {
   // was for. Only when a line was really found: the sentence that says a folder
   // has no readme in it is a true answer and it is not a description, so it is
   // never written under the project's name.
-  finishFirstRunTask(slug: string, id: string, round = 0) {
+  finishFirstRunTask(slug: string, id: string, round = 0, { asked }: { asked?: number } = {}) {
     const { workItemsDisk } = this.modules;
     const product = this.listProducts().find((p) => p.slug === slug) ?? null;
     // A REPLY TO IT IS ANSWERED HERE TOO (2026-10-06). The first answer offers
@@ -1605,16 +1674,16 @@ export class Store {
     // earn.
     if (product?.practice) {
       const item = workItemsDisk.updateWorkItem(
-        this.productDir(slug), id, { result: PRACTICE_ANSWER }, { source: 'agent' },
+        this.productDir(slug), id, { result: PRACTICE_ANSWER, problem: PRACTICE_CONTEXT, progress: PRACTICE_DONE }, { source: 'agent' },
       );
-      // AND THE RUN IT DID, so beat eleven opens onto a conversation. What she
-      // opened on 2026-08-24 was the words "Nothing has been said here yet."
-      // under the title of the first task anybody sends in Agentbox: the row had
-      // a result and no thread at all. Backdated a few seconds so the run reads
-      // as having happened before the answer rather than after it.
-      this.writePracticeTrace(
-        slug, id, PRACTICE_TASK_TRACE, Date.now() - PRACTICE_TASK_TRACE.length * 9_000,
-      );
+      // AND THE RUN IT DID, so the thread opens onto a conversation rather than
+      // a result with nothing before it. Dated between the ask and the answer,
+      // a second apart: dated back from the answer it stood above the ask.
+      const now = Date.now();
+      const from = Math.min(Math.floor((asked ?? item?.createdAt ?? now) / 1000) * 1000 + 1_000, Math.floor(now / 1000) * 1000);
+      // With no room for a second between steps, they share one: still in order, never after the answer.
+      const every = now - from >= (PRACTICE_TASK_TRACE.length - 1) * 1_000 ? 1_000 : 0;
+      this.writePracticeTrace(slug, id, PRACTICE_TASK_TRACE, from, every);
       return { item, line: PRACTICE_ANSWER, oneLiner: null };
     }
     const folder = product?.repoPath ?? null;
@@ -1732,14 +1801,29 @@ export class Store {
     wanted.forEach((thread: ImportedChat, i: number) => {
       const { at, last } = chatTimes(thread, now - i * 1000);
       const row = threadImportRow(thread);
+      const turns = notYetRead({ entries: thread.entries ?? [] }, { heardThrough: 0, knownAt: 0 });
+      if (turns.length) row.result = turns.at(-1)!.who === 'agent' ? turns.pop()!.text : '';
+      if (thread.entries) row.labels.push(AS_IT_GOES_LABEL);
+      // Claude Code's own name for it, which its window shows too, is the thread's; a name cut from what was typed is not one.
+      const named = thread.entries && !row.body.startsWith(row.title.replace(/…$/, '').trim()) ? row.title : '';
+      // The opening is the row's body.
+      if (turns[0]?.who === 'you' && turns[0].text === row.body) turns.shift();
+      if (thread.stoppedOn !== undefined) {
+        row.result = [stoppedThere(thread.stoppedOn, thread.openIn), row.result].filter(Boolean).join('\n\n');
+        row.labels = row.labels.filter((l) => l !== CATCH_UP_LABEL);
+      }
       const created = workItemsDisk.createWorkItem(
         dir,
-        { title: row.title, kind: row.kind, priority: row.priority, labels: row.labels },
+        { title: row.title, kind: row.kind, priority: row.priority, labels: row.labels, ...(named ? { label: named } : {}) },
         { source: 'agent', now: at },
       );
       // Your words draw under You and the agent's under the agent.
       workItemsDisk.updateWorkItem(dir, created.id, { body: row.body }, { source: 'founder', now: at });
-      if (row.result) workItemsDisk.updateWorkItem(dir, created.id, { result: row.result }, { source: 'agent', now: last + 1 });
+      for (const turn of turns) {
+        const said = turn.who === 'you' ? { saidOutside: turn.text } : { result: turn.text };
+        workItemsDisk.updateWorkItem(dir, created.id, said, { source: turn.who === 'you' ? 'founder' : 'agent', now: Math.min(Math.max(turn.at, at), last) });
+      }
+      workItemsDisk.updateWorkItem(dir, created.id, { ...(row.result ? { result: row.result } : {}), chatAt: last }, { source: 'agent', now: last + 1 });
       if (land === 'sorted' && !thread.waiting) {
         workItemsDisk.updateWorkItem(dir, created.id, { status: 'done' }, { source: 'founder', now: last + 2 });
         done += 1;
@@ -1844,7 +1928,7 @@ export class Store {
     const patch = codexMirrorPatch(t);
     // it draws under You, not under an agent's name.
     workItemsDisk.updateWorkItem(dir, id, { body: patch.body }, { source: 'founder', now: bodyAt });
-    const mirrored = workItemsDisk.updateWorkItem(dir, id, { kind: patch.kind, labels: patch.labels, result: patch.result }, { source: 'agent', now: now + 1 });
+    const mirrored = workItemsDisk.updateWorkItem(dir, id, { kind: patch.kind, labels: patch.labels, result: patch.result, chatAt: t.saidAt || t.when || now }, { source: 'agent', now: now + 1 });
     // At the real moment: the rows above wear the chat's own time, and an engine older than the choice is ignored.
     workItemsDisk.updateWorkItem(dir, id, { engine: (patch as typeof patch & { engine?: string }).engine }, { source: 'agent', now: Math.max(now + 1, Date.now()) });
     // Only a row that was not open is reopened; on an open one the line reads
@@ -1922,7 +2006,7 @@ export class Store {
     return refreshed;
   }
 
-  refreshCodexMirrors(threads: (CodexThreadLike & { when?: number })[] | null | undefined, { now = Date.now() }: { now?: number } = {}) {
+  refreshCodexMirrors(threads: CodexThreadLike[] | null | undefined, { now = Date.now() }: { now?: number } = {}) {
     const { workItemsDisk } = this.modules;
     const byId = new Map((threads ?? []).map((t) => [String(t?.id ?? ''), t]));
     let refreshed = 0;
@@ -1932,17 +2016,177 @@ export class Store {
       if (item.answer) continue;
       const t = byId.get(codexIdOf(item) as string);
       if (!t) continue;
-      // Written up here (main/catch-up.mts) since Codex last said anything: the write-up stands.
+      // Nothing said since what the row already has, which may be written up by now (main/catch-up.mts).
       const wroteUpAt = item.wrote?.problem?.ts ?? 0;
-      if (wroteUpAt && (t.when ?? 0) <= wroteUpAt) continue;
+      const saidAt = t.saidAt || t.when || 0;
+      const readTo = (t.saidAt && Number(item.chatAt)) || wroteUpAt;
+      if (readTo && saidAt <= readTo) continue;
       const patch = codexMirrorPatch(t);
       if (patch.result === item.result) continue;
       const labels = item.labels ?? [];
-      workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { result: patch.result }, { source: 'agent', now });
-      if (wroteUpAt && !labels.includes(CATCH_UP_LABEL)) workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { labels: [...labels, CATCH_UP_LABEL] }, { source: 'system', now });
+      workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { result: patch.result, ...(saidAt ? { chatAt: saidAt } : {}) }, { source: 'agent', now });
+      if (wroteUpAt && howTheChatEnded(patch.result).waiting && !labels.includes(CATCH_UP_LABEL)) workItemsDisk.updateWorkItem(this.productDir(item.product), item.id, { labels: [...labels, CATCH_UP_LABEL] }, { source: 'system', now });
       refreshed += 1;
     }
     return refreshed;
+  }
+
+  /**
+   * THE CHATS BROUGHT IN THAT FOLLOW WHERE THEY STARTED (main/chat-follow.mts),
+   *  and any the follow still holds, the newest ones in Done last. Not one in a
+   *  project shared with a team: every line there reaches teammates, and what
+   *  the agent says next in a terminal is nothing anybody chose to share. */
+  chatsToFollow(now = Date.now(), ours: Ours = () => false): FollowedChat[] {
+    const products = this.listProducts();
+    const shared = new Set(products.filter((p) => isShared(p)).map((p) => p.slug));
+    const folders = new Map(products.map((p) => [p.slug, p.repoPath ?? null]));
+    const out: FollowedChat[] = [];
+    const done: FollowedChat[] = [];
+    for (const item of this.listItems(now)) {
+      const labels = item.labels ?? [];
+      const thread = labels.includes(THREAD_LABEL) ? labels.find((l) => l.startsWith('thread:'))?.slice(7).trim() : '';
+      const codex = isCodexMirrorRow(item) ? codexIdOf(item) : null;
+      const chat = thread || codex;
+      if (!chat) continue;
+      const held = heldOutside(item);
+      const mine = !shared.has(item.product) && !ours(item.id);
+      const replied = replyWaits(item);
+      const told = !!item.answer && item.answer !== '(withdrawn)' && !replied && (item.wrote?.answer?.ts ?? 0) > Math.max(chatAtOf(item), item.wrote?.saidOutside?.ts ?? 0);
+      const doneAt = item.status === 'done' ? item.wrote?.status?.ts ?? 0 : 0;
+      const follow = mine && (item.status === 'open' || held || (doneAt > 0 && now - doneAt < DONE_FOLLOWED_MS));
+      if (!follow && !held) continue;
+      // A row from before `chatAt` is read from its own last writes.
+      const chatAt = chatAtOf(item);
+      const knownAt = chatAt || Math.max(item.wrote?.result?.ts ?? 0, item.createdAt ?? 0);
+      (doneAt ? done : out).push({
+        product: item.product, id: item.id, engine: thread ? 'claude' : 'codex', chat, folder: folders.get(item.product) ?? null,
+        knownAt, heardThrough: chatAt || Math.max(knownAt, item.wrote?.saidOutside?.ts ?? 0), doneAt, replied, told, left: !told && [CUT_THERE, CLOSED_THERE].some((l) => String(item.result ?? '').startsWith(l)), held, follow,
+      });
+    }
+    done.sort((a, b) => b.doneAt - a.doneAt);
+    return [...out, ...done.slice(0, DONE_FOLLOWED_MOST)];
+  }
+
+  /** What you typed there, on the thread as yours. */
+  chatSaidOutside(slug: string, id: string, words: string, { at, now = Date.now() }: { at: number; now?: number }) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    workItemsDisk.updateWorkItem(dir, id, { saidOutside: words }, { source: 'founder', now });
+    // Its own line: one written as yours would outrank every later one.
+    return workItemsDisk.updateWorkItem(dir, id, { chatAt: at }, { source: 'system', now });
+  }
+
+  /** Into In progress while its agent works on what was typed there. A claim
+   *  anybody else holds is theirs; the follow's own is renewed before its lease
+   *  is half gone. */
+  async holdChatOutside(slug: string, id: string, holder: string, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item) return null;
+    if (item.claim && !item.claimExpired) {
+      if (item.claim.holder !== holder) return null;
+      if (item.claim.leaseUntil - now < LEASE_MS / 2) workItemsDisk.heartbeatWorkItem(dir, id, { epoch: item.epoch, holder, now });
+      return item;
+    }
+    if (item.status !== 'open') return null;
+    const got = await workItemsDisk.claimWorkItem(dir, { id, holder, now });
+    if (!got.claimed) return null;
+    // Replied to here while the claim waited for the lock.
+    if (replyWaits(got.item)) {
+      this.letGoOfChat(slug, id, { now });
+      return null;
+    }
+    return got.item;
+  }
+
+  /** What its agent said there before your next message. */
+  chatAgentSaid(slug: string, id: string, said: string, { at, now = Date.now() }: { at: number; now?: number }) {
+    return this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), id, { result: said, chatAt: at }, { source: 'agent', now });
+  }
+
+  /** Its agent answered there: the answer is the row's, and the row is open. */
+  chatAnsweredOutside(slug: string, id: string, said: string, { at, now = Date.now() }: { at: number; now?: number }) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item) return null;
+    workItemsDisk.updateWorkItem(dir, id, { result: said, chatAt: at }, { source: 'agent', now });
+    this.owesWriteUp(slug, item, howTheChatEnded(said).waiting, now);
+    return this.letGoOfChat(slug, id, { now });
+  }
+
+  /** Its agent stopped there, on a question or a permission prompt only its own
+   *  window shows. Said once until you speak there again or its agent does. */
+  chatStoppedOutside(slug: string, id: string, stop: string, news: string, { at, now = Date.now() }: { at: number; now?: number }) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item) return null;
+    const yours = Math.max(item.wrote?.saidOutside?.ts ?? 0, item.wrote?.answer?.ts ?? 0);
+    const said = String(item.result ?? '').startsWith(stop) && (item.wrote?.result?.ts ?? 0) >= yours;
+    if (news || !said) {
+      workItemsDisk.updateWorkItem(dir, id, { result: [stop, news].filter(Boolean).join('\n\n'), ...(at ? { chatAt: at } : {}) }, { source: 'agent', now });
+      this.owesWriteUp(slug, item, false, now);
+    }
+    return this.letGoOfChat(slug, id, { now });
+  }
+
+  /** You stopped it there, or it closed, before it answered: `at` is when, or its
+   *  last word's, and `news` what it had said by then. */
+  chatLeftOutside(slug: string, id: string, how: 'cut' | 'closed', news: string, { at, now = Date.now() }: { at: number; now?: number }) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item) return null;
+    const said = [how === 'cut' ? CUT_THERE : CLOSED_THERE, news].filter(Boolean).join('\n\n');
+    workItemsDisk.updateWorkItem(dir, id, { result: said, ...(at ? { chatAt: at } : {}) }, { source: 'agent', now });
+    this.owesWriteUp(slug, item, false, now);
+    return this.letGoOfChat(slug, id, { now });
+  }
+
+  /** In Done, and its agent waits on an answer to what you typed there since. */
+  chatAsksAgain(slug: string, id: string, since: ChatEntry[], stop: string | null, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item || item.status !== 'done') return null;
+    // A reply typed here that no run took up went with the close.
+    if (item.answer && item.answer !== '(withdrawn)') this.settleAnswer(slug, id, item.wrote?.answer?.ts);
+    const tail = since.at(-1)?.who === 'agent' ? since.at(-1)! : null;
+    const before = tail ? since.slice(0, -1) : [...since];
+    // With your first words there, or just ahead of the line saying it stopped, so it reads as neither's sending back.
+    let opened = false;
+    for (const e of before) {
+      if (e.who === 'agent') { this.chatAgentSaid(slug, id, e.text, { at: e.at, now }); continue; }
+      workItemsDisk.updateWorkItem(dir, id, { saidOutside: e.text, ...(opened ? {} : { status: 'open' }) }, { source: 'founder', now });
+      workItemsDisk.updateWorkItem(dir, id, { chatAt: e.at }, { source: 'system', now });
+      opened = true;
+    }
+    if (!opened) workItemsDisk.updateWorkItem(dir, id, { status: 'open' }, { source: 'founder', now });
+    const said = [stop, tail?.text].filter(Boolean).join('\n\n');
+    const open = said ? workItemsDisk.updateWorkItem(dir, id, { result: said, ...(tail ? { chatAt: tail.at } : {}) }, { source: 'agent', now: now + 1 }) : null;
+    this.owesWriteUp(slug, item, !stop, now + 1);
+    return open;
+  }
+
+  /** Written up the way every thread reads (main/catch-up.mts): an answer that
+   *  asks something is. One that asks nothing is not, since a write-up always
+   *  asks, nor is a question only its own window shows. */
+  owesWriteUp(slug: string, item: StoreItem, owed: boolean, now: number) {
+    const labels = item.labels ?? [];
+    if (labels.includes(CATCH_UP_LABEL) === owed) return;
+    this.modules.workItemsDisk.updateWorkItem(this.productDir(slug), item.id, {
+      labels: owed ? [...labels, CATCH_UP_LABEL] : labels.filter((l) => l !== CATCH_UP_LABEL),
+    }, { source: 'system', now });
+  }
+
+  letGoOfChat(slug: string, id: string, { now = Date.now() }: { now?: number } = {}) {
+    const { workItemsDisk } = this.modules;
+    const dir = this.productDir(slug);
+    const item = workItemsDisk.readWorkItem(dir, id, now);
+    if (!item || !heldOutside(item)) return item;
+    return workItemsDisk.releaseWorkItem(dir, id, { epoch: item.epoch, now });
   }
 
   /**
@@ -2080,6 +2324,13 @@ function clockAt(ms: number) {
  * When a chat brought in happened: `at` when it started, `last` when it last
  *  moved. A chat with no time it can be trusted for, or one ahead of `fallback`
  *  (the moment of import), is stamped with `fallback`. */
+const chatAtOf = (item: StoreItem) => Number(item.chatAt) || 0;
+
+/** A reply typed here that nothing has taken up: no run of ours, nor its terminal. */
+function replyWaits(item: StoreItem) {
+  return !!item.answer && item.answer !== '(withdrawn)' && (item.wrote?.answer?.ts ?? 0) > (Number(item.answeredThrough) || 0);
+}
+
 function chatTimes(thread: { when?: unknown; startedAt?: unknown } | null | undefined, fallback: number) {
   const last = Number(thread?.when);
   if (!(last > 0 && last <= fallback)) return { at: fallback, last: fallback };

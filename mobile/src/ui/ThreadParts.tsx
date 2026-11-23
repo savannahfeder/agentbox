@@ -10,10 +10,12 @@ import { activitySummary } from '../../../renderer/src/activity-summary';
 import type { ParsedOption } from '../../../renderer/src/format';
 import type { AgentWork } from '../../../renderer/src/types';
 import { stateWord } from '../../../renderer/src/threads-made';
-import type { FiledRow } from '../lib/thread';
+import { fileCount, signed } from '../../../renderer/src/change-figures';
+import type { FiledRow, Thread } from '../lib/thread';
 import { FILED_WORDS, waitingWords, type Live } from '../lib/thread-offers';
 import { Chevron as FoldArrow } from './icons';
 import { InlineMarkdown, type MessageFiles } from './Markdown';
+import { router } from '../lib/router';
 import { T } from './parts';
 import { color, corner, font } from './theme';
 
@@ -252,6 +254,35 @@ export function FiledList({ rows, label, open, approve, here, dismiss, inTurn }:
           );
         })}
       </View>
+    </View>
+  );
+}
+
+const figures = (c: { plus: number; minus: number }, size: number) => signed(c).map(({ sign, text }) => (
+  <T key={sign} style={{ fontFamily: font.mono, fontSize: size, color: sign === '+' ? color.plus : color.minus }}>{text}</T>
+));
+
+/** What the last run changed: its figures, then each file (the desktop's change figures and the file bar of its code pane). */
+export function ChangeCard({ change, product, id }: { change: NonNullable<Thread['change']>; product: string; id: string }) {
+  const open = (path: string) => router.push({ pathname: '/change', params: { product, id, path } });
+  return (
+    <View style={{ marginTop: 22, borderWidth: 1, borderRadius: corner.card, borderColor: color.line, overflow: 'hidden' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingTop: 11, paddingHorizontal: 16, paddingBottom: 8 }}>
+        {figures(change, 12.5)}
+        <T style={{ fontSize: 12.5, color: color.faint }}>in {fileCount(change)}</T>
+      </View>
+      {change.list.map((f) => (
+        <Pressable key={f.path} onPress={() => open(f.path)} accessibilityRole="button" accessibilityLabel={`See the code changed in ${f.path}`}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 6, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: color.rowLine, backgroundColor: pressed ? color.fill : 'transparent' })}>
+          <T numberOfLines={1} ellipsizeMode="head" style={{ flex: 1, fontFamily: font.mono, fontSize: 12.5, color: color.dim }}>{f.path}</T>
+          {figures(f, 12)}
+        </Pressable>
+      ))}
+      {change.more > 0 && (
+        <View style={{ paddingVertical: 8, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: color.rowLine }}>
+          <T style={{ fontSize: 12.5, color: color.faint }}>and {change.more} more</T>
+        </View>
+      )}
     </View>
   );
 }

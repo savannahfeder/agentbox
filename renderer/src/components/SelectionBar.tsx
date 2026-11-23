@@ -2,7 +2,8 @@
 // over them offers a comment. Selecting alone never starts one.
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { barSpot, boxPickedIn, pickedIn, quoteFrom } from '../selection-bar';
+import { barSpot, boxPickedIn, isCommentChord, pickedIn, quoteFrom } from '../selection-bar';
+import { MAC } from '../this-keyboard';
 
 type Box = { top: number; bottom: number; left: number; right: number };
 
@@ -18,11 +19,16 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
   const [picked, setPicked] = useState<{ words: string; first: Box; all: Box } | null>(null);
   const [copied, setCopied] = useState(false);
   const [moves, setMoves] = useState(0);
+  // The key's plate goes on the far side of the bar from the words, never over them.
+  const [side, setSide] = useState<'above' | 'below'>('above');
+  const commentNow = useRef<(() => void) | null>(null);
   useEffect(() => {
     setPicked(null);
     if (!frame) return undefined;
     const hear = (e: MessageEvent) => {
-      if (e.source !== frame.contentWindow || e.data?.type !== 'agentbox-selected-words') return;
+      if (e.source !== frame.contentWindow) return;
+      if (e.data?.type === 'agentbox-comment-key' && isCommentChord(e.data, MAC)) { commentNow.current?.(); return; }
+      if (e.data?.type !== 'agentbox-selected-words') return;
       const { words, first, all } = e.data;
       setCopied(false);
       setPicked(typeof words === 'string' && words.trim() && first && all ? { words, first, all } : null);
@@ -50,8 +56,10 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
     const spot = barSpot(onScreen(picked.first), onScreen(picked.all), { w: el.offsetWidth, h: el.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, top });
     el.style.left = `${spot.left}px`;
     el.style.top = `${spot.top}px`;
+    setSide(spot.top < onScreen(picked.first).top ? 'above' : 'below');
   }, [picked, copied, moves, frame]);
 
+  commentNow.current = picked ? () => comment() : null;
   if (!picked) return null;
   const comment = () => {
     onComment(quoteFrom(picked.words));
@@ -64,7 +72,7 @@ export function FrameWordsBar({ frame, onComment }: { frame: HTMLIFrameElement |
     try { await navigator.clipboard.writeText(picked.words); setCopied(true); } catch { /* clipboard blocked */ }
   };
   return createPortal(<div ref={bar} className="link-pop selection-bar" role="toolbar" aria-label="Selected words" onMouseDown={(e) => e.preventDefault()}>
-    <button type="button" className="link-pop-btn selection-bar-comment" onClick={comment}><CommentGlyph />Comment</button>
+    <button type="button" className="link-pop-btn selection-bar-comment" data-hint="comment" data-hint-side={side} onClick={comment}><CommentGlyph />Comment</button>
     <button type="button" className="link-pop-btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</button>
   </div>, document.body);
 }
@@ -97,6 +105,7 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
   const bar = useRef<HTMLDivElement | null>(null);
   const [at, setAt] = useState<{ first: Box; all: Box } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [side, setSide] = useState<'above' | 'below'>('above');
 
   useEffect(() => {
     let frame = 0;
@@ -140,9 +149,9 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
     const spot = barSpot(at.first, at.all, { w: el.offsetWidth, h: el.offsetHeight }, { w: window.innerWidth, h: window.innerHeight, top, left });
     el.style.left = `${spot.left}px`;
     el.style.top = `${spot.top}px`;
+    setSide(spot.top < at.first.top ? 'above' : 'below');
   }, [at, copied]);
 
-  if (!at) return null;
   const picked = () => {
     const sel = window.getSelection();
     const words = pickedIn(page.current, sel);
@@ -153,12 +162,28 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
   };
   const comment = () => {
     const got = picked();
-    if (!got) return;
+    if (!got) return false;
     const { words, at } = got;
-    onComment(quoteFrom(words), at);
+    // Let go of the page's words before the note box takes the caret, never after.
     window.getSelection()?.empty();
+    onComment(quoteFrom(words), at);
     setAt(null);
+    return true;
   };
+  const commentNow = useRef(comment);
+  commentNow.current = comment;
+
+  // Capture, so a document's editor never gets the press first.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!isCommentChord(e, MAC)) return;
+      if (commentNow.current()) { e.preventDefault(); e.stopPropagation(); }
+    };
+    window.addEventListener('keydown', key, true);
+    return () => window.removeEventListener('keydown', key, true);
+  }, []);
+
+  if (!at) return null;
   const copy = async () => {
     const words = picked()?.words;
     if (!words) return;
@@ -166,7 +191,7 @@ export function SelectionBar({ page, onComment }: { page: RefObject<HTMLElement 
   };
   // On the body: the page scrolls inside a size container, which would hold a fixed bar to itself.
   return createPortal(<div ref={bar} className="link-pop selection-bar" role="toolbar" aria-label="Selected words" onMouseDown={(e) => e.preventDefault()}>
-    <button type="button" className="link-pop-btn selection-bar-comment" onClick={comment}><CommentGlyph />Comment</button>
+    <button type="button" className="link-pop-btn selection-bar-comment" data-hint="comment" data-hint-side={side} onClick={comment}><CommentGlyph />Comment</button>
     <button type="button" className="link-pop-btn" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</button>
   </div>, document.body);
 }

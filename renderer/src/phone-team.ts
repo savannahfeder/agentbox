@@ -17,16 +17,22 @@ const me = (c: Rest) => {
 };
 export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Your team, or the invites waiting for you when you are on none. */
-export async function readTeam(c: Rest): Promise<{ team: PhoneTeam | null; invites: TeamInvite[] }> {
+// An older cloud has no gate, so a failed ask is null and nothing is hidden (main/team/index.mts readMultiplayer).
+const askMultiplayer = (c: Rest): Promise<boolean | null> => c.rpc('i_have_multiplayer').then((yes) => yes === true, () => null);
+const askPro = (c: Rest): Promise<boolean | null> => c.rpc('my_team_pays').then((yes) => yes === true, () => null);
+
+/** Your team, or the invites waiting for you when you are on none, and whether your team may invite: let in, and with Pro (each false only when the cloud says not). */
+export async function readTeam(c: Rest): Promise<{ team: PhoneTeam | null; invites: TeamInvite[]; multiplayer: boolean | null; pro: boolean | null }> {
   const self = me(c);
+  const multiplayer = askMultiplayer(c);
   const ids = (await c.select('team_members', `select=team_id&person_id=eq.${self}`) as { team_id: string }[]).map((m) => m.team_id);
   if (!ids.length) {
     const rows = (await c.rpc('pending_invites') as { team_id: string; team_name: string; invited_by_name?: string | null }[] | null) ?? [];
-    return { team: null, invites: rows.map((r) => ({ teamId: r.team_id, teamName: r.team_name, invitedBy: r.invited_by_name ?? null })) };
+    return { team: null, invites: rows.map((r) => ({ teamId: r.team_id, teamName: r.team_name, invitedBy: r.invited_by_name ?? null })), multiplayer: await multiplayer, pro: null };
   }
+  const pro = askPro(c);
   const [t] = await c.select('teams', `select=id,name&id=${inList(ids)}&order=created_at&limit=1`) as { id: string; name: string }[];
-  if (!t) return { team: null, invites: [] };
+  if (!t) return { team: null, invites: [], multiplayer: await multiplayer, pro: null };
   const members = await c.select('team_members', `select=person_id,role&team_id=eq.${t.id}`) as { person_id: string; role: string }[];
   const roles = new Map<string, string>(members.map((m) => [m.person_id, m.role]));
   const people = members.length ? await c.select('people', `select=id,email,name&id=${inList([...roles.keys()])}`) as { id: string; email?: string | null; name?: string | null }[] : [];
@@ -42,6 +48,8 @@ export async function readTeam(c: Rest): Promise<{ team: PhoneTeam | null; invit
       mine: role(self),
     },
     invites: [],
+    multiplayer: await multiplayer,
+    pro: await pro,
   };
 }
 

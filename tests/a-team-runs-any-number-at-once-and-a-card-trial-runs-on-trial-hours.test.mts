@@ -16,13 +16,13 @@ import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
-import { PLANS, TEAM, FREE } from '../cloud/gateway/plans.mjs';
+import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 import { stripeClient } from '../cloud/gateway/stripe.mjs';
 import { cloudPlanOf } from '../main/cloud/account.mts';
 import { planKey } from '../renderer/src/cloud-upgrade.ts';
 import { TeamBilling } from '../renderer/src/team/TeamBilling.tsx';
-import { SETUP_PLANS, PRO_PITCH } from '../renderer/src/setup-split.ts';
+import { PRO_PITCH } from '../renderer/src/setup-split.ts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
@@ -44,7 +44,8 @@ function setup({ onTeam = true } = {}) {
     if (m) return subs.has(m[1]) ? json(200, subs.get(m[1])) : json(404, { error: { message: 'No such subscription' } });
     return json(404, { error: { message: 'not faked' } });
   };
-  const team = { id: 'team-1', createdAt: MADE, members: onTeam ? [A, B] : [], owners: [A] };
+  // Before a card, the trial is a week given by hand (the only one since 2026-11-21).
+  const team = { id: 'team-1', createdAt: MADE, freeUntil: TRIAL_ENDS, members: onTeam ? [A, B] : [], owners: [A] };
   const gw = createGateway({
     agentcore: { async invoke() { return { ok: true }; }, async stop() {} },
     links: { get: async (k: string) => `https://b/${k}`, put: async (k: string) => `https://b/${k}`, head: async (k: string) => `https://b/${k}` },
@@ -110,11 +111,11 @@ describe('a team runs any number of cloud agents at once', () => {
     expect(cloudPlanOf(me)).toMatchObject({ plan: 'team', unlimited: true, agents: null });
   });
 
-  it('someone with no team still runs two free agents at once', async () => {
+  it('someone with no team and no plan runs none', async () => {
     const { startMany } = setup({ onTeam: false });
     const out = await startMany(A);
-    expect(out.filter((b) => b.ok)).toHaveLength(FREE.agents);
-    expect(out[FREE.agents]).toMatchObject({ ok: false, error: 'agents' });
+    expect(out.filter((b) => b.ok)).toHaveLength(0);
+    expect(out[0]).toMatchObject({ ok: false, error: 'plan' });
   });
 });
 
@@ -191,14 +192,14 @@ describe('what the screens say', () => {
   // on the left, and the trial is 50 hours, not 10 ("10 cloud hours for pro is very
   // bad given free is 5. should be more like 50").
   it('the purchase page shows the free week beside the paid month, on the left', () => {
-    const pro = SETUP_PLANS.find((p) => p.id === 'pro')!;
-    expect(pro.sub).not.toMatch(/\d+ cloud agents at once/);
+    // The list of plans went when the purchase page became the one plan page (2026-11-12).
+    expect(JSON.stringify(PRO_PITCH)).not.toMatch(/\d+ cloud agents at once/);
     expect(TEAM.trialHoursPerMember).toBe(50);
     expect(PRO_PITCH.trial).toEqual({ label: 'First 7 days', price: 'Free', line: '50 cloud hours to try' });
     expect(PRO_PITCH.paid).toEqual({ label: 'Then', price: '$40', per: 'a month', line: '400 cloud hours a month' });
     expect(PRO_PITCH.terms).toBe('Cancel any time.');
     const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
-    expect(split).toMatch(/PRO_PITCH\.trial/);
-    expect(split).toMatch(/PRO_PITCH\.paid/);
+    expect(split).toMatch(/offer\.trial/);
+    expect(split).toMatch(/offer\.paid/);
   });
 });

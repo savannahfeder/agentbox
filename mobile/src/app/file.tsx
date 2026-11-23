@@ -11,7 +11,7 @@ import { FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { MAX_ZOOM, fitScale } from '../../../renderer/src/picture-view';
-import { docOnPhone, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn, tableOnPhone } from '../lib/files';
+import { docOnPhone, fileTitleOf, openingOf, pageOnPhone, pictureLink, pictureSource, shapeOfDrawn, tableOnPhone } from '../lib/files';
 import type { Table } from '../../../renderer/src/table-file';
 import { TableFile } from '../ui/TableFile';
 import { PictureMenu } from '../../modules/picture-menu';
@@ -29,14 +29,14 @@ const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 const nameOf = (src: string) => src.split('/').pop() ?? src;
 
 export default function FileScreen() {
-  const { product, src, among } = useLocalSearchParams<{ product: string; src: string; among?: string }>();
+  const { product, src, among, name } = useLocalSearchParams<{ product: string; src: string; among?: string; name?: string }>();
   const pictures = useMemo(() => { try { const a = JSON.parse(String(among ?? '')); return Array.isArray(a) && a.length ? a.map(String) : null; } catch { return null; } }, [among]);
   if (pictures) return <PictureRoom product={String(product)} pictures={pictures} start={Math.max(0, pictures.indexOf(String(src)))} />;
-  return <OnItsOwn product={String(product)} src={String(src)} />;
+  return <OnItsOwn product={String(product)} src={String(src)} name={name} />;
 }
 
 /** A document, a page, a film or a sound, under a bar with its name (`.doc-pane` on the phone). */
-function OnItsOwn({ product, src }: { product: string; src: string }) {
+function OnItsOwn({ product, src, name }: { product: string; src: string; name?: string }) {
   const c = useCloud();
   const inset = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -61,7 +61,7 @@ function OnItsOwn({ product, src }: { product: string; src: string }) {
     <Wall style={wide ? { backgroundColor: '#000' } : undefined}>
       {film && <Stack.Screen options={{ orientation: 'default' }} />}
       {!wide && <TopBar left={<IconButton label="Back" width={34} onPress={back}><Back /></IconButton>}
-        title={<T numberOfLines={1} style={{ fontSize: 15, paddingLeft: 10, paddingRight: 6 }}>{nameOf(src)}</T>} />}
+        title={<T numberOfLines={1} style={{ fontSize: 15, paddingLeft: 10, paddingRight: 6 }}>{fileTitleOf(src, name)}</T>} />}
       {body}
     </Wall>
   );

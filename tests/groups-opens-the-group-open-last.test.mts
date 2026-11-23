@@ -10,7 +10,8 @@
 // Groups is a row in the narrow sidebar rather than a tab
 // (tests/with-groups-the-sidebar-stays-narrow-and-widens-when-pointed-at).
 // A mention on a group's file also says which file to open on (f3502f31) and
-// still opens through openRoom.
+// still opens through openRoom. Pressed in Needs you, a group opens in the
+// inbox instead (tests/a-chat-opened-from-needs-you-stays-in-the-inbox).
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { groupInTab } from '../renderer/src/team/rooms/room-rules.ts';
@@ -35,12 +36,12 @@ describe('which group Groups opens', () => {
   });
 });
 
-describe('every group opens as the Groups page', () => {
-  it('which then holds it', () => {
-    expect(hook).toMatch(/const openRoom = \(id: string\) => \{[^}]*setOpenId\(id\);[^}]*setLastId\(id\); writeRoomTab\(id\);/);
+describe('every group opens through openRoom', () => {
+  it('which then holds it, as the Groups page or in the inbox', () => {
+    expect(hook).toMatch(/const openRoom = \(id: string, from: 'inbox' \| null = null\) => \{[^}]*setOpenId\(id\);[^}]*setLastId\(id\); writeRoomTab\(id\);/);
   });
   it('a mention and a chat started from someone’s page both go through it', () => {
-    expect(hook).toMatch(/const openMention = \(m: RoomMention\) => \{[^}]*\}\);\s*openRoom\(m\.roomId\);\s*\};/);
+    expect(hook).toMatch(/const openMention = \(m: RoomMention, from: 'inbox' \| null = null\) => \{[^}]*\}\);\s*openRoom\(m\.roomId, from\);\s*const line = mentionLine\(m\);\s*if \(line\) revealLine\(line\);\s*\};/);
     expect(hook).toMatch(/id = res\.value;\s*\}\s*openRoom\(id\);\s*\};/);
   });
   it('a teammate’s direct record opens in its own view, over the group', () => {

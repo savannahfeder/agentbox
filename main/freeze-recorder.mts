@@ -1,12 +1,13 @@
 // WHAT THE MAIN THREAD WAS DOING WHEN THE APP FROZE.
 //
 // The spinning wheel is this thread not answering, and it comes when nobody is
-// profiling. So a thread of its own watches all the time: the main thread
-// stamps a clock every 100 ms, the
-// watcher keeps a low-rate CPU profile of it running through the inspector,
-// and when the stamps stop for longer than `thresholdMs` it cuts that stretch
-// out of the profile and writes one line saying which of our functions held
-// it, to `freeze-<day>.jsonl` beside the memory log, kept a week.
+// profiling. So a thread of its own keeps a low-rate CPU profile of it running
+// through the inspector all the time. The main thread stamps a clock every
+// 100 ms; a stamp that comes more than `thresholdMs` after the last one is a
+// hold that just ended, and it tells the watcher, which cuts that stretch out
+// of the profile and writes one line saying which of our functions held it, to
+// `freeze-<day>.jsonl` beside the memory log, kept a week. The watcher never
+// looks on its own: in an idle app it sleeps.
 //
 // It stays on this computer. Nothing here is sent anywhere.
 import fs from 'node:fs';
@@ -14,6 +15,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { stripTypesFlags } from './strip-types.mts';
+import { noteThread } from './thread-heaps.mts';
 
 export const THRESHOLD_MS = 500;
 export const KEEP_DAYS = 7;
@@ -104,6 +106,30 @@ const realPath = (dir: string) => { try { return dir ? fs.realpathSync(dir) : ''
 const ours = (frame: FreezeStackFrame) => /\.[cm]?[jt]s$/.test(frame.file) && !/^(node:|…\/)/.test(frame.file) && !frame.file.includes('node_modules');
 const named = (f: FreezeStackFrame) => (f.file ? `${f.fn} ${f.file}:${f.line}` : f.fn);
 
+/** Reads a profile's samples as stacks, leaf first, each worked out once. */
+function stackReader(profile: CpuProfile, appDirs: string[]): (id: number) => FreezeStack {
+  const byId = new Map((profile.nodes ?? []).map((n): [number, ProfileNode] => [n.id, n]));
+  const parent = new Map<number, number>();
+  for (const n of profile.nodes ?? []) for (const c of n.children ?? []) parent.set(c, n.id);
+  const stacks = new Map<number, FreezeStack>();
+  return (id: number): FreezeStack => {
+    if (stacks.has(id)) return stacks.get(id)!;
+    const frames: FreezeStackFrame[] = [];
+    for (let at: number | undefined = id; at != null; at = parent.get(at)) {
+      const cf = byId.get(at)?.callFrame;
+      if (!cf || cf.functionName === '(root)') continue;
+      frames.push({ fn: cf.functionName || '(anonymous)', file: fileOf(cf.url, appDirs), line: cf.url ? cf.lineNumber + 1 : 0 });
+    }
+    const leaf = frames[0]?.fn ?? '(program)';
+    const kind = frames.length <= 1 && IDLE.has(leaf) ? 'idle' : leaf === GC ? 'gc' : 'busy';
+    const first = frames.findIndex(ours);
+    const mine = first < 0 ? [] : frames.slice(first);
+    const s: FreezeStack = { kind, frames, where: mine[0] ? named(mine[0]) : leaf, key: `${leaf}|${mine.slice(0, 10).map(named).join('<')}` };
+    stacks.set(id, s);
+    return s;
+  };
+}
+
 /**
  * What held the thread between `fromUs` and `toUs`, read off one or more CPU
  * profiles. Times are on the watcher's clock; `offsetUs` is each profile's
@@ -117,26 +143,7 @@ export function freezeFrom(profiles: ProfileSlice[], { fromUs, toUs, appDir = ''
   let gc = 0;
   for (const { profile, offsetUs = 0 } of profiles) {
     if (!profile?.nodes?.length || !profile.samples?.length) continue;
-    const byId = new Map(profile.nodes.map((n): [number, ProfileNode] => [n.id, n]));
-    const parent = new Map<number, number>();
-    for (const n of profile.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
-    const stacks = new Map<number, FreezeStack>();
-    const stackOf = (id: number): FreezeStack => {
-      if (stacks.has(id)) return stacks.get(id)!;
-      const frames: FreezeStackFrame[] = [];
-      for (let at: number | undefined = id; at != null; at = parent.get(at)) {
-        const cf = byId.get(at)?.callFrame;
-        if (!cf || cf.functionName === '(root)') continue;
-        frames.push({ fn: cf.functionName || '(anonymous)', file: fileOf(cf.url, appDirs), line: cf.url ? cf.lineNumber + 1 : 0 });
-      }
-      const leaf = frames[0]?.fn ?? '(program)';
-      const kind = frames.length <= 1 && IDLE.has(leaf) ? 'idle' : leaf === GC ? 'gc' : 'busy';
-      const first = frames.findIndex(ours);
-      const mine = first < 0 ? [] : frames.slice(first);
-      const s: FreezeStack = { kind, frames, where: mine[0] ? named(mine[0]) : leaf, key: `${leaf}|${mine.slice(0, 10).map(named).join('<')}` };
-      stacks.set(id, s);
-      return s;
-    };
+    const stackOf = stackReader(profile, appDirs);
     let t = profile.startTime - offsetUs;
     for (let i = 0; i < profile.samples.length; i += 1) {
       t += profile.timeDeltas?.[i] ?? 0;
@@ -161,30 +168,136 @@ export function freezeFrom(profiles: ProfileSlice[], { fromUs, toUs, appDir = ''
   };
 }
 
-/** One freeze's line, appended to today's file; older files than a week go. */
-export function writeFreeze(dir: string, line: FreezeLine, { keepDays = KEEP_DAYS }: { keepDays?: number } = {}) {
+function appendDated(dir: string, name: 'freeze' | 'cpu', pattern: RegExp, line: { at: string }, keepDays: number) {
   fs.mkdirSync(dir, { recursive: true });
   const at = Date.parse(line.at) || Date.now();
-  fs.appendFileSync(path.join(dir, `freeze-${dayOf(at)}.jsonl`), `${JSON.stringify(line)}\n`);
+  fs.appendFileSync(path.join(dir, `${name}-${dayOf(at)}.jsonl`), `${JSON.stringify(line)}\n`);
   const oldest = dayOf(new Date(at).setDate(new Date(at).getDate() - (keepDays - 1)));
   for (const f of fs.readdirSync(dir)) {
-    const m = f.match(FILE);
+    const m = f.match(pattern);
     if (m && m[1] < oldest) fs.rmSync(path.join(dir, f), { force: true });
   }
+}
+
+/** One freeze's line, appended to today's file; older files than a week go. */
+export function writeFreeze(dir: string, line: FreezeLine, { keepDays = KEEP_DAYS }: { keepDays?: number } = {}) {
+  appendDated(dir, 'freeze', FILE, line, keepDays);
+}
+
+/** A file of this name in the log folder asks for the next stretch to be written. */
+export const CPU_ASK = 'take-cpu-profile';
+const CPU_FILE = /^cpu-(\d{4}-\d{2}-\d{2})\.jsonl$/;
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export interface BusyRead {
+  /** How long the profiles cover. */
+  ms: number;
+  samples: number;
+  /** The share of samples the thread was not idle in. */
+  busy: number;
+  /** The share of busy samples spent collecting garbage. */
+  gc: number;
+  /** Our functions by the share of busy time spent inside them, callees included. */
+  inside: { fn: string; share: number }[];
+  /** The deepest of our functions on the stack, by the share of busy time. */
+  deepest: { fn: string; share: number }[];
+  stacks: { share: number; frames: string[] }[];
+  /** For an ask that named a function: the share of busy time inside it, and which calls of its own that went to. */
+  under?: { fn: string; share: number; calls: { fn: string; share: number }[] };
+}
+
+/** What a function's time is counted as when it went to no call of its own. */
+export const ITSELF = '(itself)';
+
+/**
+ * What the thread spent whole profiles on: the freeze log names a function
+ * only for a hold, and a thread busy all day in short pieces never holds.
+ * `under` is part of a function's name, or its file and line: a record of
+ * twenty rows cannot say where one function's time went when it is spread thin.
+ * Pure.
+ */
+export function busyFrom(profiles: ProfileSlice[], { appDir = '', keep = 20, under = '' }: { appDir?: string | string[]; keep?: number; under?: string } = {}): BusyRead {
+  const appDirs = [appDir].flat().filter(Boolean);
+  const inside = new Map<string, number>();
+  const deepest = new Map<string, number>();
+  const calls = new Map<string, number>();
+  let underFn = '';
+  let underN = 0;
+  const groups = new Map<string, { samples: number; s: FreezeStack }>();
+  let total = 0;
+  let idle = 0;
+  let gc = 0;
+  let us = 0;
+  for (const { profile } of profiles) {
+    if (!profile?.nodes?.length || !profile.samples?.length) continue;
+    const stackOf = stackReader(profile, appDirs);
+    for (const delta of profile.timeDeltas ?? []) us += delta;
+    const counts = new Map<number, number>();
+    for (const id of profile.samples) counts.set(id, (counts.get(id) ?? 0) + 1);
+    for (const [id, n] of counts) {
+      total += n;
+      const s = stackOf(id);
+      if (s.kind === 'idle') { idle += n; continue; }
+      if (s.kind === 'gc') gc += n;
+      deepest.set(s.where, (deepest.get(s.where) ?? 0) + n);
+      for (const fn of new Set(s.frames.filter(ours).map(named))) inside.set(fn, (inside.get(fn) ?? 0) + n);
+      // Leaf first, so this is the innermost frame by that name and the one before it is what it called.
+      const at = under ? s.frames.findIndex((f) => named(f).includes(under)) : -1;
+      if (at >= 0) {
+        underFn ||= named(s.frames[at]!);
+        underN += n;
+        const called = at > 0 ? named(s.frames[at - 1]!) : ITSELF;
+        calls.set(called, (calls.get(called) ?? 0) + n);
+      }
+      const g = groups.get(s.key) ?? { samples: 0, s };
+      g.samples += n;
+      groups.set(s.key, g);
+    }
+  }
+  const busy = total - idle;
+  const top = (counts: Map<string, number>) => [...counts]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .slice(0, keep)
+    .map(([fn, n]) => ({ fn, share: round2(n / busy) }));
+  return {
+    ms: Math.round(us / 1000),
+    samples: total,
+    busy: total ? round2(busy / total) : 0,
+    gc: busy ? round2(gc / busy) : 0,
+    inside: busy ? top(inside) : [],
+    deepest: busy ? top(deepest) : [],
+    stacks: [...groups.values()].sort((a, b) => b.samples - a.samples).slice(0, 10)
+      .map((g) => ({ share: round2(g.samples / busy), frames: g.s.frames.slice(0, FRAMES_KEPT).map(named) })),
+    ...(under ? { under: { fn: underFn || under, share: busy ? round2(underN / busy) : 0, calls: busy ? top(calls) : [] } } : {}),
+  };
+}
+
+/** One stretch's line, appended to today's cpu file; older files than a week go. */
+export function writeBusy(dir: string, line: BusyRead & { at: string }, { keepDays = KEEP_DAYS }: { keepDays?: number } = {}) {
+  appendDated(dir, 'cpu', CPU_FILE, line, keepDays);
 }
 
 /**
  * Starts the watcher for this thread. `onFreeze` hears each line as it is
  * written. Never throws: a recorder that breaks the app is worse than a gap.
  */
-export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_MS, rotateMs = 60_000, intervalUs = 10_000, onFreeze = () => {} }: FreezeRecorderOptions = {}) {
-  const beat = new SharedArrayBuffer(8);
+export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_MS, rotateMs = 60_000, intervalUs = 25_000, onFreeze = () => {} }: FreezeRecorderOptions = {}) {
+  // [0] the main thread's last beat, [1] 1 while the Mac sleeps, [2] when it
+  // last woke, all on the hrtime clock.
+  const beat = new SharedArrayBuffer(8 * 3);
   const stamp = new BigInt64Array(beat);
-  const tick = () => Atomics.store(stamp, 0, process.hrtime.bigint());
+  const late = BigInt(thresholdMs) * 1_000_000n;
+  let worker: Worker | null = null;
+  const tick = () => {
+    const now = process.hrtime.bigint();
+    const last = Atomics.exchange(stamp, 0, now);
+    if (last && now - last > late) worker?.postMessage({ hold: { fromUs: Number(last / 1000n), toUs: Number(now / 1000n) } });
+  };
+  const asleep = () => Atomics.store(stamp, 1, 1n);
+  const awake = () => { Atomics.store(stamp, 2, process.hrtime.bigint()); Atomics.store(stamp, 1, 0n); };
   tick();
   const timer = setInterval(tick, BEAT_MS);
   timer.unref?.();
-  let worker: Worker | null = null;
   try {
     worker = new Worker(new URL('./freeze-recorder-thread.mts', import.meta.url), {
       execArgv: [...process.execArgv, ...stripTypesFlags()],
@@ -193,9 +306,10 @@ export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_
   } catch (err) {
     clearInterval(timer);
     console.warn(`zero: freezes will not be recorded: ${(err as Error).message}`);
-    return { stop() {} };
+    return { stop() {}, asleep() {}, awake() {} };
   }
   worker.unref();
+  noteThread('freeze watcher', worker);
   worker.on('message', (m: { freeze?: FreezeSummary; gaveUp?: string } | null) => {
     if (m?.freeze) { try { onFreeze(m.freeze); } catch { /* the line is already on disk */ } }
     if (m?.gaveUp) console.warn(`zero: freezes will not be recorded: ${m.gaveUp}`);
@@ -203,5 +317,8 @@ export function startFreezeRecorder({ dir, appDir = '', thresholdMs = THRESHOLD_
   worker.on('error', (err) => { clearInterval(timer); console.warn(`zero: the freeze recorder stopped: ${err.message}`); });
   return {
     stop() { clearInterval(timer); worker?.terminate().catch(() => {}); },
+    // A hold that spans a sleep is the Mac asleep, not the app stuck.
+    asleep,
+    awake,
   };
 }

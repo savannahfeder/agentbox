@@ -79,16 +79,12 @@ describe('the list of overlays is total', () => {
   });
 });
 
-describe('the rule is applied at both ends of every walk', () => {
+describe('the rule is applied whenever a setup or the walkthrough starts from ⌘K', () => {
   const bodyOf = (name) => {
     const at = app.indexOf(`const ${name} = useCallback(`);
     expect(at, `${name} is gone`).toBeGreaterThan(-1);
     return app.slice(at, app.indexOf('}, [', at));
   };
-
-  it('closes what floats when a walk ends', () => {
-    expect(bodyOf('finishRun')).toMatch(/closeWhatFloats\(\)/);
-  });
 
   // A walk covers the whole window, so a screen open when one STARTS is
   // invisible for nineteen beats and then back. Both of these used to close

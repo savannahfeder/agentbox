@@ -39,6 +39,27 @@ describe('a thread sent from the phone', () => {
     expect(yours(t)).toMatchObject([{ text: long, pending: true }]);
   });
 
+  // 2026-11-18 workday issue 9: a one-line message sent with a file is the title, and the body
+  // holds only the file's link, so the waiting message showed notes.txt and none of the words.
+  it('a one-line message sent with a file shows its words above the file', () => {
+    const words = 'Use these notes to update the payments on-call runbook.';
+    const withFile = cmd({ id: 'c-7', kind: 'new', payload: { title: words, body: '[notes.txt](attachments/notes.txt)' } });
+    expect(yours(open({ projects, threads: [], commands: [withFile] }, madeHere(withFile.id))))
+      .toMatchObject([{ text: `${words}\n\n[notes.txt](attachments/notes.txt)`, pending: true }]);
+  });
+
+  it('a file sent with no words shows the file alone, not the title made from its name', () => {
+    const bare = cmd({ id: 'c-9', kind: 'new', payload: { title: 'Attached: notes.txt', body: '[notes.txt](attachments/notes.txt)' } });
+    expect(yours(open({ projects, threads: [], commands: [bare] }, madeHere(bare.id))))
+      .toMatchObject([{ text: '[notes.txt](attachments/notes.txt)', pending: true }]);
+  });
+
+  it('a message whose body already holds its first line is not given that line twice', () => {
+    const body = 'Add a rate limiter to the login endpoint, 5 tries a minute.\n[notes.txt](attachments/notes.txt)';
+    const whole = cmd({ id: 'c-8', kind: 'new', payload: { title: 'Add a rate limiter to the login endpoint, 5 tries a minute.', body } });
+    expect(yours(open({ projects, threads: [], commands: [whole] }, madeHere(whole.id)))).toMatchObject([{ text: body, pending: true }]);
+  });
+
   it('a short one-line message is its title, already on the page, so it is not said twice', () => {
     const short = cmd({ id: 'c-4', kind: 'new', payload: { title: 'Fix the rate limiter', body: '' } });
     expect(yours(open({ projects, threads: [], commands: [short] }, madeHere(short.id)))).toEqual([]);

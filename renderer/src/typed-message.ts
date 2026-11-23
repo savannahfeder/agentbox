@@ -19,7 +19,11 @@ export type TypedPart = { text: string } | { embed: string };
 const PICTURE = /^!\[[^\]\n]*\]\([^)\s]+\)$/;
 const ATTACHED_FILE = /^\[[^\]\n]*\]\((?:attachments\/[^)\s]+|phone-files\/[0-9a-f]{64}\.[a-z0-9]{1,8})\)$/;
 
-const isEmbed = (line: string) => PICTURE.test(line.trim()) || ATTACHED_FILE.test(line.trim());
+// A line that is only a thread's link, as the app writes one into a brief (main/team threadLink).
+const THREAD_WEB_LINK = /^\[[^\]\n]+\]\(https?:\/\/[^)\s]+\/t\/[^/)\s]+\/w-[a-f0-9]{10}\)$/;
+// The same link after the "Sam wrote: " a hand-off puts in front of the words it carries (threads/composer-rules.ts).
+const WROTE_THEN_THREAD_LINK = new RegExp(`^([^\\[\\]\\n]{1,80} wrote:)\\s+(${THREAD_WEB_LINK.source.slice(1, -1)})\\s*$`);
+const isEmbed = (line: string) => PICTURE.test(line.trim()) || ATTACHED_FILE.test(line.trim()) || THREAD_WEB_LINK.test(line.trim());
 const QUOTE_MARK = /^\s*(?:>\s?)+/;
 const ATTACHED_PICTURE = /(?<!`)!\[[^\]\n]*\]\((?:\.\/)?attachments\/[^)\s]+\)(?!`)/g;
 
@@ -67,6 +71,13 @@ export function typedParts(text: string): TypedPart[] {
     if (isEmbed(bare)) {
       flush();
       parts.push({ embed: bare.trim() });
+      continue;
+    }
+    const wrote = WROTE_THEN_THREAD_LINK.exec(bare);
+    if (wrote) {
+      words.push(wrote[1]);
+      flush();
+      parts.push({ embed: wrote[2] });
       continue;
     }
     let at = 0;

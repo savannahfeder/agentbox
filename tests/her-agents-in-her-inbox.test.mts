@@ -116,13 +116,13 @@ describe('one inbox, and how much of it is her agents is her setting', () => {
     expect(MACHINE.filter((a) => reachesInbox(a, AUG16, 'all'))).toHaveLength(13);
   });
 
-  // OFF IS THE DEFAULT NOW, and it is not this argument that says so. The app's
-  // default is one line in main/settings.mts and is pinned in
-  // tests/a-terminal-session-is-not-in-her-inbox.test.mts; this argument keeps
-  // its own default so the modes can be read here one at a time.
-  it('none of them by default, whatever is running on the machine', () => {
-    expect(outsideAgentsMode({})).toBe('off');
-    expect(MACHINE.filter((a) => reachesInbox(a, AUG16, outsideAgentsMode({})))).toHaveLength(0);
+  // ALL IS THE DEFAULT (2026-11-23, off before), and it is not this argument
+  // that says so. The app's default is one line in main/settings.mts and is
+  // pinned in tests/a-session-you-started-yourself-is-in-your-inbox-until-you-turn-it-off.test.mts;
+  // this argument keeps its own default so the modes can be read here one at a time.
+  it('all of them by default, as the founder asked', () => {
+    expect(outsideAgentsMode({})).toBe('all');
+    expect(MACHINE.filter((a) => reachesInbox(a, AUG16, outsideAgentsMode({})))).toHaveLength(13);
   });
 
   // AND THE ROW SHE NAMED CANNOT BE FILED IN ANY MODE.That headline is what a

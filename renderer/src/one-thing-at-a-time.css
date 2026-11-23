@@ -35,6 +35,10 @@
 /* What the app did after the answer, quiet under it. */
 .one-catching-up { margin: 18px 0 0; font-size: 15px; color: var(--text-faint); }
 .one-app-note { margin: 14px 0 0; font-size: 13px; color: var(--text-faint); }
+.one-app-note > :first-child { margin-top: 0; }
+.one-app-note > :last-child { margin-bottom: 0; }
+/* In a thread's history it keeps the thread's own 22px between blocks. */
+.thread-block > .one-app-note { margin-top: 0; }
 
 .one-answer .one-q { margin: 0 0 8px; font-size: 17px; line-height: 1.45; font-weight: 600; color: var(--text); }
 .one-by { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font-size: 14px; color: var(--text-dim); }
@@ -82,12 +86,12 @@
 .one-choices { position: relative; }
 .one-choices .opt-row { padding-right: 44px; }
 .one-choices-fold { position: absolute; top: 6px; right: 8px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0;
-  border: none; background: transparent; color: var(--text-faint); border-radius: var(--radius); cursor: pointer; transition: color 0.15s, background 0.15s; }
+  border: none; background: transparent; color: var(--text-faint); border-radius: var(--radius); cursor: pointer; }
 .one-choices-fold:hover { color: var(--text); background: var(--wash); }
 .one-choices-fold svg { width: 14px; height: 14px; }
 .one-choices-folded:not(:has(.opt-row.selected)) { display: none; }
 .one-choices-show { display: inline-flex; align-items: center; gap: 3px; margin: 0 8px 0 -4px; padding: 3px 6px; border-radius: var(--radius);
-  font: 11px var(--mono); color: var(--text-faint); cursor: pointer; transition: color 0.15s, background 0.15s; }
+  font: 11px var(--mono); color: var(--text-faint); cursor: pointer; }
 .one-choices-show:hover { color: var(--text); background: var(--wash); }
 .one-choices-show svg { width: 13px; height: 13px; }
 .one-choices .opt-row.selected .opt-text { -webkit-line-clamp: unset; }
@@ -112,7 +116,8 @@
    open on the side and the phone keep their own layouts. `.focus-scroll > .focus`
    because xterm also uses `.focus`. */
 @media (min-width: 701px) and (min-height: 521px) {
-  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-pane {
+  /* And a chat opened from Needs you, which is set on the same column (rooms.css). */
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-pane, .workspace-layout .gr-page.in-inbox {
     container-type: inline-size;
     --task-type: clamp(16px, calc(0.25cqi + 13px), 18px);
     --task-summary: max(13.5px, calc(var(--task-type) * 0.76));
@@ -134,3 +139,6 @@
   .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-dock-inner { max-width: var(--task-measure); margin: 0; }
   .app.one-at-a-time.workspace-layout:not(.doc-open) :is(.opt-row, .dock-pill) { font-size: max(14.5px, calc(var(--task-type) * 0.78)); }
 }
+
+/* A command a session asks to run is read whole before it is allowed, so it wraps rather than running off the page. */
+.agent-page pre, .agent-page pre code { white-space: pre-wrap; overflow-wrap: anywhere; }

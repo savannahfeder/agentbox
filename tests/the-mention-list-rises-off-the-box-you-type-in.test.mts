@@ -15,7 +15,7 @@ const css = read('renderer/src/team/rooms/rooms.css');
 
 describe('the @ list in a group chat', () => {
   it('lives inside the reply box', () => {
-    const box = chat.indexOf('<div className="rm-compose">');
+    const box = chat.indexOf('<div className={`rm-compose${');
     const list = chat.indexOf('className="rm-picker rm-pop rm-menu"');
     expect(box).toBeGreaterThan(-1);
     expect(list).toBeGreaterThan(box);

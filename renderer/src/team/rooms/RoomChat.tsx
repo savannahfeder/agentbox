@@ -6,8 +6,8 @@
 // Every message carries what a direct chat's does: reactions, the bar on
 // pointing with its more menu (edit, copy, mark unread, delete), an edited
 // mark, and voice notes and files. The box is the direct chat's too.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode, type SetStateAction } from 'react';
+import { MessageMarkdown } from '../../components/MessageMarkdown';
 import { ConnectionLink } from '../../connections/ConnectionsPlace';
 import { connectionLinkOf, keepConnectionLinks } from '../../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
@@ -17,7 +17,8 @@ import { chatLayout } from '../chat-layout';
 import { MessageActions, Reactions } from '../ChatActions';
 import { DeleteMessage, MessageEditor } from '../MessageMore';
 import { messageMore, withEmbeds, wordsOf } from '../message-more';
-import { FormatBar } from '../FormatBar';
+import { FormatBar, useMarksRow } from '../FormatBar';
+import { ChatSend } from '../ChatSend';
 import { RichReply, type RichBox } from '../RichReply';
 import { VoiceNote } from '../VoiceNote';
 import { voiceNoteOf } from '../voice-note';
@@ -27,24 +28,26 @@ import { FileSheet } from '../../components/FileSheet';
 import { FileCover } from '../../components/FileCover';
 import { reviewKind, shownName } from '../../../../shared/artifact-marks.mts';
 import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
+import { commentsInChat, type ChatComment } from './chat-comments';
+import { CommentOn, CommentQuote, FileMarkOpener } from '../../components/FileMarkLine';
 import { AttachRow } from '../../components/AttachRow';
 import { ChatLink } from '../../threads/ContinuedFrom';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
 import { pictureUrl } from '../../picture';
 import { holdAtBottom } from '../../thread-bottom';
-import { sendKeyFor } from '../../reply-keys';
 import { I } from './icons';
 import type { MessageMarks } from '../decisions';
 import { LINE_MISSING } from '../../reveal-line';
+import { readDraft, readDraftAttachments, saveDraft, saveDraftAttachments } from '../../drafts';
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { clockOf } from '../../teammates/chat-lines';
-import { attachedName, drawnRoots, holdsRead, madeOnce, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
+import { attachedName, drawnRoots, holdsRead, madeOnce, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, replyBoxWords, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
 
 export type ChatPerson = { id: string; name: string; avatarUrl: string | null; me: boolean };
 
 export type ChatWhere = { label: string; onOpen: () => void };
-export type ChatAlongRow = { key: string; at: number; by: string; text: string; where: ChatWhere };
+export type ChatAlongRow = { key: string; at: number; by: string; text: string; where: ChatWhere; card?: boolean };
 /** What a person's page draws among the messages: tasks, replies on them, comments, file notes. `on` is a message's own place. */
 export type ChatAlong = { rows: readonly ChatAlongRow[]; on: ReadonlyMap<string, ChatWhere> };
 
@@ -76,7 +79,9 @@ export type RoomChatCalls = {
   onDecide?: (messageId: string, kind: 'decision' | 'priority', on: boolean) => void;
 };
 
-export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, along, ...calls }: {
+const FileChipMark = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3" strokeLinejoin="round" /></svg>;
+
+export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, folded = false, along, ...calls }: {
   room: Room; messages: RoomMessage[]; people: ChatPerson[]; meId: string | null; now: number;
   onInvite?: () => void; onExpand?: () => void;
   onSwitch?: (anchor: DOMRect) => void; switchOpen?: boolean;
@@ -84,6 +89,8 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   full?: boolean; head?: ReactNode;
   /** Faces at 32, hung beside the words, as a chat that is the whole page draws them. */
   hang?: boolean;
+  /** Opened in the inbox: the box waits folded, as a thread's does, and the keys stay the inbox's until R. */
+  folded?: boolean;
   along?: ChatAlong;
 } & RoomChatCalls) {
   const { onSend, onRead, onReact, onEdit, onDelete, onMarkUnread, onNotice, marks, onDecide } = calls;
@@ -192,11 +199,15 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   const who = (id: string | null) => (id ? byId.get(id) : undefined);
   const nameOf = (id: string | null) => { const p = who(id); return p ? cardName(p) : 'Someone'; };
   const listRef = useStick([room.id, thread]);
-  type Drawn = { m: RoomMessage; a?: undefined } | { a: ChatAlongRow; m?: undefined };
+  // A comment on one of the chat's files is a row of the chat, as it is of a thread.
+  type Drawn = { m: RoomMessage; a?: undefined; c?: undefined } | { a: ChatAlongRow; m?: undefined; c?: undefined } | { c: ChatComment; m?: undefined; a?: undefined };
   const asMessages = shown.map((m): Drawn => ({ m }));
-  const drawn: Drawn[] = root || !along?.rows.length ? asMessages
-    : [...asMessages, ...along.rows.map((a): Drawn => ({ a }))].sort((x, y) => (x.m ?? x.a).at - (y.m ?? y.a).at);
-  const slots = chatLayout(drawn.map((d) => ({ at: (d.m ?? d.a).at, by: d.m ? d.m.by ?? '' : d.a.by })), now);
+  const comments = root ? [] : commentsInChat(calls.files?.marks).map((c): Drawn => ({ c }));
+  const atOf = (d: Drawn) => (d.m ?? d.a ?? d.c).at;
+  const drawn: Drawn[] = root || (!along?.rows.length && !comments.length) ? asMessages
+    : [...asMessages, ...(along?.rows ?? []).map((a): Drawn => ({ a })), ...comments].sort((x, y) => atOf(x) - atOf(y));
+  const slots = chatLayout(drawn.map((d) => ({ at: atOf(d), by: d.m ? d.m.by ?? '' : (d.a ?? d.c).by ?? '', ...(d.c ? { fileMark: d.c.link } : {}) })), now);
+  const openComment = useCallback((link: { id?: string; file: string }) => setViewing({ ...(link.id ? { note: link.id } : {}), file: link.file, at: Date.now() }), []);
   const myNames = useMemo(() => {
     const name = people.find((p) => p.me)?.name;
     if (!name) return [];
@@ -230,16 +241,22 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
       {drawn.map((d, i) => {
         const slot = slots[i];
         if (d.a) {
-          const a = d.a, p = who(a.by);
-          return <div key={a.key} data-along={a.key}>
+          const p = who(d.a.by);
+          return <AlongRow key={d.a.key} a={d.a} day={slot.day} head={slot.head} face={p} name={nameOf(d.a.by)} size={hang ? 28 : 16} />;
+        }
+        if (d.c) {
+          const p = who(d.c.by);
+          return <div key={`c:${d.c.id}`} data-line={d.c.id}>
             {slot.day && <div className="rm-day"><span className="rm-label">{slot.day}</span></div>}
-            <div className={`rm-cm rm-along${slot.head ? '' : ' cont'}`}>
-              {slot.head && <div className="h">
-                <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 32 : 16} />
-                <span>{nameOf(a.by)}</span><em>{clockOf(a.at)}</em>
-              </div>}
-              <div className="tx">{a.text}</div>
-              <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
+            <div className="rm-cm">
+              <div className="h">
+                <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 28 : 16} />
+                <span>{nameOf(d.c.by)}</span>
+                <FileMarkOpener.Provider value={calls.files ? openComment : null}><CommentOn e={{ fileMark: d.c.link }} /></FileMarkOpener.Provider>
+                <em>{clockOf(d.c.at)}</em>
+              </div>
+              <CommentQuote e={{ fileMark: d.c.link }} />
+              <div className="tx">{d.c.text}</div>
             </div>
           </div>;
         }
@@ -254,7 +271,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
           {m.id === newAt && <div className="rm-new" role="separator"><span>New</span></div>}
           <div className={`rm-cm${headed ? '' : ' cont'}${root && i === 0 ? ' root' : ''}`}>
             {headed && <div className="h">
-              <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 32 : 16} />
+              <Face name={m.voice ? m.voice.name : p?.name ?? '?'} url={m.voice ? undefined : p?.avatarUrl} agent={!!m.voice} size={hang ? 28 : 16} />
               <span>{m.voice ? voiceName(m.voice, p?.name ?? '', { mine }) : nameOf(m.by)}</span><em>{clockOf(m.at)}</em>
               {m.editedAt && !m.deleted && <em className="rm-edited">edited</em>}
             </div>}
@@ -297,8 +314,8 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
         </div>;
       })}
     </div></div>
-    <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} takesTyping={full || !!thread} people={others}
-      placeholder={root ? `Reply to ${nameOf(root.by)}` : `Message ${room.kind === 'group' ? others.map((p) => p.name.split(' ')[0]).join(', ') || room.name : room.name}`}
+    <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} takesTyping={folded ? !!thread : full || !!thread} folds={folded && !thread} people={others}
+      placeholder={root ? replyBoxWords(root, meId, nameOf) : `Message ${room.kind === 'group' ? others.map((p) => p.name.split(' ')[0]).join(', ') || room.name : room.name}`}
       onPutFile={calls.onPutFile} onPutFileFrom={calls.onPutFileFrom} sending={calls.sending} onNotice={onNotice}
       onEditLast={() => { const mine = myNewest(messages, meId, root?.id ?? null); if (mine) setEditing(mine.id); }}
       onSend={(body) => onSend(body, { inReplyTo: root?.id ?? null, mentions: mentionsIn(body, others) })} />
@@ -349,7 +366,7 @@ function RoomFile({ name, shown, load, opensBig, film = false, children }: { nam
   const bytes = useCallback(() => load?.(name) ?? Promise.resolve(null), [load, name]);
   const close = useCallback(() => setOpen(false), []);
   return <>
-    <button type="button" className={film ? 'inline-image-open rm-film' : children ? 'inline-image-open' : 'rm-file'} title={`Open ${shown}`} onClick={() => { if (!opensBig?.(name)) setOpen(true); }}>{children ?? shown}</button>
+    <button type="button" className={film ? 'inline-image-open rm-film' : children ? 'inline-image-open' : 'rm-file'} title={`Open ${shown}`} onClick={() => { if (!opensBig?.(name)) setOpen(true); }}>{children ?? <><FileChipMark />{shown}</>}</button>
     {open && createPortal(<FileSheet name={name} shown={shown} load={bytes} onClose={close} />, document.body)}
   </>;
 }
@@ -398,7 +415,7 @@ function RoomMarkdown({ text, names, loadFile, findFile, opensBig, roomId, mine,
       },
     };
   }, [roomId, mine]);
-  return <ReactMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={components} urlTransform={keepConnectionLinks}>{mentionMarkdown(text, names, me)}</ReactMarkdown>;
+  return <MessageMarkdown remarkPlugins={MARKDOWN_PLUGINS} components={components} urlTransform={keepConnectionLinks}>{mentionMarkdown(text, names, me)}</MessageMarkdown>;
 }
 
 // Keeps the newest message in view while you are at the bottom, and leaves
@@ -418,9 +435,6 @@ function useStick(deps: unknown[]) {
   useLayoutEffect(() => holdAtBottom(ref.current), deps); // eslint-disable-line react-hooks/exhaustive-deps
   return ref;
 }
-
-// What you are writing in each room, kept while you go and look at another.
-const drafts = new Map<string, string>();
 
 // A file dragged in arrives as a path on this Mac rather than as bytes.
 async function base64Of(a: PendingAttachment): Promise<string | null> {
@@ -444,6 +458,47 @@ function sendingWords(sending: Record<string, { done: number; total: number }> |
 const staged = (a: PendingAttachment): PendingAttachment => (a.storedAs ? a : { ...a, storedAs: storedName(a.name) });
 
 /** The chat's own box before there is a chat with this person; the first thing it sends makes the chat. */
+/** What two people did together before they ever chatted (pair-timeline.ts), in the chat's own rows. */
+export function AlongHistory({ rows, who }: {
+  rows: readonly ChatAlongRow[];
+  who: (id: string) => { name: string; avatarUrl: string | null; me?: boolean } | undefined;
+}) {
+  const sorted = [...rows].sort((a, b) => a.at - b.at);
+  const slots = chatLayout(sorted.map((a) => ({ at: a.at, by: a.by })));
+  return <div className="rm-full hang pl-history"><div className="rm-chat-list"><div className="rm-chat-msgs">
+    {sorted.map((a, i) => {
+      const p = who(a.by);
+      return <AlongRow key={a.key} a={a} day={slots[i].day} head={slots[i].head} face={p} name={p ? cardName({ me: !!p.me, name: p.name }) : 'Someone'} size={28} />;
+    })}
+  </div></div></div>;
+}
+
+/** A task, an ask or a hand-back is a card you can open; a comment or a note is words with where they were left. */
+function AlongRow({ a, day, head, face, name, size }: {
+  a: ChatAlongRow; day: string | null | undefined; head: boolean; name: string; size: number;
+  face: { name: string; avatarUrl?: string | null } | undefined;
+}) {
+  return <div data-along={a.key}>
+    {day && <div className="rm-day"><span className="rm-label">{day}</span></div>}
+    <div className={`rm-cm rm-along${head ? '' : ' cont'}`}>
+      {head && <div className="h">
+        <Face name={face?.name ?? '?'} url={face?.avatarUrl} size={size} />
+        <span>{name}</span><em>{clockOf(a.at)}</em>
+      </div>}
+      {a.card
+        ? <button type="button" className="rm-thread-card" onClick={a.where.onOpen}>
+          <span className="rm-thread-title">{a.where.label}</span>
+          <span className="rm-thread-what">{a.text}</span>
+        </button>
+        : <>
+          {/* A reply on a task is a message too: its list or quote is drawn as one. */}
+          <div className="tx"><MessageMarkdown remarkPlugins={MARKDOWN_PLUGINS}>{a.text}</MessageMarkdown></div>
+          <button type="button" className="rm-there" onClick={a.where.onOpen}>{a.where.label}</button>
+        </>}
+    </div>
+  </div>;
+}
+
 export function FirstChatBox({ person, placeholder, open, send, putFile, putFileFrom, sending, onNotice }: {
   person: ChatPerson; placeholder: string;
   /** The chat's id, made if there is none; throws with why it could not be. */
@@ -463,8 +518,8 @@ export function FirstChatBox({ person, placeholder, open, send, putFile, putFile
     onPutFileFrom={async (name, srcPath) => putFileFrom(await room(), name, srcPath)} />;
 }
 
-function Composer({ roomId, threadId, takesTyping = false, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
-  roomId: string; threadId: string | null; takesTyping?: boolean; placeholder: string; people: ChatPerson[];
+function Composer({ roomId, threadId, takesTyping = false, folds = false, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
+  roomId: string; threadId: string | null; takesTyping?: boolean; folds?: boolean; placeholder: string; people: ChatPerson[];
   onSend: (body: string) => Promise<string | null>;
   onPutFile?: (name: string, dataBase64: string) => Promise<string | null>;
   onPutFileFrom?: (name: string, srcPath: string) => Promise<string | null>;
@@ -472,17 +527,28 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   onNotice?: (text: string) => void;
   onEditLast: () => void;
 }) {
-  const draftKey = `${roomId}:${placeholder}`;
-  const [text, setText] = useState(() => drafts.get(draftKey) ?? '');
+  // What you are writing in each room, kept while you look at another and through a restart.
+  const draftAt = useMemo(() => ({ product: `room:${roomId}`, id: placeholder }), [roomId, placeholder]);
+  const [text, setText] = useState(() => readDraft(draftAt));
   const [plain, setPlain] = useState('');
   const [caret, setCaret] = useState(0);
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  // Its files are kept beside its words, so leaving the chat does not lose them.
+  const [attachments, setAttachmentsState] = useState<PendingAttachment[]>(() => readDraftAttachments(draftAt).map(staged));
+  const attachedNow = useRef(attachments);
+  const [tooBig, setTooBig] = useState(0);
+  const setAttachments = (change: SetStateAction<PendingAttachment[]>) => {
+    const next = typeof change === 'function' ? change(attachedNow.current) : change;
+    attachedNow.current = next;
+    setTooBig(saveDraftAttachments(draftAt, next).dropped.length);
+    setAttachmentsState(next);
+  };
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pick, setPick] = useState(0);
   const ref = useRef<RichBox | null>(null);
   const filePicker = useRef<HTMLInputElement>(null);
-  useEffect(() => { drafts.set(draftKey, text); }, [draftKey, text]);
+  const [marksAt, setMarksAt] = useMarksRow();
+  useEffect(() => { saveDraft(draftAt, text); }, [draftAt, text]);
   // A chat that is the page, or a thread opened to reply in: its box takes the typing, not the app's letter keys.
   useEffect(() => { if (takesTyping) requestAnimationFrame(() => ref.current?.focus()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // "@" then letters at the caret opens the people in the room.
@@ -503,6 +569,8 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   // A send that failed, so it can be tried again, and is when the connection comes back.
   const [failed, setFailed] = useState(false);
   const ready = !!text.trim() || attachments.length > 0 || recording;
+  const [awake, setAwake] = useState(!folds);
+  const isFolded = folds && !awake && !ready && !error;
   // EVERYTHING STAYS IN THE BOX UNTIL THE ROOM HAS IT. Each file keeps the
   // name it was given when it went into the box, so a second try puts the
   // same file rather than another copy, and a file the room already has
@@ -554,7 +622,6 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
       setAttachments((now) => now.filter((a) => !files.some((f) => f === a || (f.draftId && f.draftId === a.draftId))));
       setFailed(false);
       failedWith.current = null;
-      drafts.delete(draftKey);
     } catch (e) {
       if (marked) void sendTurnedBack(voiceKey, files.map((a) => a.draftId));
       setFailed(true);
@@ -588,11 +655,13 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   return <>
     {error && <div className="rm-chat-err" role="alert">{error}
       {failed && !busy && <button type="button" className="rm-retry" onClick={() => void send()}>Try again</button>}</div>}
-    <div className="rm-compose">
+    <div className={`rm-compose${isFolded ? ' folded' : ''}`} onFocus={() => setAwake(true)}
+      onMouseDown={isFolded ? (e) => { e.preventDefault(); ref.current?.focus(); } : undefined}>
       {matches.length > 0 && <div className="rm-picker rm-pop rm-menu">
         {matches.map((p, i) => <button type="button" key={p.id} className={`row${i === pick ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); choose(p); }}>
           <Face name={p.name} url={p.avatarUrl} size={18} /><span>{p.name}</span></button>)}
       </div>}
+      <div className="fmt-marks-slot" ref={setMarksAt} />
       <RichReply className="rm-compose-input" boxRef={ref} value={text} onChange={setText} onPlain={setPlain}
         placeholder={placeholder} label={placeholder}
         onCaret={(box) => setCaret(box.selectionStart)}
@@ -605,21 +674,23 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
           }
           if (e.key === 'ArrowUp' && !plain.trim() && !attachments.length) { e.preventDefault(); onEditLast(); return true; }
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); return true; }
-          if (e.key === 'Escape') { ref.current?.blur(); return true; }
+          if (e.key === 'Escape') { ref.current?.blur(); if (folds && !ready) setAwake(false); return true; }
           return false;
         }} />
-      <AttachRow attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+      {isFolded && <span className="rm-fold-key" aria-hidden="true"><kbd>R</kbd></span>}
+      <AttachRow look="tiles" attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
+      {tooBig > 0 && <div className="compose-note attach-problem" role="alert">{tooBig === 1
+        ? 'One pasted image is too big to keep. Leaving this chat loses it.'
+        : `${tooBig} pasted images are too big to keep. Leaving this chat loses them.`}</div>}
       <input ref={filePicker} type="file" multiple style={{ display: 'none' }}
-        onChange={async (e) => { add(await collectFiles(e.target.files ?? [])); e.target.value = ''; }} />
+        onChange={async (e) => { add(await collectFiles(e.target.files ?? [])); e.target.value = ''; ref.current?.focus(); }} />
       <div className="rm-compose-bar">
-        <FormatBar box={ref as unknown as { current: HTMLTextAreaElement | null }} onChange={setText}
+        <FormatBar box={ref as unknown as { current: HTMLTextAreaElement | null }} onChange={setText} marksAt={marksAt}
           onAttach={onPutFile ? () => filePicker.current?.click() : undefined}
           onFromFiles={onPutFile ? (f) => add([f]) : undefined}
           onVoice={onPutFile ? (note) => add([{ name: note.name, dataBase64: note.dataBase64, image: isImageName(note.name), draftId: note.draftId }]) : undefined}
           onNotice={setError} voiceKey={voiceKey} voice={voiceCtl} onRecording={setRecording} />
-        <button type="button" className="dock-send" disabled={!ready || busy} onClick={() => void send()} title={`Send · ${sendKeyFor(true)}`}>
-          {busy ? sendingWords(sending, roomId, attachments) : <>Send <kbd>{sendKeyFor(true)}</kbd></>}
-        </button>
+        <ChatSend ready={ready} busy={busy} sending={sendingWords(sending, roomId, attachments)} onSend={() => void send()} />
       </div>
     </div>
   </>;

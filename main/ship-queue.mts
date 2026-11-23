@@ -32,15 +32,21 @@ import { notPushedNote, pushNeedsGitHubSignIn } from '../shared/github-push-sign
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
 import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';
+import { pushRun } from './github-push-sign-in.mts';
+import { waitingForMemory } from '../shared/notes-for-the-agent.mts';
 import type { GateAnswer, GateRequest, GateReply } from './memory-gate.mts';
 
 export const SHIP_LABEL = 'ship';
 const SHIP_MS = 20 * 60 * 1000;
-// The whole suite is about 3,000 files, and on a busy Mac it runs past 20 minutes.
-export const WHOLE_SUITE_SHIP_MS = 60 * 60 * 1000;
+// The whole suite is about 3,000 files, and with a dozen agents on the Mac it
+// ran past an hour.
+export const WHOLE_SUITE_SHIP_MS = 120 * 60 * 1000;
 // What scripts/ship.mjs says before a push the hook runs every test for.
 export const RUNS_EVERY_TEST = 'ship: the hook runs every test for this push';
 const KEEP = 4000;
+// A test run that died rather than went red is shipped again after these
+// waits, and goes back to its agent only when every try died.
+export const DIED_AGAIN_MS = [20 * 60 * 1000, 2 * 60 * 60 * 1000];
 
 const minutes = (ms: number) => { const n = Math.max(1, Math.round(ms / 60_000)); return `${n} minute${n === 1 ? '' : 's'}`; };
 
@@ -89,13 +95,16 @@ export interface ShipQueueOptions {
   isLive: (item: ShipItem) => boolean;
   liveSince?: (item: ShipItem) => number | null;
   handBack?: (item: ShipItem, reply: string) => void;
-  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][] }) => Promise<ShipRun>;
-  // The GitHub sign-in saved on this computer, for the push (main/github-push-sign-in.mts).
-  pushSignIn?: () => { env: Record<string, string>; config: [string, string][] } | null;
+  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; base?: string | null; stdin?: string }) => Promise<ShipRun>;
+  // The GitHub token saved on this computer, for the push (main/github-push-sign-in.mts).
+  pushSignIn?: () => { token: string } | null;
   afterShip?: (shipped: { item: ShipItem; product: ShipProduct; sha: string | null }) => void;
+  // Whether the push put this commit on main, for a ship that said so and then ended non-zero.
+  pushed?: (cwd: string, sha: string) => Promise<boolean>;
   memoryGate?: () => ShipGate | null;
   shipScore?: (item: ShipItem) => number;
   log?: ShipLog;
+  clock?: () => number;
 }
 
 export const shipSettingsFile = (userDir: string) => path.join(userDir, 'ship.json');
@@ -304,11 +313,13 @@ function diagnosis({ why, failed }: { why: string | null; failed: number | null 
 }
 
 /** What the agent is told when its branch did not ship. */
-export function failureReply(output: unknown, { brief = null }: { brief?: string | null } = {}) {
+export function failureReply(output: unknown, { brief = null, tries = 1 }: { brief?: string | null; tries?: number } = {}) {
   const tail = String(output ?? '').trim().slice(-KEEP);
   const { died, ...rest } = whyItDidNotShip(output);
   return [
-    `${Name} tried to ship your branch and it did not go out. Nothing was pushed.`,
+    tries > 1
+      ? `${Name} tried to ship your branch ${tries} times, waiting longer before each try, and it did not go out. Nothing was pushed.`
+      : `${Name} tried to ship your branch and it did not go out. Nothing was pushed.`,
     // THE SAME DIAGNOSIS THE THREAD SHOWS, above the tail (w-560647d4db). The
     // tail holds everything, which is why two sessions read a quoted code
     // comment in it as the fault. One line naming how many tests failed and
@@ -343,19 +354,32 @@ export function failureNote(output: unknown) {
   return `${SHIP_FAILED}${said.slice(0, 300)}`;
 }
 
-/**
- * The base checkout's hooks, read off the task folder's shared git dir. The
- * ship runs with cwd = the task folder, whose core.hooksPath may be the
- * relative 'scripts/hooks' resolving to the branch's own, worker-edited copy.
- * Pinning the base copy here is what keeps the gate the branch cannot change.
- */
-function baseHooksPath(cwd: string) {
-  return new Promise<string | null>((resolve) => {
-    execFile('git', ['-C', cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000 }, (err, stdout) => {
-      const common = err ? '' : String(stdout).trim();
-      resolve(common ? path.resolve(common, '..', 'scripts', 'hooks') : null);
-    });
+/** The script's own line, alone on its line: a test run inside the push can quote it. */
+const pushedLine = (output: unknown) => String(output ?? '').match(/^ship: shipped ([0-9a-f]{7,40})\.$/m)?.[1] ?? null;
+
+/** A successful push moves the remote-tracking main, so this reads no network. */
+export const pushedToMain = (cwd: string, sha: string) => new Promise<boolean>((resolve) => {
+  execFile('git', ['-C', cwd, 'merge-base', '--is-ancestor', sha, 'refs/remotes/origin/main'], { timeout: 10_000, windowsHide: true }, (err) => resolve(!err));
+});
+
+const commonDirOf = (dir: string) => new Promise<string | null>((resolve) => {
+  execFile('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000, windowsHide: true }, (err, stdout) => {
+    resolve(err ? null : realOrNull(String(stdout).trim()));
   });
+});
+
+/**
+ * The base checkout's hooks. The ship runs with cwd = the task folder, whose
+ * core.hooksPath may be the relative 'scripts/hooks' resolving to the branch's
+ * own, worker-edited copy, and whose `.git` file the worker can point at a
+ * repository of its own. So given the approved checkout, a task folder that
+ * does not share its git dir is not shipped, and the hooks are that checkout's.
+ */
+async function baseHooksPath(cwd: string, base: string | null): Promise<{ hooks: string | null } | null> {
+  const task = await commonDirOf(cwd);
+  if (!base) return { hooks: task ? path.resolve(task, '..', 'scripts', 'hooks') : null };
+  const approved = await commonDirOf(base);
+  return approved && task === approved ? { hooks: path.resolve(approved, '..', 'scripts', 'hooks') } : null;
 }
 
 /** `pairs` as git reads config from the environment. */
@@ -379,9 +403,11 @@ export function stopShips() {
   for (const [pid, markQuit] of runningShips) { markQuit(); signalShip(pid, 'SIGTERM'); }
 }
 
-export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000 }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number } = {}): Promise<ShipRun> {
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000, base = null, stdin }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number; base?: string | null; stdin?: string } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
-  const hooks = await baseHooksPath(cwd);
+  const gate = await baseHooksPath(cwd, base);
+  if (!gate) return { code: 1, out: 'ship: this task folder is not a worktree of the checkout that ships it, so it was not shipped.' };
+  const { hooks } = gate;
   const baseGate = gitConfigEnv([...(hooks ? [['core.hooksPath', hooks] as [string, string]] : []), ...gitConfig]);
   return new Promise<ShipRun>((resolve) => {
     let out = '';
@@ -389,7 +415,8 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
     try {
       // Its own process group, so a stop reaches the hook's test run and not
       // only this script.
-      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'], detached: ownGroup });
+      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], detached: ownGroup, windowsHide: true });
+      if (stdin !== undefined) { child.stdin!.on('error', () => {}); child.stdin!.end(stdin); }
     } catch (e) {
       resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
@@ -469,17 +496,27 @@ export class ShipQueue {
   declare handBack: NonNullable<ShipQueueOptions['handBack']>;
   declare run: NonNullable<ShipQueueOptions['run']>;
   declare afterShip: NonNullable<ShipQueueOptions['afterShip']>;
+  declare pushed: NonNullable<ShipQueueOptions['pushed']>;
   declare memoryGate: NonNullable<ShipQueueOptions['memoryGate']>;
   declare shipScore: NonNullable<ShipQueueOptions['shipScore']>;
   declare pushSignIn: NonNullable<ShipQueueOptions['pushSignIn']>;
   declare log: ShipLog;
   declare busy: Promise<unknown> | null;
   declare earlyConflicts: Map<string, string>;
+  declare clock: () => number;
+  declare died: Map<string, { markedAt: number; tries: number; next: number }>;
 
-  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, memoryGate = () => null, shipScore = () => 0, pushSignIn = () => null, log = console }: ShipQueueOptions) {
-    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, memoryGate, shipScore, pushSignIn, log });
+  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, pushed = pushedToMain, memoryGate = () => null, shipScore = () => 0, pushSignIn = () => null, log = console, clock = Date.now }: ShipQueueOptions) {
+    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, pushed, memoryGate, shipScore, pushSignIn, log, clock });
     this.busy = null;
     this.earlyConflicts = new Map();
+    this.died = new Map();
+  }
+
+  /** How many runs died for this marking so far, and when the next may start. */
+  _diedSoFar(item: ShipItem) {
+    const was = this.died.get(keyOf(item));
+    return was && was.markedAt === markedAt(item) ? was : null;
   }
 
   tick(items: ShipItem[], products: ShipProduct[]) {
@@ -487,7 +524,8 @@ export class ShipQueue {
     const settings = pinShipBases(this.userDir, products);
     if (!Object.keys(settings).length) return null;
     this._refuseMoved(items, products, settings);
-    const next = nextToShip(items, products, settings, {
+    const now = this.clock();
+    const next = nextToShip(items.filter((i) => (this._diedSoFar(i)?.next ?? 0) <= now), products, settings, {
       isLive: this.isLive, liveSince: this.liveSince, folderFor: this.folderFor, handled: readHandled(this.userDir),
     });
     if (!next) return null;
@@ -496,7 +534,7 @@ export class ShipQueue {
     // (w-f37a34def6, 2026-10-04). Within one app, `busy` already stops a
     // second start; across a restart, trying again is the point.
     const done = () => writeHandled(this.userDir, { ...readHandled(this.userDir), [keyOf(next.item)]: markedAt(next.item) });
-    this.busy = this.ship(next, products, items).then((r) => { if (!r?.quit) done(); }, done).finally(() => { this.busy = null; });
+    this.busy = this.ship(next, products, items).then((r) => { if (!r?.quit && !r?.again) done(); }, done).finally(() => { this.busy = null; });
     return this.busy;
   }
 
@@ -573,14 +611,16 @@ export class ShipQueue {
     const red = redOnMain(this.userDir);
     const gate = this.memoryGate();
     const giveBack = gate && await shipSlot(gate, item, this.shipScore(item), {
-      onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before shipping.'); } catch { /* the ship still waits */ } },
+      onWait: () => { try { this.store.noteItem?.(item.product, item.id, waitingForMemory('shipping')); } catch { /* the ship still waits */ } },
     });
     let ran;
     let signIn: ReturnType<ShipQueue['pushSignIn']> = null;
     try { signIn = this.pushSignIn(); } catch (e) { this.log.warn?.('zero: could not read the GitHub sign-in:', (e as Error).message); }
     try {
-      const env = { ...(red.length ? { AGENTBOX_RED_ON_MAIN: red.join('\n') } : {}), ...signIn?.env };
-      ran = await this.run(script, cwd, Object.keys(env).length ? { env: { ...process.env, ...env }, ...(signIn ? { gitConfig: signIn.config } : {}) } : undefined);
+      const push = signIn ? pushRun(script, signIn.token) : null;
+      const env = { ...(red.length ? { AGENTBOX_RED_ON_MAIN: red.join('\n') } : {}), ...push?.env };
+      const base = product?.repoPath ? path.resolve(product.repoPath) : null;
+      ran = await this.run(script, cwd, { base, ...(Object.keys(env).length ? { env: { ...process.env, ...env } } : {}), ...(push ? { gitConfig: push.gitConfig, ...(push.stdin ? { stdin: push.stdin } : {}) } : {}) });
     } finally {
       giveBack?.();
     }
@@ -592,8 +632,10 @@ export class ShipQueue {
     try {
       // Already on main: there is nothing to fix, so nobody is woken.
       const already = /There is nothing to ship/.test(out);
-      if (code === 0 || already) {
-        const sha = shippedSha(out);
+      const said = code === 0 ? null : pushedLine(out);
+      const landed = !!said && await this.pushed(cwd, said);
+      if (code === 0 || already || landed) {
+        const sha = said ?? shippedSha(out);
         this.store.shipped(product.slug, item.id, { sha, labels: withoutShipLabel(item) });
         // THE COMMIT TRAVELS WITH THE NEWS. What follows a ship wants to know
         // which commit went out: main/main-went-red.mts waits for that
@@ -605,6 +647,16 @@ export class ShipQueue {
         // Nothing the agent can do: the thread asks for a sign-in and ships again once it is saved.
         this.store.shipFailed(product.slug, item.id, { note: notPushedNote(!!signIn), labels: withoutShipLabel(item) });
       } else {
+        const died = whyItDidNotShip(out).died;
+        const tries = (died ? this._diedSoFar(item)?.tries ?? 0 : 0) + 1;
+        if (died && tries <= DIED_AGAIN_MS.length) {
+          // Killed or cut off on a busy computer, with no test failing: nothing
+          // the agent or the person can fix, so it waits and goes again.
+          this.died.set(keyOf(item), { markedAt: markedAt(item), tries, next: this.clock() + DIED_AGAIN_MS[tries - 1] });
+          this.log.info?.(`zero: the ship of ${item.id} died without a failing test; it goes again in ${minutes(DIED_AGAIN_MS[tries - 1])}`);
+          return { code, again: true };
+        }
+        this.died.delete(keyOf(item));
         this.store.shipFailed(product.slug, item.id, { note: failureNote(out), labels: withoutShipLabel(item) });
         let brief: string | null = null;
         try {
@@ -613,7 +665,7 @@ export class ShipQueue {
         // Straight back to the session that wrote the change. Not through the
         // reply on the row: that field is hers, and the app's words written
         // there would be drawn as hers and could not replace hers anyway.
-        this.handBack(item, failureReply(out, { brief }));
+        this.handBack(item, failureReply(out, { brief, tries }));
       }
     } catch (e) {
       this.log.warn?.(`zero: could not record the ship of ${item.id}:`, (e as Error).message);

@@ -1,4 +1,5 @@
 // What Home shows, worked out from data the app already has.
+import { harnessOf } from '../box-filter';
 
 export function greeting(hour: number, name?: string | null): string {
   const part = hour < 4 ? 'Good evening' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -26,16 +27,17 @@ export function weekCounts(finishedAt: readonly number[], now: number): number[]
 export type DoorKey = 'inbox' | 'progress' | 'team';
 export type Door = { key: DoorKey; label: string; count: number | null };
 
-/** The places Home opens onto. Team is only there for someone on a team. */
+/** The places Home opens onto. Team is only there for someone on a team, and a door with nothing behind it shows no number. */
 export function doors({ needs, progress, team }: { needs: number; progress: number; team: boolean }): Door[] {
   const out: Door[] = [
-    { key: 'inbox', label: 'Inbox', count: needs },
-    { key: 'progress', label: 'In progress', count: progress },
+    { key: 'inbox', label: 'Inbox', count: needs > 0 ? needs : null },
+    { key: 'progress', label: 'In progress', count: progress > 0 ? progress : null },
   ];
   if (team) out.push({ key: 'team', label: 'Team', count: null });
   return out;
 }
 
+/** The command bar's short age for a thread under a day old. */
 export function agoShort(at: number, now: number): string {
   const m = Math.max(0, Math.floor((now - at) / 60_000));
   if (m < 1) return 'now';
@@ -43,6 +45,24 @@ export function agoShort(at: number, now: number): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h} hr`;
   return `${Math.floor(h / 24)} d`;
+}
+
+type EngineFacts = {
+  running?: readonly { itemId: string; product: string; engine?: string }[];
+  engines?: { workspace?: string | null; byItem?: Record<string, string> } | null;
+};
+
+/** Which coding agent a row is on: the run that really started, else a Codex
+ *  conversation, else main's answer for its next run. The row's own `engine`
+ *  is only what it asked for, and is absent when it takes the workspace default. */
+export function rowEngine(
+  item: { id: string; product: string; labels?: readonly string[]; engine?: string | null },
+  facts: EngineFacts,
+): string {
+  const run = facts.running?.find((r) => r.itemId === item.id && r.product === item.product);
+  if (run?.engine) return run.engine;
+  if (harnessOf({ labels: item.labels ? [...item.labels] : [], engine: item.engine }) === 'codex') return 'codex';
+  return facts.engines?.byItem?.[item.id] ?? facts.engines?.workspace ?? item.engine ?? 'claude';
 }
 
 export function engineName(engine: string | undefined): string {
@@ -73,4 +93,94 @@ export type TeamRowState = 'working' | 'waiting' | 'quiet';
 export function teamRowState({ agents, waitingOnYou }: { agents: number | null; waitingOnYou: boolean }): TeamRowState {
   if (waitingOnYou) return 'waiting';
   return agents ? 'working' : 'quiet';
+}
+
+/** The line under a name. An AI teammate's own status can say Waiting on you
+ *  for a run Needs you does not list, and the card says no more than that list. */
+export function teamRowLine({ waiting, now, agents }: { waiting: boolean; now: string | null; agents: number }): string {
+  if (waiting) return 'Waiting on you';
+  const said = now === 'Waiting on you' ? null : now;
+  return said ?? (agents ? 'Working' : 'Nothing running');
+}
+
+/** A Home row is on the Needs you card or the In progress card; a running thread is never in Needs you. */
+export function homeRowOpens<E extends { key: string }, I>(key: string, needs: readonly E[], progress: readonly I[], keyOf: (item: I) => string): { entry: E } | { item: I } | null {
+  const entry = needs.find((e) => e.key === key);
+  if (entry) return { entry };
+  const item = progress.find((i) => keyOf(i) === key);
+  return item ? { item } : null;
+}
+
+const STATE_RANK: Record<TeamRowState, number> = { waiting: 0, working: 1, quiet: 2 };
+
+/** Team this week, busiest first: whoever waits on you, then whoever is
+ *  working, then the most finished this week, then the latest of it. Ties keep
+ *  the Team page's order. */
+export function busiestFirst<T extends { state: TeamRowState; week: readonly number[]; total: number }>(rows: readonly T[]): T[] {
+  const latest = (w: readonly number[]) => { for (let i = w.length - 1; i >= 0; i--) if (w[i]) return i; return -1; };
+  return rows.map((r, i) => ({ r, i })).sort((a, b) =>
+    STATE_RANK[a.r.state] - STATE_RANK[b.r.state]
+    || b.r.total - a.r.total
+    || latest(b.r.week) - latest(a.r.week)
+    || a.i - b.i).map((x) => x.r);
+}
+
+/** Who you pinned to the top of Team this week, in the order you pinned
+ *  them, and who you hid from it, by member key. */
+export type TeamCardChoice = { pinned: string[]; hidden: string[] };
+
+const without = (keys: readonly string[], key: string) => keys.filter((k) => k !== key);
+
+export function pinMate(c: TeamCardChoice, key: string): TeamCardChoice {
+  return { pinned: [...without(c.pinned, key), key], hidden: without(c.hidden, key) };
+}
+
+export function unpinMate(c: TeamCardChoice, key: string): TeamCardChoice {
+  return { pinned: without(c.pinned, key), hidden: [...c.hidden] };
+}
+
+/** A pin outlives a hide, so whoever comes back comes back pinned. */
+export function hideMate(c: TeamCardChoice, key: string): TeamCardChoice {
+  return { pinned: [...c.pinned], hidden: [...without(c.hidden, key), key] };
+}
+
+export function showMate(c: TeamCardChoice, key: string): TeamCardChoice {
+  return { pinned: [...c.pinned], hidden: without(c.hidden, key) };
+}
+
+type Marked<T> = T & { pinned: boolean; hidden: boolean };
+
+/** Team this week as drawn: whoever waits on you, even someone you hid, then
+ *  everyone else. Within each, who you pinned comes first in the order you
+ *  pinned them, so a pin always moves someone up, and the rest go busiest
+ *  first. `hidden` is the rest of the ones you hid. */
+export function teamCard<T extends { key: string; state: TeamRowState; week: readonly number[]; total: number }>(rows: readonly T[], choice: TeamCardChoice): { shown: Marked<T>[]; hidden: Marked<T>[] } {
+  const pinned = new Set(choice.pinned);
+  const hid = new Set(choice.hidden);
+  const marked = rows.map((r) => ({ ...r, pinned: pinned.has(r.key) && !hid.has(r.key), hidden: hid.has(r.key) }));
+  const byPin = (r: Marked<T>) => choice.pinned.indexOf(r.key);
+  const pinsFirst = (group: Marked<T>[]) => [...group.filter((r) => r.pinned).sort((a, b) => byPin(a) - byPin(b)), ...busiestFirst(group.filter((r) => !r.pinned))];
+  return {
+    shown: [...pinsFirst(marked.filter((r) => r.state === 'waiting')), ...pinsFirst(marked.filter((r) => r.state !== 'waiting' && !r.hidden))],
+    hidden: marked.filter((r) => r.hidden && r.state !== 'waiting'),
+  };
+}
+
+const CHOICE_KEY = 'agentbox.home.teamCard';
+type Store = Pick<Storage, 'getItem' | 'setItem'> | null;
+const local = (): Store => { try { return globalThis.localStorage ?? null; } catch { return null; } };
+const keysIn = (v: unknown): string[] => (Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : []);
+
+/** Kept on this computer, like the Messages pins. */
+export function readTeamCardChoice(store: Store = local()): TeamCardChoice {
+  try {
+    const v: unknown = JSON.parse(store?.getItem(CHOICE_KEY) ?? 'null');
+    if (!v || typeof v !== 'object') return { pinned: [], hidden: [] };
+    const o = v as { pinned?: unknown; hidden?: unknown };
+    return { pinned: keysIn(o.pinned), hidden: keysIn(o.hidden) };
+  } catch { return { pinned: [], hidden: [] }; }
+}
+
+export function writeTeamCardChoice(choice: TeamCardChoice, store: Store = local()) {
+  try { store?.setItem(CHOICE_KEY, JSON.stringify(choice)); } catch { /* kept for this window only */ }
 }

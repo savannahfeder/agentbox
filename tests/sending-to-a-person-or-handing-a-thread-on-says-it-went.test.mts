@@ -31,7 +31,7 @@ describe('the note button once a note has gone', () => {
   });
 
   it('is shown only after the write came back ok, and the button keeps saying it until the next words', () => {
-    expect(view).toMatch(/const went = noteSentWords\([^;]*sendWords\);/);
+    expect(view).toMatch(/const went = noteSentWords\([^;]*(?:sendWords|typedSendWords)\);/);
     const send = view.slice(view.indexOf('const send = async'), view.indexOf('const settle = async'));
     expect(send.indexOf("if (failed(out, 'That comment did not save.'))")).toBeGreaterThan(-1);
     expect(send.indexOf('setJustSent(went)')).toBeGreaterThan(send.indexOf("if (failed(out, 'That comment did not save.'))"));
@@ -41,12 +41,12 @@ describe('the note button once a note has gone', () => {
 
 describe('the toast for a hand-off', () => {
   it('names the person by first name', () => {
-    expect(handedToWhom('Theo Okafor')).toBe('Handed to Theo');
-    expect(handedToWhom('Theo')).toBe('Handed to Theo');
+    expect(handedToWhom('Theo Okafor')).toBe('Handed over to Theo');
+    expect(handedToWhom('Theo')).toBe('Handed over to Theo');
   });
 
-  it('says only Handed on when there is no name', () => {
-    expect(handedToWhom('')).toBe('Handed on');
+  it('says only Handed over when there is no name', () => {
+    expect(handedToWhom('')).toBe('Handed over');
   });
 });
 
@@ -63,7 +63,7 @@ describe('the app', () => {
   it('says the hand-off is going at the press, and who has it once it went', () => {
     expect(give.indexOf('showToast(sendingTo(')).toBeGreaterThan(-1);
     expect(give.indexOf('showToast(sendingTo(')).toBeLessThan(give.indexOf('await api.teamHandOn'));
-    expect(give).toMatch(/showToast\(out\.ok \? handedToWhom\(to\.name\) : out\.error \?\? 'That did not work\.'/);
+    expect(give).toMatch(/showToast\(out\.ok \? `\$\{handedToWhom\(to\.name\)\}/);
   });
 
   it('says a share is going at the press, and keeps who it went to up long enough to read', () => {

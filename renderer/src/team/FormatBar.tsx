@@ -1,9 +1,9 @@
 // THE BAR UNDER THE REPLY BOX IN A CHAT (drawing A, w-2e8aa16f0f).
 //
 // @, attach, a voice note and emoji, then Aa, which brings out bold, italic,
-// strike, link, the two lists, quote and code. Square, monochrome, in the app's
-// own materials: round one came back as "no colour, no rounded corners" and
-// nothing here has either.
+// strike, link, the two lists, quote and code, in a row along the top of the
+// box when the box gives it one (`marksAt`), as Slack's does. Monochrome, in
+// the app's own materials: round one came back as "no colour".
 //
 // IT IS ONLY EVER ON A CHAT. The reply box on a thread with an agent is a box
 // you type an instruction into, and an instruction is not formatted; the bar
@@ -13,6 +13,7 @@
 // pinned by a test, because where the caret ends up is the half of a formatting
 // button that has no symptom when it is wrong.
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { EmojiPick } from './ChatActions';
 import { useVoiceRecorder, type Arrival, type Recorded, type VoiceControl } from './useVoiceRecorder';
 import { VOICE_MAX_MS, voiceClock } from './voice-note';
@@ -101,10 +102,12 @@ const marksWereOut = () => { try { return localStorage.getItem(MARKS_KEY) === '1
 // A note longer than this asks once before the cross throws it away.
 const ASK_BEFORE_DISCARD_MS = 5000;
 
-export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNotice, voiceKey = '', voice: control, onRecording, mention = true }: {
+export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNotice, voiceKey = '', voice: control, onRecording, mention = true, marksAt }: {
   /** The reply box itself: the bar works on the selection that is in it. */
   box: { current: HTMLTextAreaElement | null };
   onChange: (text: string) => void;
+  /** The row along the top of the box, where Aa puts the marks, as Slack's box does. Without it they follow Aa on the bar. */
+  marksAt?: HTMLElement | null;
   /** False where the box has nobody to mention. */
   mention?: boolean;
   /** Open the file picker. Absent where there is nothing to attach to. */
@@ -231,22 +234,43 @@ export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNot
     );
   }
 
+  const linkAsk = asking && (
+    <span className="fmt-link-pop">
+      <input
+        className="fmt-link-ask"
+        autoFocus
+        placeholder="Paste a link"
+        aria-label="Link address"
+        value={href}
+        onChange={(e) => setHref(e.target.value)}
+        onBlur={() => setAsking(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); linkDone(true); }
+          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); linkDone(false); }
+        }}
+      />
+      <button type="button" className="fmt-link-add" disabled={!href.trim()} onMouseDown={hold} onClick={() => linkDone(true)}>Add link</button>
+    </span>
+  );
+  const markButtons = (grouped: boolean) => WRITES.flatMap(({ what, title, glyph }) => [
+    ...(grouped && (what === 'bullet' || what === 'quote') ? [<span key={`gap-${what}`} className="fmt-gap" aria-hidden="true" />] : []),
+    <button
+      key={what}
+      type="button"
+      className="fmt-btn fmt-mark"
+      title={KEYS_SHOWN[what] ? `${title} (${KEYS_SHOWN[what]})` : title}
+      aria-label={title}
+      onMouseDown={hold}
+      onClick={() => press(what)}
+    >{glyph}</button>,
+  ]);
+
   return (
     <div className="fmt-bar" role="toolbar" aria-label="Formatting">
-      {asking && (
-        <input
-          className="fmt-link-ask"
-          autoFocus
-          placeholder="Paste a link, then Return"
-          aria-label="Link address"
-          value={href}
-          onChange={(e) => setHref(e.target.value)}
-          onBlur={() => setAsking(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); linkDone(true); }
-            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); linkDone(false); }
-          }}
-        />
+      {!marksAt && linkAsk}
+      {marks && marksAt && createPortal(
+        <div className="fmt-marks" role="toolbar" aria-label="Text formatting">{linkAsk}{markButtons(true)}</div>,
+        marksAt,
       )}
       {/* WHAT PUTS SOMETHING INTO THE MESSAGE comes first; the marks that
           change what is already there wait behind Aa, after a gap. */}
@@ -301,18 +325,14 @@ export function FormatBar({ box, onChange, onAttach, onFromFiles, onVoice, onNot
         aria-label="Formatting marks" aria-pressed={marks} onMouseDown={hold} onClick={() => showMarks(!marks)}>
         <span className="fmt-letter">Aa</span>
       </button>
-      {marks && <span className="fmt-gap" aria-hidden="true" />}
-      {marks && WRITES.map(({ what, title, glyph }) => (
-        <button
-          key={what}
-          type="button"
-          className="fmt-btn fmt-mark"
-          title={KEYS_SHOWN[what] ? `${title} (${KEYS_SHOWN[what]})` : title}
-          aria-label={title}
-          onMouseDown={hold}
-          onClick={() => press(what)}
-        >{glyph}</button>
-      ))}
+      {marks && !marksAt && <span className="fmt-gap" aria-hidden="true" />}
+      {marks && !marksAt && markButtons(false)}
     </div>
   );
+}
+
+/** Where a box keeps the row Aa fills: an element at its top, handed to FormatBar once it is drawn. */
+export function useMarksRow() {
+  const [at, setAt] = useState<HTMLDivElement | null>(null);
+  return [at, setAt] as const;
 }

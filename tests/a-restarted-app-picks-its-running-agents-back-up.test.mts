@@ -42,8 +42,17 @@ afterEach(async () => {
   const pid = dir ? await hostPid(path.join(dir, 'r.sock')) : null;
   if (pid) try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ }
   await wait(100);
-  // The stand-in worker can still be writing its transcript, which gave ENOTEMPTY.
-  if (dir) fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  // The worker and the app's side calls to the stand-in (the thread namer) can
+  // still be writing receipts. A file landing between rmSync's sweep and its
+  // rmdir is ENOTEMPTY, and maxRetries retries only the rmdir, so retry the
+  // whole removal. A folder left in tmp is not a failure.
+  if (dir) {
+    const end = Date.now() + 5000;
+    for (;;) {
+      try { fs.rmSync(dir, { recursive: true, force: true }); break; } catch { if (Date.now() > end) break; }
+      await wait(50);
+    }
+  }
   dir = null; apps = [];
 });
 

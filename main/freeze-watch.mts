@@ -130,7 +130,9 @@ export function memoryWords(lines: MemoryMinute[] | null | undefined): string[] 
   const heavy = rated.filter((l) => l.swapInMbps >= SWAP_CRITICAL_MBPS).length;
   const peakMb = Math.max(0, ...lines.map((l) => (Number.isFinite(l.swapMb) ? l.swapMb as number : 0)));
   out.unshift(`Swapping: up to ${worst.swapInMbps} MB/s read back off the disk (a minute's average), ${heavy} ${heavy === 1 ? 'minute' : 'minutes'} at ${SWAP_CRITICAL_MBPS} MB/s or more, the rate at which the app holds new agents.${peakMb ? ` Swap peaked at ${(peakMb / 1024).toFixed(1)} GB.` : ''}`);
-  out.push(`It swapped hardest at ${clock(worst.at)}. Memory then: the app ${Math.round(worst.app?.mb ?? 0)} MB; tasks ${held(worst.tasks, 'item').join(', ') || 'none'}; outside the app ${held(worst.others, 'name').join(', ') || 'nothing logged'}.`);
+  // A quiet minute's line is the reading alone (main/memory-log.mts).
+  const holders = worst.app ? ` Memory then: the app ${Math.round(worst.app.mb ?? 0)} MB; tasks ${held(worst.tasks, 'item').join(', ') || 'none'}; outside the app ${held(worst.others, 'name').join(', ') || 'nothing logged'}.` : '';
+  out.push(`It swapped hardest at ${clock(worst.at)}.${holders}`);
   if (heavy) out.push('The Mac was swapping hard, so the holds above are as likely the Mac paging the app back in as the code they name: start with what held memory.');
   return out;
 }

@@ -7,6 +7,7 @@ import { app, BrowserWindow, Menu, webContents } from 'electron';
 import type { BaseWindow, MenuItemConstructorOptions, WebContents } from 'electron';
 import { zoomTarget } from './zoom-keys.mts';
 import { zoomPercentFor } from './zoom-readout.mts';
+import type { AppSize } from './app-size.mts';
 
 // Approval hotkeys live in the MENU, not the renderer: a child web contents
 // owns the keyboard whenever one is up, so a renderer listener never hears
@@ -29,6 +30,14 @@ import { zoomPercentFor } from './zoom-readout.mts';
 let lastZoomAt = 0;
 let lastZoomDelta: number | null = null;
 
+// The app window's size is kept per screen (main/app-size.mts), so its steps
+// go through that. Anything else, the junk browser's page, zooms on its own.
+let appWindowSize: AppSize | null = null;
+
+export function sizeTheAppWindowWith(size: AppSize | null): void {
+  appWindowSize = size;
+}
+
 /**
  * Move the zoom one step. `target` is the web contents the caller named: the
  * one a keystroke arrived on, or the window a menu click was chosen from. When
@@ -47,6 +56,10 @@ export function applyZoom(delta: number, target: WebContents | null = null): voi
     appWindow: appWindowContents(),
   });
   if (!contents) return;
+  if (appWindowSize && contents === appWindowSize.contents) {
+    announceZoom(appWindowSize.step(delta));
+    return;
+  }
   if (delta === 0) contents.setZoomLevel(0);
   else contents.setZoomLevel(Math.max(-6, Math.min(6, contents.getZoomLevel() + delta)));
   announceZoom(contents.getZoomLevel());
@@ -58,7 +71,7 @@ export function applyZoom(delta: number, target: WebContents | null = null): voi
 // It always goes to the APP window, even when the level that moved belongs to
 // the junk browser's guest: the guest is a page inside her window, and a
 // browser puts its own readout in its own corner rather than in the page.
-function announceZoom(level: number): void {
+export function announceZoom(level: number): void {
   const percent = zoomPercentFor(level);
   if (percent === null) return;
   const target = appWindowContents();
@@ -94,9 +107,10 @@ interface MenuHandlers {
   onApproval?: (allow: boolean) => unknown;
   onReload?: () => unknown;
   onZoom?: (delta: number, target: WebContents | null) => unknown;
+  onQuit?: () => unknown;
 }
 
-export function installMenu({ onApproval, onReload, onZoom }: MenuHandlers = {}): void {
+export function installMenu({ onApproval, onReload, onZoom, onQuit }: MenuHandlers = {}): void {
   // A CLICK NAMES ITS WINDOW.after the chords were fixed. Electron hands a menu
   // click the window it was chosen from, so the click stops asking what is
   // focused, which is the question that was coming back null. main.mts decides
@@ -117,7 +131,8 @@ export function installMenu({ onApproval, onReload, onZoom }: MenuHandlers = {})
         { role: 'hideOthers' },
         { role: 'unhide' },
         { type: 'separator' },
-        { role: 'quit' },
+        // Not Electron's quit role, which quits at once even while agents work.
+        { label: process.platform === 'darwin' ? `Quit ${app.name}` : 'Quit', accelerator: 'CommandOrControl+Q', click: () => (onQuit ?? (() => app.quit()))() },
       ],
     },
     {

@@ -8,7 +8,7 @@ import { codexTranscriptFile, workerThreadParams, refusedCodexWorker } from '../
 import { codexKeyRefusal } from '../codex-account.mts';
 import { compactCodexThread } from '../codex-compaction.mts';
 import type { CompactServer } from '../codex-compaction.mts';
-import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent, rememberCodexChange, changeFromCodexTurn } from '../codex.mts';
+import { captureCodexEvent, codexStreamingText, summarizeCodexEvent, traceCodexEvent, rememberCodexChange, changeFromCodexTurn, codexTookTheWords } from '../codex.mts';
 import { codexActivity } from '../agent-activity.mts';
 import { runCodexCommand } from '../provider-commands.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
@@ -40,7 +40,7 @@ export const codexHarness = {
     const refusal = codexKeyRefusal(sup._codexProfileHome(context?.profile ?? 'default'));
     return refusal ? refusedCodexWorker(refusal) : sup._spawnCodexWorker(plan, context);
   },
-  readers: () => ({ capture: captureCodexEvent, stream: codexStreamingText, summarize: summarizeCodexEvent, trace: traceCodexEvent, activity: codexActivity }),
+  readers: () => ({ capture: captureCodexEvent, stream: codexStreamingText, summarize: summarizeCodexEvent, trace: traceCodexEvent, activity: codexActivity, took: codexTookTheWords }),
   subscribe(child: EventEmitter, session: HarnessSession, absorb: (method: string, params: unknown) => void): void {
     child.on('event', (method: string, params: unknown) => { rememberCodexChange(session, method, params); absorb(method, params); });
   },

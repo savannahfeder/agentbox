@@ -6,7 +6,10 @@ import { clickZoom, isDoubleTap, lowestZoom, panLimits, panToKeep, pictureFit, p
 import { doubleTapScale, onPhone } from '../phone-screen';
 import { CrossIcon } from './CrossIcon';
 import { focusTheReplyBox } from '../focus-at-end';
+import { pressedInThePalette } from '../palette-rows';
+import { pressedInTheComposer, startsAThread, typesInto } from '../over-a-big-view';
 import { opening, seenAt } from '../picture';
+import { fetchableFileUrl } from '../phone-files';
 
 export type { Picture };
 
@@ -50,7 +53,8 @@ function decoded(url: string): Promise<Ready> {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.decoding = 'async';
-  img.src = url;
+  // An Image() is in no page, so the browser app's rewriting of the desktop's picture address never reaches it.
+  img.src = fetchableFileUrl(url);
   let timer: number | undefined;
   const late = new Promise<never>((_, no) => { timer = window.setTimeout(() => no(new Error('slow')), PICTURE_WAIT_MS); });
   return Promise.race([img.decode(), late])
@@ -71,13 +75,16 @@ const CHEVRON_RIGHT = 'M9.5 5.5 16 12l-6.5 6.5';
 const BESIDE = 'M4.5 5.5h15v13h-15zM14 5.5v13';
 const OUTSIDE = 'M13.5 4.5h6v6M19.5 4.5l-8 8M17.5 13.5v6h-13v-13h6';
 
-export function PictureView({ pictures, start, resolve, onClose, onBeside, onPreview }: {
+export function PictureView({ pictures, start, resolve, onClose, onBeside, onPreview, overItsBox }: {
   pictures: Picture[];
   start: number;
   resolve: (path: string) => Promise<string | null>;
   onClose: () => void;
-  onBeside: (path: string) => void;
-  onPreview: (path: string) => void;
+  /** Opened from a box that may itself sit over a big view: drawn above it, and the box takes the caret back. */
+  overItsBox?: boolean;
+  /** Left out for a picture that is not yet a file in the product, such as one waiting to be sent. */
+  onBeside?: (path: string) => void;
+  onPreview?: (path: string) => void;
 }) {
   const [index, setIndex] = useState(start);
   const shown = pictures[index];
@@ -162,10 +169,11 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
   useEffect(() => {
     dialog.current?.focus();
     const key = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey) return;
+      if (e.metaKey || e.ctrlKey || pressedInThePalette(e.target) || pressedInTheComposer(e.target)) return;
+      if (startsAThread({ key: e.key, chord: e.altKey, inABox: typesInto(e.target) })) return;
       e.stopImmediatePropagation();
       wake();
-      if (e.key === 'Escape') { e.preventDefault(); onClose(); requestAnimationFrame(() => focusTheReplyBox()); }
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); if (!overItsBox) requestAnimationFrame(() => focusTheReplyBox()); }
       else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setIndex((i) => stepTo(i, pictures.length, e.key === 'ArrowRight' ? 1 : -1)); }
       else if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'PageDown' || e.key === 'PageUp') {
         e.preventDefault();
@@ -324,7 +332,7 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
       tabIndex={-1}
       role="dialog"
       aria-label={name}
-      className={`picture-view${(idle && zoom === 1) || bare ? ' pv-idle' : ''}`}
+      className={`picture-view${overItsBox ? ' pv-over-its-box' : ''}${(idle && zoom === 1) || bare ? ' pv-idle' : ''}`}
       onPointerMove={fingerMove}
       onPointerDown={fingerDown}
       onPointerUp={fingerUp}
@@ -359,10 +367,10 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
           {many && <span className="pv-count">{index + 1} / {pictures.length}</span>}
         </span>
         <span className="pv-tools">
-          <button type="button" className="pv-icon" onClick={() => onBeside(shown.path)} title="Open beside the thread" aria-label="Open beside the thread"><Glyph d={BESIDE} /></button>
+          {onBeside && <button type="button" className="pv-icon" onClick={() => onBeside(shown.path)} title="Open beside the thread" aria-label="Open beside the thread"><Glyph d={BESIDE} /></button>}
           {/* Preview is on the computer, so on a phone the press showed nothing. */}
-          {!onPhone() && <button type="button" className="pv-icon" onClick={() => onPreview(shown.path)} title="Open in Preview" aria-label="Open in Preview"><Glyph d={OUTSIDE} /></button>}
-          <span className="pv-rule" aria-hidden="true" />
+          {onPreview && !onPhone() && <button type="button" className="pv-icon" onClick={() => onPreview(shown.path)} title="Open in Preview" aria-label="Open in Preview"><Glyph d={OUTSIDE} /></button>}
+          {(onBeside || onPreview) && <span className="pv-rule" aria-hidden="true" />}
           <button type="button" className="pv-icon pv-close" onClick={onClose} title="Close (esc)" aria-label="Close"><CrossIcon /></button>
         </span>
       </header>

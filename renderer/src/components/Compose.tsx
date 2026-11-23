@@ -44,6 +44,7 @@ import { engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines
 import { DEFAULT_ENGINE, ENGINES, type Engine } from '../../../shared/engines.mts';
 import { footerIsOpen, restingClause } from '../compose-footer';
 import { practiceRefusal } from '../compose-says';
+import { closesOnPress } from '../press';
 
 const LAST_PRODUCT_KEY = 'zero.lastProduct';
 
@@ -152,8 +153,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   // Codex level belongs to the model, so a remembered `ultra` on a model that
   // stops at `xhigh` is not sent. The memory is kept for when the model changes back.
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, engine));
-  const pickEffort = (id: string | null) => { setEffort(id); writeLastEffort(id, undefined, engine); };
-  const effortRows = effortChoicesFor(engine, model, { codexModels: codexModels ?? [], codexDefault: codexModelDefault ?? null });
+  const pickEffort = (id: string | null) => { setEffort(id); writeLastEffort(id, undefined, engine); };  const effortRows = effortChoicesFor(engine, model, { codexModels: codexModels ?? [], codexDefault: codexModelDefault ?? null });
   const effortOn = effortPicked(effort, effortRows) ? effort : null;
   // What the card opened with, frozen on the first render. The level and model
   // are remembered across cards, so only a difference from this shows the user
@@ -467,7 +467,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   };
 
   return (
-    <div className="modal-backdrop compose-backdrop" onClick={onClose}>
+    <div className="modal-backdrop compose-backdrop" {...closesOnPress(onClose)}>
       <div className="modal compose" onClick={(e) => e.stopPropagation()}>
         <textarea
           ref={ref}

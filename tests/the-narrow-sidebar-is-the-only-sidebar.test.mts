@@ -60,12 +60,13 @@ describe('every install gets the narrow sidebar', () => {
 });
 
 describe('without Groups it holds Inbox, Feedback and Settings', () => {
-  it('draws exactly those three with no team, no teammates and no Groups', () => {
-    expect(labels(nav())).toEqual(['Inbox', 'Feedback', 'Settings']);
+  // The pencil beside the name starts a thread; it is not a place (2026-11-23).
+  it('draws exactly those three places with no team, no teammates and no Groups', () => {
+    expect(labels(nav())).toEqual(['New thread', 'Inbox', 'Feedback', 'Settings']);
   });
 
   it('puts no Groups row under Threads unless Groups is on, and Chats only for teammates', () => {
-    expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
+    expect(app).toContain(`groups={roomsUi.live ? roomsUi.sidebarGroups(roomOnTeam || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace, teammatesUi.live || homeLayout === 'chats' ? openChats : undefined, homeLayout === 'chats' ? 'Team' : undefined) : teammatesUi.rail(teammatesShown)} />`);
   });
 
   it('names the first row and the page Inbox, with Groups or without', () => {

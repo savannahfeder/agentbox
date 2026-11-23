@@ -62,6 +62,16 @@ export function captureStream(session: StreamSession, line: string): void {
   } catch {}
 }
 
+// The agent has begun answering, so the words it was started with are in its
+// conversation. `system/init` carries the id but comes before the prompt is
+// taken, and a run stopped right after it never heard them.
+export function claudeTookTheWords(line: string): boolean {
+  try {
+    const type = (JSON.parse(line) as StreamLine).type;
+    return type === 'assistant' || type === 'stream_event';
+  } catch { return false; }
+}
+
 // Whether this run was refused its own row, off the claim call and its reply.
 // `closingMessageIsTheAnswer` reads it: a refused worker is told to end saying
 // nothing, and whatever it does say must not land on a row someone else holds.

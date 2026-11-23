@@ -183,10 +183,10 @@ describe('applyZoom itself, with nothing focused', () => {
   });
 });
 
-// So Chromium keeps carrying her level between launches, and the chords above
-// are the whole of the way back. Do not add a reset here.
+// The size picked for each screen is kept between launches (main/app-size.mts), and
+// the chords above are the whole of the way to change it. Do not add a reset here.
 describe('a fresh launch', () => {
-  it('leaves the remembered zoom alone', () => {
+  it('never puts the zoom back to 100% by itself', () => {
     expect(main).not.toMatch(/setZoomLevel\(0\)/);
   });
 });

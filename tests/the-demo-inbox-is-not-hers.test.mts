@@ -25,9 +25,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  HOMES as DEMO_HOMES, clearDemoHomes, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
+  HOMES as DEMO_HOMES, demoEnv, demoPaths, makeDemoHome, openDemo, seedDemoStore,
 } from '../main/demo.mts';
-import { DEMO_ENV, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, runningAsADemo } from '../shared/demo-world.mts';
+import { DEMO_ENV, DEMO_GROUP_POSTS, DEMO_INSTALL_ID, DEMO_PRODUCTS, demoLedgerLines, demoMessages, runningAsADemo } from '../shared/demo-world.mts';
 import { HOMES as FRESH_HOMES } from '../shared/fresh-user-home.mts';
 import { readInstallId } from '../shared/install-id.mts';
 import { readWorkItems } from '../main/store/work-items.mts';
@@ -65,12 +65,11 @@ describe('where a demo lives', () => {
     }
   });
 
-  it('clears only its own folder', () => {
-    aHome();
-    expect(fs.existsSync(DEMO_HOMES)).toBe(true);
-    expect(clearDemoHomes()).toEqual({ ok: true });
-    expect(fs.existsSync(DEMO_HOMES)).toBe(false);
-    made.length = 0;
+  // A demo copy may be open on a call while the suite runs on the same
+  // computer. Clearing the whole folder here wiped an open demo's store and
+  // left its inbox empty (2026-11-21), so nothing clears it any more.
+  it('offers nothing that deletes every demo home, so a test run cannot empty an open demo', async () => {
+    expect('clearDemoHomes' in (await import('../main/demo.mts'))).toBe(false);
   });
 });
 
@@ -158,10 +157,12 @@ describe('the store a demo opens on', () => {
     try {
       const all = [];
       for (const p of out.products) all.push(...readWorkItems(p.dir));
-      expect(all.length).toBeGreaterThanOrEqual(9);
+      expect(all.length).toBeGreaterThanOrEqual(6);
       // Every screen worth demoing has a row that lands on it.
-      expect(all.some((i) => i.status === 'open' && /## Options/.test(i.body ?? ''))).toBe(true);
-      expect(all.some((i) => i.status === 'blocked')).toBe(true);
+      expect(all.some((i) => i.status === 'open' && /## Options/.test(i.result ?? ''))).toBe(true);
+      // Nothing blocked: on the call, "Send back to agent" on a thread nobody
+      // handed off read as a riddle (2026-11-21).
+      expect(all.some((i) => i.status === 'blocked')).toBe(false);
       expect(all.some((i) => i.status === 'done' && (i.result ?? '').length > 40)).toBe(true);
       // And one row the user wrote, which an agent may not overwrite.
       expect(all.some((i) => i.wrote?.body?.source === 'founder')).toBe(true);
@@ -191,9 +192,13 @@ describe('what a demo never shows', () => {
     });
     made.push(out.home);
     expect(out.ok).toBe(true);
-    // Checked through the link, not on it: `~/.claude` really is on this Mac,
-    // so a link that had been made would resolve and this would go red.
-    expect(fs.existsSync(path.join(out.home, '.claude'))).toBe(false);
+    // A home with Claude Code is given an empty folder of its own, so the app does not read
+    // Claude Code as never set up (shared/fresh-user-home.mts). Empty, and no link to hers.
+    const folder = path.join(out.home, '.claude');
+    if (fs.existsSync(folder)) {
+      expect(fs.lstatSync(folder).isSymbolicLink()).toBe(false);
+      expect(fs.readdirSync(folder)).toEqual([]);
+    }
   });
 
   it('carries nothing about the person running it in anything it writes', () => {
@@ -236,18 +241,50 @@ describe('what a demo never shows', () => {
 
 describe('how the demo rows are written', () => {
   const rows = Object.values(demoLedgerLines(Date.now())).flat();
-  // AGENT BODIES ONLY. The user's own row is their sentence, written the way
-  // somebody types a sentence, and a rule about how we open a card does not
-  // apply to what the user wrote.
-  const bodies = rows.filter((l) => l.source === 'agent').map((l) => l.patch?.body).filter(Boolean);
+  // THE AGENTS' ANSWERS ON THREADS STILL WAITING ON YOU. The user's own words
+  // are a sentence somebody typed, and a finished thread's answer is a report.
+  const finished = new Set(rows.filter((l) => l.patch?.status === 'done').map((l) => l.id));
+  const bodies = rows.filter((l) => l.source === 'agent' && !finished.has(l.id)).map((l) => l.patch?.result).filter(Boolean);
 
-  it('opens every body with the ask in bold on the first line', () => {
-    expect(bodies.length).toBeGreaterThan(0);
+  it('opens every answer waiting on you with the ask in bold, under fifteen words', () => {
+    expect(bodies.length).toBeGreaterThanOrEqual(4);
     for (const body of bodies) {
       const first = body.split('\n')[0];
       expect(first.startsWith('**')).toBe(true);
       expect(first.endsWith('**')).toBe(true);
+      expect(first.replace(/\*/g, '').split(/\s+/).length).toBeLessThan(15);
     }
+  });
+
+  it('names and summarises every thread itself, so the copy never asks a model to', () => {
+    // main/row-label.mts names any row without a label on a timer.
+    const ids = new Set(rows.map((l) => l.id));
+    for (const id of ids) {
+      const mine = rows.filter((l) => l.id === id);
+      expect(mine.some((l) => String(l.patch?.label ?? '').trim())).toBe(true);
+      const summary = mine.find((l) => l.patch?.problem);
+      expect(String(summary?.patch.problem).split(/\s+/).length).toBeLessThanOrEqual(45);
+      const done = String(summary?.patch.progress).split('\n');
+      expect(done.length).toBeLessThanOrEqual(6);
+      for (const step of done) expect(step.split(/\s+/).length).toBeLessThanOrEqual(15);
+    }
+  });
+
+  it('joins no two sentences with a colon, the same standing rule as the em dash', () => {
+    const said = [
+      ...rows.flatMap((l) => ['title', 'body', 'result', 'problem', 'progress', 'label'].map((k) => l.patch?.[k])),
+      ...demoMessages().flatMap((m) => [m.title, m.body]),
+      ...DEMO_GROUP_POSTS.map((p) => p.body),
+    ].filter((s): s is string => typeof s === 'string');
+    for (const text of said) expect(text).not.toMatch(/[a-z]: [a-z]/i);
+  });
+
+  // "The word 'fairy,' by the way, is a little funny because it sounds like
+  // 'fairy fairy,' which is like a slur" (founder, 2026-11-21). Renamed Shuttle.
+  it('never calls the invented company Ferry', () => {
+    const src = fs.readFileSync(path.join(import.meta.dirname, '../shared/demo-world.mts'), 'utf8');
+    expect(src).not.toMatch(/ferry/i);
+    expect(src).toContain("name: 'Shuttle'");
   });
 
   it('writes no em dash anywhere, because a screenshot of this is our writing', () => {
@@ -256,13 +293,50 @@ describe('how the demo rows are written', () => {
     }
   });
 
-  it('gives every unanswered question and review an options section to draw', () => {
-    // The list under the reply box is drawn from the body's `## Options`
-    // section. A demo whose questions have none demonstrates the app with its
-    // best feature switched off.
-    const asks = rows.filter((l) => l.patch?.body && /^\*\*(Say|Merge|Post|Pick)/.test(l.patch.body));
-    expect(asks.length).toBeGreaterThanOrEqual(4);
-    for (const ask of asks) expect(ask.patch.body).toMatch(/\n## Options\n/);
+  // The founder, 2026-11-21, on the Stripe thread: "They don't give me options
+  // because... they should all have 1, 2, 3 options", and "They don't really
+  // show me screenshots or visuals". Two of four agent threads had neither.
+  it('gives every agent thread waiting on you two or three options to pick', () => {
+    expect(bodies.length).toBe(4);
+    for (const body of bodies) {
+      const options = body.split('\n## Options\n')[1];
+      expect(options).toBeTruthy();
+      const picks = options.split('\n').filter((l) => /^\d\. /.test(l));
+      expect(picks.length).toBeGreaterThanOrEqual(2);
+      expect(picks.length).toBeLessThanOrEqual(3);
+      expect(picks.filter((l) => l.endsWith('(recommended)'))).toHaveLength(1);
+    }
+  });
+
+  it('shows a picture of the work in every agent thread waiting on you', () => {
+    for (const body of bodies) expect(body).toMatch(/^designs\/[\w-]+\.png$/m);
+  });
+
+  // "The first couple of threads should be Claude Code threads with standard
+  // stuff... and then I'll introduce them to messages from Teams." A message
+  // from a person wins a tie in Needs you (threads/page-rules `byPriority`),
+  // so the agents' threads rank a level above the teammates' messages.
+  it('puts two Claude Code threads first in Needs you, and teammates after every agent', () => {
+    const waiting = [...new Set(rows.filter((l) => !finished.has(l.id)).map((l) => l.id))].map((id) => {
+      const mine = rows.filter((l) => l.id === id);
+      return { engine: mine.find((l) => l.patch?.engine)?.patch.engine, priority: Number(mine.find((l) => l.patch?.priority)?.patch.priority), at: mine[0].ts };
+    }).sort((a, b) => b.priority - a.priority || b.at - a.at);
+    expect(waiting.slice(0, 2).map((r) => r.engine)).toEqual(['claude', 'claude']);
+    const lowest = Math.min(...waiting.map((r) => r.priority));
+    for (const m of demoMessages()) expect(m.priority).toBeLessThan(lowest);
+  });
+
+  it('lays every picture it names into the project, where the thread draws it from', () => {
+    const home = aHome();
+    const out = seedDemoStore(home, { now: Date.now() });
+    const byId = new Map(rows.map((l) => [l.id, l]));
+    const named = rows.flatMap((l) => [...String(l.patch?.result ?? '').matchAll(/^(designs\/[\w-]+\.png)$/gm)].map((m) => ({ id: l.id, file: m[1] })));
+    expect(named.length).toBeGreaterThanOrEqual(4);
+    for (const { id, file } of named) {
+      const product = Object.entries(demoLedgerLines(Date.now())).find(([, ls]) => ls.some((l) => l.id === id))![0];
+      expect(byId.has(id)).toBe(true);
+      expect(fs.statSync(path.join(out.accountRoot, product, file)).size).toBeGreaterThan(10_000);
+    }
   });
 });
 
@@ -280,7 +354,7 @@ describe('opening one', () => {
     // ROWS, NOT LEDGER LINES. The toast reads this number out loud, and one row
     // is two or three appended lines, so counting lines said twenty for nine.
     expect(out.rows).toBe(new Set(Object.values(demoLedgerLines(Date.now())).flat().map((l) => l.id)).size);
-    expect(out.rows).toBeGreaterThanOrEqual(9);
+    expect(out.rows).toBeGreaterThanOrEqual(6);
     expect(spawned).toHaveLength(1);
     expect(spawned[0].opts.detached).toBe(true);
     expect(spawned[0].opts.env.HOME).toBe(out.home);

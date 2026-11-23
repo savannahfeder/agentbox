@@ -1,19 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
-import { agoShort, doors, type DoorKey, type TeamRowState } from './home-model';
+import { doors, type DoorKey, type TeamRowState } from './home-model';
+import { updatedWords } from '../threads/page-rules';
 import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
+import { MateFace } from '../teammates/MateFace';
+import { AgentFace } from '../components/AgentFace';
+import { initialsOf } from '../team/rooms/room-rules';
+import { MoreMenu, type MoreItem } from '../team/MessageMore';
+import { PinMark } from '../threads/ThreadMenu';
 import './home.css';
 import { enterIsTheButtons } from '../focused-button';
 
-/** `from` is the teammate who asked, when one did; priority is null at Medium, as in the Inbox; an invitation has no time. */
-export type NeedsRow = { key: string; letter: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
-export type TeamRow = { key: string; name: string; letter: string; ai: boolean; line: string; state: TeamRowState; week: number[]; total: number };
+/** `from` is the teammate who asked, when one did; priority is null at Medium, as on the Inbox's board; an invitation has no time. `agent` is an agent's thread. */
+export type NeedsRow = { key: string; letter: string; face?: string; photo?: string; agent?: boolean; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean; pinned?: boolean };
+export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; photo?: string; line: string; state: TeamRowState; week: number[]; total: number; pinned?: boolean; hidden?: boolean };
+export type MateAct = 'pin' | 'unpin' | 'hide' | 'show';
+
+const stroke = { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
+const eyeOff = (size = 16) => <svg {...stroke} width={size} height={size}><path d="M4 4l16 16" /><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c4.9 0 8.4 4 9.5 6-.5.9-1.4 2.1-2.6 3.3M6.7 7.7C4.7 9 3.2 10.8 2.5 12c1.1 2 4.6 6 9.5 6 1.5 0 2.9-.4 4.1-1" /><path d="M9.9 10a2.8 2.8 0 0 0 4 4" /></svg>;
+const EYE = <svg {...stroke}><path d="M2.5 12C3.6 10 7.1 6 12 6s8.4 4 9.5 6c-1.1 2-4.6 6-9.5 6s-8.4-4-9.5-6z" /><circle cx="12" cy="12" r="2.8" /></svg>;
+const EYE_OFF = eyeOff();
+const DOTS = <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="18" cy="12" r="1.5" /></svg>;
+const CHEVRON = <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>;
+
+function mateMenu(m: TeamRow, act: (key: string, a: MateAct) => void): MoreItem[] {
+  if (m.hidden) return [{ label: 'Show on Home', icon: EYE, onClick: () => act(m.key, 'show') }];
+  return [
+    m.pinned ? { label: 'Unpin', icon: <PinMark />, onClick: () => act(m.key, 'unpin') } : { label: 'Pin to top', icon: <PinMark />, onClick: () => act(m.key, 'pin') },
+    { label: 'Hide from Home', icon: EYE_OFF, onClick: () => act(m.key, 'hide') },
+  ];
+}
 export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
 
 const ICONS: Record<DoorKey, JSX.Element> = {
-  inbox: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9" /></svg>,
-  progress: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5" /><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none" /></svg>,
-  team: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5" /><circle cx="6" cy="10" r="2" /><circle cx="18" cy="10" r="2" /><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" /><path d="M3 18c0-2 1.3-3.5 3-3.5M21 18c0-2-1.3-3.5-3-3.5" /></svg>,
+  inbox: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9" /></svg>,
+  progress: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7.5" /><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none" /></svg>,
+  team: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5" /><circle cx="6" cy="10" r="2" /><circle cx="18" cy="10" r="2" /><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5" /><path d="M3 18c0-2 1.3-3.5 3-3.5M21 18c0-2-1.3-3.5-3-3.5" /></svg>,
 };
 
 function Bars({ week }: { week: number[] }) {
@@ -23,7 +45,7 @@ function Bars({ week }: { week: number[] }) {
   </div>;
 }
 
-export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCount, progressCount, team, progress, slot, onDoor, onOpen, onMember, onTeam }: {
+export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCount, progressCount, team, hiddenTeam = [], progress, slot, onDoor, onOpen, onMember, onTeam, onMate }: {
   hello: string; now: number;
   needs: NeedsRow[]; needsCount: number;
   /** The Inbox's own number, for its door. */
@@ -31,15 +53,42 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
   progressCount: number;
   /** Null when there is no team: the second card is your own In progress. */
   team: TeamRow[] | null;
+  /** Who you hid from Team this week, drawn under it when you ask. */
+  hiddenTeam?: TeamRow[];
   progress: ProgressRow[];
   slot: (el: HTMLDivElement | null) => void;
   onDoor: (key: DoorKey) => void;
   onOpen: (key: string) => void;
   onMember: (key: string) => void;
   onTeam: () => void;
+  onMate?: (key: string, act: MateAct) => void;
 }) {
   const [pick, setPick] = useState(-1);
+  const [menu, setMenu] = useState<{ m: TeamRow; at: DOMRect } | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
   const rows = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (!hiddenTeam.length) setShowHidden(false); }, [hiddenTeam.length]);
+  const face = (m: TeamRow, live: boolean) => {
+    const state = live && m.state === 'working' ? ' live' : live && m.state === 'waiting' ? ' wait' : '';
+    return m.face
+      ? <MateFace seed={m.face} className={`hm-face${state}`} />
+      : <span className={`hm-face${m.ai ? ' ai' : ''}${state}`}>
+        {m.photo ? <img className="hm-photo" src={m.photo} alt="" referrerPolicy="no-referrer" /> : m.ai ? m.letter : initialsOf(m.name)}</span>;
+  };
+  const mateRow = (m: TeamRow, gone: boolean) => (
+    <div key={m.key} className={`hm-mate-wrap${gone ? ' gone' : ''}${menu?.m.key === m.key ? ' menu' : ''}`}
+      onContextMenu={onMate ? (e) => { e.preventDefault(); setMenu({ m, at: new DOMRect(e.clientX, e.clientY, 0, 0) }); } : undefined}>
+      <button type="button" className="hm-row hm-mate" onClick={() => onMember(m.key)}>
+        {face(m, !gone)}
+        <span className="hm-text"><span className="hm-name"><b>{m.name}</b>{m.pinned && <span className="hm-pin" aria-label="Pinned"><PinMark size={13} /></span>}{m.hidden && !gone && <span className="hm-pin" aria-label="Hidden from Home" title="Hidden from Home">{eyeOff(13)}</span>}</span><small>{m.line}</small></span>
+        {m.total > 0 && !gone && <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>}
+      </button>
+      {onMate && (gone
+        ? <button type="button" className="hm-mate-act hm-show" aria-label={`Show ${m.name} on Home`} title="Show on Home" onClick={() => onMate(m.key, 'show')}>Show</button>
+        : <button type="button" className="hm-mate-act" aria-label={`More for ${m.name}`} title="More"
+          onClick={(e) => setMenu(menu?.m.key === m.key ? null : { m, at: e.currentTarget.getBoundingClientRect() })}>{DOTS}</button>)}
+    </div>
+  );
   useEffect(() => { if (pick >= needs.length) setPick(needs.length - 1); }, [needs.length, pick]);
   useEffect(() => {
     // J and K walk Needs you and Enter opens the row, as they do in the Inbox.
@@ -67,6 +116,10 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
     rows.current?.querySelector('.hm-row.on')?.scrollIntoView({ block: 'nearest' });
   }, [pick]);
 
+  // Up to three rows a card is as tall as its rows; past that it stops at its full height and scrolls.
+  const teamRows = team ? team.length + (hiddenTeam.length ? 1 : 0) + (showHidden ? hiddenTeam.length : 0) : progress.length;
+  const tallest = Math.max(needs.length, teamRows, 1);
+
   return <div className="hm-page">
     <div className="hm-col">
       <h1 className="hm-hello">{hello}</h1>
@@ -78,7 +131,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
         ))}
       </nav>
       <div className="hm-start" ref={slot} />
-      <div className="hm-two">
+      <div className={`hm-two${tallest <= 3 ? ' fits' : ''}`}>
         <section className="hm-card hm-glass" aria-label="Needs you">
           <header className="hm-head">
             <span className="t">Needs you{needsCount > 0 && <em>{needsCount}</em>}</span>
@@ -88,15 +141,15 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
             {needs.length === 0 && <p className="hm-empty">Nothing needs you.</p>}
             {needs.map((r, i) => (
               <button type="button" key={r.key} className={`hm-row${i === pick ? ' on' : ''}${r.unread ? ' unread' : ''}`} onClick={() => onOpen(r.key)} onMouseEnter={() => setPick(i)}>
-                <span className="hm-face">{r.letter}</span>
-                <span className="hm-text"><b>{r.title}</b>
+                {r.face ? <MateFace seed={r.face} className="hm-face" /> : r.agent ? <span className="hm-face hm-agent"><AgentFace /></span> : <span className="hm-face">{r.photo ? <img className="hm-photo" src={r.photo} alt="" referrerPolicy="no-referrer" /> : r.letter}</span>}
+                <span className="hm-text"><span className="hm-name"><b>{r.title}</b>{r.pinned && <span className="hm-pin" aria-label="Pinned"><PinMark size={13} /></span>}</span>
                   <span className="hm-tags">
                     {r.priority && <span className={`hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`} title={priorityLabelOf(r.priority)} aria-label={priorityLabelOf(r.priority)}><PriorityMark id={r.priority} /></span>}
                     {r.from && <span className="hm-tag">{r.from}</span>}
                     {r.project && <span className="hm-tag">{r.project}</span>}
                   </span>
                 </span>
-                {r.at !== null && <time>{agoShort(r.at, now)}</time>}
+                {r.at !== null && <time>{updatedWords(r.at, now)}</time>}
               </button>
             ))}
           </div>
@@ -108,15 +161,16 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
               <button type="button" className="hm-link" onClick={onTeam}>Open Team →</button>
             </header>
             <div className="hm-scroll">
-              {team.length === 0 && <p className="hm-empty">Nobody else on your team yet.</p>}
-              {team.map((m) => (
-                <button type="button" key={m.key} className="hm-row hm-mate" onClick={() => onMember(m.key)}>
-                  <span className={`hm-face${m.ai ? ' ai' : ''}${m.state === 'working' ? ' live' : m.state === 'waiting' ? ' wait' : ''}`}>{m.letter}</span>
-                  <span className="hm-text"><b>{m.name}</b><small>{m.line}</small></span>
-                  <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>
-                </button>
-              ))}
+              {team.length === 0 && !hiddenTeam.length && <p className="hm-empty">Nobody else on your team yet.</p>}
+              {team.map((m) => mateRow(m, false))}
+              {hiddenTeam.length > 0 && <button type="button" className={`hm-row hm-hidden${showHidden ? ' open' : ''}`} aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}>
+                <span className="hm-face hm-hid-mark" aria-hidden="true">{EYE_OFF}</span>
+                <span className="hm-text"><small>{hiddenTeam.length} hidden</small></span>
+                <span className="hm-chev">{CHEVRON}</span>
+              </button>}
+              {showHidden && hiddenTeam.map((m) => mateRow(m, true))}
             </div>
+            {menu && onMate && <MoreMenu at={menu.at} width={196} items={mateMenu(menu.m, onMate)} onClose={() => setMenu(null)} />}
           </section>
         ) : (
           <section className="hm-card hm-glass" aria-label="In progress">
@@ -128,9 +182,9 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
               {progress.length === 0 && <p className="hm-empty">No agent is working right now.</p>}
               {progress.map((r) => (
                 <button type="button" key={r.key} className="hm-row" onClick={() => onOpen(r.key)}>
-                  <span className="hm-face live">{r.letter}</span>
+                  <span className="hm-face hm-agent live"><AgentFace /></span>
                   <span className="hm-text"><b>{r.title}</b><small>{r.line}</small></span>
-                  <time>{agoShort(r.at, now)}</time>
+                  <time>{updatedWords(r.at, now)}</time>
                 </button>
               ))}
             </div>

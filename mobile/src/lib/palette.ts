@@ -58,15 +58,16 @@ export function phoneCommands({ team, mates = [], groups = [], looks = [], pages
 }): PhoneCommand[] {
   return [
     { id: 'new', label: 'New thread', keywords: 'compose write task', act: { push: '/new' } },
-    { id: 'inbox', label: 'Needs you', keywords: 'inbox', act: { go: 'inbox' } },
+    { id: 'inbox', label: 'Go to Inbox', keywords: 'needs you home list threads', act: { go: 'inbox' } },
     ...(team ? [
-      { id: 'everything', label: 'Everything else', keywords: 'team board cards', act: { go: 'everything' as const } },
-      { id: 'chats', label: 'Chats', keywords: 'groups messages people', act: { go: 'chats' as const } },
+      { id: 'everything', label: 'Go to Everything else', keywords: 'team board cards', act: { go: 'everything' as const } },
+      { id: 'chats', label: 'Go to Chats', keywords: 'groups messages people', act: { go: 'chats' as const } },
     ] : []),
-    { id: 'progress', label: 'In progress', keywords: 'running working', act: { go: 'progress' } },
-    { id: 'later', label: 'Later', keywords: 'snoozed scheduled', act: { go: 'snoozed' } },
-    { id: 'done', label: 'Done', keywords: 'closed finished', act: { go: 'done' } },
-    { id: 'filter', label: 'View and filters', keywords: 'board list sort', act: { go: 'inbox', menu: true } },
+    { id: 'progress', label: 'Go to In progress', keywords: 'running working', act: { go: 'progress' } },
+    { id: 'later', label: 'Go to Later', keywords: 'snoozed scheduled', act: { go: 'snoozed' } },
+    { id: 'done', label: 'Go to Done', keywords: 'closed finished', act: { go: 'done' } },
+    { id: 'files', label: 'Files', keywords: 'documents pictures designs films attachments', act: { go: 'files' } },
+    { id: 'filter', label: 'Filter…', keywords: 'view filters board list sort project priority agent', act: { go: 'inbox', menu: true } },
     ...(mates.length ? [{ id: 'new-mate', label: 'New teammate', keywords: 'hire ai', act: { push: '/teammate/new' } }] : []),
     ...mates.map((t) => ({ id: `mate-${t.id}`, label: t.name, aside: 'Teammate', keywords: 'chat message ai', act: { push: `/teammate/${t.id}` } })),
     ...mates.map((t) => ({ id: `teammate-pause-${t.id}`, label: `${t.paused ? 'Resume' : 'Pause'} ${t.name}`, keywords: 'teammate pause resume stop hold', act: { teammate: t.id, paused: !t.paused }, typed: true as const })),

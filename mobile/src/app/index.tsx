@@ -8,12 +8,13 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-import { backWords, readDisplay, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, emptyTabWords, readDisplay, rowPriorityId, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
 import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
 import { agentChoices, type Harness } from '../lib/agent-filter';
 import { EverythingPlace } from '../ui/Everything';
+import { FilesPlace } from '../ui/FilesPlace';
 import { bottomTabs, type PlaceId } from '../lib/groups';
 import { useGroups } from '../state/groups';
 import { GroupsPlace } from '../ui/Groups';
@@ -38,16 +39,10 @@ import { color, corner, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
 import { ComputerWait } from '../ui/Onboarding';
 import { ALERTS_ASKED_KEY, FIRST_RUN, nextSetup } from '../lib/first-run';
+import { skipWait, waitNotice, waitSkipped } from '../lib/computer-wait';
 import { alertsHere } from '../platform/alerts';
 import { previewWalksFirstRun } from '../lib/preview';
 import { PEN } from '../lib/overlays';
-
-// The desktop's own words for an empty tab (renderer/src/threads/Pages.tsx `EmptyTab`).
-const EMPTY: Record<Exclude<TabId, 'inbox'>, string> = {
-  progress: 'Nothing is running.',
-  snoozed: 'Nothing is waiting for later. "Add it to Later" on a new thread writes one down without starting it.',
-  done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
-};
 
 const open = (product: string, id: string) => router.push({ pathname: '/thread/[product]/[id]', params: { product, id } });
 
@@ -84,6 +79,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
         {row.queued && <><T style={{ ...small, color: color.dim }}>Queued</T><T style={small}>·</T></>}
+        {row.away && <><T style={{ ...small, color: color.dim }}>Computer offline</T><T style={small}>·</T></>}
         {row.priority && <View accessibilityLabel={row.priority === 'urgent' ? 'Urgent' : 'High priority'}><PriorityBars level={row.priority === 'urgent' ? 4 : 3} /></View>}
         {row.agent && <><T style={{ ...small, color: color.dim }}>{row.agent}</T><T style={small}>·</T></>}
         <T numberOfLines={1} style={{ fontFamily: font.mono, fontSize: 11, lineHeight: 20, letterSpacing: 0.55, textTransform: 'uppercase', color: color.dim, flexShrink: 1 }}>{row.projectName}</T>
@@ -285,14 +281,13 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
               </View>
             </Pressable>
           ))}
-          {c.rows.length + repeatsIn(c.state).length === 0 && <T style={{ fontSize: 13, color: color.faint, paddingVertical: 4, paddingHorizontal: 2 }}>Nothing here.</T>}
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
               style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
               <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
-                {e.priority !== null && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority)} /></View>}
+                {rowPriorityId(e.priority) && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority!)} /></View>}
                 {e.agent && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>
                 {c.state === 'scheduled' && e.item && !!backWords(e.item, c0.now) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.faint, marginLeft: 8 }}>{backWords(e.item, c0.now)}</T>}
@@ -309,8 +304,12 @@ export default function Threads() {
   const c = useCloud();
   // The first run's steps after sign-in, in order (lib/first-run.ts); the computer's is drawn here.
   const walking = c.preview && previewWalksFirstRun();
+  const [, setSkippedAt] = useState(0);
+  const skipped = !!c.connect && waitSkipped(appStore, c.connect.email);
+  const skip = () => { if (c.connect) skipWait(appStore, c.connect.email); setSkippedAt(Date.now()); };
+  const notice = c.status ? { message: c.status, next: null } : waitNotice(c.connect);
   const next = c.preview && !walking ? null : nextSetup({
-    signedIn: c.signedIn, started: !c.loading, connect: !!c.connect, noticeAnswered: !!c.notice,
+    signedIn: c.signedIn, started: !c.loading, connect: !!c.connect && !skipped, noticeAnswered: !!c.notice,
     alertsOn: !!c.alerts, alertsAsked: !!appStore.getItem(ALERTS_ASKED_KEY), alertsHere: alertsHere || walking,
   });
   useEffect(() => {
@@ -327,12 +326,13 @@ export default function Threads() {
   // Groups and teammates both off on the computer while open: back to the threads.
   const teamMode = !!c.team || groups.on;
   const onChats = teamMode && place === 'chats';
-  const onEverything = teamMode && place !== 'inbox' && place !== 'chats';
+  const onFiles = place === 'files';
+  const onEverything = teamMode && place !== 'inbox' && place !== 'chats' && !onFiles;
   // In progress, Later and Done are your own card's work on Everything else.
   const [mineTab, setMineTab] = useState<Exclude<TabId, 'inbox'>>('progress');
   const [evView, setEvViewRaw] = useState<EvView>(() => evViewOf(appStore));
   const setEvView = (v: EvView) => { setEvViewRaw(v); keepEvView(v, appStore); };
-  const tab: TabId = onEverything ? mineTab : place === 'everything' || place === 'chats' || teamMode ? 'inbox' : place;
+  const tab: TabId = onEverything ? mineTab : place === 'everything' || place === 'chats' || place === 'files' || teamMode ? 'inbox' : place;
   const openGroup = (id: string) => { groups.setLast(id); setChatGroup(place); setPlace('chats'); };
   // A command from Search (app/search.tsx).
   useEffect(() => {
@@ -341,7 +341,7 @@ export default function Threads() {
     c.takeWanted();
     setChatGroup(w.group ? 'chats' : null);
     if (w.menu) setMenu(true);
-    if (w.place !== 'inbox' && w.place !== 'chats' && w.place !== 'everything' && teamMode) { setMineTab(w.place); setPlace('everything'); } else setPlace(w.place);
+    if (w.place !== 'inbox' && w.place !== 'chats' && w.place !== 'everything' && w.place !== 'files' && teamMode) { setMineTab(w.place); setPlace('everything'); } else setPlace(w.place);
   }, [c.wanted]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pulling, setPulling] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -350,7 +350,7 @@ export default function Threads() {
   const setDisplay = (d: Display) => { setDisplayRaw(d); writeDisplay('inbox', d, appStore); };
   // Not kept between launches, as the desktop's filter is not.
   const [agent, setAgent] = useState<Harness | null>(null);
-  const order = useMemo(() => c.view.products.map((p) => p.slug), [c.view.products]);
+  const order = c.view.projectOrder;
   const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order, agent), [c.tabs, display, c.now, order, agent]);
   const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now, agent) : null), [teamMode, display, c.view, c.tabs, c.now, agent]);
   // Your card's board: your own threads, and what waits on you is Needs you, so it is no column (whose-board.ts).
@@ -376,7 +376,7 @@ export default function Threads() {
     .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
     .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
-  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0) };
+  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0), files: 0 };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
   const mentionsShown = tab === 'inbox' && (mentions.length > 0 || asks.length > 0);
   const hidden = shown.whole[tab] - shown.rows[tab].length;
@@ -412,7 +412,7 @@ export default function Threads() {
   const penUp = c.view.approvals.length > 0;
   // The empty inbox draws the form itself, so it needs no pen.
   const inboxEmpty = tab === 'inbox' && rows.length === 0 && hidden === 0 && !c.loading && !mentionsShown;
-  if (c.connect) return <ComputerWait email={c.connect.email} signOut={c.signOut} />;
+  if (c.connect && !skipped) return <ComputerWait email={c.connect.email} signOut={c.signOut} skip={skip} />;
   if (onChats) {
     return (
       <Wall>
@@ -422,6 +422,7 @@ export default function Threads() {
       </Wall>
     );
   }
+  if (onFiles) return <Wall><FilesPlace tabs={<Tabs on="files" counts={counts} pick={setPlace} team={teamMode} />} /></Wall>;
   // With a team on, List and Board in the View menu are Everything else's (App.tsx `headerDisplay`).
   // Needs you is always a list, so it lights List; Board there opens Everything else's board.
   const shownView = teamMode && !onEverything ? 'list' : evView;
@@ -451,7 +452,7 @@ export default function Threads() {
         </View> : undefined}
       ListEmptyComponent={c.loading ? <Waiting list /> : repeatsShown || mentionsShown ? undefined : hidden > 0 ? <FilteredEmpty tab={tab} hidden={hidden} clear={clear} />
         : tab === 'inbox' ? <InboxClear />
-          : <T style={{ paddingHorizontal: size.inset, paddingTop: 28, fontSize: 15, lineHeight: 23, color: color.dim }}>{EMPTY[tab]}</T>}
+          : <T style={{ paddingHorizontal: 24, paddingTop: 32, textAlign: 'center', fontSize: 14, lineHeight: 21, color: color.faint }}>{emptyTabWords(tab, false, counts.inbox)}</T>}
       contentContainerStyle={{ paddingBottom: Math.max(picked ? 120 : 96, c.approvalRoom + 16) }}
     />
   );
@@ -468,13 +469,13 @@ export default function Threads() {
   return (
     <Picking.Provider value={picking}>
     <Wall>
-      <TopBar title={teamMode ? 'Inbox' : 'Threads'} right={<>
+      <TopBar title="Inbox" right={<>
         <IconButton label="Search threads" onPress={() => router.push('/search')}><Magnifier size={18} /></IconButton>
         {penUp && <IconButton label="New thread" onPress={() => router.push('/new')}><Pen size={18} tint={color.dim} /></IconButton>}
         <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
-      <StatusNotice message={c.status} next={c.statusNext} />
+      <StatusNotice message={notice?.message} next={notice?.next} />
       {onEverything
         ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
         : board ? <Board columns={board} foot={foot} /> : list}

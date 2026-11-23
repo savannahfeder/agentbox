@@ -23,22 +23,34 @@ export class StrayLetters {
   looseAt = -Infinity;
   looseKey = '';
   inBurst = false;
+  sentAt = -Infinity;
 
   typed(now: number) { this.typedAt = now; }
   opening(box: BoxKind, now: number) { this.openedAt = now; this.openingBox = box; }
-  /** Escape, a press or ⌘↵: the person chose to leave the box. */
-  reset() { this.typedAt = -Infinity; this.openedAt = -Infinity; this.looseAt = -Infinity; }
+  /** Escape or a press: the person chose to leave the box. */
+  reset() { this.typedAt = -Infinity; this.openedAt = -Infinity; this.looseAt = -Infinity; this.sentAt = -Infinity; }
+  /**
+   * ⌘↵ leaves the box too, but letters already on their way when it landed
+   * (a slow box, or ⌘↵ hit mid-word) were typed before the send could be seen.
+   */
+  sent(now: number) { this.reset(); this.sentAt = now; }
   /** A held letter turned out to be typing: it and the rest of the burst act on nothing. */
   burst(now: number) { this.looseAt = now; this.inBurst = true; }
 
-  decide({ key, inInput, chord, now, boxThere, openingThere }: {
+  decide({ key, inInput, chord, now, boxThere, openingThere, sentFromThere = false }: {
     key: string; inInput: boolean; chord: boolean; now: number;
     /** The box last typed in is still on screen. */
     boxThere: boolean;
     /** The box that is opening is on screen. */
     openingThere: boolean;
+    /** The very box the send came from, not another thread's drawn in its place. */
+    sentFromThere?: boolean;
   }): StrayCall {
     if (inInput || chord || key.length !== 1) return 'shortcut';
+    if (now - this.sentAt < BURST_MS) {
+      this.sentAt = now;
+      return sentFromThere ? 'back-to-box' : 'drop';
+    }
     if (now - this.openedAt < OPENING_MS) return openingThere ? 'into-opening-box' : 'drop';
     if (now - this.typedAt < STILL_TYPING_MS) return boxThere ? 'back-to-box' : 'drop';
     // Only the first letter of loose typing can still act; the rest of the burst is dropped.
@@ -80,6 +92,8 @@ export function installStrayLetters(win: Window = window, replay: Replay = copyK
     if (replayed.has(e)) return;
     const now = Date.now();
     const chord = e.metaKey || e.ctrlKey || e.altKey;
+    // A second Z while the first waits is the same press said twice, not a word.
+    if (held && !chord && (e.key === 'z' || e.key === 'Z') && !editable(e.target)) { e.stopImmediatePropagation(); e.preventDefault(); return; }
     if (held && !MODIFIERS.includes(e.key)) {
       clearTimeout(held);
       held = null;
@@ -91,14 +105,14 @@ export function installStrayLetters(win: Window = window, replay: Replay = copyK
     if ((e.target as HTMLElement | null)?.dataset?.keysOnly !== undefined) return;
     if (editable(e.target)) {
       // Plain Enter is a new line in a brief; ⌘↵ sends, so the next letter starts something new.
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { strayLetters.reset(); return; }
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { strayLetters.sent(now); lastBox = e.target; return; }
       if (!chord && e.key.length === 1) { strayLetters.typed(now); lastBox = e.target; }
       return;
     }
     const box = typedBox();
     const kind = strayLetters.openingBox;
     const opening = kind ? win.document.querySelector<HTMLElement>(BOXES[kind]) : null;
-    const call = strayLetters.decide({ key: e.key, inInput: false, chord, now, boxThere: !!box, openingThere: shown(opening) });
+    const call = strayLetters.decide({ key: e.key, inInput: false, chord, now, boxThere: !!box, openingThere: shown(opening), sentFromThere: shown(lastBox) });
     if (call === 'shortcut') {
       if (chord || (e.key !== 'z' && e.key !== 'Z')) return;
       e.stopImmediatePropagation();

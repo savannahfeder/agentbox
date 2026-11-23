@@ -33,10 +33,11 @@ export function T({ style, ...rest }: TextProps) {
 
 /** The top bar: 56px over the wall with its line, the title on the left. What
  * goes `below` (the inbox's tabs) sits inside it, over the same one line. */
-export function TopBar({ left, title, right, below }: { left?: ReactNode; title?: ReactNode; right?: ReactNode; below?: ReactNode }) {
+export function TopBar({ left, title, right, below, noReview = false }: { left?: ReactNode; title?: ReactNode; right?: ReactNode; below?: ReactNode; noReview?: boolean }) {
   const inset = useSafeAreaInsets();
   const { view, minimizedApproval, setMinimizedApproval } = useCloud();
-  const aside = view.approvals.findIndex((a: { id: string }) => a.id === minimizedApproval) === 0;
+  // A thread's bar has no room for it; the inbox's bar still brings the card back.
+  const aside = !noReview && view.approvals.findIndex((a: { id: string }) => a.id === minimizedApproval) === 0;
   return (
     <View style={{ paddingTop: inset.top, borderBottomWidth: 1, borderBottomColor: color.line }}>
       {/* The line is inside the 56px, as the website's border-box bar has it. */}
@@ -117,7 +118,8 @@ export function SheetRow({ label, on, aside, lead, onPress }: { label: string; o
 }
 
 /** A priority as the desktop draws it (`.prio-bars`): three bars, four for Urgent. */
-export function PriorityBars({ level }: { level: 1 | 2 | 3 | 4 }) {
+/** `level` 0 is Agent decides: three bars, none filled (components/Priority.tsx `PriorityIcon`). */
+export function PriorityBars({ level }: { level: 0 | 1 | 2 | 3 | 4 }) {
   const heights = level === 4 ? [4, 7, 10, 13] : [4, 7.5, 11];
   const inked = (i: number) => (level >= 3 ? color.text : i < level ? color.dim : color.lineStrong);
   return (

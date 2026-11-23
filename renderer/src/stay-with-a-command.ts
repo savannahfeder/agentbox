@@ -18,7 +18,7 @@ import { DEFAULT_ENGINE } from '../../shared/engines.mts';
 /**
  * The row she is watching a command run on. Product and id, because two
  *  products can hold the same id and the pane only ever shows one of them. */
-export type Followed = { product: string; id: string } | null;
+export type Followed = { product: string; id: string; reply?: boolean } | null;
 
 /**
  * DOES THIS SEND KEEP HER ON THE TASK.
@@ -62,6 +62,11 @@ export function staysOnTheTask(
   return commandPrompt(text) !== null;
 }
 
+/** What a send that keeps her on the thread follows: a command, or else a reply. */
+export function followedAfter(item: { product: string; id: string; agent?: unknown }, text: string, engine?: string | null): NonNullable<Followed> {
+  return { product: item.product, id: item.id, ...(staysOnTheTask(item, text, engine) ? {} : { reply: true }) };
+}
+
 /**
  * IS SHE STILL ON THE ROW SHE RAN IT FROM.
  *
@@ -81,9 +86,10 @@ export function stillFollowing(following: Followed, focused: { product: string; 
 
 /**
  * Where closing the task leaves her: her inbox when she was watching a command
- *  on it, and wherever she already was for every other task. */
+ *  on it, and wherever she already was for every other task. A reply follows
+ *  the thread only for its fresh copies (`reply`), so it leaves her where she was. */
 export function wayOut(following: Followed, focused: unknown): 'inbox' | 'stay' {
-  return !focused && following ? 'inbox' : 'stay';
+  return !focused && following && !following.reply ? 'inbox' : 'stay';
 }
 
 /**
@@ -129,4 +135,16 @@ export function freshCopy<T extends { id: string; product: string; updatedAt?: n
   if (!!fresh.onMac !== !!focused.onMac || (fresh.needsMac ?? null) !== (focused.needsMac ?? null)) return fresh;
   if ((fresh.label ?? '') !== (focused.label ?? '')) return fresh;
   return (fresh.updatedAt ?? 0) !== (focused.updatedAt ?? 0) ? fresh : null;
+}
+
+/**
+ * The open row's newer copy when it stands for a session started outside
+ * Agentbox: such a row is rebuilt from the session on every reading, so it is
+ * taken whenever what the session says or where it stands has moved.
+ */
+export function freshAgentRow<T extends { id: string; agent?: unknown }>(rows: readonly T[], focused: T | null): T | null {
+  if (!focused?.agent) return null;
+  const fresh = rows.find((r) => r.id === focused.id);
+  if (!fresh || fresh === focused) return null;
+  return JSON.stringify(fresh.agent) === JSON.stringify(focused.agent) ? null : fresh;
 }

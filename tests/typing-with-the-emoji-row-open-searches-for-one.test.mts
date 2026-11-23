@@ -59,12 +59,6 @@ describe('the picker takes the key before the app does', () => {
     expect(actions).toMatch(/stopImmediatePropagation\(\)/);
     expect(actions).toMatch(/addEventListener\('keydown', \w+, true\)/);
   });
-
-  it('is not beaten to S by the summary, which also listens at the window first', () => {
-    // Two capture listeners on the window run in the order they were added,
-    // and the summary's is re-added whenever its callback changes.
-    expect(read('threads/Summary.tsx')).toMatch(/querySelector\('\.chat-emoji, \.chat-emoji-all'\)/);
-  });
 });
 
 describe('finding one by its Slack name', () => {

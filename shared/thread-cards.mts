@@ -122,7 +122,8 @@ export function firstSentence(text: string | null | undefined, max = 240): strin
     .replace(/^##\s*Options[\s\S]*$/m, '')
     // A blockquote's mark is the one at the start of its line. Elsewhere `>`
     // is a redirect or an arrow and belongs to whoever typed it.
-    .replace(/^\s*>\s?/gm, '');
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/(?<![!`])\[([^\]\n]+)\]\([^)\s]+\)/g, '$1');
   for (const [re, to] of EMPHASIS) plain = plain.replace(re, to);
   plain = plain.replace(/\s+/g, ' ').trim();
   const m = plain.match(SENTENCE);
@@ -158,7 +159,17 @@ export function wordsIn(text: string | null | undefined): number {
 /** The Done steps in `progress`: one per line, the marks a writer puts in front of a step taken off. */
 export function doneSteps(progress: string | null | undefined): string[] {
   if (typeof progress !== 'string') return [];
-  return progress.split('\n').map((l) => l.trim().replace(/^(?:[-*•✓✔]\s*)+/, '').trim()).filter(Boolean);
+  return (asWordList(progress) ?? progress.split('\n')).map((l) => l.trim().replace(/^(?:[-*•✓✔]\s*)+/, '').trim()).filter(Boolean);
+}
+
+/** Some agents send the steps as a JSON list in the string. */
+export function asWordList(text: string): string[] | null {
+  const t = text.trim();
+  if (!t.startsWith('[') || !t.endsWith(']')) return null;
+  try {
+    const list: unknown = JSON.parse(t);
+    return Array.isArray(list) && list.every((x) => typeof x === 'string') ? list : null;
+  } catch { return null; }
 }
 
 /** The thread's summary: what the agent or the person wrote, else stand-ins. */
@@ -187,6 +198,12 @@ const startOfDay = (now: number) => { const d = new Date(now); d.setHours(0, 0, 
 const FINISHED_CARDS_KEPT_MS = 7 * 86_400_000;
 
 /** When this thread shipped: a person's word, else the app's own note once its merge lands. An agent saying so does not count. */
+/** When the row was last closed, from its own ledger, or null. */
+export function closedAt(item: { status?: string; wrote?: { status?: { ts?: number } | null } | null } | null | undefined): number | null {
+  const ts = item?.status === 'done' ? item.wrote?.status?.ts : undefined;
+  return Number.isFinite(ts) ? ts! : null;
+}
+
 export function shippedAtOf(item: Pick<CardItem, 'shippedAt' | 'note' | 'wrote'> | null | undefined): number | null {
   if (Number.isFinite(item?.shippedAt)) return item!.shippedAt! > 0 ? item!.shippedAt! : null;
   if (isShippedNote(item?.note) && item?.wrote?.note?.source === 'system') return item.wrote.note.ts ?? null;
@@ -399,7 +416,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
     const s = summaryOf(item);
     // The run that got nowhere is said by the wait; as a solution it read as finished.
     // A thread handed on says so, so a teammate's screen never reads its close as finished.
-    const solution = handedOn(item) ? item.answer : waitsOn && gotNowhere ? '' : s.solution;
+    // The first line names who has it; the giver's note under it is theirs to read, not the team board's.
+    const solution = handedOn(item) ? String(item.answer).split('\n')[0] : waitsOn && gotNowhere ? '' : s.solution;
     const shippedAt = shippedAtOf(item);
     cards.push({
       threadId: item.id, visible: true, title: shownTitle(item), project: product.name,
@@ -411,7 +429,8 @@ export function cardsFor<P extends CardProduct>({ products, readItems, now = Dat
       state, priority: shownPriority(item),
       problem: s.problem || null, progress: s.progress || null, solution: solution || null,
       blockedBy: [...(waitsOn ? [{ id: waitsOn, title: waitsOn.slice('name:'.length) }] : []), ...linked(item.blockedBy)],
-      blocks: linked(item.blocks), updatedAt: item.updatedAt ?? now,
+      // A finished thread is dated when it finished: a comment on it later is not news that it finished.
+      blocks: linked(item.blocks), updatedAt: (state === 'done' ? closedAt(item) : null) ?? item.updatedAt ?? now,
       ...(shippedAt ? { shippedAt } : {}),
     });
   }

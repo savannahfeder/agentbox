@@ -11,6 +11,14 @@ starts this checkout. The Mac app, the dmg, and the Darwin paths
 stay. Read the code and git for the current state; this file only holds the
 rules that are not obvious from them.
 
+The skills, their tests and the plans (`docs/cloud`, `docs/mobile`,
+`docs/team`) are a private repository checked out at `.claude/skills`
+(`.agentbox/private.json`). Its notes are as binding as this file. A change
+there is committed and pushed in that folder, not in this repository. On a
+cloud run without it, `sh .agentbox/private-folder.sh` clones it.
+
+@.claude/skills/CLAUDE.md
+
 ## Every change lands with tests, and you run all of them
 
 - Write the test first and watch it fail, then fix.
@@ -137,34 +145,10 @@ nowhere else. That folder follows the public main on its own:
 Whether you ask before shipping is set by the person's own instructions, not
 by this file.
 
-## SYNTHETIC USERS, AND THE THREAD THAT SETS THE STANDARD (2026-11-01)
-
-When a change wants synthetic users before it ships, they are `power-test`,
-with the people the change is for. Team and Rooms changes get several testers
-at once on one team. The phone app's testers are `product-loop`.
-
-Synthetic users run on Codex, never Claude Code (2026-11-08): the person keeps
-a Codex plan for testing only. Both skills start every tester as `codex exec`
-on the Codex login with the best plan; never run one as a subagent
-(`tests/every-synthetic-tester-runs-on-codex`).
-
-The app they test runs real agents on real plans, Claude Code and Codex
-(2026-11-11). Stand-in agents run only when the person agreed to them for
-that run, in their own words (`--stand-ins "<their words>"`), and the run
-says so up front. 48 of 50 runs were on stand-ins without anyone being told
-(`tests/a-power-test-runs-on-real-plans-unless-the-person-agreed`).
-
-The standard for the tester loop is thread w-e5f506ccb3: a synthetic team
-used the multiplayer build for whole workdays, logged what broke, agents
-fixed it on the branch, and the team tested the fixes. The person only chose
-between finished screens. Run a big change the same way: real use for
-hours, real people from `power-test/people/`, fixes tested again by the same
-testers, and screenshots of the result.
-
 ## RELEASING IS ONE COMMAND: `npm run deploy` (2026-10-26)
 
 A release (the Mac app, npm, the agentbox.ac download and update feed, the
-cloud server) is `cd ~/Desktop/dev/agentbox-team && npm run deploy`, run by
+cloud server) is `npm run deploy` in the folder the app runs from, run by
 the person, because it signs with their Apple account. Hand them that line
 and nothing else. Do not write out the steps it runs: hand-written release
 steps went wrong in a dozen ways, which is why it exists. To see what it would
@@ -197,10 +181,11 @@ anywhere else. `--ide` is the user's to switch on, never ours.
 
 Nor does an agent start the person's Google Chrome headless: the Mac files that
 copy as their Chrome, and their own Chrome then opens no window. Every hidden
-browser comes from `shared/hidden-browser.mjs` (Chrome for Testing or
-Playwright's headless shell), and
-`tests/no-agent-browser-is-the-persons-own-chrome.test.mjs` fails if any other
-file names Google Chrome's binary.
+browser comes from `shared/hidden-browser.mts` (Playwright's headless shell,
+else Chrome for Testing) and starts with its `KEEPS_OFF_THE_KEYCHAIN` flags,
+even a one-off from the shell; without them it asks for the person's keychain
+password. `tests/no-agent-browser-is-the-persons-own-chrome.test.mts` fails if
+any other file names Google Chrome's binary.
 
 ## Billing
 
@@ -267,12 +252,13 @@ separate private repository. It was merged in here with its history, so this
 is the one app and the one source of truth. The plan is `docs/team/PLAN.md`.
 
 - `cloud/team.config.json` is never committed (it is ignored, and
-  `tests/the-team-cloud-key-stays-out-of-the-repository` checks it). It is what
-  makes a copy the team version: machines that run it keep their own copy, and
-  without it the app is the single-person app. `cloud/team.config.example.json`
-  shows the shape. The same database's public address and anon key do ship, in
+  `tests/the-team-cloud-key-stays-out-of-the-repository` checks it). It points
+  a copy at another team cloud. `cloud/team.config.example.json` shows the
+  shape. The database's public address and anon key ship in
   `shared/cloud-address.mts`, so every copy can sign in to Agentbox Cloud
-  (2026-10-26); they were already inside every download.
+  (2026-10-26), and a checkout with no team file signs in to that same team, so
+  forks get Multiplayer (2026-11-22). Fresh test copies and the new-user window
+  still get a team only when handed one.
 - A branch cut from the old private repository's history will not line up with
   this one: the merge rewrote those commits to take the key file out. Move it
   across with

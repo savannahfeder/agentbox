@@ -29,7 +29,9 @@ export function useLiveTicket(file: { product: string; project?: string | null; 
     let gone = false;
     setTicket(undefined);
     void api.liveRoom(file).then((t) => { if (!gone) setTicket(t ?? null); });
-    return () => { gone = true; };
+    // An ask that never comes back opens the file on its own, as a room that never answers does.
+    const giveUp = window.setTimeout(() => { if (!gone) setTicket((t) => (t === undefined ? null : t)); }, ROOM_WAIT_MS);
+    return () => { gone = true; window.clearTimeout(giveUp); };
   }, [key]);
   return ticket;
 }

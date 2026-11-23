@@ -95,7 +95,9 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   // actually touched. See `editor/patch-md.ts` for why that matters here and
   // did not matter there: these files are markdown an agent wrote, and two
   // of them are how every session on a product stays in agreement.
-  const baseMd = useRef(pmDocToMd(mdToPmDoc(text)));
+  // Worked out once: the app redraws this several times a second while an agent works.
+  const [firstMd] = useState(() => pmDocToMd(mdToPmDoc(text)));
+  const baseMd = useRef(firstMd);
   const lastMtime = useRef(mtime);
   const dirty = useRef(!!versions?.draft);
   // Unlike `dirty`, stays set once a person changed the file, so a later flush still hands their words over.
@@ -103,7 +105,9 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   const saveTimer = useRef<number | null>(null);
   const asVersions = useRef(versions);
   asVersions.current = versions;
-  useEffect(() => { lastMtime.current = mtime; }, [mtime]);
+  // Unsaved words keep the time of the file they were written over, so a
+  // newer file read in under them is a conflict at save, not overwritten.
+  useEffect(() => { if (!dirty.current) lastMtime.current = mtime; }, [mtime]);
 
   // Until the room has answered, the file's own words show, so nothing blanks.
   const collab = live?.synced ? live : null;
@@ -118,10 +122,15 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
     live: collab ? liveExtensions(collab) : null,
   }), [folder, collab?.doc]);
 
+  // An editor reads its starting words only when it is made, which is when `extensions` changes.
+  const content = useMemo(() => (collab ? null : mdToPmDoc(versions?.draft ?? text)), [extensions]);
+  const editable = !readOnly && !(live && !collab);
   const editor = useEditor({
     extensions,
-    ...(collab ? {} : { content: mdToPmDoc(versions?.draft ?? text) }),
-    editable: !readOnly && !(live && !collab),
+    ...(content ? { content } : {}),
+    editable,
+    // Tiptap calls every editor a text box; one nobody may type in is read as a document.
+    editorProps: { attributes: { role: editable ? 'textbox' : 'document' } },
     autofocus: versions?.focus && !readOnly ? 'end' : false,
     onTransaction: ({ transaction }) => {
       if (transaction.docChanged && isTypedHere(transaction)) touched.current = true;
@@ -229,14 +238,16 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
   useEffect(() => {
     if (!editor || editor.isDestroyed || text === onDisk.current) return;
     const room = liveNow.current;
-    if (room) {
+    // A sitting's words are merged with a new version, never replaced by it or left behind it.
+    if (room || asVersions.current) {
       // In a live file a new version is merged in once, by the keeper.
-      const was = onDisk.current;
+      const was = baseMd.current;
+      const next = pmDocToMd(mdToPmDoc(text));
       onDisk.current = text;
-      baseMd.current = pmDocToMd(mdToPmDoc(text));
-      if (!room.keeper) return;
+      baseMd.current = next;
+      if (room && !room.keeper) return;
       const now = pmDocToMd(editor.getJSON());
-      const merged = mergeText(was, now, text, { overlap: 'mine' }).text;
+      const merged = mergeText(was, now, next, { overlap: 'mine' }).text;
       // An edit, so the keeper saves the merged words.
       if (merged !== now) editor.commands.setContent(mdToPmDoc(merged), { emitUpdate: true });
       return;

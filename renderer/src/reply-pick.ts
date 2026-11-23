@@ -53,9 +53,34 @@ export function pickOnTheRow(item: { model?: string | null; effort?: string | nu
 export function replyOpensOn(
   item: { model?: string | null; effort?: string | null } | null | undefined,
   kept: ReplyPick | null,
+  onItsWay: ReplyPick | null = null,
 ): { pick: ReplyPick; touched: boolean } {
-  if (kept) return { pick: { model: kept.model, effort: kept.effort }, touched: true };
+  if (kept) return { pick: withEngine(kept), touched: true };
+  // The row carries a sent pick only once the undo hold is over and the next
+  // snapshot lands; until then the box shows what went, without writing it again.
+  if (onItsWay) return { pick: withEngine(onItsWay), touched: false };
   return { pick: pickOnTheRow(item), touched: false };
+}
+
+function withEngine(p: ReplyPick): ReplyPick {
+  return { model: p.model, effort: p.effort, ...(p.engine ? { engine: p.engine } : {}) };
+}
+
+/** The pick the newest reply still on its way to this row went with. */
+export function pickOnItsWay(sending: readonly { pick?: ReplyPick; refused?: string }[] | null | undefined): ReplyPick | null {
+  const going = (sending ?? []).filter((s) => !s.refused && s.pick);
+  return going.length ? going[going.length - 1].pick! : null;
+}
+
+/** The agent and model the folded reply box names. */
+export function modelShown(
+  item: { model?: string | null } | null | undefined,
+  runningEngine: string | null,
+  sending: readonly { pick?: ReplyPick; refused?: string }[] | null | undefined,
+): { engine: string | null; model: string | null } {
+  const going = pickOnItsWay(sending);
+  if (!going) return { engine: runningEngine, model: pickOnTheRow(item).model };
+  return { engine: going.engine ?? runningEngine, model: going.model };
 }
 
 /**
@@ -74,9 +99,30 @@ export function pickToSend(
   // say "clear it" there and nothing is lost by naming what she picked. Codex
   // has no alias for its default and "Codex's own" is a real row, so null is
   // her saying her config.toml decides.
-  const model = engine === 'codex' ? pick.model : (pick.model ?? DEFAULT_MODEL);
+  // A further harness is like Codex here: with nothing named, it decides.
+  const model = engine && engine !== 'claude' ? pick.model : (pick.model ?? DEFAULT_MODEL);
   const moves = engineCount > 1 && !!was && !!engine && engine !== was;
   return { model, effort: pick.effort, ...(moves ? { engine } : {}) };
+}
+
+/**
+ * The harness the thread runs on now, and the one the reply box is showing,
+ * which is the same until a pick moves it. `further` is the ids of the further
+ * harnesses on offer here; any other word reads as Claude Code.
+ */
+export function replyHarness(
+  running: string | null | undefined,
+  chosen: string | null | undefined,
+  further: readonly string[] = [],
+): { now: string; shown: string } {
+  const here = (id: string | null | undefined): id is string => id === 'codex' || (!!id && further.includes(id));
+  const now = here(running) ? running : 'claude';
+  return { now, shown: chosen === 'claude' || here(chosen) ? chosen : now };
+}
+
+/** Claude Code's and Codex's permission words and commands mean nothing to a further harness, so its reply box offers none. */
+export function takesModesAndCommands(running: string | null | undefined, further: readonly string[] = []): boolean {
+  return !running || !further.includes(running);
 }
 
 /**

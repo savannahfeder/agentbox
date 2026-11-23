@@ -47,9 +47,13 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   teamSignOut: 'zero:team-sign-out',
   teamSignInEmail: 'zero:team-sign-in-email',
   teamSignUp: 'zero:team-sign-up',
+  teamConfirmation: 'zero:team-confirmation',
+  teamResendConfirmation: 'zero:team-resend-confirmation',
   teamCreate: 'zero:team-create',
   teamInvite: 'zero:team-invite',
   teamRename: 'zero:team-rename',
+  teamUpdateMe: 'zero:team-update-me',
+  teamSetLogo: 'zero:team-logo',
   teamRemoveMember: 'zero:team-remove-member',
   teamLeave: 'zero:team-leave',
   teamCancelInvite: 'zero:team-cancel-invite',
@@ -103,6 +107,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   teamMessageMate: 'zero:team-message-mate',
   teamGiveTask: 'zero:team-give-task',
   teamHandOn: 'zero:team-hand-on',
+  teamAsk: 'zero:team-ask',
+  teamHandBack: 'zero:team-hand-back',
   teamTaskBrief: 'zero:team-task-brief',
   rooms: 'zero:rooms',
   // Teammates: make, describe, start, edit, write to, and what they remember.
@@ -177,6 +183,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   gitHubCloudSignIn: 'zero:github-cloud-sign-in',
   // The answer to a sign-in link an agent is waiting on (shared/sign-in-ask.mjs).
   signInAnswer: 'zero:sign-in-answer',
+  signInKeep: 'zero:sign-in-keep',
   // A file or a one-time code a cloud run asked for (shared/cloud-needs.mts).
   cloudSendFile: 'zero:cloud-send-file',
   cloudSendCode: 'zero:cloud-send-code',
@@ -190,6 +197,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   cloudAccountSignOut: 'zero:cloud-account-sign-out',
   cloudAccountPlan: 'zero:cloud-account-plan',
   cloudAccountPay: 'zero:cloud-account-pay',
+  cloudAccountFromTeam: 'zero:cloud-account-from-team',
   cloudAccountBilling: 'zero:cloud-account-billing',
   cloudAccountTeamBilling: 'zero:cloud-account-team-billing',
   projectRename: 'zero:project-rename',
@@ -207,10 +215,16 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   blankCheck: 'zero:blank-check',
   // The appearance the desktop window's glass is drawn in; a tab has no glass.
   glassTone: 'zero:glass-tone',
+  windowButtons: 'zero:window-buttons',
   track: 'zero:track',
+  // How long the window's own thread held (renderer/src/window-holds.ts).
+  windowHeld: 'zero:window-held',
+  // And how held it was over the last minute (renderer/src/window-lag.ts). Main takes it from the desktop window only.
+  windowLag: 'zero:window-lag',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
   openArtifact: 'zero:open-artifact',
+  openWith: 'zero:open-with',
   folderPictures: 'zero:folder-pictures',
   readDoc: 'zero:read-doc',
   fileLink: 'zero:file-link',
@@ -234,6 +248,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   saveRailNote: 'zero:save-rail-note',
   agentReply: 'zero:agent-reply',
   agentReveal: 'zero:agent-reveal',
+  bringInSession: 'zero:bring-in-session',
   agentConversation: 'zero:agent-conversation',
   scheduleAgent: 'zero:schedule-agent',
   closeAgent: 'zero:close-agent',
@@ -244,6 +259,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   setProductOrder: 'zero:set-product-order',
   setThreadPlaces: 'zero:set-thread-places',
   setThreadPins: 'zero:set-thread-pins',
+  seenHere: 'zero:seen-here',
   setThreadOnMac: 'zero:set-thread-on-mac',
   moveToCloud: 'zero:move-to-cloud',
   setProductHidden: 'zero:set-product-hidden',
@@ -260,6 +276,7 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
   onFind: 'zero:find',
   onZoomPercent: 'zero:zoom-percent',
   onRecovered: 'zero:recovered',
+  onSeenOnPhone: 'zero:seen-on-phone',
   onJoinRoom: 'zero:join-room',
   onThreadLink: 'zero:thread-link',
   onSharedFile: 'zero:shared-file',
@@ -277,6 +294,7 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
 export const WRAPPED_ARGS: Readonly<Record<string, string[]>> = {
   notify: ['arrivals', 'needsYou'],
   track: ['name', 'count'],
+  windowHeld: ['ms'],
   instructionWrite: ['id', 'text'],
   instructionVersion: ['id', 'at'],
 };

@@ -47,7 +47,8 @@ function shim(sockPath, args, { env = {} } = {}) {
   const out = { stdout: '', stderr: '' };
   child.stdout.on('data', (d) => { out.stdout += d; });
   child.stderr.on('data', (d) => { out.stderr += d; });
-  out.exited = new Promise((r) => child.on('exit', (code) => r(code)));
+  // 'close', not 'exit': 'exit' can come before the last of its output is read.
+  out.exited = new Promise((r) => child.on('close', (code) => r(code)));
   return { child, out };
 }
 const until = async (fact, ms = 10_000) => { const end = Date.now() + ms; while (!fact()) { if (Date.now() > end) throw new Error('never happened'); await new Promise((r) => setTimeout(r, 20)); } };

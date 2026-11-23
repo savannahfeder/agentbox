@@ -1,0 +1,136 @@
+# One iPhone simulator on one of GitHub's free Macs, held for one synthetic
+# tester (the product-loop skill's iphones.mjs starts it). The app
+# is the phone app's preview build: made-up threads, nothing signed in, so
+# nothing private reaches this public run. It is built here once per version
+# of mobile/, renderer/ and shared/ and kept in the cache.
+#
+# The tester's commands reach iphone-host.mjs through a Cloudflare quick
+# tunnel, whose address the run gives as the name of an artifact. The host
+# answers only the key whose sha256 is `ticket`; the key stays on the
+# tester's computer.
+name: iPhone for testers
+run-name: iPhone for tester ${{ inputs.ticket }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      ticket:
+        description: sha256 of the key the tester's computer holds
+        required: true
+      hours:
+        description: How long to hold the iPhone, at most
+        default: '5'
+      build_url:
+        description: Or a simulator build (.tar.gz) to use instead of building one
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  iphone:
+    runs-on: macos-15
+    timeout-minutes: 355
+    steps:
+      - name: Check what was asked
+        env:
+          TICKET: ${{ inputs.ticket }}
+          HOURS: ${{ inputs.hours }}
+        run: |
+          [[ "$TICKET" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::the ticket is not a sha256"; exit 1; }
+          [[ "$HOURS" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "::error::hours is not a number"; exit 1; }
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Which build
+        id: app
+        run: echo "key=iphone-preview-$(git rev-parse HEAD:mobile HEAD:renderer HEAD:shared | shasum | cut -c1-16)-xcode$(xcodebuild -version | head -1 | tr -cd '0-9.')" >> "$GITHUB_OUTPUT"
+      - name: The build, if made before
+        id: cached
+        if: inputs.build_url == ''
+        uses: actions/cache/restore@v6
+        with:
+          path: built
+          key: ${{ steps.app.outputs.key }}
+      - name: Build the preview app
+        if: inputs.build_url == '' && steps.cached.outputs.cache-hit != 'true'
+        timeout-minutes: 90
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_PREVIEW: '1'
+          CI: '1'
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo prebuild --platform ios --clean
+          ws=$(ls -d ios/*.xcworkspace | head -1)
+          xcodebuild -workspace "$ws" -scheme "$(basename "$ws" .xcworkspace)" -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO -quiet
+          mkdir -p ../built
+          cp -R "$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' | head -1)" ../built/
+      - name: Keep the build
+        if: inputs.build_url == '' && steps.cached.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: built
+          key: ${{ steps.app.outputs.key }}
+      - name: Fetch the given build
+        if: inputs.build_url != ''
+        env:
+          BUILD_URL: ${{ inputs.build_url }}
+        run: |
+          mkdir -p built
+          curl -fsSL --retry 4 --retry-all-errors --max-time 600 -o "$RUNNER_TEMP/app.tar.gz" "$BUILD_URL"
+          tar -xzf "$RUNNER_TEMP/app.tar.gz" -C built
+      - name: Start an iPhone
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k in sorted(d, reverse=True) if 'iOS' in k for x in d[k] if x['name'].startswith('iPhone 16')))")
+          echo "UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl ui "$udid" appearance dark
+          app=$(find built -maxdepth 2 -name '*.app' | head -1)
+          xcrun simctl install "$udid" "$app"
+          echo "BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" >> "$GITHUB_ENV"
+      - name: Install the iPhone's hands and the tunnel
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          brew install cameroncooke/axe/axe
+          curl -fsSL --retry 4 --retry-all-errors --max-time 300 -o "$RUNNER_TEMP/cloudflared.tgz" https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz
+          tar -xzf "$RUNNER_TEMP/cloudflared.tgz" -C "$RUNNER_TEMP"
+          axe describe-ui --udid "$UDID" > /dev/null
+      - name: Open the iPhone to its tester
+        id: open
+        env:
+          TICKET: ${{ inputs.ticket }}
+        run: |
+          nohup node scripts/iphone-host.mjs --udid "$UDID" --bundle "$BUNDLE" --ticket "$TICKET" --port 8790 --stop-file "$RUNNER_TEMP/stop" > "$RUNNER_TEMP/host.log" 2>&1 &
+          echo "HOST_PID=$!" >> "$GITHUB_ENV"
+          nohup "$RUNNER_TEMP/cloudflared" tunnel --no-autoupdate --protocol http2 --url http://127.0.0.1:8790 > "$RUNNER_TEMP/tunnel.log" 2>&1 &
+          url=""
+          for i in $(seq 1 60); do url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$RUNNER_TEMP/tunnel.log" | head -1); [ -n "$url" ] && break; sleep 2; done
+          [ -n "$url" ] || { echo "::error::the tunnel gave no address"; tail -20 "$RUNNER_TEMP/tunnel.log"; exit 1; }
+          code=""
+          for i in $(seq 1 40); do code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$url/hello" || true); [ "$code" = 401 ] && break; sleep 3; done
+          [ "$code" = 401 ] || { echo "::error::the tunnel does not reach the iPhone (last answer: $code)"; tail -20 "$RUNNER_TEMP/host.log"; exit 1; }
+          name=${url#https://}
+          echo "name=${name%.trycloudflare.com}" >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/at"
+          echo "$url" > "$RUNNER_TEMP/at/address"
+          echo "The iPhone is at $url"
+      - name: Name the address
+        uses: actions/upload-artifact@v7
+        with:
+          name: iphone-at-${{ steps.open.outputs.name }}
+          path: ${{ runner.temp }}/at/
+          retention-days: 1
+      - name: Hold the iPhone until its tester is done
+        env:
+          HOURS: ${{ inputs.hours }}
+        run: |
+          end=$(( $(date +%s) + $(python3 -c "import sys; print(int(float(sys.argv[1]) * 3600))" "$HOURS") ))
+          while [ ! -f "$RUNNER_TEMP/stop" ] && kill -0 "$HOST_PID" 2>/dev/null && [ "$(date +%s)" -lt "$end" ]; do sleep 15; done
+          if [ -f "$RUNNER_TEMP/stop" ]; then echo "Let go: $(cat "$RUNNER_TEMP/stop")"; elif ! kill -0 "$HOST_PID" 2>/dev/null; then echo "::warning::the iPhone's hands stopped"; else echo "The hours asked for are up."; fi
+          tail -n 40 "$RUNNER_TEMP/host.log"

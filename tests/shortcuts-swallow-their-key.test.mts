@@ -94,7 +94,7 @@ describe('single-key shortcuts', () => {
   it('the picker is still opened from two different branches', () => {
     const { start, end } = handlerBounds();
     const inHandler = app.slice(start, end);
-    expect([...inHandler.matchAll(/openSnooze\(/g)].length).toBe(3); // focus mode, batch, single
+    expect([...inHandler.matchAll(/openSnooze\(/g)].length).toBe(4); // focus mode, a teammate's thread asking you, batch, single
   });
 
   // `/` left the set when ⌘K became the one search (w-30e94db8cf).

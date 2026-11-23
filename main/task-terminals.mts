@@ -152,7 +152,7 @@ export function disposeTerminalProcess(pty: Pick<TerminalPty,'pid'|'kill'>,platf
   }
   const descendants: number[]=[];
   try{
-    const rows=execFileSync('/bin/ps',['-axo','pid=,ppid='],{encoding:'utf8',timeout:2000}).trim().split('\n').map(s=>s.trim().split(/\s+/).map(Number));
+    const rows=execFileSync('/bin/ps',['-axo','pid=,ppid='],{encoding:'utf8',timeout:2000,windowsHide:true}).trim().split('\n').map(s=>s.trim().split(/\s+/).map(Number));
     const parents=new Set([pty.pid]);
     for(let found=true;found;){found=false;for(const [pid,ppid] of rows)if(parents.has(ppid)&&!parents.has(pid)){parents.add(pid);descendants.push(pid);found=true;}}
   }catch{}

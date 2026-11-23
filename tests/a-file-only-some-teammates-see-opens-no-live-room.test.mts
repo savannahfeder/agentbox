@@ -34,4 +34,13 @@ describe('a teammate\'s project, known from its cards', () => {
     expect(liveForTheWholeTeam({ mine: null, cards: [{ project: 'Launch', people: ['p-ben'] }], named: 'Launch' })).toBe(false);
     expect(liveForTheWholeTeam({ mine: null, cards: [{ project: 'Hiring', people: null }], named: 'Launch' })).toBe(false);
   });
+
+  // Weekly audit, 2026-11-16: a room is named by the project's name, so a
+  // team-wide card of another project called Launch, or one thread marked
+  // Team inside it, opened the room for the chosen-people one.
+  it('opens none when any project of that name is shared with chosen people, whatever else shares the name', () => {
+    expect(liveForTheWholeTeam({ mine: null, cards: [{ project: 'Launch', people: ['p-ben'] }, { project: 'launch ', people: null }], named: 'Launch' })).toBe(false);
+    expect(liveForTheWholeTeam({ mine: null, cards: [{ project: 'Launch', people: null }, { project: 'Launch', people: ['p-ben'] }], named: 'Launch' })).toBe(false);
+    expect(liveForTheWholeTeam({ mine: null, cards: [{ project: 'Launch', people: null }, { project: 'Launch 2', people: ['p-ben'] }], named: 'Launch' })).toBe(true);
+  });
 });

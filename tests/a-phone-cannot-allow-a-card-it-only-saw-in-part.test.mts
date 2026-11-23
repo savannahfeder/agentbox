@@ -95,8 +95,8 @@ describe('the Mac asked to allow a phone card', () => {
     // The whole request, with a secret in it, digested the Mac's way.
     const lossy = ask({ command: `aws configure set aws_secret_access_key ${KEY}` });
     write(lossy);
-    listPending(root);
-    const real = cardShown(root, 'a-1'); // the digest of the real request, as the Mac keeps it
+    listPending(root, { on: 'phone' });
+    const real = cardShown(root, 'a-1', 'phone'); // the digest of the real request, as the Mac keeps it
     const card = phoneApproval(lossy, real, { home: HOME });
     // The phone cannot even form an answer without a digest, and the Mac would
     // refuse the real one it never carried.
@@ -109,8 +109,8 @@ describe('the Mac asked to allow a phone card', () => {
     // the Mac allows it.
     const plain = ask({ command: 'git status' });
     write(plain);
-    listPending(root);
-    const realPlain = cardShown(root, 'a-1');
+    listPending(root, { on: 'phone' });
+    const realPlain = cardShown(root, 'a-1', 'phone');
     const ok = phoneApproval(plain, realPlain, { home: HOME });
     expect(ok.card).toBe(realPlain);
     expect(approve(ok.card)).toBeNull();

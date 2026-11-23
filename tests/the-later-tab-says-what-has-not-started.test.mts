@@ -96,9 +96,13 @@ describe('the underline under a row title', () => {
   const css = read('renderer/src/threads/pages.css');
   const rule = (name) => css.match(new RegExp(`\\.${name} \\{[^}]*\\}`))?.[0] ?? '';
 
-  it('runs through all three marks that sit after the title', () => {
+  // It ran on through the marks until 2026-11-20, when a picture is never
+  // decorated, so the line broke at the people icon and went on under the
+  // count: "The underline is a little weird here because it breaks at the
+  // icon." It stops at the title now (a-rows-underline-stops-at-its-title).
+  it('stops at the title, before the marks after it', () => {
     for (const name of ['th-shared', 'th-shared-n', 'th-lock']) {
-      expect(rule(name)).toMatch(/display: inline;/);
+      expect(rule(name)).toMatch(/display: inline-block;/);
     }
   });
 

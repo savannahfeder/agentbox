@@ -5,6 +5,7 @@ import type { WorkItem } from '../types';
 import { cardPlace, rowPriorityId } from '../threads/page-rules';
 import { followWords } from '../team/following';
 import { firstRealLine } from '../format';
+import { messageOnRow } from '../list-rules';
 
 export const HOME_NEEDS_CAP = 80;
 
@@ -26,7 +27,7 @@ export function homeNeedsRows(entries: readonly NeedsEntry[], { item, nameOf }: 
     }
     if (e.kind === 'file') {
       const from = person(e.news.by);
-      return { ...row, letter: letterOf(from), title: `named you on ${e.news.file.replace(/#\d+$/, '')}: ${e.news.text}`, from, project: e.card.title ?? 'Shared thread', at: e.news.ts };
+      return { ...row, letter: letterOf(from), title: messageOnRow(`named you on ${e.news.file.replace(/#\d+$/, '')}: ${e.news.text}`), from, project: e.card.title ?? 'Shared thread', at: e.news.ts };
     }
     if (e.kind === 'follow') {
       const from = person(e.news.owner);
@@ -37,7 +38,7 @@ export function homeNeedsRows(entries: readonly NeedsEntry[], { item, nameOf }: 
       const from = first(m.byName) ?? person(m.by);
       // A two-person chat is named for the sender, who is already on the row.
       const project = m.roomName === m.byName ? '' : m.roomName;
-      return { ...row, letter: letterOf(from), title: firstRealLine(m.body) || 'sent a file', from, project, at: m.at, unread: m.unread !== false };
+      return { ...row, letter: letterOf(from), title: messageOnRow(firstRealLine(m.body)) || 'sent a file', from, project, at: m.at, unread: m.unread !== false };
     }
     return { ...row, letter: letterOf(first(e.lead.invite?.words)), title: e.lead.invite?.words ?? 'An invitation', from: null, project: '', at: null };
   });

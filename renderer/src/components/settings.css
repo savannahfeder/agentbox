@@ -15,20 +15,23 @@
    so its menu clears the traffic lights itself. */
 .settings-screen[data-pane]:not(.settings-embedded) .set-nav-top { padding-top: 34px; }
 
+/* The menu's rows, back row and search are the app sidebar's
+   (workspace-navigation.css), so opening Settings does not change the sidebar's look. */
 .settings-screen[data-pane] .set-nav-back {
-  display: flex; align-items: center; gap: 9px; width: 100%; height: 32px; margin: 0;
-  padding: 0 10px; justify-content: flex-start; font-size: 13px; color: var(--text-dim);
+  display: flex; align-items: center; gap: 11px; width: 100%; height: 36px; margin: 0;
+  padding: 0 10px; justify-content: flex-start; font-size: 13px; color: var(--text-faint);
 }
+.settings-screen[data-pane] .set-nav-back svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.settings-screen[data-pane] .set-nav-back:hover { color: var(--text); }
 .settings-screen[data-pane] .set-nav-back .set-nav-title { flex: 1; text-align: left; font-size: 13px; font-weight: 400; letter-spacing: 0; color: inherit; }
-.settings-screen[data-pane] .set-nav-esc { font: inherit; font-size: 11px; color: var(--text-faint); opacity: .8; }
+.settings-screen[data-pane] .set-nav-esc { font: inherit; font-size: 12px; letter-spacing: .02em; color: var(--text-faint); opacity: .7; }
 
 .set-search {
-  display: flex; align-items: center; gap: 8px; height: 32px; margin-top: 8px; padding: 0 10px;
-  border: 1px solid var(--line); border-radius: var(--radius); background: var(--wash);
+  position: relative; display: flex; align-items: center; gap: 11px; height: 32px; margin-top: 6px; padding: 0 10px;
+  border: 0; background: none;
   color: var(--text-faint); cursor: text; -webkit-app-region: no-drag;
 }
-.set-search:focus-within { border-color: var(--line-strong); }
-.set-search svg { width: 15px; height: 15px; flex: none; }
+.set-search svg { width: 18px; height: 18px; flex: none; }
 .set-search input {
   flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: none;
   font: inherit; font-size: 13px; color: var(--text); user-select: text; -webkit-user-select: text;
@@ -41,15 +44,15 @@
   letter-spacing: 0; text-transform: none; color: var(--text-faint);
 }
 .settings-screen[data-pane] .set-nav-item {
-  display: flex; width: 100%; height: 32px; padding: 0 10px; gap: 10px;
-  font-size: 13px; font-weight: 400; color: var(--text-dim);
+  display: flex; width: 100%; height: 36px; padding: 0 10px; gap: 11px;
+  font-size: 13px; font-weight: 400; color: var(--text-faint);
 }
-.settings-screen[data-pane] .set-nav-item + .set-nav-item { margin-top: 1px; }
+.settings-screen[data-pane] .set-nav-item + .set-nav-item { margin-top: 3px; }
 .settings-screen[data-pane] .set-nav-item:hover { background: var(--wash); color: var(--text); }
 .settings-screen[data-pane] .set-nav-item.on { background: var(--wash); color: var(--text); font-weight: 500; }
-.settings-screen[data-pane] .set-nav-ico { flex: 0 0 16px; width: 16px; height: 16px; color: var(--text-faint); }
-.settings-screen[data-pane] .set-nav-ico svg { width: 16px; height: 16px; }
-.settings-screen[data-pane] .set-nav-item.on .set-nav-ico { color: var(--text); }
+:root[data-theme="light"]:not([data-skin]) .settings-screen[data-pane] .set-nav-item.on { background: rgba(255, 255, 255, .75); box-shadow: inset 0 0 0 1px var(--line); }
+.settings-screen[data-pane] .set-nav-ico { flex: 0 0 18px; width: 18px; height: 18px; display: grid; place-items: center; color: inherit; }
+.settings-screen[data-pane] .set-nav-ico svg { width: 18px; height: 18px; }
 /* The project you are inside, under Projects. Indented a step so it reads as
    being inside the row above rather than as a page of its own. */
 .settings-screen[data-pane] .set-nav-sub { padding-left: 24px; }
@@ -141,6 +144,11 @@
 .acct-tile-trouble { margin-top: 16px; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
 .acct-tile-add { grid-column: 1 / -1; padding: 11px 16px; border-style: dashed; background: none; color: var(--text-faint); font: inherit; font-size: 13px; text-align: center; cursor: pointer; }
 .acct-tile-add:hover { color: var(--text); }
+/* Where an agent's cloud login would be: the tile's shape, dashed and unfilled, so the gap is seen. */
+.acct-tile-slot { display: flex; flex-direction: column; border-style: dashed; background: none; }
+.acct-slot-title { margin-top: 10px; font-size: 13.5px; font-weight: 500; color: var(--text); }
+.acct-slot-line { margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-dim); }
+.acct-slot-act { margin-top: auto; padding-top: 14px; }
 /* IN USE is said in the app's label voice, the small mono capitals the
    new-task card's TO and MODEL wear, in the accent. */
 .set-badge {
@@ -157,18 +165,17 @@
    another app: "our standard ui with the orange etc is quite beautiful, so idk
    why our settings keeps feeling like this". So a button here is the
    composer's chip (`.tc-chip`: 28 tall, a hairline, a faint wash, the tag
-   corner), a switch that is on is the Send orange, and the stepper is two chips
-   with the number between them. Every colour is a token. */
+   corner) and the stepper is two chips with the number between them. Every
+   colour is a token. */
 .settings-screen[data-pane] .set-ghost {
   display: inline-flex; align-items: center; height: 28px; padding: 0 11px;
   border: 1px solid var(--line); border-radius: var(--tag-radius); background: var(--wash);
   color: var(--text-dim); font-size: 13px; line-height: 1; white-space: nowrap;
-  transition: color 0.12s, border-color 0.12s;
 }
 .settings-screen[data-pane] .set-ghost:hover:not(:disabled) { background: var(--wash); color: var(--text); border-color: var(--line-strong); }
 
-/* THE SWITCH. Off is a hairline track with a faint knob; on is the accent,
-   filled, with a light knob. Smaller than before, 30 by 18. */
+/* THE SWITCH, 30 by 18. On is the text ink with a knob of the ground, as
+   every other switch in the app: the accent is only ever a small dot. */
 .settings-screen[data-pane] .set-sw {
   width: 30px; height: 18px; border-radius: 9px;
   background: var(--wash-strong); border: 1px solid var(--line-strong);
@@ -176,8 +183,8 @@
 .settings-screen[data-pane] .set-sw::after {
   top: 2px; left: 2px; width: 12px; height: 12px; background: var(--text-dim); box-shadow: none;
 }
-.settings-screen[data-pane] .set-sw.on { background: var(--accent); border-color: var(--accent); }
-.settings-screen[data-pane] .set-sw.on::after { transform: translateX(12px); background: var(--on-accent, #fff); }
+.settings-screen[data-pane] .set-sw.on { background: var(--text); border-color: var(--text); }
+.settings-screen[data-pane] .set-sw.on::after { transform: translateX(12px); background: var(--bg); }
 .settings-screen[data-pane] .set-sw:focus-visible { outline: 1px solid var(--text); outline-offset: 2px; }
 
 /* THE STEPPER: two chips and the number between them, no box round the three. */
@@ -243,8 +250,9 @@
 /* The phone page's QR code: white behind it whatever the theme, because a
    phone camera reads dark on light, and big enough to scan off a laptop. */
 .set-phone-qr { display: flex; gap: 18px; align-items: center; }
-.set-phone-qr img { width: 168px; height: 168px; flex: none; background: #fff; border-radius: 10px; padding: 8px; }
+.set-phone-qr img { width: 136px; height: 136px; flex: none; background: #fff; border-radius: 10px; padding: 8px; }
 .set-phone-qr code { font-size: 11px; opacity: .7; word-break: break-all; }
+.set-phone-qr .set-phone-store { display: inline-flex; margin-top: 12px; text-decoration: none; }
 
 /* WHICH PROJECTS GO TO HER PHONE (Settings › Phone): the dropdown's own rows,
    a line of small print under the two choices and a tick beside each project. */

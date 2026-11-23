@@ -6,6 +6,7 @@ import { decisionRows } from './decisions';
 import { shippedWords, type ShippedRow } from './shipped';
 import { I } from './rooms/icons';
 import './rooms/rooms.css';
+import { closesOnPress } from '../press';
 
 /** A conversation's message filed into the team's list, where there is one. */
 export const DecideContext = createContext<{ label: string; mark: (message: { uid: string; text: string; by: string | null }) => void } | null>(null);
@@ -16,7 +17,7 @@ function List({ title, label, onClose, children }: { title: string; label: strin
     window.addEventListener('keydown', key, true);
     return () => window.removeEventListener('keydown', key, true);
   }, [onClose]);
-  return <div className="modal-backdrop" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+  return <div className="modal-backdrop" {...closesOnPress(onClose, { stop: true })}>
     <div className="modal rm-dlg tl-list" role="dialog" aria-label={label} onClick={(e) => e.stopPropagation()}>
       <div className="sec tl-head"><div className="t">{title}<button type="button" className="x" aria-label="Close" onClick={onClose}>{I.x()}</button></div></div>
       <div className="tl-body">{children}</div>

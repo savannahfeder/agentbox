@@ -38,7 +38,6 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const settings = read('renderer/src/components/Settings.tsx');
 const api = read('renderer/src/api.ts');
-const onboarding = read('renderer/src/onboarding.ts');
 
 /**
  * The status component, on its own, so a claim about it cannot be satisfied
@@ -158,12 +157,8 @@ describe('it is said in English', () => {
     }
   });
 
-  it('matches the voice of the only other screen that talks about this', () => {
-    // The walk's own words, so the two screens do not describe one fact in two
-    // vocabularies. Since 2026-10-01 the walk names Codex beside Claude Code,
-    // because either one runs the app, and this card says only what it knows:
-    // with Codex on the Mac, "your agents run on it" would be false here.
-    expect(onboarding).toContain('missing: `${Name} could not find Claude Code or Codex on this computer, and your agents run on one of them.`');
+  it('says only what it knows', () => {
+    // With Codex on the Mac, "your agents run on it" would be false here.
     expect(copy('missingSay')).toContain(`${Name} could not find Claude Code on this computer.`);
     expect(copy('missingSay')).not.toContain('your agents run on it');
     expect(copy('missingSay')).toContain('Install it, then check again.');
@@ -208,7 +203,7 @@ describe('where it lives', () => {
   it('is the first thing on Claude Code\'s own page, which the menu names', () => {
     expect(read('renderer/src/settings-search.ts')).toContain("{ id: 'claude', label: 'Claude Code', group: 'Agents' }");
     const page = settings.slice(settings.indexOf('const enginePage = (engine'), settings.indexOf('<div className="set-nav">'));
-    expect(page).toContain('(!agent.found || agent.trouble || agent.chosen)\n          && (engine === \'codex\' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)');
+    expect(page).toContain('(!agent.found || (agent.trouble && !limitIsHereOnly) || agent.chosen)\n          && (engine === \'codex\' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)');
     expect(page.indexOf('<ClaudeCode')).toBeLessThan(page.indexOf('name="Signed in"'));
     // And the card still reads main's answer rather than deriving a second one.
     expect(settings).toContain('found: !!w.claudeFound');

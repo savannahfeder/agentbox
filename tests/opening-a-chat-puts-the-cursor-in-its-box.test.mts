@@ -16,7 +16,8 @@ const place = read('renderer/src/team/everything/PlacePage.tsx');
 describe('a chat that is the page', () => {
   it('focuses its reply box when it opens, and when its thread opens', () => {
     expect(chat).toMatch(/useEffect\(\(\) => \{ if \(takesTyping\) requestAnimationFrame\(\(\) => ref\.current\?\.focus\(\)\); \}, \[\]\);/);
-    expect(chat).toMatch(/takesTyping=\{full \|\| !!thread\}/);
+    // Except one opened from Needs you, which waits folded for R (a-chat-opened-from-needs-you-answers-keys-like-a-thread).
+    expect(chat).toMatch(/takesTyping=\{folded \? !!thread : full \|\| !!thread\}/);
   });
   it('a person’s first message box too', () => {
     expect(place).toMatch(/<textarea className="rm-compose-input" autoFocus /);

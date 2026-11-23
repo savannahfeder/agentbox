@@ -9,6 +9,9 @@
 // The approved design is a bar under the picture: "3 comments not sent to your
 // agent, 1 on another picture" with Send all and ⌘↵, and a dot beside each
 // comment that says Not sent.
+//
+// The bar later covered the foot of the picture, so a picture's Send all moved
+// beside Approve (send-all-sits-beside-approve-on-a-picture). A film keeps it.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { notesToSendTheAgentAnywhere, unsentWords } from '../renderer/src/artifact-pins.ts';
@@ -60,7 +63,7 @@ describe('the picture view', () => {
     expect(view).not.toMatch(/className="av-unsent"/);
   });
   it('Send all hands over every waiting comment, and ⌘↵ does the same', () => {
-    expect(view).toMatch(/toAgent\(unsent\.ids\)/);
+    expect(view).toMatch(/handOver\(unsent\.ids\)/);
     expect(view).toMatch(/Send all/);
     expect(view).toMatch(/e\.key === 'Enter' && \(e\.metaKey \|\| e\.ctrlKey\)/);
   });

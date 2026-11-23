@@ -9,6 +9,7 @@
 import type { FoundInThreads, FoundWhere, ThreadCard, WorkItem } from './types';
 import { fold, firstHit, holds, queryOf, windowAround } from '../../shared/word-match.mts';
 import { parseQuery, splitHits, type Run } from './search';
+import { openedBand } from '../../shared/opened-lately.mts';
 
 /** A found line as runs, the typed words marked, drawn the way the thread list draws its own. */
 export function markedWords(text: string, query: string): Run[] {
@@ -40,6 +41,10 @@ export interface InsideRow {
 
 export interface InsideGroup { key: InsideGroupKey; label: string; rows: InsideRow[]; more: number }
 
+/** The groups, and the threads opened lately the words are inside, by id, with the line (../search Lately.inside). */
+export interface InsideFound { groups: InsideGroup[]; threads: ReadonlyMap<string, string> }
+export const NOTHING_INSIDE: InsideFound = { groups: [], threads: new Map() };
+
 type RoomLine = { id: string; roomId: string; by: string | null; body: string; at: number; deleted?: boolean };
 type DecisionLike = { roomId: string; messageId: string; kind: 'decision' | 'priority'; body: string; saidBy: string | null; at: number; on: boolean };
 
@@ -70,6 +75,8 @@ export interface InsideInput {
   titleOf: (item: WorkItem) => string;
   /** How many of each group to keep. */
   limit: Record<InsideGroupKey, number>;
+  /** When each thread was last opened, by id: what is in one opened lately comes first (../../shared/opened-lately). */
+  opened?: { at: Readonly<Record<string, number>>; now: number };
 }
 
 export function insideGroups(input: InsideInput): InsideGroup[] {
@@ -77,7 +84,8 @@ export function insideGroups(input: InsideInput): InsideGroup[] {
   if (!q.terms.length) return [];
   const byItem = new Map(input.items.map((i) => [`${i.product}/${i.id}`, i]));
   const byCard = new Map(input.cards.map((c) => [`${c.personId}/${c.threadId}`, c]));
-  const who = (by: string | null, source: string) => (by ? (by === input.me ? 'You' : input.nameOf(by)) : source === 'agent' ? 'Agent' : 'You');
+  // A team copy stamps `by` (whose Mac wrote it) on the agent's lines too, so who spoke comes first.
+  const who = (by: string | null, source: string) => (source === 'agent' ? 'Agent' : by ? (by === input.me ? 'You' : input.nameOf(by)) : 'You');
 
   // Where a found thing sits, or null when this screen cannot open it.
   const placeOf = (w: FoundWhere): { where: string; at: (extra: { line?: string; file?: string; note?: { file: string; id: string } }) => InsideOpen } | null => {
@@ -115,7 +123,7 @@ export function insideGroups(input: InsideInput): InsideGroup[] {
     files.push({
       id: `file-${f.kind}-${f.product ?? f.ownerId}-${f.id ?? f.threadId}-${f.src}`, group: 'files',
       text: f.how === 'name' ? f.name : f.text, ...(f.how === 'contents' ? { file: f.name } : {}),
-      who: f.by ? who(f.by, 'founder') : '', at: f.at, where: place.where, open: place.at({ file: f.src }),
+      who: f.agent !== undefined ? 'Agent' : f.by ? who(f.by, 'founder') : '', at: f.at, where: place.where, open: place.at({ file: f.src }),
     });
   }
 
@@ -144,7 +152,8 @@ export function insideGroups(input: InsideInput): InsideGroup[] {
     }
   }
 
-  const newest = (a: InsideRow, b: InsideRow) => b.at - a.at;
+  const lift = (r: InsideRow) => (input.opened && r.open.type === 'thread' ? openedBand(input.opened.at[r.open.item.id], input.opened.now) : 0);
+  const newest = (a: InsideRow, b: InsideRow) => lift(b) - lift(a) || b.at - a.at;
   const made = (key: InsideGroupKey, rows: InsideRow[]): InsideGroup[] => {
     const sorted = key === 'files' ? rows : [...rows].sort(newest);
     const kept = sorted.slice(0, input.limit[key]);

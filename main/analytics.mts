@@ -146,7 +146,7 @@ export function createAnalytics({ config, version, dir, client, env = process.en
     username: (() => { try { return os.userInfo().username; } catch { return null; } })(),
   };
 
-  // Which first run this install was shown, for the test of the two (shared/onboarding-arm.mts). Set here, never by a caller.
+  // Which first run this install was shown (shared/onboarding-arm.mts). Set here, never by a caller.
   let armWord = dir ? readArm(dir) : null;
   const arm = () => armWord;
   let posthog: AnalyticsClient | null = client ?? null;
@@ -179,9 +179,9 @@ export function createAnalytics({ config, version, dir, client, env = process.en
   };
 
   return {
-    /** Draws this install's first run the first time one starts, and every count after carries it. */
-    onboardingArm({ random }: { random?: () => number } = {}) {
-      armWord = armFor(dir as string, { env, ...(random ? { random } : {}) }) as string;
+    /** Writes down the first run this install got when one starts, and every count after carries it. */
+    onboardingArm() {
+      armWord = armFor(dir as string, { env });
       return armWord;
     },
     get enabled() { return on(); },

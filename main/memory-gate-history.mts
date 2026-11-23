@@ -30,8 +30,10 @@
 // program: builtins start nothing, and time/nice/env/timeout/nohup only run the
 // command after them.
 
+// `kill` is one too, and the one that must never wait: it is how a thread
+// gives memory back when asked (main/memory-give-back.mts).
 const BUILTINS = new Set(['cd', 'export', 'echo', 'printf', 'true', 'false', 'test', '[', '[[', ']]', 'set', 'unset',
-  'pwd', 'read', 'exit', 'return', 'shift', 'wait', ':', 'alias', 'type', 'local', 'declare', 'pushd', 'popd', 'umask']);
+  'pwd', 'read', 'exit', 'return', 'shift', 'wait', ':', 'alias', 'type', 'local', 'declare', 'pushd', 'popd', 'umask', 'kill']);
 const WRAPPERS = new Set(['time', 'nice', 'env', 'timeout', 'nohup', 'caffeinate', 'exec', 'command']);
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const REDIRECT = /^\d*(>>?|<<?<?|&>>?|>&|<&)/;

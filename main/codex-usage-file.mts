@@ -57,6 +57,12 @@ const TAIL_BYTES = 8 * 1024 * 1024;
 const FILES = 3;
 
 /**
+ * How far back to look past refused runs. A Codex at its limit leaves a small
+ *  log whose only reports are all-null, which must not use up FILES. */
+const LOOK_BACK = 60;
+const SMALL_LOG = 1024 * 1024;
+
+/**
  * Don't answer out of a log nobody has written to in a fortnight. A stale
  *  percentage is worse than no percentage, and the panel says how old its reading
  *  is rather than hiding it, so this only has to catch the absurd cases. */
@@ -77,7 +83,7 @@ const usable = (window: unknown): boolean => plain(window)
  * walk is three levels of directory and never a full recursive scan of a folder
  * holding a thousand files. Only the newest day or two is ever opened.
  */
-function newestLogs(home: string, limit = FILES): LogFile[] {
+function newestLogs(home: string, limit = LOOK_BACK): LogFile[] {
   const root = path.join(home, 'sessions');
   const found: LogFile[] = [];
   const descend = (dir: string, depth: number): void => {
@@ -118,7 +124,8 @@ function tail(file: string, bytes = TAIL_BYTES): { text: string; whole: boolean 
 }
 
 /**
- * THE LAST RATE LIMITS THIS LOG RECORDS, or null.
+ * THE LAST RATE LIMITS THIS LOG RECORDS, 'empty' when it is a refused run's
+ * (a small log whose only reports are all-null), or null.
  *
  * Lines are walked backwards because the last report is the one that is true. A
  * report carrying no usable window is skipped rather than accepted: Codex emits
@@ -126,9 +133,10 @@ function tail(file: string, bytes = TAIL_BYTES): { text: string; whole: boolean 
  * `premium` family, every field null), and taking one of those would blank a
  * panel that had a real figure a moment earlier.
  */
-function lastLimitsIn(file: string): { snapshot: CodexSnapshot; at: number | null } | null {
+function lastLimitsIn(file: string): { snapshot: CodexSnapshot; at: number | null } | 'empty' | null {
   const read = tail(file);
   if (!read) return null;
+  let saidNothing = false;
   const lines = read.text.split('\n');
   // The first line is a fragment unless the whole file was read, and a fragment
   // is not JSON.
@@ -140,14 +148,14 @@ function lastLimitsIn(file: string): { snapshot: CodexSnapshot; at: number | nul
     try { event = JSON.parse(line); } catch { continue; }
     const limits = find(event);
     if (!limits) continue;
-    if (!usable(limits.primary) && !usable(limits.secondary)) continue;
+    if (!usable(limits.primary) && !usable(limits.secondary)) { saidNothing = true; continue; }
     const at = Date.parse(event?.timestamp ?? '');
     return {
       snapshot: { primary: limits.primary ?? null, secondary: limits.secondary ?? null },
       at: Number.isFinite(at) ? at : null,
     };
   }
-  return null;
+  return saidNothing && read.whole && read.text.length <= SMALL_LOG ? 'empty' : null;
 }
 
 /**
@@ -184,17 +192,30 @@ export function loggedCodexLimits(home: string | null, { now = Date.now() }: { n
   if (seen && seen.file === logs[0].file && seen.at === logs[0].at) return seen.reading;
 
   let reading: LoggedLimits | null = null;
+  let ordinary = 0;
   for (const log of logs) {
+    if (now - log.at > TOO_OLD_MS) break;
     const read = lastLimitsIn(log.file);
-    if (read) {
+    if (read && read !== 'empty') {
       // The event's own timestamp when it has one, and the file's otherwise.
       reading = { snapshot: read.snapshot, at: read.at ?? log.at };
       break;
     }
+    if (read === null && (ordinary += 1) >= FILES) break;
   }
 
   remembered.set(home, { file: logs[0].file, at: logs[0].at, reading });
   return reading;
+}
+
+/**
+ * When the newest run under this home was refused at its limit, or null. A
+ *  refused run's figures are all null, so the reading alone cannot tell a spent
+ *  login from one that has not run yet. */
+export function refusedAt(home: string | null): number | null {
+  if (!home) return null;
+  const [newest] = newestLogs(home, 1);
+  return newest && lastLimitsIn(newest.file) === 'empty' ? newest.at : null;
 }
 
 /** Drop what was remembered. For tests, and for a home that has changed under us. */

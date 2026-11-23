@@ -62,15 +62,14 @@ it('builds again only the file a new line names', async () => {
   expect(built() - before).toBe(1);
 });
 
-it('looks again once the kept list is old, and finds a file that has arrived since', async () => {
+// Since 2026-11-16 a file that arrives without a word is found before the kept list is old
+// (tests/a-next-version-whose-bytes-land-after-its-line-joins-the-files-versions.test.mts).
+it('finds a file that has arrived since, without waiting for the kept list to grow old', async () => {
   const start = Date.now();
   const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
   expect(names(await lineOf(ids[0]))).toEqual(['hero.png']);
   fs.writeFileSync(path.join(dir, 'report.md'), '# Report\n');
   disk.updateWorkItem(dir, ids[1], { note: 'Tests pass.' });
   clock.mockReturnValue(start + CHAIN_KEEP_MS - 1);
-  expect(names(await lineOf(ids[0]))).toEqual(['hero.png']);
-  disk.updateWorkItem(dir, ids[2], { note: 'Tests pass.' });
-  clock.mockReturnValue(start + CHAIN_KEEP_MS + 1);
   expect(names(await lineOf(ids[0])).sort()).toEqual(['hero.png', 'report.md']);
 });

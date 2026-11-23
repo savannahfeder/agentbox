@@ -20,8 +20,8 @@ import { EndingLink } from '../editor/ending-link';
 import { Placeholder } from '@tiptap/extension-placeholder';
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { lift, toggleMark, wrapIn } from '@tiptap/pm/commands';
-import { liftListItem, wrapInList } from '@tiptap/pm/schema-list';
+import { lift, newlineInCode, splitBlock, toggleMark, wrapIn } from '@tiptap/pm/commands';
+import { liftListItem, splitListItem, wrapInList } from '@tiptap/pm/schema-list';
 import type { Node as PmNode, Schema } from '@tiptap/pm/model';
 import { mdToPmDoc, pmDocToMd } from '../editor/markdown';
 import { STARTER_KIT_EXTRAS_OFF } from '../editor/extensions';
@@ -40,6 +40,8 @@ const lineJoin = (blocks: Json[]): Json[] => {
   const out: Json[] = [];
   let run: Json[] | null = null;
   for (const block of blocks) {
+    // A quote's lines are lines too, or its second line goes out a paragraph down.
+    if (block.type === 'blockquote') { run = null; out.push({ ...block, content: lineJoin(block.content ?? []) }); continue; }
     if (block.type !== 'paragraph') { run = null; out.push(block); continue; }
     if (run) run.push({ type: 'hardBreak' }, ...(block.content ?? []));
     else { run = [...(block.content ?? [])]; out.push({ type: 'paragraph', content: run }); }
@@ -126,6 +128,24 @@ export const CHAT_KEYS: Record<string, Exclude<Format, 'link'>> = {
   'Mod-Shift-9': 'quote',
 };
 
+/**
+ * SHIFT+RETURN, SLACK'S WAY. Return sends, so this is the only new line, and
+ * each line is a block of its own so a list button lists only the line it is
+ * on. In a list or a quote it starts the next point or line, and on an empty
+ * one it leaves the list or quote; in code it is a new line of code. The lines
+ * still go out one newline apart (`lineJoin`).
+ */
+export function shiftReturn(schema: Schema): Command {
+  const { nodes } = schema;
+  return (state, dispatch) => {
+    const { $from } = state.selection;
+    if ($from.parent.type === nodes.codeBlock) return newlineInCode(state, dispatch);
+    if (inside(state, nodes.listItem.name)) return splitListItem(nodes.listItem)(state, dispatch) || liftListItem(nodes.listItem)(state, dispatch);
+    if (inside(state, nodes.blockquote.name) && $from.parent.content.size === 0) return lift(state, dispatch);
+    return splitBlock(state, dispatch);
+  };
+}
+
 const ChatKeys = Extension.create({
   name: 'chatKeys',
   priority: 1000,
@@ -134,6 +154,7 @@ const ChatKeys = Extension.create({
     for (const [key, what] of Object.entries(CHAT_KEYS)) {
       keys[key] = () => formatCommand(what, this.editor.schema)(this.editor.state, this.editor.view.dispatch);
     }
+    keys['Shift-Enter'] = () => shiftReturn(this.editor.schema)(this.editor.state, this.editor.view.dispatch);
     return keys;
   },
 });

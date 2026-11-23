@@ -54,6 +54,9 @@ export interface RouteOffer { role: string; why: string; gains?: string[]; answe
 export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: RouteOffer }
 export interface SaidAt { said: string; at: number }
 export interface TeammateFrom { teammate: string; name: string }
+/** A thread owner asking one teammate for something on it (shared/thread-asks.mts). */
+export interface AskPatch { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string }
+export type Verdict = 'done' | 'yes' | 'changes';
 export type MessageEditPatch = { on: string; gone: true; text?: undefined } | { on: string; text: string; gone?: undefined };
 /** `place`: where in the file it points, as an in-app note does (shared/artifact-marks.mts). */
 export interface LinkComment { name: string; file: string; text: string; place?: NotePlace }
@@ -105,11 +108,17 @@ export type WorkItemPatch = {
   waitEnded?: SaidAt;
   handedOver?: SaidAt;
   linkComment?: LinkComment;
+  linkReply?: { file: string; text: string };
+  saidOutside?: string;
+  chatAt?: number;
   comment?: { text: string; name?: string };
   artifact?: ArtifactMarkPatch;
   putAway?: boolean;
   signIn?: SignInAsk;
   signInAnswer?: SignInAnswer;
+  ask?: AskPatch;
+  verdict?: Verdict;
+  approvedFiles?: string[];
 };
 export type WorkItemField = keyof WorkItemPatch;
 export type PatchInput = { readonly [K in WorkItemField]?: unknown };
@@ -117,7 +126,7 @@ type PatchValue = NonNullable<WorkItemPatch[WorkItemField]>;
 type PatchEntry = { [K in WorkItemField]-?: [K, NonNullable<WorkItemPatch[K]>] }[WorkItemField];
 
 // Marks on one line, not values the row holds, so the fold never keeps them as fields.
-type LineMark = 'react' | 'inReplyTo' | 'edit' | 'from' | 'voice' | 'forAgent' | 'fromNotes' | 'typed' | 'comment' | 'artifact' | 'putAway';
+type LineMark = 'react' | 'inReplyTo' | 'edit' | 'from' | 'voice' | 'forAgent' | 'fromNotes' | 'typed' | 'comment' | 'artifact' | 'putAway' | 'linkReply';
 
 export interface FieldWrite {
   ts: number;
@@ -129,7 +138,8 @@ export interface FieldWrite {
   forAgent?: AgentVoice;
 }
 
-export interface TalkLine { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice }
+/** `cut`: the words ran past what the record keeps, so `text` is their start. */
+export interface TalkLine { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice; cut?: true }
 export interface TalkThread { by: string; text: string; voice?: AgentVoice; replies: TalkLine[] }
 export interface Talk {
   chat: TalkLine[];
@@ -173,6 +183,7 @@ interface Said {
   crossed?: number;
   voice?: AgentVoice;
   forAgent?: AgentVoice;
+  cut?: true;
 }
 interface Close { by: string; ts: number; done: boolean; spoke: boolean }
 type ArtifactLine = ArtifactMarkPatch & { by: string | null; ts: number; uid: string | null };
@@ -389,6 +400,16 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // SOMEONE'S COMMENT ON THE THREAD'S FILE THROUGH ITS PUBLIC LINK:
   // `{ name, file, text }`, beside the note that says it (main/team/link-comments.mts).
   'linkComment',
+  // THE OWNER'S ANSWER TO THOSE, POSTED ON THE LINK PAGE: `{ file, text }`. It
+  // answers the comments before it and starts no agent.
+  'linkReply',
+  // WHAT YOU TYPED TO A CHAT BROUGHT IN, WHERE IT STARTED (main/chat-follow.mts),
+  // written by the app as yours. Like `linkReply` it starts no agent: the agent
+  // it was typed to already has it.
+  'saidOutside',
+  // HOW FAR THAT CHAT HAS BEEN READ, in its own times: the row's last write is
+  // no measure, since the write-up of one answer lands after the next message.
+  'chatAt',
   // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
   // writes from the cloud's own comment (main/team/thread-share.mts). A delta
   // like `react`, read back as `waitingComments` until the owner deals with
@@ -404,6 +425,11 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // A SIGN-IN LINK A RUNNING AGENT IS WAITING ON, AND THE ANSWER TO IT
   // (shared/sign-in-ask.mjs). Latest wins on both, whoever wrote it.
   'signIn', 'signInAnswer',
+  // A TASK THAT ASKS FOR HELP OR A REVIEW ON ONE THREAD, and what its holder
+  // said when they handed it back (shared/thread-asks.mts).
+  'ask', 'verdict',
+  // The files they approved while the ask was on them, by name, on the verdict's line.
+  'approvedFiles',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -667,7 +693,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     // rule about how the app writes, and it lives with the writer in
     // main/row-label.mts. This module holds no taxonomy, only storage.
     case 'label': return str(value, MAX_TITLE);
-    case 'body': case 'result': case 'note': case 'answer': case 'typed': return str(value, MAX_TEXT_BYTES);
+    case 'body': case 'result': case 'note': case 'answer': case 'typed': case 'saidOutside': return str(value, MAX_TEXT_BYTES);
     // kind and product are free strings on purpose: the taxonomy of work is the
     // caller's to invent and change without a migration here.
     //
@@ -729,7 +755,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     //
     // A ts rather than a flag, so her NEXT answer outdates it by carrying a
     // later one, with nothing to clear and nobody who has to remember to.
-    case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
+    case 'chatAt': case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
     // An empty list is a real value: it is how the last label, `ship` above
     // all, comes off.
     case 'labels': {
@@ -800,6 +826,21 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     case 'signIn': return cleanSignIn(value);
     case 'signInAnswer': return cleanSignInAnswer(value);
     case 'putAway': return typeof value === 'boolean' ? value : undefined;
+    case 'ask': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const kind = value.kind === 'help' || value.kind === 'review' ? value.kind : null;
+      const owner = shortId(value.owner);
+      const thread = shortId(value.thread);
+      const product = str(value.product, MAX_SHORT);
+      const step = str(value.step, MAX_SUMMARY);
+      const note = str(value.note, MAX_SUMMARY);
+      return kind && owner && thread && product ? { kind, owner, thread, product, ...(step ? { step } : {}), ...(note ? { note } : {}) } : undefined;
+    }
+    case 'verdict': return value === 'done' || value === 'yes' || value === 'changes' ? value : undefined;
+    case 'approvedFiles': {
+      if (!Array.isArray(value)) return undefined;
+      return [...new Set(value.map((v) => str(v, MAX_SHORT)).filter(Boolean) as string[])].slice(0, MAX_LABELS);
+    }
     case 'shippedAt': return Number.isFinite(value) && (value as number) >= 0 ? Math.trunc(value as number) : undefined;
     case 'linkComment': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -808,6 +849,12 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       const text = str(value.text, MAX_TEXT_BYTES);
       const place = cleanPlace(value.place as RawPlace | null | undefined);
       return name && file && text ? { name, file, text, ...(place ? { place } : {}) } : undefined;
+    }
+    case 'linkReply': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const file = str(value.file, MAX_SHORT);
+      const text = str(value.text, MAX_TEXT_BYTES);
+      return file && text ? { file, text } : undefined;
     }
     case 'waitEnded': case 'handedOver': {
       if (!value || typeof value !== 'object' || !Number.isFinite((value as Fields).at)) return undefined;
@@ -898,7 +945,9 @@ export function finishItem(raw: FoldingItem, now = Date.now()): WorkItem {
     const said = edits?.size ? item.said.flatMap((s) => {
       const e = s.uid ? edits.get(s.uid) : null;
       if (!e) return [s];
-      return e.gone ? [] : [{ ...s, text: e.text!.trim().slice(0, TALK_TEXT) }];
+      if (e.gone) return [];
+      const { text, cut } = talkText(e.text!);
+      return [{ ...s, text, cut }];
     }) : item.said;
     delete item.said;
     if (Array.isArray(item.people) && item.people.length) {
@@ -996,7 +1045,7 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
     if (line.by && words && words.trim() && !told) {
       const close = item.status === 'done' ? item.wrote.status : null;
       const crossed = close?.by && close.by !== line.by && line.ts < close.ts && !item.said?.some((s) => s.uid && s.uid === line.uid);
-      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
+      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, ...talkText(words), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
     }
     // Who closed the chat and when, so `whatWaits` can tell a reopen by your own
     // message (still settled) from an undo of the close (not).
@@ -1024,7 +1073,7 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
       }
       // WHICH MESSAGE A REPLY ANSWERS belongs to that reply's line alone. Held
       // as a value, the row would carry the newest reply's parent forever.
-      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'typed' || field === 'putAway') continue;
+      if (field === 'inReplyTo' || field === 'from' || field === 'voice' || field === 'forAgent' || field === 'fromNotes' || field === 'typed' || field === 'putAway' || field === 'linkReply') continue;
       if (field === 'comment') {
         if (line.by && teammateComment(line)) (item.waitingComments ??= []).push({ by: line.by, ts: line.ts, text: value.text });
         continue;
@@ -1095,7 +1144,7 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
     }
     if (!isNotNews(line)) item.updatedAt = Math.max(item.updatedAt, line.ts);
     if (item.waitingComments && dealsWithComments(line)) delete item.waitingComments;
-    if (item.linkComments && dealsWithComments(line)) delete item.linkComments;
+    if (item.linkComments && (dealsWithComments(line) || (line.source === 'founder' && line.patch?.linkReply))) delete item.linkComments;
     if (line.ts < item.createdAt) item.createdAt = line.ts;
   }
 
@@ -1112,7 +1161,11 @@ export function foldWorkItems(lines: unknown, now = Date.now()): Map<string, Wor
 // A reply taken back reads as this, and is nobody's news.
 const WITHDRAWN = '(withdrawn)';
 // How much of a message the record keeps: enough for a row's one line.
-const TALK_TEXT = 280;
+export const TALK_TEXT = 280;
+const talkText = (words: string): { text: string; cut?: true } => {
+  const all = words.trim();
+  return all.length > TALK_TEXT ? { text: all.slice(0, TALK_TEXT), cut: true } : { text: all };
+};
 // How many of the newest messages the record keeps, in the chat and in each
 // thread. The counts it answers stop at your own newest word, which in a chat
 // you are part of is never this far back.
@@ -1153,6 +1206,8 @@ export const WORK_THREAD = 'work-thread';
 function reopenIfWrittenPastTheClose(item: FoldingItem, said: Said[]): void {
   const close = item.status === 'done' ? item.wrote.status : null;
   if (!close?.by) return;
+  // An ask handed back (shared/thread-asks.mts) stays handed back: a thank-you after it is a message, not more work.
+  if (item.ask && item.verdict) return;
   const others = said.filter((s) => s.by !== close.by && !s.body);
   const crossed = others.filter((s) => s.crossed === close.ts);
   if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;
@@ -1169,7 +1224,7 @@ function talkOf(said: Said[]): Talk {
   for (const s of lines) {
     // A rename that sends the same opening words again is not a new message.
     if (s.body) { if (bodies.has(s.text)) continue; bodies.add(s.text); }
-    const said1 = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}) };
+    const said1: TalkLine = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}), ...(s.cut ? { cut: true } : {}) };
     const parent = s.inReplyTo ? parents.get(s.inReplyTo) : null;
     if (parent) {
       (threads[s.inReplyTo!] ??= { by: parent.by, text: parent.text, replies: [], ...(parent.voice ? { voice: parent.voice } : {}) }).replies.push(said1);

@@ -141,6 +141,32 @@ function readAll(target: string | null | undefined): AnswerTable {
   }
 }
 
+// Every thread read asks, so the table is parsed again only when the file is
+// another one or was written since. Change time is in the stamp because a
+// writer can put a file's modified time back and cannot put that back.
+const parsed = new Map<string, { stamp: string; table: AnswerTable }>();
+const stampOf = (target: string): string | null => {
+  try {
+    const st = fs.lstatSync(target, { bigint: true });
+    return st.isFile() ? `${st.dev}:${st.ino}:${st.size}:${st.mtimeNs}:${st.ctimeNs}` : null;
+  } catch {
+    return null;
+  }
+};
+
+/** For looking only: the same object answers every caller until the file changes. */
+function readShared(target: string | null | undefined): Readonly<AnswerTable> {
+  if (!target) return {};
+  const stamp = stampOf(target);
+  if (stamp === null) return {};
+  const had = parsed.get(target);
+  if (had?.stamp === stamp) return had.table;
+  const table = readAll(target);
+  // Kept only if nobody wrote between the look and the read.
+  if (stampOf(target) === stamp) parsed.set(target, { stamp, table });
+  return table;
+}
+
 // tmp + rename, so a reader never sees half a file and a crash mid-write leaves
 // the previous one intact.
 function writeAll(target: string | null | undefined, all: AnswerTable) {
@@ -197,7 +223,7 @@ function sweep(all: AnswerTable, now: number) {
 const ALLOWED_MODES = [...CLAUDE_PERMISSION_MODES, ...CODEX_MODE_ORDER];
 
 export function answerMode(slug: string, id: string, { home, now = Date.now() }: AnswerModeOptions = {}) {
-  const entry = readAll(fileFor(home))[keyOf(slug, id)];
+  const entry = readShared(fileFor(home))[keyOf(slug, id)];
   if (!entry || typeof entry !== 'object') return undefined;
   if (Number.isFinite(entry.at) && now - entry.at > KEEP_MS) return undefined;
   if (entry.mode === null) return null;
@@ -207,7 +233,7 @@ export function answerMode(slug: string, id: string, { home, now = Date.now() }:
 /** Every row that currently carries one, as `{ "<slug>/<id>": mode }`. */
 export function answerModes({ home, now = Date.now() }: AnswerModeOptions = {}) {
   const out: Record<string, string | null> = {};
-  for (const [key, entry] of Object.entries(readAll(fileFor(home)))) {
+  for (const [key, entry] of Object.entries(readShared(fileFor(home)))) {
     if (!entry || typeof entry !== 'object') continue;
     if (Number.isFinite(entry.at) && now - entry.at > KEEP_MS) continue;
     if (entry.mode === null) { out[key] = null; continue; }

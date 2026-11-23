@@ -27,11 +27,14 @@ interface EventLoopMonitor {
 }
 
 export function stallWatch(
-  { clock = () => performance.now(), loop = monitorEventLoopDelay({ resolution: 20 }) }:
+  // Each sample is a timer on the main thread; the limit it feeds is 500 ms.
+  { clock = () => performance.now(), loop = monitorEventLoopDelay({ resolution: 100 }) }:
     { clock?: () => number; loop?: EventLoopMonitor } = {},
 ) {
   loop.enable();
   let slow = new Map<string, SlowRequest>();
+  // Every request, slow or not: one made often at a few milliseconds holds nothing and still costs.
+  let asked = new Map<string, { times: number; ms: number }>();
   let freezes: Freeze[] = [];
   return {
     /** A freeze main/freeze-recorder.mts caught, with the function that held it. */
@@ -44,7 +47,12 @@ export function stallWatch(
         try {
           return fn(...args);
         } finally {
-          const ms = Math.round(clock() - start);
+          const took = clock() - start;
+          const all = asked.get(channel) ?? { times: 0, ms: 0 };
+          all.times += 1;
+          all.ms += took;
+          asked.set(channel, all);
+          const ms = Math.round(took);
           if (ms >= SLOW_MS) {
             const seen = slow.get(channel) ?? { channel, times: 0, maxMs: 0 };
             seen.times += 1;
@@ -61,10 +69,15 @@ export function stallWatch(
       const out = {
         longestStallMs: Math.round(loop.max / 1e6),
         slowRequests: [...slow.values()].sort((a, b) => b.maxMs - a.maxMs).slice(0, 5),
+        ...(asked.size ? {
+          requests: [...asked].map(([channel, a]) => ({ channel, times: a.times, ms: Math.round(a.ms) }))
+            .sort((a, b) => b.ms - a.ms || b.times - a.times).slice(0, 5),
+        } : {}),
         ...(freezes.length ? { freezes: freezes.sort((a, b) => b.ms - a.ms).slice(0, 5) } : {}),
       };
       loop.reset();
       slow = new Map();
+      asked = new Map();
       freezes = [];
       return out;
     },

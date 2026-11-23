@@ -6,6 +6,7 @@ import { ScreenCrash } from './components/ScreenCrash';
 import '@fontsource-variable/source-sans-3';
 import './styles.css';
 import './workspace-navigation.css';
+import './sidebar.css';
 import './phone.css';
 import './soft-corners.css';
 import './narrow-conversation.css';
@@ -20,10 +21,16 @@ import { theDoorNeedsItsKey } from './browser-bridge';
 import { comeBackFromABlankScreen, writeHeldBeforeReload } from './after-a-crash';
 import { installStrayLetters } from './stray-letters';
 import { installFullScreenEscape } from './full-screen-escape';
+import { installWindowHolds } from './window-holds';
+import { installWindowLag } from './window-lag';
 import { onASharedFilePage } from './shared-file/route';
 import { bootSharedFile } from './shared-file/boot';
 import { bootSharedThread } from './shared-thread/boot';
 import { sharedThreadOf } from './shared-thread/shared-thread';
+import { paidPageOf } from './paid/paid';
+import { bootPaid } from './paid/PaidPage';
+import { invitedPageOf } from './invited/invited';
+import { bootInvited } from './invited/InvitedPage';
 import { readCloudConfig } from './cloud-bridge';
 import { keepACopyOfTheDrafts } from './draft-copy';
 
@@ -70,7 +77,10 @@ window.addEventListener('unhandledrejection', (e) => {
 const sharedFile = onASharedFilePage();
 // A thread's link is a page of its own on the web app too.
 const sharedThread = sharedFile ? null : sharedThreadOf(location.pathname, !!readCloudConfig(document));
-if (!sharedFile && !sharedThread) normalizeSavedLook(localStorage, machineTheme());
+// Where Stripe sends people back to, signed in or not.
+const paid = sharedFile || sharedThread ? null : paidPageOf(location.pathname, location.search, !!readCloudConfig(document));
+const invited = !sharedFile && !sharedThread && !paid && invitedPageOf(location.pathname, !!readCloudConfig(document));
+if (!sharedFile && !sharedThread && !paid && !invited) normalizeSavedLook(localStorage, machineTheme());
 applyTheme(resolveTheme(localStorage.getItem(THEME_KEY)));
 // And the picture, for the same reason and one worse: a skin changes what the
 // surfaces are made of, so a frame drawn before it lands is an opaque card
@@ -100,6 +110,8 @@ const boot = () => {
   installPictureWatch();
   installStrayLetters();
   installFullScreenEscape();
+  installWindowHolds();
+  installWindowLag();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <ScreenCrash><AgentUpdates><App /></AgentUpdates></ScreenCrash>
@@ -120,4 +132,6 @@ const boot = () => {
 const cloud = readCloudConfig();
 if (sharedFile && cloud) bootSharedFile(sharedFile, cloud);
 else if (sharedThread && cloud) bootSharedThread(sharedThread, cloud);
+else if (paid) bootPaid(paid);
+else if (invited) bootInvited();
 else if (!theDoorNeedsItsKey()) boot();

@@ -6,13 +6,17 @@
 // row can say what is happening without four more props threaded through two
 // components that have nothing to do with agents.
 import { createContext } from 'react';
-import type { RunningSession, WhyNotCloud } from './types';
+import type { RunningSession, WhyNotCloud, WorkItem } from './types';
+import { DEFAULT_ENGINE } from '../../shared/engines.mts';
+import { CODEX_LABELS } from './box-filter';
 
 export interface Fleet {
   /** The run on each thread an agent is on right now, by thread id. */
   sessions?: Map<string, RunningSession>;
   /** `supervisor.queued`: a tick spawns these as soon as a slot frees. */
   queued?: string[];
+  /** `supervisor.settingUp`: of those, the ones whose folder is being made now. */
+  settingUp?: string[];
   /** `supervisor.remoteHeld`: sessions of ours open between Remote Control turns. */
   remoteHeld?: string[];
   /** `supervisor.runNow`: the queued ones pushed to the front. */
@@ -38,6 +42,15 @@ export interface Fleet {
   whyNotCloud?: Record<string, WhyNotCloud>;
   /** The inbox's sign-in bar is up (`PlanBar`): no agent is signed in. */
   signInBar?: boolean;
+  /** `snapshot.engines`: what a thread nothing is running on would start on, `byItem[id] ?? workspace`. */
+  engines?: { workspace: string; byItem: Record<string, string> };
+}
+
+/** The harness a thread is on, read as the row's byline reads it (List.tsx `agentRest`, byline.ts `agentAtWork`). */
+export function harnessOn(item: Pick<WorkItem, 'id' | 'labels'> & { agent?: { engine?: string } | null }, fleet: Fleet): string {
+  if (item.agent) return item.agent.engine === 'codex' ? 'codex' : 'claude';
+  if ((item.labels ?? []).some((l) => CODEX_LABELS.has(l))) return 'codex';
+  return fleet.sessions?.get(item.id)?.engine ?? fleet.engines?.byItem[item.id] ?? fleet.engines?.workspace ?? DEFAULT_ENGINE;
 }
 
 /**

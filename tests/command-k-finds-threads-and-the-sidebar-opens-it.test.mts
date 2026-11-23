@@ -17,7 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WorkspaceNavigation } from '../renderer/src/components/WorkspaceNavigation';
 import { threadRows, THREADS_SHOWN } from '../renderer/src/components/Palette';
-import { glyphFor } from '../renderer/src/palette-glyphs';
+import { iconFor } from '../renderer/src/palette-glyphs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const app = fs.readFileSync(path.join(root, 'renderer/src/App.tsx'), 'utf8');
@@ -34,13 +34,13 @@ describe('the sidebar opens ⌘K', () => {
   // Above Threads since w-5988eed6f3 (search-sits-above-the-inbox-and-is-not-a-tab).
   it('has a Search row above Inbox, with the keys on it', () => {
     const html = nav({ onPalette: () => {} });
-    expect(labels(html)).toEqual(['Search', 'Inbox', 'Feedback', 'Settings']);
+    expect(labels(html)).toEqual(['New thread', 'Search', 'Inbox', 'Feedback', 'Settings']);
     expect(html).toMatch(/aria-label="Search"[^>]*title="Search · ⌘K"/);
     expect(html).toContain('>⌘K</small>');
   });
 
   it('draws no Search row where nothing opens ⌘K', () => {
-    expect(labels(nav())).toEqual(['Inbox', 'Feedback', 'Settings']);
+    expect(labels(nav())).toEqual(['New thread', 'Inbox', 'Feedback', 'Settings']);
   });
 
   it('is wired to ⌘K itself in the app', () => {
@@ -69,14 +69,16 @@ describe('⌘K finds threads', () => {
   });
 
   it('marks a thread and See all apart from the commands', () => {
-    expect(glyphFor({ id: 'thread-p-1', label: 'Pricing page' })).toBe('›');
-    expect(glyphFor({ id: 'all-threads', label: 'See all 6 threads' })).toBe('/');
+    expect(iconFor({ id: 'thread-p-1', label: 'Pricing page' })).toBe('thread');
+    expect(iconFor({ id: 'all-threads', label: 'See all 6 threads' })).toBe('search');
+    expect(iconFor({ id: 'new-thread', label: 'New thread' })).not.toBe('thread');
   });
 
   it('is handed the list search and a way to open it with words typed', () => {
     expect(app).toContain('findThreads={findThreads}');
     expect(app).toContain('onSearchFor={searchFor}');
     const finder = app.slice(app.indexOf('const findThreads = useCallback'), app.indexOf('const goToStop'));
-    expect(finder).toMatch(/searchThreads\(items, q, searchContext\)/);
+    // With the terminal sessions in the inbox, which are found by the names their rows wear.
+    expect(finder).toMatch(/searchThreads\(\[\.\.\.items, \.\.\.agentList\], q, searchContext[,)]/);
   });
 });

@@ -19,12 +19,24 @@ export function cellAround(el: { closest(selector: string): Attrs | null } | nul
 
 type Quoted = { text: string; cell?: TableCell };
 
+const BLOCKS = 'p,li,h1,h2,h3,h4,h5,h6,blockquote,pre,td,th,tr,dt,dd,figcaption,div';
+
+// A quote is saved with a space where the page has a new block or a line break,
+// so the run of the page's words gets one there too.
 function textIn(root: Node) {
   const nodes: { node: Text; start: number }[] = [];
   let words = '';
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let block: Element | null = null;
+  let broke = false;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   while (walker.nextNode()) {
-    const node = walker.currentNode as Text;
+    const at = walker.currentNode;
+    if (at.nodeType !== Node.TEXT_NODE) { if ((at as Element).tagName === 'BR') broke = true; continue; }
+    const node = at as Text;
+    const inside = node.parentElement?.closest(BLOCKS) ?? null;
+    if (words && (broke || inside !== block)) words += '\n';
+    broke = false;
+    block = inside;
     nodes.push({ node, start: words.length });
     words += node.data;
   }

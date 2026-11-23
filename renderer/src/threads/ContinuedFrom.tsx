@@ -40,6 +40,7 @@ export function ContinuedFrom({ labels }: { labels?: string[] | null }) {
 export function HandedFrom({ item }: { item: WorkItem }) {
   const team = useContext(TeamContext);
   const from = team && item.assignee === team.me ? handedFrom(item.body, taskGiver(item)) : null;
-  if (!from) return null;
+  // An ask is not handed on: its bar opens the thread (team/AskBar.tsx).
+  if (!from || item.ask) return null;
   return <WayBack word="Handed on from" personId={from.owner} threadId={from.id} />;
 }

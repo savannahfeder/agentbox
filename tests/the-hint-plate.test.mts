@@ -86,7 +86,7 @@ describe('a plate never outlives the thing it is about', () => {
 
   it('drops the hint when the component leaves the document', () => {
     expect(app).toContain('const watch = new MutationObserver(() => {');
-    expect(app).toContain('if (!shownHint.el.isConnected) drop();');
+    expect(app).toContain("if (!shownHint.el.isConnected || shownHint.el.getAttribute('aria-expanded') === 'true') drop();");
     expect(app).toContain('watch.disconnect();');
   });
 });
