@@ -163,4 +163,21 @@ describe('the page itself', () => {
     expect(app).toMatch(/querySelector<HTMLInputElement>\('\.fp-find input'\)/);
     expect(tsx).toMatch(/className="fp-find fh-find"/);
   });
+  // Seen on the first home: "it doesn't change to the little hand icon", and every
+  // click opened something the person meant only to point at.
+  it('shows the hand on everything that opens or goes somewhere', () => {
+    for (const cls of ['.fh-open', '.fh-link', '.fh-crumb']) {
+      const rule = css.split('}').find((r) => r.trim().startsWith(cls) && /cursor/.test(r));
+      expect(rule, cls).toMatch(/cursor: pointer/);
+    }
+  });
+  it('opens a tile\'s menu on a right click as well as on its ⋯', () => {
+    expect(tsx).toMatch(/onContextMenu=/);
+  });
+  it('offers what a person does to a file and a folder in their menus', () => {
+    for (const words of ['Rename', 'Change icon', 'Move to', 'Move to the Trash', 'Delete folder']) expect(tsx).toContain(words);
+  });
+  it('makes a section\'s name a way into its own page', () => {
+    expect(tsx).toMatch(/className="fh-link"[^>]*onClick=\{\(\) => onFolder\(/);
+  });
 });

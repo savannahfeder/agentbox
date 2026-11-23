@@ -1033,8 +1033,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const shownIn = lib.folders.find((x) => x.id === (own ?? beside))?.project ?? project;
       const sizes = await sizesOf(f, roots);
       const title = lib.titleOf(f.key) ?? (filed ? lib.titleOf(filed.key) : null);
+      const icon = lib.iconOf(f.key) ?? (filed ? lib.iconOf(filed.key) : null);
       // A newest version in the cloud draws its poster, not an older version still here.
-      return { ...row, ...(title ? { title } : {}), project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
+      return { ...row, ...(title ? { title } : {}), ...(icon ? { icon } : {}), project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
     })).then((all) => all.filter((f) => f.opened || f.cloud || (f.kind !== 'page' && f.kind !== 'code')));
     consider();
     const projects: string[] = [];
@@ -1182,6 +1183,14 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       if (!file) throw new Error('that file is gone');
       writeFolderLog(logDir(), { op: 'name', key, project: file.project, name: clean, by, at: Date.now() });
       return { ok: true, title: clean };
+    },
+
+    /** The icon a file's tile wears; empty gives it back the one Files picks. */
+    async setIcon({ key, icon, by = team?.state?.().me?.id ?? null }: { key: string; icon: string; by?: string | null }) {
+      const file = allFiles().find((f) => f.key === key);
+      if (!file) throw new Error('that file is gone');
+      writeFolderLog(logDir(), { op: 'icon', key, project: file.project, icon: String(icon).replace(/[^a-z-]/g, '').slice(0, 24), by, at: Date.now() });
+      return { ok: true };
     },
 
     /** Copies of files from this computer, into the project's documents. A kind Files cannot show is left out and named. */

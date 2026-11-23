@@ -2337,7 +2337,7 @@ export default function App() {
   }), [follows, changeFollows]);
   const [shippedOpen, setShippedOpen] = useState(false);
   // The Files place, on a project's page or (null) on every file.
-  const [filesPage, setFilesPage] = useState<{ project: string | null } | null>(null);
+  const [filesPage, setFilesPage] = useState<{ project: string | null; folder?: string | null } | null>(null);
   // Home is where the app opens on a computer; any other page put in front of
   // it hides it, and closing that page brings it back. A phone has no Home and
   // no skies.
@@ -3751,9 +3751,9 @@ export default function App() {
   // A teammate's thread opened from a page in Team is still in Team.
   const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;
   useEffect(() => { if (roomsUi.openId || teammatesUi.open) { setFilesPage(null); setConnectionsPage(null); } }, [roomsUi.openId, teammatesUi.open]);
-  const openFiles = (project: string | null) => {
+  const openFiles = (project: string | null, folder: string | null = null) => {
     roomsUi.leave(); teammatesUi.leave(); setChatsPlace(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null);
-    closeSearch(); setFocused(null); setFocusedRepeat(null); setConnectionsPage(null); setFilesPage({ project });
+    closeSearch(); setFocused(null); setFocusedRepeat(null); setConnectionsPage(null); setFilesPage({ project, folder });
   };
   const openConnectionsPage = (focus: string | null) => {
     roomsUi.leave(); teammatesUi.leave(); setChatsPlace(null); setTeamOpen(false); setSettingsOpen(false); setSettingsPane(null);
@@ -6715,7 +6715,7 @@ export default function App() {
     thread: focused ? { product: focused.product, id: focused.id } : null,
     card: teamShown && openCard ? { person: openCard.personId, thread: openCard.threadId } : null,
     home: homeHere,
-    files: filesShown ? { project: filesPage?.project ?? null } : null,
+    files: filesShown ? { project: filesPage?.project ?? null, folder: filesPage?.folder ?? null } : null,
     connections: connectionsShown,
     group: groupHere,
     groupInInbox: roomShown && roomsUi.inInbox,
@@ -6735,7 +6735,7 @@ export default function App() {
     go: (s) => {
       if (s.at === 'home') { openView('inbox'); setHomeOpen(true); }
       else if (s.at === 'list') openView(s.view);
-      else if (s.at === 'files') openFiles(s.project);
+      else if (s.at === 'files') openFiles(s.project, s.folder ?? null);
       else if (s.at === 'connections') openConnectionsPage(null);
       else if (s.at === 'team') openChatsPlace(s.place);
       else if (s.at === 'group') { openView(view); roomsUi.open(s.id, s.inbox ? 'inbox' : null); }
@@ -7804,7 +7804,7 @@ export default function App() {
               : connectionsShown ? (
                 <ConnectionsPlace now={now} focus={connectionsPage!.focus} onNotice={showToast} corner={connectionsCorner} cloudKeys={savedCloudKeyList} />
               ) : filesShown ? (
-                <FilesPlace project={filesPage!.project} onProject={(project) => setFilesPage({ project })} now={now} onNotice={showToast} onUndoable={pushUndo}
+                <FilesPlace project={filesPage!.project} onProject={(project) => setFilesPage({ project })} folder={filesPage!.folder ?? null} onFolder={(folder) => setFilesPage((was) => ({ project: was?.project ?? null, folder }))} now={now} onNotice={showToast} onUndoable={pushUndo}
                   onSettings={(pane) => { setTeamOpen(false); setSettingsPane(pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true); }}
                   onPlace={(p) => {
                     if (p.kind === 'room') { roomsUi.openGroupById(p.roomId!); return; }

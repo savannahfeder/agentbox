@@ -7,7 +7,8 @@ export type Stop =
   | { at: 'home' }
   | { at: 'list'; view: View }
   | { at: 'thread'; product: string; id: string }
-  | { at: 'files'; project: string | null }
+  /** `folder`: a folder's page in the project, or its files in no folder. */
+  | { at: 'files'; project: string | null; folder?: string | null }
   | { at: 'connections' }
   | { at: 'settings'; pane: string | null }
   /** The Team page: 'team' is the Standup, `mate:<id>` and `person:<id>` a member's page. */
@@ -27,7 +28,7 @@ export function sameStop(a: Stop, b: Stop): boolean {
   if (a.at !== b.at) return false;
   if (a.at === 'list' && b.at === 'list') return a.view === b.view;
   if (a.at === 'thread' && b.at === 'thread') return a.product === b.product && a.id === b.id;
-  if (a.at === 'files' && b.at === 'files') return a.project === b.project;
+  if (a.at === 'files' && b.at === 'files') return a.project === b.project && (a.folder ?? null) === (b.folder ?? null);
   if (a.at === 'team' && b.at === 'team') return a.place === b.place;
   if (a.at === 'group' && b.at === 'group') return a.id === b.id && !!a.inbox === !!b.inbox;
   if (a.at === 'teammate' && b.at === 'teammate') return a.id === b.id;
@@ -42,7 +43,7 @@ export type Screen = {
   thread: { product: string; id: string } | null;
   card: { person: string; thread: string } | null;
   home: boolean;
-  files: { project: string | null } | null;
+  files: { project: string | null; folder?: string | null } | null;
   connections: boolean;
   group: string | null;
   groupInInbox?: boolean;
@@ -58,7 +59,7 @@ export function stopOnScreen(s: Screen): Stop | null {
   if (s.thread) return { at: 'thread', product: s.thread.product, id: s.thread.id };
   if (s.card) return { at: 'card', person: s.card.person, thread: s.card.thread };
   if (s.home) return { at: 'home' };
-  if (s.files) return { at: 'files', project: s.files.project };
+  if (s.files) return { at: 'files', project: s.files.project, ...(s.files.folder !== undefined ? { folder: s.files.folder } : {}) };
   if (s.connections) return { at: 'connections' };
   if (s.group) return s.groupInInbox ? { at: 'group', id: s.group, inbox: true } : { at: 'group', id: s.group };
   if (s.teammate) return { at: 'teammate', id: s.teammate };

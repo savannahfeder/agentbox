@@ -16,8 +16,8 @@ import type { DragEvent } from 'react';
 import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus, FilesPlaceList, FilesPlaceView, PlacedFile } from '../types';
 import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, inOrderOf, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, showsTotal, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
 import { fileRenameUndo, moveUndo, renameUndo } from './files-undo';
-import { FilesHome, type ProjectShelf } from './FilesHome';
-import { FILE_DRAG, homeOf } from './files-home';
+import { FilesHome, type HomeActs, type HomePage, type ProjectShelf } from './FilesHome';
+import { crumbsFor, FILE_DRAG, folderFiles, homeOf, NOT_IN_A_FOLDER } from './files-home';
 import './files-place.css';
 
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
@@ -368,14 +368,6 @@ function FolderMenu({ name, onRename, onRemove }: { name: string; onRename?: () 
   </div>;
 }
 
-/** A home section's head: the folder's name, its count, and its menu. */
-function FolderHead({ folder, count, onRename, onRemove }: { folder: FileFolder; count: number; onRename: (name: string) => void; onRemove: () => void }) {
-  const [renaming, setRenaming] = useState(false);
-  if (renaming) return <NameBox placeholder="Folder name" start={folder.name} onCancel={() => setRenaming(false)} onDone={(n) => { setRenaming(false); onRename(n); }} />;
-  return <><span className="fh-head-name">{folder.name}</span><span className="fh-count">{count}</span>
-    <FolderMenu name={folder.name} onRename={() => setRenaming(true)} onRemove={onRemove} /></>;
-}
-
 const FolderGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M2 4.6c0-.6.5-1.1 1.1-1.1h2.7c.3 0 .6.1.8.3l1 1h5.3c.6 0 1.1.5 1.1 1.1v6c0 .6-.5 1.1-1.1 1.1H3.1c-.6 0-1.1-.5-1.1-1.1z" strokeLinejoin="round" /></svg>;
 const TableGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="1" /><path d="M2.5 6.4h11M2.5 9.7h11M6.2 6.4V13" /></svg>;
 const UploadGlyph = () => <svg className="fp-folder-glyph" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 10.5V3M5 6l3-3 3 3M3 10.5v2h10v-2" /></svg>;
@@ -454,10 +446,13 @@ const PlaceGlyph = ({ kind }: { kind: FileSentIn['kind'] }) => (kind === 'chat'
   ? <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" /></svg>
   : <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" strokeLinecap="round" /></svg>);
 
-export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoable, onSettings }: {
+export function FilesPlace({ project, onProject, folder: folderAsked, onFolder, now, onPlace, onNotice, onUndoable, onSettings }: {
   /** The project's page, or null for every file. */
   project: string | null;
   onProject: (project: string | null) => void;
+  /** The folder's page open in it, kept by the app so Back and Forward step through folders. */
+  folder?: string | null;
+  onFolder?: (folder: string | null) => void;
   now: number;
   onPlace: (p: FileSentIn) => void;
   onNotice: (words: string) => void;
@@ -505,7 +500,9 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const [asList, setAsList] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [madeKey, setMadeKey] = useState<string | null>(null);
-  const [folderId, setFolderId] = useState<string | null>(null);
+  const [ownFolder, setOwnFolder] = useState<string | null>(null);
+  const folderId = folderAsked !== undefined ? folderAsked : ownFolder;
+  const setFolderId = (id: string | null) => { if (onFolder) onFolder(id); else setOwnFolder(id); };
   const [naming, setNaming] = useState<{ what: Making; project: string } | null>(null);
   // Every file at once, with the sort, the sizes and the Trash; otherwise the home.
   const [everything, setEverything] = useState(false);
@@ -515,7 +512,13 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const folder = folders.some((f) => f.id === folderId) ? folderId : null;
   const place = { project, folder };
   // Picking a project from every file opens its page with the name box already there.
-  useEffect(() => { setFolderId(null); setEverything(false); setNaming((n) => (n && n.project === project ? n : null)); }, [project]);
+  // Only on a move to another project: Back to a folder's page mounts with it already open.
+  const shownProject = useRef(project);
+  useEffect(() => {
+    if (shownProject.current === project) return;
+    shownProject.current = project;
+    setFolderId(null); setEverything(false); setNaming((n) => (n && n.project === project ? n : null));
+  }, [project]); // eslint-disable-line react-hooks/exhaustive-deps
   const mine = all.mine ?? [];
   const isMine = (p: string | null) => !!p && mine.some((m) => m.toLowerCase() === p.toLowerCase());
   const makeFile = (kind: 'document' | 'table', into: string, inFolder: string | null) => {
@@ -662,16 +665,27 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   const openFile = openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); readAgain(); }} onNotice={onNotice} onRename={renameFile}
     onPlace={(p) => { setOpenKey(null); onPlace(p); }} />;
 
-  if (!chosen && !folder && !everything) return <div className="fp-page fh-page">
-    <FilesHome title={project ?? 'Files'} home={home} projects={shelves} found={query.trim() ? found : null} query={query} onQuery={setQuery} findRef={box}
-      newMenu={<NewMenu project={project} projects={mine} canDocument={project ? isMine(project) : true} canFolder onPick={pick} />}
-      naming={naming?.what === 'folder' && project ? <NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name }); }} /> : null}
+  const page: HomePage = folder && project ? { kind: 'folder', folder: folders.find((f) => f.id === folder)!, files: folderFiles(all.files, folders, project, folder) }
+    : folderId === NOT_IN_A_FOLDER && home ? { kind: 'loose', files: home.loose } : { kind: 'home' };
+  const acts: HomeActs = {
+    move,
+    moveToNew: (key, name) => { void act({ do: 'make', project: all.files.find((f) => f.key === key)?.project ?? project ?? '', name }).then((r) => { if (r.ok && r.folder) move(key, r.folder); }); },
+    rename: (file, name) => { void renameFile(file, name); },
+    icon: (file, icon) => { void act({ do: 'icon', key: file.key, icon }); },
+    trash: (file) => trash([file.key], shownName(file)),
+    renameFolder: (f, name) => rename(f.id, name),
+    removeFolder: (f) => { if (folderId === f.id) setFolderId(null); removeFolder(f); },
+  };
+
+  if (!chosen && !everything) return <div className="fp-page fh-page">
+    <FilesHome title={project ?? 'Files'} crumbs={crumbsFor(folders, project, folderId)} onCrumb={(c) => { if (c.project !== project) onProject(c.project); setFolderId(c.folder); }}
+      page={page} home={home} projects={shelves} found={query.trim() ? found : null} query={query} onQuery={setQuery} findRef={box}
+      newMenu={<NewMenu project={project} projects={mine} canDocument={project ? isMine(project) : true} canFolder={canNest} onPick={pick} />}
+      naming={naming?.what === 'folder' && project ? <NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /> : null}
       loaded={!!list} me={team?.me ?? null} nameOf={nameOf} now={now} onOpen={setOpenKey}
-      tileMenu={(f) => f.project && <MoveMenu file={f} folders={folders} onMove={moveAll} onTrash={f.trashable ? () => trash([f.key], shownName(f)) : undefined}
-        onNewFolder={(name) => { void act({ do: 'make', project: f.project ?? '', name }).then((r) => { if (r.ok && r.folder) move(f.key, r.folder); }); }} />}
-      folderHead={(f, count) => <FolderHead folder={f} count={count} onRename={(name) => rename(f.id, name)} onRemove={() => removeFolder(f)} />}
+      folders={folders.filter((f) => !!project && f.project.toLowerCase() === project.toLowerCase())} acts={acts}
       dropOn={(id, setOver) => dropsFile((key) => move(key, id), setOver)}
-      onProject={onProject} onEverything={() => setEverything(true)} />
+      onFolder={setFolderId} onProject={onProject} onEverything={() => setEverything(true)} />
     {openFile}
   </div>;
 
