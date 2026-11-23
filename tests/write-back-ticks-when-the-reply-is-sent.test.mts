@@ -19,6 +19,7 @@ describe('the Write back lesson', () => {
     expect(tour).not.toMatch(/screen\.typing && !tour\.done\.includes\('reply'\)/);
   });
   it('is learned when a reply is sent', () => {
-    expect(app).toMatch(/const answerWith = useCallback\(async \([^)]*\) => \{\n\s*if \(tourLive\(tourRef\.current\)\) \{\n\s*let t = finishLesson\(tourRef\.current!, 'reply'\);/);
+    // On the practice thread only, when there is one (tests/a-newcomer-can-tell-they-are-in-the-walkthrough).
+    expect(app).toMatch(/const answerWith = useCallback\(async \([^)]*\) => \{\n\s*if \(replyTeaches\(tourRef\.current, item\)\) \{\n\s*let t = finishLesson\(tourRef\.current!, 'reply'\);/);
   });
 });

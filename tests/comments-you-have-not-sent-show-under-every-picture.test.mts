@@ -60,7 +60,7 @@ describe('the picture view', () => {
     expect(view).not.toMatch(/className="av-unsent"/);
   });
   it('Send all hands over every waiting comment, and ⌘↵ does the same', () => {
-    expect(view).toMatch(/toAgent\(unsent\.ids\)/);
+    expect(view).toMatch(/handOver\(unsent\.ids\)/);
     expect(view).toMatch(/Send all/);
     expect(view).toMatch(/e\.key === 'Enter' && \(e\.metaKey \|\| e\.ctrlKey\)/);
   });

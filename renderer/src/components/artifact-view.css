@@ -215,6 +215,10 @@
 }
 .av-unsent-dot, .av-note-sent.is-waiting::before { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .av-note-sent.is-waiting::before { content: ''; }
+.av-unsent-bar[data-state] { padding-right: 14px; }
+.av-unsent-bar[data-state="sending"] .av-unsent-dot { animation: pulse 1.2s ease-in-out infinite; }
+.av-unsent-bar[data-state="sent"] .av-glyph { color: var(--text-dim); }
+@media (prefers-reduced-motion: reduce) { .av-unsent-bar[data-state="sending"] .av-unsent-dot { animation: none; } }
 .av-unsent-send { background: var(--wash-strong); border-color: var(--text-faint); }
 .av-unsent-send kbd { margin-left: 6px; padding: 0; border: 0; background: none; font: 11px var(--mono); color: var(--text-dim); }
 .av-trouble { margin: 8px 16px 0; font-size: 12.5px; line-height: 1.4; color: var(--text); }

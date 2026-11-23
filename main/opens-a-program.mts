@@ -25,7 +25,7 @@ type Run = (cmd: string, args: string[], opts: { timeout: number }) => Promise<u
 export const OPEN_MS = 60_000;
 
 const runFile: Run = (cmd, args, opts) => new Promise((resolve, reject) => {
-  execFile(cmd, args, opts, (err) => (err ? reject(err) : resolve(undefined)));
+  execFile(cmd, args, { ...opts, windowsHide: true }, (err) => (err ? reject(err) : resolve(undefined)));
 });
 
 /**

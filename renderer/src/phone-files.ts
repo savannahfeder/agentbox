@@ -93,10 +93,22 @@ export function askShape(img: ShapeAsked, fetcher: Fetcher = (url) => fetch(url)
     .finally(() => asking.delete(file));
 }
 
-export function watchPicture(img: PictureLike) {
+// THE OPEN BUTTON AROUND A LOADING PICTURE IS MARKED, and styles.css holds it
+// at the column's width. A :has() rule reading the picture's state did that
+// before, and restyled the whole thread on each change
+// (tests/a-picture-landing-does-not-restyle-the-whole-thread).
+type DoorLike = { classList: { contains(c: string): boolean }; toggleAttribute(name: string, on: boolean): unknown };
+type InDoor = { parentElement?: DoorLike | null; classList?: { contains(c: string): boolean } };
+function markDoor(img: InDoor, loading: boolean) {
+  const door = img.parentElement;
+  if (door?.classList.contains('inline-image-open') && img.classList?.contains('inline-image')) door.toggleAttribute('data-picture-loading', loading);
+}
+
+export function watchPicture(img: PictureLike & InDoor) {
   const src = img.getAttribute('src') ?? '';
   const loading = !img.complete;
   img.setAttribute(STATE, img.complete ? (img.naturalWidth > 0 ? 'ready' : 'failed') : 'loading');
+  markDoor(img, loading);
   // While it loads, the box is the shape it had last time, if it has been seen.
   const shape = (value: string) => { if (img.style) img.style.aspectRatio = value; };
   shape(loading ? shapeOf(src) ?? '' : '');
@@ -106,8 +118,9 @@ export function watchPicture(img: PictureLike) {
     if (img.naturalWidth > 0 && (img.naturalHeight ?? 0) > 0) learn(img.getAttribute('src') ?? '', `${img.naturalWidth} / ${img.naturalHeight}`);
     shape('');
     img.setAttribute(STATE, 'ready');
+    markDoor(img, false);
   });
-  img.addEventListener('error', () => { shape(''); img.setAttribute(STATE, 'failed'); });
+  img.addEventListener('error', () => { shape(''); img.setAttribute(STATE, 'failed'); markDoor(img, false); });
 }
 
 /** Every picture drawn from now on, and again whenever its address changes. */

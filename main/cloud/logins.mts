@@ -51,6 +51,7 @@ export interface CloudLoginRecord {
   retired?: { id: string; at: number }[];
   duplicateOf?: string;
   limitedUntil?: number;
+  refusedUntil?: number | null;
   lookFailedAt?: number;
   lookError?: string | null;
 }
@@ -251,13 +252,15 @@ function duplicatesIn(records: Partial<CloudLoginRecord>[]) {
 
 // 'none' (never signed in), 'broken' (sign in again), 'duplicate' (the same
 // account as an earlier one), 'limited' (at its usage limit until
-// `limitedUntil`), 'renew' (Codex: must be renewed before a run), 'stale'
+// `limitedUntil`), 'refused' (Claude refuses its subscription, asked again after
+// `refusedUntil`), 'renew' (Codex: must be renewed before a run), 'stale'
 // (Codex: may run, renewal due), 'ready'.
 export function cloudLoginState(rec: Partial<CloudLoginRecord> | null | undefined, { now = Date.now() }: { now?: number } = {}) {
   if (!rec?.id) return 'none';
   if (rec.broken) return 'broken';
   if (rec.duplicateOf) return 'duplicate';
   if (rec.limitedUntil && now < rec.limitedUntil) return 'limited';
+  if (rec.refusedUntil && now < rec.refusedUntil) return 'refused';
   if (rec.engine !== 'codex' || !rec.expiresAt) return 'ready';
   const left = rec.expiresAt - now;
   if (left < CODEX_RUN_NEEDS_MS) return 'renew';
@@ -367,6 +370,7 @@ export function noCloudAccountSentence(engine: string, inUse: CloudLoginRecord |
   const name = engine === 'codex' ? 'Codex' : 'Claude';
   const state = inUse ? cloudLoginState(inUse, { now }) : 'none';
   if (state === 'limited') return `the ${name} account the cloud runs on is at its usage limit until ${clock(inUse!.limitedUntil!)}`;
+  if (state === 'refused') return `Claude is refusing the account the cloud runs on until about ${clock(inUse!.refusedUntil!)}`;
   if (state === 'renew') return `the ${name} account the cloud runs on is renewing its sign-in`;
   return `no ${name} account is signed in for the cloud yet (the cloud button)`;
 }

@@ -55,7 +55,9 @@ describe('the page', () => {
   const src = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
   it('notices the ask going while the page is open, unless you handed it back yourself', () => {
     expect(src).toContain("if (was && !handedBack.current) setEnded({ note: String(was.ask?.note ?? '').trim() });");
-    expect(src).toMatch(/handedBack\.current = true;\n\s*const ok = await onHandBack\(verdict, words\);\n\s*if \(!ok\) handedBack\.current = false;/);
+    expect(src).toMatch(/handedBack\.current = true;\n\s*setAnsweredAsk\(ask\);\n\s*const ok = await onHandBack\(verdict, words\);\n\s*if \(!ok\) \{ handedBack\.current = false; setAnsweredAsk\(null\); \}/);
+    // The ask you answered stays where it was, with your answer under it (a power test, 2026-11-22).
+    expect(src).toContain('const shownAsk = ask ?? answeredAsk;');
     expect(src).toContain('onHandBack={handBack}');
   });
   // A live check: once Sam took the help ask back, "Sam asked you to help: …"

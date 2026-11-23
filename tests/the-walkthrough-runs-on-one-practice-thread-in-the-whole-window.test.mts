@@ -89,7 +89,8 @@ describe('the practice project', () => {
     const at = app.indexOf('const tourGone =');
     const effect = app.slice(at, app.indexOf('}, [tourGone]);', at));
     expect(effect).toContain('if (!tourGone || !tour?.practice) return;');
-    expect(effect).toContain('void api.firstRunPracticeEnd()');
+    // After any close on it still held for Z (tests/a-newcomer-can-tell-they-are-in-the-walkthrough).
+    expect(effect).toContain('void held.then(() => api.firstRunPracticeEnd())');
   });
 });
 
