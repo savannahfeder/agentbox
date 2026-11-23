@@ -122,7 +122,9 @@ export function teamPass({ to, title, details, project: named }: { to?: unknown;
   if (!target) throw new Error('pass work to another teammate, not to yourself. For work in another project, name it in project');
   const what = plain(title);
   if (!what) throw new Error('give the work a short title');
-  const yours = toSelf ? startedByYou(item) : !!me?.primary && startedByYou(item);
+  // A pass is yours only from a run your words opened or your reply is newest
+  // on, so a run another teammate's pass started still waits for your yes.
+  const yours = startedByYou(item);
   const m = writeChat(dir, { kind: 'pass', from: me?.id ?? YOU, to: target, title: what.slice(0, 200), details: String(details ?? '').slice(0, 6000), hop, ...writtenIn, ...(where ? { product: where } : {}), ...(yours ? { yours: true } : {}) }, ctx.now);
   const them = team.find((t) => t.id === target);
   const held = me && !yours && (toSelf || them?.handoffsNeedYes !== false);
