@@ -41,7 +41,7 @@ describe('every group opens through openRoom', () => {
     expect(hook).toMatch(/const openRoom = \(id: string, from: 'inbox' \| null = null\) => \{[^}]*setOpenId\(id\);[^}]*setLastId\(id\); writeRoomTab\(id\);/);
   });
   it('a mention and a chat started from someone’s page both go through it', () => {
-    expect(hook).toMatch(/const openMention = \(m: RoomMention, from: 'inbox' \| null = null\) => \{[^}]*\}\);\s*openRoom\(m\.roomId, from\);\s*\};/);
+    expect(hook).toMatch(/const openMention = \(m: RoomMention, from: 'inbox' \| null = null\) => \{[^}]*\}\);\s*openRoom\(m\.roomId, from\);\s*const line = mentionLine\(m\);\s*if \(line\) revealLine\(line\);\s*\};/);
     expect(hook).toMatch(/id = res\.value;\s*\}\s*openRoom\(id\);\s*\};/);
   });
   it('a teammate’s direct record opens in its own view, over the group', () => {

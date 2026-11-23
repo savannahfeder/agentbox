@@ -294,6 +294,9 @@ export function withMe<T extends { me: boolean }>(people: readonly T[], me: T | 
   return !me || people.some((p) => p.me) ? [...people] : [...people, me];
 }
 
+/** The line a group's row opens on: a reply is drawn only in its side thread, so it is asked for by name. */
+export const mentionLine = (m: Pick<RoomMention, 'messageId' | 'thread'>): string | null => (m.thread ? m.messageId : null);
+
 /** One Needs you row per group, the newest: a Mac's rooms already give one, a phone's give one per message. */
 export function mentionRows(mentions: readonly RoomMention[], rooms: Pick<RoomsState, 'rooms' | 'me'> | null): RoomMention[] {
   const rows = new Map<string, RoomMention>();
