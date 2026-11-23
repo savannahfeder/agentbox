@@ -6321,7 +6321,8 @@ export default function App() {
         // The page stays open: full screen draws the box under it.
         // An open box focuses itself only when it opens, so R on one already
         // there has to put the caret back (focus-at-end.ts).
-        else if ((e.key === 'r' || e.key === 'R') && focused.agent && replyIsSwallowed(focused.agent) && focused.agent.product && focused.agent.sessionId) { e.preventDefault(); void bringIn(focused, { reply: true }); }
+        // R on a session nothing here can answer is its Continue in Agentbox (the bar's other half).
+        else if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey && focused.agent && replyIsSwallowed(focused.agent) && focused.agent.product && focused.agent.sessionId) { e.preventDefault(); void bringIn(focused, { reply: true }); }
         else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setModal('reply'); if (modal === 'reply') focusTheReplyBox(); else if (sayWhoseBox(arrived.current, keyOf(focused), Date.now())) { const whose = replyingTo({ people: conversationNames(focused) }); if (whose) showToast(whose); } }
         // N MEANS THE SAME THING ON BOTH SCREENS. The + in the top bar is on
         // this screen too and its tooltip says "New task (N)", so the key is

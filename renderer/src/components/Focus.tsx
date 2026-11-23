@@ -2709,7 +2709,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                 {bringIn && <button type="button" className="dock-pill dock-pill-go" onClick={bringIn}>
                   <span className="dock-pill-icon">{inIcon}</span>
                   <span className="dock-pill-text">{BRING_IN}</span>
-                  <span className="dock-pill-key"><kbd>R</kbd></span>
+                  <span className="dock-pill-key"><kbd>{chord('R')}</kbd></span>
                 </button>}
               </div>
             ) : (

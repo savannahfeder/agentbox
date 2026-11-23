@@ -182,10 +182,10 @@ describe('where it is offered', () => {
   // definitely use keyboard shortcuts", and Open terminal in ⋯ is Agentbox's own terminal's key
   // (the founder, 2026-11-24). Each half reads icon, words, key; ⌘J and R do them.
   it('each half reads icon, words, key: ⌘J for its terminal, R to carry on here', () => {
-    expect(focus()).toMatch(/<span className="dock-pill-icon">\{goIcon\}<\/span>[\s\S]*?<kbd>\{chord\('⌘J'\)\}<\/kbd>[\s\S]*?<span className="dock-pill-icon">\{inIcon\}<\/span>[\s\S]*?<kbd>R<\/kbd>/);
+    expect(focus()).toMatch(/<span className="dock-pill-icon">\{goIcon\}<\/span>[\s\S]*?<kbd>\{chord\('⌘J'\)\}<\/kbd>[\s\S]*?<span className="dock-pill-icon">\{inIcon\}<\/span>[\s\S]*?<kbd>\{chord\('R'\)\}<\/kbd>/);
     const app = read('renderer/src/App.tsx');
     expect(app).toContain('if (focused?.agent) { void revealAgent(focused); return; }');
-    expect(app).toContain("else if ((e.key === 'r' || e.key === 'R') && focused.agent && replyIsSwallowed(focused.agent) && focused.agent.product && focused.agent.sessionId) { e.preventDefault(); void bringIn(focused, { reply: true }); }");
+    expect(app).toContain("else if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey && focused.agent && replyIsSwallowed(focused.agent) && focused.agent.product && focused.agent.sessionId) { e.preventDefault(); void bringIn(focused, { reply: true }); }");
     expect(app).toContain("if (movedIn.reply) setModal('reply');");
   });
   it("and its ⋯ has no Open terminal, which is the key for a terminal of Agentbox's own", () => {
