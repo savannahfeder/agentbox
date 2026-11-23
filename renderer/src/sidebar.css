@@ -60,6 +60,10 @@
   /* An 18 point face in the icons' 16 point column, so every name starts on one line. */
   :root:root .gt-rail-nav.workspace-navigation .ws-recent-mark { flex: none; display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; }
   :root:root .gt-rail-nav.workspace-navigation .ws-recent-mark > * { flex: none; margin: -1px; }
+  /* An agent's mark is bare here, like the icons above it: its tile is grey on grey on this ground.
+     The drawing is 11/16 of its box (EngineLogos.tsx IN_TILE), so a 20 point box gives the icons' ink. */
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent-mark > .harness-mark { width: 16px; height: 16px; margin: 0; border: 0; background: none; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent-mark > .harness-mark > svg { flex: none; width: 20px; height: 20px; margin: -2px; }
   :root:root .gt-rail-nav.workspace-navigation .ws-need { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 
   :root:root .gt-rail-nav.workspace-navigation .workspace-bottom { position: relative; flex: none; padding-top: 16px; }
