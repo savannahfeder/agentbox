@@ -4194,11 +4194,10 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .palette-k .palette-ai-ask .palette-key { margin-left: 2px; height: 18px; min-width: 0; }
 .palette-k .palette-ai-ask:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
 .palette-k .palette-ai-ask:disabled { opacity: .55; cursor: default; }
-.palette-k .palette-ai-modes { flex: none; display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius); }
-.palette-k .palette-ai-modes button {
-  height: 22px; padding: 0 9px; border: none; border-radius: var(--radius); background: none; color: var(--text-faint); font-size: 12.5px; cursor: pointer;
-}
-.palette-k .palette-ai-modes button.on { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
+.palette-k .palette-ai-ask.asking:disabled { opacity: 1; color: var(--text); }
+.palette-k .palette-ai-ask.asking svg, .palette-k .palette-asking .palette-glyph svg { animation: palette-ai-reading 1.4s ease-in-out infinite; }
+@keyframes palette-ai-reading { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.82); } }
+@media (prefers-reduced-motion: reduce) { .palette-k .palette-ai-ask.asking svg, .palette-k .palette-asking .palette-glyph svg { animation: none; } }
 .palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }
 .palette-k .palette-item.selected { color: var(--text); }
 .palette-k .palette-glyph { flex: none; width: 18px; height: 18px; display: grid; place-items: center; color: var(--text-faint); }

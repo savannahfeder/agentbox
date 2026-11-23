@@ -9,7 +9,9 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { aboutThread, candidatesFor, describePrompt, findByDescription, readPicks, FIND_MOST, FIND_BUDGET_MS, type FindCandidate } from '../shared/find-by-description.mts';
-import { agentRow, aiLookOf, offersAgent, paletteOrder, withoutPicked } from '../renderer/src/components/Palette.tsx';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Palette, agentRow, offersAgent, paletteOrder, withoutPicked } from '../renderer/src/components/Palette.tsx';
 
 const thread = (n: number, title: string, about = '', at = n): FindCandidate => ({
   key: `p/w-${n}`, product: 'p', title, about, where: 'Done', at, project: 'Agentbox',
@@ -90,24 +92,37 @@ describe('reading the answer', () => {
 
 describe('⌘K offers it', () => {
   // The owner, 2026-11-23: "for ai search it should be clearer that it's
-  // gonna search with ai: make it discoverable". The row used to appear only
-  // for three words or no thread found, and said "Ask an agent".
-  it('as a row whenever something is typed, in the row design', () => {
-    expect(offersAgent('chrome', 5)).toBe(true);
-    expect(offersAgent('chrome focus', 2, 'row')).toBe(true);
-    expect(offersAgent('', 0)).toBe(false);
-    expect(offersAgent('   ', 0)).toBe(false);
+  // gonna search with ai: make it discoverable". Of five designs they picked
+  // an Ask AI button in the search bar, there whenever the box is.
+  const drawn = (props: Record<string, unknown>) => renderToStaticMarkup(createElement(Palette, {
+    products: [], supervisorPaused: false, onClose: () => {}, findThreads: () => [], findByDescription: async () => ({ ok: true, rows: [] }), ...props,
+  }));
+  const button = (html: string) => html.match(/<button[^>]*class="palette-ai-ask"[^>]*>.*?<\/button>/)?.[0] ?? '';
+
+  it('as an Ask AI button in the bar, which waits for words', () => {
+    expect(button(drawn({ typed: 'chrome' }))).toMatch(/Ask AI/);
+    expect(button(drawn({ typed: 'chrome' }))).not.toMatch(/disabled/);
+    expect(button(drawn({ typed: '' }))).toMatch(/disabled/);
+    expect(button(drawn({ typed: '  ' }))).toMatch(/disabled/);
   });
 
-  it('for a sentence or nothing found, in the spark design; never as an idle row with its own button or by itself', () => {
-    expect(offersAgent('browser kept stealing focus', 4, 'spark')).toBe(true);
-    expect(offersAgent('quokka', 0, 'spark')).toBe(true);
-    expect(offersAgent('chrome', 5, 'spark')).toBe(false);
-    expect(offersAgent('browser kept stealing focus', 4, 'button')).toBe(false);
-    expect(offersAgent('browser kept stealing focus', 4, 'auto')).toBe(false);
-    expect(aiLookOf('modes')).toBe('modes');
-    expect(aiLookOf('nonsense')).toBe('row');
-    expect(aiLookOf(null)).toBe('row');
+  it('not on a phone, which has no room for it, nor in a copy whose main cannot ask', () => {
+    expect(button(drawn({ typed: 'chrome', phone: true }))).toBe('');
+    expect(button(drawn({ typed: 'chrome', findByDescription: undefined }))).toBe('');
+  });
+
+  it('as a row too when the words find no thread, so Enter asks; and always on a phone', () => {
+    expect(offersAgent('quokka', 0)).toBe(true);
+    expect(offersAgent('chrome', 5)).toBe(false);
+    expect(offersAgent('chrome', 5, true)).toBe(true);
+    expect(offersAgent('', 0)).toBe(false);
+    expect(offersAgent('   ', 0, true)).toBe(false);
+    expect(drawn({ typed: 'quokka' })).toMatch(/Ask AI about “quokka”/);
+  });
+
+  it('in one design only: the other four are gone', () => {
+    const palette = fs.readFileSync(new URL('../renderer/src/components/Palette.tsx', import.meta.url), 'utf8');
+    expect(palette).not.toMatch(/aiSearchLook|palette-ai-modes|AiLook/);
   });
 
   // A power tester typed a model command in words, pressed Enter, and an agent
@@ -131,11 +146,14 @@ describe('⌘K offers it', () => {
 
   it('says it is looking, and for how long, then what went wrong if it did', () => {
     const ask = () => {};
-    expect(agentRow(null, 0, ask, { query: 'chrome' }).label).toBe('Search with AI for “chrome”');
-    expect(agentRow(null, 0, ask, { query: 'x'.repeat(60) }).label).toBe(`Search with AI for “${'x'.repeat(47)}…”`);
+    expect(agentRow(null, 0, ask, { query: 'chrome' }).label).toBe('Ask AI about “chrome”');
+    expect(agentRow(null, 0, ask, { query: 'x'.repeat(60) }).label).toBe(`Ask AI about “${'x'.repeat(47)}…”`);
     expect(agentRow({ query: 'q', at: 1000, state: 'looking' }, 4500, ask).label).toBe('AI is reading your threads');
     expect(agentRow({ query: 'q', at: 0, state: 'found', rows: [] }, 0, ask).label).toBe('AI found no thread that fits');
     expect(agentRow({ query: 'q', at: 1000, state: 'looking' }, 4500, ask).hint).toBe('3s');
+    // A count reading 0s looks stuck; it starts at the first whole second.
+    expect(agentRow({ query: 'q', at: 1000, state: 'looking' }, 1900, ask).hint).toBeUndefined();
+    expect(agentRow({ query: 'q', at: 1000, state: 'looking' }, 2000, ask).hint).toBe('1s');
     expect(agentRow({ query: 'q', at: 0, state: 'failed', error: 'No agent answered in time.' }, 0, ask)).toMatchObject({ label: 'No agent answered in time.', hint: 'Try again' });
   });
 
