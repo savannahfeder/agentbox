@@ -98,6 +98,8 @@ export interface ShipQueueOptions {
   // The GitHub sign-in saved on this computer, for the push (main/github-push-sign-in.mts).
   pushSignIn?: () => { env: Record<string, string>; config: [string, string][] } | null;
   afterShip?: (shipped: { item: ShipItem; product: ShipProduct; sha: string | null }) => void;
+  // Whether the push put this commit on main, for a ship that said so and then ended non-zero.
+  pushed?: (cwd: string, sha: string) => Promise<boolean>;
   memoryGate?: () => ShipGate | null;
   shipScore?: (item: ShipItem) => number;
   log?: ShipLog;
@@ -351,6 +353,14 @@ export function failureNote(output: unknown) {
   return `${SHIP_FAILED}${said.slice(0, 300)}`;
 }
 
+/** The script's own line, alone on its line: a test run inside the push can quote it. */
+const pushedLine = (output: unknown) => String(output ?? '').match(/^ship: shipped ([0-9a-f]{7,40})\.$/m)?.[1] ?? null;
+
+/** A successful push moves the remote-tracking main, so this reads no network. */
+export const pushedToMain = (cwd: string, sha: string) => new Promise<boolean>((resolve) => {
+  execFile('git', ['-C', cwd, 'merge-base', '--is-ancestor', sha, 'refs/remotes/origin/main'], { timeout: 10_000, windowsHide: true }, (err) => resolve(!err));
+});
+
 const commonDirOf = (dir: string) => new Promise<string | null>((resolve) => {
   execFile('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000, windowsHide: true }, (err, stdout) => {
     resolve(err ? null : realOrNull(String(stdout).trim()));
@@ -484,6 +494,7 @@ export class ShipQueue {
   declare handBack: NonNullable<ShipQueueOptions['handBack']>;
   declare run: NonNullable<ShipQueueOptions['run']>;
   declare afterShip: NonNullable<ShipQueueOptions['afterShip']>;
+  declare pushed: NonNullable<ShipQueueOptions['pushed']>;
   declare memoryGate: NonNullable<ShipQueueOptions['memoryGate']>;
   declare shipScore: NonNullable<ShipQueueOptions['shipScore']>;
   declare pushSignIn: NonNullable<ShipQueueOptions['pushSignIn']>;
@@ -493,8 +504,8 @@ export class ShipQueue {
   declare clock: () => number;
   declare died: Map<string, { markedAt: number; tries: number; next: number }>;
 
-  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, memoryGate = () => null, shipScore = () => 0, pushSignIn = () => null, log = console, clock = Date.now }: ShipQueueOptions) {
-    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, memoryGate, shipScore, pushSignIn, log, clock });
+  constructor({ store, userDir, folderFor, isLive, liveSince = () => null, handBack = () => {}, run = runScript, afterShip = () => {}, pushed = pushedToMain, memoryGate = () => null, shipScore = () => 0, pushSignIn = () => null, log = console, clock = Date.now }: ShipQueueOptions) {
+    Object.assign(this, { store, userDir, folderFor, isLive, liveSince, handBack, run, afterShip, pushed, memoryGate, shipScore, pushSignIn, log, clock });
     this.busy = null;
     this.earlyConflicts = new Map();
     this.died = new Map();
@@ -618,8 +629,10 @@ export class ShipQueue {
     try {
       // Already on main: there is nothing to fix, so nobody is woken.
       const already = /There is nothing to ship/.test(out);
-      if (code === 0 || already) {
-        const sha = shippedSha(out);
+      const said = code === 0 ? null : pushedLine(out);
+      const landed = !!said && await this.pushed(cwd, said);
+      if (code === 0 || already || landed) {
+        const sha = said ?? shippedSha(out);
         this.store.shipped(product.slug, item.id, { sha, labels: withoutShipLabel(item) });
         // THE COMMIT TRAVELS WITH THE NEWS. What follows a ship wants to know
         // which commit went out: main/main-went-red.mts waits for that
