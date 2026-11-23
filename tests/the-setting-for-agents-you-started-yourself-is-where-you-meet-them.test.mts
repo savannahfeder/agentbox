@@ -29,7 +29,7 @@ const base = { change: false, terminal: null, finish: true } as const;
 describe('the ⋯ menu on one of those sessions', () => {
   it('has a row naming the setting and what it is now', () => {
     const row = threadMenuRows({ ...base, outside: 'waiting' }).find((r) => r.id === 'outside');
-    expect(row).toMatchObject({ label: 'Terminal sessions', detail: 'When they need you' });
+    expect(row).toMatchObject({ label: 'All terminal sessions', detail: 'When they need you' });
   });
   it('is not on a thread Agentbox started', () => {
     expect(threadMenuRows({ ...base }).some((r) => r.id === 'outside')).toBe(false);

@@ -6,6 +6,8 @@ import type { AgentMode } from './types';
 import { Name } from '../../shared/product-name.mjs';
 
 export const OUTSIDE_TITLE = 'Terminal sessions';
+/** On one session's ⋯, where the plain name read as a setting for that session alone. */
+export const OUTSIDE_ALL = 'All terminal sessions';
 /** Over the three choices, which answer it. */
 export const OUTSIDE_ASK = 'Show in your inbox';
 

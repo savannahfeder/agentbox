@@ -48,7 +48,7 @@ import type { Person } from '../types';
 import { ChooseList, CopiedSheet, EveryoneMark, GiveSheet, PanelBack, SeeList, SendSheet, ShareList, pointsAtStep } from './SharePanel';
 import { readAskDraft, saveAskDraft, type AskDraft, type ItemRef } from '../drafts';
 import type { SeenBy, ShareFace } from './share-rules';
-import { BRING_IN, OUTSIDE_ASK, OUTSIDE_MODES, OUTSIDE_TITLE, outsideLabel } from '../outside-agents';
+import { BRING_IN, OUTSIDE_ALL, OUTSIDE_ASK, OUTSIDE_MODES, OUTSIDE_TITLE, outsideLabel } from '../outside-agents';
 import type { AgentMode } from '../types';
 
 /** ⌘K asking a person: the thread's menu opens its sheet for them. */
@@ -150,7 +150,7 @@ export function threadMenuRows({ change, terminal, finish, follow = null, carryO
   if (people && !share) rows.push({ id: 'people', label: 'Add people', key: null });
   if (later) rows.push({ id: 'later', label: 'Later', key: later === 'key' ? 'L' : null });
   if (priority) rows.push({ id: 'priority', label: 'Priority', key: null, detail: priorityLabelOf(priority) });
-  if (outside) rows.push({ id: 'outside', label: OUTSIDE_TITLE, key: null, detail: outsideLabel(outside) });
+  if (outside) rows.push({ id: 'outside', label: OUTSIDE_ALL, key: null, detail: outsideLabel(outside) });
   if (rename) rows.push({ id: 'rename', label: 'Rename', key: null });
   if (move) rows.push({ id: 'move', label: 'Move to another project', key: null });
   if (pin) rows.push({ id: 'pin', label: pin === 'pinned' ? 'Unpin thread' : 'Pin thread', key: null });

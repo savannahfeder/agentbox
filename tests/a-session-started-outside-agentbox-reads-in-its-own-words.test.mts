@@ -172,6 +172,16 @@ describe('"You asked" is the person\'s own words', () => {
     const raw = '<send_user_message_question_reply>\n[{"questionItemId":"x","question":"Which one?","answer":"Build a local prototype"}]\n</send_user_message_question_reply>';
     expect(theirWords(raw)).toBe('Build a local prototype');
   });
+  // A power tester picked "API pagination" in Codex's own question box and the
+  // page said You asked: {"answers":{"pagination":...}} (2026-11-23).
+  it("a pick in Codex's own question box reads as the pick", () => {
+    expect(theirWords('{"answers":{"pagination":{"answers":["API pagination (Recommended)"]}}}')).toBe('API pagination (Recommended)');
+    expect(theirWords('{"answers":{"a":{"answers":["Newest first"]},"b":{"answers":["20","50"]}}}')).toBe('Newest first; 20, 50');
+  });
+  it('but words that only look like that are left as they are', () => {
+    expect(theirWords('{"answers": not json')).toBe('{"answers": not json');
+    expect(theirWords('the answers are in {braces}')).toBe('the answers are in {braces}');
+  });
   it('plain words pass through, spaces tidied', () => {
     expect(theirWords('  fix   the login\nplease ')).toBe('fix the login please');
   });

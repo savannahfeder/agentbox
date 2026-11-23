@@ -240,6 +240,14 @@ export function theirWords(raw: string | null | undefined): string {
       }).filter(Boolean).join('; ');
     } catch { s = ''; }
   }
+  // A pick in Codex's own question box comes back as {"answers":{"<id>":{"answers":[...]}}}.
+  const picked = s.trim();
+  if (/^\{\s*"answers"\s*:/.test(picked)) {
+    try {
+      const { answers } = JSON.parse(picked) as { answers?: Record<string, { answers?: unknown }> };
+      s = Object.values(answers ?? {}).map((a) => ([] as unknown[]).concat(a?.answers ?? []).map(String).join(', ')).filter(Boolean).join('; ');
+    } catch { /* not that shape: shown as written */ }
+  }
   return s.replace(/<([a-z_-]+)(?:\s[^>]*)?>[\s\S]*?<\/\1>/g, ' ')
     .replace(/# Files mentioned by the user:[\s\S]*?(?=\n\n[^#\n]|$)/, ' ')
     .replace(/\[Image #\d+\]/g, ' ').replace(/&#x20;/g, ' ')
