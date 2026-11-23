@@ -100,7 +100,9 @@ function useDocTop(file: PlacedFile, near: boolean): DocTop {
 
 /** Where a menu opens: under its button, or at the pointer for a right click. */
 type At = { x: number; y: number };
-const atButton = (el: Element): At => { const r = el.getBoundingClientRect(); return { x: r.right, y: r.bottom + 6 }; };
+const MENU_WIDTH = 210;
+const atButton = (el: Element, from: 'right' | 'left' = 'right'): At => { const r = el.getBoundingClientRect(); return { x: from === 'left' ? r.left + MENU_WIDTH : r.right, y: r.bottom + 6 }; };
+const Check = () => <svg className="fh-check" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8.3l3 3 6-6.6" /></svg>;
 
 /** A menu over the page, kept inside the window, closed by a click outside or Escape. */
 function Menu({ at, onClose, children, wide = false }: { at: At; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -123,7 +125,7 @@ function Menu({ at, onClose, children, wide = false }: { at: At; onClose: () => 
 }
 
 const Item = ({ onPick, children, on = false }: { onPick: () => void; children: ReactNode; on?: boolean }) =>
-  <button type="button" role="menuitem" className={`fh-item${on ? ' is-on' : ''}`} onClick={onPick}>{children}</button>;
+  <button type="button" role="menuitem" className={`fh-item${on ? ' is-on' : ''}`} aria-checked={on || undefined} onClick={onPick}>{children}{on && <Check />}</button>;
 
 function NameInput({ start, placeholder, onDone, onCancel }: { start: string; placeholder: string; onDone: (name: string) => void; onCancel: () => void }) {
   const [name, setName] = useState(start);
@@ -180,7 +182,7 @@ function Tile({ file, folder, me, nameOf, now, onOpen, folders, acts }: Shared &
   const line = file.kind === 'markdown' ? doc.line : tileLine(file);
   const picture = markOf(file) === 'picture' && !broken;
   const inside = <>
-    {picture ? <span className="fh-thumb">{near && <img src={pictureUrl(file.opened!)} alt="" draggable={false} onError={() => setBroken(true)} />}</span>
+    {picture ? <span className="fh-preview">{near && <img src={pictureUrl(file.opened!)} alt="" draggable={false} onError={() => setBroken(true)} />}</span>
       : <GlyphMark glyph={glyphFor(file, folder?.name ?? null, doc.title)} />}
     <span className="fh-name">{renaming ? <NameInput start={name} placeholder="Name" onCancel={() => setRenaming(false)} onDone={(n) => { setRenaming(false); acts.rename(file, n); }} />
       : <span>{name}</span>}{folder && pinChangedLately(folder, file, now) && <i className="fh-dot" title="Changed this week" />}</span>
@@ -203,7 +205,7 @@ function FolderHead({ folder, count, onFolder, acts, big = false }: { folder: Fi
   const [menu, setMenu] = useState<At | null>(null);
   const [renaming, setRenaming] = useState(false);
   const menuButton = <button type="button" className={`fh-more-btn is-inline${menu ? ' is-open' : ''}`} aria-label={`More for ${folder.name}`} aria-haspopup="menu" aria-expanded={!!menu}
-    onClick={(e) => setMenu(menu ? null : atButton(e.currentTarget))}><Dots /></button>;
+    onClick={(e) => setMenu(menu ? null : atButton(e.currentTarget, 'left'))}><Dots /></button>;
   const menuBox = menu && <Menu at={menu} onClose={() => setMenu(null)}>
     <Item onPick={() => { setMenu(null); setRenaming(true); }}>Rename</Item>
     <div className="fh-menu-gap" role="separator" />
@@ -269,8 +271,8 @@ export function FilesHome({ title, crumbs, onCrumb, page, home, projects, found,
   const heading = page.kind === 'folder' ? <FolderHead folder={page.folder} count={null} onFolder={onFolder} acts={shared.acts} big /> : <h1>{page.kind === 'loose' ? 'Not in a folder' : title}</h1>;
   return <div className="fh">
     {crumbs.length > 0 && <nav className="fh-crumbs" aria-label="Where you are">
-      {crumbs.map((c) => <span key={`${c.project}/${c.folder}`} className="fh-crumb-box">
-        <button type="button" className="fh-crumb" onClick={() => onCrumb(c)} {...(c.project ? dropOn(c.folder, () => {}) : {})}>{c.name}</button><Chevron />
+      {crumbs.map((c, i) => <span key={`${c.project}/${c.folder}`} className="fh-crumb-box">
+        {i > 0 && <Chevron />}<button type="button" className="fh-crumb" onClick={() => onCrumb(c)} {...(c.project ? dropOn(c.folder, () => {}) : {})}>{c.name}</button>
       </span>)}
     </nav>}
     <div className="fh-top">

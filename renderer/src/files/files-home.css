@@ -58,9 +58,11 @@
 .fh-sec:hover .fh-head .fh-more-btn, .fh-title:hover .fh-more-btn, .fh-more-btn.is-inline.is-open { opacity: 1; transform: none; }
 
 .fh-glyph { flex: none; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-dim); }
-.fh-thumb { flex: none; display: block; width: 44px; height: 30px; overflow: hidden; border-radius: 6px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--line); }
-.fh-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
-.fh-thumb + .fh-name { margin-top: 10px; }
+/* A picture shows itself: 562 pictures under one picture icon were all alike. */
+.fh-preview { flex: none; display: block; height: 58px; margin: -4px -6px 0; overflow: hidden; border-radius: 8px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--line); }
+.fh-preview img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.fh-preview + .fh-name { margin-top: 10px; }
+.fh-preview ~ .fh-line { -webkit-line-clamp: 1; }
 .fh-name { margin-top: 12px; display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 14.5px; line-height: 20px; font-weight: 600; letter-spacing: -.004em; color: var(--text); }
 .fh-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fh-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
@@ -95,7 +97,7 @@
 }
 .fh-item svg { flex: none; color: var(--text-faint); }
 .fh-item:hover { background: var(--wash-strong); }
-.fh-item.is-on { color: var(--text-dim); }
+.fh-item .fh-check { margin-left: auto; color: var(--text-dim); }
 .fh-sub { padding-left: 14px; display: inline-flex; }
 .fh-icons { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 2px 4px 4px; }
 .fh-icon-pick {
