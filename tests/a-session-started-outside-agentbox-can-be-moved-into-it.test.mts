@@ -172,6 +172,13 @@ describe('the app around it', () => {
     expect(handler).toContain("store.recordSessionResult(product, had.id, { result: chat.lastSaid, status: null })");
     expect(handler).toContain("if (had.status === 'done') store.answerItem(product, had.id, { status: 'open' })");
   });
+  // A moved Codex thread follows Codex's newest answer through the Codex watch.
+  // The browser copy never started it, so a power tester's moved thread kept
+  // asking whether to start a memo its terminal had finished.
+  it('the browser copy keeps moved Codex threads in step, as the desktop does', () => {
+    expect(read('bin/agentbox.mjs')).toMatch(/codexWatch = startCodexWatch\(\{/);
+    expect(read('main/main.mts')).toMatch(/const codexWatch = startCodexWatch\(\{/);
+  });
   it('offers it only on a session with a project to go to and an id to file it under', () => {
     expect(read('renderer/src/components/Focus.tsx')).toContain('onBringIn={agent?.product && agent.sessionId && onBringIn ? onBringIn : null}');
   });

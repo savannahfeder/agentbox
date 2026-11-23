@@ -25,6 +25,9 @@ const { learnShellDataDirs } = await import('../main/shell-path.mts');
 const { startFreezeRecorder } = await import('../main/freeze-recorder.mts');
 const { readHubAddress } = await import('../main/hub-address.mts');
 const { watchNewChatsFor } = await import('../main/new-chats-watch.mts');
+const { startCodexWatch } = await import('../main/codex-watch.mts');
+const { readCodexThreadsOffThread } = await import('../main/chat-reader.mts');
+const { appSessionFolders } = await import('../main/agent-homes.mts');
 const { osOpenDialog } = await import('../main/os-folder-window.mts');
 const { browserLauncher } = await import('../main/open-in-browser.mts');
 
@@ -96,6 +99,7 @@ startFreezeRecorder({
 // entry is the same inbox, so a launch that asks for no agents must not start
 // them here either.
 let newChatsWatch = null;
+let codexWatch = null;
 if (!process.env.ZERO_NO_SUPERVISOR) {
   // Whoever was signed in to the team last time is signed in again.
   booted.team?.start().then(() => booted.supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
@@ -105,6 +109,11 @@ if (!process.env.ZERO_NO_SUPERVISOR) {
   booted.supervisor.start();
   // The chats setup's "Keep bringing in new chats" tick asks for.
   newChatsWatch = watchNewChatsFor({ store: booted.store, config: booted.config, supervisor: booted.supervisor });
+  // And the one that keeps a Codex conversation brought in here following Codex's newest answer, as the desktop does.
+  codexWatch = startCodexWatch({
+    store: booted.store,
+    readThreads: (opts) => readCodexThreadsOffThread({ ...opts, codexDirs: appSessionFolders({ config: booted.config, supervisor: booted.supervisor }).codexDirs }),
+  });
 }
 const token = newToken();
 const server = createServer({
@@ -145,6 +154,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     console.log('\n  Stopping.');
     newChatsWatch?.stop();
+    codexWatch?.stop();
     booted.host.app.quit();
     // The quit count and whatever is still queued, or a copy opened once is
     // never heard from. `shutdown` rather than `flush`, because flush does not
