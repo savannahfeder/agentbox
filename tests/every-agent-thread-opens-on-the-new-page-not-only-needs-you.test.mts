@@ -26,7 +26,7 @@ const thread = read('renderer/src/components/ItemThread.tsx');
 
 describe('which threads get the page', () => {
   it('every thread with an agent, wherever it is opened from', () => {
-    expect(app).toMatch(/const onePage = !!focused && !directSlugs\.has\(focused\.product\);/);
+    expect(app).toMatch(/const onePage = !!focused && \(!directSlugs\.has\(focused\.product\) \|\| isTaskRow\(focused\)\);/);
     expect(app).toMatch(/onePage=\{onePage\}/);
     expect(focus).toMatch(/const page = !!queue \|\| !!onePage;/);
   });

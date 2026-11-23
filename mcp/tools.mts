@@ -33,6 +33,7 @@ import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
 import { joinCause } from './core/causes.mts';
 import { addRuleToProduct } from './core/project-rules.mts';
 import { joinedWords } from '../shared/causes.mts';
+import { askToBringBack } from '../main/files-come-back.mts';
 // The descriptions below are read by every agent on every run, so the app is
 // named in them from the one place it is named. They said "the app" while this
 // server lived in that product's repo, which told every worker the wrong name
@@ -667,6 +668,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       const said = await waitForSignIn(id, asked.id, { product });
       return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' || said.status === 'code' ? withKeep(said, true) : said);
     },
+  });
+
+  // On a cloud machine the computer is asked with request_cloud_resource, which brings such a file back first.
+  if (typeof requestCloudResource !== 'function') tools.push({
+    name: 'bring_back_files',
+    description: `Bring back pictures, films and sound ${Name} moved to the cloud to free space on this computer. One nobody opened for a while leaves its folder, so a file or folder that should be there and is not may come back with this. Give the paths as you would open them, files or folders: a folder brings back everything that left it. Waits up to 45 seconds; call again with the same paths if some are still on their way.`,
+    schema: {
+      paths: z.array(z.string()).min(1).max(200).describe('the files or folders, written out in full or inside a project\'s folder (designs/w-…/shots)'),
+    },
+    run: async ({ paths }: { paths: string[] }) => json(await askToBringBack({ dir: path.join(account.root, '.files-cloud', 'asks'), paths, cwd: process.cwd() })),
   });
 
   if (typeof requestCloudResource === 'function') tools.push({

@@ -560,7 +560,7 @@ describe('the way back', () => {
     // mode set on a Codex row was silently dropped by the run; it reaches
     // `thread/start` now, so the control is honest on either engine. An
     // external agent row still has none.
-    expect(focus).toContain('const canSetMode = !item.agent;');
+    expect(focus).toContain('const canSetMode = !item.agent && ownControls;');
     expect(focus.match(/const claudeCode = /g)).toHaveLength(1);
   });
 });
