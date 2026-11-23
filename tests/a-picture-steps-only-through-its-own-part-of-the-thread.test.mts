@@ -99,7 +99,8 @@ describe('the thread says which part each block is in', () => {
   it('puts that turn on the answer itself', () => {
     const view = fs.readFileSync(new URL('../renderer/src/components/ItemThread.tsx', import.meta.url), 'utf8');
     const answer = view.slice(view.indexOf('const answer = outcome'), view.indexOf('return (', view.indexOf('const answer = outcome')));
-    expect(answer.match(/data-exchange=\{answerAt\}/g)).toHaveLength(2);
+    // The agent's result, its checkpoint, and the app's own quiet note.
+    expect(answer.match(/data-exchange=\{answerAt\}/g)).toHaveLength(3);
     expect(view).toMatch(/const answerAt = answerTurn\(events, omitted, chat\)/);
   });
 
