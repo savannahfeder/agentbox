@@ -18,7 +18,6 @@ import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
 import { phoneSlug, type phoneView } from '../../../renderer/src/phone-rows';
 import type { ThreadStateWord, WorkItem } from '../../../renderer/src/types';
-import { teammateIdOf } from '../../../shared/teammates.mts';
 import { keepsAgent, type Harness } from './agent-filter';
 import { harnessOf } from '../../../renderer/src/box-filter';
 
@@ -194,16 +193,15 @@ export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: num
  * would draw with no filter on. `above` is the rows drawn over the list that no
  * filter hides (mentions, questions, repeating tasks).
  */
-export function filterCount({ rows, whole, mineOnly = false, above = 0, board = null, wholeBoard = null }: {
-  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number;
+export function filterCount({ rows, whole, above = 0, board = null, wholeBoard = null }: {
+  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; above?: number;
   board?: { rows: unknown[] }[] | null; wholeBoard?: { rows: unknown[] }[] | null;
 }) {
   if (board && wholeBoard) {
     const cards = (b: { rows: unknown[] }[]) => b.reduce((n, c) => n + c.rows.length, 0);
     return { shown: cards(board), total: cards(wholeBoard) };
   }
-  const counted = (list: Pick<Row, 'item'>[]) => (mineOnly ? list.filter((r) => !teammateIdOf(r.item)) : list).length;
-  return { shown: counted(rows) + above, total: counted(whole) + above };
+  return { shown: rows.length + above, total: whole.length + above };
 }
 
 /** The board, column by column, as the site draws it (page-rules.ts `boardColumns`). */

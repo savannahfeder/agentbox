@@ -3,15 +3,26 @@
 import { firstName } from '../../../renderer/src/team/company';
 import { shippedThisWeek, shippedWords, type ShippedRow } from '../../../renderer/src/team/shipped';
 import type { Person, ThreadCard } from '../../../renderer/src/types';
-import { threadCardOf, type ThreadCardRow } from './everything';
 
 export { shippedWords, type ShippedRow };
 
 const WEEK = 7 * 86_400_000;
 
-// Its own query, not Everything else's: a cloud from before shipped_at would refuse the whole read.
+// Asks for shipped_at by name: a cloud from before it refuses the read, and the page says so.
 export const shippedCardsQuery = (now: number) =>
   `select=person_id,thread_id,visible,title,project,state,priority,people,shipped_at,updated_at&shipped_at=gte.${encodeURIComponent(new Date(now - WEEK).toISOString())}&order=shipped_at.desc&limit=200`;
+
+/** One `thread_cards` row, less what only the shipped list reads. */
+type ThreadCardRow = {
+  person_id: string; thread_id: string; visible?: boolean | null; title?: string | null; project?: string | null; state: ThreadCard['state'];
+  priority?: number | null; problem?: string | null; progress?: string | null; solution?: string | null; updated_at: string;
+};
+function threadCardOf(r: ThreadCardRow): ThreadCard {
+  return {
+    personId: r.person_id, threadId: r.thread_id, visible: r.visible !== false, title: r.title ?? null, project: r.project ?? null, state: r.state,
+    priority: r.priority ?? null, problem: r.problem ?? null, progress: r.progress ?? null, solution: r.solution ?? null, blockedBy: [], blocks: [], people: null, updatedAt: Date.parse(r.updated_at) || 0,
+  } as ThreadCard;
+}
 
 /** One `thread_cards` row as shippedCardsQuery reads it. */
 export type ShippedCardRow = ThreadCardRow & { people?: unknown; shipped_at?: string | null };

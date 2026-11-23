@@ -21,7 +21,6 @@ describe("the phone's command bar", () => {
     expect(label('done')).toBe('Go to Done');
   });
   it('names the team places the same way', () => {
-    expect(label('everything', true)).toBe('Go to Everything else');
     expect(label('chats', true)).toBe('Go to Chats');
   });
   it('calls the filters row Filter…', () => {

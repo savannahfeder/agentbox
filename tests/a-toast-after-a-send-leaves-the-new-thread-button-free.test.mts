@@ -12,16 +12,20 @@ import { PEN, penOnScreen, toastPlace } from '../mobile/src/lib/overlays';
 const inbox = fs.readFileSync(new URL('../mobile/src/app/index.tsx', import.meta.url), 'utf8');
 const toast = fs.readFileSync(new URL('../mobile/src/ui/Toast.tsx', import.meta.url), 'utf8');
 
+// The first fix stopped the toast short of the pen, level with it, so it ran
+// from 12 to 302 on a screen 390 wide: "the little toast messages that come up
+// don't seem to be centered" (2026-11-22). It now keeps the screen's width and
+// sits above the pen instead.
 describe('on the inbox, where the pen is', () => {
   const foot = 34;
   const p = toastPlace('inbox', foot);
-  it('the toast ends before the pen starts, with a gap', () => {
-    expect(p.right).toBeGreaterThanOrEqual(PEN.right + PEN.size + 8);
+  it('the toast is centred: as far from the right edge as from the left', () => {
+    expect(p.right).toBe(12);
+    expect(toast).toMatch(/left: 12, right, bottom/);
   });
-  it('and sits level with it, centre on centre, not above it', () => {
-    const toastCentre = p.bottom + 20;
-    const penCentre = foot + PEN.lift + PEN.size / 2;
-    expect(toastCentre).toBe(penCentre);
+  it('and sits clear above the pen, with a gap, not over it', () => {
+    expect(p.bottom).toBeGreaterThanOrEqual(foot + PEN.lift + PEN.size + 8);
+    expect(p.bottom).toBeLessThanOrEqual(foot + PEN.lift + PEN.size + 16);
   });
   it('the pen is drawn from the same numbers', () => {
     expect(inbox).toMatch(/right: PEN\.right, bottom: foot \+ PEN\.lift, width: PEN\.size, height: PEN\.size/);

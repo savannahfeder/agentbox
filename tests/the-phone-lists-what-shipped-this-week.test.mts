@@ -84,10 +84,4 @@ describe('where it is reached', () => {
   it('not with no team', () => {
     expect(phoneCommands({ team: false }).map((c) => c.id)).not.toContain('team-list-shipped');
   });
-
-  it('from the team\'s card in Everything else, and no other card', () => {
-    const ev = fs.readFileSync('mobile/src/ui/Everything.tsx', 'utf8');
-    expect(ev).toMatch(/onShipped=\{member\.team \? \(\) => router\.push\('\/shipped'\) : undefined\}/);
-    expect(ev).toMatch(/>Shipped this week</);
-  });
 });

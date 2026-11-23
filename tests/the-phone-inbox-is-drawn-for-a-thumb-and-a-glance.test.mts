@@ -17,7 +17,7 @@ describe('the tabs', () => {
     expect(tabs).toMatch(/color: on === t\.id \? color\.ink : color\.dim/);
     expect(tabs).not.toMatch(/borderBottomWidth/);
     expect(tabs).not.toMatch(/foot/);
-    expect(inbox).toMatch(/below=\{board \? undefined : <Tabs /);
+    expect(inbox).toMatch(/below=\{<Tabs /);
   });
   it('sit close, since each pill pads itself, and still tighten on a narrow screen', () => {
     expect(TAB_GAP.loose).toBeLessThanOrEqual(6);

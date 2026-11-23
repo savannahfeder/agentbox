@@ -1,6 +1,5 @@
 // What shipped this week, as the desktop's team list draws it (team/TeamLists.tsx
-// `ShippedList`): each thread, whose it is, and the day. Reached from Search and
-// the team's card in Everything else.
+// `ShippedList`): each thread, whose it is, and the day. Reached from Search.
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
@@ -10,7 +9,7 @@ import { router } from '../lib/router';
 import { phoneShipped, shippedCardOf, shippedCardsQuery, shippedName, shippedWords, type ShippedCardRow, type ShippedRow } from '../lib/shipped';
 import { screenGate } from '../lib/thread-gate';
 import { useCloud } from '../state/cloud';
-import { CardSheet } from '../ui/Everything';
+import { CardSheet } from '../ui/CardSheet';
 import { Back } from '../ui/icons';
 import { Waiting } from '../ui/LogoOrbit';
 import { IconButton, T, TopBar, Wall } from '../ui/parts';

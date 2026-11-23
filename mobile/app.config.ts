@@ -52,7 +52,8 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
   // Automatic so Match system can read the phone's own light or dark (state/look.tsx).
   userInterfaceStyle: 'automatic',
-  backgroundColor: '#1a1817',
+  // Light's ground (ui/theme.ts), behind the app until it draws.
+  backgroundColor: '#f8f8fa',
   ios: {
     // iPhone only; it still runs in an iPad's iPhone mode, where reviewers sometimes test.
     supportsTablet: false,

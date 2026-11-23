@@ -4,7 +4,7 @@
 // answered 'dark', and by reading ui/theme.ts, whose colours started as DARK.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { lookOf, wornOf } from '../mobile/src/lib/look';
+import { lookOf, schemeOf, wornOf } from '../mobile/src/lib/look';
 import { color, LIGHT, DARK, wear } from '../mobile/src/ui/theme';
 
 describe('the look nobody picked', () => {
@@ -38,5 +38,25 @@ describe('a look somebody picked', () => {
     expect(color.bg).toBe(DARK.bg);
     wear('light');
     expect(color.bg).toBe(LIGHT.bg);
+  });
+});
+
+// "It also should default to light mode rather than matching your operating
+// system" (2026-11-22). The screens were Light, but on a phone set to Dark the
+// keyboard and the system's own sheets stayed dark, and the ground behind the
+// app before it draws was the old Dark's #1a1817. Measured by reading
+// app.config.ts and state/look.tsx, which never told the system which look is worn.
+describe('what the system draws for the app', () => {
+  const look = fs.readFileSync('mobile/src/state/look.tsx', 'utf8');
+  it('is told the look that is worn, and to follow the phone only under Match system', () => {
+    expect(schemeOf('light')).toBe('light');
+    expect(schemeOf('dark')).toBe('dark');
+    expect(schemeOf('match')).toBe('unspecified');
+    expect(look).toMatch(/Appearance\.setColorScheme\?\.\(schemeOf\(look\)\)/);
+  });
+  it('starts from Light\'s ground before the app has drawn', () => {
+    const config = fs.readFileSync('mobile/app.config.ts', 'utf8');
+    expect(config).toContain(`backgroundColor: '${LIGHT.bg}'`);
+    expect(config).not.toMatch(/#1a1817/);
   });
 });

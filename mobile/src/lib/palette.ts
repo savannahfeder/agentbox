@@ -47,7 +47,7 @@ function computerCommands(c: ComputerFacts): PhoneCommand[] {
 }
 
 export function phoneCommands({ team, mates = [], groups = [], looks = [], pages = [], computer = null }: {
-  /** A team is on: In progress, Later and Done sit under Everything else. */
+  /** A team is on (Groups or AI teammates): Chats is a place. */
   team: boolean;
   mates?: readonly { id: string; name: string; paused?: boolean }[];
   groups?: readonly { id: string; name: string }[];
@@ -59,10 +59,7 @@ export function phoneCommands({ team, mates = [], groups = [], looks = [], pages
   return [
     { id: 'new', label: 'New thread', keywords: 'compose write task', act: { push: '/new' } },
     { id: 'inbox', label: 'Go to Inbox', keywords: 'needs you home list threads', act: { go: 'inbox' } },
-    ...(team ? [
-      { id: 'everything', label: 'Go to Everything else', keywords: 'team board cards', act: { go: 'everything' as const } },
-      { id: 'chats', label: 'Go to Chats', keywords: 'groups messages people', act: { go: 'chats' as const } },
-    ] : []),
+    ...(team ? [{ id: 'chats', label: 'Go to Chats', keywords: 'groups messages people team', act: { go: 'chats' as const } }] : []),
     { id: 'progress', label: 'Go to In progress', keywords: 'running working', act: { go: 'progress' } },
     { id: 'later', label: 'Go to Later', keywords: 'snoozed scheduled', act: { go: 'snoozed' } },
     { id: 'done', label: 'Go to Done', keywords: 'closed finished', act: { go: 'done' } },

@@ -83,7 +83,7 @@ describe('everything that counts or lists your threads agrees with the board', (
     expect(app).not.toMatch(/yoursOnly\(/);
   });
 
-  it('the phone, which draws no teammate name on a card, keeps them off its own board', () => {
-    expect(read('mobile/src/lib/everything.ts')).toMatch(/export const myItems = [^\n]*!teammateIdOf\(/);
+  it('the phone\'s board draws them too, each card under its teammate\'s name', () => {
+    expect(read('mobile/src/app/index.tsx')).toMatch(/mateOf\(e\.item, c0\.team\)\?\.name \?\? e\.agent/);
   });
 });

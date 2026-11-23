@@ -10,13 +10,13 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { askUnderAnswer, pageOf } from '../mobile/src/lib/one-page';
-import { cardsDrawn, cardsShown, myItems, phoneMembers, threadCardOf } from '../mobile/src/lib/everything';
+import { shippedCardOf } from '../mobile/src/lib/shipped';
 import { commandsFor, phoneCommands } from '../mobile/src/lib/palette';
 import { bodyParts, pictureType } from '../mobile/src/lib/groups';
 import { searchSettings } from '../renderer/src/settings-search';
 
 const read = (p) => fs.readFileSync(p, 'utf8');
-const store = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) }; };
+
 const said = (at, who, text) => ({ at, who, text });
 const item = (more = {}) => ({ id: 'w-1', product: 'p', title: 'Plan the launch', status: 'blocked', labels: ['founder'], ...more });
 
@@ -70,54 +70,18 @@ describe('a thread as one page', () => {
   });
 });
 
-describe('Everything else', () => {
-  const card = (id, name, more = {}) => ({ id, name, me: false, avatarUrl: null, agents: 0, level: null, workingOn: null, workingPrivate: false, status: null, ...more });
-  const team = { id: 'r-team', name: 'Team', kind: 'room', teamId: 't', lastAt: 5, unread: 2, people: [{ id: 'me', name: 'Ada', avatarUrl: null }, { id: 'p-2', name: 'Sam', avatarUrl: null }], wall: [card('me', 'Ada', { me: true, agents: 2 }), card('p-2', 'Sam', { agents: 1, workingOn: 'A thing' })] };
-  const dm = { id: 'r-dm', name: 'Sam', kind: 'group', teamId: null, lastAt: 7, unread: 0, wall: [card('me', 'Ada', { me: true }), card('p-2', 'Sam')] };
-  const other = { id: 'r-launch', name: 'Launch', kind: 'room', teamId: null, lastAt: 9, unread: 1, wall: [] };
-  const mate = { id: 't-a', name: 'Chief', letter: 'C', role: null, now: null, status: 'active', paused: false, running: null, waiting: [] };
-  it('cards are you, the team, each person, each teammate and your other chats', () => {
-    const members = phoneMembers({ meId: 'me', rooms: [team, dm, other], messages: { 'r-team': [{ body: 'Hi' }] }, mates: [mate], store: store() });
-    expect(members.map((m) => m.key)).toEqual(['me', 'room:r-team', 'person:p-2', 'mate:t-a', 'room:r-launch']);
-    expect(members[0]).toMatchObject({ name: 'You', faceName: 'Ada', agents: 2 });
-    expect(members[1]).toMatchObject({ team: true, unread: true });
-  });
-  it('a teammate counts the agents on its own runs, not on yours', () => {
-    const items = [{ id: 'w-1', labels: ['teammate:t-a'], title: 'Its run' }, { id: 'w-2', labels: [], title: 'Mine' }, { id: 'w-3', labels: ['teammate:t-a'], title: 'Idle' }];
-    const members = phoneMembers({ meId: 'me', rooms: [], messages: {}, mates: [mate], items, running: [{ itemId: 'w-1' }, { itemId: 'w-2' }], store: store() });
-    expect(members.find((m) => m.key === 'mate:t-a').agents).toBe(1);
-    expect(members[0]).toMatchObject({ agents: 1, now: 'Mine' });
-  });
-  it('with no team group the people on your team are still cards', () => {
-    const members = phoneMembers({ meId: 'me', rooms: [], messages: {}, teamPeople: [{ id: 'me', name: 'Ada' }, { id: 'p-9', name: null, email: 'kai@example.test' }], store: store() });
-    expect(members.map((m) => m.name)).toEqual(['You', 'kai@example.test']);
-  });
-  it('your own board leaves your teammates\' runs to their cards', () => {
-    expect(myItems([{ id: 'a', labels: ['teammate:t-a'] }, { id: 'b', labels: ['founder'] }, { id: 'c' }]).map((i) => i.id)).toEqual(['b', 'c']);
-  });
-  it('one row of two cards, with the line that shows the rest, and the lit card kept in view', () => {
-    expect(cardsShown(2, false)).toEqual({ count: 2, line: null });
-    expect(cardsShown(5, false)).toEqual({ count: 2, line: 'Show 3 more' });
-    expect(cardsShown(5, true)).toEqual({ count: 5, line: 'Show fewer' });
-    const m = ['a', 'b', 'c', 'd'].map((key) => ({ key }));
-    expect(cardsDrawn(m, 'd', false).map((x) => x.key)).toEqual(['a', 'd']);
-    expect(cardsDrawn(m, 'a', false).map((x) => x.key)).toEqual(['a', 'b']);
-  });
-  it('a shared thread reads as a card, and a private one keeps its words out', () => {
-    expect(threadCardOf({ person_id: 'p', thread_id: 't', visible: false, title: null, state: 'running', updated_at: '2026-10-30T00:00:00Z' })).toMatchObject({ personId: 'p', threadId: 't', visible: false, title: null, state: 'running' });
-  });
-  it('the page draws it under the tabs, and the board is yours', () => {
-    const src = read('mobile/src/app/index.tsx');
-    expect(src).toMatch(/<EverythingPlace mine=/);
-    expect(src).toMatch(/items: myItems\(c\.view\.items\)/);
-    expect(src).toMatch(/col\.state !== 'waiting'/);
+// Everything else and its team cards went on 2026-11-22
+// (the-phone-has-no-everything-else-and-every-state-is-a-tab); what shipped still reads the team's shared threads.
+describe('a teammate\'s shared thread', () => {
+  it('reads as a card, and a private one keeps its words out', () => {
+    expect(shippedCardOf({ person_id: 'p', thread_id: 't', visible: false, title: null, state: 'running', updated_at: '2026-10-30T00:00:00Z' })).toMatchObject({ personId: 'p', threadId: 't', visible: false, title: null, state: 'running' });
   });
 });
 
 describe('the magnifier runs commands', () => {
   const all = phoneCommands({ team: true, mates: [{ id: 't-a', name: 'Chief of staff' }], groups: [{ id: 'r', name: 'Launch week' }], looks: [{ id: 'dark', name: 'Dark' }], pages: [{ id: 'team', label: 'Team' }] });
   it('offers the phone\'s places, teammates, groups, looks and Settings pages', () => {
-    expect(all.map((c) => c.label)).toEqual(expect.arrayContaining(['New thread', 'Go to Inbox', 'Go to Everything else', 'Go to Chats', 'Go to In progress', 'Filter…', 'New teammate', 'Chief of staff', 'Launch week', 'Dark', 'Team']));
+    expect(all.map((c) => c.label)).toEqual(expect.arrayContaining(['New thread', 'Go to Inbox', 'Go to Chats', 'Go to In progress', 'Filter…', 'New teammate', 'Chief of staff', 'Launch week', 'Dark', 'Team']));
   });
   it('offers no team places, teammate or group with no team', () => {
     const none = phoneCommands({ team: false }).map((c) => c.id);

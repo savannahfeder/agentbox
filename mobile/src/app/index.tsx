@@ -10,10 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { backWords, emptyTabWords, readDisplay, rowPriorityId, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
-import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
+import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { agentChoices, type Harness } from '../lib/agent-filter';
-import { EverythingPlace } from '../ui/Everything';
 import { FilesPlace } from '../ui/FilesPlace';
 import { bottomTabs, type PlaceId } from '../lib/groups';
 import { useGroups } from '../state/groups';
@@ -183,9 +181,11 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: Wo
 /** The tabs under the title, inside the top bar, with Groups fifth while it
  * is on: a pill each, the picked one filled. They stay at the top ("all that
  * stuff is best placed at the top") and scroll sideways when they do not fit. */
-function Tabs({ on, counts, pick, team }: { on: PlaceId; counts: Record<PlaceId, number>; pick: (t: PlaceId) => void; team: boolean }) {
+function Tabs({ on, counts, pick, team, board = false }: { on: PlaceId; counts: Record<PlaceId, number>; pick: (t: PlaceId) => void; team: boolean; board?: boolean }) {
   const [span, setSpan] = useState({ view: 0, content: 0, x: 0 });
-  const tabs = bottomTabs(team);
+  const tabs = bottomTabs(team, board);
+  // The board's one tab is lit whichever state was open under it.
+  if (board && on !== 'chats' && on !== 'files') on = 'inbox';
   const counted = tabs.filter((t) => t.id !== 'done' && counts[t.id] > 0).length;
   const [tight, setTight] = useState(false);
   useEffect(() => { setTight((now) => tabsTighten(span, now, { tabs: tabs.length, counted })); }, [span.view, span.content, tabs.length, counted]);
@@ -259,7 +259,8 @@ function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; cle
 
 /** The board: a column a swipe, each scrolling on its own (phone.css `.th-board`). */
 const SHADE = 16;
-function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; foot: number; inset?: number }) {
+function Board({ columns, foot }: { columns: ReturnType<typeof phoneBoard>; foot: number }) {
+  const inset = 12;
   const { width } = useWindowDimensions();
   const c0 = useCloud();
   const room = c0.approvalRoom;
@@ -297,7 +298,8 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {e.queued ? <T style={{ fontSize: 12.5, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
                 {rowPriorityId(e.priority) && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority!)} /></View>}
-                {e.agent && <T style={{ fontSize: 12.5, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
+                {/* A teammate's run is named for the teammate, as its row in the list is. */}
+                {(mateOf(e.item, c0.team)?.name ?? e.agent) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12.5, color: color.dim, marginRight: 8 }}>{mateOf(e.item, c0.team)?.name ?? e.agent}</T>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12.5, color: color.faint }}>{e.project}</T>
                 {c.state === 'scheduled' && e.item && !!backWords(e.item, c0.now) && <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 12.5, color: color.faint, marginLeft: 8 }}>{backWords(e.item, c0.now)}</T>}
               </View>
@@ -336,12 +338,7 @@ export default function Threads() {
   const teamMode = !!c.team || groups.on;
   const onChats = teamMode && place === 'chats';
   const onFiles = place === 'files';
-  const onEverything = teamMode && place !== 'inbox' && place !== 'chats' && !onFiles;
-  // In progress, Later and Done are your own card's work on Everything else.
-  const [mineTab, setMineTab] = useState<Exclude<TabId, 'inbox'>>('progress');
-  const [evView, setEvViewRaw] = useState<EvView>(() => evViewOf(appStore));
-  const setEvView = (v: EvView) => { setEvViewRaw(v); keepEvView(v, appStore); };
-  const tab: TabId = onEverything ? mineTab : place === 'everything' || place === 'chats' || place === 'files' || teamMode ? 'inbox' : place;
+  const tab: TabId = place === 'chats' || place === 'files' ? 'inbox' : place;
   const openGroup = (id: string) => { groups.setLast(id); setChatGroup(place); setPlace('chats'); };
   // A command from Search (app/search.tsx).
   useEffect(() => {
@@ -350,7 +347,7 @@ export default function Threads() {
     c.takeWanted();
     setChatGroup(w.group ? 'chats' : null);
     if (w.menu) setMenu(true);
-    if (w.place !== 'inbox' && w.place !== 'chats' && w.place !== 'everything' && w.place !== 'files' && teamMode) { setMineTab(w.place); setPlace('everything'); } else setPlace(w.place);
+    setPlace(w.place);
   }, [c.wanted]); // eslint-disable-line react-hooks/exhaustive-deps
   const [pulling, setPulling] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -361,11 +358,7 @@ export default function Threads() {
   const [agent, setAgent] = useState<Harness | null>(null);
   const order = c.view.projectOrder;
   const shown = useMemo(() => shownTabs(c.tabs, display, c.now, order, agent), [c.tabs, display, c.now, order, agent]);
-  const board = useMemo(() => (!teamMode && display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now, agent) : null), [teamMode, display, c.view, c.tabs, c.now, agent]);
-  // Your card's board: your own threads, and what waits on you is Needs you, so it is no column (whose-board.ts).
-  const mineBoard = useMemo(() => (onEverything && evView === 'board'
-    ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, display, c.now, agent).filter((col) => col.state !== 'waiting') : null), [onEverything, evView, display, c.view, c.tabs, c.now, agent]);
-  const rowOf = useMemo(() => new Map(Object.values(c.tabs).flat().map((r) => [r.key, r])), [c.tabs]);
+  const board = useMemo(() => (display.view === 'board' ? phoneBoard(c.view, c.tabs, display, c.now, agent) : null), [display, c.view, c.tabs, c.now, agent]);
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [closing, setClosing] = useState(false);
   const [pickedMenu, setPickedMenu] = useState(false);
@@ -375,8 +368,7 @@ export default function Threads() {
   const rowActs = useMemo(() => ({ close: (i: WorkItem) => { void c.closeAll([i]); }, later: (i: WorkItem) => setLaterOne(i) }), [c.closeAll]);
   if (!c.opened) return <Wall><Waiting /></Wall>;
   if (!c.signedIn) return <Redirect href="/sign-in" />;
-  // Under your own card, your threads without your AI teammates' runs, which their cards hold.
-  const rows = onEverything ? myItems(shown.rows[tab].map((r) => ({ ...r, labels: r.item?.labels }))) as typeof shown.rows[TabId] : shown.rows[tab];
+  const rows = shown.rows[tab];
   // Later counts its repeating tasks too, as the desktop's does (App.tsx `scheduledCount`).
   // Messages in your groups that name you lead Needs you, and count in it (App.tsx `MentionRows`).
   const mentions = groups.on ? mentionRows(groups.state.mentions, groups.state) : [];
@@ -387,7 +379,7 @@ export default function Threads() {
     .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
     .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
-  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0), files: 0 };
+  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0), files: 0 };
   const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
   const mentionsShown = tab === 'inbox' && (mentions.length > 0 || asks.length > 0);
   const hidden = shown.whole[tab] - shown.rows[tab].length;
@@ -410,14 +402,11 @@ export default function Threads() {
   const level = pickedPriority(pickedItems);
   const unfiltered: Display = { ...display, priorities: [], projects: [], updated: 'any', privacy: 'any' };
   const clear = () => { setDisplay(unfiltered); setAgent(null); };
-  const agents = agentChoices(board || mineBoard ? Object.values(c.tabs).flat() : c.tabs[tab], display, c.now, agent);
+  const agents = agentChoices(board ? Object.values(c.tabs).flat() : c.tabs[tab], display, c.now, agent);
   const menuCount = () => {
-    const drawnBoard = onEverything ? mineBoard : board;
-    const wholeBoard = !drawnBoard ? null : onEverything
-      ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, unfiltered, c.now).filter((col) => col.state !== 'waiting')
-      : phoneBoard(c.view, c.tabs, unfiltered, c.now);
+    const wholeBoard = board ? phoneBoard(c.view, c.tabs, unfiltered, c.now) : null;
     const above = mentionsShown ? mentions.length + asks.length : repeatsShown ? c.repeats.length : 0;
-    return filterCount({ rows: shown.rows[tab], whole: c.tabs[tab], mineOnly: onEverything, above, board: drawnBoard, wholeBoard });
+    return filterCount({ rows: shown.rows[tab], whole: c.tabs[tab], above, board, wholeBoard });
   };
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
   const penUp = c.view.approvals.length > 0;
@@ -429,26 +418,11 @@ export default function Threads() {
       <Wall>
         {chatGroup && groups.on
           ? <GroupsPlace onBack={() => { setPlace(chatGroup); setChatGroup(null); }} />
-          : <ChatsPlace tabs={<Tabs on="chats" counts={counts} pick={setPlace} team />} openGroup={(id) => { groups.setLast(id); setChatGroup('chats'); }} />}
+          : <ChatsPlace tabs={<Tabs on="chats" counts={counts} pick={setPlace} team board={!!board} />} openGroup={(id) => { groups.setLast(id); setChatGroup('chats'); }} />}
       </Wall>
     );
   }
-  if (onFiles) return <Wall><FilesPlace tabs={<Tabs on="files" counts={counts} pick={setPlace} team={teamMode} />} /></Wall>;
-  // With a team on, List and Board in the View menu are Everything else's (App.tsx `headerDisplay`).
-  // Needs you is always a list, so it lights List; Board there opens Everything else's board.
-  const shownView = teamMode && !onEverything ? 'list' : evView;
-  const headerDisplay = teamMode ? { ...display, view: shownView } : display;
-  const onHeaderDisplay = !teamMode ? setDisplay : (d: Display) => {
-    if (d.view !== shownView) {
-      setEvView(d.view as EvView);
-      if (!onEverything && d.view === 'board') { setPlace('everything'); setMenu(false); }
-    }
-    setDisplay({ ...d, view: display.view });
-  };
-  const threadRow = (i: WorkItem, first: boolean) => {
-    const r = rowOf.get(`${i.product}/${i.id}`);
-    return r ? <ThreadRow key={r.key} row={r} first={first} unread={c.unread(i)} mate={mateOf(i, c.team)} /> : null;
-  };
+  if (onFiles) return <Wall><FilesPlace tabs={<Tabs on="files" counts={counts} pick={setPlace} team={teamMode} board={!!board} />} /></Wall>;
   const list = (
     <FlatList
       data={rows}
@@ -467,16 +441,6 @@ export default function Threads() {
       contentContainerStyle={{ paddingBottom: Math.max(picked ? 120 : 96, c.approvalRoom + 16) }}
     />
   );
-  // Your card's words for its list; its board's columns already say them.
-  const mineTabs = evView === 'list' ? (
-    <View style={{ flexDirection: 'row', gap: 14, marginLeft: 8 }}>
-      {TABS.filter((t) => t.id !== 'inbox').map((t) => (
-        <Pressable key={t.id} onPress={() => setMineTab(t.id as typeof mineTab)} accessibilityRole="tab" accessibilityState={{ selected: mineTab === t.id }} hitSlop={6}>
-          <T style={{ fontSize: 13, color: mineTab === t.id ? color.text : color.faint }}>{t.label}</T>
-        </Pressable>
-      ))}
-    </View>
-  ) : undefined;
   return (
     <Picking.Provider value={picking}>
     <RowActs.Provider value={rowActs}>
@@ -486,11 +450,9 @@ export default function Threads() {
         {penUp && <IconButton label="New thread" onPress={() => router.push('/new')}><Pen size={18} tint={color.dim} /></IconButton>}
         <ViewButton display={display} agent={agent} open={menu} onPress={() => setMenu(!menu)} />
         <IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>
-      </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
+      </>} below={<Tabs on={tab} counts={board ? { ...counts, inbox: 0 } : counts} pick={setPlace} team={teamMode} board={!!board} />} />
       <StatusNotice message={notice?.message} next={notice?.next} />
-      {onEverything
-        ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
-        : board ? <Board columns={board} foot={foot} /> : list}
+      {board ? <Board columns={board} foot={foot} /> : list}
       {picked && (
         <View style={{ position: 'absolute', left: 12, right: 12, bottom: foot, height: 60, paddingLeft: 20, paddingRight: 10, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: corner.pill, backgroundColor: color.pop, ...lift('float') }}>
           <T style={{ flex: 1, fontSize: 15, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>
@@ -523,7 +485,7 @@ export default function Threads() {
         }}>
         <Pen />
       </Squish>}
-      {menu && <ViewMenu display={headerDisplay} onDisplay={onHeaderDisplay} agent={agent} agents={agents} onAgent={setAgent} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
+      {menu && <ViewMenu display={display} onDisplay={setDisplay} agent={agent} agents={agents} onAgent={setAgent} products={c.view.products} items={c.view.items} {...menuCount()} tab={tab} close={() => setMenu(false)}
         onSelect={rows.length && !board ? () => { setMenu(false); setPicked(new Set()); } : undefined} />}
       <LaterSheet visible={!!laterOne} onClose={() => setLaterOne(null)} onPick={(until, label) => { const i = laterOne; setLaterOne(null); if (i) void c.laterAll([i], until, label); }}
         onNow={laterOne && inLater([laterOne], c.now) ? () => { const i = laterOne; setLaterOne(null); void c.laterAll([i], 0); } : undefined} />

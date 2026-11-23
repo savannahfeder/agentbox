@@ -20,6 +20,11 @@ export function lookOf(stored: string | null | undefined): PhoneLook {
   return stored === 'dark' || stored === 'match' ? stored : 'light';
 }
 
+/** What the system is told to draw its own parts in (the keyboard, its sheets): the pick, or its own setting under Match system. */
+export function schemeOf(look: PhoneLook): 'light' | 'dark' | 'unspecified' {
+  return look === 'match' ? 'unspecified' : look;
+}
+
 /** What is worn: the pick, or the phone's own setting under Match system. */
 export function wornOf(look: PhoneLook, phone: string | null | undefined): Worn {
   if (look === 'match') return phone === 'dark' ? 'dark' : 'light';

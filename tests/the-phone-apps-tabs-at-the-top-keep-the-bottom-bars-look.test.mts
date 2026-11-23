@@ -45,7 +45,7 @@ describe("the phone app's tabs, at the top", () => {
     expect(tabs).not.toMatch(/position: 'absolute'/);
   });
   it('are drawn inside the title bar, on the list, on Chats and on Files, and never at the foot', () => {
-    expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{onEverything \? 'everything' : tab\} counts=\{counts\} pick=\{setPlace\} team=\{teamMode\} \/>\}/);
+    expect(inbox).toMatch(/below=\{<Tabs on=\{tab\} counts=\{board \? \{ \.\.\.counts, inbox: 0 \} : counts\} pick=\{setPlace\} team=\{teamMode\} board=\{!!board\} \/>\}/);
     expect(inbox).toMatch(/<ChatsPlace tabs=\{<Tabs on="chats"/);
     expect(inbox).toMatch(/<FilesPlace tabs=\{<Tabs on="files"/);
     expect(fs.readFileSync('mobile/src/ui/Teammates.tsx', 'utf8')).toMatch(/<TopBar title="Chats" right=\{[^\n]*below=\{tabs\} \/>/);

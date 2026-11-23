@@ -33,20 +33,19 @@ export const toastLift = (onThread: boolean) => (onThread ? OVER_THE_REPLY_BOX :
 
 /** The inbox's round New thread button: its gap from the right edge, its size, and its lift over the foot. */
 export const PEN = { right: 20, size: 56, lift: 16 };
-const TOAST_HIGH = 40;
 const TOAST_SIDE = 12;
 const PEN_GAP = 12;
 /** The inbox is the one screen with the pen. */
 export const penOnScreen = (segments: readonly string[]) => segments.length === 0 || segments[0] === 'index';
 
 /**
- * Where the toast sits, from the foot's room. On the inbox it stops short of
- * the pen and sits level with it, so the next thread is one tap away.
+ * Where the toast sits, from the foot's room. On the inbox it sits above the
+ * pen at the screen's width, so it is centred and the next thread is one tap away.
  */
 export function toastPlace(screen: 'thread' | 'inbox' | 'other', foot: number, card = 0) {
   // A permission card over the foot keeps its Allow and Deny clear; the pen is up in the bar then.
   if (card > 0) return { bottom: card + PEN_GAP, right: TOAST_SIDE };
-  if (screen === 'inbox') return { bottom: foot + PEN.lift + (PEN.size - TOAST_HIGH) / 2, right: PEN.right + PEN.size + PEN_GAP };
+  if (screen === 'inbox') return { bottom: foot + PEN.lift + PEN.size + PEN_GAP, right: TOAST_SIDE };
   return { bottom: foot + toastLift(screen === 'thread'), right: TOAST_SIDE };
 }
 export const toastTapOpens = (toast: { goes?: ToastGoes }, here: Here) => toastOpens(toast, here);

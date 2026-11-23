@@ -118,7 +118,7 @@ describe('the tabs on the phone app', () => {
 
   it('are drawn inside the top bar, above its one line, and only there', () => {
     expect(between(parts, 'export function TopBar(')).toMatch(/\{below\}/);
-    expect(inbox).toMatch(/below=\{board \? undefined : <Tabs on=\{onEverything \? 'everything' : tab\} counts=\{counts\} pick=\{setPlace\} team=\{teamMode\} \/>\}/);
+    expect(inbox).toMatch(/below=\{<Tabs on=\{tab\} counts=\{board \? \{ \.\.\.counts, inbox: 0 \} : counts\} pick=\{setPlace\} team=\{teamMode\} board=\{!!board\} \/>\}/);
     // And under Chats' own bar while it is open, never along the foot.
     expect(inbox).toMatch(/<ChatsPlace tabs=\{<Tabs on="chats"/);
     // And Files' own bar (2026-11-15).

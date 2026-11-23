@@ -4,16 +4,16 @@ import { TABS, type TabId } from './tabs';
 import type { Room, RoomCard, RoomMessage } from '../../../renderer/src/types';
 import { Name } from '../../../shared/product-name.mjs';
 
-export type PlaceId = TabId | 'everything' | 'chats' | 'files';
+export type PlaceId = TabId | 'chats' | 'files';
 
 /**
- * The tabs: the four, or with a team on (Groups or AI teammates) Needs you,
- * Everything else, which holds your In progress, Later and Done as your card's
- * work (threads/Pages.tsx `StateTabsRow`), and Chats. Files is last in both.
+ * The tabs: the four states, each its own as on a computer (threads/Pages.tsx
+ * `StateTabsRow`), then Chats with a team on (Groups or AI teammates), then
+ * Files. The board holds the four as columns, so one tab stands for them.
  */
-export function bottomTabs(team: boolean): { id: PlaceId; label: string }[] {
-  const files = { id: 'files' as const, label: 'Files' };
-  return team ? [TABS[0], { id: 'everything', label: 'Everything else' }, { id: 'chats', label: 'Chats' }, files] : [...TABS, files];
+export function bottomTabs(team: boolean, board = false): { id: PlaceId; label: string }[] {
+  const states = board ? [{ id: 'inbox' as const, label: 'Board' }] : TABS;
+  return [...states, ...(team ? [{ id: 'chats' as const, label: 'Chats' }] : []), { id: 'files' as const, label: 'Files' }];
 }
 
 export const LAST_GROUP_KEY = 'groups.last';

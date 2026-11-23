@@ -14,12 +14,8 @@ const mate = (id) => row(id, ['teammate:m1']);
 const col = (n) => ({ rows: Array.from({ length: n }, (_, i) => ({ i })) });
 
 describe('Showing N of M in View and filters', () => {
-  it('leaves an AI teammate\'s run out of both numbers on your own list', () => {
-    const whole = [row('a'), row('b'), row('c'), mate('d')];
-    expect(filterCount({ rows: whole, whole, mineOnly: true })).toEqual({ shown: 3, total: 3 });
-  });
-
-  it('still counts a teammate\'s run on a list that draws it', () => {
+  // Every list draws a teammate's run since Everything else went (2026-11-22).
+  it('counts a teammate\'s run, which the list draws', () => {
     const whole = [row('a'), mate('d')];
     expect(filterCount({ rows: whole, whole })).toEqual({ shown: 2, total: 2 });
   });
@@ -36,7 +32,7 @@ describe('Showing N of M in View and filters', () => {
 
   it('still says fewer when a filter hides some', () => {
     const whole = [row('a'), row('b'), row('c'), mate('d')];
-    expect(filterCount({ rows: whole.slice(0, 2), whole, mineOnly: true })).toEqual({ shown: 2, total: 3 });
+    expect(filterCount({ rows: whole.slice(0, 2), whole })).toEqual({ shown: 2, total: 4 });
     expect(filterCount({ rows: [], whole: [], board: [col(1), col(0)], wholeBoard: [col(3), col(2)] })).toEqual({ shown: 1, total: 5 });
   });
 });

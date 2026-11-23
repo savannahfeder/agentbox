@@ -48,7 +48,6 @@ describe('no screen says level', () => {
     'renderer/src/team/rooms/RoomsSettings.tsx',
     'renderer/src/team/rooms/GoInvisible.tsx',
     'renderer/src/team/everything/members.ts',
-    'mobile/src/ui/Everything.tsx',
     'mobile/src/ui/Groups.tsx',
   ];
   it.each(screens)('%s neither draws a level nor names one', (file) => {
