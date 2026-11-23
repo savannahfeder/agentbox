@@ -8508,7 +8508,7 @@ export default function App() {
               const said = firstNames(how.toMany ?? [how.to ?? '']);
               // Named for O, like a new thread (w-5513afd09a). No Z: a message
               // has reached the team cloud by now and there is no taking it back.
-              showToast(how.given ? `Task sent to ${said}` : said ? `Sent to ${said}` : 'Message sent', how.made ? { product: how.made.product, id: how.made.id } : undefined);
+              showToast(how.given ? `To-do sent to ${said}` : said ? `Sent to ${said}` : 'Message sent', how.made ? { product: how.made.product, id: how.made.id } : undefined);
               await refresh();
               return;
             }

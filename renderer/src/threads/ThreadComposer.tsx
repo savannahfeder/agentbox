@@ -993,15 +993,15 @@ export function ThreadComposer({
     />
   );
 
-  // IS THIS A TASK OR A MESSAGE. Both are drawn, because a word that only showed
+  // IS THIS A TO-DO OR A MESSAGE. Both are drawn, because a word that only showed
   // its other choice when pressed was missed. Picking Message puts the day away:
-  // a message has nothing to be due.
+  // a message has nothing to be due. The store still calls a to-do a task.
   const sendAsChoice = (
     <span className="tc-seg" role="group" aria-label="Send as">
       {(['message', 'task'] as SendAs[]).map((k) => (
-        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={`Send as a ${k}`}
+        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={k === 'task' ? 'Send as a to-do' : 'Send as a message'}
           onClick={() => { setSendAs(k); if (k === 'message') setDue(null); textRef.current?.focus(); }}>
-          {k === 'task' ? 'Task' : 'Message'}
+          {k === 'task' ? 'To-do' : 'Message'}
         </button>
       ))}
     </span>
@@ -1275,7 +1275,7 @@ export function ThreadComposer({
             <button type="button" aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`} onClick={() => setAlso((was) => was.filter((x) => x !== p.id))}>×</button>
           </span>
         ))}
-        {/* A task goes to one person, so Home offers no second one for it. */}
+        {/* A to-do goes to one person, so Home offers no second one for it. */}
         {person && others.length > group.length && !(quiet && sendAs === 'task' && !extra.length) && (
           <button type="button" className="tc-add" aria-label="Add someone" title="Add someone"
             onClick={() => { setAdding(true); setQuery(''); if (open !== 'to') toggle('to'); }}>+</button>
@@ -1431,7 +1431,7 @@ export function ThreadComposer({
       {fieldNode('To')}
       {person ? (<>
         {sendAsChoice}
-        {taskToMany && <span className="tc-why">A task goes to one person.</span>}
+        {taskToMany && <span className="tc-why">A to-do goes to one person.</span>}
         <span className="tc-gap" />
         {sendAs === 'task' ? (<>{fieldNode('Due On')}{fieldNode('Blocked By')}{seesChip(taskSees)}</>) : fieldNode('Subject')}
         {priorityChip}
@@ -1571,7 +1571,7 @@ export function ThreadComposer({
         {person ? (
           <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
-            {taskToMany && <span className="tc-why">A task goes to one person.</span>}
+            {taskToMany && <span className="tc-why">A to-do goes to one person.</span>}
             {team && sendAs === 'task' && seesChip(taskSees)}
             {/* HOW URGENT IT IS, AND NOTHING ELSE (w-7ba439c883, approved
                 2026-10-05). The corner used to carry "Goes to Maya's inbox.",
