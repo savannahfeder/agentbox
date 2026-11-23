@@ -2567,6 +2567,10 @@ body {
 .dock-split { display: flex; align-items: stretch; width: 100%; }
 .dock-split > .dock-pill { flex: 1 1 0; min-width: 0; }
 .dock-split > .dock-pill + .dock-pill { border-left: 1px solid var(--line); }
+/* Icon, words, key: the order a menu row reads in. */
+.dock-pill-go .dock-pill-icon { display: flex; align-items: center; padding-left: 16px; color: var(--text-faint); }
+.dock-pill-go .dock-pill-icon + .dock-pill-text { padding-left: 10px; }
+.dock-pill-go:hover .dock-pill-icon { color: var(--text-dim); }
 .dock-pill-static .dock-pill-text { padding-right: 16px; }
 /* THE BOX GROWS AS SHE WRITES. The height is written by dock-height.ts on every
    render, because the ceiling is 40% of the PANE and no stylesheet can read

@@ -251,9 +251,9 @@ function FollowMark() {
   return <svg {...mark}><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5h4" /></svg>;
 }
 /** An arrow turning off the line: carry it on from here. */
-/** The box Respond in terminal leaves by, with the arrow coming in. */
+/** An arrow going in through a door: into here, as the bar under a session draws it. */
 function BringInMark() {
-  return <svg {...mark}><path d="M11 7v6h6" /><path d="m11 13 9-9" /><path d="M18 14v5H5V6h5" /></svg>;
+  return <svg {...mark}><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="m9 16 4-4-4-4" /><path d="M13 12H3" /></svg>;
 }
 function InboxMark() {
   return <svg {...mark}><path d="M3 13.5h5l1.5 2.5h5l1.5-2.5h5" /><path d="M5.5 5h13L21 13.5V19H3v-5.5z" /></svg>;

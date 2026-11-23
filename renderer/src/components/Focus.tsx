@@ -130,6 +130,7 @@ import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { AgentThread } from './AgentThread';
 import { BRING_IN } from '../outside-agents';
+import { chord } from '../this-keyboard';
 import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
@@ -758,10 +759,9 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-/** Out of the app, to the window the session runs in. */
-const GO_MARK = <span className="dock-pill-key" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6" /><path d="m20 4-9 9" /><path d="M18 14v5H5V6h5" /></svg></span>;
-/** The same box with the arrow coming in: from where it runs into here. */
-const IN_MARK = <span className="dock-pill-key" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 7v6h6" /><path d="m11 13 9-9" /><path d="M18 14v5H5V6h5" /></svg></span>;
+const goIcon = <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6" /><path d="m20 4-9 9" /><path d="M18 14v5H5V6h5" /></svg>;
+/** An arrow going in through a door: into here. The arrow has to read at 15 points. */
+const inIcon = <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="m9 16 4-4-4-4" /><path d="M13 12H3" /></svg>;
 
 export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, outside = 'all', onOutside, onBringIn, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
   /** `supervisor.outOfUsage`, for the reply box's model chip. */
@@ -2008,7 +2008,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onAddPeople={onAddPeople ? (person) => onAddPeople(item, person) : undefined}
       /* A PHONE HAS NO TERMINAL AND NO ⌘J (QA batch 005, F-118), and it is the
          only way it has of putting a thread off (F-117). */
-      terminal={direct || onPhone() ? null : terminalOpen ? 'open' : 'closed'}
+      // A session started outside Agentbox: ⌘J goes to its own terminal, the bar's Respond in terminal.
+      terminal={direct || onPhone() || agent ? null : terminalOpen ? 'open' : 'closed'}
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
       // An ask is answered by handing it back, so it offers no second way to end it.
@@ -2701,12 +2702,14 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
             codexAtWork ? null : onReveal ? (
               <div className="dock-split">
                 <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
+                  <span className="dock-pill-icon">{goIcon}</span>
                   <span className="dock-pill-text">{agent?.engine === 'codex' ? respondIn : 'Respond in terminal'}</span>
-                  {GO_MARK}
+                  <span className="dock-pill-key"><kbd>{chord('⌘J')}</kbd></span>
                 </button>
                 {bringIn && <button type="button" className="dock-pill dock-pill-go" onClick={bringIn}>
+                  <span className="dock-pill-icon">{inIcon}</span>
                   <span className="dock-pill-text">{BRING_IN}</span>
-                  {IN_MARK}
+                  <span className="dock-pill-key"><kbd>R</kbd></span>
                 </button>}
               </div>
             ) : (

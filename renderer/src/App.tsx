@@ -109,7 +109,7 @@ import { wearJustMade, type JustMade } from './just-made';
 import { newToDraw, useKeptSet, type Drawn } from './shown-snapshot';
 import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
-import { agentKey, agentLayout, agentRow, agentRowId, asksSomething, byRecency, choicesArePressed, listed as agentIsListed, onTheRail, putAway, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
+import { agentKey, agentLayout, agentRow, agentRowId, asksSomething, byRecency, choicesArePressed, listed as agentIsListed, onTheRail, putAway, railLine, reachesInbox, progressAfterReply, replyIsSwallowed, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { eOnThisList, keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
@@ -3731,14 +3731,15 @@ export default function App() {
   }, []);
   showToastRef.current = showToast;
   // The thread a session was just brought in as, opened the moment it is in the list.
-  const [movedIn, setMovedIn] = useState<{ product: string; id: string } | null>(null);
-  const bringIn = useCallback(async (item: WorkItem) => {
+  const [movedIn, setMovedIn] = useState<{ product: string; id: string; reply: boolean } | null>(null);
+  // R on one of those sessions is its Continue in Agentbox, and lands in the reply box.
+  const bringIn = useCallback(async (item: WorkItem, { reply = false } = {}) => {
     const agent = item.agent;
     if (!agent) return;
     const r = await api.bringInSession({ pid: agent.pid, engine: agent.engine, sessionId: agent.sessionId });
     if (!r.ok) { showToast(r.reason); return; }
     showToast(BROUGHT_IN);
-    setMovedIn({ product: r.product, id: r.id });
+    setMovedIn({ product: r.product, id: r.id, reply });
   }, [showToast]);
   useEffect(() => {
     if (!movedIn) return;
@@ -3747,6 +3748,7 @@ export default function App() {
     setMovedIn(null);
     setFocused(it);
     markSeen(it);
+    if (movedIn.reply) setModal('reply');
   }, [snap, movedIn, markSeen]);
   // From one of those sessions' ⋯, the inbox's View and filters, or ⌘K. The
   // filters menu shows the list change under it, so it raises no toast.
@@ -6071,7 +6073,9 @@ export default function App() {
       // show, and the key says so rather than going quiet.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
-        if (!focused || focused.agent) { showToast('Open a task to use its terminal'); return; }
+        // On a session started outside Agentbox it is that session's own terminal.
+        if (focused?.agent) { void revealAgent(focused); return; }
+        if (!focused) { showToast('Open a task to use its terminal'); return; }
         window.dispatchEvent(new Event('task-terminal-toggle'));
         return;
       }
@@ -6317,6 +6321,7 @@ export default function App() {
         // The page stays open: full screen draws the box under it.
         // An open box focuses itself only when it opens, so R on one already
         // there has to put the caret back (focus-at-end.ts).
+        else if ((e.key === 'r' || e.key === 'R') && focused.agent && replyIsSwallowed(focused.agent) && focused.agent.product && focused.agent.sessionId) { e.preventDefault(); void bringIn(focused, { reply: true }); }
         else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setModal('reply'); if (modal === 'reply') focusTheReplyBox(); else if (sayWhoseBox(arrived.current, keyOf(focused), Date.now())) { const whose = replyingTo({ people: conversationNames(focused) }); if (whose) showToast(whose); } }
         // N MEANS THE SAME THING ON BOTH SCREENS. The + in the top bar is on
         // this screen too and its tooltip says "New task (N)", so the key is
@@ -6495,7 +6500,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, urgentShownRow, openUrgentReady, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab, team]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, urgentShownRow, openUrgentReady, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab, team, bringIn, revealAgent]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
