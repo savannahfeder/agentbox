@@ -85,24 +85,36 @@ interface ChangeSeen {
   knowsYou?: unknown;
 }
 
+// The phone's pass asks for every carried thread's change each time, and a
+// saved change is the same object until its file is rewritten
+// (main/code-change.mts readChangeSummary): read for secrets once, by home.
+const phoneChanges = new WeakMap<object, Map<string, PhoneChange | null>>();
+
 /** A saved change (main/code-change.mts readChangeSummary) as the phone gets it, or null when it touched no files. */
 export function phoneChangeOf(summary: ChangeSeen | null | undefined, { home = null }: Ctx = {}): PhoneChange | null {
   if (!summary || typeof summary !== 'object' || !Array.isArray(summary.files)) return null;
+  let byHome = phoneChanges.get(summary);
+  if (!byHome) phoneChanges.set(summary, byHome = new Map());
+  const made = byHome.get(home ?? '');
+  if (made !== undefined) return made;
   const count = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : 0);
   const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
-  const files = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
-    .filter((f) => f && typeof f.path === 'string' && f.path)
+  const named = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
+    .filter((f) => f && typeof f.path === 'string' && f.path);
+  // Only the paths that are kept: a generated change names thousands.
+  const files = named.slice(0, PHONE_CHANGE_FILES)
     .map((f) => ({ path: hideSecrets(f!.path, { home }), plus: count(f!.plus), minus: count(f!.minus) }));
-  if (!files.length) return null;
-  return {
+  const change: PhoneChange | null = files.length ? {
     plus: count(summary.plus),
     minus: count(summary.minus),
-    files: files.slice(0, PHONE_CHANGE_FILES),
-    ...(files.length > PHONE_CHANGE_FILES ? { more: files.length - PHONE_CHANGE_FILES } : {}),
+    files,
+    ...(named.length > PHONE_CHANGE_FILES ? { more: named.length - PHONE_CHANGE_FILES } : {}),
     committed: flag(summary.committed),
     uncommitted: flag(summary.uncommitted),
     knowsYou: flag(summary.knowsYou),
-  };
+  } : null;
+  byHome.set(home ?? '', change);
+  return change;
 }
 
 /** A row's fields as this file reads them, before they are picked. */

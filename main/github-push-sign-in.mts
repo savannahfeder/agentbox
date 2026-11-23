@@ -1,12 +1,14 @@
 // THE GITHUB SIGN-IN A SHIP PUSHES WITH, kept on this computer by the cipher its door has.
 //
-// Given to git only for the ship's own run, through config in its environment
-// (`pushSignIn`), so neither the person's git settings nor any worker sees it.
+// Given only to the ship's own run (`pushSignIn`), so neither the person's git
+// settings nor any worker sees it.
+import fs from 'node:fs';
 import { connectionVault, CANNOT_ENCRYPT, type VaultData } from './connections/vault.mts';
 
 type PushVault = VaultData & { token?: string; savedAt?: number };
 
-// A GIT_ name, because the push hook drops every GIT_ variable before its tests run.
+// For a ship script that cannot take the token on stdin. A GIT_ name, because
+// the push hook drops every GIT_ variable before its tests run.
 export const TOKEN_VAR = 'GIT_AGENTBOX_GITHUB_TOKEN';
 const CHECK_MS = 15_000;
 
@@ -23,6 +25,23 @@ export const pushConfig = (site = 'https://github.com'): [string, string][] => [
   ['url.https://github.com/.pushInsteadOf', 'git@github.com:'],
   ['url.https://github.com/.pushInsteadOf', 'ssh://git@github.com/'],
 ];
+
+// The line a ship script carries when it reads the token on stdin (scripts/ship.mjs).
+export const SIGN_IN_ON_STDIN = 'agentbox-push-sign-in: stdin';
+
+export interface PushRun { env: Record<string, string>; gitConfig: [string, string][]; stdin?: string }
+
+/**
+ * How a ship's run gets the token. On stdin when its script says it reads it
+ * there, so no environment holds it while the branch's tests run; otherwise in
+ * the environment, so another project's own ship script still pushes.
+ */
+export function pushRun(script: string, token: string, site = 'https://github.com'): PushRun {
+  let onStdin = false;
+  try { onStdin = fs.readFileSync(script, 'utf8').includes(SIGN_IN_ON_STDIN); } catch { /* read as not */ }
+  if (!onStdin) return { env: { [TOKEN_VAR]: token }, gitConfig: pushConfig(site) };
+  return { env: { AGENTBOX_PUSH_SIGN_IN: 'stdin', AGENTBOX_PUSH_SITE: site }, gitConfig: pushConfig(site).slice(2), stdin: token };
+}
 
 /** Why GitHub would not take this token for a push, asking GitHub itself; null when it would. */
 export async function tokenRefused(token: string, { fetchImpl = fetch as unknown as Fetch, timeoutMs = CHECK_MS }: { fetchImpl?: Fetch; timeoutMs?: number } = {}): Promise<string | null> {
@@ -53,10 +72,10 @@ export function gitHubPushSignIn({ file, cipher, fetchImpl, timeoutMs }: { file:
   };
   return {
     has: () => !!saved(),
-    /** What a ship's run adds for git, or null with nothing saved. */
-    forPush(): { env: Record<string, string>; config: [string, string][] } | null {
+    /** The token a ship pushes with, or null with nothing saved. */
+    forPush(): { token: string } | null {
       const token = saved();
-      return token ? { env: { [TOKEN_VAR]: token }, config: pushConfig() } : null;
+      return token ? { token } : null;
     },
     /** Drops the saved token, so git's own sign-in answers the push. */
     async forget() {

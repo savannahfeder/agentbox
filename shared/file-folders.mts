@@ -40,6 +40,16 @@ export const newFolderId = (): string => crypto.randomUUID();
 export const cleanFolderName = (name: string | null | undefined): string => String(name ?? '').replace(/\s+/g, ' ').trim().slice(0, FOLDER_NAME_MOST);
 const nameKey = (name: string | null | undefined): string => cleanFolderName(name).toLowerCase();
 
+/** The log's size and time, which change with every op written to it. */
+export function folderLogStamp(dir: string): string {
+  try {
+    const stat = fs.statSync(path.join(dir, LOG));
+    return `${stat.size}:${stat.mtimeMs}`;
+  } catch {
+    return '';
+  }
+}
+
 export function readFolderLog(dir: string): FolderLogOp[] {
   let text = '';
   try { text = fs.readFileSync(path.join(dir, LOG), 'utf8'); } catch { return []; }

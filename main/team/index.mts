@@ -18,7 +18,7 @@ import { createThreadShare } from './thread-share.mts';
 import { createAsks, type TellThread } from './asks.mts';
 import { changePath, readChangeSummary } from '../code-change.mts';
 import { changeWithCommits } from '../handed-commits.mts';
-import { askBody, askIsOpen, askOf, withoutAskLead, type AskKind } from '../../shared/thread-asks.mts';
+import { approvedDuring, askBody, askIsOpen, askOf, withoutAskLead, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
 import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
@@ -56,7 +56,7 @@ import type { Departure } from './departures.mts';
 import type { CloudPhoneCommand } from './supabase-backend.mts';
 import { mateCard, splitCards } from '../../shared/mate-cards.mts';
 import type { BoardMate } from '../../shared/mate-cards.mts';
-import { cleanPlace, type Mark, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
+import { cleanPlace, marksOf, type Mark, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
 import type { RoomsBackend, RoomsOptions, RoomsState } from './rooms.mts';
 
 export interface TeamPerson {
@@ -1527,8 +1527,14 @@ export function createTeamService({
       const said = String(words ?? '').trim();
       const dir = products().find((p) => p.slug === slug)?.dir;
       if (!dir) throw new Error('that ask is gone');
+      // Approved on the review's page or on the owner's thread: both are yours to name.
+      const held = row as typeof row & { artifacts?: { approvals?: { file: string; by: string | null; ts: number }[] }; wrote?: { ask?: { ts?: number } } };
+      const onThread = marksOf((threadShare?.read(a.owner, a.thread).lines ?? [])
+        .filter((l) => l.patch?.artifact)
+        .map((l) => ({ ...(l.patch!.artifact as object), by: l.by ?? null, ts: l.ts, uid: l.uid ?? null })) as never).approvals;
+      const approvedFiles = approvedDuring([...(held.artifacts?.approvals ?? []), ...onThread], { by: state.me.id, from: held.wrote?.ask?.ts ?? row.createdAt ?? 0 });
       // Before the close, so the owner's copy never reads a close without its verdict.
-      disk.updateWorkItem(dir, id, { verdict: verdict === 'yes' || verdict === 'changes' ? verdict : 'done' }, { source: 'founder' });
+      disk.updateWorkItem(dir, id, { verdict: verdict === 'yes' || verdict === 'changes' ? verdict : 'done', ...(approvedFiles.length ? { approvedFiles } : {}) }, { source: 'founder' });
       store.answerItem(slug, id, { ...(said ? { answer: said } : {}), status: 'done' });
       onChange();
       await syncNow();

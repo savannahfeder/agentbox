@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { SHIP_LABEL, ShipQueue } from '../main/ship-queue.mts';
 import { Store } from '../main/store.mts';
-import { gitHubPushSignIn, TOKEN_VAR } from '../main/github-push-sign-in.mts';
+import { gitHubPushSignIn, pushConfig, SIGN_IN_ON_STDIN, TOKEN_VAR } from '../main/github-push-sign-in.mts';
 import { notShipped, notShippedLine } from '../shared/not-shipped.mts';
 import {
   GITHUB_REFUSED_SIGN_IN, NO_GITHUB_SIGN_IN, SHIPPING_AGAIN, asksForGitHubSignIn, notPushedNote, pushNeedsGitHubSignIn,
@@ -88,7 +88,7 @@ describe('the ship queue, when the push needs a GitHub sign-in', () => {
 
   it('says the saved sign-in was refused when one was used', async () => {
     const store = fakeStore();
-    const q = new ShipQueue({ store, userDir, folderFor, isLive: () => false, pushSignIn: () => ({ env: { [TOKEN_VAR]: 't' }, config: [] }), run: async () => ({ code: 1, out: NO_USERNAME }) });
+    const q = new ShipQueue({ store, userDir, folderFor, isLive: () => false, pushSignIn: () => ({ token: 't' }), run: async () => ({ code: 1, out: NO_USERNAME }) });
     await q.tick([row()], products());
     expect(store.calls[0][3].note).toBe(notPushedNote(true));
   });
@@ -106,12 +106,24 @@ describe('the ship queue, when the push needs a GitHub sign-in', () => {
     const run = async (script, cwd, opts) => { seen.push(opts); return { code: 0, out: 'ship: shipped abc1234.\n' }; };
     await new ShipQueue({ store: fakeStore(), userDir, folderFor, isLive: () => false, run }).tick([row()], products());
     await new ShipQueue({ store: fakeStore(), userDir, folderFor, isLive: () => false, run,
-      pushSignIn: () => ({ env: { [TOKEN_VAR]: 'tok' }, config: [['credential.https://github.com.helper', 'x']] }) }).tick([row({ updatedAt: 2000 })], products());
+      pushSignIn: () => ({ token: 'tok' }) }).tick([row({ updatedAt: 2000 })], products());
     expect(seen).toHaveLength(2);
     // Every ship names the approved checkout, which the hooks come from.
     expect(seen[0]).toEqual({ base: expect.any(String) });
     expect(seen[1].env[TOKEN_VAR]).toBe('tok');
-    expect(seen[1].gitConfig).toEqual([['credential.https://github.com.helper', 'x']]);
+    expect(seen[1].gitConfig).toEqual(pushConfig());
+    expect(seen[1].stdin).toBeUndefined();
+  });
+
+  it('gives it on stdin, and in no environment, to a ship script that reads it there', async () => {
+    fs.writeFileSync(path.join(repo, 'scripts', 'ship.mjs'), `// ${SIGN_IN_ON_STDIN}\n`);
+    const seen = [];
+    const run = async (script, cwd, opts) => { seen.push(opts); return { code: 0, out: 'ship: shipped abc1234.\n' }; };
+    await new ShipQueue({ store: fakeStore(), userDir, folderFor, isLive: () => false, run, pushSignIn: () => ({ token: 'tok' }) }).tick([row()], products());
+    expect(seen[0].stdin).toBe('tok');
+    expect(seen[0].env[TOKEN_VAR]).toBeUndefined();
+    expect(JSON.stringify(seen[0].env)).not.toContain('tok"');
+    expect(JSON.stringify(seen[0].gitConfig)).not.toContain('tok');
   });
 });
 
@@ -171,7 +183,7 @@ describe('the sign-in kept on this computer', () => {
     expect(s.forPush()).toBeNull();
     await s.save('  ghp_abc  ');
     expect(fs.readFileSync(file(), 'utf8')).toMatch(/^sealed:/);
-    expect(s.forPush().env).toEqual({ [TOKEN_VAR]: 'ghp_abc' });
+    expect(s.forPush()).toEqual({ token: 'ghp_abc' });
   });
 
   it('is refused, and nothing kept, when GitHub does not take it', async () => {

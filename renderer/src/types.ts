@@ -143,6 +143,8 @@ export interface WorkItem {
   ask?: { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string };
   /** How that ask was handed back. */
   verdict?: 'done' | 'yes' | 'changes';
+  /** The files approved while it was out, by name. */
+  approvedFiles?: string[];
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -821,6 +823,8 @@ export interface RunningSession {
   startedAt: number;
   /** When the reply this cloud run is working on went in; absent on its first turn. Timers read `runningSince`. */
   turnStartedAt?: number;
+  /** How long its next command has waited for memory on this computer; absent while none waits. */
+  memoryHeldMs?: number;
   /**
    * WHICH CODING AGENT REALLY STARTED THIS RUN, written at the spawn — a fact,
    *  where `snapshot.engines.byItem` is the supervisor's answer for the NEXT
@@ -1181,8 +1185,10 @@ export interface AgentTurn {
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment, an agent's checkpoint, or the app's own note (thread-history.ts). */
-  says?: 'comment' | 'progress' | 'to-agent' | 'app';
+  /** A teammate's comment, an agent's checkpoint, the app's own note, or an ask handed back (thread-history.ts). */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app' | 'hand-back';
+  /** On a hand-back, what the asker had asked, drawn under it. */
+  asked?: string;
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
@@ -1821,7 +1827,7 @@ declare global {
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;
       remoteControl(p: {product: string; id: string; action?: string}): Promise<{state: string; at: number; text?: string; url?: string; mayBeActive?: boolean} | null>;
       compactionStatus(p: {product: string; id: string}): Promise<{state: string; at: number} | null>;
-      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: { status?: string; mine?: boolean } }): Promise<WorkItem>;
+      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: { status?: string; mine?: boolean }; reopen?: boolean }): Promise<WorkItem>;
       sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
@@ -1873,7 +1879,7 @@ declare global {
       connectionsCheck?(p: { id: string }): Promise<ConnectionTile | null>;
       connectionsDisconnect?(p: { id: string }): Promise<boolean>;
       connectionsAccept?(p: { id: string }): Promise<boolean>;
-      filesPlace?(): Promise<FilesPlaceList>;
+      filesPlace?(opts?: { soon?: boolean }): Promise<FilesPlaceList>;
       filesPlaceOpen?(p: { key: string }): Promise<FilesPlaceView | null>;
       filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
       filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;

@@ -105,14 +105,14 @@ describe('the word the panel puts over the reading', () => {
   // it out of the sentence would label the reading for one reader and not the
   // other.
   it('names the agent in the sentence read aloud, when there is one to name', () => {
-    expect(usageSentence(limits, NOW, 'Codex')).toBe('Codex. This session: 45% used, 2h 14m left.');
+    expect(usageSentence(limits, NOW, 'Codex')).toBe('Codex. This session: 45% used, resets in 2h 14m.');
   });
 
   // AND THE CASE THAT MUST NOT MATCH: one coding agent, no word, byte for byte
   // the sentence she has been reading since 2026-09-01.
   it('says exactly what it always said when there is no agent to name', () => {
-    expect(usageSentence(limits, NOW, null)).toBe('This session: 45% used, 2h 14m left.');
-    expect(usageSentence(limits, NOW)).toBe('This session: 45% used, 2h 14m left.');
+    expect(usageSentence(limits, NOW, null)).toBe('This session: 45% used, resets in 2h 14m.');
+    expect(usageSentence(limits, NOW)).toBe('This session: 45% used, resets in 2h 14m.');
   });
 
   it('still says nothing when there is nothing to say, named or not', () => {
@@ -125,9 +125,9 @@ describe('the word the panel puts over the reading', () => {
   it('puts the agent on the label the corner reads aloud', () => {
     const usage = { engine: 'codex', limits, at: NOW };
     expect(renderToStaticMarkup(createElement(UsagePill, { usage, now: NOW, engineWord: 'Codex' })))
-      .toContain('aria-label="Codex. This session: 45% used, 2h 14m left."');
+      .toContain('aria-label="Codex. This session: 45% used, resets in 2h 14m."');
     expect(renderToStaticMarkup(createElement(UsagePill, { usage, now: NOW })))
-      .toContain('aria-label="This session: 45% used, 2h 14m left."');
+      .toContain('aria-label="This session: 45% used, resets in 2h 14m."');
   });
 
   // The dropdown itself. It is `Your limits` on the Mac with one agent and the
