@@ -109,6 +109,21 @@ describe('a doc the agent wrote in the thread\'s own checkout', () => {
     const page = linked(theTask().body).find((f) => /bookings-empty-states\.html$/.test(f));
     expect(page).toBeTruthy();
     expect(carried(theTask(), page!)).toBe('<h1>No bookings yet</h1>\n');
+    // Where the agent wrote the page's whole path, the task links the copy, not the bare name that opens nothing.
+    expect(theTask().body).toContain(`The two states:\n\n[bookings-empty-states.html](${page})`);
+    expect(theTask().body).not.toMatch(/^bookings-empty-states\.html$/m);
+  });
+
+  it('draws a picture the agent wrote by its whole path as the picture it carried', async () => {
+    const at = (id) => path.join(sam.dir, 'designs', id, 'first-visit.png');
+    const t = aThread((id) => `The picture:\n\n${at(id)}`);
+    write(at(t.id), 'png bytes');
+    await sam.service.syncNow();
+    await sam.service.handOn({ product: 'api', id: t.id, to: priya.personId });
+    await both();
+    const pic = linked(theTask().body).find((f) => /first-visit\.png$/.test(f));
+    expect(theTask().body).toContain(`The picture:\n\n![first-visit.png](${pic})`);
+    expect(theTask().body.match(/first-visit\.png\]\(attachments/g)).toHaveLength(1);
   });
 
   it('is said to be left behind when it is over the size a message carries', async () => {
