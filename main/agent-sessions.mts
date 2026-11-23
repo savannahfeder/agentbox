@@ -225,7 +225,7 @@ export function isSubagentPath(file: unknown) {
 const NOT_TYPED = [
   /^<command-name>/, /^<command-message>/, /^<command-args>/, /^<local-command/,
   /^<system-reminder>/, /^<user-memory/, /^Caveat: The messages below/,
-  /^This session is being continued from/, /^\[Request interrupted/,
+  /^This session is being continued from/, /^\[Request interrupted/, /^<task-notification>/,
 ];
 
 /** The row's name, from the first line a person typed. Terminal transcripts
@@ -326,6 +326,9 @@ export function readTranscriptHead(file: string, bytes = HEAD_BYTES, most = FIRS
  *  command's wrapper. Only these end the agent's reply. */
 function typedTurn(row: TranscriptRow | null | undefined) {
   if (row?.type !== 'user' || row.toolUseResult || row.isMeta || row.isCompactSummary) return false;
+  // Claude Code 2.1.330 marks who wrote a turn; a background command's notice is `task-notification`.
+  const kind = (row as { origin?: { kind?: unknown } }).origin?.kind;
+  if (typeof kind === 'string' && kind !== 'human') return false;
   return threadTitle(messageText(row)) !== '';
 }
 
@@ -370,6 +373,135 @@ export function readTranscriptTail(file: string, bytes = TAIL_BYTES): Transcript
   } finally {
     if (fd !== null) { try { fs.closeSync(fd); } catch { /* nothing to do */ } }
   }
+}
+
+/** One thing said in a chat: typed or picked by the person, or by its agent. */
+export interface ChatEntry { who: 'you' | 'agent'; at: number; text: string }
+
+/** Where a chat stands at its end, for a row that follows it
+ *  (main/chat-follow.mts). `heard` is what the person last typed and `heardAt`
+ *  when, 0 when that is further back than the tail; `said` is the agent's reply
+ *  since, and `ended` whether that reply's turn is over. `entries` is the last
+ *  of what was said, oldest first, and `cutAt` when the person last stopped it. */
+export interface ChatTurn { heard: string; heardAt: number; said: string; saidAt: number; ended: boolean; cutAt: number; entries: ChatEntry[] }
+const ENTRIES_KEPT = 24;
+
+// Claude Code 2.1.330 writes each request's attachments and records into the
+// transcript, so what you typed can sit further back than the tail.
+const TYPED_BACK_MOST = FIRST_TURN_BYTES;
+
+export function readChatTurn(file: string, bytes = TAIL_BYTES): ChatTurn | null {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size;
+    for (let want = Math.min(bytes, TYPED_BACK_MOST); ; want = Math.min(want * 4, TYPED_BACK_MOST)) {
+      const turn = turnIn(fd, size, want);
+      if (turn.heardAt || want >= size || want >= TYPED_BACK_MOST) return turn;
+    }
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) { try { fs.closeSync(fd); } catch { /* nothing to do */ } }
+  }
+}
+
+/** A question its agent put up and what was picked, from the picker's own
+ *  result, the only place either is written. A plan put up to approve is one too. */
+function pickedIn(result: unknown): { asked: string; picked: string } | null {
+  const r = (result ?? {}) as { answers?: unknown; questions?: unknown; plan?: unknown };
+  if (typeof r.plan === 'string' && r.plan.trim()) return { asked: r.plan.trim().slice(0, SAID_CHARS), picked: 'Approved the plan' };
+  if (!r.answers || typeof r.answers !== 'object') return null;
+  const picks = Object.entries(r.answers).map(([q, a]) => [q, bareLabel(a)]).filter(([, a]) => a);
+  if (!picks.length) return null;
+  return { asked: questionsAsked(r.questions), picked: picks.map(([, a]) => a).join('\n').slice(0, FIRST_CHARS) };
+}
+
+const bareLabel = (s: unknown) => String(s ?? '').replace(/\s*\(recommended\)\s*$/i, '').trim();
+
+/** A question as a thread draws one: its first line in bold, its choices numbered so they can be pressed. */
+function questionsAsked(questions: unknown): string {
+  return (Array.isArray(questions) ? questions : []).map((q: { question?: unknown; options?: unknown }) => {
+    const [first, ...rest] = bareLabel(q?.question).split('\n');
+    const more = rest.join('\n').trim();
+    const choices = (Array.isArray(q?.options) ? q.options : []).map((o: { label?: unknown; description?: unknown }, i: number) => {
+      const why = String(o?.description ?? '').trim();
+      return `${i + 1}. ${bareLabel(o?.label)}${why ? `: ${why}` : ''}`;
+    });
+    return [`**${first}**`, ...(more ? ['', more, ''] : []), ...choices].join('\n');
+  }).join('\n\n').slice(0, SAID_CHARS);
+}
+
+/** What a tool call put up for an answer: a picker's questions, a plan to approve. */
+function putUp(call: { name?: unknown; input?: { questions?: unknown; plan?: unknown } }): string {
+  if (call.name === 'AskUserQuestion') return questionsAsked(call.input?.questions);
+  return call.name === 'ExitPlanMode' && typeof call.input?.plan === 'string' ? call.input.plan.trim().slice(0, SAID_CHARS) : '';
+}
+
+/** Typed while its agent was at work: kept as an attachment, not a message. */
+function queuedWords(row: { attachment?: unknown }): string {
+  const a = (row.attachment ?? {}) as { type?: unknown; prompt?: unknown; commandMode?: unknown; origin?: { kind?: unknown } };
+  if (a.type !== 'queued_command' || a.commandMode !== 'prompt' || (a.origin?.kind ?? 'human') !== 'human') return '';
+  return threadTitle(String(a.prompt ?? '')) ? String(a.prompt).trim().slice(0, FIRST_CHARS) : '';
+}
+
+const CUT_SHORT = /^\[Request interrupted/;
+
+function turnIn(fd: number, size: number, bytes: number): ChatTurn {
+  const from = Math.max(0, size - bytes);
+  const buf = Buffer.alloc(size - from);
+  const n = fs.readSync(fd, buf, 0, buf.length, from);
+  const lines = buf.slice(0, n).toString('utf8').split('\n');
+  if (from > 0) lines.shift();
+  const turn: ChatTurn = { heard: '', heardAt: 0, said: '', saidAt: 0, ended: false, cutAt: 0, entries: [] };
+  // What each call put up and when, so one you cancelled is known at all.
+  const called = new Map<unknown, { at: number; asked: string }>();
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let row: TranscriptRow & { isSidechain?: boolean; attachment?: unknown; message?: { content?: unknown; stop_reason?: unknown } };
+    try { row = JSON.parse(line); } catch { continue; }
+    if (row.isSidechain || (row.type !== 'user' && row.type !== 'assistant' && row.type !== 'attachment')) continue;
+    const at = Date.parse(String(row.timestamp ?? '')) || 0;
+    const blocks = Array.isArray(row.message?.content) ? row.message.content as { type?: unknown; id?: unknown; name?: unknown; input?: { questions?: unknown; plan?: unknown }; tool_use_id?: unknown }[] : [];
+    if (row.type === 'attachment') {
+      const words = queuedWords(row);
+      if (words) turn.entries.push({ who: 'you', at, text: words });
+      continue;
+    }
+    if (typedTurn(row)) {
+      const text = messageText(row).trim().slice(0, FIRST_CHARS);
+      turn.entries.push({ who: 'you', at, text });
+      Object.assign(turn, { said: '', saidAt: 0, ended: false });
+      continue;
+    }
+    // A tool's result: the agent carries on from it, unless you stopped it there.
+    if (row.type === 'user') {
+      const pick = pickedIn(row.toolUseResult);
+      const call = called.get(blocks.find((b) => b?.type === 'tool_result')?.tool_use_id);
+      const asked = pick?.asked || call?.asked;
+      if (asked) turn.entries.push({ who: 'agent', at: Math.min(call?.at ?? at, at - 1), text: asked });
+      if (pick) turn.entries.push({ who: 'you', at, text: pick.picked });
+      turn.ended = CUT_SHORT.test(messageText(row).trim());
+      if (turn.ended) turn.cutAt = at;
+      continue;
+    }
+    // Claude Code refusing the turn, a usage limit: the agent has stopped.
+    if (row.isApiErrorMessage) { turn.ended = true; continue; }
+    // Its own filler over an interrupted turn, which no model wrote.
+    if ((row.message as { model?: unknown } | undefined)?.model === '<synthetic>') continue;
+    for (const b of blocks) if (b?.type === 'tool_use') called.set(b.id, { at, asked: putUp(b) });
+    const text = messageText(row).trim();
+    if (text) {
+      turn.entries.push({ who: 'agent', at, text: text.slice(-SAID_CHARS) });
+      Object.assign(turn, { said: turn.said ? `${turn.said}\n\n${text}` : text, saidAt: at });
+    }
+    turn.ended = row.message?.stop_reason === 'end_turn' && !blocks.some((b) => b?.type === 'tool_use');
+  }
+  // A message typed while it worked is written later than it was typed.
+  turn.entries = turn.entries.sort((a, b) => a.at - b.at).slice(-ENTRIES_KEPT);
+  const heard = turn.entries.findLast((e) => e.who === 'you');
+  Object.assign(turn, { said: turn.said.slice(-SAID_CHARS), ...(heard ? { heard: heard.text, heardAt: heard.at } : {}) });
+  return turn;
 }
 
 /** What a finished read knows about how a chat ended, for its row and the

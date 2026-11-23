@@ -76,10 +76,13 @@ describe('a long Inbox', () => {
   it('skips a thread row far off screen', () => {
     expect(rule).not.toBeNull();
   });
+  // A two-line row since w-6714ad1360: its padding, the title's line, the gap and the second line.
   it("holds a skipped row at a row's own height, so the scrollbar does not lurch", () => {
-    const pad = styles.match(/\n\.row \{[^}]*padding: (\d+)px \S+ (\d+)px/);
+    const pad = pages.match(/\.th-table \.row:not\(\.th-head\) \{ padding-top: (\d+)px; padding-bottom: (\d+)px; \}/);
     const line = pages.match(/\.th-grid > div \{ line-height: (\d+)px; \}/);
-    expect(Number(rule![1])).toBe(Number(pad![1]) + Number(line![1]) + Number(pad![2]));
+    const gap = pages.match(/\.th-grid\.has-line \{ grid-template-rows: auto auto; row-gap: (\d+)px; \}/);
+    const second = pages.match(/\.th-grid\.has-line > \.th-line \{[^}]*line-height: (\d+)px;/);
+    expect(Number(rule![1])).toBe(Number(pad![1]) + Number(line![1]) + Number(gap![1]) + Number(second![1]) + Number(pad![2]));
   });
   it('leaves the phone layout alone, whose rows are of more than one height', () => {
     const phone = read('phone.css').match(/@media \(max-width: (\d+)px\), \(max-height: (\d+)px\) \{/);

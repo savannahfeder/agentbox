@@ -14,7 +14,8 @@ const LOCAL_MS = 20_000;
 // The push runs the skill tests it reaches (scripts/private-push-gate.mjs).
 const CHECKED_PUSH_MS = 10 * 60_000;
 
-export function pushPrivateFolder(dir, { message, env = process.env, trusted = dir } = {}) {
+// `signIn` runs the fetch and the push with the ship's GitHub sign-in (scripts/lib/push-sign-in.mjs).
+export function pushPrivateFolder(dir, { message, env = process.env, trusted = dir, signIn = null } = {}) {
   // The task's own private.json is the worker's to write, so the name is the app folder's.
   const rel = named(trusted);
   const at = rel && path.join(dir, rel);
@@ -29,7 +30,9 @@ export function pushPrivateFolder(dir, { message, env = process.env, trusted = d
   if (!fs.existsSync(path.join(gate, 'pre-push'))) return { pushed: false, why: `${rel} was left as it is, because the checks its push runs are missing here` };
   const quiet = { ...env, GIT_TERMINAL_PROMPT: '0' };
   const git = (args, timeout = LOCAL_MS) => {
-    const r = spawnSync('git', ['-c', `core.hooksPath=${gate}`, ...args], { cwd: at, encoding: 'utf8', env: quiet, timeout, killSignal: 'SIGKILL' });
+    const opts = { cwd: at, encoding: 'utf8', env: quiet, timeout, killSignal: 'SIGKILL' };
+    const line = ['-c', `core.hooksPath=${gate}`, ...args];
+    const r = signIn && (args[0] === 'fetch' || args[0] === 'push') ? signIn(line, { ...opts, pushing: args[0] === 'push' }) : spawnSync('git', line, opts);
     return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
   };
   const status = git(['status', '--porcelain']);

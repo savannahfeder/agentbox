@@ -241,6 +241,7 @@ interface FilesPlace {
   renameFolder(ask: { id: string; name?: string }): Promise<{ id?: string }>;
   moveFile(ask: { key: string; folder: string | null }): Promise<{ id?: string }>;
   renameFile(ask: { key: string; name: string }): Promise<{ id?: string }>;
+  setIcon(ask: { key: string; icon: string }): Promise<{ id?: string }>;
   removeFolder(ask: { id: string }): Promise<{ ids: string[] }>;
   restoreFolders(ask: { ids: string[] }): Promise<{ back: number }>;
   newDocument(ask: { project: string; name?: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string; title: string }>;
@@ -925,12 +926,20 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // answered at once (supervisor.sendNow).
   ipcMain.handle('zero:send-now', (_e, { product, id }: { product: string; id: string }) => supervisor.sendNow(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, runAt, putAway, reopenAs }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean; runAt?: number; putAway?: unknown; reopenAs?: WasBeforeClose }) => {
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, runAt, putAway, reopenAs, reopen }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean; runAt?: number; putAway?: unknown; reopenAs?: WasBeforeClose; reopen?: boolean }) => {
     if (isAgentRow(id)) return { ok: false };
     if (reopenAs && status === 'open' && !answer) {
       const out = store.reopenAsItWas(product, id, reopenAs);
       push();
       if (out?.status === 'open') { supervisor.liftBrakeForHer?.(); supervisor.wake(); }
+      return out;
+    }
+    // Reopen on a done thread puts it back for you; the reply it had already
+    // heard does not run again.
+    if (reopen && status === 'open' && !answer) {
+      const out = store.answerItem(product, id, { status: 'open' });
+      if (out) supervisor.keepReplyHeard({ ...out, product });
+      push();
       return out;
     }
     // Out of your own Needs you, on a task between people: no reply, no close, no run.
@@ -2766,13 +2775,14 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:files-place', async () => {
     try { return await filesPlaceNow().list(); } catch { return { files: [], projects: [], folders: [] }; }
   });
-  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; ids?: unknown; key?: unknown; folder?: string | null } = {}) => {
+  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; ids?: unknown; key?: unknown; folder?: string | null; icon?: unknown } = {}) => {
     try {
       const place = filesPlaceNow();
       const out = what === 'make' ? await place.makeFolder({ project: p.project, name: p.name, parent: p.parent ?? null })
         : what === 'rename' ? await place.renameFolder({ id: String(p.id ?? ''), name: p.name })
           : what === 'move' ? await place.moveFile({ key: String(p.key ?? ''), folder: p.folder ?? null })
             : what === 'name' ? await place.renameFile({ key: String(p.key ?? ''), name: String(p.name ?? '') })
+              : what === 'icon' ? await place.setIcon({ key: String(p.key ?? ''), icon: String(p.icon ?? '') })
               : what === 'remove' ? await place.removeFolder({ id: String(p.id ?? '') })
                 : what === 'restore' ? await place.restoreFolders({ ids: Array.isArray(p.ids) ? p.ids.map(String) : [] })
                   : null;

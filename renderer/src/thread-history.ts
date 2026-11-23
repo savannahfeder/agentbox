@@ -27,6 +27,7 @@ import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { handBackReadBy } from '../../shared/thread-asks.mts';
+import { carriedOnIn, saidBeforeTheStop, saysItStopped } from '../../shared/carried-on-outside.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { forTheAgent } from '../../shared/notes-for-the-agent.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
@@ -93,6 +94,10 @@ export interface ThreadEvent {
   // sentence someone rewords must never quietly turn that block off, because a
   // thread with no answer at the end of it still draws.
   field?: 'body' | 'answer' | 'result' | 'note';
+  /** Your words to a chat brought in, typed where it started. */
+  saidOutside?: true;
+  /** When its agent said what is under the line saying it stopped, which is dated when that was seen. */
+  saidAt?: number;
   /** The agent teammate who handed this over, on a reply the app wrote for it. */
   from?: string;
   /** Whose that was, by id: a person you asked to help draws with their face. */
@@ -240,11 +245,18 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // her.
   const claudeCode = (engine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
   let askedACommand = false;
+  // The status before this line's, so an open after a done reads as a reopen.
+  let wasStatus = '';
   // When an ask's verdict was written: the close right after it is the hand-back (shared/thread-asks.mts).
   let verdictAt = -Infinity;
   // The newest ask written from your side, for an imported Codex
   // conversation's opening (see the relabel branch in the loop).
   let yourBody: string | null = null;
+  // Where a chat brought in started, for your words typed there.
+  let startedIn: 'Claude Code' | 'Codex' | null = null;
+  let resultAt = 0;
+  // A followed chat is read moments after it was said: by its own clock, not ours.
+  const saidThen = (chatAt: unknown, at: number) => (Number(chatAt) > 0 && Number(chatAt) < at ? Number(chatAt) : at);
   // The short written name, folded forward like `title`. Read once at the end:
   // see `withTitleSaid`.
   let label: string | null = null;
@@ -346,6 +358,9 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     // The lease. A heartbeat extends it, a release ends it, and neither is
     // news: an agent that held a task for an hour did one thing, not thirty.
     if (line.heartbeat || line.release) continue;
+    // A chat brought in, carried on where it started (main/chat-follow.mts): no
+    // run of ours, and your words there have lines of their own.
+    if (line.claim && carriedOnIn(line.claim.holder)) continue;
     if (line.claim) {
       events.push({ at, who: 'agent', said: 'An agent picked it up', pickup: true });
       continue;
@@ -394,6 +409,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // A chat the import brought in from Claude Code was yours, not an agent's,
       // and its row is dated when the chat started there.
       const broughtIn = Array.isArray(patch!.labels) && patch!.labels.includes('thread-import');
+      if (broughtIn) startedIn = 'Claude Code';
       events.push({
         at, who: ruled ? 'you' : who,
         said: leaver ? 'Handed over to you' : mine || ruled ? 'You opened this' : broughtIn ? 'Started in Claude Code' : 'An agent opened this',
@@ -420,6 +436,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // dated when the chat started there (store.importCodexThreads).
       const birth = events.findIndex((e) => e.said === 'An agent opened this' && !e.field);
       if (birth >= 0) events[birth] = { ...events[birth], said: 'Started in Codex' };
+      startedIn = 'Codex';
     }
 
     // The ask, on whichever line it arrived. See `opened` above: on her own
@@ -493,8 +510,17 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       continue;
     }
 
+    // How far a followed chat has been read: what it dates is the line just above.
+    if (line.source === 'system' && has(patch, 'chatAt') && Object.keys(patch!).length === 1) {
+      const said = events.at(-1);
+      if (said?.saidOutside) events[events.length - 1] = { ...said, at: saidThen(patch!.chatAt, said.at) };
+      continue;
+    }
+
     if (words(patch.result)) {
-      events.push({ at, who: 'agent', said: 'It came back to you', words: words(patch.result)!, message: true, field: 'result', ...(ranNow() ? { ran: ranNow() } : {}) });
+      resultAt = at;
+      const then = saidThen((patch as { chatAt?: unknown }).chatAt, at);
+      events.push({ ...(saysItStopped(patch.result) ? { at, saidAt: then } : { at: then }), who: 'agent', said: 'It came back to you', words: words(patch.result)!, message: true, field: 'result', ...(ranNow() ? { ran: ranNow() } : {}) });
       continue;
     }
 
@@ -503,6 +529,13 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       const s = fromLink.place?.kind === 'time' && typeof fromLink.place.s === 'number' ? Math.floor(fromLink.place.s) : null;
       const moment = s === null ? '' : ` at ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
       events.push({ at, who: 'agent', said: `${fromLink.name} commented on ${fromLink.file}${moment}`, ...(words(fromLink.text) ? { words: words(fromLink.text)! } : {}) });
+      continue;
+    }
+
+    // Written by the app, as yours, only ever on the founder's side of the ledger.
+    const there = mine ? words((patch as { saidOutside?: unknown } | null)?.saidOutside) : undefined;
+    if (there) {
+      events.push({ at, who: 'you', said: `You replied in ${startedIn ?? 'Claude Code'}`, words: there, message: true, saidOutside: true });
       continue;
     }
 
@@ -576,11 +609,18 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // 'claimed' with no claim beside it is a lease line that lost its claim,
       // and the pickup above already said it.
       if (status === 'claimed') continue;
+      const before = wasStatus;
+      wasStatus = status;
       if (status === 'done') {
         // Handing it over closes your copy; "Given to …" just above already says what happened.
         const prev = events.at(-1);
         if (mine && prev?.field === 'answer' && /^Given to /.test(prev.words ?? '') && at - prev.at < 2000) continue;
         const handedBack = Number(line.ts) - verdictAt < 2000;
+        // Filed in Done as it came in, its agent having finished there.
+        if (mine && startedIn && resultAt && at - resultAt <= 10) {
+          events.push({ at, who: 'agent', said: `It finished in ${startedIn}` });
+          continue;
+        }
         events.push({ at, who, said: handedBack ? (mine ? 'You handed it back' : 'It was handed back') : mine ? 'You marked it done' : 'It closed this', ...(mine ? { personal: true as const } : {}) });
         continue;
       }
@@ -615,7 +655,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
         // Nor is the app reopening the row for a teammate's words (`tellItem`).
         if (line.source === 'system' && events.at(-1)?.from && events.at(-1)?.field === 'answer') continue;
-        const said = mine ? 'You sent it back' : 'It handed this back';
+        const said = mine ? (before === 'done' ? 'You reopened it' : 'You sent it back') : 'It handed this back';
         // One press can write the reopening twice (the notes path does), so the same words within a second are one.
         const last = events.at(-1);
         if (last?.said === said && Math.abs(at - last.at) < 1000) continue;
@@ -627,7 +667,25 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   }
   tagWriter();
 
-  return withTitleSaid(theAskComesFirst(waitingReplies(events)), title, label);
+  // A question there is read once it is answered, by when it was put up.
+  const shown = stopsAnswered(events);
+  const told = theAskComesFirst(waitingReplies(startedIn ? shown.sort((a, b) => a.at - b.at) : shown));
+  // A chat brought in has the name Claude Code or Codex gave it, which nobody typed.
+  return startedIn ? told : withTitleSaid(told, title, label);
+}
+
+// WHERE A CHAT STOPPED ON ITS OWN WINDOW IS NEWS ONLY UNTIL YOU ARE THERE: once
+// something follows, the question itself is on the thread (main/chat-follow.mts).
+function stopsAnswered(events: ThreadEvent[]): ThreadEvent[] {
+  const lastMessage = events.findLastIndex((e) => e.message);
+  return events.flatMap((e, i) => {
+    const next = events[i + 1];
+    // Back from Done as it stopped (store.chatAsksAgain): the line says why, and nobody sent it.
+    if (e.said === 'You sent it back' && next?.field === 'result' && saysItStopped(next.words) && next.at - e.at <= 5) return [];
+    if (i >= lastMessage || e.field !== 'result' || !saysItStopped(e.words)) return [e];
+    const before = saidBeforeTheStop(e.words ?? '');
+    return before ? [{ ...e, words: before, at: e.saidAt ?? e.at }] : [];
+  });
 }
 
 // A REPLY SET FOR LATER GOES WITH THE NEXT REPLY OF HERS, at that one's time:

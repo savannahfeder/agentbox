@@ -22,7 +22,7 @@ function run(argv) {
 }`;
 
 const askFile: Ask = (cmd, args, opts) => new Promise((resolve, reject) => {
-  execFile(cmd, args, { ...opts, encoding: 'utf8', maxBuffer: 1 << 20 }, (err, out) => (err ? reject(err) : resolve(String(out))));
+  execFile(cmd, args, { ...opts, encoding: 'utf8', windowsHide: true, maxBuffer: 1 << 20 }, (err, out) => (err ? reject(err) : resolve(String(out))));
 });
 
 const appName = (p: string) => path.basename(p).replace(/\.app$/i, '');
