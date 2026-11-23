@@ -921,8 +921,16 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     let id: string | null = null;
     try {
       const had = rowForSession(store.listItems().filter((i) => i.product === product), agent);
-      if (had?.status !== 'done' && had?.id) id = had.id;
-      else {
+      // Moved before: that thread is brought up to where the session is now, and opened again if it was closed.
+      if (had?.id) {
+        id = had.id;
+        if (chat.source === 'codex') store.answerCodexImport(product, had.id, 'yes', { thread: chat });
+        else {
+          store.recordSessionResult(product, had.id, { result: chat.lastSaid, status: null });
+          // Her press, so it outranks her own close.
+          if (had.status === 'done') store.answerItem(product, had.id, { status: 'open' });
+        }
+      } else {
         const out = chat.source === 'codex'
           ? store.importCodexThreads(product, [chat], { land: 'inbox' })
           : store.importThreadRows(product, [chat], { land: 'inbox' });

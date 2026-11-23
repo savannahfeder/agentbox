@@ -106,6 +106,25 @@ describe('moving it in', () => {
     w.store.importCodexThreads(w.slug, [chatFromSession(codex(w.folder))!], { land: 'inbox' });
     expect(w.store.importCodexThreads(w.slug, [chatFromSession(codex(w.folder))!], { land: 'inbox' }).added).toBe(0);
   });
+  // A power tester moved a session again once its thread was closed and got
+  // the old thread back without the question the session was now asking.
+  it('moved again, its thread is brought up to where the session is now and opened', async () => {
+    const w = await world();
+    const [cx] = w.store.importCodexThreads(w.slug, [chatFromSession(codex(w.folder))!], { land: 'inbox' }).ids;
+    w.store.answerItem(w.slug, cx, { status: 'done' });
+    w.store.answerCodexImport(w.slug, cx, 'yes', { thread: chatFromSession(codex(w.folder, { approval: null, lastSaid: 'Should the page size be 20 or 50?' }))! });
+    const row = w.store.listItems().find((i) => i.id === cx)!;
+    expect(row.status).toBe('open');
+    expect(row.result).toContain('Should the page size be 20 or 50?');
+    const [cl] = w.store.importThreadRows(w.slug, [chatFromSession(claude(w.folder))!], { land: 'inbox' }).ids;
+    w.store.answerItem(w.slug, cl, { status: 'done' });
+    w.store.recordSessionResult(w.slug, cl, { result: 'Fixed. Want me to add an index too?', status: null });
+    w.store.answerItem(w.slug, cl, { status: 'open' });
+    expect(w.store.listItems().find((i) => i.id === cl)).toMatchObject({ status: 'open', result: 'Fixed. Want me to add an index too?' });
+  });
+  it('a session still working when it moved says so, rather than that it never answered', () => {
+    expect(chatFromSession(codex('/x', { status: 'busy', approval: null, lastSaid: '' }))?.last).toBe('It was still working in its terminal when it moved here.');
+  });
   it('a Claude Code session is never taken for a Codex one with the same id, nor the other way', async () => {
     const w = await world();
     w.store.importThreadRows(w.slug, [chatFromSession(claude(w.folder, { sessionId: 'same' }))!], { land: 'inbox' });
@@ -149,6 +168,9 @@ describe('the app around it', () => {
     expect(handler).toContain('agentSchedule.close(agentKey(agent), agent.lastActiveAt || Date.now())');
     expect(handler).toMatch(/importCodexThreads\(product, \[chat\], \{ land: 'inbox' \}\)/);
     expect(handler).toMatch(/importThreadRows\(product, \[chat\], \{ land: 'inbox' \}\)/);
+    expect(handler).toContain("store.answerCodexImport(product, had.id, 'yes', { thread: chat })");
+    expect(handler).toContain("store.recordSessionResult(product, had.id, { result: chat.lastSaid, status: null })");
+    expect(handler).toContain("if (had.status === 'done') store.answerItem(product, had.id, { status: 'open' })");
   });
   it('offers it only on a session with a project to go to and an id to file it under', () => {
     expect(read('renderer/src/components/Focus.tsx')).toContain('onBringIn={agent?.product && agent.sessionId && onBringIn ? onBringIn : null}');
