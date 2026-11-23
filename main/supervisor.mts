@@ -10303,9 +10303,17 @@ export class Supervisor {
       }
       if (this.sessions.has(current.id)) return;
       if (this._answerDelivered(current)) return;
-      this._handledAnswers.add(this._answerKey(current));
+      // The run closed its thread before it heard these words, and a closed
+      // thread refuses the claim the next run makes. One she closed stays closed.
+      let next = current;
+      if (current.status === 'done') {
+        if (current.wrote?.status?.source === 'founder') return;
+        this.store.answerItem(current.product, current.id, { status: 'open' });
+        next = { ...current, status: 'open' };
+      }
+      this._handledAnswers.add(this._answerKey(next));
       this._saveState();
-      this.spawnWorker(current, { continuation: true });
+      this.spawnWorker(next, { continuation: true });
     } catch {}
   }
 

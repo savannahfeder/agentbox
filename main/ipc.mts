@@ -1,6 +1,6 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
-import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mts';
+import { noteToItsAgent, notesLeftUnsent, notReached, replyWithWaitingNotes, waitingNotes } from './notes-wake.mts';
 import { leftByAMove } from '../shared/move-thread.mts';
 import { moveThread } from './move-thread.mts';
 import { whereTheWorkStands, type WorkStands } from './git-change.mts';
@@ -97,11 +97,10 @@ import { closeRefusal, closedAnywayNote } from '../shared/not-shipped.mts';
 import { lightRunning, snapshotSender } from '../shared/snapshot-delta.mts';
 import { wakesItselfAt } from '../shared/answers.mts';
 import type { WasBeforeClose } from '../shared/reopen-as-it-was.mts';
-import { traceAnswer } from '../shared/trace-delta.mts';
 import { saveAttachments } from './save-attachments.mts';
 import { stageAttachment, stageAttachmentPart } from './stage-attachment.mts';
 import type { StagedPart } from './stage-attachment.mts';
-import { readRunTraces } from './run-traces.mts';
+import { newestRunTraces, readRunTraces } from './run-traces.mts';
 import { openInBrowser } from './open-in-browser.mts';
 import type { AnswerInput, ComposeInput, Store, StoreConfig } from './store.mts';
 import type { Supervisor, SupervisorConfig } from './supervisor.mts';
@@ -1337,8 +1336,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       store.fileMark(product, id, mark);
       push();
       void team?.syncNow?.()?.catch?.(() => {});
-      try { await noteToItsAgent({ store, supervisor, product, id, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
+      let handed = false;
+      try { handed = await noteToItsAgent({ store, supervisor, product, id, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
       catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${(err as Error)?.message ?? err}` }; }
+      const left = handed ? [] : notesLeftUnsent({ store, product, id, mark: mark as Mark, people: teamPeople() });
+      if (left.length) return { ok: false, error: notReached(left) };
       return { ok: true };
     } catch (err) {
       return { ok: false, error: String((err as Error)?.message ?? err) };
@@ -2811,8 +2813,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const { wrote, ...out } = await filesPlaceNow().mark(String(key ?? ''), mark);
     if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
     if (out.ok && wrote) {
-      try { await noteToItsAgent({ store, supervisor, ...wrote, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
+      let handed = false;
+      try { handed = await noteToItsAgent({ store, supervisor, ...wrote, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
       catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${(err as Error)?.message ?? err}` }; }
+      const left = handed ? [] : notesLeftUnsent({ store, ...wrote, mark: mark as Mark, people: teamPeople() });
+      if (left.length) return { ok: false, error: notReached(left) };
     }
     return out;
   });
@@ -3138,21 +3143,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // (main/run-traces.mts). Otherwise the newest, and `have` holds the stamps
   // of the logs the screen already has (shared/trace-delta.mts).
   ipcMain.handle('zero:session-trace', async (_e, { product, id, have, whole }: { product: string; id: string; have?: Record<string, string>; whole?: boolean } = {} as { product: string; id: string }) => {
-    const fs = await import('node:fs');
     const path = await import('node:path');
     const dir = store.listProducts().find((p) => p.slug === product)?.dir;
     if (!dir || !/^[\w-]+$/.test(String(id ?? ''))) return { ok: false, sessions: [] };
     const traceDir = machineryPath(dir, path.join('sessions', id));
     if (whole) return { ok: true, sessions: readRunTraces(traceDir, { whole: true }) };
-    let files: string[] = [];
-    try {
-      files = fs.readdirSync(traceDir).filter((f) => f.endsWith('.log')).sort();
-    } catch { return { ok: true, sessions: [] }; }
-    const sessions = files.slice(-20).map((f) => {
-      const startedAt = Number(f.replace('.log', '')) || 0;
-      return traceAnswer({ fs, file: path.join(traceDir, f), startedAt, had: have?.[startedAt] });
-    });
-    return { ok: true, sessions };
+    return { ok: true, sessions: newestRunTraces(traceDir, have) };
   });
 
   // The thread history behind the time under a task's title. Raw ledger lines,

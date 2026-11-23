@@ -561,6 +561,16 @@ export function whereAPressLands(families: readonly FileFamily[] | null | undefi
 }
 
 /**
+ * The paths a press keeps on its file's version line when Files has not
+ * numbered them (threadFiles `keep`): what it names, and the file of the note
+ * it opens at, which a press from the note's line names only by the note.
+ */
+export function pathsAPressKeeps(open: { path?: string; steps?: readonly string[]; drawn?: readonly string[]; note?: string }, notes: readonly { id: string; file: string }[]): string[] {
+  const noted = open.note ? notes.find((n) => n.id === open.note)?.file.replace(/#\d+$/, '') : undefined;
+  return [open.path, ...(open.steps ?? []), ...(open.drawn ?? []), noted].filter((p): p is string => !!p);
+}
+
+/**
  * The version a mark's `file` names on this computer: its id here, else
  * `name@n`, the n-th on the file's version line as Files names it, else a name
  * a teammate's copy gave it before (`name#k` for the k-th of those). Null when
