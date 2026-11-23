@@ -1411,8 +1411,9 @@ export function createTeamService({
       // A path of the sender's ending in the file is the file: the whole of it becomes the link, or a cut-down path is left to send.
       const quoted = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       for (const [rel, copy] of moved) text = text.replace(new RegExp(`(?<![\\w(\\]])(?:~|/)[^\\s()\\[\\]\`]*/${quoted(rel)}(?![\\w/])`, 'g'), `[${copy.name}](${copy.rel})`);
-      // The file's own path written out is the file too: a bare name in its place opens nothing for the receiver.
-      for (const [rel, copy] of moved) if (rel.includes('/')) text = text.replace(new RegExp(`(?<![\\w/(\\[\\]])${quoted(rel)}(?![\\w/\\]])`, 'g'), `${/\.(?:png|jpe?g|gif|webp|svg)$/i.test(copy.name) ? '!' : ''}[${copy.name}](${copy.rel})`);
+      // The file's own path alone on its line is the file too: a bare name in its place opens nothing for the receiver.
+      // Inside a sentence it stays a name, with the link at the foot: the receiver's view opens a file link only on a line of its own.
+      for (const [rel, copy] of moved) if (rel.includes('/')) text = text.replace(new RegExp(`^(\\s*(?:>\\s?)*)${quoted(rel)}[ \\t]*$`, 'gm'), (_m, lead: string) => `${lead}${/\.(?:png|jpe?g|gif|webp|svg)$/i.test(copy.name) ? '!' : ''}[${copy.name}](${copy.rel})`);
       for (const [rel, copy] of moved) text = text.split(rel).join(copy.name);
       const unlinked = saved.filter((s) => !text.includes(`](${s.rel})`));
       const full = [text, attachmentMarkdown(unlinked)].filter(Boolean).join('\n\n') || named;
