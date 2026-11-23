@@ -11,5 +11,10 @@ export function filesToAttach(files: PlacedFile[], query: string): PlacedFile[] 
 /** The newest version on this computer; null while it has not come down. */
 export function attachmentOf(f: PlacedFile): { name: string; srcPath: string; image: boolean } | null {
   if (!f.opened) return null;
-  return { name: f.name, srcPath: f.opened, image: f.kind === 'image' };
+  // Files lists a file under its first name; a chat that gets a later version under
+  // that name holds two of it and opens the first.
+  const onDisk = f.opened.split(/[\\/]/).pop() ?? '';
+  const name = [f.name, ...(f.versionNames ?? [])].sort((a, b) => b.length - a.length)
+    .find((n) => onDisk === n || onDisk.endsWith(`-${n}`)) ?? f.name;
+  return { name, srcPath: f.opened, image: f.kind === 'image' };
 }
