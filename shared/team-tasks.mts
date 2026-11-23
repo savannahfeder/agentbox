@@ -13,7 +13,7 @@
 import { isTaskRow, taskGiver } from './team-rules.mts';
 import { waitParts, personWait, cardWait } from './thread-waits.mts';
 import { shortTitle, shownTitle } from './thread-title.mts';
-import type { TalkLine, TalkRow } from './team-rules.mts';
+import type { TalkLine, TalkRow, TeamRow } from './team-rules.mts';
 
 /** The moment a deadline passes; `clock` is false for a whole day. */
 export interface Deadline { at: number; clock: boolean }
@@ -343,6 +343,13 @@ const CHOICES = 8;
  * open threads and tasks the holder's Mac can look up, newest first.
  * `published` says whether one of your threads has a card the team can read.
  */
+// A teammate's thread synced into a shared project holds their summary but not
+// its title; their card names it and is the block their Mac can end.
+const runByAnother = (i: TeamRow, me: string | null) => {
+  const runs = i.runner || i.createdBy;
+  return !!runs && runs !== me;
+};
+
 export function blockChoices<T extends TaskRow & { id: string }>({ task = null, holder, me, people, items, cards, nameOf, published }: {
   task?: { id: string } | null;
   holder: string | null;
@@ -362,7 +369,7 @@ export function blockChoices<T extends TaskRow & { id: string }>({ task = null, 
       if (i.visibility !== 'team' || !i.assignee) continue;
       here.add(i.id);
       threads.push({ id: cardWait(i.assignee, i.id), label: `${i.assignee === me ? 'You' : FIRST(nameOf(i.assignee))}: ${shownTitle(i)}`, at: i.updatedAt ?? 0 });
-    } else if (published(i)) {
+    } else if (!runByAnother(i, me) && published(i)) {
       here.add(i.id);
       // Published means it is on the team's board, which only someone signed in has.
       threads.push({ id: cardWait(me as string, i.id), label: shownTitle(i), at: i.updatedAt ?? 0 });
