@@ -53,7 +53,7 @@ import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { FileMarkOpener } from './FileMarkLine';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { catchUpDue } from '../../../shared/agent-import.mts';
+import { gettingReady } from '../../../shared/agent-import.mts';
 import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, footOf, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
 import { gapIndex } from '../../../shared/agents.mts';
 import { askMarkUnread, say } from '../team/chat-events';
@@ -503,7 +503,7 @@ export function ItemThread({ askAbout = false, onOpenFileMark, item, engine, eng
     </div>
   );
   // A chat just brought in is being written up as a thread (main/catch-up.mts). Its raw end stays readable until then.
-  if (queue && catchUpDue(item)) {
+  if (queue && gettingReady(item) && !earlierOpen) {
     return (
       <>
         {queueHead}

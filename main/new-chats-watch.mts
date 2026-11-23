@@ -8,6 +8,10 @@
 // carries on a copy (Supervisor#importedThreadFor). It is filed the way setup
 // files one: waiting on you to Needs you, finished to Done. Nothing asks about
 // a chat first; asking rows are what the old Codex watch was removed for.
+//
+// A chat Claude Code says is at work has not gone quiet, however long it has
+// written nothing, and one stopped on a question or a permission prompt in its
+// own window is waiting on you, which its transcript does not say.
 import { productsForThread } from '../shared/codex-import.mts';
 import type { CodexThreadLike } from '../shared/codex-import.mts';
 import { isShared } from '../shared/team-rules.mts';
@@ -15,16 +19,24 @@ import { appSessionFolders } from './agent-homes.mts';
 import type { HomesSupervisor } from './agent-homes.mts';
 import { outsideAgentsMode } from './settings.mts';
 import type { SettingsConfig } from './settings.mts';
-import { claudeSessionOpen } from './claude-session-open.mts';
+import { claudeSessionState } from './claude-session-open.mts';
+import type { ClaudeSessionState } from './claude-session-open.mts';
+import { atWork, stoppedOn } from './chat-follow.mts';
 import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { readRecentThreads } from './importable-threads.mts';
+import { readChatTurn } from './agent-sessions.mts';
+import type { ChatEntry } from './agent-sessions.mts';
 
 export const NEW_CHATS_POLL_MS = 60_000;
 /** How long a chat has to have been still before it comes in. */
 export const QUIET_MS = 10 * 60_000;
+/** And one stopped on a question or a permission prompt, which nobody is at. */
+export const STOPPED_QUIET_MS = 2 * 60_000;
 const PASS_DEADLINE_MS = 90_000;
 
-export interface NewChatThread extends CodexThreadLike { source?: string }
+export interface NewChatThread extends CodexThreadLike { source?: string; waiting?: boolean; stoppedOn?: string; openIn?: string; path?: string; entries?: ChatEntry[] }
+
+type StateOf = (t: NewChatThread) => ClaudeSessionState | null;
 
 export interface NewChatProduct {
   slug: string;
@@ -58,12 +70,13 @@ function idsWithRows(items: { labels?: unknown[] }[] | null | undefined) {
 /** Which of `threads` come in now, grouped by the project each lands in. */
 export function newChatsToBring(
   threads: NewChatThread[] | null | undefined,
-  { products, items, since, now, isOpen = () => false, openShownLive = false }: {
+  { products, items, since, now, isOpen = () => false, stateOf = () => null, openShownLive = false }: {
     products: NewChatProduct[];
     items?: { labels?: unknown[] }[];
     since: number;
     now: number;
     isOpen?: (t: NewChatThread) => boolean;
+    stateOf?: StateOf;
     openShownLive?: boolean;
   },
 ): Map<string, NewChatThread[]> {
@@ -73,12 +86,17 @@ export function newChatsToBring(
     const id = String(t?.id ?? '').trim();
     if (!id || had.has(id)) continue;
     if (!(Number(t.startedAt) > since)) continue;
-    if (now - Number(t.when ?? 0) < QUIET_MS) continue;
+    const quiet = now - Number(t.when ?? 0);
+    if (quiet < STOPPED_QUIET_MS) continue;
     if (t.source === 'codex' ? t.live : openShownLive && isOpen(t)) continue;
     const slug = productsForThread(t, products)[0]?.slug;
     if (!slug) continue;
+    const state = t.source === 'codex' ? null : stateOf(t);
+    if (atWork(state)) continue;
+    const on = stoppedOn(state);
+    if (on === null && quiet < QUIET_MS) continue;
     if (!bySlug.has(slug)) bySlug.set(slug, []);
-    bySlug.get(slug)!.push(t);
+    bySlug.get(slug)!.push(on === null ? t : { ...t, waiting: true, stoppedOn: on, openIn: state?.folder });
     had.add(id);
   }
   return bySlug;
@@ -89,10 +107,11 @@ export interface ScanNewChatsOptions {
   config?: NewChatsConfig | null;
   readThreads: ReadThreads;
   isOpen: (t: NewChatThread) => boolean;
+  stateOf?: StateOf;
   now?: number;
 }
 
-export async function scanNewChats({ store, config, readThreads, isOpen, now = Date.now() }: ScanNewChatsOptions): Promise<{ brought: number }> {
+export async function scanNewChats({ store, config, readThreads, isOpen, stateOf, now = Date.now() }: ScanNewChatsOptions): Promise<{ brought: number }> {
   if (config?.importNew !== true) return { brought: 0 };
   const since = Number(config.importNewSince) || now;
   // Only as far back as the switch, and never further than the import card reads.
@@ -103,10 +122,11 @@ export async function scanNewChats({ store, config, readThreads, isOpen, now = D
   const threads = await readThreads({ days, since, folders, now });
   // An open session already has its own row when "Show while they run" is on.
   const openShownLive = outsideAgentsMode(config) !== 'off';
-  const picks = newChatsToBring(threads, { products, items: store.listItems(), since, now, isOpen, openShownLive });
+  const picks = newChatsToBring(threads, { products, items: store.listItems(), since, now, isOpen, stateOf, openShownLive });
   let brought = 0;
   for (const [slug, list] of picks) {
-    brought += store.importThreadRows(slug, list, { now, land: 'sorted' }).added;
+    const whole = list.map((t) => (t.source === 'codex' || !t.path ? t : { ...t, entries: readChatTurn(t.path)?.entries }));
+    brought += store.importThreadRows(slug, whole, { now, land: 'sorted' }).added;
     brought += store.importCodexThreads(slug, list, { now, land: 'sorted' }).added;
   }
   return { brought };
@@ -120,7 +140,7 @@ export interface NewChatsTiming {
 }
 
 export function startNewChatsWatch({
-  store, config, readThreads, isOpen,
+  store, config, readThreads, isOpen, stateOf,
   everyMs = NEW_CHATS_POLL_MS, firstDelayMs = 30_000, deadlineMs = PASS_DEADLINE_MS, log = console.warn,
 }: ScanNewChatsOptions & NewChatsTiming) {
   // One pass at a time, and a pass that never answers is given up on so the
@@ -132,7 +152,7 @@ export function startNewChatsWatch({
     const deadline = new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error(`no answer in ${Math.round(deadlineMs / 1000)}s`)), deadlineMs);
     });
-    running = Promise.race([scanNewChats({ store, config, readThreads, isOpen }), deadline])
+    running = Promise.race([scanNewChats({ store, config, readThreads, isOpen, stateOf }), deadline])
       .catch((e) => log('new chats watch:', e?.message ?? e))
       .finally(() => { clearTimeout(timer!); running = null; });
     return running;
@@ -147,11 +167,13 @@ export function startNewChatsWatch({
 
 /** The watch as the app runs it, on the desktop (main/main.mts) and in the browser copy (bin/agentbox.mjs). */
 export function watchNewChatsFor({ store, config, supervisor, ...timing }: { store: NewChatsStore; config: NewChatsConfig | null | undefined; supervisor: HomesSupervisor | null | undefined } & NewChatsTiming) {
+  const stateOf: StateOf = (t) => claudeSessionState(t.id, appSessionFolders({ config, supervisor }).dirs);
   return startNewChatsWatch({
     store,
     config,
     readThreads: (opts) => readRecentThreads({ ...opts, config, supervisor, readCodex: readCodexThreadsOffThread }),
-    isOpen: (t) => claudeSessionOpen(t.id, appSessionFolders({ config, supervisor }).dirs),
+    isOpen: (t) => stateOf(t) !== null,
+    stateOf,
     ...timing,
   });
 }
