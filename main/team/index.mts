@@ -871,7 +871,7 @@ export function createTeamService({
         const on = new Set(phoneProjectsOf(phone.projects(), owner, phoneEligible(products())));
         return products().filter((p) => on.has(p.slug)).map((p) => ({ slug: p.slug, name: p.name || p.slug, dir: p.dir || null, repoPath: p.repoPath || null }));
       },
-      listItems: (slug) => { const p = productOf(slug); try { return p ? disk.readWorkItems(p.dir) : []; } catch { return []; } },
+      listItems: (slug) => { const p = productOf(slug); try { return p ? rowsOf(p.dir) : []; } catch { return []; } },
       historyOf: (slug, id, { all = false }: { all?: boolean } = {}) => { try { return store.readHistory(slug, id, { max: all ? Number.MAX_SAFE_INTEGER : SNAPSHOT_LIMITS.lines * 4 }); } catch { return []; } },
       runsOf: (slug, id) => {
         const p = productOf(slug);
