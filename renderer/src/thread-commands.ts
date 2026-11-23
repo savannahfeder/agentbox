@@ -16,8 +16,8 @@ export interface AskAnswer { verdict: AskVerdict; label: string }
 
 /** What a teammate's ask on you is answered with, in the words of the page's buttons (threads/TeammateThread). */
 export function askAnswers(kind: 'help' | 'review' | null | undefined, owner: string): AskAnswer[] {
+  // A review is answered by replying to it, not by fixed answers.
   if (kind === 'help') return [{ verdict: 'done', label: `Hand back to ${owner}` }];
-  if (kind === 'review') return [{ verdict: 'yes', label: 'Looks good' }, { verdict: 'changes', label: 'Needs changes' }];
   return [];
 }
 

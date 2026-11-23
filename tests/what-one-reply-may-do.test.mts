@@ -683,10 +683,10 @@ describe('the wiring from the reply box is present in the source', () => {
     const focus = fs.readFileSync('renderer/src/components/Focus.tsx', 'utf8');
     // SINCE 2026-09-23 BOTH ENGINES MAY SET ONE, so the rule is about the
     // external agent row alone: that value really is thrown away by the send.
-    expect(focus).toContain('const canSetMode = !item.agent;');
+    expect(focus).toContain('const canSetMode = !item.agent && ownControls;');
     expect(focus).toContain('const claudeCode = (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;');
     // The slash menu: no query means no rows means no menu.
-    expect(focus).toContain('const toAgent = !item.agent && !talkTo?.length;');
+    expect(focus).toContain('const toAgent = !item.agent && !talkTo?.length && ownControls;');
     expect(focus).toContain('const query = toAgent ? slashQuery(text) : null;');
     // And Claude Code's own Shift+Tab.
     expect(focus).toContain("e.key === 'Tab' && e.shiftKey && canSetMode");

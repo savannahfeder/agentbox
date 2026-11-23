@@ -128,8 +128,8 @@ export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
-const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'sage', 'dusk-light', 'light', 'dark'];
-const LIGHT_SKIES = ['sage', 'dusk-light'];
+const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'mountains', 'sage', 'light', 'dark'];
+const LIGHT_SKIES = ['mountains', 'sage'];
 /** The look you have first, then Match my system, then every sky Settings offers.
  *  A sky is drawn only on Home, so without it the choice is Light or Dark. */
 export function lookChoices(current: string, skies: boolean): string[] {
@@ -161,17 +161,19 @@ type Lesson = 'start' | 'compose' | 'working' | 'open' | 'choose' | 'reply' | 'c
 export interface ChecklistRow { label: string; keys: string[]; state: 'done' | 'now' | 'todo' }
 /** The tour's lessons as the list beside it. Answering is either a choice or a reply.
  *  `now` is the lesson the tour is pointing at; without one, the first not done is lit. */
+// Each step: its words, its keys, the lessons that tick it, and the tips that point at it.
+const walkSteps = (cmd: string): Array<[string, string[], Lesson[], Lesson[]]> => [
+  ['Send a thread', ['N'], ['start', 'compose'], ['start', 'compose']],
+  // Writing back to a thread or closing it means it was opened, whatever opened it.
+  ['Open one', ['↵'], ['open', 'choose', 'reply', 'close'], ['open', 'working']],
+  ['Write back', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
+  ['Mark it done', ['E'], ['close'], ['close']],
+  ['Find anything', [cmd, 'K'], ['palette'], ['palette', 'urgent']],
+];
+
 export function tourChecklist(done: readonly Lesson[], cmd = '⌘', now: Lesson | null = null): ChecklistRow[] {
   const has = (...l: Lesson[]) => l.some((x) => done.includes(x));
-  // Each row: its words, its keys, the lessons that tick it, and the tips that point at it.
-  const rows: Array<[string, string[], Lesson[], Lesson[]]> = [
-    ['Send a thread', ['N'], ['start', 'compose'], ['start', 'compose']],
-    // Writing back to a thread or closing it means it was opened, whatever opened it.
-    ['Open one', ['↵'], ['open', 'choose', 'reply', 'close'], ['open', 'working']],
-    ['Write back', ['R'], ['choose', 'reply'], ['choose', 'reply', 'busy']],
-    ['Mark it done', ['E'], ['close'], ['close']],
-    ['Find anything', [cmd, 'K'], ['palette'], ['palette', 'urgent']],
-  ];
+  const rows = walkSteps(cmd);
   // A row already done keeps its tick; the tour pointing back at it lights the next one to do.
   const at = now ? rows.findIndex(([, , ls, by]) => by.includes(now) && !has(...ls)) : -1;
   const lit = at >= 0 ? at : rows.findIndex(([, , ls]) => !has(...ls));
@@ -194,9 +196,9 @@ export function tabStop(count: number, at: number, back: boolean): number {
   return (at + (back ? count - 1 : 1)) % count;
 }
 
-/** The look the setup ticks: the sky picked, Light or Dark once one of those was picked, and otherwise Match my system. */
-export function setupLook({ skies, picked, worn, light }: { skies: boolean; picked: boolean; worn: string | null; light: boolean }): string {
-  if (skies && picked && worn) return worn;
+/** The look the setup ticks: the sky worn, Match my system when the window follows the computer, and plain Light or Dark once one of those was picked. */
+export function setupLook({ skies, picked, worn, light, follows = true }: { skies: boolean; picked: boolean; worn: string | null; light: boolean; follows?: boolean }): string {
+  if (skies && worn && (picked || !follows)) return worn;
   if (skies && worn) return MATCH_SKY;
   return light ? 'light' : 'dark';
 }
@@ -205,8 +207,14 @@ export function setupLook({ skies, picked, worn, light }: { skies: boolean; pick
 export const tourPlace = (rows: ChecklistRow[]) => Math.min(Math.max(rows.filter((r) => r.state === 'done').length + 1, rows.findIndex((r) => r.state === 'now') + 1), rows.length);
 export const tourCount = (rows: ChecklistRow[]) => `${tourPlace(rows)} of ${rows.length}`;
 
-/** How far through the walkthrough you are, for the bar above the framed app. */
+/** How far through the walkthrough you are, for the column beside the framed app: the step the tip on
+ *  screen is about. ⌘K opened before the practice thread is closed has its own tip, which is not a step
+ *  further on, and a lesson learned out of turn does not move the count past the tip. */
 export function walkPlace(done: readonly Lesson[], now: Lesson | null): { at: number; of: number } {
-  const rows = tourChecklist(done, '⌘', now);
-  return { at: tourPlace(rows), of: rows.length };
+  const early = (now === 'palette' || now === 'urgent') && !done.includes('close');
+  const steps = walkSteps('⌘');
+  const tip = now && !early ? steps.findIndex(([, , , by]) => by.includes(now)) : -1;
+  const next = tourChecklist(done).findIndex((r) => r.state !== 'done');
+  const at = tip >= 0 ? tip : next >= 0 ? next : steps.length - 1;
+  return { at: at + 1, of: steps.length };
 }

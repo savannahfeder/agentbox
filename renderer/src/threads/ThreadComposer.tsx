@@ -49,6 +49,8 @@ import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
+import { handedIn, type HandedComment } from './comments-to-hand';
+import { rememberHanded } from './send-back';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
 import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { cardPick, clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
@@ -68,7 +70,7 @@ import { dropRank, useFitRow } from './fit-row';
 import { useThreadMentions } from '../components/ThreadMentions';
 import {
   agentChoices, toOffered, autoOffered,
-  allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
+  allModels, findPeople, furtherModelLabel, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInTo, findInvited, type ToSection,
@@ -126,6 +128,8 @@ export interface ComposeStart {
   caret?: [number, number];
   /** Files already on disk that go with it: what a handed-over message or task carries. */
   attachments?: PendingAttachment[];
+  /** The comments on the files it carries, which go to the agent unless unticked. */
+  comments?: HandedComment[];
   /** The message this card was opened from, when it was handed to an agent. */
   handFrom?: HandFrom;
   /** The task's name, which the thread keeps while its first line still says it. */
@@ -143,7 +147,7 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, toChat, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor, outOfUsage,
+  products, items, engines, furtherEngines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, toChat, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor, outOfUsage,
 }: {
   /** `supervisor.outOfUsage`: each agent whose account is out of usage, and when it comes back. */
   outOfUsage?: Record<string, { tool: string; until: number }>;
@@ -170,6 +174,8 @@ export function ThreadComposer({
   items: WorkItem[];
   /** The coding agents this Mac really offers, off the snapshot. Absent means Claude Code alone. */
   engines?: Engine[];
+  /** Any harness on offer besides those two, each with the models it listed (`snapshot.engines.further`). */
+  furtherEngines?: Engine[];
   /** Codex's models as read off this Mac, with their own effort levels. */
   codexModels: ModelChoice[];
   codexModelDefault: string | null;
@@ -293,6 +299,9 @@ export function ThreadComposer({
   const [dropped, setDropped] = useState(0);
   const { attaching, collect } = useAttaching();
   const onThisWork = initial?.handFrom ? agentOnThisWork(items, initial.handFrom) : null;
+  // The comments are lines of the words; the ones still there when it is sent are the ones it carried.
+  const comments = initial?.comments ?? [];
+  const commenter = (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null) || 'A teammate';
 
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
@@ -352,11 +361,14 @@ export function ThreadComposer({
   const claudeOffered = engineRows.some((e) => e.id === 'claude');
   const codexDefault = codexModelDefault ?? null;
   const modelOpts = { codexModels, codexDefault };
+  // A harness besides the two is never the default: it is picked by picking one of its models.
+  const further = furtherEngines ?? [];
+  const furtherIds = further.map((e) => e.id).join(',');
   // The agent is the default from Settings, not the last one picked: a pick
   // carried silently into the next thread sent work to the wrong agent. Each
   // agent's own last model is still remembered.
   const remembered = (): ModelPick => {
-    const kept = cardPick(opened.current, engineRows.map((e) => e.id));
+    const kept = cardPick(opened.current, [...engineRows, ...further].map((e) => e.id));
     if (kept) return { engine: kept.engine as Harness, model: kept.model };
     const engine: Harness = startingEngine(workspaceEngine ?? null, engines);
     return { engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) };
@@ -368,7 +380,9 @@ export function ThreadComposer({
     if (pick.engine === 'codex' && !codexOffered) setPick({ engine: 'claude', model: readLastModel(undefined, 'claude') ?? defaultModelFor('claude') });
     // And the other way (w-db6f5e331e): a Mac with Codex and no Claude Code.
     if (pick.engine === 'claude' && !claudeOffered && codexOffered) setPick({ engine: 'codex', model: readLastModel(undefined, 'codex', codexDefault) ?? defaultModelFor('codex', codexDefault) });
-  }, [codexOffered, claudeOffered]);
+    // And a further harness that is no longer here.
+    if (pick.engine !== 'claude' && pick.engine !== 'codex' && !further.some((e) => e.id === pick.engine)) setPick(remembered());
+  }, [codexOffered, claudeOffered, furtherIds]);
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, pick.engine));
   // The setup asks which agent while this box is already open behind it.
   useEffect(() => {
@@ -395,17 +409,17 @@ export function ThreadComposer({
     setEffort(next);
     writeLastEffort(next, undefined, pick.engine);
   };
-  const labelOf = (p: ModelPick) => engineModelLabel(p.engine, p.model, modelOpts);
+  const labelOf = (p: ModelPick) => furtherModelLabel(further, p) ?? engineModelLabel(p.engine, p.model, modelOpts);
   // Recent rows say which agent runs them, where there are two.
-  const engineTags = agentChoices(engineRows).length > 0;
+  const engineTags = agentChoices(engineRows).length > 0 || further.length > 0;
   // Said before Send, so nobody files a task expecting an agent that cannot start.
   const outHere = person || mate ? null : outOfUsage?.[pick.engine] ?? null;
   const outNote = outOfUsageNote(outHere);
   const recent = useMemo(
-    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered }),
-    [items, codexModels, codexDefault, codexOffered, claudeOffered],
+    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered, further }),
+    [items, codexModels, codexDefault, codexOffered, claudeOffered, furtherEngines],
   );
-  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered }), [codexModels, codexOffered, claudeOffered]);
+  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered, further }), [codexModels, codexOffered, claudeOffered, furtherEngines]);
   const more = moreCount(recent, every);
 
   /* ------------------------------ menus --------------------------------- */
@@ -657,7 +671,7 @@ export function ThreadComposer({
       const harness = harnessFields({
         engine: pick.engine, model: pick.model,
         effort: effortPicked(effort, effortRows) ? effort : null,
-        engineCount: engineRows.length, codexDefault,
+        engineCount: engineRows.length + further.length, codexDefault,
       });
       const priority = sentPriority(prio);
       if (when.repeat) {
@@ -689,6 +703,7 @@ export function ThreadComposer({
           ...(scripted ? { labels: scripted.labels } : {}),
         });
         dropComposeDraft(taken, undefined, place);
+        if (made?.id && !person) rememberHanded(product.slug, made.id, handedIn(typed, comments, { nameOf: commenter }));
         if (initial?.continueFrom) void api.teamContinued(initial.continueFrom);
         // The person who handed it over can follow the work to where it went (round two of the team test).
         const startedAt = initial?.handFrom && made?.id && team?.me ? threadLink(team.me, made.id) : null;
@@ -962,7 +977,7 @@ export function ThreadComposer({
     </div>
   );
 
-  const engineLabel = (id: string) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id;
+  const engineLabel = (id: string) => [...engineRows, ...further].find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id;
 
   // The menu itself is ./ModelMenu.tsx, which the reply box draws too.
   const modelMenu = (
@@ -986,15 +1001,15 @@ export function ThreadComposer({
     />
   );
 
-  // IS THIS A TASK OR A MESSAGE. Both are drawn, because a word that only showed
+  // IS THIS A TO-DO OR A MESSAGE. Both are drawn, because a word that only showed
   // its other choice when pressed was missed. Picking Message puts the day away:
-  // a message has nothing to be due.
+  // a message has nothing to be due. The store still calls a to-do a task.
   const sendAsChoice = (
     <span className="tc-seg" role="group" aria-label="Send as">
       {(['message', 'task'] as SendAs[]).map((k) => (
-        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={`Send as a ${k}`}
+        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={k === 'task' ? 'Send as a to-do' : 'Send as a message'}
           onClick={() => { setSendAs(k); if (k === 'message') setDue(null); textRef.current?.focus(); }}>
-          {k === 'task' ? 'Task' : 'Message'}
+          {k === 'task' ? 'To-do' : 'Message'}
         </button>
       ))}
     </span>
@@ -1268,7 +1283,7 @@ export function ThreadComposer({
             <button type="button" aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`} onClick={() => setAlso((was) => was.filter((x) => x !== p.id))}>×</button>
           </span>
         ))}
-        {/* A task goes to one person, so Home offers no second one for it. */}
+        {/* A to-do goes to one person, so Home offers no second one for it. */}
         {person && others.length > group.length && !(quiet && sendAs === 'task' && !extra.length) && (
           <button type="button" className="tc-add" aria-label="Add someone" title="Add someone"
             onClick={() => { setAdding(true); setQuery(''); if (open !== 'to') toggle('to'); }}>+</button>
@@ -1424,7 +1439,7 @@ export function ThreadComposer({
       {fieldNode('To')}
       {person ? (<>
         {sendAsChoice}
-        {taskToMany && <span className="tc-why">A task goes to one person.</span>}
+        {taskToMany && <span className="tc-why">A to-do goes to one person.</span>}
         <span className="tc-gap" />
         {sendAs === 'task' ? (<>{fieldNode('Due On')}{fieldNode('Blocked By')}{seesChip(taskSees)}</>) : fieldNode('Subject')}
         {priorityChip}
@@ -1493,7 +1508,7 @@ export function ThreadComposer({
         <PhoneStatus message={statusLine} className="tc-note tc-connection-status" />
         <textarea
           ref={textRef}
-          className={`tc-text ${named.over}`}
+          className={`tc-text ${named.over}${comments.length && !person ? ' tc-text-tall' : ''}`}
           rows={inline ? 1 : undefined}
           value={text}
           onChange={(e) => { talk.typed(); setText(e.target.value); setCaret(e.target.selectionStart); named.track(e.target); }}
@@ -1564,7 +1579,7 @@ export function ThreadComposer({
         {person ? (
           <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
-            {taskToMany && <span className="tc-why">A task goes to one person.</span>}
+            {taskToMany && <span className="tc-why">A to-do goes to one person.</span>}
             {team && sendAs === 'task' && seesChip(taskSees)}
             {/* HOW URGENT IT IS, AND NOTHING ELSE (w-7ba439c883, approved
                 2026-10-05). The corner used to carry "Goes to Maya's inbox.",

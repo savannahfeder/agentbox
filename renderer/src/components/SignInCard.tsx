@@ -3,27 +3,31 @@ import { comesBackTo, linkHost, linkIsTheService, serviceId } from '../../../sha
 import { logoOf, DARK_INK } from '../connections/logos';
 import './need-card.css';
 
-export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; asksForCode?: true }
+export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; asksForCode?: true; keep?: false }
 export type SignInSaid = { said: 'signed-in' | 'skipped' } | { said: 'landed'; url: string } | { said: 'code'; code: string };
 
 const arrow = <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M5 11l6-6M6 5h5v5" /></svg>;
 const key = <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="14" r="4" /><path d="M11 11l8-8M16 6l2 2M14 8l2 2" /></svg>;
+const tick = <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2.5 6.2l2.3 2.3 4.7-5" /></svg>;
 
 const sentence = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}${/[.!?]$/.test(s) ? '' : '.'}`;
 
 /** A service's own sign-in link, put here by an agent that waits for it (shared/sign-in-ask.mjs). */
-export function SignInCard({ ask, cloud, open, answer, copy }: {
+export function SignInCard({ ask, cloud, open, answer, copy, choose }: {
   ask: SignInAsk;
   // The agent runs on another machine, so a sign-in that sends the browser to localhost lands here.
   cloud: boolean;
   open: (href: string) => void;
   answer: (said: SignInSaid) => Promise<string | null>;
   copy: (text: string) => void;
+  /** Whether a cloud sign-in is saved for every cloud thread, written to the ask at once so a login that comes back by itself honours it too. */
+  choose: (keep: boolean) => Promise<string | null>;
 }) {
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
   const [landed, setLanded] = useState('');
+  const [save, setSave] = useState(ask.keep !== false);
   const [pasted, setPasted] = useState('');
   // The agent names the service; the card names the address it opens, and
   // draws the service's logo only when the address is that service's own.
@@ -37,6 +41,11 @@ export function SignInCard({ ask, cloud, open, answer, copy }: {
     const out = await answer(s);
     setBusy(false);
     if (out) setSaid(out);
+  };
+  const toggle = async (next: boolean) => {
+    setSave(next); setSaid(null);
+    const out = await choose(next);
+    if (out) { setSave(!next); setSaid(out); }
   };
   return <div className="need need-sign-in" data-need="sign-in" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}>
     <div className="need-body">
@@ -62,6 +71,10 @@ export function SignInCard({ ask, cloud, open, answer, copy }: {
             <button type="submit" className="need-btn need-main" disabled={busy || !pasted.trim()}>Send</button>
           </div>
         </form>}
+        {cloud && <label className="need-check">
+          <input type="checkbox" checked={save} disabled={busy} onChange={(e) => void toggle(e.target.checked)} />
+          <span className="need-check-box" aria-hidden="true">{save && tick}</span>Save this sign-in for every cloud thread
+        </label>}
         {back && !pasting && <button type="button" className="need-link need-also" onClick={() => setPasting(true)}>Page did not load after signing in?</button>}
         {pasting && <form className="need-form" onSubmit={(e) => { e.preventDefault(); if (landed.trim() && !busy) void send({ said: 'landed', url: landed.trim() }); }}>
           <div className="need-row">

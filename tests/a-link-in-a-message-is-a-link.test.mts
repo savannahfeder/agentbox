@@ -100,8 +100,12 @@ describe('a full path into the product folder', () => {
     expect(links(run('/Users/you/Desktop/dev/zero/renderer/index.html', { dir: DIR }))).toEqual([]);
   });
 
-  it('stays text in a sibling product whose name starts the same way', () => {
-    expect(links(run('/Users/you/Zero/accounts/acct/astral-video-agent/designs/a.html', { dir: DIR }))).toEqual([]);
+  // A page in a sibling project is still the account's, so it links as written
+  // (tests/a-picture-named-at-a-wrong-path-is-drawn-or-said-to-be-missing).
+  it('is never read as a short path into a sibling product whose name starts the same way', () => {
+    const sibling = '/Users/you/Zero/accounts/acct/astral-video-agent/designs/a.html';
+    expect(links(run(sibling, { dir: DIR }))).toEqual([sibling]);
+    expect(productPath(sibling, DIR)).toBe(null);
   });
 
   it('stays text when the pane does not know the product folder', () => {

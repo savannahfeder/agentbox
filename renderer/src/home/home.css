@@ -1,7 +1,7 @@
 /* Home. The sky sits under the main card's content; cards
    over it are glass. */
 
-.home-sky { position: absolute; z-index: 0; pointer-events: none; overflow: hidden; border-radius: var(--radius); }
+.home-sky { position: absolute; z-index: 0; pointer-events: none; overflow: hidden; border-radius: var(--pane-corner); }
 /* Pinned to the card's right edge and drawn as wide as the card with the
    sidebar folded, so the sidebar opening covers its left edge (sky-follows-the-card.ts). */
 .home-sky canvas { position: absolute; top: 0; right: 0; width: 100%; height: 100%; }
@@ -11,6 +11,20 @@
 /* The light card is white and the window around it takes the sky's tint. */
 :root[data-theme="light"][data-sky-frame] body,
 :root[data-theme="light"][data-sky-frame] .app.workspace-layout { background: var(--sky-frame) !important; }
+/* The orange mountains bring warm greys to go with the orange. */
+:root[data-theme="light"][data-sky-frame="mountains"] {
+  --text: #16171b; --text-dim: #4f5159; --text-faint: #75777f;
+  --line: rgba(40, 28, 16, .07); --line-strong: rgba(40, 28, 16, .14); --wash: rgba(40, 28, 16, .04); --wash-strong: rgba(40, 28, 16, .08);
+  --film-strong: rgba(40, 28, 16, .07); --select: rgba(238, 96, 24, .16);
+}
+/* The mountains rise behind the cards, so the cards are clear enough to show them, frosted.
+   The frost is drawn once under them (frost.ts): the browser's own is drawn again each time a bird moves. */
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-glass,
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-start .tc-card.tc-inline,
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-door {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, .42));
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
 
 .app.home-shown > .topbar { visibility: hidden; border-bottom-color: transparent; }
 .app.sky-shown .list-pane, .app.sky-shown .list-pane .th-table { background: transparent; }
@@ -163,7 +177,7 @@
 .app.sky-shown:not(.home-shown) > .topbar { border-bottom-color: transparent; }
 /* The board has no tabs, so the same sky sits 60px higher, its top cut off,
    and is gone before the column headings. */
-.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--radius));
+.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--pane-corner));
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px); }
 
@@ -181,12 +195,6 @@
 .app:has(> .inbox-sky-zero) .th-start .tc-chip { color: var(--text); }
 .app:has(> .inbox-sky-zero) .th-start .tc-send > button:disabled { opacity: 1; }
 .app:has(> .inbox-sky-zero) .th-start .tc-send kbd { opacity: 1; }
-/* The light purple sky draws its ink soft here (sky.ts emptySoft), and the
-   controls are filled white so no dot sits inside one. */
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-chip { background: #fff; }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-send > button { background: #fff; box-shadow: inset 0 0 0 1px rgba(30, 22, 36, .14); }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-send > button:hover:not(:disabled) { background: #f3f1f5; }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-ideas { background: rgba(255, 255, 255, .55); }
 
 /* Team and Files wear the Inbox's sky; the Team list would cover it. */
 .app.sky-place .cx-list { background: transparent; }

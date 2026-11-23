@@ -6,6 +6,7 @@ import { MessageMarkdown } from './MessageMarkdown';
 import { docKind, isPlainText } from '../doc-pane';
 import { pressedInTheFindBox } from '../find-in-page';
 import { paletteIsOpen } from '../palette-rows';
+import { composerIsOpen } from '../over-a-big-view';
 import { CodeFile } from './CodeFile';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
@@ -36,7 +37,7 @@ export function FileSheet({ name, shown, load, onClose }: { name: string; shown?
   const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pressedInTheFindBox(e.target) && !paletteIsOpen(document)) { e.stopPropagation(); onClose(); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !pressedInTheFindBox(e.target) && !paletteIsOpen(document) && !composerIsOpen(document)) { e.stopPropagation(); onClose(); } };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);

@@ -108,8 +108,9 @@ describe('what ships is public', () => {
     }
   });
 
-  it('and a copy holding it is still the single-person app until it is given the team file', () => {
-    expect(loadCloudConfig(app, { packaged: false, home, env: {} })).toBe(null);
+  // Reversed 2026-11-22 (tests/a-copy-from-github-signs-in-to-the-team-that-ships).
+  it('and a copy holding it signs in to the same team, with or without the team file', () => {
+    expect(loadCloudConfig(app, { packaged: false, home, env: {} })?.url).toBe(CLOUD_ADDRESS.supabaseUrl);
     write(path.join(app, 'cloud', 'team.config.json'), { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey });
     expect(loadCloudConfig(app, { packaged: false, home, env: {} })?.url).toBe(CLOUD_ADDRESS.supabaseUrl);
   });

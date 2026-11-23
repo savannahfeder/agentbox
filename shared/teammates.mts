@@ -29,7 +29,7 @@ export interface RunItem {
   start?: string;
   createdAt?: number;
   updatedAt?: number;
-  wrote?: Partial<Record<'note' | 'result' | 'answer' | 'status' | 'start' | 'labels', Written>>;
+  wrote?: Partial<Record<'note' | 'result' | 'answer' | 'status' | 'start' | 'labels' | 'body', Written>>;
 }
 
 export type DutyEvery = 'day' | 'weekday' | 'week';
@@ -733,15 +733,17 @@ export function dutyUnread(teammateId: string, dutyId: string, items: readonly R
 }
 
 // The one thread a duty's job lives in: its first-job run while that is still
-// open, else the newest run of the duty itself. Code finds it; the thread
-// decides what the round needs. `busy` is a thread already at work, or one
-// waiting on your answer, which the duty never goes around.
-export function dutyHome(teammateId: string, dutyId: string, items: readonly RunItem[], chat: ChatLike): { item: RunItem; busy: boolean } | null {
+// open, else the newest run of the job, under any of the duties saved with the
+// same words (one job on several weekdays). Code finds it; the thread decides
+// what the round needs. `busy` is a thread already at work, or one waiting on
+// your answer, which the duty never goes around.
+export function dutyHome(teammateId: string, dutyIds: readonly string[], items: readonly RunItem[], chat: ChatLike): { item: RunItem; busy: boolean } | null {
   const firstId = runIdFor(`${teammateId}#first`);
   const newest = (a: RunItem, b: RunItem) => (b.createdAt ?? 0) - (a.createdAt ?? 0);
   const runs = runsOf(teammateId, items);
+  const job = new Set<string | null>(dutyIds);
   const item = runs.filter((i) => i.id === firstId && i.status !== 'done').sort(newest)[0]
-    ?? runs.filter((i) => dutyOf(i) === dutyId).sort(newest)[0];
+    ?? runs.filter((i) => job.has(dutyOf(i))).sort(newest)[0];
   if (!item || (item.status === 'done' && item.wrote?.status?.source === 'founder')) return null;
   const busy = item.status !== 'done' && (isActiveRun(item) || isQueued(item) || (waitingOnYou(item) && asksYouStill(item, teammateId, chat)));
   return { item, busy };
@@ -761,12 +763,27 @@ export function isQueued(item: { status?: string; start?: string } | null | unde
   return item?.status === 'open' && item?.start === 'later';
 }
 
+// The order a teammate's queue lets runs out: your own words first, then the
+// teammate's own rounds and hand-offs, oldest first within each.
+export function queueOrder(a: RunItem, b: RunItem): number {
+  const yours = (i: RunItem) => (i.wrote?.body?.source === 'founder' ? 0 : 1);
+  return yours(a) - yours(b) || (a.createdAt ?? 0) - (b.createdAt ?? 0);
+}
+
 // Running or about to: one at a time per teammate, so this is what the queue
 // waits behind.
 export function isActiveRun(item: RunItem | null | undefined): boolean {
   if (!item || item.status === 'done') return false;
   if (isQueued(item)) return false;
+  if (item.status !== 'claimed' && answeredByItsAgent(item)) return false;
   return !waitingOnYou(item);
+}
+
+// Its agent spoke last and nobody is on it: finished, whether it waits on you
+// or was closed quietly on a row only you may close.
+function answeredByItsAgent(item: RunItem): boolean {
+  const r = item.wrote?.result;
+  return r?.source === 'agent' && (r.ts ?? 0) > (item.wrote?.answer?.ts ?? 0);
 }
 
 export function activeRunOf(teammateId: string, items: readonly RunItem[] | null | undefined): RunItem | null {
@@ -1071,7 +1088,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
           continue;
         }
       }
-      // `yours`: the primary passing on what your own words asked of it.
+      // `yours`: a teammate passing on what your own words asked of it.
       const hold = !fromYou && !m.yours && (selfPass || t.handoffsNeedYes !== false);
       const home = fromYou ? null : homeOf(t, m);
       if (home && !closedByYou(home)) {
@@ -1179,7 +1196,8 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
         key = slot;
       }
       // A duty after each ship keeps a thread per ship, which its weekly most counts.
-      const home = d.after === 'ship' ? null : dutyHome(t.id, d.id, items, chat);
+      const sameJob = (t.duties ?? []).filter((x) => x.what.trim() === d.what.trim() && x.after !== 'ship').map((x) => x.id);
+      const home = d.after === 'ship' ? null : dutyHome(t.id, sameJob, items, chat);
       if (home) {
         if (!home.busy && overLimit(t)) { limited.add(t.id); continue; }
         if (!home.busy) actions.push({ type: 'due', teammate: t.id, item: home.item.id, product: home.item.product, duty: d.id, key, text: dutyDueText(d) });
@@ -1215,7 +1233,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
 
   for (const t of live) {
     if (t.paused || active(t)) continue;
-    const next = runsOf(t.id, items).filter(isQueued).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))[0];
+    const next = runsOf(t.id, items).filter(isQueued).sort(queueOrder)[0];
     if (next) actions.push({ type: 'release', teammate: t.id, item: next.id, product: next.product });
   }
 
@@ -1319,7 +1337,7 @@ export function statusOf(teammate: { id: string; paused?: boolean }, items: read
   const runs = runsOf(teammate.id, items);
   const waiting = runs.filter(waitingOnYou).map((i) => ({ id: i.id, product: i.product, title: i.label || i.title }));
   const running = runs.find((i) => isActiveRun(i));
-  const next = runs.filter(isQueued).sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0)).map((i) => ({ id: i.id, product: i.product, title: i.label || i.title }));
+  const next = runs.filter(isQueued).sort(queueOrder).map((i) => ({ id: i.id, product: i.product, title: i.label || i.title }));
   const queued = next.length;
   const today = startOfDay(now);
   const done = runs

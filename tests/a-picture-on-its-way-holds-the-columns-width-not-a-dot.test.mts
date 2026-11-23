@@ -58,7 +58,8 @@ describe('a picture in a message, while it is on its way', () => {
   const anyWidth = outsideMedia(css);
 
   it('has a button as wide as the column around it, so its box is not a dot', () => {
-    const button = declarations(anyWidth, '.inline-image-open:has(> .inline-image[data-phone-img="loading"])');
+    // Marked by watchPicture while it loads (a-picture-landing-does-not-restyle-the-whole-thread).
+    const button = declarations(anyWidth, '.inline-image-open[data-picture-loading]');
     expect(button).toMatch(/(^|;)\s*width:\s*100%/);
   });
 

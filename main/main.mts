@@ -32,12 +32,15 @@ import { Supervisor } from './supervisor.mts';
 import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
+import { followChatsFor } from './chat-follow.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
 import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
 import { ownUseReader } from './own-use.mts';
+import { sendLastDaysHealth } from './health-day.mts';
+import { setupFreezeCounter } from './setup-freezes.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { startMemoryRecorder } from './memory-recorder.mts';
 import { threadHeaps } from './thread-heaps.mts';
@@ -440,8 +443,14 @@ async function createWindow() {
   // died are finally sent, because a report is written while the process is
   // dying and delivery cannot be synchronous.
   const analytics = createAnalytics({ config, version: app.getVersion(), dir: crashDir });
-  // "Used today", once a day, at launch and whenever the window comes forward.
-  const usedToday = createDailyCount((name) => analytics.track(name));
+  // "Used today", once a day, at launch and whenever the window comes forward,
+  // and with it how heavy the app was on the last day it was open.
+  const usedToday = createDailyCount((name) => {
+    analytics.track(name);
+    try { sendLastDaysHealth({ dir: path.join(userDir, 'memory-log'), track: (n, props) => analytics.track(n, props) }); }
+    catch (err) { console.warn(`zero: could not count how heavy the app was: ${(err as Error).message}`); }
+  });
+  const froze = setupFreezeCounter({ track: (n, props) => analytics.track(n, props) });
   // The seam is filled whenever there is somewhere to send to. Whether anything
   // actually goes is asked again inside, at every send, so her switch stops it
   // from the moment she moves it rather than at the next launch.
@@ -468,6 +477,10 @@ async function createWindow() {
     ensurePersonalProject(config.accountRoot);
   } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
+  try {
+    const closed = store.closeShippedThreads();
+    if (closed) console.log(`zero: closed ${closed} shipped thread(s) that only offered closing`);
+  } catch (err) { console.warn(`zero: could not close shipped threads: ${(err as Error).message}`); }
   // Where the window's own pictures may come from (main/img-scheme.mts). The
   // account root holds every product's docs, attachments, designs and the
   // `.staging` folder a pasted screenshot lands in; a product's repo is where a
@@ -493,7 +506,11 @@ async function createWindow() {
   const freezes = startFreezeRecorder({
     dir: path.join(userDir, 'memory-log'),
     appDir,
-    onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
+    onFreeze: (f) => {
+      stalls.noteFreeze(f);
+      console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`);
+      froze.held({ ms: f.ms, where: f.where, part: 'main' });
+    },
   });
   powerMonitor.on('suspend', () => freezes.asleep());
   powerMonitor.on('resume', () => freezes.awake());
@@ -608,10 +625,14 @@ async function createWindow() {
   // `analytics.track` itself, so this hands it over unconditionally.
   // Every Codex folder on the machine, read fresh each minute so a login made
   // while the app is open is followed too (main/agent-homes.mts).
+  // A chat brought in follows where it started (main/chat-follow.mts).
+  const chatFollow = followChatsFor({ store, config, supervisor });
+  quitStep(app, 'before-quit', 'chatFollow.stop', () => chatFollow.stop());
   const codexWatch = startCodexWatch({
     store,
     count: (name, props) => analytics.track(name, props),
     readThreads: (opts) => readCodexThreadsOffThread({ ...opts, codexDirs: appSessionFolders({ config, supervisor }).codexDirs }),
+    follow: (threads) => chatFollow.followCodex(threads),
   });
   quitStep(app, 'before-quit', 'codexWatch.stop', () => codexWatch.stop());
   // New chats from Claude Code and Codex, once asked for on setup's last
@@ -979,7 +1000,7 @@ async function createWindow() {
   });
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
-    store, supervisor, config, window, analytics, docGrants, updater,
+    store, supervisor, config, window, analytics, docGrants, updater, froze,
     glass: (on) => applyGlass(window, process.platform, on, liquidGlass),
     host: filingHost,
     team,
@@ -1476,6 +1497,12 @@ if (!app.requestSingleInstanceLock()) {
     for (const scheme of DOC_SCHEMES) protocol.handle(scheme, async (request) => {
       const file = docPath(request.url);
       if (!file || !docGrants.allows(file)) return new Response('Not available.', { status: 403 });
+      // A page's own pictures and films, which no thread names, may be in the cloud too.
+      if (comeBackAt && !fs.existsSync(file)) {
+        let timer: NodeJS.Timeout | undefined;
+        await Promise.race([comeBackAt(file).catch(() => false), new Promise((r) => { timer = setTimeout(r, COME_BACK_WAIT_MS); })]);
+        clearTimeout(timer);
+      }
       try {
         // The file is streamed exactly as it is on disk, pictures and all.
         // Nothing is injected into a page any more; see doc-scheme.mts for the

@@ -6,6 +6,7 @@ import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../..
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { asksToClose } from '../../shared/asks-to-close.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
+import { closedByItsShip } from '../../shared/ship-closes-its-thread.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
 import { shownTitle } from '../../shared/thread-title.mts';
@@ -13,6 +14,7 @@ import { firstRealLine, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 import { isCause } from '../../shared/causes.mts';
+import { heldOutside } from '../../shared/carried-on-outside.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -42,6 +44,8 @@ export interface InboxItem {
   createdAt?: number;
   updatedAt?: number;
   wrote?: Record<string, { ts: number; source: string } | undefined>;
+  claim?: { holder?: string | null; leaseUntil?: number } | null;
+  claimExpired?: boolean;
 }
 
 // The queue's own rule, so In progress never holds a thread it will not start.
@@ -83,6 +87,8 @@ const liveAnswer = (i: InboxItem) => (i.answer && i.answer !== '(withdrawn)' ? i
 export function stillAsksYou(i: InboxItem): boolean {
   if (i.kind !== 'question' && i.kind !== 'review') return false;
   if (i.status === 'done') return false;
+  // Answered where it started, and its agent is at work on that.
+  if (heldOutside(i)) return false;
   return !liveAnswer(i);
 }
 
@@ -173,6 +179,17 @@ function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   return Math.max(mine, reminder, legacySnooze);
 }
 
+/**
+ * Its agent is waiting on you (`asking`: a permission card or a sign-in) and
+ * you put the thread in Later yourself. It waits in Later, not In progress,
+ * because nothing moves until you answer, and is back in Needs you at the time
+ * you picked. Only your own Later counts, so an agent's moment never hides its ask
+ * (tests/a-thread-you-put-in-later-stays-there-while-its-agent-waits-on-you).
+ */
+export function askPutOff(i: InboxItem, asking: boolean, now = Date.now()): boolean {
+  return asking && putAwayByThem(i) > now;
+}
+
 /** What a person said this thread waits on has ended, and they have not acted on it since. */
 export function waitCameBack(i: InboxItem & { waitEnded?: { at: number } }): boolean {
   return !!i.waitEnded && i.status !== 'done' && i.waitEnded.at > herLastWord(i);
@@ -221,8 +238,12 @@ export function belongsInInbox(
   if (notStarted(i)) return false;
   // Its agent is stopped on a permission request, so it answers before the
   // status, the schedule and the waits do: each of those is a reason the thread
-  // would be elsewhere, and none is a reason the question has gone away.
-  if (asking) return true;
+  // would be elsewhere, and none is a reason the question has gone away. Except
+  // your own Later, which you chose (`askPutOff`).
+  if (asking) return !askPutOff(i, asking, now);
+  // A chat brought in, answered where it started while its agent works on that
+  // there (main/chat-follow.mts). The claim's lease brings it back.
+  if (heldOutside(i)) return false;
   // A session is still on it, so it is In progress until it exits. Unless it is
   // still asking you something (w-fe48447cab): the one thing a session may not
   // do is take away the question it is asking (`stillAsksYou`).
@@ -260,6 +281,8 @@ export function belongsInInbox(
     if (!hers(i) && !liveAnswer(i)) return false;            // agent work she never touched is filed
     if (i.wrote?.status?.source === 'founder') return false; // she archived it herself
     if (closedAsSheAsked(i)) return false;
+    if (closedByItsShip(i)) return false;
+
     return (i.wrote?.status?.ts ?? i.updatedAt ?? 0) > deliveredThrough;
   }
   // A stopped row is in the inbox whatever its kind. This must come before the
@@ -619,6 +642,11 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
   const space = window.lastIndexOf(' ');
   return `${text.slice(0, space > 40 ? space : budget).trimEnd()}…`;
 }
+
+// A message drawn as a row's title stops at about the length of the thread
+// names beside it, however wide the window.
+export const MESSAGE_ROW_BUDGET = 48;
+export const messageOnRow = (text: string): string => clipToSentence(text, MESSAGE_ROW_BUDGET);
 
 // Every ordered list sorts through this, so the inbox, In progress and the
 // fleet agree on which row comes next. `score` is the one in shared/rank.mts,
