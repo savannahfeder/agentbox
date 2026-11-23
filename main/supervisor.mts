@@ -512,6 +512,8 @@ export interface LiveSessionRecord {
   engine?: string;
   continuation?: boolean;
   startedAt?: number;
+  // A cloud run takes replies between turns, so its start is not its turn's.
+  turnStartedAt?: number;
   cloud?: boolean;
   reachedTheCloud?: boolean;
   carrying?: string | null;
@@ -8287,6 +8289,7 @@ export class Supervisor {
     const joinedAt = Date.now();
     const view: JoinedRun = {
       itemId, product: rec.product, startedAt: rec.startedAt ?? joinedAt, engine, cloud: true,
+      ...(rec.turnStartedAt ? { turnStartedAt: rec.turnStartedAt } : {}),
       tail: [], saying: '', sayingAt: 0, stop: () => child.kill('SIGINT'),
     };
     const item: WorkItem = { id: itemId, product: rec.product };
@@ -8346,7 +8349,11 @@ export class Supervisor {
         if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : view.movedHere ? MOVED_HERE : ''}\n`);
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
-        const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
+        // A reply it heard began a turn, even in a record saved without that turn's start.
+        const replied = this.store.readItem?.(rec.product, itemId);
+        const heardAt = replied?.answer && this._heardIn(replied, rec.sessionId) ? answerTs(replied) : 0;
+        const turnStartedAt = Math.max(view.turnStartedAt ?? rec.startedAt ?? 0, heardAt) || undefined;
+        const session = { ...view, startedAt: rec.startedAt, turnStartedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
         // Same as a run the app started: its reply was marked heard when it was
         // joined, so it is released here or nothing would run it on this Mac.
         if (this.runFinished(session) && this._noteCloudHandBack(item, session, rec.cwd)) {
@@ -12756,7 +12763,7 @@ export class Supervisor {
       child, itemId: item.id, product: item.product, startedAt: adopted?.rec.startedAt ?? Date.now(), tail: [], profile,
       command: !!plan.command, engine,
       hosted: child instanceof HostedRun,
-      ...(adopted ? { sessionId: adopted.rec.sessionId, idRemembered: true, adopted: true } : {}),
+      ...(adopted ? { sessionId: adopted.rec.sessionId, idRemembered: true, adopted: true, ...(adopted.rec.turnStartedAt ? { turnStartedAt: adopted.rec.turnStartedAt } : {}) } : {}),
       // Picking up a conversation an earlier run had, so a death says "not finished".
       resumed: !!plan.resumeId,
       // What the row asked for when this run started, so a switch the agent
@@ -14423,6 +14430,8 @@ export class Supervisor {
     session.answerOnRow = null;
     session.turnStartedAt = session.lastOutputAt = Date.now();
     session.turnEpoch = this.store.readItem?.(session.product, session.itemId)?.epoch ?? session.turnEpoch;
+    const rec = this._liveSessions?.[session.itemId];
+    if (rec) { rec.turnStartedAt = session.turnStartedAt; this._saveState(); }
     this.onChange?.();
   }
 
