@@ -511,7 +511,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     }
 
     if (words(patch.note)) {
-      // Trouble the app is seeing to by itself is for the next run, not for her.
+      // Trouble the app is seeing to by itself is for the next run, not the person.
       if (line.source === 'system' && forTheAgent(words(patch.note)!)) continue;
       // The app's own news on the row is the app's quiet line, never a
       // checkpoint signed with the model the agent runs on
