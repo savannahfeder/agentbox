@@ -83,7 +83,8 @@ describe('asking the Mac', () => {
 });
 
 describe('opening with the app you picked', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'open-with-'));
+  // Resolved, because open is handed the checked real path and a Mac's temp folder is behind a link.
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'open-with-')));
   const file = (name: string, mode = 0o644) => { const p = path.join(dir, name); fs.writeFileSync(p, 'a,b\n'); fs.chmodSync(p, mode); return p; };
   const shell = () => { const calls: string[][] = []; return { calls, openPath: async (p: string) => { calls.push(['openPath', p]); return ''; }, showItemInFolder: (p: string) => { calls.push(['finder', p]); } }; };
 
