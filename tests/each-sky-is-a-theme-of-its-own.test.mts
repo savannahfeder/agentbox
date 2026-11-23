@@ -1,7 +1,9 @@
 // Each sky is a theme of its own (Home, Alpha features), picked beside Light,
 // Dark and Match system in Settings and in Command-K, with no separate Sky
 // setting. Only the light skies the founder approved are offered, and the dark
-// card is a step off black so the Inbox stays easy to read.
+// card is a step off pure black. It was a warm grey until the founder picked a
+// deep black (#131315) in November 2026; how readable it stays is held in
+// the-dark-skies-wear-a-deep-black-not-the-warm-ash.test.mts.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { SKY_THEMES, skyTheme } from '../renderer/src/home/sky.ts';
@@ -18,8 +20,8 @@ describe('the sky themes', () => {
     for (const id of ['morning', 'slate', 'ember-light', 'dusk-light']) expect(skyTheme(id)).toBeNull();
     expect(skyTheme(null)).toBeNull();
   });
-  it('keep the dark card off black', () => {
-    for (const k of SKY_THEMES.filter((t) => t.dark)) expect(luminance(k.art.bg)).toBeGreaterThan(20);
+  it('keep the dark card off pure black', () => {
+    for (const k of SKY_THEMES.filter((t) => t.dark)) expect(luminance(k.art.bg)).toBeGreaterThan(15);
   });
   it('sit in the Theme row, with no Sky group of their own', () => {
     expect(settings).toContain('SKY_THEMES.map((k) => <SkyTile');
