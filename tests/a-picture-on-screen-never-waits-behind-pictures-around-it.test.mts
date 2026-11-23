@@ -9,9 +9,10 @@
 // place in line however far behind it was left.
 //
 // Measured in Chromium with 40 Retina screenshots in one thread
-// (scripts/scratch, median of five): the pictures on screen showed 856 ms
-// after the thread opened, and 1.3 s after a fast scroll of ten screens
-// stopped, while 14 of the pictures scrolled past were shrunk on the way.
+// (scripts/scratch, median of five): after a fast scroll of ten screens
+// stopped, the pictures on screen waited 1.3 s, because every picture
+// scrolled past was shrunk before them. With the fix, 0.5 to 0.7 s, and none
+// to two of those were shrunk.
 //
 // Now a picture on screen goes before any picture that is not, a picture off
 // screen uses one of the two turns at most, and only while no picture on

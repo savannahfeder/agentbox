@@ -5,9 +5,9 @@
 // screen of view and then kept its place in line for good. Measured with the
 // real FittedImg in Chromium, 40 Retina screenshots, a fast scroll of ten
 // screens then a stop (scripts/scratch, median of five): the pictures on
-// screen showed after 1.3 s, behind pictures scrolled past, and 32 of the 40
-// had been shrunk by the end of a second scroll. With the fix: 0.5 to 0.7 s,
-// and 10 to 19 shrunk.
+// screen showed after 1.3 s, behind every picture scrolled past, and 32 of
+// the 40 had been shrunk by the end of a second scroll. With the fix: 0.5 to
+// 0.7 s, and 7 to 19 shrunk.
 //
 // The line itself is held by a-picture-on-screen-never-waits-behind-pictures-around-it;
 // this is the real component in a real browser, watched through the decoder.
