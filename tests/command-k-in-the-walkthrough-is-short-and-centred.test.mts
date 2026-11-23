@@ -39,6 +39,14 @@ describe('⌘K during the walkthrough', () => {
   it('still finds them by typing', () => {
     expect(matchesQuery('new project', { label: 'New project…', unlisted: true })).toBe(true);
   });
+  // Its last tip reads "Type urgent and press ↵ to make this thread urgent" only when that row is listed.
+  it('lists Priority: Urgent for a thread it acts on, and no other priority', () => {
+    const prio = ['urgent', 'high', 'medium', 'low'].map((id) => ({ id: `priority-${id}`, label: `Priority: ${id[0].toUpperCase()}${id.slice(1)}`, run: noop }));
+    const shown = rows(draw({ onEndTutorial: noop, itemCommands: prio }));
+    expect(shown).toContain('Priority: Urgent');
+    expect(shown.some((w) => /Priority: (High|Medium|Low)/.test(w))).toBe(false);
+    expect(shown.at(-1)).toBe('Skip walkthrough');
+  });
 });
 
 describe('⌘K any other time', () => {

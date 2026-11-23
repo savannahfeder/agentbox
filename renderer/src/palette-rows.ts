@@ -119,8 +119,9 @@ export function pageRows({ team }: { team: boolean }): PageRow[] {
   ];
 }
 
-/** What a newcomer's first ⌘K lists: the things the walkthrough is about, and the way out of it. */
-const WALK_ROWS = ['new-thread', 'view-home', 'view-inbox', 'view-progress', 'end-tutorial'];
+/** What a newcomer's first ⌘K lists: the things the walkthrough is about, and the way out of it.
+ *  Priority: Urgent is there only with a thread selected, and its last tip names it. */
+const WALK_ROWS = ['new-thread', 'priority-urgent', 'view-home', 'view-inbox', 'view-progress', 'end-tutorial'];
 
 /** The walkthrough's list: those rows in that order, and everything else a word away. */
 export function walkRows<T extends { id: string; unlisted?: boolean }>(rows: readonly T[]): T[] {
