@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { itemThread } from '../renderer/src/item-thread.ts';
-import { traceLines } from '../renderer/src/terminal.ts';
+import { traceLines } from '../shared/trace-lines.mts';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
