@@ -635,9 +635,9 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
   return `${text.slice(0, space > 40 ? space : budget).trimEnd()}…`;
 }
 
-// A message drawn as a row's title stops where the longest thread name would
-// (NAME_MAX in main/row-label.mts), however wide the window.
-export const MESSAGE_ROW_BUDGET = 64;
+// A message drawn as a row's title stops at about the length of the thread
+// names beside it, however wide the window.
+export const MESSAGE_ROW_BUDGET = 48;
 export const messageOnRow = (text: string): string => clipToSentence(text, MESSAGE_ROW_BUDGET);
 
 // Every ordered list sorts through this, so the inbox, In progress and the
