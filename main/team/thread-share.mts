@@ -330,7 +330,8 @@ export function createThreadShare({
       if (!inside) real = null;
     }
     if (!real && meant) {
-      const hit = await findFileToSend({ ref: src, meant: true, products: listProducts() });
+      // This look repeats every minute for every thread, so it takes the folder lists already made.
+      const hit = await findFileToSend({ ref: src, meant: true, products: listProducts(), fresh: false });
       real = hit?.file ?? null;
     }
     if (!real || looksSecret(src) || looksSecret(path.basename(real))) return null;

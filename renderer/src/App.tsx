@@ -9024,8 +9024,8 @@ export default function App() {
           onSetTune={setTune}
           onResetTune={resetTune}
           cloud={snap.cloud?.setUp ? snap.cloud : null}
-          onCloudSignIn={(key, email) => {
-            void api.cloudSignIn({ action: 'start', engine: 'claude', key });
+          onCloudSignIn={(key, email, engine = 'claude') => {
+            void api.cloudSignIn({ action: 'start', engine, key });
             setCloudSignInAs(email);
             setCloudSetupOpen(true);
           }}

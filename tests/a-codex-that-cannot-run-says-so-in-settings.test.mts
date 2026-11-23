@@ -248,7 +248,9 @@ describe('the connection card', () => {
     // at themselves is the one healthy state that draws this card, because the
     // card is the only place that choice can be handed back. The trouble half,
     // which is what this file is named for, is unchanged.
-    expect(settingsTsx).toContain("(!agent.found || agent.trouble || agent.chosen)\n          && (engine === 'codex' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)");
+    // A limit on this computer's login is left out while the cloud takes every thread
+    // (tests/an-agent-page-shows-the-cloud-login-it-is-missing).
+    expect(settingsTsx).toContain("(!agent.found || (agent.trouble && !limitIsHereOnly) || agent.chosen)\n          && (engine === 'codex' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)");
     // And it is still SAID, not turned into a word of ours.
     expect(settingsTsx).not.toContain("<span className=\"ac-warn\">not running</span>");
   });
