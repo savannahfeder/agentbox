@@ -17,7 +17,8 @@ import { resolveAccount } from './core/account.mts';
 import { listProducts, getProduct, createProduct, updateProduct, type ProductPatch } from './core/products.mts';
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mts';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mts';
-import { listWorkItems, updateItem, createClaimRegistry, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
+import { listWorkItems, updateItem, createClaimRegistry, startOnTheirWord, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
+import { RUN_IT } from '../shared/answers.mts';
 import { createRepeatingTask, readStandingInstruction, setStandingInstruction, stopRepeatingTask, type NewRepeatingTask, type StopRepeatingTask } from './core/repeats.mts';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mts';
 import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mts';
@@ -301,10 +302,14 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         runAt: z.number().int().optional().describe('epoch ms before which nothing happens with this item: it cannot be claimed and will not start. Use it when the work genuinely belongs to a later moment. A missed moment is not lost; the item simply becomes available once it passes.'),
         model: z.string().max(80).optional().describe(MODEL_WORDS),
         effort: z.string().optional().describe(EFFORT_WORDS),
+        startBecause: z.string().optional().describe('when they asked for this thread to be made and worked on ("file that so it gets fixed", "give this to the other agent as its own thread"): their own words asking for it, quoted exactly from the thread you are working for. It then starts at once, as if they had approved it; without them it waits for their yes'),
       },
-      run: ({ product, ...fields }: { product: string } & ItemFields & { model?: string; effort?: string }) => {
+      run: ({ product, startBecause, ...fields }: { product: string; startBecause?: string } & ItemFields & { model?: string; effort?: string }) => {
         runWords(fields);
-        return json(claims.file(product, fields));
+        if (startBecause === undefined) return json(claims.file(product, fields));
+        const filed = claims.file(product, fields);
+        const start = startOnTheirWord(filed, startBecause, { ownItem });
+        return json({ ...filed, ...('started' in start ? { answer: RUN_IT } : {}), ...start });
       },
     },
     {

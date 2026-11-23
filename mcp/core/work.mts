@@ -21,9 +21,10 @@ import path from 'node:path';
 import { bringPicturesHome } from './pictures-home.mts';
 import { listProjects } from '../../main/store/project.mts';
 import {
-  readWorkItems, readWorkItem, createWorkItem, updateWorkItem,
+  readWorkItems, readWorkItem, readItemHistory, createWorkItem, updateWorkItem,
   claimWorkItem, heartbeatWorkItem, releaseWorkItem, LEASE_MS,
 } from '../../main/store/work-items.mts';
+import { RUN_IT } from '../../shared/answers.mts';
 import { matchesFilter, type PatchInput, type WorkItem, type WorkItemField, type WorkItemFilter, type WorkItemSource, type WorkItemStatus } from '../../shared/work-items.mts';
 import { unleaked } from '../../shared/agents.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS, asWordList, doneSteps, wordsIn } from '../../shared/thread-cards.mts';
@@ -255,6 +256,34 @@ export function saidToClose(item: Pick<WorkItem, 'answer' | 'body' | 'title'> | 
   const quote = plainly(words).replace(/^["'\s]+|["'.,!?\s]+$/g, '');
   if (quote.length < 4) return false;
   return [item?.answer, item?.body, item?.title].some((t) => plainly(t).includes(quote));
+}
+
+// A THREAD THEY ASKED FOR STARTS WHEN IT IS FILED: the filing quotes their
+// words asking for it (`startBecause`), found in what they wrote on the thread
+// this session works for (its opening or any reply of theirs, never an agent's
+// or a teammate's), and gets the answer Approve writes. A question or a review
+// is still theirs to answer.
+const THEIR_FIELDS = ['title', 'body', 'answer'] as const;
+const NOT_THEIR_WORDS = 'It was NOT started, so it waits for their yes: the words in startBecause are not ones they wrote on the thread you are working for. Say in your answer that it waits for them.';
+
+function theyWroteOn(dir: string, item: WorkItem, words: unknown): boolean {
+  const quote = plainly(words).replace(/^["'\s]+|["'.,!?\s]+$/g, '');
+  if (quote.length < 4) return false;
+  const theirs = readItemHistory(dir, item.id, { max: Number.MAX_SAFE_INTEGER })
+    .filter((l) => l.source === 'founder')
+    .flatMap((l) => THEIR_FIELDS.map((f) => l.patch?.[f]));
+  for (const f of THEIR_FIELDS) if (item.wrote?.[f]?.source === 'founder') theirs.push(item[f]);
+  return theirs.some((t) => typeof t === 'string' && plainly(t).includes(quote));
+}
+
+export function startOnTheirWord(filed: ProductItem, words: unknown, { ownItem }: { ownItem?: string | null }): { started: string } | { notStarted: string } {
+  if (filed.kind === 'question' || filed.kind === 'review') return { notStarted: 'It was NOT started: a question or a review waits for their answer.' };
+  let from: { project: Project; item: WorkItem } | null = null;
+  try { if (ownItem) from = locate(ownItem); } catch { /* refused below */ }
+  if (!from) return { notStarted: 'It was NOT started, so it waits for their yes: this session runs for no thread, so nothing says they asked for it.' };
+  if (!theyWroteOn(from.project.dir, from.item, words)) return { notStarted: NOT_THEIR_WORDS };
+  updateWorkItem(resolveProduct(filed.product).dir, filed.id, { answer: RUN_IT }, { source: 'founder' });
+  return { started: 'They asked for it, so it starts now, as if they had approved it.' };
 }
 
 /*
