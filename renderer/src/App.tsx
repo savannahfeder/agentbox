@@ -106,6 +106,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
+import { newToDraw, type Drawn } from './shown-snapshot';
 import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
@@ -415,6 +416,12 @@ function Booting() {
 
 export default function App() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
+  // What the refresh last drew, and what is on screen, so an answer that changed
+  // nothing draws nothing (./shown-snapshot.ts).
+  const drawn = useRef<Drawn<Snapshot, WorkItem> | null>(null);
+  const snapOnScreen = useRef(snap);
+  snapOnScreen.current = snap;
+  const [, setClock] = useState(0);
   // WHERE SHE WAS BEFORE ⌘R, read once, on the way in.
   //
   // A ref rather than state because it is never rendered and never changes: it
@@ -1525,7 +1532,11 @@ export default function App() {
     if (worn) justMade.current = worn.held;
     // A module value, like the model names: set before the repaint the next line causes.
     setFurtherHarnesses(next?.engines?.further);
-    setSnap(next && { ...next, items: overlayPins(overlayPlaces(worn!.items, unsavedPlaces.current), unsavedPins.current) });
+    const items = next && overlayPins(overlayPlaces(worn!.items, unsavedPlaces.current), unsavedPins.current);
+    if (next && !newToDraw(drawn.current, next, items!, snapOnScreen.current)) return next;
+    const shown = next && { ...next, items: items! };
+    drawn.current = next && { from: next, items: items!, shown };
+    setSnap(shown);
     return next;
   }, []);
   // A new thread in the list the moment the computer says it is written, a
@@ -1550,7 +1561,13 @@ export default function App() {
     };
     first();
     const off = api.onChanged(refresh);
-    const poll = setInterval(refresh, pollEvery(10_000, onPhone()));
+    // The poll draws the app every time, changed or not: ages, and threads
+    // coming back from Later, are worked out as it draws.
+    const tick = () => {
+      const before = drawn.current;
+      refresh().then(() => { if (!gone && drawn.current === before) setClock(Date.now()); }, () => {});
+    };
+    const poll = setInterval(tick, pollEvery(10_000, onPhone()));
     return () => { gone = true; clearTimeout(again); off(); clearInterval(poll); };
   }, [refresh]);
 
