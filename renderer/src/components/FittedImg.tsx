@@ -20,7 +20,7 @@ export function picturesNamedIn(text: string | null | undefined): string[] {
 /** Makes the copies a thread will draw these pictures from, before it is opened. */
 export function warmPictures(paths: string[], signal: AbortSignal) {
   for (const path of paths) {
-    fitPicture(pictureUrl(path), { width: inlineWidth }, undefined, signal).then((r) => URL.revokeObjectURL(r.url), () => {});
+    fitPicture(pictureUrl(path), { width: inlineWidth }, undefined, signal, () => false).then((r) => URL.revokeObjectURL(r.url), () => {});
   }
 }
 
@@ -55,8 +55,18 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
   const place = useRef<HTMLImageElement | null>(null);
   const [room, setRoom] = useState<{ width: number; height?: number } | null>(null);
   const [near, setNear] = useState(false);
+  const onScreen = useRef(false);
   const [drawn, setDrawn] = useState<{ for: string; url: string } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // The open button around it holds the column's width while it waits (styles.css);
+  // before the room is measured below, so the measure is of that width.
+  const waiting = failed !== src && drawn?.for !== src;
+  useLayoutEffect(() => {
+    const door = waiting ? place.current?.parentElement : null;
+    if (!door?.classList.contains('inline-image-open')) return;
+    door.setAttribute('data-picture-arriving', '');
+    return () => door.removeAttribute('data-picture-arriving');
+  }, [waiting]);
   useLayoutEffect(() => {
     if (room) return;
     const el = place.current;
@@ -66,36 +76,50 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
     setRoom({ width, height: cover ? Math.max((el?.clientHeight ?? 0) * grown, 1) : maxHeight });
     if (!cover && maxHeight === undefined && measured > 0 && /\binline-image\b/.test(img.className ?? '')) inlineWidth = width;
   });
-  // Made when it comes within a screen of view, so a thread opened at its end
-  // draws what is on screen first and the pictures far above cost nothing yet.
+  // Made while it is within a screen of view, so a thread opened at its end
+  // costs nothing yet for the pictures far above. One scrolled out of reach
+  // before it is drawn gives up its place in line (../fit-picture.ts).
+  const isDrawn = drawn?.for === src;
   useEffect(() => {
     const el = place.current;
-    if (near || !el || typeof IntersectionObserver === 'undefined') { setNear(true); return; }
-    const watch = new IntersectionObserver((seen) => { if (seen.some((s) => s.isIntersecting)) setNear(true); },
-      { root: scrollerOf(el), rootMargin: '100% 0px' });
-    watch.observe(el);
-    return () => watch.disconnect();
-  }, [near]);
+    if (isDrawn) return;
+    if (!el || typeof IntersectionObserver === 'undefined') { onScreen.current = true; setNear(true); return; }
+    const root = scrollerOf(el);
+    const last = (seen: IntersectionObserverEntry[]) => seen[seen.length - 1].isIntersecting;
+    const nearBy = new IntersectionObserver((seen) => setNear(last(seen)), { root, rootMargin: '100% 0px' });
+    const inView = new IntersectionObserver((seen) => { onScreen.current = last(seen); }, { root });
+    nearBy.observe(el);
+    inView.observe(el);
+    return () => { nearBy.disconnect(); inView.disconnect(); };
+  }, [isDrawn]);
+  // The copy is let go when the picture goes or draws another file, never as
+  // it scrolls away: one drawn the moment it left reach would draw as broken.
+  const copy = useRef<string | null>(null);
+  useEffect(() => () => { if (copy.current) URL.revokeObjectURL(copy.current); copy.current = null; }, [src]);
   useEffect(() => {
-    if (!room || !near) return;
+    if (!room || !near || isDrawn) return;
     let live = true;
-    let made: string | null = null;
     const leaving = new AbortController();
-    fitPicture(src, { ...room, cover }, undefined, leaving.signal)
-      .then((r) => { made = r.url; if (live) setDrawn({ for: src, url: r.url }); else URL.revokeObjectURL(r.url); })
+    fitPicture(src, { ...room, cover }, undefined, leaving.signal, () => onScreen.current)
+      .then((r) => {
+        if (!live) { URL.revokeObjectURL(r.url); return; }
+        copy.current = r.url;
+        setDrawn({ for: src, url: r.url });
+      })
       .catch((err) => {
         if (!live) return;
         // Nothing there: the caller's next place is tried now, not after a second load fails.
         if (err instanceof PictureMissing && img.onError) img.onError(undefined as never);
         else setFailed(src);
       });
-    return () => { live = false; leaving.abort(); if (made) URL.revokeObjectURL(made); };
-  }, [src, room, near, cover]);
+    return () => { live = false; leaving.abort(); };
+  }, [src, room, near, cover, isDrawn]);
   if (failed === src) return <img {...img} src={src} />;
   if (drawn?.for !== src) {
     // An empty picture holding the place: what draws it, and the viewer, read `data-full`.
+    // `data-far` keeps it still until it is on its way (styles.css).
     const { onError: _e, onLoad: _l, alt: _a, ...still } = img;
-    return <img {...still} ref={place} className={`${img.className ?? ''} arriving`} alt="" aria-hidden="true" data-full={src} />;
+    return <img {...still} ref={place} className={`${img.className ?? ''} arriving`} alt="" aria-hidden="true" data-full={src} data-far={near ? undefined : ''} />;
   }
   return <img {...img} src={drawn.url} data-full={src} />;
 }

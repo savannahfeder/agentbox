@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { Person, PictureIn, TeamBillingDetails } from './types';
+import type { AppsThatOpen, Person, PictureIn, TeamBillingDetails } from './types';
 import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, FilesTrashed, FilesCloudStatus, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { NotePlace } from '../../shared/artifact-marks.mts';
@@ -931,10 +931,18 @@ export const api = {
 
   // Hand a file to the operating system, the way every link on a card already
   // does. The pane's first mark, and what a png or a pdf still does.
-  async openArtifactExternally(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; error?: string }> {
+  // `app` opens it in one of the apps `appsThatOpen` listed; `reveal` shows it in Finder.
+  async openArtifactExternally(p: { product: string; src: string; thread?: string; app?: string; reveal?: boolean }): Promise<{ ok: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.openArtifact) { window.open(p.src, '_blank'); return { ok: true }; }
-    return zero.openArtifact(p);
+    const { reveal, ...ask } = p;
+    return zero.openArtifact(reveal ? { ...ask, mode: 'reveal' } : ask);
+  },
+
+  // The open mark's menu. The phone's door has no such channel and throws, which reads as no list.
+  async appsThatOpen(p: { product: string; src: string; thread?: string }): Promise<AppsThatOpen> {
+    try { return (await window.zero?.openWith?.(p)) ?? { ok: false, apps: [] }; }
+    catch { return { ok: false, apps: [] }; }
   },
 
   // Everything that happened on one task: the raw ledger lines, which the

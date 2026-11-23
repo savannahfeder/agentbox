@@ -174,6 +174,17 @@ function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   return Math.max(mine, reminder, legacySnooze);
 }
 
+/**
+ * Its agent is waiting on you (`asking`: a permission card or a sign-in) and
+ * you put the thread in Later yourself. It waits in Later, not In progress,
+ * because nothing moves until you answer, and is back in Needs you at the time
+ * you picked. Only your own Later counts, so an agent's moment never hides its ask
+ * (tests/a-thread-you-put-in-later-stays-there-while-its-agent-waits-on-you).
+ */
+export function askPutOff(i: InboxItem, asking: boolean, now = Date.now()): boolean {
+  return asking && putAwayByThem(i) > now;
+}
+
 /** What a person said this thread waits on has ended, and they have not acted on it since. */
 export function waitCameBack(i: InboxItem & { waitEnded?: { at: number } }): boolean {
   return !!i.waitEnded && i.status !== 'done' && i.waitEnded.at > herLastWord(i);
@@ -222,8 +233,9 @@ export function belongsInInbox(
   if (notStarted(i)) return false;
   // Its agent is stopped on a permission request, so it answers before the
   // status, the schedule and the waits do: each of those is a reason the thread
-  // would be elsewhere, and none is a reason the question has gone away.
-  if (asking) return true;
+  // would be elsewhere, and none is a reason the question has gone away. Except
+  // your own Later, which you chose (`askPutOff`).
+  if (asking) return !askPutOff(i, asking, now);
   // A session is still on it, so it is In progress until it exits. Unless it is
   // still asking you something (w-fe48447cab): the one thing a session may not
   // do is take away the question it is asking (`stillAsksYou`).
@@ -622,6 +634,11 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
   const space = window.lastIndexOf(' ');
   return `${text.slice(0, space > 40 ? space : budget).trimEnd()}…`;
 }
+
+// A message drawn as a row's title stops at about the length of the thread
+// names beside it, however wide the window.
+export const MESSAGE_ROW_BUDGET = 48;
+export const messageOnRow = (text: string): string => clipToSentence(text, MESSAGE_ROW_BUDGET);
 
 // Every ordered list sorts through this, so the inbox, In progress and the
 // fleet agree on which row comes next. `score` is the one in shared/rank.mts,

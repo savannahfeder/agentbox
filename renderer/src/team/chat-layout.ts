@@ -15,7 +15,11 @@ export interface ChatSlot {
   head: boolean;
 }
 
-type Said = { kind?: string; at: number; who?: string; by?: string };
+type Said = { kind?: string; at: number; who?: string; by?: string; fileMark?: { kind?: string } };
+
+// A comment names its file in its own head, so it neither carries on the line
+// above nor lends its head to the line below.
+const isComment = (e: Said | undefined) => e?.fileMark?.kind === 'note';
 
 // Who said it. A teammate's words carry `by`; a line with no `by` is the agent
 // ('it') or the single-person app's own user ('you').
@@ -35,6 +39,7 @@ export function chatLayout(events: readonly Said[], now = Date.now()): ChatSlot[
     // work) ends it, because the face would otherwise sit above a line that is
     // not theirs.
     const carries = !!prev && prev.kind !== 'work' && e.kind !== 'work' && day === null
+      && !isComment(prev) && !isComment(e)
       && authorOf(prev) === authorOf(e) && e.at - prev.at <= RUN_GAP_MS;
     out.push({ day, head: e.kind !== 'work' && !carries });
   }

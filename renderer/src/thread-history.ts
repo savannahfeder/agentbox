@@ -22,11 +22,13 @@ import { readNotes, type Notes, type TraceSession } from './notes';
 import { commandPrompt } from '../../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../../shared/engines.mts';
 import { instructionOf } from '../../shared/repeats.mts';
-import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
+import { baseName, familyName, filesInLines, fromATeammatesCopy, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
 import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { handBackReadBy } from '../../shared/thread-asks.mts';
+import { Name } from '../../shared/product-name.mjs';
+import { forTheAgent } from '../../shared/notes-for-the-agent.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
@@ -99,8 +101,8 @@ export interface ThreadEvent {
   voice?: AgentVoice;
   /** A comment or approval on a file: which file, and for a comment where on it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment (reaches the owner, starts nothing) or an agent's checkpoint. */
-  says?: 'comment' | 'progress' | 'to-agent';
+  /** A teammate's comment (reaches the owner, starts nothing), an agent's checkpoint, or the app's own note. */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app';
   // The runs that began at this pickup, oldest first. Set by withRuns, and
   // an array because a session that never got its claim in still has to land
   // somewhere rather than disappear.
@@ -323,12 +325,14 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       if (mark.do === 'note' && mark.id) {
         const n = (pinsSoFar.get(mark.file ?? '') ?? 0) + (mark.place?.kind === 'pin' || hasSpot(mark.place) ? 1 : 0);
         pinsSoFar.set(mark.file ?? '', n);
+        // A teammate's note addressed to nobody waits for their reply, which says it (TeammateThread `notesWithYourReply`).
+        if (fromATeammatesCopy(line.uid) && mark.wait && !(mark.mentions ?? []).some((m) => m !== line.by)) continue;
         events.push({
           at, who: 'you', said: 'Commented', words: mark.text ?? '', message: true,
           fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}), ...(mark.wait && !sentNotes.has(mark.id) && !(mark.mentions ?? []).some((m) => m !== line.by) ? { unsent: true as const } : {}) },
         });
       } else if (mark.do === 'reply' && typeof mark.on === 'string') {
-        events.push({ at, who: 'you', said: 'Replied', words: mark.text ?? '', message: true, fileMark: { kind: 'note', file: mark.file ?? '', id: mark.on } });
+        events.push({ at, who: 'you', said: 'Replied', words: mark.text ?? '', message: true, fileMark: { kind: 'note', file: mark.file ?? '', id: mark.on, reply: true, ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}) } });
       } else if (mark.do === 'approve' && mark.file) {
         events.push({ at, who: 'you', said: 'You approved', words: fileShownName(mark.file), fileMark: { kind: 'approved', file: mark.file } });
       } else if (mark.do === 'edit' && mark.path) {
@@ -509,7 +513,13 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     }
 
     if (words(patch.note)) {
-      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', says: 'progress', ...(ranNow() ? { ran: ranNow() } : {}) });
+      // Trouble the app is seeing to by itself is for the next run, not the person.
+      if (line.source === 'system' && forTheAgent(words(patch.note)!)) continue;
+      // The app's own news on the row is the app's quiet line, never a
+      // checkpoint signed with the model the agent runs on
+      // (tests/the-apps-own-note-is-never-signed-as-the-agents).
+      const signed = line.source === 'system' ? { says: 'app' as const, from: Name } : { says: 'progress' as const, ...(ranNow() ? { ran: ranNow() } : {}) };
+      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', ...signed });
       continue;
     }
 

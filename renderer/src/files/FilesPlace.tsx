@@ -418,6 +418,10 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice, onRenam
     open={opened}
     ownerOfRow={null}
     withAgent={!!view?.sentIn.some((p) => p.kind === 'thread' && p.product === product)}
+    onHandToAgent={(paths) => {
+      onClose();
+      window.dispatchEvent(new CustomEvent('zero:hand-file-comments', { detail: { name: view?.name ?? paths[0], product, src: paths[0], notes: view?.marks.notes ?? [] } }));
+    }}
     write={(mark) => api.filesPlaceMark({ key: fileKey, mark })}
     onNewVersion={editsTo ? async (_name, text) => {
       const out = await api.filesPlaceEdit({ key: fileKey, text });
@@ -430,6 +434,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice, onRenam
     missingSays={(by) => (view?.coming ? 'is on its way back from the cloud.' : missingWords(by && by !== team?.me && team?.byId.get(by) ? firstName(team.byId.get(by)!) : null))}
     editGoes={editsTo?.kind === 'shared' ? `Sent to ${team?.byId.get(editsTo.ownerId ?? '') ? firstName(team.byId.get(editsTo.ownerId!)!) : 'whoever made it'}.` : undefined}
     onOutside={(src) => { void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error || 'That file could not be opened.'); }); }}
+    onNotice={onNotice}
     onClose={onClose}
     below={below}
     typing={typing}
@@ -446,13 +451,10 @@ const PlaceGlyph = ({ kind }: { kind: FileSentIn['kind'] }) => (kind === 'chat'
   ? <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" strokeLinejoin="round" /></svg>
   : <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" strokeLinecap="round" /></svg>);
 
-export function FilesPlace({ project, onProject, folder: folderAsked, onFolder, now, onPlace, onNotice, onUndoable, onSettings }: {
+export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoable, onSettings }: {
   /** The project's page, or null for every file. */
   project: string | null;
   onProject: (project: string | null) => void;
-  /** The folder's page open in it, kept by the app so Back and Forward step through folders. */
-  folder?: string | null;
-  onFolder?: (folder: string | null) => void;
   now: number;
   onPlace: (p: FileSentIn) => void;
   onNotice: (words: string) => void;
@@ -500,9 +502,7 @@ export function FilesPlace({ project, onProject, folder: folderAsked, onFolder, 
   const [asList, setAsList] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [madeKey, setMadeKey] = useState<string | null>(null);
-  const [ownFolder, setOwnFolder] = useState<string | null>(null);
-  const folderId = folderAsked !== undefined ? folderAsked : ownFolder;
-  const setFolderId = (id: string | null) => { if (onFolder) onFolder(id); else setOwnFolder(id); };
+  const [folderId, setFolderId] = useState<string | null>(null);
   const [naming, setNaming] = useState<{ what: Making; project: string } | null>(null);
   // Every file at once, with the sort, the sizes and the Trash; otherwise the home.
   const [everything, setEverything] = useState(false);
@@ -512,13 +512,7 @@ export function FilesPlace({ project, onProject, folder: folderAsked, onFolder, 
   const folder = folders.some((f) => f.id === folderId) ? folderId : null;
   const place = { project, folder };
   // Picking a project from every file opens its page with the name box already there.
-  // Only on a move to another project: Back to a folder's page mounts with it already open.
-  const shownProject = useRef(project);
-  useEffect(() => {
-    if (shownProject.current === project) return;
-    shownProject.current = project;
-    setFolderId(null); setEverything(false); setNaming((n) => (n && n.project === project ? n : null));
-  }, [project]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setFolderId(null); setEverything(false); setNaming((n) => (n && n.project === project ? n : null)); }, [project]);
   const mine = all.mine ?? [];
   const isMine = (p: string | null) => !!p && mine.some((m) => m.toLowerCase() === p.toLowerCase());
   const makeFile = (kind: 'document' | 'table', into: string, inFolder: string | null) => {

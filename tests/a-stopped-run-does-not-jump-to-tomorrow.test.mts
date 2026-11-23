@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { momentOf } from '../renderer/src/notes.ts';
-import { traceLines } from '../renderer/src/terminal.ts';
+import { traceLines } from '../shared/trace-lines.mts';
 import { itemThread } from '../renderer/src/item-thread.ts';
 
 const SPAWNED = Date.UTC(2026, 9, 4, 18, 30, 28, 97);
