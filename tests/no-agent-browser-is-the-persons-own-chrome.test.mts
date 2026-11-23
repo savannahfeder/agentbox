@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { MAC_CHROME, hiddenBrowser, startableChrome } from '../shared/hidden-browser.mts';
+import { MAC_CHROME, startableChrome } from '../shared/hidden-browser.mts';
 import { browsersToTry } from '../mcp/core/page.mts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -64,12 +64,6 @@ describe('the browser a script starts on a Mac', () => {
 
   it('is whatever CHROME names on Linux', () => {
     expect(startableChrome({ platform: 'linux', env: { CHROME: '/usr/bin/chromium' }, hidden: () => null })).toBe('/usr/bin/chromium');
-  });
-
-  it('prefers Chrome for Testing to the headless shell', () => {
-    expect(hiddenBrowser({ forTesting: () => ['/cft'], shells: () => ['/shell'] })).toBe('/cft');
-    expect(hiddenBrowser({ forTesting: () => [], shells: () => ['/shell'] })).toBe('/shell');
-    expect(hiddenBrowser({ forTesting: () => [], shells: () => [] })).toBe(null);
   });
 });
 

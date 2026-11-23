@@ -8,10 +8,10 @@ import { SearchIcon } from '../components/SearchIcon';
 import { pictureUrl } from '../picture';
 import type { FileFolder, PlacedFile } from '../types';
 import { changedBy } from './files-shown';
-import { docTop, FILE_DRAG, GLYPH_NAMES, glyphFor, markOf, NOT_IN_A_FOLDER, pinChangedLately, SHOWN_AT_FIRST, tileLine, tileName, whenWords, type Crumb, type DocTop, type Glyph, type Home } from './files-home';
+import { docTop, FILE_DRAG, GLYPH_NAMES, glyphFor, markOf, NOT_IN_A_FOLDER, pinChangedLately, recentByDay, SHOWN_AT_FIRST, tileLine, tileName, whenWords, type Crumb, type DocTop, type Glyph, type Home, type RecentFile } from './files-home';
 import './files-home.css';
 
-type DropHandlers = { onDragOver: (e: DragEvent) => void; onDragLeave: () => void; onDrop: (e: DragEvent) => void };
+type DropHandlers = { onDragOver: (e: DragEvent) => void; onDragLeave: (e: DragEvent) => void; onDrop: (e: DragEvent) => void };
 export interface ProjectShelf { name: string; kept: number; loose: number; at: number | null }
 
 /** What a person can do to a file or a folder from Files' home. */
@@ -177,6 +177,7 @@ function Tile({ file, folder, me, nameOf, now, onOpen, folders, acts }: Shared &
   const [menu, setMenu] = useState<At | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [broken, setBroken] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const name = tileName(file, doc.title);
   const who = changedBy(file, { me, nameOf });
   const line = file.kind === 'markdown' ? doc.line : tileLine(file);
@@ -190,8 +191,8 @@ function Tile({ file, folder, me, nameOf, now, onOpen, folders, acts }: Shared &
     <span className="fh-meta">{whenWords(file.at, now)} · {who === 'You' ? 'you' : who}</span>
   </>;
   const openMenu = (e: ReactMouseEvent) => { e.preventDefault(); e.stopPropagation(); setMenu({ x: e.clientX + 4, y: e.clientY + 4 }); };
-  return <div ref={ref} className={`fh-tile${menu ? ' is-open' : ''}`} draggable={!!file.project && !renaming} onContextMenu={openMenu}
-    onDragStart={(e) => { e.dataTransfer.setData(FILE_DRAG, file.key); e.dataTransfer.effectAllowed = 'move'; }}>
+  return <div ref={ref} className={`fh-tile${menu ? ' is-open' : ''}${dragging ? ' is-dragging' : ''}`} draggable={!!file.project && !renaming} onContextMenu={openMenu}
+    onDragStart={(e) => { e.dataTransfer.setData(FILE_DRAG, file.key); e.dataTransfer.effectAllowed = 'move'; setDragging(true); }} onDragEnd={() => setDragging(false)}>
     {renaming ? <div className="fh-open">{inside}</div>
       : <button type="button" className="fh-open" onClick={() => onOpen(file.key)} aria-label={`Open ${name}`} title={name === file.name ? undefined : file.name}>{inside}</button>}
     {!renaming && <button type="button" className="fh-more-btn" aria-label={`More for ${name}`} aria-haspopup="menu" aria-expanded={!!menu}
@@ -242,9 +243,34 @@ function Shelf({ files, folder, dropOn, ...shared }: Shared & { files: PlacedFil
   </section>;
 }
 
+function RecentRow({ row, ...shared }: Shared & { row: RecentFile }) {
+  const [ref, near] = useNear<HTMLButtonElement>();
+  const doc = useDocTop(row.file, near);
+  const name = tileName(row.file, doc.title);
+  return <button ref={ref} type="button" className="fh-rrow" onClick={() => shared.onOpen(row.file.key)} title={name} draggable={!!row.file.project}
+    onDragStart={(e) => { e.dataTransfer.setData(FILE_DRAG, row.file.key); e.dataTransfer.effectAllowed = 'move'; }}>
+    <GlyphMark glyph={glyphFor(row.file, row.folder?.name ?? null, doc.title)} /><span className="fh-rname">{name}</span>
+  </button>;
+}
+
+/** A page's folders with what changed last on their left, a day at a time. */
+function besideRecent(recent: RecentFile[], main: ReactNode, shared: Shared): ReactNode {
+  if (!recent.length) return main;
+  return <div className="fh-split">
+    <aside className="fh-rail" aria-label="Recent">
+      <div className="fh-head"><h2 className="fh-head-name">Recent</h2></div>
+      {recentByDay(recent, shared.now).map((d) => <div key={d.day} className="fh-rday-box">
+        <div className="fh-rday">{d.day}</div>
+        {d.rows.map((r) => <RecentRow key={r.file.key} row={r} {...shared} />)}
+      </div>)}
+    </aside>
+    <div className="fh-main">{main}</div>
+  </div>;
+}
+
 const andJoined = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
 
-export function FilesHome({ title, crumbs, onCrumb, page, home, projects, found, query, onQuery, findRef, newMenu, naming, loaded, dropOn, onFolder, onProject, onEverything, ...shared }: Shared & {
+export function FilesHome({ title, crumbs, onCrumb, page, home, projects, recent, found, query, onQuery, findRef, newMenu, naming, loaded, dropOn, onFolder, onProject, onEverything, ...shared }: Shared & {
   title: string;
   crumbs: Crumb[];
   onCrumb: (c: Crumb) => void;
@@ -252,6 +278,8 @@ export function FilesHome({ title, crumbs, onCrumb, page, home, projects, found,
   /** A project's home; null on All files, which shows `projects`. */
   home: Home | null;
   projects?: ProjectShelf[];
+  /** What changed last on this page, drawn on its left. */
+  recent: RecentFile[];
   /** What the search box leaves, while it has words in it. */
   found: PlacedFile[] | null;
   query: string;
@@ -288,7 +316,7 @@ export function FilesHome({ title, crumbs, onCrumb, page, home, projects, found,
       <Grid files={found} folder={null} limit={60} {...shared} /></section>
       : page.kind === 'folder' ? <Shelf files={page.files} folder={page.folder} dropOn={(setOver) => dropOn(page.folder.id, setOver)} {...shared} />
         : page.kind === 'loose' ? <Shelf files={page.files} folder={null} dropOn={(setOver) => dropOn(null, setOver)} {...shared} />
-          : home ? <>
+          : besideRecent(recent, home ? <>
             {naming && <section className="fh-sec"><div className="fh-head">{naming}</div></section>}
             {home.kept.map((s) => <Section key={s.folder.id} head={<FolderHead folder={s.folder} count={s.files.length} onFolder={onFolder} acts={shared.acts} />}
               files={s.files} folder={s.folder} more={() => onFolder(s.folder.id)} dropOn={(setOver) => dropOn(s.folder.id, setOver)} {...shared} />)}
@@ -299,6 +327,7 @@ export function FilesHome({ title, crumbs, onCrumb, page, home, projects, found,
             {loaded && !nothing && <button type="button" className="fh-every" onClick={onEverything}>Every file, with sizes and the Trash</button>}
           </>
             : <section className="fh-sec">
+              {projects && projects.length > 0 && <div className="fh-head"><h2 className="fh-head-name">Projects</h2></div>}
               {loaded && !projects?.length && <p className="fh-empty">Nothing in Files yet.</p>}
               <div className="fh-grid">{projects?.map((p) => <div key={p.name} className="fh-tile">
                 <button type="button" className="fh-open" onClick={() => onProject(p.name)} aria-label={`Open ${p.name}`}>
@@ -308,6 +337,6 @@ export function FilesHome({ title, crumbs, onCrumb, page, home, projects, found,
                   <span className="fh-meta">{p.at ? whenWords(p.at, shared.now) : ''}</span>
                 </button>
               </div>)}</div>
-            </section>}
+            </section>, shared)}
   </div>;
 }

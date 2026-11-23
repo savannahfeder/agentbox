@@ -17,7 +17,8 @@ import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus,
 import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, inOrderOf, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, showsTotal, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
 import { fileRenameUndo, moveUndo, renameUndo } from './files-undo';
 import { FilesHome, type HomeActs, type HomePage, type ProjectShelf } from './FilesHome';
-import { crumbsFor, FILE_DRAG, folderFiles, homeOf, NOT_IN_A_FOLDER } from './files-home';
+import { crumbsFor, FILE_DRAG, folderFiles, homeOf, NOT_IN_A_FOLDER, recentOf } from './files-home';
+import { cleanName, withChanges, type Shown } from './files-changes';
 import './files-place.css';
 
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
@@ -30,21 +31,59 @@ const readAgain = () => { for (const read of readers) read(); };
 // A pass over every file takes seconds on a big store; a visit starts from the last one.
 let lastList: FilesPlaceList | null = null;
 
+// Changes made here, drawn over the list until one asked for after the app wrote them arrives. `done` is when it did.
+let pending: Array<{ change: Shown; done: number | null }> = [];
+const redraws = new Set<() => void>();
+const redraw = () => { for (const r of redraws) r(); };
+type ActAnswer = Awaited<ReturnType<typeof api.filesPlaceFolder>>;
+function actNow(p: FileFolderAct): Promise<ActAnswer> {
+  const mine = p.do === 'make' || p.do === 'restore' ? null : { change: p, done: null as number | null };
+  // A folder put back is drawn by the next list, unless the deletion is still only drawn here.
+  if (p.do === 'restore') pending = pending.filter((q) => !(q.change.do === 'remove' && p.ids.includes(q.change.id)));
+  if (mine) pending = [...pending, mine];
+  redraw();
+  return api.filesPlaceFolder(p).then((r) => {
+    if (mine) {
+      if (!r.ok) pending = pending.filter((q) => q !== mine);
+      else mine.done = Date.now();
+    }
+    if (r.ok && p.do === 'make' && r.folder) {
+      pending = [...pending, { change: { do: 'made', folder: { id: r.folder, project: p.project, name: cleanName(p.name), parent: p.parent ?? null, at: Date.now() } }, done: Date.now() }];
+    }
+    redraw();
+    readAgain();
+    return r;
+  });
+}
+
 /** Every file, read again whenever the store says something changed. */
 export function useFilesList(on: boolean) {
   const [list, setList] = useState<FilesPlaceList | null>(() => lastList);
+  const [drawn, setDrawn] = useState(0);
+  useEffect(() => {
+    const again = () => setDrawn((n) => n + 1);
+    redraws.add(again);
+    return () => { redraws.delete(again); };
+  }, []);
   useEffect(() => {
     if (!on) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const read = () => { void api.filesPlace().then((l) => { lastList = l; if (live) setList(l); }); };
-    read();
+    const read = (soon = false) => {
+      const asked = Date.now();
+      void api.filesPlace(soon ? { soon } : undefined).then((l) => {
+        if (!soon) pending = pending.filter((p) => p.done === null || p.done > asked);
+        lastList = l;
+        if (live) setList(l);
+      });
+    };
+    read(!lastList);
     readers.add(read);
     // A burst of changes reads once.
     const off = api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 400); });
     return () => { live = false; readers.delete(read); if (timer) clearTimeout(timer); off?.(); };
   }, [on]);
-  return list;
+  return useMemo(() => (list && pending.length ? withChanges(list, pending.map((p) => p.change)) : list), [list, drawn]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 function DocFace({ file }: { file: PlacedFile }) {
@@ -107,7 +146,8 @@ const DRAGGED = FILE_DRAG;
 function dropsFile(onFile: (key: string) => void, setOver?: (on: boolean) => void) {
   return {
     onDragOver: (e: DragEvent) => { if (e.dataTransfer.types.includes(DRAGGED)) { e.preventDefault(); setOver?.(true); } },
-    onDragLeave: () => setOver?.(false),
+    // Crossing a tile inside the folder is not leaving it.
+    onDragLeave: (e: DragEvent) => { if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) setOver?.(false); },
     onDrop: (e: DragEvent) => {
       setOver?.(false);
       const key = e.dataTransfer.getData(DRAGGED);
@@ -572,16 +612,15 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
     return () => watch.disconnect();
   }, [drawn, total]);
   const nameOf = (id: string) => firstName(team?.byId.get(id) ?? null) || 'A teammate';
-  const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); else readAgain(); return r; });
+  const act = (p: FileFolderAct) => actNow(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); return r; });
   const undoable = (u: { label: string; undoes: string }, back: FileFolderAct[]) => onUndoable?.({
     label: u.label,
     undoes: u.undoes,
     run: async () => {
       for (const p of back) {
-        const r = await api.filesPlaceFolder(p);
-        if (!r.ok) { readAgain(); return { refused: r.error || 'That could not be put back.' }; }
+        const r = await actNow(p);
+        if (!r.ok) return { refused: r.error || 'That could not be put back.' };
       }
-      readAgain();
     },
   });
   const moveAll = (keys: string[], to: string | null) => {
@@ -650,12 +689,13 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   };
   const headSlot = useSlot('fp-head-slot');
   const home = useMemo(() => (project ? homeOf(all.files, folders, project) : null), [all.files, folders, project]);
-  const shelves = useMemo<ProjectShelf[]>(() => (project ? [] : all.projects.map((p) => {
-    const h = homeOf(all.files, folders, p);
+  const homes = useMemo(() => (project ? [] : all.projects.map((p) => ({ p, h: homeOf(all.files, folders, p) }))), [all.files, all.projects, folders, project]);
+  const recent = useMemo(() => recentOf(project ? [home!] : homes.map((x) => x.h)), [home, homes, project]);
+  const shelves = useMemo<ProjectShelf[]>(() => homes.map(({ p, h }) => {
     const kept = h.kept.reduce((n, s) => n + s.files.length, 0);
     const newest = [...h.kept.map((s) => s.files[0].at), ...h.loose.slice(0, 1).map((f) => f.at)];
     return { name: p, kept, loose: h.loose.length, at: newest.length ? Math.max(...newest) : null };
-  })), [all.files, all.projects, folders, project]);
+  }), [homes]);
   const openFile = openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); readAgain(); }} onNotice={onNotice} onRename={renameFile}
     onPlace={(p) => { setOpenKey(null); onPlace(p); }} />;
 
@@ -673,7 +713,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
 
   if (!chosen && !everything) return <div className="fp-page fh-page">
     <FilesHome title={project ?? 'Files'} crumbs={crumbsFor(folders, project, folderId)} onCrumb={(c) => { if (c.project !== project) onProject(c.project); setFolderId(c.folder); }}
-      page={page} home={home} projects={shelves} found={query.trim() ? found : null} query={query} onQuery={setQuery} findRef={box}
+      page={page} home={home} projects={shelves} recent={recent} found={query.trim() ? found : null} query={query} onQuery={setQuery} findRef={box}
       newMenu={<NewMenu project={project} projects={mine} canDocument={project ? isMine(project) : true} canFolder={canNest} onPick={pick} />}
       naming={naming?.what === 'folder' && project ? <NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /> : null}
       loaded={!!list} me={team?.me ?? null} nameOf={nameOf} now={now} onOpen={setOpenKey}

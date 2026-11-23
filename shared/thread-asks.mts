@@ -10,6 +10,7 @@
 // the owner's throughout: their computer runs it, and it comes back to their
 // Needs you saying what was said.
 import { toldBy } from './answers.mts';
+import { shownName } from './artifact-marks.mts';
 import { isTaskRow, taskGiver } from './team-rules.mts';
 import { handedFrom } from './thread-link.mts';
 import type { AskPatch, Verdict } from './work-items.mts';
@@ -199,16 +200,30 @@ export function askedOutWord(rows: readonly AskRow[], me: string | null, thread:
 /** The word under an ask's name in a list, where "Task" goes on any other. */
 export const askWord = (kind: AskKind): string => (kind === 'help' ? 'Help' : 'Review');
 
+/** "a", "a and b", "a, b and c". */
+const listed = (names: readonly string[]): string => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
+
+/** The files `by` approved between `from` and `to`, by the name they are shown under, oldest first. */
+export function approvedDuring(approvals: readonly { file: string; by: string | null; ts: number }[], { by, from, to = Infinity }: { by: string; from: number; to?: number }): string[] {
+  const named = approvals
+    .filter((a) => a.by === by && a.ts >= from && a.ts <= to)
+    .sort((a, b) => a.ts - b.ts)
+    .map((a) => shownName(a.file.replace(/[#@]\d+$/, '')));
+  return [...new Set(named.filter(Boolean))];
+}
+
 /** What the giver's thread says once the ask comes back. */
-export function handedBackWords({ kind, name, verdict, words, asked = null }: { kind: AskKind; name: string; verdict: Verdict | null; words: string; asked?: { by: string; note: string } | null }): string {
+export function handedBackWords({ kind, name, verdict, words, asked = null, approved = [] }: { kind: AskKind; name: string; verdict: Verdict | null; words: string; asked?: { by: string; note: string } | null; approved?: readonly string[] }): string {
   const said = words.trim();
   const head = kind === 'review'
     ? verdict === 'yes' ? `${name} reviewed this and it looks good.` : verdict === 'changes' ? `${name} reviewed this and asked for changes.` : `${name} reviewed this.`
     : `${name} handed this back.`;
   // What was asked lived only on the task, so the thread lost it once the ask came back (round four of the team test).
   const ask = asked?.note.trim() ? `${asked.by} had asked: “${asked.note.trim()}”` : '';
+  // Quoted, so `readHandBack` finds each name whatever it holds.
+  const files = approved.length ? `${name} approved ${listed(approved.map((n) => `“${n}”`))}.` : '';
   // The question before the answer, as a reply reads (a walk-through read it backwards).
-  return [head, ask, said].filter(Boolean).join('\n\n');
+  return [head, ask, files, said].filter(Boolean).join('\n\n');
 }
 
 // A hand-back is written on the thread as the helper's words to the agent are
@@ -217,6 +232,48 @@ const HANDED_BACK = /^\S+ (?:handed this back|reviewed this(?: and it looks good
 
 /** Whether words on a thread are a hand-back `handedBackWords` wrote. */
 export const isHandBack = (text: string | null | undefined): boolean => HANDED_BACK.test(String(text ?? ''));
+
+export interface HandBackParts { name: string; kind: AskKind; verdict: Verdict; asked: { by: string; note: string } | null; approved: string[]; words: string }
+
+const HEAD = /^(\S+) (handed this back|reviewed this(?: and it looks good| and asked for changes)?)\.(?:\n\n|\n|$)/;
+const ASKED = /(?:^|\n\n)(\S+) had asked: “([\s\S]*?)”(?=\n\n|$)/;
+const APPROVED = /(?:^|\n\n)\S+ approved ((?:“[^”]+”(?:, | and )?)+)\.(?=\n\n|$)/;
+
+/** A stored hand-back taken apart, or null for any other words. */
+export function readHandBack(text: string | null | undefined): HandBackParts | null {
+  const head = HEAD.exec(String(text ?? ''));
+  if (!head) return null;
+  let rest = String(text).slice(head[0].length);
+  const asked = ASKED.exec(rest);
+  if (asked) rest = rest.replace(asked[0], '');
+  const files = APPROVED.exec(rest);
+  if (files) rest = rest.replace(files[0], '');
+  const approved = files ? [...files[1].matchAll(/“([^”]+)”/g)].map((m) => m[1]) : [];
+  // Sharing a thread carries each file a line names as a picture line of its own; those are the list, not words.
+  rest = rest.replace(/^!\[([^\]\n]+)\]\(attachments\/[^)\s]+\)$/gm, (line, name: string) => (approved.includes(name) ? '' : line));
+  const said = head[2];
+  return {
+    name: head[1],
+    kind: said === 'handed this back' ? 'help' : 'review',
+    verdict: said.endsWith('looks good') ? 'yes' : said.endsWith('changes') ? 'changes' : 'done',
+    asked: asked ? { by: asked[1], note: asked[2] } : null,
+    approved,
+    words: rest.trim(),
+  };
+}
+
+/**
+ * A hand-back as the message a person sends: the verdict, what they said, and
+ * the files they approved. The same words on both sides of an ask, under the
+ * helper's name; `link` draws a file's name as a link to it.
+ */
+export function handBackMessage({ kind, verdict, words, approved, link = (n) => n }: { kind: AskKind; verdict: Verdict | null; words: string; approved: readonly string[]; link?: (name: string) => string }): string {
+  const said = words.trim();
+  // A reply that handed it back says only what was written.
+  const head = verdict === 'yes' ? 'Looks good.' : verdict === 'changes' ? 'Needs changes.' : said ? '' : kind === 'help' ? 'Handed back.' : 'Reviewed.';
+  const files = approved.length ? `Approved ${listed(approved.map(link))}.` : '';
+  return [head, said, files].filter(Boolean).join('\n\n');
+}
 
 // Nothing runs on a teammate's hand-back until the owner replies, even once a
 // run's own status has replaced the hold (`heldForHer`).
