@@ -45,13 +45,17 @@ let busy = false;
 // written every quarter of an hour and whenever the ask file is there, so a
 // thread busy all day in pieces too short to be a freeze can be read too.
 const CPU_EVERY_MS = 15 * 60_000;
+const ASKED_KEEPS = 60;
 let cpuAt = Date.now();
 function noteBusy(profiles: StoppedProfile[]) {
   try {
     const ask = path.join(dir, CPU_ASK);
     const asked = fs.existsSync(ask);
     if (!asked && Date.now() - cpuAt < CPU_EVERY_MS) return;
-    const read = busyFrom(profiles, { appDir });
+    // An ask may name a function on its first line, and is answered at more length than the quarter-hour line.
+    let under = '';
+    if (asked) try { under = fs.readFileSync(ask, 'utf8').split('\n')[0]!.trim().slice(0, 120); } catch { /* an ask of nothing */ }
+    const read = busyFrom(profiles, asked ? { appDir, keep: ASKED_KEEPS, under } : { appDir });
     // A turn right after a start or a freeze covers a moment: wait for a fuller one.
     if (read.ms < rotateMs / 2) return;
     cpuAt = Date.now();
