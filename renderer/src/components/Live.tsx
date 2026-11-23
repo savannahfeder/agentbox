@@ -26,6 +26,13 @@ const TICK_MS = 15_000;
 // Only this lowest status line owns the lattice and shimmer (2026-09-19).
 // The task header repeats status in plain text, never another animation.
 
+/** The step a working run is on, unless the memory gate holds its command: then it waits, and says so. */
+export function heldStepWord(current: { label?: string } | undefined, memoryHeldMs: number | undefined): string {
+  if (memoryHeldMs == null) return current?.label || 'Thinking';
+  const command = /^Running (.+)$/.exec(current?.label ?? '')?.[1];
+  return command ? `Waiting for memory to run ${command}` : 'Waiting for memory';
+}
+
 export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveFacts; onTryAgain?: () => void }) {
   const [expandedAt, setExpandedAt] = useState<number | null>(null);
   const expanded = expandedAt !== null;
@@ -95,7 +102,7 @@ export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveF
 
   const activity = facts.session?.activity ?? [];
   const current = activity[activity.length - 1];
-  const word = working ? (current?.label || 'Thinking') : shortWord(live.state, facts.session?.helpers ?? 0);
+  const word = working ? heldStepWord(current, facts.session?.memoryHeldMs) : shortWord(live.state, facts.session?.helpers ?? 0);
   const place = working ? livePlace(facts) : null;
   const finished = previousActivity(history, activity);
   // The newest few, oldest at the top and what is running now at the foot, the

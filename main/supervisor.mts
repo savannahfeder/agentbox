@@ -18,6 +18,7 @@ import { gitJob, warmGitThread } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes } from './notes-wake.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
+import { shownTitle } from '../shared/thread-title.mts';
 import { editedFilesLine } from '../shared/artifact-marks.mts';
 import { readItemHistory, updateWorkItem } from './store/work-items.mts';
 import { reconcileRows, type ReconcilePatch } from './version-reconcile.mts';
@@ -133,9 +134,13 @@ import { namedThreadsBlock } from '../shared/named-threads.mts';
 import { changePath } from './code-change.mts';
 import { noteAgentWrites } from './store/written-elsewhere.mts';
 import { snapshotRepo } from './git-change.mts';
-import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, writesTheAnswer, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
 import { readTranscriptHead } from './agent-sessions.mts';
-import { claudeSessionOpen } from './claude-session-open.mts';
+import { claudeSessionOpen, claudeSessionState } from './claude-session-open.mts';
+import { carriedOnFromTheApp, reply as replyToSession } from './agents.mts';
+import { HELD_IN, heldThere } from '../shared/carried-on-outside.mts';
+import { isShared } from '../shared/team-rules.mts';
+import { appSessionFolders } from './agent-homes.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
 import { troubleCause, refineCause, needsHerHands, accountRefused, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown, modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
@@ -183,7 +188,7 @@ import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexM
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mts';
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel, smallModelPictures } from './row-label.mts';
-import { catchUpRow, catchUpResult } from './catch-up.mts';
+import { catchUpRow, catchUpResult, turnsSaid } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orAgent, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
@@ -784,6 +789,7 @@ export interface SupervisorStore {
   prioritizeItem(slug: string, id: string, value: unknown): unknown;
   touchAnswerMode(slug: string, id: string, used: unknown): unknown;
   settleAnswer?(slug: string, id: string, answerTs: number): unknown;
+  holdChatOutside?(slug: string, id: string, holder: string): Promise<unknown>;
   composeItem(slug: string, fields: Record<string, unknown>): WorkItem | null | undefined;
   fileItem(slug: string, fields: Record<string, unknown>): { id: string };
   noteItem(slug: string, id: string, note: string): unknown;
@@ -1383,6 +1389,7 @@ export class Supervisor {
   declare _heardAnswers: Record<string, string>;
   declare _liveSessions: Record<string, LiveSessionRecord>;
   declare _rowSessions: Record<string, RowSessionRecord>;
+  declare _toTerminal: { going: Set<string>; refused: Set<string> } | undefined;
   declare _stoppedSessions: Record<string, StoppedSessionRecord>;
   declare _compactions: Record<string, CompactionRecord>;
   declare _nativeCommands: Record<string, string[]>;
@@ -2516,6 +2523,9 @@ export class Supervisor {
       if (item.wrote?.blockedBy?.source === 'founder') continue;
       const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`) ?? causes.get(id));
       if (blockers.some((b) => !b || b.status !== 'done')) continue;
+      // A task an agent filed that you closed before saying yes was dismissed,
+      // not finished: what the thread waited for will not come.
+      if (blockers.some((b) => !isCause(b) && b!.wrote?.status?.source === 'founder' && !filedByThePerson(b!) && !(b!.answer && b!.answer !== '(withdrawn)'))) continue;
       const cleared = Math.max(...blockers.map((b) => b!.wrote?.status?.ts ?? 0));
       if (cleared <= (item.wrote?.blockedBy?.ts ?? 0) || cleared <= this._waitsSince) continue;
       // A wait somebody else wrote is theirs to show, not a reason to start a
@@ -3012,6 +3022,8 @@ export class Supervisor {
       || (b.session.startedAt ?? 0) - (a.session.startedAt ?? 0));
     const taken = candidates[0];
     this._kill(taken.session);
+    // Said on the paused thread, or its agent just stops with no reason given.
+    try { this.store.noteItem?.(taken.victim.product, taken.id, `Paused so “${shownTitle(item)}” could run first. This carries on when an agent is free.`); } catch { /* the pause still holds */ }
     this._preempted.set(taken.id, {
       at: Date.now(),
       forItem: item.id,
@@ -3513,6 +3525,54 @@ export class Supervisor {
     try { fresh = Date.now() - fs.statSync(file!).mtimeMs < 2 * 60_000; } catch { fresh = false; }
     const open = fresh || claudeSessionOpen(sessionId, [home, path.join(this.config.home || os.homedir(), '.claude')]);
     return { sessionId, profile, imported: true, folder, open };
+  }
+
+  /**
+   * A REPLY TO A CHAT STILL OPEN IN A TERMINAL GOES TO THAT TERMINAL, so it stays
+   * one conversation; the follow brings its answer back (main/chat-follow.mts).
+   * A copy run here beside it put two agents on one job in two folders. True
+   * while it is on its way or gone there. False for a chat that is closed, or
+   * whose terminal would not take it: the reply then starts a run here as ever.
+   */
+  _goesToItsTerminal(item: WorkItem): boolean {
+    this._toTerminal ??= { going: new Set(), refused: new Set() };
+    const { going, refused } = this._toTerminal;
+    const key = this._answerKey(item);
+    if (going.has(key)) return true;
+    if (refused.has(key) || answerSettled(item) || this._answerDelivered(item)) return false;
+    const open = this._openTerminalFor(item);
+    if (!open) return false;
+    going.add(key);
+    const text = String(item.answer);
+    void Promise.resolve()
+      .then(() => this._sayInTerminal(open.pid, text))
+      .then(async (r) => {
+        if (!r.ok && !r.held) { refused.add(key); return; }
+        this._handledAnswers.add(key);
+        this._saveState();
+        this.store.settleAnswer?.(item.product, item.id, answerTs(item));
+        if (r.held) this.store.modules.workItemsDisk.updateWorkItem(this.store.productDir(item.product), item.id, { result: heldThere(open.folder) }, { source: 'agent' });
+        else await this.store.holdChatOutside?.(item.product, item.id, HELD_IN.claude);
+      })
+      .catch((e) => { refused.add(key); console.warn(`zero: ${item.id} could not reach its terminal:`, e?.message ?? e); })
+      .finally(() => { going.delete(key); this.onChange?.(); this.wake(); });
+    return true;
+  }
+
+  _sayInTerminal(pid: number, text: string): Promise<{ ok: boolean; held?: boolean; reason?: string }> {
+    return replyToSession(pid, text, { wrap: carriedOnFromTheApp });
+  }
+
+  /** The live Claude Code process holding this row's chat, for a plain reply no run here has taken up. */
+  _openTerminalFor(item: WorkItem): { pid: number; folder?: string } | null {
+    const words = String(item.answer ?? '');
+    if (!words.trim() || words === '(withdrawn)' || /^\s*\//.test(words) || words.includes('attachments/')) return null;
+    const label = (item.labels ?? []).includes(THREAD_LABEL) ? (item.labels ?? []).find((l) => typeof l === 'string' && l.startsWith('thread:')) : null;
+    if (!label || this._rowSessions?.[item.id]?.sessionId || engineOf(this._engineFor(item)) !== 'claude') return null;
+    const product = this.store.listProducts?.().find((p) => p.slug === item.product);
+    if (!product || isShared(product as Parameters<typeof isShared>[0])) return null;
+    const state = claudeSessionState(label.slice(7).trim(), appSessionFolders({ config: this.config, supervisor: this, home: this.config.home || os.homedir() }).dirs);
+    return state?.pid ? { pid: state.pid, folder: state.folder } : null;
   }
 
   /**
@@ -5223,7 +5283,7 @@ export class Supervisor {
 
   /**
    * A CHAT BROUGHT IN, REWRITTEN AS A THREAD (main/catch-up.mts): its name, its
-   * context and its answer with options. Never awaited, like the namer, and
+   * answer with options and its context, and after the first time only that. Never awaited, like the namer, and
    * a few at once: the person is looking at these rows the moment setup ends. A miss waits a minute; after three the row keeps the
    * agent's own last message.
    */
@@ -5240,7 +5300,9 @@ export class Supervisor {
     return Promise.all(due.map((next) => {
       this._catchingUp.add(key(next));
       const labels = (next.labels ?? []).filter((l) => l !== CATCH_UP_LABEL);
-      return this._askSmall((opts) => catchUpRow(next, opts) as Promise<CatchUpCard | ''>, { product: next.product })
+      const project = this.store.listProducts?.().find((p) => p.slug === next.product)?.name ?? null;
+      const turns = turnsSaid(this.store.readHistory?.(next.product, next.id) ?? []);
+      return this._askSmall((opts) => catchUpRow({ ...next, project, turns }, opts) as Promise<CatchUpCard | ''>, { product: next.product })
         .then((card) => {
           if (!card) {
             const misses = (this._catchUpMisses.get(key(next))?.count ?? 0) + 1;
@@ -5249,7 +5311,10 @@ export class Supervisor {
             return;
           }
           this._catchUpMisses.delete(key(next));
-          this.store.catchUpItem(next.product, next.id, { label: card.title, problem: card.context, result: catchUpResult(card) });
+          // Carried on in its terminal while this was written: its newer answer is owed its own.
+          const row = this.store.readItem?.(next.product, next.id);
+          if (row && (row.result !== next.result || row.wrote?.saidOutside?.ts !== next.wrote?.saidOutside?.ts || row.status !== next.status)) return;
+          this.store.catchUpItem(next.product, next.id, { ...(next.label ? {} : { label: card.title }), problem: card.context, ...(writesTheAnswer(next) ? { result: catchUpResult(card) } : {}) });
           this.store.routeItem?.(next.product, next.id, { labels });
           this.onChange?.();
         })
@@ -5748,6 +5813,15 @@ export class Supervisor {
     this._fruitless[key] = { runs, endedAt: Date.now(), founderAt, ...(account ? { account } : {}) };
     this._saveState();
     return 'rested';
+  }
+
+  // A thread reopened by hand: its reply was heard before the close, and a
+  // close that stopped the run gave it back to the queue. Nothing starts until
+  // a new word, so the thread waits in Needs you (`stalled`).
+  keepReplyHeard(item: WorkItem) {
+    if (!item.answer || item.answer === '(withdrawn)') return;
+    this._handledAnswers.add(this._answerKey(item));
+    this._saveState();
   }
 
   // Give an answer its delivery back: the mark is written at spawn, so a
@@ -9193,6 +9267,14 @@ export class Supervisor {
     // they have shipped or gone back to their agent.
     let shipping: string[] = [];
     try { shipping = this.shipQueue.waitingIds(allThreads(), this.store.listProducts?.() ?? []); } catch {}
+    // A run whose next command the memory gate holds, and for how long: its
+    // step was asked for, so it would read Running the whole time it waits.
+    const heldForMemory = new Map<string, number>();
+    try {
+      for (const w of this._memoryGate?.gate?.snapshot?.().waiting ?? []) {
+        if (w.item) heldForMemory.set(w.item, Math.max(heldForMemory.get(w.item) ?? 0, w.waitedMs));
+      }
+    } catch {}
     return {
       paused: this.paused,
       shipping,
@@ -9214,6 +9296,7 @@ export class Supervisor {
         product: s.product,
         startedAt: s.startedAt,
         ...('turnStartedAt' in s && s.turnStartedAt ? { turnStartedAt: s.turnStartedAt } : {}),
+        ...(heldForMemory.has(s.itemId) ? { memoryHeldMs: heldForMemory.get(s.itemId) } : {}),
         // WHICH CODING AGENT REALLY STARTED THIS ONE. `engineFacts` below is the
         // answer for the NEXT spawn on a row; this is the one that happened, so
         // the byline says what is in front of her rather than what would be next
@@ -9949,7 +10032,10 @@ export class Supervisor {
     this._asleepQueue = asleep ? queue.filter((r) => !r.command).map(({ item, continuation }) => ({ item, continuation })) : [];
     if (asleep) for (const { item } of queue) this._noteNotStarting(item, 'asleep', this._engineFor(item));
 
+    // Ahead of the room and memory asked about below: a message to a terminal that is open needs neither.
+    for (const { item, continuation, command } of queue) if (continuation && !command) this._goesToItsTerminal(item);
     for (const { item, continuation, command } of asleep ? [] : queue) {
+      if (continuation && !command && this._goesToItsTerminal(item)) continue;
       // The cap is real for both kinds. Uncapped, one restart's respawn wave
       // put ten workers into one tick, which split the founder's rate limit
       // ten ways and slow-motioned everything, twice, before two agents

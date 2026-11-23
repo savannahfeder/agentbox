@@ -10,7 +10,7 @@ import { REST_HEADING, URGENT_HEADING, clickIntent, rowSummary, rowTitle } from 
 import { isUrgentRow } from '../urgent-arrival';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
+import { cameBackEmpty, cannotStartLine, cannotStartWord, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { isTroubleRow } from '../trouble-row';
@@ -33,7 +33,7 @@ import type { MixedRow } from '../threads/people-rules';
 import { useRowDrag } from '../threads/row-drag';
 import { heldByAPerson } from '../../../shared/team-rules.mts';
 import { shownPriority } from '../../../shared/rank.mts';
-import { catchUpDue } from '../../../shared/agent-import.mts';
+import { gettingReady } from '../../../shared/agent-import.mts';
 import { cutAt, firstRows, placeOf, useRowsDrawn } from '../rows-drawn';
 
 /**
@@ -434,7 +434,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                    itself, by id, rather than at whatever is drawn first
                    (w-0b60195a14, 2026-08-21). Nothing else reads this. */
                 data-item-id={item.id}
-                data-catching-up={catchUpDue(item) ? '1' : undefined}
+                data-catching-up={gettingReady(item) ? '1' : undefined}
                 /*
                  * THE HOVER HINT, AND ONLY IN THE INBOX. `hint-plate.ts` says
                    ↵ Open task, E Mark done, S Schedule for later, which are the
@@ -702,7 +702,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                         : shipping?.includes(item.id)
                           ? <span className="time" title="The app is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.">shipping</span>
                         : queued?.includes(item.id) && cannotStart?.[item.id] && cannotStartLine(cannotStart[item.id])
-                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>not started</span>
+                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>{cannotStartWord(cannotStart[item.id]).toLowerCase()}</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && tab === 'progress'

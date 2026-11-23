@@ -28,6 +28,8 @@ export function mentionName(target: string): string {
   const value = (target ?? '').trim();
   if (/^mailto:/i.test(value)) return value.slice('mailto:'.length);
   if (ADDRESS.test(value) && !/^file:/i.test(value)) return value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/\/+$/, '');
+  // In code the folder is what tells two server.js apart.
+  if (!value.startsWith('/') && sourceReference(value.replace(/#L\d+$/, ''))) return value.replace(/^\.\//, '');
   const parts = value.replace(/^file:\/\//i, '').replace(/\/+$/, '').split('/');
   return parts[parts.length - 1] || value;
 }
