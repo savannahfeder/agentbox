@@ -318,6 +318,8 @@ export interface PlacedFile {
   name: string;
   /** The name a person gave it in Files; `name` stays its name on disk. */
   title?: string;
+  /** The icon a person picked for its tile. */
+  icon?: string;
   kind: FileKind | null;
   /** Made in Files and nothing written in it yet. */
   blank?: boolean;
@@ -372,6 +374,7 @@ export type FileFolderAct =
   | { do: 'rename'; id: string; name: string }
   | { do: 'move'; key: string; folder: string | null }
   | { do: 'name'; key: string; name: string }
+  | { do: 'icon'; key: string; icon: string }
   | { do: 'remove'; id: string }
   | { do: 'restore'; ids: string[] };
 

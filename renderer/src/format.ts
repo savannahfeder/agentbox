@@ -235,6 +235,8 @@ export function offerIsLive(item: HasFields & { answer?: string }): boolean {
   const later: OptionsField[] = field === 'body' ? ['result'] : ['result', 'note'];
   const afterTheShip = isShippedNote(item.note) && !options.some((o) => asksToShip(o.text));
   if (later.some((f) => f !== field && writtenAt(item, f) > offered && !(f === 'note' && afterTheShip))) return false;
+  // Answered where the chat started (main/chat-follow.mts).
+  if ((item.wrote?.saidOutside?.ts ?? 0) > offered) return false;
   if (!item.answer || item.answer === '(withdrawn)') return true;
   // A teammate's words handed back answer them too: what is left is yours to say, not a pick.
   const spoke = item.wrote?.answer?.ts ?? 0;
