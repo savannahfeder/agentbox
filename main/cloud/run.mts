@@ -88,6 +88,7 @@ import { saveCloudKey } from './keys.mts';
 import type { ResourceContext, ResourceFile, ResourceState } from './resources.mts';
 import { createKeyAsks, keyFileFor } from './key-asks.mts';
 import { HOOK_FREE } from '../hook-free-git.mts';
+import { MACHINE_STOPPED } from '../../shared/notes-for-the-agent.mts';
 import type { CloudMarker } from './marker.mts';
 import type { CloudCallError, CloudEvent, CloudReply, CloudStorage, CloudTransport } from './managed.mts';
 import type { Readable, Writable } from 'node:stream';
@@ -2101,8 +2102,8 @@ export async function cloudRun({
   // told either way, or the next run starts as if nothing had happened.
   async function layCheckpoint(rec: RunMarker): Promise<Homecoming> {
     const stopped = rec.startedAt
-      ? `This thread's cloud machine stopped ${howLongWords(Date.now() - rec.startedAt)} into its run, before it finished, so the run never sent its work back.`
-      : 'This thread\'s cloud machine stopped before its run finished, so the run never sent its work back.';
+      ? `${MACHINE_STOPPED} ${howLongWords(Date.now() - rec.startedAt)} into its run, before it finished, so the run never sent its work back.`
+      : `${MACHINE_STOPPED} before its run finished, so the run never sent its work back.`;
     const tell = (note: string) => tellTheRow(rec, note, { lost: true });
     if (rec.plain) {
       clearMarker(here);

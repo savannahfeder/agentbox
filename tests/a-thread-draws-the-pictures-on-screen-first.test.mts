@@ -97,18 +97,27 @@ async function open({ scriptedSight = false } = {}) {
       }
     };
     const link = URL.createObjectURL;
-    URL.createObjectURL = (blob) => { const url = link(blob); const then = w.onLink; w.onLink = undefined; then?.(); return url; };
+    // The shrink worker's own program is a link too, and is not a copy.
+    URL.createObjectURL = (blob) => { const url = link(blob); if ((blob as Blob).type === 'text/javascript') return url; const then = w.onLink; w.onLink = undefined; then?.(); return url; };
   });
   await page.route('https://pic.test/**', (route) => {
     const m = /\/p(\d+)\.png$/.exec(new URL(route.request().url()).pathname);
     if (m) return route.fulfill({ contentType: 'image/png', body: pictures[Number(m[1])], headers: { 'access-control-allow-origin': '*' } });
     return route.fulfill({ contentType: 'text/html', body: `<style>${CSS}</style><div id="root"></div>` });
   });
-  // Every whole picture the decoder is handed, which one and when.
+  // Every whole picture the decoder is handed, which one and when: in the
+  // shrink worker (a-picture-is-shrunk-off-the-windows-thread), or in the
+  // window where no worker starts.
   await page.addInitScript(() => {
     const w = window as never as { decodes: { i: number; at: number }[] };
     w.decodes = [];
     const names = new WeakMap<Blob, string>();
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (data: { blob?: Blob }, ...rest: never[]) {
+      const name = data?.blob instanceof Blob ? names.get(data.blob) : undefined;
+      if (name) w.decodes.push({ i: Number(/p(\d+)\.png/.exec(name)![1]), at: performance.now() });
+      return (post as (...a: unknown[]) => void).call(this, data, ...rest);
+    } as typeof Worker.prototype.postMessage;
     const fetched = window.fetch;
     window.fetch = async (...args: Parameters<typeof fetch>) => {
       const res = await fetched(...args);
