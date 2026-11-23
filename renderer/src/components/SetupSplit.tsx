@@ -301,7 +301,7 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-acts">{go(ticked.length ? `Add ${ticked.length} to your inbox` : 'Continue', () => void bring(), true, 'Adding…')}{quiet('Skip', next)}</div>
     </>;
   } else if (step === 'folder') {
-    head = ['Pick a folder for your first project.', 'Agents can read and change the files in it.'];
+    head = ['Pick a folder for your first project.', ''];
     body = done.project ? <>
       <div className="ss-list"><Row face={<span className="ss-ok"><Tick /></span>} name={done.project} sub="Your first project" /></div>
       <div className="ss-acts">{go('Continue', next)}{quiet('Choose another', () => void chooseFolder())}</div>

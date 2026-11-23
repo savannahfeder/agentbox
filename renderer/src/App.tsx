@@ -188,7 +188,7 @@ import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, replyTeaches, walkBackTo, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, replyTeaches, walkBackTo, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipFromPalette, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, FIRST_RUN_LABEL, firstRunDone, firstRunNeeded, projectsOfTheirOwn, restartFirstRun,
   finishFirstRun, TASK_BODY, TASK_TITLE, practiceDraftLeft, whyNotMade, replyWritten,
@@ -8845,7 +8845,7 @@ export default function App() {
         // is one line however many projects she has (w-aa3fa4cbf0).
         onOpenFilter={() => setModal('filter')}
         onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
-        onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}
+        onEndTutorial={tourLive(tour) ? () => { setTour(skipFromPalette(tour!)); setModal(null); } : undefined}
         onView={(v) => { setModal(null); openView(v); }}
         teamLayout={!!teamTabs}
         onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}

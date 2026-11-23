@@ -36,7 +36,8 @@ describe('the way to end it', () => {
   it('is in the command bar, only while it is running', () => {
     // Named as the walkthrough's column names it (tests/a-newcomer-can-tell-they-are-in-the-walkthrough).
     expect(read('renderer/src/components/Palette.tsx')).toContain("...(onEndTutorial ? [{ id: 'end-tutorial', label: 'Skip walkthrough', keywords: 'end the tutorial skip stop hide tips', run: onEndTutorial }] : [])");
-    expect(read('renderer/src/App.tsx')).toContain('onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}');
+    // At its last step it finishes instead (tests/skip-walkthrough-in-command-k-at-its-last-step-finishes-it).
+    expect(read('renderer/src/App.tsx')).toContain('onEndTutorial={tourLive(tour) ? () => { setTour(skipFromPalette(tour!)); setModal(null); } : undefined}');
   });
 });
 

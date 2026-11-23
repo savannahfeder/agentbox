@@ -85,6 +85,11 @@ export const tourOver = (t: Tour | null): boolean =>
 export const tourLive = (t: Tour | null): boolean => !!t && !t.skipped && !tourOver(t) && LESSONS.some((l) => !t.done.includes(l));
 export const madeUrgent = (t: Tour): Tour => ({ ...t, urgent: true });
 export const noteSent = (t: Tour): Tour => finishLesson({ ...t, sent: true }, 'compose');
+/** Skip walkthrough run from ⌘K: a use of ⌘K, so at the step that asks for one it finishes the walkthrough rather than skipping it. */
+export function skipFromPalette(t: Tour): Tour {
+  const used = finishLesson(t, 'palette');
+  return tourOver(used) ? used : skipTour(t);
+}
 export function finishLesson(t: Tour, l: Lesson): Tour {
   if (t.done.includes(l)) return t;
   const next = { ...t, done: [...t.done, l] };
