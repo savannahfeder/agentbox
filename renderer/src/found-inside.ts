@@ -123,7 +123,7 @@ export function insideGroups(input: InsideInput): InsideGroup[] {
     files.push({
       id: `file-${f.kind}-${f.product ?? f.ownerId}-${f.id ?? f.threadId}-${f.src}`, group: 'files',
       text: f.how === 'name' ? f.name : f.text, ...(f.how === 'contents' ? { file: f.name } : {}),
-      who: f.by ? who(f.by, 'founder') : '', at: f.at, where: place.where, open: place.at({ file: f.src }),
+      who: f.agent !== undefined ? 'Agent' : f.by ? who(f.by, 'founder') : '', at: f.at, where: place.where, open: place.at({ file: f.src }),
     });
   }
 

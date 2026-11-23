@@ -492,7 +492,7 @@ export interface FoundWhere {
   updatedAt: number;
 }
 export interface FoundLine extends FoundWhere { uid: string; by: string | null; source: 'founder' | 'agent' | 'system'; at: number; comment: boolean; text: string }
-export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; at: number; text: string }
+export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; agent?: string; at: number; text: string }
 export interface FoundComment extends FoundWhere { src: string; name: string; by: string | null; at: number; resolved: boolean; noteId: string; fileId: string; text: string }
 /** What the finder in main answers (main/everything-found.mts). */
 export interface FoundInThreads {
