@@ -39,7 +39,7 @@ import type { Verdict } from './memory-gate-history.mts';
 import { etimeSeconds } from './leftovers.mts';
 import { readMacPressure } from './mac-pressure.mts';
 import { gatePressure } from './memory-allowance.mts';
-import { giveBackAsk, mayAskAgain } from './memory-give-back.mts';
+import { askedByANestedAgent, giveBackAsk, mayAskAgain } from './memory-give-back.mts';
 import type { Holding } from './memory-give-back.mts';
 
 export const PROTOCOL = 1;
@@ -571,6 +571,7 @@ export class MemoryGateServer {
     if (!mayAskAgain(this.askedBack.get(item), holding, now)) return null;
     let workers: number[] = [];
     try { workers = this.agentPids(item) ?? []; } catch { workers = []; }
+    if (askedByANestedAgent(holding, asker, workers)) return null;
     const ask = giveBackAsk(holding, now, { asker: [...asker, ...workers], running: this.running });
     if (!ask) return null;
     // One thread is asked at a time, so only the latest few are worth keeping.

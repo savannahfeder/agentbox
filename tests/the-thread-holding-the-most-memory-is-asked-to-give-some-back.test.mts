@@ -28,7 +28,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { heaviestOver } from '../main/memory-allowance.mts';
-import { ASK_AGAIN_MS, ASK_FORGOTTEN_MS, commandTrees, giveBackAsk, mayAskAgain } from '../main/memory-give-back.mts';
+import { ASK_AGAIN_MS, ASK_FORGOTTEN_MS, askedByANestedAgent, commandTrees, giveBackAsk, mayAskAgain } from '../main/memory-give-back.mts';
 import { MemoryLog } from '../main/memory-log.mts';
 import { MemoryGateServer } from '../main/memory-gate-server.mts';
 import { CommandHistory } from '../main/memory-gate-history.mts';
@@ -148,6 +148,45 @@ describe('which thread is asked', () => {
   it('nobody when even the biggest holds under a sixteenth, which gives nothing back', () => {
     expect(heaviestOver([{ item: 'w-a', mb: GB - 1 }, { item: 'w-b', mb: 600 }], over, RAM)).toBe(null);
     expect(heaviestOver([{ item: 'w-a', mb: GB }, { item: 'w-b', mb: 600 }], over, RAM)).toEqual({ item: 'w-a', mb: GB });
+  });
+});
+
+describe('who may be asked on a thread\'s behalf', () => {
+  // A thread whose worker (200) runs two testers, each an agent of its own
+  // started by one of the worker's commands, as a tester loop does.
+  const LOOP = [
+    proc(200, 100, '/u/.local/bin/claude', 300),
+    proc(210, 200, '/bin/zsh', 2),
+    proc(499, 210, '/usr/local/bin/node', 60, { cmd: 'node /usr/local/lib/node_modules/@openai/codex/bin/codex.js exec' }),
+    proc(500, 499, '/usr/local/lib/node_modules/@openai/codex/vendor/codex', 250),
+    proc(510, 500, '/bin/bash', 2),
+    proc(511, 510, '/u/Library/Caches/ms-playwright/chromium/Google Chrome for Testing', 1900),
+  ];
+  const holding = { item: 'w-aaa', mb: 2500, programs: LOOP, at: NOW };
+
+  it('the thread\'s own worker, which is the pid above its hook on a Mac', () => {
+    expect(askedByANestedAgent(holding, [200], [200])).toBe(false);
+  });
+
+  it('not an agent one of its commands started: that is one of the things it left running', () => {
+    expect(askedByANestedAgent(holding, [500], [200])).toBe(true);
+    // On Linux the hook's parent is a launcher, with the pids above it nearest first.
+    expect(askedByANestedAgent(holding, [9001, 500, 499, 210, 200], [200])).toBe(true);
+    expect(askedByANestedAgent(holding, [9002, 200, 100], [200])).toBe(false);
+  });
+
+  it('only on a positive finding: a pid the listing does not have is not a nested agent', () => {
+    // A Codex thread asks from the one app-server every thread shares, which carries no thread.
+    expect(askedByANestedAgent(holding, [90], [])).toBe(false);
+    // A launcher too short-lived to have been listed.
+    expect(askedByANestedAgent(holding, [9003], [200])).toBe(false);
+    expect(askedByANestedAgent(holding, [], [200])).toBe(false);
+  });
+
+  it('the worker is still told of what its testers started, and never to stop a tester itself', () => {
+    const said = giveBackAsk(holding, NOW, { asker: [200] })!;
+    expect(said).toContain('pid 511: Google Chrome for Testing, 1.9 GB');
+    for (const agent of [200, 499, 500]) expect(said).not.toContain(`pid ${agent}:`);
   });
 });
 
@@ -381,6 +420,21 @@ describe('the command gate', () => {
     expect(said).toContain('pid 300:');
     expect(said).not.toContain('pid 55001:');
     expect(said).not.toContain('pid 55002:');
+  });
+
+  it('does not ask a tester the thread is running, and keeps its one ask for the thread\'s own worker', async () => {
+    // The command comes from this test's own process, listed as a Codex agent a worker's command started.
+    let worker = 55001;
+    const loop = [
+      proc(55001, 1, '/u/.local/bin/claude', 300), proc(55010, 55001, '/bin/zsh', 2),
+      proc(process.pid, 55010, '/usr/local/lib/node_modules/@openai/codex/vendor/codex', 250), ...browser(),
+    ];
+    const { sock, server } = await makeServer({ heaviest: () => holding('w-big', 3400, loop), agentPids: () => [worker] });
+    expect(await ask(sock, 'c1', 'git status')).toBe('');
+    expect(server.status().counts.askedBack).toBe(0);
+    // The same pid as the thread's worker is asked.
+    worker = process.pid;
+    expect(reason(await ask(sock, 'c2', 'git status'))).toContain('pid 300:');
   });
 
   it('asks nothing when what the listing named has since ended, and does not count that as its one ask', async () => {

@@ -42,6 +42,24 @@ function looksLikeAnAgent(p: HeldProgram): boolean {
   return AGENT_FILE.test(base(first)) || (/^(node|bun)$/.test(base(first)) && AGENT_PACKAGE.test(second));
 }
 
+/**
+ * Whether the command asking came from an agent one of the thread's commands
+ * started (a tester, a `claude -p` it ran) and not from its own worker. Such
+ * an agent is one of the things the worker left running, and is not the one
+ * to say what the thread still needs. `asker` is the pids above the hook,
+ * nearest first; `workers` the pids the app started for the thread. Only a
+ * program the listing has, that looks like an agent, counts. Pure.
+ */
+export function askedByANestedAgent(holding: Holding, asker: readonly number[], workers: readonly number[]): boolean {
+  const byPid = new Map(holding.programs.map((p) => [p.pid, p]));
+  for (const pid of asker) {
+    if (workers.includes(pid)) return false;
+    const program = byPid.get(pid);
+    if (program && looksLikeAnAgent(program)) return true;
+  }
+  return false;
+}
+
 type Kind = 'own' | 'shell' | 'program';
 
 /**
