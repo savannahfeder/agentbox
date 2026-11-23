@@ -117,8 +117,9 @@ describe('what must not be taken for an ask', () => {
     expect(sessionLayout('This time overlaps with an existing appointment. Please choose a different time.').kind).toBe('plain');
     expect(sessionLayout("Couldn't refresh appointments. The list may be out of date. Please try again.").kind).toBe('plain');
   });
-  it('"Please" said to her still is', () => {
-    expect(sessionLayout('[The test is ready](http://x). Please rate each set out of 10. I will reveal the counts afterwards.').bold).toBe('Please rate each set out of 10.');
+  it('"Please" said to her is shown as written too, the safe miss', () => {
+    expect(sessionLayout('[The test is ready](http://x). Please rate each set out of 10. I will reveal the counts afterwards.').kind).toBe('plain');
+    expect(sessionLayout('Your appointment is booked. Please call us if you need to change it.').kind).toBe('plain');
   });
   it('"let me know if" is politeness, not an ask', () => {
     expect(sessionLayout('Shipped. Let me know if any spacing still feels off.').kind).toBe('plain');

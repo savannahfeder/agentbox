@@ -48,7 +48,8 @@ describe('a session put off and then closed', () => {
   // and the row stayed in Later at its moment (w-34f79ab66e, 2026-11-22).
   it('is taken out of the list every tab is drawn from, Later included', async () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toContain('const agentList = useMemo(() => agentRows.filter((r) => !r.agent || !putAway(r.agent)), [agentRows]);');
+    // And while the close waits out its undo: a power tester looked at Later at once and it was still there.
+    expect(app).toContain('const agentList = useMemo(() => agentRows.filter((r) => !pendingIds.has(r.id) && (!r.agent || !putAway(r.agent))), [agentRows, pendingIds]);');
     const { putAway } = await import('../shared/agents.mts');
     expect(putAway({ ...codex, runAt: NOW + 3_600_000, doneThrough: NOW, asked: [{ at: NOW - 60_000, text: 'x' }] })).toBe(true);
     expect(putAway({ ...claude, runAt: NOW + 3_600_000, doneThrough: NOW })).toBe(true);

@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readCodexLive, codexConversation, runsIn, CODEX_STALE_TURN_MS } from '../main/codex-live.mts';
+import { readCodexLive, codexConversation, runsIn, approvalAsked, CODEX_STALE_TURN_MS } from '../main/codex-live.mts';
 import { reachesInbox, progressAfterReply, putAway, replyIsSwallowed, agentAnswer, agentContext, agentRow } from '../shared/agents.mts';
 import { theirWords } from '../shared/session-layout.mts';
 
@@ -352,5 +352,20 @@ describe('telling a granted command from one still waiting', () => {
   });
   it('no command, no match', () => {
     expect(runsIn(ps, '')).toBe(false);
+  });
+});
+
+describe('the command in a permission request, however Codex quotes it', () => {
+  // A power tester's long git log came in single quotes, because it holds
+  // double ones, and the page showed the reason with no command (2026-11-23).
+  it('single quotes, with double quotes inside', () => {
+    const input = `text(await tools.exec_command({cmd:'git log -1 --format="commit=%H subject=%s" HEAD',sandbox_permissions:"require_escalated",justification:"May I run the exact read-only git log command you provided?"}))\n`;
+    expect(approvalAsked('c1', input)).toEqual({ callId: 'c1', command: 'git log -1 --format="commit=%H subject=%s" HEAD', reason: 'May I run the exact read-only git log command you provided?' });
+  });
+  it('double quotes with an escaped quote, and a backtick string', () => {
+    expect(approvalAsked('c2', 'tools.exec_command({cmd:"echo \\"hi\\"",sandbox_permissions:"require_escalated",justification:`May I?`})')).toEqual({ callId: 'c2', command: 'echo "hi"', reason: 'May I?' });
+  });
+  it('a call that asks for nothing is not a request', () => {
+    expect(approvalAsked('c3', 'tools.exec_command({cmd:"ls"})')).toBeNull();
   });
 });

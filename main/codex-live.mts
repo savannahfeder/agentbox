@@ -78,7 +78,21 @@ function questionsOf(raw: unknown): ToolQuestion[] {
 /** A command Codex has asked permission to run, in its own words, until it is answered. */
 export interface CodexApproval { callId: string; command: string; reason: string }
 
-const unquote = (s: string) => { try { return JSON.parse(`"${s}"`) as string; } catch { return s; } };
+/** The string a key is given in the JavaScript Codex writes for a tool call, in any of its three quotes. */
+export function jsString(text: string, key: string): string {
+  const m = new RegExp(`["']?\\b${key}["']?\\s*:\\s*(["'\`])`).exec(text);
+  if (!m) return '';
+  const quote = m[1];
+  const escapes: Record<string, string> = { n: '\n', t: '\t', r: '\r' };
+  let out = '';
+  for (let i = m.index + m[0].length; i < text.length; i++) {
+    const c = text[i];
+    if (c === '\\') { const e = text[i + 1] ?? ''; out += escapes[e] ?? e; i += 1; continue; }
+    if (c === quote) return out;
+    out += c;
+  }
+  return out;
+}
 /** The command and Codex's reason, when a tool call asks to run outside the sandbox. Null for one that needs no permission. */
 export function approvalAsked(callId: string, text: string): CodexApproval | null {
   if (!/require_escalated|with_escalated_permissions["']?\s*:\s*true/.test(text)) return null;
@@ -90,8 +104,8 @@ export function approvalAsked(callId: string, text: string): CodexApproval | nul
     command = Array.isArray(c) ? c.map(String).join(' ') : String(c ?? '');
     reason = String(j.justification ?? '');
   } catch {
-    command = unquote(text.match(/\bcmd:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? '');
-    reason = unquote(text.match(/\bjustification:\s*"((?:[^"\\]|\\.)*)"/)?.[1] ?? '');
+    command = jsString(text, 'cmd') || jsString(text, 'command');
+    reason = jsString(text, 'justification');
   }
   return { callId, command: command.trim(), reason: reason.trim() };
 }

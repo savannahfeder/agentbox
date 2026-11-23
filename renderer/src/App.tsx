@@ -1600,8 +1600,8 @@ export default function App() {
     });
   }, [snap?.agents, now]);
 
-  // A session she closed is out of every list, whatever moment it was put off to.
-  const agentList = useMemo(() => agentRows.filter((r) => !r.agent || !putAway(r.agent)), [agentRows]);
+  // A session she closed, or is closing (Z can still take it back), is out of every list, whatever moment it was put off to.
+  const agentList = useMemo(() => agentRows.filter((r) => !pendingIds.has(r.id) && (!r.agent || !putAway(r.agent))), [agentRows, pendingIds]);
 
   // HOW MANY OF HER AGENTS THE INBOX TAKES: all of them, only the ones stopped
   // on a question, or none.
