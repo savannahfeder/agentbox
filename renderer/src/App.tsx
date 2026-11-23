@@ -163,7 +163,7 @@ import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
 import { ChatStart, EmptyChat, JobBlock, MateWork, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow, type PlaceView } from './team/everything/PlacePage';
 import { nowAndFinished, personThreads, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
-import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
+import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, withMyThreadNamed, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
 import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, type NeedsGroup, type StackKey } from './threads/stack-rules';
 import { FeedbackCard } from './components/FeedbackCard';
@@ -4029,7 +4029,7 @@ export default function App() {
     }
     const built = buildMembers({
       me: me ? { id: me.id, name: me.name, avatarUrl: me.avatarUrl } : null,
-      people: team?.state.people ?? [], wall: teamRoom?.wall ?? null, cards, tasksHeld,
+      people: team?.state.people ?? [], wall: withMyThreadNamed(teamRoom?.wall ?? null, items), cards, tasksHeld,
       teammates: teammatesUi.list, mateAgents, theirMates: teamMates,
       chats: roomsUi.live ? roomsUi.groups : [], personChats, teamRoomId: teamRoom?.id ?? null,
       myAgents: mine, myNow,
