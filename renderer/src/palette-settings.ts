@@ -14,3 +14,9 @@ export function settingRows(query: string, pages: readonly string[], open: (hit:
     run: () => open(hit),
   }));
 }
+
+/** A setting named like a command already listed ("Keyboard shortcuts") is that command. */
+export function besideCommands(settings: readonly Command[], commands: readonly Command[]): Command[] {
+  const named = new Set(commands.map((c) => c.label.toLowerCase()));
+  return settings.filter((s) => !named.has(s.label.toLowerCase()));
+}

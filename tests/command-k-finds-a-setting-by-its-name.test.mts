@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { settingRows, SETTINGS_SHOWN } from '../renderer/src/palette-settings';
+import { besideCommands, settingRows, SETTINGS_SHOWN } from '../renderer/src/palette-settings';
 import { pagesOn, type SettingsHit } from '../renderer/src/settings-search';
 import { paletteOrder, type Command } from '../renderer/src/components/Palette';
 
@@ -39,20 +39,28 @@ describe('a setting in ⌘K', () => {
     expect(labels.get(1)).toBe('Threads');
   });
 
-  it('goes under the threads, as Settings, when the words only name its page', () => {
+  it('goes under the threads when the words only name its page', () => {
     // "codex" is a word people type to find threads; the Codex page's rows must not push them down.
     const { rows: drawn, labels } = order('codex', [thread('Codex stalls on a long run')]);
     expect(drawn[0].label).toBe('Codex stalls on a long run');
-    expect(labels.get(1)).toBe('Settings');
+    expect(labels.get(1)).toBe('Commands');
     expect(drawn.slice(1).every((c) => c.hint === 'Settings · Codex')).toBe(true);
   });
 
-  it('keeps commands and settings apart when both come after the threads', () => {
+  it('comes after the commands the words find', () => {
     const cmd: Command = { id: 'usage', label: 'Usage and limits', keywords: 'codex', run: () => {} };
     const { rows: drawn, labels } = order('codex', [thread('Codex stalls')], [cmd]);
-    expect(drawn.map((c) => c.label).slice(0, 2)).toEqual(['Codex stalls', 'Usage and limits']);
+    expect(drawn.map((c) => c.label).slice(0, 3)).toEqual(['Codex stalls', 'Usage and limits', 'Usage']);
     expect(labels.get(1)).toBe('Commands');
-    expect(labels.get(2)).toBe('Settings');
+    expect(labels.has(2)).toBe(false);
+  });
+
+  it('is left out when a command of the same name is listed', () => {
+    const shortcuts: Command = { id: 'shortcuts', label: 'Keyboard shortcuts', run: () => {} };
+    const found = rows('keyboard shortcut');
+    expect(found.map((r) => r.label)).toContain('Keyboard shortcuts');
+    expect(besideCommands(found, [shortcuts]).map((r) => r.label)).not.toContain('Keyboard shortcuts');
+    expect(besideCommands(found, [shortcuts]).map((r) => r.label)).toContain('Show keyboard shortcut hints');
   });
 
   it('lists a few, not a page of them', () => {

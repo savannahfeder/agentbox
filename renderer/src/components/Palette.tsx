@@ -15,7 +15,7 @@ import { type ThemeChoice } from '../theme';
 import { NAME } from '../../../shared/product-name.mjs';
 import { CHECK_SAY, MOVE_SAY } from '../update-row';
 import { closesOnPress } from '../press';
-import { SETTING_ROW } from '../palette-settings';
+import { besideCommands } from '../palette-settings';
 
 export interface Command {
   id: string;
@@ -486,19 +486,14 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
   const ahead = (c: Command) => named(c) && (!carriesANamedTitle(c) || said(c.label).startsWith(said(query)));
   if (!phone) {
     // A command the words only touch by keyword comes after the threads they found.
-    const setting = (c: Command) => c.id.startsWith(SETTING_ROW);
     if (found.length && query.trim()) {
       const first = matched.filter(ahead);
-      const after = matched.filter((c) => !ahead(c) && !setting(c));
-      const settings = matched.filter((c) => !ahead(c) && setting(c));
+      const after = matched.filter((c) => !ahead(c));
       heads(first.length);
       if (after.length) labels.set(first.length + found.length, 'Commands');
-      if (settings.length) labels.set(first.length + found.length + after.length, 'Settings');
-      return { rows: [...first, ...found, ...after, ...settings], labels };
+      return { rows: [...first, ...found, ...after], labels };
     }
     if (found.length) heads(matched.length);
-    const settingsAt = matched.findIndex(setting);
-    if (settingsAt > 0) labels.set(settingsAt, 'Settings');
     return { rows: [...matched, ...found], labels };
   }
   if (found.length) {
@@ -536,8 +531,9 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findSettings
     if (!q) return offered.filter((c) => !c.unlisted);
     // Ranked as well as filtered, so "rem" puts Remind Me above Remote Control
     // (../palette-rows).
-    const settings = phone || !findSettings ? [] : findSettings(q);
-    return [...rankMatches(q, offered.filter((c) => matchesQuery(q, c))), ...settings];
+    const commandsFound = rankMatches(q, offered.filter((c) => matchesQuery(q, c)));
+    const settings = phone || !findSettings ? [] : besideCommands(findSettings(q), commandsFound);
+    return [...commandsFound, ...settings];
   }, [offered, query, phone, findSettings]);
   const chats = useMemo(() => (query.trim() && findChats ? findChats(query.trim()) : []), [query, findChats]);
   // Found inside things comes from main a moment after the words are typed. The
