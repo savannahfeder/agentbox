@@ -1,12 +1,22 @@
-// WHERE THE APP'S MAIN THREAD SPENDS ITS TIME, ON A BIG INBOX.
+// WHERE THE APP'S MAIN THREAD SPENDS ITS TIME AND MEMORY, ON A BIG INBOX.
 //
 //   node scripts/measure-speed.mjs [--projects 8] [--threads 400] [--stranded 800] [--fresh]
+//                                  [--cycles 1] [--idle 30] [--streaming]
+//                                  [--runtime node|electron|electron-as-node] [--electron <binary>]
 //
 // Makes a made-up store (projects × threads, long histories, most finished),
 // starts the browser copy of the app on it in a child process with the freeze
 // recorder on, presses keys the way a person works an inbox, idles, and prints:
-// each request's synchronous time, each agents'-clock tick, and every freeze
-// with its stack. Run it before and after a speed fix and compare.
+// each request's synchronous time, each agents'-clock tick, every freeze with
+// its stack, and the back end's memory. Run it before and after a speed fix
+// and compare.
+//
+// --streaming tells the window something changed every 400 ms, as one agent
+// writing does, so the inbox is asked for the whole run.
+//
+// --runtime says what runs the back end: Node, Electron's main process (where
+// the desktop app runs it), or Electron started as Node (what a child of the
+// packaged app would be). Same store, same keys, so the runtimes compare.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -112,10 +122,19 @@ async function serve(port) {
   sup._tick = async (...a) => { const start = performance.now(); try { return await tick(...a); } finally { log({ tick: Math.round(performance.now() - start) }); } };
   const loop = monitorEventLoopDelay({ resolution: 10 });
   loop.enable();
-  setInterval(() => { log({ loopMax: Math.round(loop.max / 1e6) }); loop.reset(); }, 5000).unref();
+  const mb = (bytes) => Math.round(bytes / 1048576);
+  setInterval(() => {
+    log({ loopMax: Math.round(loop.max / 1e6) });
+    loop.reset();
+    const m = process.memoryUsage();
+    const cpu = process.cpuUsage();
+    log({ mem: { rss: mb(m.rss), heap: mb(m.heapUsed), heapTotal: mb(m.heapTotal), external: mb(m.external) }, cpuMs: Math.round((cpu.user + cpu.system) / 1000) });
+  }, 5000).unref();
   // On a swapping Mac each collection pages the heap back in, so how often it runs matters.
   new PerformanceObserver((list) => { for (const e of list.getEntries()) log({ gc: Math.round(e.duration * 10) / 10, major: e.detail?.kind === constants.NODE_PERFORMANCE_GC_MAJOR }); }).observe({ entryTypes: ['gc'] });
   sup.start();
+  // What one writing agent does to the window: a push for every line it writes.
+  if (args.includes('--streaming')) setInterval(() => booted.store.onChange?.(), 400).unref();
   const token = newToken();
   createServer({ channels: booted.channels, token, listeners: booted.window.listeners, dist: path.join(repo, 'renderer', 'dist'), files: picturesTheAppOwns(booted) })
     .listen(port, '127.0.0.1', () => console.log(`up: http://127.0.0.1:${port}/?token=${token}`));
@@ -141,7 +160,12 @@ async function measure() {
   // opened an empty store in /tmp instead of the one made above. NODE_OPTIONS:
   // scripts/run.mjs puts the flag a Node before 22.18 needs for .mts there.
   const env = { PATH: process.env.PATH, TMPDIR: os.tmpdir(), NODE_OPTIONS: process.env.NODE_OPTIONS ?? '', HOME: path.join(root, 'home'), AGENTBOX_FRESH_USER: '1' };
-  const app = spawn(process.execPath, [fileURLToPath(import.meta.url), '--serve', String(port)], { env, stdio: ['ignore', 'pipe', 'inherit'] });
+  const runtime = flag('runtime', 'node');
+  const [command, ...before] = backEndCommand(runtime, env);
+  // Its own process group: under xvfb-run the app is a grandchild.
+  const streaming = args.includes('--streaming') ? ['--streaming'] : [];
+  const app = spawn(command, [...before, fileURLToPath(import.meta.url), '--serve', String(port), ...streaming], { env, stdio: ['ignore', 'pipe', 'inherit'], detached: true });
+  const stop = () => { try { process.kill(-app.pid, 'SIGKILL'); } catch { /* already gone */ } };
   const url = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('the app did not start in 2 minutes')), 120_000);
     app.stdout.on('data', (b) => { const m = String(b).match(/up: (\S+)/); if (m) { clearTimeout(timer); resolve(m[1]); } });
@@ -153,26 +177,79 @@ async function measure() {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await page.addInitScript(() => localStorage.setItem('zero.firstRun.done', '1'));
     const step = async (label, key, wait) => { log({ step: label }); if (key) await page.keyboard.press(key); await page.waitForTimeout(wait); };
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Performance.enable');
+    const windowUse = async () => {
+      const { metrics } = await cdp.send('Performance.getMetrics');
+      const of = (name) => metrics.find((m) => m.name === name)?.value ?? 0;
+      return { heap: Math.round(of('JSHeapUsedSize') / 1048576), nodes: of('Nodes'), busyMs: Math.round(of('TaskDuration') * 1000) };
+    };
     await page.goto(url);
     await step('loaded', null, 6000);
-    for (let i = 0; i < 6; i += 1) await step('J', 'j', 400);
-    await step('open a thread', 'Enter', 1500);
-    await step('back', 'Escape', 1500);
-    for (let i = 0; i < 5; i += 1) await step('E', 'e', 2000);
-    await step('Z', 'z', 2000);
-    await step('open a thread', 'Enter', 1500);
-    await step('back', 'Escape', 1500);
-    await step('board', 'b', 2000);
-    await step('list', 'b', 2000);
-    await step('idle', null, 30_000);
+    for (let cycle = 0, cycles = Number(flag('cycles', 1)); cycle < cycles; cycle += 1) {
+      for (let i = 0; i < 6; i += 1) await step('J', 'j', 400);
+      await step('open a thread', 'Enter', 1500);
+      await step('back', 'Escape', 1500);
+      for (let i = 0; i < 5; i += 1) await step('E', 'e', 2000);
+      await step('Z', 'z', 2000);
+      await step('open a thread', 'Enter', 1500);
+      await step('back', 'Escape', 1500);
+      await step('board', 'b', 2000);
+      await step('list', 'b', 2000);
+    }
+    log({ window: await windowUse() });
+    await step('idle', null, Number(flag('idle', 30)) * 1000);
+    log({ step: 'end', window: await windowUse() });
   } finally {
     await browser.close();
-    app.kill();
+    stop();
   }
-  report(fs.readFileSync(timings, 'utf8').trim().split('\n').map((l) => JSON.parse(l)));
+  report(fs.readFileSync(timings, 'utf8').trim().split('\n').map((l) => JSON.parse(l)), runtime);
 }
 
-function report(lines) {
+/** What starts the back end under `runtime`, ahead of this script's path. */
+function backEndCommand(runtime, env) {
+  if (runtime === 'node') return [process.execPath];
+  if (runtime !== 'electron' && runtime !== 'electron-as-node') throw new Error(`--runtime is node, electron or electron-as-node, not ${runtime}`);
+  const electron = flag('electron', null) ?? createRequire(import.meta.url)('electron');
+  if (runtime === 'electron-as-node') { env.ELECTRON_RUN_AS_NODE = '1'; return [electron]; }
+  if (process.platform !== 'linux') return [electron];
+  // Linux: Electron's main process wants a display, and its sandbox helper wants root.
+  env.ELECTRON_DISABLE_SANDBOX = '1';
+  if (!process.env.DISPLAY) return ['xvfb-run', '-a', electron];
+  env.DISPLAY = process.env.DISPLAY;
+  return [electron];
+}
+
+/** The back end's memory at the moments that matter, in MB. */
+function reportMemory(lines, runtime) {
+  const at = (label) => lines.find((l) => l.step === label)?.t ?? Infinity;
+  const readings = lines.filter((l) => l.mem);
+  if (!readings.length) return;
+  const last = (until) => readings.filter((l) => l.t <= until).pop()?.mem;
+  const row = (label, m) => m && console.log(`  ${label.padEnd(22)} ${String(m.rss).padStart(6)} ${String(m.heap).padStart(6)} ${String(m.heapTotal).padStart(6)} ${String(m.external).padStart(6)}`);
+  console.log(`\nThe back end's memory under ${runtime}, MB (resident, heap in use, heap held, outside the heap):`);
+  row('once loaded', last(at('loaded') + 6000));
+  row('highest', readings.reduce((a, l) => (l.mem.rss > a.rss ? l.mem : a), readings[0].mem));
+  row('when the keys stop', last(at('idle')));
+  row('after sitting idle', last(at('end')));
+  const share = (from, to) => {
+    const within = readings.filter((l) => l.t >= from && l.t <= to);
+    if (within.length < 2) return null;
+    const [a, b] = [within[0], within[within.length - 1]];
+    return Math.round(((b.cpuMs - a.cpuMs) / (b.t - a.t)) * 100);
+  };
+  const busy = share(at('loaded') + 6000, at('idle'));
+  const idle = share(at('idle'), at('end'));
+  if (busy !== null) console.log(`Its share of one core: ${busy}% while the keys ran${idle === null ? '' : `, ${idle}% sitting idle`}`);
+  const [win, after] = lines.filter((l) => l.window);
+  if (!win) return;
+  console.log(`The window when the keys stop: ${win.window.heap} MB of heap in use, ${win.window.nodes} elements on the page`);
+  if (after && after.t > win.t) console.log(`The window's main thread sitting idle: busy ${Math.round(((after.window.busyMs - win.window.busyMs) / (after.t - win.t)) * 100)}% of the time`);
+}
+
+function report(lines, runtime) {
+  reportMemory(lines, runtime);
   const by = new Map();
   for (const l of lines) if (l.channel) { const c = by.get(l.channel) ?? { n: 0, sum: 0, max: 0 }; c.n += 1; c.sum += l.ms; c.max = Math.max(c.max, l.ms); by.set(l.channel, c); }
   console.log('\nRequests from the window, synchronous ms (calls, average, longest), longest first:');

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, agentOfVersion, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
+  addressedTo, agentOfVersion, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, pathsAPressKeeps, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
 } from '../../../shared/artifact-marks.mts';
 import { labelSaidFor } from '../../../shared/file-label.mts';
 import { AgentFace } from './AgentFace';
@@ -14,7 +14,7 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
+import { ADD_TO_YOUR_REPLY, hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
 import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
@@ -82,7 +82,7 @@ function NameInTop({ shown, onRename }: { shown: string; onRename: (name: string
     }} />;
 }
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, withYourReply = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** The name a person gave the file in Files, shown over its name on disk. */
@@ -114,6 +114,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   write: (mark: ArtifactMark) => Promise<{ ok: boolean; error?: string }>;
   /** Only on a thread with an agent, on the owner's own computer. */
   withAgent?: boolean;
+  /** A teammate's review is on you: a note waits for your reply to them, addressed to nobody on its own. */
+  withYourReply?: boolean;
   /** Posts edited words as the next version of a document. Null when it went, else why not. */
   onNewVersion?: (name: string, text: string, path: string, id: string, since?: string | null) => Promise<string | null>;
   /** Said after a save that only becomes a version on someone else's computer. */
@@ -139,7 +141,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     return withFilesAsked(said, [path, ...(open.drawn ?? open.steps ?? [])]);
   }, [lines, open.path, open.note, open.steps, open.drawn, given.notes]);
   // What the page drew has bytes, so Files not having numbered it yet does not drop it.
-  const kept = useMemo(() => [open.path, ...(open.steps ?? []), ...(open.drawn ?? [])].filter((p): p is string => !!p), [open.path, open.steps, open.drawn]);
+  const kept = useMemo(() => pathsAPressKeeps(open, given.notes), [open.path, open.steps, open.drawn, open.note, given.notes]);
   const families = useMemo(() => threadFiles(files, numbers, { keep: kept }), [files, numbers, kept]);
   // A note made on another computer, or before a rename of how copies are read, still sits on its file here.
   const marks = useMemo(() => marksOnVersions(given, families), [given, families]);
@@ -340,7 +342,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const others = people.filter((p) => p.id !== me);
     const to = addressedTo(typed, others);
     const goes = whereANoteGoes({ ...noteTo, text: typed });
-    const mentions = [...new Set([...(to ? [to] : []), ...(goes.to === 'person' ? [goes.person] : []), ...named.filter((p) => p.id !== me && typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
+    const mentions = withYourReply ? [] : [...new Set([...(to ? [to] : []), ...(goes.to === 'person' ? [goes.person] : []), ...named.filter((p) => p.id !== me && typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
     const id = newId();
     const withIt = now ? sentWithTheNote(goes, unsent.ids, id) : [];
     const went = noteSentWords(withIt.length ? 'Send to your agent' : sendWords);
@@ -751,7 +753,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
         : kind === 'page' ? 'Press Pin a spot, then click the page'
           : kind === 'film' ? 'Pause the film and click it to pin a note'
             : null;
-  const sendWords = noteSendWords({ ...noteTo, text: words, nameOf });
+  const sendWords = withYourReply ? ADD_TO_YOUR_REPLY : noteSendWords({ ...noteTo, text: words, nameOf });
   const buttonWords = justSent && !words.trim() && !pictures.length ? justSent : sendWords;
 
   const heldFor = (n: FileNote): { words: string; went: boolean } | null => {
@@ -884,7 +886,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
               {canSendAll && sendBeside && <button type="button" className="av-btn av-unsent-send" title={unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
-              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
+              {/* In a review your reply is the answer, so there is no approving a picture on its own. */}
+              {offers.approve && !withYourReply && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>
           )}
           <div className="av-list">

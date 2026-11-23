@@ -68,7 +68,7 @@ import { dropRank, useFitRow } from './fit-row';
 import { useThreadMentions } from '../components/ThreadMentions';
 import {
   agentChoices, toOffered, autoOffered,
-  allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
+  allModels, findPeople, furtherModelLabel, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInTo, findInvited, type ToSection,
@@ -143,7 +143,7 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, toChat, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor, outOfUsage,
+  products, items, engines, furtherEngines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, toChat, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor, outOfUsage,
 }: {
   /** `supervisor.outOfUsage`: each agent whose account is out of usage, and when it comes back. */
   outOfUsage?: Record<string, { tool: string; until: number }>;
@@ -170,6 +170,8 @@ export function ThreadComposer({
   items: WorkItem[];
   /** The coding agents this Mac really offers, off the snapshot. Absent means Claude Code alone. */
   engines?: Engine[];
+  /** Any harness on offer besides those two, each with the models it listed (`snapshot.engines.further`). */
+  furtherEngines?: Engine[];
   /** Codex's models as read off this Mac, with their own effort levels. */
   codexModels: ModelChoice[];
   codexModelDefault: string | null;
@@ -352,11 +354,14 @@ export function ThreadComposer({
   const claudeOffered = engineRows.some((e) => e.id === 'claude');
   const codexDefault = codexModelDefault ?? null;
   const modelOpts = { codexModels, codexDefault };
+  // A harness besides the two is never the default: it is picked by picking one of its models.
+  const further = furtherEngines ?? [];
+  const furtherIds = further.map((e) => e.id).join(',');
   // The agent is the default from Settings, not the last one picked: a pick
   // carried silently into the next thread sent work to the wrong agent. Each
   // agent's own last model is still remembered.
   const remembered = (): ModelPick => {
-    const kept = cardPick(opened.current, engineRows.map((e) => e.id));
+    const kept = cardPick(opened.current, [...engineRows, ...further].map((e) => e.id));
     if (kept) return { engine: kept.engine as Harness, model: kept.model };
     const engine: Harness = startingEngine(workspaceEngine ?? null, engines);
     return { engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) };
@@ -368,7 +373,9 @@ export function ThreadComposer({
     if (pick.engine === 'codex' && !codexOffered) setPick({ engine: 'claude', model: readLastModel(undefined, 'claude') ?? defaultModelFor('claude') });
     // And the other way (w-db6f5e331e): a Mac with Codex and no Claude Code.
     if (pick.engine === 'claude' && !claudeOffered && codexOffered) setPick({ engine: 'codex', model: readLastModel(undefined, 'codex', codexDefault) ?? defaultModelFor('codex', codexDefault) });
-  }, [codexOffered, claudeOffered]);
+    // And a further harness that is no longer here.
+    if (pick.engine !== 'claude' && pick.engine !== 'codex' && !further.some((e) => e.id === pick.engine)) setPick(remembered());
+  }, [codexOffered, claudeOffered, furtherIds]);
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, pick.engine));
   // The setup asks which agent while this box is already open behind it.
   useEffect(() => {
@@ -395,17 +402,17 @@ export function ThreadComposer({
     setEffort(next);
     writeLastEffort(next, undefined, pick.engine);
   };
-  const labelOf = (p: ModelPick) => engineModelLabel(p.engine, p.model, modelOpts);
+  const labelOf = (p: ModelPick) => furtherModelLabel(further, p) ?? engineModelLabel(p.engine, p.model, modelOpts);
   // Recent rows say which agent runs them, where there are two.
-  const engineTags = agentChoices(engineRows).length > 0;
+  const engineTags = agentChoices(engineRows).length > 0 || further.length > 0;
   // Said before Send, so nobody files a task expecting an agent that cannot start.
   const outHere = person || mate ? null : outOfUsage?.[pick.engine] ?? null;
   const outNote = outOfUsageNote(outHere);
   const recent = useMemo(
-    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered }),
-    [items, codexModels, codexDefault, codexOffered, claudeOffered],
+    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered, further }),
+    [items, codexModels, codexDefault, codexOffered, claudeOffered, furtherEngines],
   );
-  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered }), [codexModels, codexOffered, claudeOffered]);
+  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered, further }), [codexModels, codexOffered, claudeOffered, furtherEngines]);
   const more = moreCount(recent, every);
 
   /* ------------------------------ menus --------------------------------- */
@@ -657,7 +664,7 @@ export function ThreadComposer({
       const harness = harnessFields({
         engine: pick.engine, model: pick.model,
         effort: effortPicked(effort, effortRows) ? effort : null,
-        engineCount: engineRows.length, codexDefault,
+        engineCount: engineRows.length + further.length, codexDefault,
       });
       const priority = sentPriority(prio);
       if (when.repeat) {
@@ -962,7 +969,7 @@ export function ThreadComposer({
     </div>
   );
 
-  const engineLabel = (id: string) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id;
+  const engineLabel = (id: string) => [...engineRows, ...further].find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id;
 
   // The menu itself is ./ModelMenu.tsx, which the reply box draws too.
   const modelMenu = (

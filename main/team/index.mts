@@ -364,6 +364,12 @@ export interface TeamServiceOptions {
 /** A file handed to a task; one with a `rel` is a file the words name. */
 interface TaskFile extends AttachmentFile { rel?: string }
 
+// "View the change" opens the first .change, so a thread's own goes before one it was handed.
+function sentInOrder(files: readonly TaskFile[], own: readonly TaskFile[]): TaskFile[] {
+  const isChange = (f: TaskFile) => String(f.name ?? '').toLowerCase().endsWith('.change');
+  return [...files.filter((f) => !isChange(f)), ...own, ...files.filter(isChange)];
+}
+
 interface TaskInput {
   title?: unknown; body?: unknown; priority?: number | null; due?: unknown; files?: TaskFile[]; voice?: unknown;
   visibility?: unknown; visibleTo?: unknown[]; blockedBy?: unknown;
@@ -566,10 +572,16 @@ export function createTeamService({
       if (branch) return name ? `the branch for ${name}` : 'another branch';
       return name || 'another thread';
     });
+    const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
+    // The newest review or help a teammate handed back, which the giver's note often points at, though they wrote since.
+    const back = [...lines].reverse().find((l) => typeof l.patch?.answer === 'string' && (l.patch.from as { teammate?: unknown } | undefined)?.teammate);
+    const backWho = (back?.patch?.from as { teammate?: string; name?: string } | undefined);
+    const backName = backWho ? state.people.find((p) => p.id === backWho.teammate)?.name?.split(/\s+/)[0] || backWho.name?.split(/\s+/)[0] || 'A teammate' : '';
     const words = titled([
       brief,
       tried.length ? `What the agent already tried:\n\n${tried.map((t) => `- ${unbold(t)}`).join('\n')}` : '',
       row.result ? `Where it got to:\n\n${unbold(row.result)}` : '',
+      back ? `What ${backName} said back:\n\n${unbold(String(back.patch!.answer))}` : '',
     ].filter(Boolean).join('\n\n'));
     const root = fs.realpathSync(product.dir);
     const files: { rel: string; name: string; srcPath: string }[] = [];
@@ -582,8 +594,8 @@ export function createTeamService({
       else files.push({ rel, name: shownName(rel), srcPath: real });
     };
     const roots = artifactRoots(product).flatMap((r) => { try { return [fs.realpathSync(r)]; } catch { return []; } });
-    const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
-    const named = [...filesInLines(lines), ...otherFilesInLines(lines).filter((f) => viewKind(f.path) === 'table')];
+    // A page or table the agent made is something to see, as a picture is; code it names is not.
+    const named = [...filesInLines(lines), ...otherFilesInLines(lines).filter((f) => viewKind(f.path) === 'table' || viewKind(f.path) === 'page')];
     for (const family of threadFiles(named)) {
       const rel = family.versions[family.versions.length - 1].path;
       if (looksSecret(rel)) continue;
@@ -998,7 +1010,18 @@ export function createTeamService({
   }
 
   return {
-    state: () => ({ ...state, sharedFileNews: threadShare?.fileNews() ?? [], threadTalk: threadShare?.talk() ?? [], ...(rooms ? { rooms: rooms.state() } : {}) }),
+    // The two lists read every shared thread from disk and most callers want
+    // only who you are, so each is worked out when first looked at, and kept.
+    state: () => {
+      let news: ReturnType<ThreadShare['fileNews']> | null = null;
+      let talk: ReturnType<ThreadShare['talk']> | null = null;
+      return {
+        ...state,
+        get sharedFileNews() { return (news ??= threadShare?.fileNews() ?? []); },
+        get threadTalk() { return (talk ??= threadShare?.talk() ?? []); },
+        ...(rooms ? { rooms: rooms.state() } : {}),
+      };
+    },
     rooms,
     /** What the desktop's banner was told arrived, for her phone's alerts (main/phone-alerts.mts). */
     phoneArrivals: (list: unknown[], needsYou: unknown[]) => phoneInbox?.arrivals(list, needsYou),
@@ -1388,6 +1411,8 @@ export function createTeamService({
       // A path of the sender's ending in the file is the file: the whole of it becomes the link, or a cut-down path is left to send.
       const quoted = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       for (const [rel, copy] of moved) text = text.replace(new RegExp(`(?<![\\w(\\]])(?:~|/)[^\\s()\\[\\]\`]*/${quoted(rel)}(?![\\w/])`, 'g'), `[${copy.name}](${copy.rel})`);
+      // The file's own path written out is the file too: a bare name in its place opens nothing for the receiver.
+      for (const [rel, copy] of moved) if (rel.includes('/')) text = text.replace(new RegExp(`(?<![\\w/(\\[\\]])${quoted(rel)}(?![\\w/\\]])`, 'g'), `${/\.(?:png|jpe?g|gif|webp|svg)$/i.test(copy.name) ? '!' : ''}[${copy.name}](${copy.rel})`);
       for (const [rel, copy] of moved) text = text.split(rel).join(copy.name);
       const unlinked = saved.filter((s) => !text.includes(`](${s.rel})`));
       const full = [text, attachmentMarkdown(unlinked)].filter(Boolean).join('\n\n') || named;
@@ -1439,7 +1464,7 @@ export function createTeamService({
         title,
         body: link ? sentWords(row.label || row.title || '', link, brief) : brief,
         keepTitle: true,
-        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: [...files, ...changeFiles],
+        priority: row.priority, due: row.due && row.due !== 'none' ? row.due : undefined, files: sentInOrder(files, changeFiles),
       });
       // The asks on it end with it: what they say back would come to a thread you no longer hold.
       for (const r of store.listItems()) {
@@ -1473,7 +1498,7 @@ export function createTeamService({
       if (seen !== 'team') store.threadEdit(slug, id, openTo(seen, row.visibleTo, [to]));
       const title = shownTitle(row) || 'A thread';
       const link = threadLink(state.me.id, id);
-      const files = [...(await briefOfThread(row, product)).files, ...changeOfThread(product, id, title).files];
+      const files = sentInOrder((await briefOfThread(row, product)).files, changeOfThread(product, id, title).files);
       const brief = askBody({ kind, owner: state.me.name?.split(/\s+/)[0] || 'A teammate', helper: person.name?.split(/\s+/)[0] || null, note: String(note), step: String(step) });
       const made = await this.giveTask(to, {
         title,

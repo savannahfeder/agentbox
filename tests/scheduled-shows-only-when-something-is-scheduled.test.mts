@@ -35,8 +35,8 @@ it('keeps the tab under her while she is standing on it', () => {
 it('ignores a count that is not a real number', () => {
   for (const scheduledCount of [-1, NaN, 0.4]) expect(keys({scheduledCount})).toEqual(['inbox', 'progress', 'done']);
 });
-it('counts what the Scheduled page actually lists, deferred rows and repeats', () => {
-  expect(app).toContain('const scheduledCount = snoozed.length + repeats.length;');
+it('counts what the Scheduled page actually lists, deferred rows, repeats and chats put off', () => {
+  expect(app).toContain('const scheduledCount = snoozed.length + repeats.length + chatsLater;');
   expect(app).toContain('scheduledCount={scheduledCount}');
 });
 it('does not bounce out of an empty Scheduled page', () => {
