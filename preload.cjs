@@ -309,6 +309,8 @@ contextBridge.exposeInMainWorld('zero', {
   track: (name, count) => ipcRenderer.invoke('zero:track', { name, count }),
   // How long this window's own thread held, a number and nothing else (renderer/src/window-holds.ts).
   windowHeld: (ms) => ipcRenderer.invoke('zero:window-held', { ms }),
+  // This window's long tasks and slow answers to input over the last minute, four numbers (renderer/src/window-lag.ts).
+  windowLag: (lag) => ipcRenderer.invoke('zero:window-lag', lag),
   onboardingArm: () => ipcRenderer.invoke('zero:onboarding-arm'),
   sessionTrace: (payload) => ipcRenderer.invoke('zero:session-trace', payload),
   // Everything that happened on one task, as the ledger lines it happened as.

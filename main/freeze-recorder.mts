@@ -202,17 +202,27 @@ export interface BusyRead {
   /** The deepest of our functions on the stack, by the share of busy time. */
   deepest: { fn: string; share: number }[];
   stacks: { share: number; frames: string[] }[];
+  /** For an ask that named a function: the share of busy time inside it, and which calls of its own that went to. */
+  under?: { fn: string; share: number; calls: { fn: string; share: number }[] };
 }
+
+/** What a function's time is counted as when it went to no call of its own. */
+export const ITSELF = '(itself)';
 
 /**
  * What the thread spent whole profiles on: the freeze log names a function
  * only for a hold, and a thread busy all day in short pieces never holds.
+ * `under` is part of a function's name, or its file and line: a record of
+ * twenty rows cannot say where one function's time went when it is spread thin.
  * Pure.
  */
-export function busyFrom(profiles: ProfileSlice[], { appDir = '', keep = 20 }: { appDir?: string | string[]; keep?: number } = {}): BusyRead {
+export function busyFrom(profiles: ProfileSlice[], { appDir = '', keep = 20, under = '' }: { appDir?: string | string[]; keep?: number; under?: string } = {}): BusyRead {
   const appDirs = [appDir].flat().filter(Boolean);
   const inside = new Map<string, number>();
   const deepest = new Map<string, number>();
+  const calls = new Map<string, number>();
+  let underFn = '';
+  let underN = 0;
   const groups = new Map<string, { samples: number; s: FreezeStack }>();
   let total = 0;
   let idle = 0;
@@ -231,6 +241,14 @@ export function busyFrom(profiles: ProfileSlice[], { appDir = '', keep = 20 }: {
       if (s.kind === 'gc') gc += n;
       deepest.set(s.where, (deepest.get(s.where) ?? 0) + n);
       for (const fn of new Set(s.frames.filter(ours).map(named))) inside.set(fn, (inside.get(fn) ?? 0) + n);
+      // Leaf first, so this is the innermost frame by that name and the one before it is what it called.
+      const at = under ? s.frames.findIndex((f) => named(f).includes(under)) : -1;
+      if (at >= 0) {
+        underFn ||= named(s.frames[at]!);
+        underN += n;
+        const called = at > 0 ? named(s.frames[at - 1]!) : ITSELF;
+        calls.set(called, (calls.get(called) ?? 0) + n);
+      }
       const g = groups.get(s.key) ?? { samples: 0, s };
       g.samples += n;
       groups.set(s.key, g);
@@ -250,6 +268,7 @@ export function busyFrom(profiles: ProfileSlice[], { appDir = '', keep = 20 }: {
     deepest: busy ? top(deepest) : [],
     stacks: [...groups.values()].sort((a, b) => b.samples - a.samples).slice(0, 10)
       .map((g) => ({ share: round2(g.samples / busy), frames: g.s.frames.slice(0, FRAMES_KEPT).map(named) })),
+    ...(under ? { under: { fn: underFn || under, share: busy ? round2(underN / busy) : 0, calls: busy ? top(calls) : [] } } : {}),
   };
 }
 

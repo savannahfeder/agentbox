@@ -2021,6 +2021,13 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return froze?.held({ ms: Number(ms), part: 'windows' }) ?? false;
   });
 
+  // And how held it was over the last minute, for the minute log (main/window-lag.mts).
+  // A browser tab's lag is its browser's, so only the desktop window is heard.
+  ipcMain.handle('zero:window-lag', (event, lag: unknown) => {
+    if (event.senderFrame?.parent || event.sender !== window.webContents) return false;
+    return supervisor.windowLag?.add(lag) ?? false;
+  });
+
   ipcMain.handle('zero:supervisor-pause', (_e, paused) => {
     supervisor.paused = !!paused;
     // Taking the pause off is a thing she does expecting work to start, so it

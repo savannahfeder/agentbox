@@ -707,14 +707,11 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
   .th-table .row:not(.th-head) .th-cell-title > .th-slot { position: absolute; left: 0; top: 5px; width: 24px; height: 24px; margin: 0; display: flex; align-items: flex-start; justify-content: center; transform: translateY(-0.36px); }
   .th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, .th-mate, .harness-mark, .agent-face) { width: 24px; height: 24px; }
   .th-table .row:not(.th-head) .th-slot .tm-av { line-height: 22px; font-size: 10px; }
-  /* Claude Code's and Codex's marks stand on the page: a grey tile behind the starburst read as orange. */
-  .th-table .row:not(.th-head) .th-slot .harness-mark { background: none; border: 0; overflow: visible; }
-  /* The mark is 11/16 of its svg (EngineLogos IN_TILE): 32px draws it 22px, which looks as big as a 24px face.
-     It sits 5px inside the svg, so -5px on top puts its top where a face's top is. */
-  .th-table .row:not(.th-head) .th-slot .harness-mark > svg { width: 32px; height: 32px; margin: -5px -4px -3px; }
+  /* A white tile: on grey, the starburst's soft edges made the tile read as orange. */
+  .th-table .row:not(.th-head) .th-slot .harness-mark { background: var(--surface); }
+  .th-table .row:not(.th-head) .th-slot .harness-mark > svg { width: 19.68px; height: 19.68px; }
   .th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, i.mate-face, .harness-mark) { border-radius: 7px; }
-  .th-table .row:not(.th-head) .th-slot img.tm-av { border-color: var(--face-ring); }
-  .th-table .row:not(.th-head) .th-slot span.tm-av { background: var(--surface); border-color: color-mix(in srgb, var(--text) 14%, transparent); }
+  .th-table .row:not(.th-head) .th-slot :is(.tm-av, .harness-mark) { border-color: var(--face-ring); }
   .th-table .row:not(.th-head) .th-slot i.mate-face { box-shadow: none; border: 1px solid var(--face-ring); }
   .th-table .row:not(.th-head) .th-grid.has-line > :is(.th-cell-state, .th-cell-proj, .th-cell-person, .th-cell-prio, .th-cell-when) { grid-row: 1 / span 2; align-self: center; }
   /* Text moved by `top` jumps whole pixels; a transform puts each cell's ink
