@@ -11,7 +11,8 @@ import { LiveMark } from '../components/LiveMark';
 import { createPortal } from 'react-dom';
 import { scrollerOf, useRowDrag } from './row-drag';
 import { chord } from '../this-keyboard';
-import type { CloudPlan, Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
+import type { AgentMode, CloudPlan, Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
+import { OUTSIDE_MODES, OUTSIDE_TITLE } from '../outside-agents';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, dueWords, firstName, personOf } from '../team/people';
 import { handedBy, taskWords } from '../team/company';
@@ -234,7 +235,9 @@ export function SearchButton({ onSearch }: { onSearch: () => void }) {
 }
 
 /** New thread, the cloud and the Display icon (and Search on the board), at the right of the Inbox header. */
-export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab, people, cloud, cloudPlan = null, onCloudMode, onCloudWhenOn, onCloudSetUp, onCloudMove, filters = true, view = null, home = null }: {
+export function HeaderActions({ page, display, onDisplay, products, items, onSearch, onCompose, shown, total, tab, people, cloud, cloudPlan = null, onCloudMode, onCloudWhenOn, onCloudSetUp, onCloudMove, filters = true, view = null, home = null, outside = null }: {
+  /** The inbox only: how many sessions started outside Agentbox it takes. */
+  outside?: OutsidePick | null;
   /** With a team: which home the page draws, so the two can be compared. */
   home?: HomeChoice | null;
   /** False over a room, where there is no list to view or filter. */
@@ -276,7 +279,7 @@ export function HeaderActions({ page, display, onDisplay, products, items, onSea
         </span>}
         <SlidersIcon />{dot && <i />}
       </button>
-      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} tab={tab} people={people} home={home} />}
+      {open && <DisplayMenu page={page} display={display} onDisplay={onDisplay} products={products} items={items} shown={shown} total={total} tab={tab} people={people} home={home} outside={outside} />}
     </span>}
     {!filters && view}
   </div>;
@@ -386,8 +389,11 @@ function CloudButton({ cloud, cloudPlan, onMode, onWhenOn, onSetUp, onMove }: { 
 
 export type HomeChoice = { group: 'none' | 'who'; onGroup: (group: 'none' | 'who') => void };
 
-export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab, people, home = null }: {
+export type OutsidePick = { mode: AgentMode; onMode: (mode: AgentMode) => void };
+
+export function DisplayMenu({ page, display, onDisplay, products, items = [], shown, total, tab, people, home = null, outside = null }: {
   home?: HomeChoice | null;
+  outside?: OutsidePick | null;
   page: PageId; display: Display; onDisplay: (d: Display) => void; products: Product[];
   /** The tab the page is on, which Done's own order depends on. */
   tab?: string;
@@ -449,6 +455,11 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
     <div className="line"><span className="lab">Sent</span><span className="opts">
       {windows.map(([w, label]) => <button type="button" key={w} className={display.updated === w ? 'on' : ''} onClick={() => set({ updated: w })}>{label}</button>)}
     </span></div>
+    {/* Not a filter of this view: it is what comes into the inbox at all, so
+        Clear filters leaves it and it lights no dot. */}
+    {outside && <><div className="rule" /><div className="line"><span className="lab lab-two">{OUTSIDE_TITLE}</span><span className="opts">
+      {OUTSIDE_MODES.map((m) => <button type="button" key={m.value} className={outside.mode === m.value ? 'on' : ''} onClick={() => outside.onMode(m.value)}>{m.label}</button>)}
+    </span></div></>}
     <div className="rule" />
     <div className="foot"><span>{shown !== undefined && total !== undefined ? `Showing ${shown} of ${total}` : ''}</span>
       {isFiltered(display) && <button type="button" onClick={() => set({ priorities: [], projects: [], updated: 'any', privacy: 'any' })}>Clear filters</button>}
@@ -775,7 +786,8 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // this row is drawn under: the words about agents waiting their turn are
   // only ever true there, which is the gate live-line has always had.
   const fleet = useContext(FleetContext);
-  const facts = { ...factsFor(fleet, item.id), inProgress: tab === 'progress', now, practice: !!product?.practice };
+  // A session started outside Agentbox in In progress is working there; nothing of it is waiting.
+  const facts = { ...factsFor(fleet, item.id), inProgress: tab === 'progress', now, practice: !!product?.practice, ...(item.agent && tab === 'progress' ? { state: 'running' as const } : {}) };
   const cell = tab === 'snoozed' ? laterCell(item, facts) : statusCell(item, facts);
   const tryAgain = useContext(TryAgainContext);
   const retry = tryAgain && offersTryAgain(item, facts) ? <TryAgainButton onPress={() => tryAgain(item)} /> : undefined;

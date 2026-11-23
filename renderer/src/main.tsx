@@ -6,6 +6,7 @@ import { ScreenCrash } from './components/ScreenCrash';
 import '@fontsource-variable/source-sans-3';
 import './styles.css';
 import './workspace-navigation.css';
+import './sidebar.css';
 import './phone.css';
 import './soft-corners.css';
 import './narrow-conversation.css';

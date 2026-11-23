@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { AppsThatOpen, Person, PictureIn, TeamBillingDetails } from './types';
+import type { AppsThatOpen, BringInResult, Person, PictureIn, TeamBillingDetails } from './types';
 import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, FilesTrashed, FilesCloudStatus, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { NotePlace } from '../../shared/artifact-marks.mts';
@@ -759,7 +759,7 @@ export const api = {
   // everything else, so the reply box can be built and looked at without a live
   // session to type into. Fixtures answer sent-and-working, which is the good
   // case; &agentUnsure draws the failure, which is the one worth looking at.
-  async agentReply(p: { pid: number; text: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string; key?: string; at?: number }> {
+  async agentReply(p: { pid: number; text: string; engine?: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string; key?: string; at?: number }> {
     if (useFixtures) {
       if (params.has('agentUnsure')) return { ok: false, reason: 'That agent is not listening any more.' };
       return { ok: true, delivered: true, working: true };
@@ -767,16 +767,21 @@ export const api = {
     return window.zero?.agentReply?.(p) ?? { ok: false, reason: 'The message could not be handed over.' };
   },
 
-  async agentReveal(p: { pid: number }): Promise<{ ok: boolean; name?: string; reason?: string }> {
-    if (useFixtures) return { ok: true, name: 'CNVS' };
+  async agentReveal(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<{ ok: boolean; name?: string; reason?: string }> {
+    if (useFixtures) return { ok: true, name: p.engine === 'codex' ? 'Codex' : 'CNVS' };
     return window.zero?.agentReveal?.(p) ?? { ok: false, reason: `${Name} cannot tell which window it is running in.` };
+  },
+
+  async bringInSession(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<BringInResult> {
+    if (useFixtures) return { ok: true, product: 'storefront', id: 'w-brought' };
+    return window.zero?.bringInSession?.(p) ?? { ok: false, reason: `Quit and reopen ${Name} to bring sessions in.` };
   },
 
   // WHAT THE TWO OF THEM SAID, read only when she presses the line. The main
   // process streams it off the transcript she already has; nothing is sent and
   // no model sees a word of it. `whole` is her pressing the gap line: send the
   // middle back too.
-  async agentConversation(p: { pid: number; sessionId: string | null; cwd: string; whole?: boolean }): Promise<AgentConversation> {
+  async agentConversation(p: { pid: number; sessionId: string | null; cwd: string; whole?: boolean; engine?: string }): Promise<AgentConversation> {
     if (useFixtures) return fixtureConversation();
     return window.zero?.agentConversation?.(p) ?? { ok: false, reason: 'That conversation could not be read.' };
   },

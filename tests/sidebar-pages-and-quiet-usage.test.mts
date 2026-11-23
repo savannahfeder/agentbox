@@ -6,9 +6,12 @@ import {expect,it} from 'vitest';
 import {UsagePill} from '../renderer/src/components/UsagePill';
 import {WorkspaceNavigation} from '../renderer/src/components/WorkspaceNavigation';
 const reading = {engine:'claude',at:0,limits:[{span:'session',name:'This session',percent:38}]};
-it('uses quiet text rather than a permanent meter in the sidebar',()=>{
- const html=renderToStaticMarkup(createElement(UsagePill,{usage:reading,now:0,sidebar:true,engineWord:'Claude Code'}));
- expect(html).toContain('38%'); expect(html).not.toContain('usage-meter');
+// 2026-11-23: the quiet text became one small bar on your own row, for the agent
+// you used last. Two subscriptions still draw one bar; the other is on pointing.
+it('draws one small bar in the sidebar, however many subscriptions there are',()=>{
+ const other={engine:'codex',at:0,limits:[{span:'session',name:'This session',percent:12}]};
+ const html=renderToStaticMarkup(createElement(UsagePill,{usage:reading,now:0,sidebar:true,engineWord:'Claude Code',all:[reading,other]}));
+ expect(html).toContain('width:38%'); expect(html.match(/class="usage-meter"/g)).toHaveLength(1);
 });
 it('keeps the legacy meter outside the sidebar and hides missing readings',()=>{
  expect(renderToStaticMarkup(createElement(UsagePill,{usage:reading,now:0}))).toContain('usage-meter');

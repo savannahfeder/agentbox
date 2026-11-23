@@ -103,7 +103,7 @@ describe('the corner on the reading from that screenshot', () => {
   it('is untouched on a reading taken this minute', () => {
     const fresh = { engine: 'codex', at: NOW, limits: [limit({ resetsAt: NOW + 4 * HOUR + 56 * 60_000 }), week()] };
     expect(aloud(row({ usage: fresh, all: [fresh] }))).toBe('Codex. This session: 1% used, resets in 4h 56m. This week: 9% used, resets in 6d 4h.');
-    expect(row({ usage: fresh, all: [fresh] })).toContain('>1%<');
+    expect(row({ usage: fresh, all: [fresh] })).toContain('width:1%');
   });
 });
 
