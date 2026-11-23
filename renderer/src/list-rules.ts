@@ -1,7 +1,7 @@
 // Pure rules for what each list shows, and what a click on a row or its select
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mts';
-import { teammateIdOf } from '../../shared/teammates.mts';
+import { asksSomething, teammateIdOf } from '../../shared/teammates.mts';
 import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../../shared/answers.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { asksToClose } from '../../shared/asks-to-close.mts';
@@ -10,7 +10,7 @@ import { closedByItsShip } from '../../shared/ship-closes-its-thread.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
 import { shownTitle } from '../../shared/thread-title.mts';
-import { firstRealLine, offerIsLive, previewText, searchText } from './format';
+import { closesTheTask, firstRealLine, itemOptions, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 import { isCause } from '../../shared/causes.mts';
@@ -27,6 +27,8 @@ export interface InboxItem {
   labels?: string[];
   answer?: string;
   result?: string;
+  note?: string;
+  body?: string;
   answeredThrough?: number;
   runAt?: number;
   snoozedUntil?: number;
@@ -170,8 +172,18 @@ function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
   // A pick lifts Later with no write of its own, so an answer after it lifts it here.
   const answered = !!liveAnswer(i) && (i.wrote?.answer?.ts ?? 0) > (i.wrote?.snoozedUntil?.ts ?? 0);
-  const reminder = i.wrote?.snoozedUntil?.source === 'founder' && !answered ? i.snoozedUntil ?? 0 : 0;
+  const asked = askedSince(i, i.wrote?.snoozedUntil?.ts ?? Infinity);
+  const reminder = i.wrote?.snoozedUntil?.source === 'founder' && !answered && !asked ? i.snoozedUntil ?? 0 : 0;
   return Math.max(mine, reminder, legacySnooze);
+}
+
+// The agent's last answer came after `since` and asks the person something:
+// in words, or with a pick that is more than closing.
+function askedSince(i: InboxItem, since: number): boolean {
+  const r = i.wrote?.result;
+  if (!r || r.source === 'founder' || (r.ts ?? 0) <= since || (i.wrote?.note?.ts ?? 0) > r.ts) return false;
+  const options = itemOptions(i);
+  return options.length ? offerIsLive(i) && !options.every((o) => closesTheTask(o.text)) : asksSomething(i.result);
 }
 
 /**
@@ -334,10 +346,11 @@ export function putOffInLater(i: InboxItem, { hiddenUntil, now, waitingOn, runOn
  * hiding a thread is the dangerous direction. Not a wait: a blocker that is
  * done, one this window cannot see (another project, archived, past the 8 MB
  * read), the thread itself, and a loop of threads that only wait on each
- * other, since nothing would ever resume them. A blocker counts when it is not
- * itself waiting, or when one of its own waits counts.
+ * other, since nothing would ever resume them, and a proposal, which ends
+ * only when a person says yes. A blocker counts when it is not itself
+ * waiting, or when one of its own waits counts.
  */
-export function waitsThatCanEnd<T extends Pick<InboxItem, 'status' | 'blockedBy'> & { id: string }>(
+export function waitsThatCanEnd<T extends InboxItem & { id: string }>(
   i: T,
   byId: ReadonlyMap<string, T>,
   path: ReadonlySet<string> = new Set([i.id]),
@@ -347,6 +360,7 @@ export function waitsThatCanEnd<T extends Pick<InboxItem, 'status' | 'blockedBy'
   return live(i).filter((id) => {
     if (path.has(id)) return false;
     const blocker = byId.get(id)!;
+    if (isProposal(blocker)) return false;
     if (!live(blocker).length) return true;
     return waitsThatCanEnd(blocker, byId, new Set(path).add(id)).length > 0;
   });

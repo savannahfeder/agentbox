@@ -88,7 +88,8 @@ export type StoppedKey = (typeof STOPPED_WARNING_KEYS)[number];
 const COST: Record<StoppedKey, string> = { E: 'marking it done', L: 'putting it off' };
 
 export function stoppedWarning(key: StoppedKey, { pressAgain = true } = {}): string {
-  const lesson = `This agent is waiting on your answer, and ${COST[key]} leaves it stuck.`;
+  // "Has answered", because its row says Answered (threads/page-rules.ts cellUnderTab).
+  const lesson = `This agent has answered and waits on you, so ${COST[key]} leaves it stuck.`;
   return pressAgain ? `${lesson} Press again to go ahead.` : lesson;
 }
 
