@@ -49,7 +49,7 @@ import { NOTES_CLOSED_KEY, notesSidebarOpen, rememberNotesSidebar, takesNotesSid
 import { putAwayTheNewest } from './escape-steps';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
-import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
+import { askStillStands, bringsBack, closesAgain, graceUndoneLine, namedNow, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
 import { answeredAlready, TOO_LATE_TO_WITHDRAW, UNDID_SENDING, withoutWithdrawnSends } from './withdraw-send';
 import { addUndoMark, readUndoMarks, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mts';
@@ -4460,7 +4460,7 @@ export default function App() {
     // nothing: the other person may be mid-work, and a close from you would land
     // in theirs. It comes back when they next write.
     if (isGivenTask(item, team?.products.get(item.product)) && !closeTask) {
-      const title = clipToSentence(item.title, TOAST_TITLE);
+      const title = clipToSentence(rowTitle(item), TOAST_TITLE);
       if (!stay) window.dispatchEvent(new CustomEvent(THREAD_CLOSED));
       await deferCommit(item, async () => {
         await api.answer({ product: item.product, id: item.id, putAway: true });
@@ -4483,7 +4483,7 @@ export default function App() {
   }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, showToast, pushUndo, nudgeOnStopped, waitingFiled, focused, markSeen, team, tour]);
 
   const reopenDone = useCallback(async (item: WorkItem) => {
-    const title = clipToSentence(item.title, TOAST_TITLE);
+    const title = clipToSentence(rowTitle(item), TOAST_TITLE);
     try { await api.answer({ product: item.product, id: item.id, status: 'open', reopen: true }); } catch (err) { showToast(`Not reopened: ${(err as Error).message}`); return; }
     pushUndo({ label: `Done again: ${title}`, undoes: `mark “${title}” done again`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'done' }); } });
     showToast(`Reopened: ${title}${SAYS_UNDO}`);
@@ -4560,8 +4560,8 @@ export default function App() {
     const undid = [{ product: child.product, id: child.id, words: 'Undid doing it here' }];
     await deferCommit(child, async () => {
       for (const w of writes) await api.answer(w);
-      pushUndo({ label: `Back as its own thread: ${clipToSentence(child.title, TOAST_TITLE)}. The message already went.`, undoes: `reopen “${clipToSentence(child.title, TOAST_TITLE)}”`, brings: child, undid, run: async () => { await api.answer({ product: child.product, id: child.id, status: 'open' }); } });
-    }, `Doing it in this thread: ${clipToSentence(child.title, TOAST_TITLE)}`, undefined, true, { product: parent.product, id: parent.id }, undid);
+      pushUndo({ label: `Back as its own thread: ${clipToSentence(rowTitle(child), TOAST_TITLE)}. The message already went.`, undoes: `reopen “${clipToSentence(rowTitle(child), TOAST_TITLE)}”`, brings: child, undid, run: async () => { await api.answer({ product: child.product, id: child.id, status: 'open' }); } });
+    }, `Doing it in this thread: ${clipToSentence(rowTitle(child), TOAST_TITLE)}`, undefined, true, { product: parent.product, id: parent.id }, undid);
   }, [items, deferCommit, pushUndo]);
 
   // START ALL AND DISMISS ALL (w-fe64f35bdd), from the count line over one
@@ -5665,9 +5665,12 @@ export default function App() {
     }
     const asked = undoAskRef.current;
     const answeringIt = asked?.entry === last && askStillStands(asked.at, now);
+    const then = last.brings;
+    const fresh = then ? selectable.find((i) => i.id === then.id && i.product === then.product) : undefined;
+    const nowNamed = (words: string) => (then && fresh ? namedNow(words, clipToSentence(rowTitle(then), TOAST_TITLE), clipToSentence(rowTitle(fresh), TOAST_TITLE)) : words);
     if (!instant && !answeringIt) {
       undoAskRef.current = { entry: last, at: now };
-      showToast(undoAsk(last.undoes));
+      showToast(undoAsk(nowNamed(last.undoes)));
       return 'old' as const;
     }
     undoAskRef.current = null;
@@ -5709,10 +5712,11 @@ export default function App() {
     // boxes are different places and she has to be told which one to look in. A
     // bare "Undone" left her hunting for a task Z had silently pulled out of
     // every view.
+    const label = nowNamed(last.label);
     showToast(
-      item ? `${last.label} · your message is back in the reply box`
-        : restored ? `${last.label} · your thread is back in the new thread card`
-          : last.label,
+      item ? `${label} · your message is back in the reply box`
+        : restored ? `${label} · your thread is back in the new thread card`
+          : label,
     );
     await refresh();
     setMultiSel((m) => ticksAfterUndo(last.ticks, m));
@@ -5726,7 +5730,7 @@ export default function App() {
     if (shown.open) { setFocused(shown.open); markSeen(shown.open); }
     else if (shown.compose) { setFocused(null); setModal('compose'); }
     return 'done' as const;
-  }, [undoStack, focused, refresh, showToast, markSeen, leaveUndoMarks, letRowGo]);
+  }, [undoStack, focused, refresh, showToast, markSeen, leaveUndoMarks, letRowGo, selectable]);
 
   // INTO THE ROW THE TOAST IS ABOUT, from a click on it or from O
   // (w-f0bfe32859). One path, so the key can never open something the click
@@ -6680,7 +6684,7 @@ export default function App() {
     const undid = [{ product: item.product, id: item.id, words: UNDID_CLOSING }];
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
-      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => {
+      pushUndo({ label: `Reopened: ${clipToSentence(rowTitle(item), TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(rowTitle(item), TOAST_TITLE)}”`, brings: item, undid, run: async () => {
         await endIt();
         await api.answer({ product: item.product, id: item.id, status: 'open', reopenAs: wasBeforeClose(item) });
       } });
