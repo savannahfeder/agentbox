@@ -37,8 +37,8 @@ export function useFilesList(on: boolean) {
     if (!on) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const read = () => { void api.filesPlace().then((l) => { lastList = l; if (live) setList(l); }); };
-    read();
+    const read = (soon = false) => { void api.filesPlace(soon ? { soon } : undefined).then((l) => { lastList = l; if (live) setList(l); }); };
+    read(!lastList);
     readers.add(read);
     // A burst of changes reads once.
     const off = api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 400); });

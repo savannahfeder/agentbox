@@ -1873,7 +1873,7 @@ declare global {
       connectionsCheck?(p: { id: string }): Promise<ConnectionTile | null>;
       connectionsDisconnect?(p: { id: string }): Promise<boolean>;
       connectionsAccept?(p: { id: string }): Promise<boolean>;
-      filesPlace?(): Promise<FilesPlaceList>;
+      filesPlace?(opts?: { soon?: boolean }): Promise<FilesPlaceList>;
       filesPlaceOpen?(p: { key: string }): Promise<FilesPlaceView | null>;
       filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
       filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;

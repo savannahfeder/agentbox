@@ -1107,8 +1107,9 @@ export const api = {
   async connectionsCheck(p: { id: string }): Promise<ConnectionTile | null> { return (await window.zero?.connectionsCheck?.(p).catch(() => null)) ?? null; },
   async connectionsDisconnect(p: { id: string }): Promise<void> { await window.zero?.connectionsDisconnect?.(p); },
   async connectionsAccept(p: { id: string }): Promise<void> { await window.zero?.connectionsAccept?.(p); },
-  async filesPlace(): Promise<FilesPlaceList> {
-    return (await window.zero?.filesPlace?.().catch(() => null)) ?? { files: [], projects: [], folders: [] };
+  /** `soon`: the last list made, at once, for a page with nothing to draw yet. */
+  async filesPlace(opts?: { soon?: boolean }): Promise<FilesPlaceList> {
+    return (await window.zero?.filesPlace?.(opts).catch(() => null)) ?? { files: [], projects: [], folders: [] };
   },
   async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null; ids?: string[] }> {
     if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };

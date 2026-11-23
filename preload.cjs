@@ -110,7 +110,7 @@ contextBridge.exposeInMainWorld('zero', {
   fileMark: (payload) => ipcRenderer.invoke('zero:file-mark', payload),
   fileNewVersion: (payload) => ipcRenderer.invoke('zero:file-new-version', payload),
   teamMarkFile: (payload) => ipcRenderer.invoke('zero:team-mark-file', payload),
-  filesPlace: () => ipcRenderer.invoke('zero:files-place'),
+  filesPlace: (opts) => ipcRenderer.invoke('zero:files-place', opts),
   filesPlaceOpen: (payload) => ipcRenderer.invoke('zero:files-place-open', payload),
   filesPlaceEdit: (payload) => ipcRenderer.invoke('zero:files-place-edit', payload),
   filesPlaceMark: (payload) => ipcRenderer.invoke('zero:files-place-mark', payload),

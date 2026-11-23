@@ -237,6 +237,7 @@ type WorkspaceSet = { key: string; value?: unknown };
 interface FilesPlace {
   forAgents(): Promise<unknown>;
   list(): Promise<unknown>;
+  listSoon(): Promise<unknown>;
   makeFolder(ask: { project?: string; name?: string; parent: string | null }): Promise<{ id?: string }>;
   renameFolder(ask: { id: string; name?: string }): Promise<{ id?: string }>;
   moveFile(ask: { key: string; folder: string | null }): Promise<{ id?: string }>;
@@ -2741,6 +2742,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   supervisor.onStarting = (item) => { void filesPlaceNow().bringBackFor({ product: item.product, id: item.id }).catch(() => {}); };
   // Files is read when it is open; the keeper also passes while it is not.
   if (config.accountRoot) setInterval(() => { void filesPlaceNow().list().catch(() => {}); }, 15 * 60_000).unref?.();
+  // Made once soon after a start, so the first time Files opens it has a list to draw at once.
+  if (config.accountRoot) setTimeout(() => { void filesPlaceNow().list().catch(() => {}); }, 30_000).unref?.();
   // A cloud run asking for a file, and an agent's bring_back_files, get what the keeper took off this computer.
   setFilesComeBack(keeperNow);
   if (config.accountRoot) {
@@ -2764,8 +2767,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:files-cloud', () => keeperNow()?.look() ?? null);
   // An agent's team_read reads folders from the view the reach tick writes.
   if (store.teammates) store.teammates.foldersForAgents = () => filesPlaceNow().forAgents();
-  ipcMain.handle('zero:files-place', async () => {
-    try { return await filesPlaceNow().list(); } catch { return { files: [], projects: [], folders: [] }; }
+  ipcMain.handle('zero:files-place', async (_e, { soon }: { soon?: unknown } = {}) => {
+    try {
+      const place = filesPlaceNow();
+      return await (soon === true ? place.listSoon() : place.list());
+    } catch { return { files: [], projects: [], folders: [] }; }
   });
   ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; ids?: unknown; key?: unknown; folder?: string | null; icon?: unknown } = {}) => {
     try {

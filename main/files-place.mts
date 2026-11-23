@@ -1051,13 +1051,21 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   // runs waits for it and reads once more, so they never pile up behind each other.
   let listing: Promise<FilesList> | null = null;
   let listAgain: Promise<FilesList> | null = null;
+  let lastMade: FilesList | null = null;
   function list(): Promise<FilesList> {
     if (!listing) {
-      listing = listOnce().finally(() => { listing = null; });
+      listing = listOnce().then((made) => { lastMade = made; return made; }).finally(() => { listing = null; });
       return listing;
     }
     listAgain ??= listing.catch(() => {}).then(() => { listAgain = null; return list(); });
     return listAgain;
+  }
+  /** The last list made, at once, for a page with nothing to draw yet; the fresh one arrives as a change. */
+  function listSoon(): Promise<FilesList> {
+    const had = lastMade;
+    if (!had) return list();
+    void list().then((fresh) => { if (JSON.stringify(fresh) !== JSON.stringify(had)) notify(); }, () => {});
+    return Promise.resolve(had);
   }
 
   async function listOnce(): Promise<FilesList> {
@@ -1161,6 +1169,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
 
   return {
     list,
+    listSoon,
 
     crossing,
 
