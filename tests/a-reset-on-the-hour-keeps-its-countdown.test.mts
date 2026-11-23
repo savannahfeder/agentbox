@@ -99,16 +99,16 @@ describe('a reset stamp printed on the hour', () => {
 describe('her corner, on the reading that confused her', () => {
   it('says the time left, where before it said a bare percent', () => {
     const limits = readUsage(HERS, NOW, ZONE);
-    expect(pillText(limits, NOW)).toEqual({ used: '45%', when: '2h 14m left' });
+    expect(pillText(limits, NOW)).toEqual({ used: '45%', when: 'resets in 2h 14m' });
   });
 
   it('carries the reset into the sentence the pointer gets', () => {
     const limits = readUsage(HERS, NOW, ZONE);
     const said = usageSentence(limits, NOW);
-    expect(said).toContain('This session: 45% used, 2h 14m left.');
+    expect(said).toContain('This session: 45% used, resets in 2h 14m.');
     // The week line lost its "all models" qualifier on 2026-09-01, in her own
     // words. The reason is in tests/the-corner-drains-and-opens.test.mjs.
-    expect(said).toContain('This week: 7% used, 2d 2h left.');
+    expect(said).toContain('This week: 7% used, resets in 2d 2h.');
   });
 
   // The third line of her reading has NO reset at all, and that is the CLI's

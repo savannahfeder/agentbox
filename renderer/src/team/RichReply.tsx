@@ -203,6 +203,7 @@ export function RichReply({ value, onChange, onPlain, placeholder, className, bo
       onClick={() => { if (wrap.current) onClick?.(wrap.current); }}
       // A click on the padding round the words still puts the caret in them.
       onMouseDown={(e) => { if (e.target === e.currentTarget) { e.preventDefault(); editor?.commands.focus('end'); } }}
+      onScroll={(e) => e.currentTarget.classList.toggle('more-above', e.currentTarget.scrollTop > 2)}
       onDragOver={(e) => e.preventDefault()}
     >
       <EditorContent editor={editor} />

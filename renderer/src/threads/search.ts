@@ -1,4 +1,4 @@
-import { matchedSentence, parseQuery, searchItems, searchScore } from '../search';
+import { matchedSentence, parseQuery, searchItems, searchScore, type Lately } from '../search';
 import { searchText } from '../format';
 import { isDirect, messageLine } from './page-rules';
 import type { Person, Product, WorkItem } from '../types';
@@ -39,7 +39,8 @@ function indexed(item: WorkItem, context: SearchContext) {
   return value;
 }
 
-export function searchThreads(items: WorkItem[], query: string, context: SearchContext) {
+/** `lead`, with `lately`: 4 a conversation with the person named, then as `SearchHit.lead`. */
+export function searchThreads(items: WorkItem[], query: string, context: SearchContext, lately?: Lately) {
   const originals = new Map<WorkItem, WorkItem>();
   const projections = items.map(item => {
     const { searchable } = indexed(item, context);
@@ -47,16 +48,17 @@ export function searchThreads(items: WorkItem[], query: string, context: SearchC
     return searchable;
   });
   const q = parseQuery(query);
-  return searchItems(projections, query).map(hit => {
+  return searchItems(projections, query, lately).map(hit => {
     const item = originals.get(hit.item)!;
     const { names, latest, chat } = indexed(item, context);
     const named = !!names && searchScore({ id: item.id, title: names }, query) > 0;
+    if (lately?.inside?.has(item.id) && searchScore(hit.item, query) === 0) return { item, summary: hit.summary, named, lead: hit.lead };
     const matched = chat ? matchedSentence(searchText(hit.item.body), q.terms, q.phrase) : '';
     const subject = chat ? matchedSentence([item.label, item.title].filter(Boolean).join(' . '), q.terms, q.phrase) : '';
     const subjectMatch = searchScore({ id: item.id, title: [item.label, item.title].filter(Boolean).join(' . ') }, query) >= 2;
-    return { item, summary: chat ? ((subjectMatch ? subject : matched) || subject || latest || hit.summary) : hit.summary, named, rung: searchScore(hit.item, query) };
+    return { item, summary: chat ? ((subjectMatch ? subject : matched) || subject || latest || hit.summary) : hit.summary, named, lead: hit.lead };
   }).sort((a, b) => Number(b.named) - Number(a.named))
-    .map(({ item, summary, rung, named }) => ({ item, summary, rung: named ? Math.max(rung, 2) : rung }));
+    .map(({ item, summary, named, lead }) => (lately ? { item, summary, lead: named ? 4 : lead ?? 0 } : { item, summary }));
 }
 
 export function threadSearchDetails(item: WorkItem, context: SearchContext) {

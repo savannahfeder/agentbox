@@ -104,12 +104,23 @@ export interface CodexMemoryGateOptions {
   cwds?: string[];
   fs?: Pick<typeof fsNode, 'readFileSync' | 'mkdirSync' | 'writeFileSync' | 'renameSync'>;
   log?: (line: string) => void;
+  platform?: NodeJS.Platform;
 }
 
 export interface CodexMemoryGateResult {
   wrote: boolean;
   trusted: number;
   error: string | null;
+}
+
+/**
+ * Whether Codex can run our hook here. Not on Windows: the hook is a quoted
+ * path to a .sh script, which neither cmd nor PowerShell runs, and the
+ * coordinator it asks cannot listen on a socket file there (EACCES). So on
+ * Windows nothing is written into the Codex home at all, on or off.
+ */
+export function codexHookRunsOn(platform: NodeJS.Platform = process.platform) {
+  return platform !== 'win32';
 }
 
 /** How we know a hook in somebody's file is one of ours. */
@@ -254,9 +265,11 @@ export function ourTrustEdits(answer: unknown): TrustEdit[] {
  *   home is listed for any cwd, so one is enough; the app's own folder is used.
  * @param how.fs Injected for tests.
  * @param how.log
+ * @param how.platform Injected for tests. On Windows nothing is read or written.
  */
-export async function syncCodexMemoryGate({ home, scriptPath, on, request = null, cwds = [], fs = fsNode, log = () => {} }: CodexMemoryGateOptions): Promise<CodexMemoryGateResult> {
+export async function syncCodexMemoryGate({ home, scriptPath, on, request = null, cwds = [], fs = fsNode, log = () => {}, platform = process.platform }: CodexMemoryGateOptions): Promise<CodexMemoryGateResult> {
   const out: CodexMemoryGateResult = { wrote: false, trusted: 0, error: null };
+  if (!codexHookRunsOn(platform)) { out.error = 'the Codex hook cannot run on Windows'; return out; }
   if (!home || (on && !scriptPath)) { out.error = 'no codex home'; return out; }
   const file = path.join(home, HOOKS_FILE);
 

@@ -217,6 +217,29 @@ describe('the sandbox, with the computer away', () => {
     expect(events.find((e) => e.kind === 'mcp-offline')).toMatchObject({ id: 3 });
   });
 
+  // 2026-11-17: four cloud runs exited 1 with "mcp__zero-approvals__approval_prompt
+  // ... not found. Available MCP tools: none", three of them on one thread just
+  // after its owner answered. Each time the Mac woke for seconds, sent the run
+  // and slept. It still counted as there (seen under `afterMs` ago), so the
+  // handshake waited on it, and Claude Code gave up on the server first.
+  it('opens the approvals server from the start\'s handshake at once, even while the computer still counts as there', async () => {
+    await startWith(asker({ other: 100 }), { ...held, afterMs: 90_000, away: false });
+    const { events } = await peekUntil((e) => e.kind === 'stdout' && said([e]).includes('zero-approvals:{"jsonrpc":"2.0","id":1,'), 'the handshake answered', 3_000);
+    const answer = JSON.parse(said(events).match(/zero-approvals:(\{"jsonrpc":"2.0","id":1,.*\})/)[1]);
+    expect(answer.result).toEqual(SHAKES.initialize);
+    // Still sent on, so the computer's own server opens; its late answer is dropped.
+    const sent = events.find((e) => e.kind === 'mcp' && /"method":"initialize"/.test(e.line));
+    expect(sent).toBeTruthy();
+    const late = await sandbox.handle({ action: 'mcp', runId: 'r', n: 1, conn: sent.conn, line: JSON.stringify({ jsonrpc: '2.0', id: 1, result: { late: true } }) });
+    expect(late).toMatchObject({ ok: true, dropped: true });
+    // A permission request with the computer there still goes to it, not held.
+    const asked = await peekUntil((e) => e.kind === 'mcp' && /"id":9/.test(e.line), 'the request sent to the computer');
+    expect(asked.events.some((e) => e.kind === 'ask')).toBe(false);
+    // A server the start carries no handshake for waits for the computer.
+    await peekUntil((e) => e.kind === 'mcp' && /read_document/.test(e.line), 'the other call sent to the computer');
+    expect(said((await sandbox.handle({ action: 'events', since: 0, peek: true })).events)).not.toMatch(/agentbox:/);
+  });
+
   it('a start whose held servers are not a list of names is refused', async () => {
     const out = await startWith(asker(), { ...held, hold: 'zero-approvals' });
     expect(out).toMatchObject({ ok: false, error: 'bad-start' });

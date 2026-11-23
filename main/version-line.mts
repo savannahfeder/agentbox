@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { appendTo, cleanEntry, foldLine, foldOnto } from '../shared/version-line.mts';
+import { cloneFile } from './clone-file.mts';
 import { hashBytesOf } from './hash-bytes.mts';
 import type { LineEntry } from '../shared/version-line.mts';
 
@@ -34,10 +35,12 @@ export interface AddVersion { file: string; src: string; name: string; by?: stri
 
 export interface VersionLine {
   of(key: string): LineVersion[];
+  hashesOf(key: string): string[];
   add(p: AddVersion): Promise<LineVersion | null>;
   refresh(): Promise<boolean>;
   hashOf(src: string): Promise<FileHash | null>;
   idOf(s: unknown): string;
+  shareKeptCopies(): Promise<number>;
 }
 
 const LINE = 'version-line.jsonl';
@@ -56,7 +59,13 @@ const OUT_MOST_MS = 30 * 60_000;
 export const lineId = (s: unknown): string => crypto.createHash('sha256').update(String(s)).digest('hex').slice(0, 40);
 const safeName = (name: string | null | undefined): string => String(name ?? 'file').replace(/[^\w.-]+/g, '-').slice(-120) || 'file';
 
-export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { dir: string; cloud?: () => LineHolder | null; onMoved?: () => void }): VersionLine {
+export function versionLine({ dir, cloud = () => null, onMoved = () => {}, clone = cloneFile, platform = process.platform }: {
+  dir: string;
+  cloud?: () => LineHolder | null;
+  onMoved?: () => void;
+  clone?: (src: string, to: string) => Promise<void>;
+  platform?: NodeJS.Platform;
+}): VersionLine {
   const file = path.join(dir, LINE);
   const hashFile = path.join(dir, HASHES);
   let entries: StoredEntry[] = [];
@@ -111,21 +120,56 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
   const keptDir = (hash: string): string => path.join(dir, BYTES, hash);
   const kept = new Map<string, string>();
   function keptOf(hash: string): string | null {
-    if (kept.has(hash)) return kept.get(hash)!;
+    // A kept copy can be moved to the Trash or taken off to the cloud.
+    if (kept.has(hash) && fs.existsSync(kept.get(hash)!)) return kept.get(hash)!;
+    kept.delete(hash);
     let found: string | null = null;
-    try { const [name] = fs.readdirSync(keptDir(hash)).filter((n) => !n.endsWith('.tmp')); found = name ? path.join(keptDir(hash), name) : null; } catch { /* not kept */ }
+    // Finder leaves a .DS_Store behind when it trashes the kept copy.
+    try { const [name] = fs.readdirSync(keptDir(hash)).filter((n) => !n.endsWith('.tmp') && !n.startsWith('.')); found = name ? path.join(keptDir(hash), name) : null; } catch { /* not kept */ }
     if (found) kept.set(hash, found);
     return found;
   }
-  function keep(src: string, { hash, size }: FileHash, name: string): void {
+  async function keep(src: string, { hash, size }: FileHash, name: string): Promise<void> {
     if (keptOf(hash) || size > KEEP_UP_TO) return;
     try {
       fs.mkdirSync(keptDir(hash), { recursive: true });
       const to = path.join(keptDir(hash), safeName(name));
       // A clone where the disk can make one, so keeping a film costs no space.
-      fs.copyFileSync(src, `${to}.tmp`, fs.constants.COPYFILE_FICLONE);
+      await clone(src, `${to}.tmp`);
       fs.renameSync(`${to}.tmp`, to);
     } catch (err) { console.warn(`version line: could not keep ${name}: ${(err as Error).message}`); }
+  }
+
+  // Kept copies made before keep() cloned on a Mac are full copies: each is
+  // made again as a clone of a file still holding its bytes, once.
+  async function shareKeptCopies(): Promise<number> {
+    const bytesDir = path.join(dir, BYTES);
+    const done = path.join(bytesDir, '.shared');
+    if (platform !== 'darwin' || fs.existsSync(done)) return 0;
+    const holders = new Map<string, string[]>();
+    for (const [p, h] of hashes) if (!p.startsWith(`${bytesDir}${path.sep}`)) holders.set(h.hash, [...(holders.get(h.hash) ?? []), p]);
+    let names: string[] = [];
+    try { names = fs.readdirSync(bytesDir); } catch { return 0; }
+    let shared = 0;
+    for (const hash of names) {
+      const at = keptOf(hash);
+      if (!at) continue;
+      for (const src of holders.get(hash) ?? []) {
+        const st = await fs.promises.stat(src, { bigint: true }).catch(() => null);
+        const was = hashes.get(src);
+        if (!st || !was || Number(st.size) !== was.size || Number(st.mtimeMs) !== was.mtime) continue;
+        const tmp = `${at}.share`;
+        try {
+          await clone(src, tmp);
+          if (await hashBytesOf(tmp) !== hash) continue;
+          fs.renameSync(tmp, at);
+          shared += 1;
+          break;
+        } catch { /* left as it was */ } finally { fs.rmSync(tmp, { force: true }); }
+      }
+    }
+    fs.writeFileSync(done, '');
+    return shared;
   }
 
   const shown = (e: Omit<LineVersion, 'kept'>): LineVersion => { const at = keptOf(e.hash); return at ? { ...e, kept: at } : { ...e }; };
@@ -174,8 +218,8 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
     if (!bytes) return null;
     const id = lineId(key);
     const had = lineOf(id).find((v) => v.hash === bytes.hash);
-    if (had) { keep(src, bytes, name); return shown(had); }
-    keep(src, bytes, name);
+    if (had) { await keep(src, bytes, name); return shown(had); }
+    await keep(src, bytes, name);
     const asked: Asked = { file: id, hash: bytes.hash, name: lineId(name), by, at };
     const holder = shared ? cloud() : null;
     if (holder) {
@@ -201,6 +245,11 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
 
   return {
     of,
+    /** The bytes every version of `file` was, by hash, without a look at the disk: `of` checks each kept copy. */
+    hashesOf(key: string): string[] {
+      const id = lineId(key);
+      return [...lineOf(id).map((v) => v.hash), ...[...(pending.get(id)?.values() ?? [])].map((p) => p.hash)];
+    },
     /** One at a time, so two versions of one file never take the same number here. */
     add(p: AddVersion) {
       const run = queue.then(() => addNow(p));
@@ -223,5 +272,6 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {} }: { d
     },
     hashOf,
     idOf: lineId,
+    shareKeptCopies,
   };
 }

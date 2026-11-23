@@ -74,13 +74,13 @@ describe('the control the page offers', () => {
   // On the Signed in card's head since 2026-10-25, the one Claude Code's has.
   it('puts Refresh and how old the reading is at the head of the Codex accounts', () => {
     expect(page).toContain("const busy = engine === 'codex' ? codexRefreshing : refreshing;");
-    expect(page).toContain("engine === 'codex' ? refreshCodex() : readAccounts(true)");
+    expect(page).toContain("engine === 'codex' ? refreshCodex(true) : readAccounts(true)");
     expect(page).toContain('{!busy && checked && <span className="acct-checked">{checked}</span>}');
   });
 
   // The press reaches the Codex reader and not Claude Code's.
   it('asks for the Codex engine by name', () => {
-    expect(settings).toContain("api.refreshUsage('codex')");
+    expect(settings).toContain("api.refreshUsage('codex', { ask })");
     expect(read('main/ipc.mts')).toContain('supervisor.refreshCodexUsage()');
   });
 
@@ -88,6 +88,6 @@ describe('the control the page offers', () => {
   // was wrong: "No usage reading yet" alone reads as something broken. One
   // line, with no caption under it, because a caption goes unread.
   it('says why there is nothing yet, in one line', () => {
-    expect(page).toContain("none: tile.inUse ? 'Codex reports usage as it works'");
+    expect(page).toContain("none: placed.inUse ? 'Codex reports usage as it works'");
   });
 });

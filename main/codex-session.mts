@@ -24,6 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Name } from '../shared/product-name.mjs';
 import { codexPosture } from '../shared/codex-modes.mts';
+import { TURN_CLOSED } from './claude-input.mts';
 
 export interface McpServerEntry {
   enabled?: boolean;
@@ -57,6 +58,7 @@ export interface WorkerThreadOptions {
   connectionServers?: ConnectionServers | null;
   mode?: string | null;
   reviewer?: string | null;
+  thread?: { item: string; product?: string | null } | null;
 }
 
 export type WorkerThreadParams = {
@@ -69,6 +71,7 @@ export type WorkerThreadParams = {
     mcp_servers: Record<string, McpServerEntry>;
     projects: Record<string, { trust_level: string }>;
     features: { apps: boolean; plugins: boolean; remote_plugin: boolean };
+    [threadTag: `shell_environment_policy.set.${string}`]: string;
   };
   model?: string;
   developerInstructions?: string;
@@ -137,6 +140,7 @@ export interface CodexWorkerOptions {
   requireMcpServer?: string | null;
   askedMcpServers?: string[];
   mcpReadyMs?: number;
+  turnStartWaitMs?: number;
 }
 
 export interface CodexWorker extends EventEmitter {
@@ -172,6 +176,8 @@ export const WORKER_SANDBOX = 'workspace-write';
  * Codex retries a server that fails to start, and this leaves room for the retry.
  */
 export const MCP_READY_MS = 30_000;
+// A cloud start takes 10 to 30 seconds before its turn has an id.
+export const TURN_START_WAIT_MS = 120_000;
 
 /**
  * The `mcp_servers` override for a worker: every server in the user's Codex
@@ -272,7 +278,20 @@ const plainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof 
  * while signed out, so `createCodexWorker` also reports any server that starts
  * unasked (`sayUnasked`).
  */
-export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, connectionServers = null, mode = null, reviewer = null }: WorkerThreadOptions = {}) {
+/**
+ * The thread's tag on every command it runs. One app-server runs every local
+ * Codex thread, so without this their programs are counted as the app's own
+ * and the leftovers sweep cannot tie them to a thread. Dotted keys add to a
+ * `shell_environment_policy` of the person's own rather than replace it.
+ */
+function threadTag(thread: WorkerThreadOptions['thread']): Record<`shell_environment_policy.set.${string}`, string> {
+  if (!thread || !/^w-[0-9a-f]+$/.test(thread.item)) return {};
+  const tag: Record<`shell_environment_policy.set.${string}`, string> = { 'shell_environment_policy.set.ZERO_ITEM': thread.item };
+  if (thread.product && /^[A-Za-z0-9._-]+$/.test(thread.product)) tag['shell_environment_policy.set.ZERO_PRODUCT'] = thread.product;
+  return tag;
+}
+
+export function workerThreadParams({ cwd, model = null, instructions = null, mcpServers = [], storeServer = null, connectionServers = null, mode = null, reviewer = null, thread = null }: WorkerThreadOptions = {}) {
   const posture = codexPosture(mode, { reviewer });
   const params: WorkerThreadParams = {
     cwd,
@@ -287,6 +306,7 @@ export function workerThreadParams({ cwd, model = null, instructions = null, mcp
       // Plugins can contribute MCP servers outside config.mcp_servers.
       // Keep this worker on the same explicit integration boundary.
       features: { apps: false, plugins: false, remote_plugin: false },
+      ...threadTag(thread),
     },
   };
   if (model) params.model = model;
@@ -375,6 +395,7 @@ export function createCodexWorker({
   requireMcpServer = null,
   askedMcpServers = [],
   mcpReadyMs = MCP_READY_MS,
+  turnStartWaitMs = TURN_START_WAIT_MS,
 }: CodexWorkerOptions = {}): CodexWorker {
   if (!server) throw new Error('createCodexWorker needs a codex app-server client');
 
@@ -385,10 +406,31 @@ export function createCodexWorker({
   worker.turnId = null;
 
   let ended = false;
+  const turnWaiters: ((began: boolean) => void)[] = [];
+  const turnBegan = () => { for (const wake of turnWaiters.splice(0)) wake(true); };
+  // A reply that arrives before the turn has an id waits for it; one whose
+  // turn never begins is too late for this run and is saved for the next.
+  const turnStarting = () => new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => done(false), turnStartWaitMs);
+    timer?.unref?.();
+    const done = (began: boolean) => {
+      clearTimeout(timer);
+      if (began) return resolve();
+      const err: Error & { code?: string } = new Error('The turn did not begin; this reply will start the next one.');
+      err.code = TURN_CLOSED;
+      reject(err);
+    };
+    turnWaiters.push(done);
+  });
+  const tooLate = () => Object.assign(new Error('The turn has ended; this reply will start the next one.'), { code: TURN_CLOSED });
   worker.steer = async (text: string, pictures: unknown[] = []) => {
-    if (ended || !worker.threadId || !worker.turnId) throw Error('The turn is not running. Send again when the conversation is ready.');
+    if (!ended && !worker.turnId) await turnStarting();
+    if (ended) throw tooLate();
+    if (!worker.threadId || !worker.turnId) throw Error('The turn is not running. Send again when the conversation is ready.');
     const expected=worker.turnId;
-    const result=await server.steerTurn(worker.threadId,expected,text,pictures);
+    // The server can finish a turn a moment before its turn/completed reaches us,
+    // and a cloud turn's end closes the connection under a steer still in flight.
+    const result=await server.steerTurn(worker.threadId,expected,text,pictures).catch((e: Error) => { throw ended || /no active turn/i.test(String(e?.message)) ? tooLate() : e; });
     if(result?.turnId!==expected)throw Error('The provider did not confirm the active turn.');
     return result;
   };
@@ -492,6 +534,7 @@ export function createCodexWorker({
     if (ended) return;
     ended = true;
     for (const wake of waiting.splice(0)) wake(false);
+    for (const wake of turnWaiters.splice(0)) wake(false);
     if (worker.threadId) { try { server.unwatch(worker.threadId); } catch { /* already gone */ } }
     worker.emit('exit', code, signal, how);
   };
@@ -501,7 +544,7 @@ export function createCodexWorker({
       // `turn/started` can arrive before the `turn/start` response resolves,
       // and `turn/interrupt` needs the turn id, so take it from the earlier one.
       const id = params?.turn?.id ?? params?.turnId;
-      if (typeof id === 'string' && id) worker.turnId = id;
+      if (typeof id === 'string' && id) { worker.turnId = id; if (method !== 'turn/completed' && method !== 'turn/failed') turnBegan(); }
 
       if (method === 'mcpServer/startupStatus/updated') readStoreStatus(params);
 
@@ -577,7 +620,7 @@ export function createCodexWorker({
     })
     .then((accepted) => {
       const id = accepted?.turn?.id;
-      if (typeof id === 'string' && id) worker.turnId = id;
+      if (typeof id === 'string' && id) { worker.turnId = id; turnBegan(); }
     })
     .catch((err) => {
       // No thread, a refused resume, or a refused turn. The message includes the

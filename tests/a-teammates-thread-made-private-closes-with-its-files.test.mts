@@ -42,9 +42,12 @@ describe('the window', () => {
   });
 });
 
-describe('a restarted test copy', () => {
+// The skills are a private checkout, absent on GitHub and in a public clone.
+const LIVE = new URL('../.claude/skills/verify-agentbox/scripts/live.mjs', import.meta.url);
+
+describe.skipIf(!fs.existsSync(LIVE))('a restarted test copy', () => {
   it('asks for the port it had, and takes a new one only if that is gone', () => {
-    const live = fs.readFileSync(new URL('../.claude/skills/verify-agentbox/scripts/live.mjs', import.meta.url), 'utf8');
+    const live = fs.readFileSync(LIVE, 'utf8');
     expect(live).toContain("const kept = state.url ? new URL(state.url).port : '';");
     expect(live).toContain("...(port ? ['--port', port] : [])");
     expect(live).toContain("if (!url && kept && !alive(child.pid)) ({ child, found: url } = await launch(''));");

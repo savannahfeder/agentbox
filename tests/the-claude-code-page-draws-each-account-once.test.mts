@@ -24,7 +24,7 @@ describe('the Claude Code page', () => {
   it('the reported case:one group of tiles, every account in it, with Refresh at its head', () => {
     expect(claude.match(/<Place\b/g)).toHaveLength(1);
     expect(claude).toMatch(/name="Signed in"[\s\S]*onClick=\{refresh\}[\s\S]*accounts=\{tiles\}/);
-    expect(page).toContain("engine === 'codex' ? refreshCodex() : readAccounts(true)");
+    expect(page).toContain("engine === 'codex' ? refreshCodex(true) : readAccounts(true)");
   });
 
   it('IN USE sits beside the address, and must NOT be pushed to the right margin, where it was missed', () => {
@@ -38,7 +38,7 @@ describe('the Claude Code page', () => {
 
   it('the cloud is one row with a switch, not a second set of tiles', () => {
     expect(claude).toMatch(/<Group id="cloud-accounts" label="Cloud">\s*<Row label="Use the cloud"/);
-    expect(claude).toContain('cloudToggleTarget(cloudHere)');
+    expect(claude).toContain('cloudToggleTarget(cloud)');
     expect(page).not.toContain('cloudCard');
   });
 });

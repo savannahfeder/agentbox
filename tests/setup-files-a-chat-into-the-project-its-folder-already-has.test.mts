@@ -11,36 +11,18 @@
 // differs from its project's would have been made into a second project of
 // the same folder instead.
 //
-// So the card gets every project, the walk's own first, never the practice one.
+// So the card is handed every project, and a chat lands in the one its folder
+// already has. (The old walk's own project list went with it, 2026-11-21.)
 
 import { describe, it, expect } from 'vitest';
-import { walkProjects } from '../renderer/src/onboarding';
 import { destinations } from '../renderer/src/agent-import-card';
 
-const run = (over = {}) => ({ step: 'done', product: 'house', name: 'House', folder: '/h/dev/house', ...over });
 const kestrel = { slug: 'kestrel', name: 'Kestrel', repoPath: '/h/dev/kestrel' };
 const payments = { slug: 'payments-api', name: 'Payments API', repoPath: '/h/dev/payments' };
-const practice = { slug: 'practice', name: 'Practice', repoPath: '/h/practice', practice: true };
 const chat = (id, folder) => ({ id, source: 'terminal', folder, folderName: folder.split('/').pop(), short: folder, title: id, when: Date.now(), path: `/x/${id}.jsonl` });
 
-describe("the projects setup's last screen files into", () => {
-  it('puts the walk\'s own project first, then every other one, and never the practice one', () => {
-    const house = { slug: 'house', name: 'House', repoPath: '/h/dev/house' };
-    expect(walkProjects([kestrel, practice, house, payments], run()).map((p) => p.slug))
-      .toEqual(['house', 'kestrel', 'payments-api']);
-  });
-
-  it('builds the walk\'s project from the walk while the app\'s list has not caught up', () => {
-    expect(walkProjects([kestrel], run())[0]).toEqual({ slug: 'house', name: 'House', repoPath: '/h/dev/house' });
-  });
-
-  it('is every real project when the walk made none', () => {
-    expect(walkProjects([kestrel, practice], run({ product: null })).map((p) => p.slug)).toEqual(['kestrel']);
-  });
-});
-
 describe('a chat in a folder a project already points at', () => {
-  const sections = (threads) => destinations({ found: null, folders: [], products: walkProjects([kestrel, payments], run()), project: 'house', threads });
+  const sections = (threads) => destinations({ found: null, folders: [], products: [kestrel, payments], project: 'house', threads });
 
   it('lands in that project, not a new one', () => {
     const d = sections([chat('a', '/h/dev/kestrel')]);

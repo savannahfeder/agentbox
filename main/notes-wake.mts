@@ -1,6 +1,10 @@
-import { answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles, unsentReplies, type FileMarks, type FileNote, type FileVersion, type Mark, type NotePerson } from '../shared/artifact-marks.mts';
+import path from 'node:path';
+import { agentOfVersion, answeredNotes, approvalId, notedFilesInLines, noteGoesTo, notesForTheAgent, repliesForTheAgent, stillWaiting, threadFiles, unsentReplies, type FileFamily, type FileMarks, type FileNote, type FileVersion, type Mark, type NotePerson } from '../shared/artifact-marks.mts';
+import { withRunsSaid } from '../shared/runs-said.mts';
 import { heldByAPerson, type TeamRow } from '../shared/team-rules.mts';
 import { readItemHistory } from './store/work-items.mts';
+import { machineryPath } from './store/home.mts';
+import { newestRunTraces } from './run-traces.mts';
 import { submitReply, type ReplyItem, type ReplySupervisor } from './live-replies.mts';
 
 type NoteMark = { do: 'sent' | 'resolve'; on?: unknown; in?: unknown };
@@ -26,6 +30,15 @@ interface NoteReplyStore extends Omit<NotesStore, 'listItems'> {
 type NoteReadStore = Omit<NoteReplyStore, 'answerItem' | 'fileMark'>;
 
 type NotesSupervisor = ReplySupervisor & { liftBrakeForHer?(): unknown; wake?(): unknown };
+
+// Read as the big view reads them (ThreadArtifacts.tsx), so a note made there
+// finds its version here: the row's whole history, and what the runs said,
+// which is where an agent's answer and its pictures usually are.
+function filesTheThreadShows(store: Pick<NotesStore, 'productDir'>, product: string, id: string, item: NotesItem): FileFamily[] {
+  const dir = store.productDir(product);
+  const runs = newestRunTraces(machineryPath(dir, path.join('sessions', id))).map((s) => ({ startedAt: s.startedAt, text: 'text' in s ? s.text : '' }));
+  return threadFiles(notedFilesInLines(withRunsSaid(readItemHistory(dir, id, { max: Number.MAX_SAFE_INTEGER }), runs, item.runner ?? item.createdBy ?? null)));
+}
 
 // The next version from whoever a comment went to resolves it, so nobody presses
 // Resolve on what the agent or a teammate already fixed. Only the thread's own
@@ -74,6 +87,27 @@ export async function noteToItsAgent({ store, supervisor, product, id, mark, nam
   return handOn({ store, supervisor, product, id, text: words.join('\n\n'), sent, handOffMs });
 }
 
+/** The notes a Send named that its agent has still not been handed. */
+export function notesLeftUnsent({ store, product, id, mark, people = [] }: {
+  store: NoteReadStore;
+  product: string;
+  id: string;
+  mark: Mark | null | undefined;
+  people?: readonly NotePerson[];
+}): string[] {
+  const ids = mark?.do === 'toagent' ? mark.on ?? [] : [];
+  if (!ids.length || store.listProducts().find((p) => p.slug === product)?.team?.direct) return [];
+  const item = store.readItem(product, id);
+  if (!item || heldByAPerson(item)) return [];
+  return (item.artifacts?.notes ?? [])
+    .filter((n) => ids.includes(n.id) && !n.resolved && (!n.sent || unsentReplies(n, people).length > 0))
+    .map((n) => n.id);
+}
+
+export const notReached = (left: readonly string[]): string => (left.length === 1
+  ? 'The note is saved, but it did not reach the agent.'
+  : 'The notes are saved, but they did not reach the agent.');
+
 // A reply typed in the thread takes every comment of yours still waiting for
 // Send with it, so the agent hears them in the same turn. Null when none wait.
 export function replyWithWaitingNotes({ store, product, id, answer, me = null, nameOf = () => 'the person writing to you', people = [] }: {
@@ -119,7 +153,7 @@ function notesWords({ store, product, id, item, ids, nameOf, people }: {
   nameOf: (by: string | null) => string;
   people: readonly NotePerson[];
 }): { words: string[]; sent: string[] } {
-  const families = threadFiles(notedFilesInLines(readItemHistory(store.productDir(product), id)));
+  const families = filesTheThreadShows(store, product, id, item);
   const byVersion = new Map<string, { version: FileVersion; count: number; notes: FileNote[] }>();
   const words: string[] = [];
   const sent: string[] = [];
@@ -128,7 +162,7 @@ function notesWords({ store, product, id, item, ids, nameOf, people }: {
     if (note.resolved || (note.sent && !later.length) || noteGoesTo(note, people).to !== 'agent') continue;
     const family = families.find((f) => f.versions.some((v) => v.id === note.file));
     const version = family?.versions.find((v) => v.id === note.file);
-    if (typeof version?.agent !== 'string') continue;
+    if (!version || agentOfVersion(family!.versions, version.id) === null) continue;
     // `version` was found in `family`.
     if (note.sent) {
       words.push(repliesForTheAgent(note, later, version, family!.versions.length, { nameOf }));
@@ -181,14 +215,18 @@ async function approvalToItsAgent({ store, supervisor, product, id, mark }: {
   if (!mark.file || store.listProducts().find((p) => p.slug === product)?.team?.direct) return false;
   const item = store.readItem(product, id);
   if (!item || item.status === 'done' || heldByAPerson(item)) return false;
-  const families = threadFiles(notedFilesInLines(readItemHistory(store.productDir(product), id)));
-  const version = families.flatMap((f) => f.versions).find((v) => v.id === mark.file);
+  const versions = filesTheThreadShows(store, product, id, item).find((f) => f.versions.some((v) => v.id === mark.file))?.versions ?? [];
+  const version = versions.find((v) => v.id === mark.file);
   if (typeof version?.agent !== 'string') return false;
   const given = (item.artifacts?.approvals ?? []).filter((a) => a.file === mark.file).sort((a, b) => b.ts - a.ts)[0];
   if (!given) return false;
   // A teammate's version is theirs to act on; approving it tells this agent nothing.
   if (version.by && version.by !== given.by && version.by !== (item.runner ?? item.createdBy ?? null)) return false;
-  const text = `Approved ${version.path}. Proceed as you proposed.`;
+  const newest = versions.at(-1)!;
+  // "As you proposed" points the agent at its latest proposal, which an older version is not.
+  const text = newest === version
+    ? `Approved ${version.path}. Proceed as you proposed.`
+    : `Approved version ${version.n} of ${versions.length} (${version.path}). It is older than the newest, version ${newest.n} (${newest.path}). Go ahead with version ${version.n}, not version ${newest.n}.`;
   // fromNotes keeps the thread from drawing this reply beside the approval it already shows.
   await submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: [approvalId(given)] }));
   supervisor.liftBrakeForHer?.();

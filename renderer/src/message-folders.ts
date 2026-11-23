@@ -47,6 +47,11 @@ export function namedFolders(texts: Array<string | null | undefined>, dir: strin
   return out;
 }
 
+/** The folder a thread's runs work in (main/task-folders.mts). */
+export function taskFolder(repo: string | null | undefined, id: string | null | undefined): string | null {
+  return repo && id ? `${repo.replace(/\/+$/, '')}/.claude/worktrees/${id}` : null;
+}
+
 /** Every folder a picture this message names may be in, the likeliest first. */
 export function pictureRoots({ dir, repo, id, texts }: {
   dir: string | null | undefined;
@@ -61,7 +66,7 @@ export function pictureRoots({ dir, repo, id, texts }: {
     // id>` under the repository (main/task-folders.mts), so a path it writes is
     // relative to that folder. Her screenshot that evening was seven of them,
     // all "missing image" (tests/a-picture-in-the-workers-own-checkout-is-drawn).
-    repo && id && `${repo}/.claude/worktrees/${id}`,
+    taskFolder(repo, id),
     dir,
     dir && `${dir}/designs`,
     dir && `${dir}/attachments`,

@@ -23,7 +23,7 @@ describe('a reply in a conversation', () => {
     expect(quiet.indexOf('setSending((q) => [...q, mine])')).toBeLessThan(quiet.indexOf('await deferCommit('));
     // HELD ONLY WHERE IT IS HELD (w-461fbd8d2d). A phone writes a reply at
     // once and has no Z, and its message said "Sending… press Z to undo".
-    expect(quiet).toMatch(/const mine = \{ product: item\.product, id: item\.id, at: Date\.now\(\), text, held: holdsReplies\(onPhone\(\)\) \}/);
+    expect(quiet).toMatch(/const mine = \{ product: item\.product, id: item\.id, at: Date\.now\(\), text, held: holdsReplies\(onPhone\(\)\)[, }]/);
   });
 
   it('comes off the screen again when Z takes it back', () => {

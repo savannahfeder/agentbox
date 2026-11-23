@@ -3,13 +3,17 @@
 // versions within a project (shared/artifact-marks.mts); its comments and
 // approvals are those made on any copy of it. Only the threads the caller
 // lists are read: your own, and the teammates' threads the cloud shows you.
+import crypto from 'node:crypto';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { resolveArtifact } from './artifact-path.mts';
+import { isProjectsOwnFile } from './store/paths.mts';
 import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles, viewKind } from '../shared/artifact-marks.mts';
 import { saveNextVersion } from './file-version.mts';
 import { versionLine } from './version-line.mts';
-import { cleanFolderName, fileKeyIn, folderNamed, foldFolders, newFolderId, readFolderLog, writeFolderLog } from '../shared/file-folders.mts';
+import { cleanFolderName, fileKeyIn, folderLogStamp, folderNamed, foldFolders, newFolderId, readFolderLog, writeFolderLog } from '../shared/file-folders.mts';
 import { projectSeenBy } from '../shared/thread-cards.mts';
 import { shownTitle } from '../shared/thread-title.mts';
 import { FILE_HOME, isFileHome } from '../shared/file-home.mts';
@@ -19,12 +23,15 @@ import type { ArtifactProduct } from './artifact-path.mts';
 import type { LineVersion, VersionLine } from './version-line.mts';
 import type { SavedVersion } from './file-version.mts';
 import type { Store, StoreProduct } from './store.mts';
+import type { FilesKeeper, KeptVersion } from './files-cloud.mts';
+import { looseFilesIn } from './files-loose.mts';
+import { ICON_KINDS } from './project-identity.mts';
 import type { createTeamService } from './team/index.mts';
 
 type FilesTeam = ReturnType<typeof createTeamService>;
 type TeamNow = Partial<ReturnType<FilesTeam['state']>>;
 
-interface CloudFolder extends FileFolder { people?: string[] | null }
+interface CloudFolder extends FileFolder { people?: string[] | null; gone?: boolean }
 interface CloudPlace { owner: string; threadId: string; project: string; family: string; folder: string | null; at: number; by?: string | null }
 interface CloudShelf { folders: CloudFolder[]; places: CloudPlace[] }
 
@@ -102,7 +109,16 @@ interface FileBytes { size: number; mtime: number; hash: string }
 
 type HistoryReader = (id: string, o: { max?: number }) => readonly ThreadLine[];
 
-export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null };
+/**
+ * `bytes` is the newest version's size on this computer, `onMac` every
+ * version's, `older` what Move older versions to the Trash would move and
+ * `movable` what the file's own Move to the Trash would, which is 0 for an
+ * empty document that `trashable` still lets it move. `cloud` is a newest
+ * version kept in the cloud and off this computer, drawn from `poster`.
+ */
+export interface FileSizes { bytes: number | null; onMac: number; older: number; movable: number; trashable: boolean; cloud?: boolean; poster?: string | null }
+
+export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null; title?: string } & FileSizes;
 
 export type MarkAnswer =
   | { ok: true; wrote?: { product: string; id: string } }
@@ -132,8 +148,15 @@ const projectKey = (name: string | null | undefined): string => String(name ?? '
 const toCloudFamily = (family: string): string => family.split('\0').map(encodeURIComponent).join('/');
 const fromCloudFamily = (family: unknown): string => String(family).split('/').map(decodeURIComponent).join('\0');
 const CROSS_EVERY_MS = 10_000;
+const UNDO_KEEP_MS = 10 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
+// A thread its agent may still work on: its folder stays on this computer.
+const OPEN_STATUSES = new Set(['open', 'claimed', 'blocked']);
 // What New makes, and what it starts with: a table needs its columns to be typed into.
-const MADE: Record<MadeKind, { ext: string; seed: string }> = { document: { ext: '.md', seed: '' }, table: { ext: '.csv', seed: 'Name,Notes\n' } };
+const MADE: Record<MadeKind, { ext: string; seed: string; untitled: string }> = {
+  document: { ext: '.md', seed: '', untitled: 'Untitled document' },
+  table: { ext: '.csv', seed: 'Name,Notes\n', untitled: 'Untitled table' },
+};
 const SEED_OF = new Map(Object.values(MADE).map((m) => [m.ext, m.seed]));
 /** Whether the file at `src` is still exactly what New started it with. */
 async function untouched(src: string): Promise<boolean> {
@@ -144,6 +167,12 @@ async function untouched(src: string): Promise<boolean> {
   return (await fs.promises.readFile(src, 'utf8').catch(() => null)) === seed;
 }
 const FILES_FOR_AGENTS = 40;
+/** How long the folders made for agents answer while no folder or filing changes. */
+export const AGENTS_VIEW_KEPT_MS = 60_000;
+interface AgentFolder {
+  id: string; project: string | null; folder: string; inside?: string | null; more?: number;
+  files: { file: string; title?: string; path: string | null; versions: number; openComments: number; approved: boolean }[];
+}
 
 /**
  * Threads to files. A thread is `{ ref, title, project, lines }`, where `ref`
@@ -152,7 +181,8 @@ const FILES_FOR_AGENTS = 40;
  * same name, as the agent's tools match it (mcp/core/reach.mts).
  */
 /** Counts for tests: how many threads were parsed for their files. */
-export const filesOfInternals = { parses: 0, entries: 0, lists: 0 };
+export const filesOfInternals = { parses: 0, entries: 0, lists: 0, chains: 0 };
+export const CHAIN_KEEP_MS = 30_000;
 
 // Every list of Files reads every thread, so a thread is parsed again only when
 // its lines did: one agent writing must not re-read thousands of threads.
@@ -217,6 +247,22 @@ export function filesOf(threads: readonly PlaceThread[]): PlacedFile[] {
 }
 
 const COPY_PATH = /^sources\/[^/]+\/[^/]+$/;
+// A teammate's shared thread names its copy for the first 12 of its bytes' sha256 (main/team/thread-share.mts).
+const copiedHash = (c: ChainCopy): string | null => (c.thread.ref.kind === 'shared' ? /^attachments\/([0-9a-f]{12})-[^/]+$/.exec(c.path)?.[1] ?? null : null);
+
+/**
+ * The version a copy whose bytes are not here is: the one its copied name's
+ * hash names, else the one that names it. Two threads' report.md share one
+ * version whatever their bytes, so that version must not contradict the hash,
+ * and a hash two versions start with names neither.
+ */
+export function versionOfMissingCopy(chain: readonly LinedVersion[], c: ChainCopy): LinedVersion | null {
+  const sum = copiedHash(c);
+  const byHash = sum ? chain.filter((v) => v.hash?.startsWith(sum)) : [];
+  if (byHash.length > 1) return null;
+  const fits = (v: LinedVersion): boolean => !sum || !v.hash || v.hash.startsWith(sum);
+  return byHash[0] ?? chain.find((v) => !v.away && fits(v) && v.copies.some((x) => refKey(x.thread.ref) === refKey(c.thread.ref) && x.path === c.path)) ?? null;
+}
 const firsts = new WeakMap<FileFamily, number>();
 const firstAt = (fam: FileFamily): number => {
   if (!firsts.has(fam)) firsts.set(fam, Math.min(...fam.versions.map((v) => v.at || 0)));
@@ -340,6 +386,9 @@ function summary(f: GroupedFile): PlacedFile {
   };
 }
 
+/** A path as the big view's lines carry it: the line readers split on forward slashes only. */
+export const linkPath = (p: string, sep: string = path.sep): string => p.split(sep).join('/');
+
 /** The big view's lines: one per version, at the path it opens from. */
 const linesOf = (file: LinedFile, opened: Map<string, string>): ThreadLine[] => file.chain.map((v): ThreadLine => (v.edited
   ? { ts: v.at, by: v.by, source: 'founder', patch: { artifact: { do: 'edit', file: v.id, path: opened.get(v.id) } } }
@@ -391,12 +440,16 @@ function viewOf(file: LinedFile, opened: Map<string, string>) {
 }
 
 /** The store and the team, as the Files place reads them. */
-export function appFilesPlace({ store, team = null, accountRoot, storeRoot, notify = () => {} }: {
+export function appFilesPlace({ store, team = null, accountRoot, storeRoot, notify = () => {}, keeper = null, trashItem = null }: {
   store: Store;
   team?: FilesTeam | null;
   accountRoot?: string | null;
   storeRoot: string;
   notify?: () => void;
+  keeper?: FilesKeeper | null;
+  /** The computer's own Trash, so a file moved there can be put back. */
+  /** Where the file landed, when the Trash says. */
+  trashItem?: ((file: string) => Promise<string | void>) | null;
 }) {
   const built = new Map<string, { version: unknown; lines: readonly ThreadLine[] }>();
   const logDir = (): string => store.teammates?.dir?.() ?? storeRoot;
@@ -459,12 +512,16 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const quietly = async (what: string, fn: () => Promise<unknown>): Promise<void> => {
       try { await fn(); wrote = true; } catch (err) { console.warn(`files: ${what}: ${(err as Error).message}`); }
     };
-    for (const f of local.folders) {
+    for (const f of [...local.folders, ...local.gone]) {
       const was = seenFolder.get(f.id);
       if (was && was.at >= f.at) continue;
       const people = was ? was.people : audienceOf(f.project);
       if (people === 'private') continue;
-      await quietly('sending a folder', () => cloud.putFolder({ id: f.id, project: f.project, name: f.name, parent: f.parent, people, at: f.at }));
+      // A removed folder never sent is nothing for anyone else to remove.
+      if (!was && 'gone' in f) continue;
+      // `gone` is named only when it says something, so a database without the column still takes folders.
+      const gone = 'gone' in f ? { gone: true } : was?.gone ? { gone: false } : {};
+      await quietly('sending a folder', () => cloud.putFolder({ id: f.id, project: f.project, name: f.name, parent: f.parent, people, at: f.at, ...gone }));
     }
     if (wrote) held = await cloud.read() as CloudShelf;
     const merged = shelf();
@@ -585,20 +642,78 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     return found.ok ? found.path : null;
   };
 
-  // An open file asks for every copy it names on each change in the app, so a
-  // file's line is read once per state of the threads, with one reading of the projects.
-  type Lined = { chain: LinedVersion[]; same: Map<string, string> };
-  let chainsFor: { files: PlacedFile[] | null; products: ArtifactProduct[]; shared: Map<string, boolean>; byKey: Map<string, Promise<Lined>> } = { files: null, products: [], shared: new Map(), byKey: new Map() };
+  // An open file asks for every copy it names on each change in the app, so the
+  // projects are read once per state of the threads.
+  type Lined = { chain: LinedVersion[]; same: Map<string, string>; unfound: ChainVersion[] };
+  type Chains = { files: PlacedFile[] | null; products: ArtifactProduct[]; productsSig: string; shared: Map<string, boolean>; byKey: Map<string, Promise<Lined>> };
+  let chainsFor: Chains = { files: null, products: [], productsSig: '', shared: new Map(), byKey: new Map() };
   const chainsNow = (files: PlacedFile[]) => {
-    if (chainsFor.files !== files) chainsFor = { files, products: readable(), shared: new Map(), byKey: new Map() };
+    if (chainsFor.files !== files) {
+      const products = readable();
+      chainsFor = { files, products, productsSig: products.map((p) => `${p.slug}|${p.dir}|${p.repoPath ?? ''}`).join('\n'), shared: new Map(), byKey: new Map() };
+    }
     return chainsFor;
   };
+  // A file's line looks up every copy of it every thread names, so a new line
+  // anywhere must not redo the files it left alone. A kept line is looked up
+  // again after CHAIN_KEEP_MS, which finds a file that arrived without a word.
+  const keptChains = new Map<string, { sig: string; line: string | null; until: number; value: Promise<Lined> }>();
+  const fileSigs = new WeakMap<PlacedFile, string>();
+  const fileSig = (f: PlacedFile): string => {
+    let sig = fileSigs.get(f);
+    if (sig === undefined) {
+      sig = JSON.stringify([f.key, f.chain.map((v) => [v.id, v.name, v.at, v.by, v.agent, v.edited, v.made, v.copies.map((c) => [refKey(c.thread.ref), c.path, c.at])])]);
+      fileSigs.set(f, sig);
+    }
+    return sig;
+  };
+  const lineSig = (key: string): string => lineNow().of(key).map((e) => `${e.n}:${e.hash}:${e.pending ? 1 : 0}:${e.kept ?? ''}`).join(',');
   function chainOf(f: PlacedFile, files: PlacedFile[]): Promise<Lined> {
     const now = chainsNow(files);
     const project = projectKey(f.project);
     if (!now.shared.has(project)) now.shared.set(project, audienceOf(f.project) !== 'private');
-    if (!now.byKey.has(f.key)) now.byKey.set(f.key, lineChain(f, now.shared.get(project), now.products));
-    return now.byKey.get(f.key)!;
+    const shared = now.shared.get(project);
+    const sig = `${now.productsSig}\0${shared}\0${fileSig(f)}`;
+    let had = now.byKey.get(f.key);
+    if (!had) {
+      const kept = keptChains.get(f.key);
+      if (!(kept && kept.sig === sig && Date.now() < kept.until && (kept.line === null || kept.line === lineSig(f.key)))) return buildChain(f, sig, shared, now);
+      had = kept.value;
+      now.byKey.set(f.key, had);
+    }
+    const held = had;
+    // An agent writing over the same path changes nothing the sig reads.
+    return held.then(async (was) => {
+      // A cloud run's answer reaches the thread before its files reach this Mac.
+      if (await bytesUnmoved(was.chain) && !(await anyLanded(f, was.unfound, now.products))) return was;
+      const latest = now.byKey.get(f.key)!;
+      return latest !== held ? latest : buildChain(f, sig, shared, now);
+    });
+  }
+  async function bytesUnmoved(chain: readonly LinedVersion[]): Promise<boolean> {
+    for (const v of chain) {
+      if (!v.opened || !v.hash) continue;
+      if ((await bytesOf(v.opened).catch(() => null))?.hash !== v.hash) return false;
+    }
+    return true;
+  }
+  // Only the newest copy: a name hundreds of threads say would otherwise be looked up hundreds of times an ask.
+  async function anyLanded(f: PlacedFile, unfound: readonly ChainVersion[], products: ArtifactProduct[]): Promise<boolean> {
+    for (const v of unfound) {
+      const newest = v.copies.reduce<ChainCopy | null>((a, c) => (!a || c.at > a.at ? c : a), null);
+      if (newest && await openedOf(f, { ...v, copies: [newest] }, { products })) return true;
+    }
+    return false;
+  }
+  function buildChain(f: PlacedFile, sig: string, shared: boolean | undefined, now: Chains): Promise<Lined> {
+    filesOfInternals.chains += 1;
+    const value = lineChain(f, shared, now.products);
+    const entry = { sig, line: null as string | null, until: Date.now() + CHAIN_KEEP_MS, value };
+    if (keptChains.size >= PARSED_KEEP) for (const [k, e] of keptChains) if (e.until <= Date.now()) keptChains.delete(k);
+    keptChains.set(f.key, entry);
+    value.then(() => { entry.line = lineSig(f.key); }, () => { if (keptChains.get(f.key) === entry) keptChains.delete(f.key); });
+    now.byKey.set(f.key, value);
+    return value;
   }
   // A group's file not fetched yet is null: drawing a view fetches nothing.
   const copyHere = (c: ChainCopy, products: ArtifactProduct[]): Promise<string | null> | string | null => (c.thread.ref.kind === 'room'
@@ -617,10 +732,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     }
     return null;
   }
-  // A copy whose bytes are not here is the version that names it.
   const versionOfCopy = async (chain: readonly LinedVersion[], c: ChainCopy, products: ArtifactProduct[]): Promise<LinedVersion | null> => {
     const held = await versionHeld(chain, await copyHere(c, products));
-    return held === undefined ? chain.find((v) => !v.away && v.copies.some((x) => x.thread === c.thread && x.path === c.path)) ?? null : held;
+    return held === undefined ? versionOfMissingCopy(chain, c) : held;
   };
 
   const nameInRoom = (src: string): string => String(src).replace(/^\.?\/?attachments\//, '');
@@ -651,7 +765,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
    * agent's shorthand, a file only promised) is no version. `same` maps every
    * other id a version went by to the one it is shown under.
    */
-  async function lineChain(f: PlacedFile | LinedFile, shared: boolean = audienceOf(f.project) !== 'private', products: ArtifactProduct[] = readable()): Promise<{ chain: LinedVersion[]; same: Map<string, string> }> {
+  async function lineChain(f: PlacedFile | LinedFile, shared: boolean = audienceOf(f.project) !== 'private', products: ArtifactProduct[] = readable()): Promise<Lined> {
     const line = lineNow();
     const mine: Array<{ v: ChainVersion; src: string | null; entry: LineVersion | null; blank: boolean }> = [];
     // A file nothing was ever written in is no version yet: its first words are v1.
@@ -692,7 +806,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     const blank = mine.find((m) => m.blank);
     if (blank && !chain.length) chain.push({ ...blank.v, n: 1, opened: blank.src, blank: true });
     for (const v of chain) same.set(`${baseName(v.name)}@${v.n}`, v.id);
-    return { chain, same };
+    return { chain, same, unfound: mine.filter((m) => !m.src).map((m) => m.v) };
   }
   // Opening may fetch: a version a teammate made is in the cloud for whoever can read its thread.
   async function openedToView(file: LinedFile, v: LinedVersion): Promise<string | null> {
@@ -701,13 +815,15 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   }
   /** A file as the big view opens it: its line, every mark on the line's ids, and where each version opens. */
   async function viewed(whole: PlacedFile): Promise<{ file: LinedFile; opened: Map<string, string>; same: Map<string, string> } | null> {
-    const { chain, same } = await lineChain(whole);
+    const { chain: all, same } = await lineChain(whole);
+    const trashed = trashedNow();
+    const chain = all.filter((v) => v.opened || !v.hash || !trashed[v.hash]);
     if (!chain.length) return null;
     const onLine = <T extends { file: string }>(m: T): T => (same.has(m.file) ? { ...m, file: same.get(m.file)! } : m);
     const file: LinedFile = { ...asOf(whole, chain), notes: whole.notes.map(onLine), approvals: whole.approvals.map(onLine) };
     const opened = new Map<string, string>();
     // A path that finds nothing, so the view says where the version is rather than drawing the one it was written over.
-    for (const v of file.chain) opened.set(v.id, await openedToView(file, v) ?? (v.away ? `line/${v.n}/${v.name}` : v.copies[0]?.path ?? v.name));
+    for (const v of file.chain) opened.set(v.id, linkPath(await openedToView(file, v) ?? (v.away ? `line/${v.n}/${v.name}` : v.copies[0]?.path ?? v.name)));
     return { file, opened, same };
   }
 
@@ -739,6 +855,197 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   // The version line saves its fingerprints, so a restart reads no film again.
   const bytesOf = (file: string): Promise<FileBytes | null> => lineNow().hashOf(file);
 
+  // Files moves only what sits in a project's own documents or among the
+  // version line's kept copies, never anything inside a code folder.
+  interface Roots { allow: string[]; deny: string[] }
+  // Through the nearest folder that exists: a root not made yet, such as the
+  // kept versions' before a first pass, still names the files later made in it.
+  const realOr = (p: string): string => {
+    const rest: string[] = [];
+    for (let at = path.resolve(p); ; at = path.dirname(at)) {
+      try { return path.join(fs.realpathSync(at), ...rest); } catch { /* not there yet */ }
+      if (path.dirname(at) === at) return path.resolve(p);
+      rest.unshift(path.basename(at));
+    }
+  };
+  function rootsNow(): Roots {
+    const products = store.listProducts();
+    return {
+      allow: [...products.map((p) => p.dir), path.join(logDir(), '.file-versions')].filter(Boolean).map(realOr),
+      deny: products.map((p) => p.repoPath).filter(Boolean).map((p) => realOr(p as string)),
+    };
+  }
+  const within = (dir: string, file: string): boolean => { const rel = path.relative(dir, file); return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel); };
+  const movableIn = (roots: Roots, file: string): boolean => movableReal(roots, realOr(file));
+  function movableReal(roots: Roots, real: string): boolean {
+    if (real.split(path.sep).includes('.git') || roots.deny.some((d) => within(d, real))) return false;
+    if (isProjectsOwnFile(path.basename(real)) && roots.allow.includes(path.dirname(real))) return false;
+    return roots.allow.some((a) => within(a, real));
+  }
+
+  const TRASHED = (): string => path.join(logDir(), '.file-versions', 'trashed.json');
+  function trashedNow(): Record<string, number> {
+    try { return JSON.parse(fs.readFileSync(TRASHED(), 'utf8')) as Record<string, number>; } catch { return {}; }
+  }
+
+  // Z's way back from the Trash. Electron's Trash does not say where a file
+  // went, so a clone is made first; once the Trash is emptied a clone holds
+  // the space, so it goes after a few minutes.
+  interface HeldBack { from: string; at: string; hash: string }
+  const UNDO = (): string => path.join(logDir(), '.file-versions', 'undo');
+  const HELD = 'held.json';
+  async function cloneFor(file: string, hold: string, n: number): Promise<string | null> {
+    const to = path.join(hold, `${n}-${path.basename(file)}`);
+    try {
+      fs.mkdirSync(hold, { recursive: true });
+      // Node cannot force a clone on a Mac (ENOSYS), and a full copy of a film is the space being freed.
+      if (process.platform === 'darwin') await promisify(execFile)('/bin/cp', ['-c', file, to], { timeout: 30_000 });
+      else await fs.promises.copyFile(file, to, fs.constants.COPYFILE_FICLONE_FORCE);
+      return to;
+    } catch {
+      fs.rmSync(to, { force: true });
+      return null;
+    }
+  }
+  function sweepUndo(): void {
+    let names: string[] = [];
+    try { names = fs.readdirSync(UNDO()); } catch { return; }
+    for (const n of names) {
+      const at = path.join(UNDO(), n);
+      const st = fs.statSync(at, { throwIfNoEntry: false });
+      if (st && Date.now() - st.mtimeMs > UNDO_KEEP_MS) fs.rmSync(at, { recursive: true, force: true });
+    }
+  }
+
+  /** Every place on this computer that holds this version's own bytes: a path written over since holds the next one. */
+  async function pathsOf(f: PlacedFile | LinedFile, v: LinedVersion, products: ArtifactProduct[]): Promise<string[]> {
+    if (!v.hash) return [];
+    const found = new Set<string>();
+    for (const c of v.copies) {
+      const ref = c.thread.ref;
+      if (ref.kind !== 'thread' && ref.kind !== 'chat') continue;
+      const p = await onDisk(c.path, ref.product, ref.kind === 'thread' ? ref.id : null, products);
+      if (p) found.add(p);
+    }
+    const kept = lineNow().of(f.key).find((e) => e.hash === v.hash)?.kept;
+    if (kept) found.add(kept);
+    if (v.opened) found.add(v.opened);
+    const out: string[] = [];
+    for (const p of found) if ((await lineNow().hashOf(p))?.hash === v.hash) out.push(p);
+    return out;
+  }
+
+  async function sizesOf(f: LinedFile, roots: Roots): Promise<FileSizes> {
+    let onMac = 0;
+    let older = 0;
+    let movable = 0;
+    let trashable = false;
+    let bytes: number | null = null;
+    const seen = new Set<string>();
+    const newest = f.chain.at(-1);
+    for (const v of f.chain) {
+      if (!v.opened || (v.hash && seen.has(v.hash))) continue;
+      const st = await fs.promises.stat(v.opened).catch(() => null);
+      if (!st?.isFile()) continue;
+      if (v.hash) seen.add(v.hash);
+      onMac += st.size;
+      if (v === newest) bytes = st.size;
+      if (movableIn(roots, v.opened)) { trashable = true; movable += st.size; if (v !== newest) older += st.size; }
+    }
+    const off = newest?.hash && !newest.opened ? keeper?.off(newest.hash) : null;
+    return { bytes, onMac, older, movable, trashable, ...(off ? { cloud: true, poster: off.poster ?? null } : {}) };
+  }
+
+  /** Every version on this computer, as the cloud keeper weighs them. */
+  async function keptVersions(): Promise<KeptVersion[]> {
+    const products = readable();
+    const roots = rootsNow();
+    const out: KeptVersion[] = [];
+    for (const whole of allFiles()) {
+      const { chain } = await lineChain(whole, audienceOf(whole.project) !== 'private', products);
+      for (const v of chain) {
+        const paths = await pathsOf(whole, v, products);
+        const st = paths[0] ? await fs.promises.stat(paths[0]).catch(() => null) : null;
+        if (!st || !v.hash) continue;
+        const threads = paths.map(threadFolderOf).filter((k): k is string => !!k);
+        out.push({
+          hash: v.hash, size: st.size, paths, kind: whole.kind, at: v.at || st.mtimeMs, name: v.name, movable: paths.every((p) => movableIn(roots, p)),
+          ...(threads.length ? { staysNow: () => threads.some((k) => workingNow().has(k)) } : {}),
+        });
+      }
+    }
+    return [...out, ...await looseVersions(out, roots)];
+  }
+
+  // The threads an agent may still work on, read again at most every half minute while a pass runs for hours.
+  let working: { at: number; keys: Set<string> } = { at: 0, keys: new Set() };
+  function workingNow(): Set<string> {
+    if (Date.now() - working.at > 30_000) {
+      working = { at: Date.now(), keys: new Set(store.listAllWorkItems().filter((i) => OPEN_STATUSES.has(i.status ?? '')).map((i) => `${i.product}/${i.id}`)) };
+    }
+    return working.keys;
+  }
+  /** `<project>/<thread>` for a path inside a thread's own designs folder. */
+  function threadFolderOf(file: string): string | null {
+    const at = path.resolve(file);
+    for (const p of store.listProducts()) {
+      if (!p.dir) continue;
+      const parts = path.relative(path.resolve(p.dir), at).split(path.sep);
+      if (parts[0] === 'designs' && parts.length > 2) return `${p.slug}/${parts[1]}`;
+    }
+    return null;
+  }
+
+  // Most of what agents make is never named one by one, and threads old enough
+  // drop off the list the app reads, so their folders are looked through too.
+  // Only what is old enough to leave is weighed: hashing the rest is wasted.
+  async function looseVersions(named: readonly KeptVersion[], roots: Roots): Promise<KeptVersion[]> {
+    const { offAfterDays } = keeper!.status();
+    if (offAfterDays <= 0) return [];
+    const before = Date.now() - offAfterDays * DAY_MS;
+    // Plain paths, not real ones: a twin missed here is still one version once the keeper joins them by their bytes.
+    const claimed = new Set(named.flatMap((v) => v.paths.map((p) => path.resolve(p))));
+    const products = store.listProducts().filter((p) => p.dir);
+    // The project's own mark, which the app draws without asking for it back (main/project-identity.mts).
+    for (const p of products) for (const ext of ICON_KINDS) claimed.add(path.resolve(p.dir, `icon${ext}`));
+    const places = [
+      ...products.map((p) => ({ dir: p.dir, slug: p.slug as string | null, skip: p.repoPath ? [p.repoPath] : [] })),
+      { dir: path.join(logDir(), '.file-versions', 'version-bytes'), slug: null, skip: [] },
+    ];
+    const out: KeptVersion[] = [];
+    for (const place of places) {
+      // The walk follows no link, so a file's real place is its folder's real place and the rest of its path.
+      const realDir = realOr(place.dir);
+      for (const f of await looseFilesIn(place.dir, { skip: place.skip })) {
+        const key = place.slug && f.thread ? `${place.slug}/${f.thread}` : null;
+        if (f.at >= before || (key && workingNow().has(key)) || claimed.has(path.resolve(f.path))) continue;
+        const bytes = await lineNow().hashOf(f.path);
+        if (!bytes) continue;
+        out.push({
+          hash: bytes.hash, size: bytes.size, paths: [f.path], kind: f.kind, at: f.at, name: path.basename(f.path),
+          movable: movableReal(roots, path.join(realDir, path.relative(place.dir, f.path))), loose: true,
+          ...(key ? { staysNow: () => workingNow().has(key) } : {}),
+        });
+      }
+    }
+    return out;
+  }
+  const CONSIDER_EVERY_MS = 10 * 60_000;
+  let consideredAt = 0;
+  let considering: Promise<void> | null = null;
+  let shared = false;
+  function consider(force = false): Promise<void> {
+    if (!keeper || considering || (!force && Date.now() - consideredAt < CONSIDER_EVERY_MS)) return considering ?? Promise.resolve();
+    consideredAt = Date.now();
+    // Before the first pass, so a kept copy is never made again while the pass takes it off.
+    const sharing = shared ? Promise.resolve() : lineNow().shareKeptCopies().then(() => { shared = true; }, (err: Error) => { console.warn(`files: kept copies were not shared: ${err.message}`); });
+    // Without a plan for files a pass needs no versions: it only brings back what an ended plan kept.
+    considering = sharing.then(() => keeper.wantsVersions()).then(async (want) => keeper.pass(want ? await keptVersions() : []))
+      .catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); })
+      .finally(() => { considering = null; });
+    return considering;
+  }
+
   // Shared and group threads are only listed with a team, and a group's only with its rooms.
   async function writeTo(thread: PlaceThread, mark: unknown): Promise<void> {
     if (thread.ref.kind === 'shared') await team!.markSharedFile(thread.ref.ownerId, thread.ref.threadId, mark);
@@ -748,15 +1055,24 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
 
   // Every change in the app asks for the list again. A list asked for while one
   // runs waits for it and reads once more, so they never pile up behind each other.
+  let agentsView: { log: string; held: CloudShelf; at: number; view: Promise<AgentFolder[]> } | null = null;
   let listing: Promise<FilesList> | null = null;
   let listAgain: Promise<FilesList> | null = null;
+  let lastMade: FilesList | null = null;
   function list(): Promise<FilesList> {
     if (!listing) {
-      listing = listOnce().finally(() => { listing = null; });
+      listing = listOnce().then((made) => { lastMade = made; return made; }).finally(() => { listing = null; });
       return listing;
     }
     listAgain ??= listing.catch(() => {}).then(() => { listAgain = null; return list(); });
     return listAgain;
+  }
+  /** The last list made, at once, for a page with nothing to draw yet; the fresh one arrives as a change. */
+  function listSoon(): Promise<FilesList> {
+    const had = lastMade;
+    if (!had) return list();
+    void list().then((fresh) => { if (JSON.stringify(fresh) !== JSON.stringify(had)) notify(); }, () => {});
+    return Promise.resolve(had);
   }
 
   async function listOnce(): Promise<FilesList> {
@@ -790,9 +1106,13 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     };
     // Read once for the pass: per version it was thousands of stats of every project folder.
     const products = readable();
+    const roots = rootsNow();
+    const trashed = trashedNow();
     const lined: LinedFile[] = [];
     for (const whole of files) {
-      const { chain } = await lineChain(whole, isShared(whole.project), products);
+      const { chain: all } = await lineChain(whole, isShared(whole.project), products);
+      // A version put back from the Trash is on disk again, and shows again.
+      const chain = all.filter((v) => v.opened || !v.hash || !trashed[v.hash]);
       if (chain.length) lined.push(asOf(whole, chain));
     }
     const rows = await Promise.all(lined.map(async (f) => {
@@ -804,8 +1124,13 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const beside = own ? null : homeOf(f);
       // Filed in another project's folder, it is listed where it was filed.
       const shownIn = lib.folders.find((x) => x.id === (own ?? beside))?.project ?? project;
-      return { ...row, project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: await faceOf(f, products) };
-    })).then((all) => all.filter((f) => f.opened || (f.kind !== 'page' && f.kind !== 'code')));
+      const sizes = await sizesOf(f, roots);
+      const title = lib.titleOf(f.key) ?? (filed ? lib.titleOf(filed.key) : null);
+      const icon = lib.iconOf(f.key) ?? (filed ? lib.iconOf(filed.key) : null);
+      // A newest version in the cloud draws its poster, not an older version still here.
+      return { ...row, ...(title ? { title } : {}), ...(icon ? { icon } : {}), project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
+    })).then((all) => all.filter((f) => f.opened || f.cloud || (f.kind !== 'page' && f.kind !== 'code')));
+    consider();
     const projects: string[] = [];
     for (const name of [...rows.map((f) => f.project), ...lib.folders.map((f) => f.project)]) {
       if (name && !projects.some((p) => projectKey(p) === projectKey(name))) projects.push(name);
@@ -851,6 +1176,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
 
   return {
     list,
+    listSoon,
 
     crossing,
 
@@ -879,6 +1205,34 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return { ok: true };
     },
 
+    /**
+     * A folder and the ones under it, gone. Its files are untouched and show at
+     * the top of the project; their places still name it, so putting it back
+     * returns them.
+     */
+    async removeFolder({ id, by = team?.state?.().me?.id ?? null }: { id: string; by?: string | null }) {
+      const lib = shelf();
+      const was = lib.folders.find((f) => f.id === lib.canon(id));
+      if (!was) throw new Error('that folder is gone');
+      writeFolderLog(logDir(), { op: 'folder', id: was.id, project: was.project, name: was.name, parent: was.parent, gone: true, by, at: Date.now() });
+      void crossing();
+      return { ok: true, ids: [was.id] };
+    },
+
+    async restoreFolders({ ids, by = team?.state?.().me?.id ?? null }: { ids: readonly string[]; by?: string | null }) {
+      const lib = shelf();
+      const at = Date.now();
+      let back = 0;
+      for (const id of ids) {
+        const was = lib.gone.find((f) => f.id === id);
+        if (!was) continue;
+        writeFolderLog(logDir(), { op: 'folder', id: was.id, project: was.project, name: was.name, parent: was.parent, gone: false, by, at });
+        back += 1;
+      }
+      if (back) void crossing();
+      return { ok: true, back };
+    },
+
     /** A file's place is by its identity, so this holds for every version, past and to come. */
     async moveFile({ key, folder = null, by = team?.state?.().me?.id ?? null }: { key: string; folder?: string | null; by?: string | null }) {
       const lib = shelf();
@@ -897,19 +1251,40 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
      * only what a thread names, so it gets a thread of its own, made closed so
      * no agent starts on it.
      */
-    async newDocument({ project, name, kind = 'document', folder = null, by = team?.state?.().me?.id ?? null }: { project: string; name: string; kind?: string; folder?: string | null; by?: string | null }) {
-      const title = cleanFolderName(name);
-      if (!title) throw new Error(`a ${kind} needs a name`);
+    async newDocument({ project, name = '', kind = 'document', folder = null, by = team?.state?.().me?.id ?? null }: { project: string; name?: string; kind?: string; folder?: string | null; by?: string | null }) {
       const made = MADE[kind as MadeKind] as (typeof MADE)[MadeKind] | undefined;
       if (!made) throw new Error('New makes a document or a table');
+      // New asks for nothing first; the person renames it once it is open.
+      const title = cleanFolderName(name) || made.untitled;
       const { home, into } = whereNew(project, folder);
-      const stem = title.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
+      const typed = title.toLowerCase().endsWith(made.ext) ? title.slice(0, -made.ext.length) : title;
+      const stem = typed.toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || kind;
       const file = freeName(home, stem, made.ext);
       fs.mkdirSync(path.join(home.dir, 'documents'), { recursive: true });
       fs.writeFileSync(path.join(home.dir, 'documents', file), made.seed, { flag: 'wx' });
       holdIn(home, title, [file]);
       placeIn(home, into, [file], by);
-      return { key: fileKeyIn(home.name, file) };
+      const key = fileKeyIn(home.name, file);
+      writeFolderLog(logDir(), { op: 'name', key, project: home.name, name: title, by, at: Date.now() });
+      return { key, title };
+    },
+
+    /** The name Files shows for a file. Its name on disk stays, so every thread and version that names it still finds it. */
+    async renameFile({ key, name, by = team?.state?.().me?.id ?? null }: { key: string; name: string; by?: string | null }) {
+      const clean = cleanFolderName(name);
+      if (!clean) throw new Error('a file needs a name');
+      const file = allFiles().find((f) => f.key === key);
+      if (!file) throw new Error('that file is gone');
+      writeFolderLog(logDir(), { op: 'name', key, project: file.project, name: clean, by, at: Date.now() });
+      return { ok: true, title: clean };
+    },
+
+    /** The icon a file's tile wears; empty gives it back the one Files picks. */
+    async setIcon({ key, icon, by = team?.state?.().me?.id ?? null }: { key: string; icon: string; by?: string | null }) {
+      const file = allFiles().find((f) => f.key === key);
+      if (!file) throw new Error('that file is gone');
+      writeFolderLog(logDir(), { op: 'icon', key, project: file.project, icon: String(icon).replace(/[^a-z-]/g, '').slice(0, 24), by, at: Date.now() });
+      return { ok: true };
     },
 
     /** Copies of files from this computer, into the project's documents. A kind Files cannot show is left out and named. */
@@ -946,20 +1321,35 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return made;
     },
 
-    /** Folders and their files for an agent's team_read. A chat's file is left out: its owner decides who reads those. */
-    async forAgents() {
-      const { files, folders } = await this.list();
-      return folders.map((f) => {
+    /**
+     * Folders and their files for an agent's team_read. A chat's file is left out: its owner decides who reads those.
+     *
+     * The supervisor asks on every pass, and the list behind this looks every
+     * version of every thread's files up on disk. So it is made again when a
+     * folder or a filing changes, here or in the cloud, and otherwise once in
+     * AGENTS_VIEW_KEPT_MS: a thread's next file landing beside its others, or a
+     * file arriving without a word, shows that much later.
+     */
+    forAgents(): Promise<AgentFolder[]> {
+      crossSoon();
+      const log = folderLogStamp(logDir());
+      const had = agentsView;
+      if (had && had.log === log && had.held === held && Date.now() - had.at < AGENTS_VIEW_KEPT_MS) return had.view;
+      const view = list().then(({ files, folders }): AgentFolder[] => folders.map((f) => {
         const inside = files.filter((x) => x.folder === f.id && x.sentIn.some((s) => s.kind !== 'chat'));
         return {
           id: f.id, project: f.project, folder: f.name,
           ...(f.parent ? { inside: folders.find((x) => x.id === f.parent)?.name ?? null } : {}),
           files: inside.slice(0, FILES_FOR_AGENTS).map((x) => ({
-            file: x.name, path: x.opened, versions: x.versions, openComments: x.open, approved: x.approvedBy.length > 0,
+            file: x.name, ...(x.title ? { title: x.title } : {}), path: x.opened, versions: x.versions, openComments: x.open, approved: x.approvedBy.length > 0,
           })),
           ...(inside.length > FILES_FOR_AGENTS ? { more: inside.length - FILES_FOR_AGENTS } : {}),
         };
-      });
+      }));
+      agentsView = { log, held, at: Date.now(), view };
+      // A list that failed is asked for again next time.
+      view.catch(() => { if (agentsView?.view === view) agentsView = null; });
+      return view;
     },
 
     /** The next version of a file, from any place that names it. `goes: 'sent'` is one still on its way to its owner. */
@@ -1042,8 +1432,135 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     async open(key: string) {
       const whole = find(key);
       const seen = whole && await viewed(whole);
-      return seen ? viewOf(seen.file, seen.opened) : null;
+      if (!seen) return null;
+      // Opening it is what brings it back; its view reads again once it is here.
+      const newest = seen.file.chain.at(-1);
+      const coming = !!(newest?.hash && !newest.opened && keeper?.off(newest.hash));
+      if (coming) void keeper!.bringBack(newest!.hash!);
+      else if (newest?.hash && keeper) keeper.opened(newest.hash);
+      const title = shelf().titleOf(key);
+      // A file made in Files is sent in no thread, so only this says where a table saves.
+      const home = seen.file.project ? store.listProducts().find((p) => !p.team?.direct && projectKey(p.name) === projectKey(seen.file.project)) : null;
+      return { ...viewOf(seen.file, seen.opened), ...(home ? { product: home.slug } : {}), ...(title ? { title } : {}), ...(coming ? { coming: true } : {}) };
     },
+
+    /**
+     * Versions of these files moved to the computer's Trash, every copy here
+     * and the version line's kept one, so the space comes back once the Trash
+     * is emptied. `older` leaves each file's newest version where it is.
+     */
+    async trash({ keys, older = false }: { keys: readonly string[]; older?: boolean }): Promise<{ ok: true; moved: number; bytes: number; undo?: string } | { ok: false; error: string; moved: number; bytes: number }> {
+      let moved = 0;
+      let bytes = 0;
+      if (!trashItem) return { ok: false, error: 'This computer has no Trash to move files to.', moved, bytes };
+      const products = readable();
+      const roots = rootsNow();
+      const trashed = trashedNow();
+      const gone = new Set<string>();
+      sweepUndo();
+      const token = `${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}`;
+      const hold = path.join(UNDO(), token);
+      const held: HeldBack[] = [];
+      let undoable = true;
+      try {
+        for (const key of keys) {
+          const whole = find(key);
+          if (!whole) continue;
+          const { chain } = await lineChain(whole, audienceOf(whole.project) !== 'private', products);
+          for (const v of older ? chain.slice(0, -1) : chain) {
+            // A document nothing was written in has no fingerprint, only its file.
+            const all = v.blank && v.opened ? [v.opened] : await pathsOf(whole, v, products);
+            // A version with a copy in a code folder is the code's, and stays whole.
+            if (!all.length || !all.every((p) => movableIn(roots, p))) continue;
+            const paths = all.filter((p) => !gone.has(p));
+            if (!paths.length) continue;
+            let size = 0;
+            for (const p of paths) {
+              size = Math.max(size, (await fs.promises.stat(p)).size);
+              const clone = await cloneFor(p, hold, held.length);
+              const landed = await trashItem(p);
+              gone.add(p);
+              const back = typeof landed === 'string' ? landed : clone;
+              if (clone && back !== clone) fs.rmSync(clone, { force: true });
+              if (back) held.push({ from: p, at: back, hash: v.hash ?? '' });
+              else undoable = false;
+            }
+            if (v.hash) trashed[v.hash] = Date.now();
+            moved += 1;
+            bytes += size;
+          }
+        }
+      } catch (err) {
+        undoable = false;
+        return { ok: false, error: `Not everything could be moved to the Trash: ${(err as Error).message}`, moved, bytes };
+      } finally {
+        if (moved) {
+          fs.mkdirSync(path.dirname(TRASHED()), { recursive: true });
+          fs.writeFileSync(TRASHED(), JSON.stringify(trashed));
+          notify();
+        }
+        if (undoable && held.length) {
+          fs.mkdirSync(hold, { recursive: true });
+          fs.writeFileSync(path.join(hold, HELD), JSON.stringify(held));
+          setTimeout(sweepUndo, UNDO_KEEP_MS + 1000).unref?.();
+        } else fs.rmSync(hold, { recursive: true, force: true });
+      }
+      return { ok: true, moved, bytes, ...(undoable && held.length ? { undo: token } : {}) };
+    },
+
+    /** Z on a Move to the Trash: each file back where it was, unless something new is there now. */
+    async untrash(token: string): Promise<{ ok: true; back: number } | { ok: false; error: string }> {
+      sweepUndo();
+      const hold = path.join(UNDO(), path.basename(token));
+      let held: HeldBack[];
+      try { held = JSON.parse(fs.readFileSync(path.join(hold, HELD), 'utf8')) as HeldBack[]; } catch { return { ok: false, error: 'Those files are in the Trash now. Put them back from there.' }; }
+      const trashed = trashedNow();
+      let back = 0;
+      for (const h of held) {
+        if (fs.existsSync(h.from) || !fs.existsSync(h.at)) continue;
+        fs.mkdirSync(path.dirname(h.from), { recursive: true });
+        try { fs.renameSync(h.at, h.from); } catch (err) {
+          if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
+          await fs.promises.copyFile(h.at, h.from);
+          await fs.promises.rm(h.at);
+        }
+        // A Trash that follows the freedesktop spec keeps a note beside each file.
+        if (path.basename(path.dirname(h.at)) === 'files') fs.rmSync(path.join(path.dirname(path.dirname(h.at)), 'info', `${path.basename(h.at)}.trashinfo`), { force: true });
+        if (h.hash) delete trashed[h.hash];
+        back += 1;
+      }
+      fs.rmSync(hold, { recursive: true, force: true });
+      if (back) {
+        fs.writeFileSync(TRASHED(), JSON.stringify(trashed));
+        notify();
+      }
+      return { ok: true, back };
+    },
+
+    /** A thread's files kept in the cloud, and its own folder's, brought back as its agent starts. False when one could not come in time. */
+    async bringBackFor({ product, id, deadlineMs = 5 * 60_000 }: { product: string; id: string; deadlineMs?: number }): Promise<boolean> {
+      if (!keeper || !keeper.status().offBytes) return true;
+      const waits: Promise<boolean>[] = [];
+      const products = readable();
+      const sharedIn = new Map<string | null, boolean>();
+      const line = lineNow();
+      for (const whole of allFiles().filter((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.product === product && c.thread.ref.id === id)))) {
+        // What the cloud holds is known by its hash: only such a file's versions are looked up on disk.
+        if (!line.hashesOf(whole.key).some((hash) => hash && keeper.off(hash))) continue;
+        if (!sharedIn.has(whole.project)) sharedIn.set(whole.project, audienceOf(whole.project) !== 'private');
+        const { chain } = await lineChain(whole, sharedIn.get(whole.project), products);
+        for (const v of chain) if (v.hash && !v.opened && keeper.off(v.hash)) waits.push(keeper.bringBack(v.hash));
+      }
+      const own = store.listProducts().find((p) => p.slug === product)?.dir;
+      if (own) for (const hash of keeper.offUnder(path.join(own, 'designs', id))) waits.push(keeper.bringBack(hash));
+      if (!waits.length) return true;
+      let timer: NodeJS.Timeout | undefined;
+      const late = new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), deadlineMs); timer.unref?.(); });
+      try { return await Promise.race([Promise.all(waits).then((r) => r.every(Boolean)), late]); } finally { clearTimeout(timer); }
+    },
+
+    /** A pass of the cloud keeper now, as when its setting changes. */
+    considerNow: () => consider(true),
 
     /**
      * Each file a thread, chat or group names, as its line numbers it: every

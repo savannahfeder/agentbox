@@ -21,6 +21,7 @@
   <a href="#how-it-works">How it works</a> ·
   <a href="#what-matters-most-goes-first">Priorities</a> ·
   <a href="#built-for-the-keyboard">Keys</a> ·
+  <a href="#agentcloud-gives-every-agent-its-own-computer">Agentcloud</a> ·
   <a href="#what-this-sends">Privacy</a> ·
   <a href="LICENSE">GPL-3.0</a>
 </p>
@@ -38,11 +39,19 @@
 
 ## Install
 
-**As a Mac app.** [Download Agentbox for Mac](https://agentbox.ac/download). It is signed and notarised, and runs on Apple silicon and Intel.
+| Your computer | How you get Agentbox |
+| --- | --- |
+| Mac | [Download the app](https://agentbox.ac/download) |
+| Windows | [Build it from this repo](#install-on-windows) |
+| Linux | [Build it from this repo](#install-on-linux), or [run it in your browser](#run-it-in-your-browser-on-a-mac-or-linux) |
 
-Every way needs Claude Code or Codex installed and signed in. Building it from source or running it in the browser also needs Node 22.18 or newer.
+Every way runs Claude Code or Codex on the plan you already have. If your computer has neither, the first run installs one and opens its sign-in.
 
-**As a desktop app from source.** Build it from this repo. `npm start` is the desktop command on Omarchy and on a Mac:
+### Install on a Mac
+
+[Download Agentbox for Mac](https://agentbox.ac/download). It is signed and notarised, and runs on Apple silicon and Intel.
+
+To build it from this repo instead, you need Git and Node 22.18 or newer.
 
 ```
 git clone https://github.com/savannahfeder/agentbox.git
@@ -51,21 +60,60 @@ npm install
 npm start
 ```
 
-`npm install` ends with a count of vulnerabilities. What is left after `npm audit fix` are advisories on Vite,
-Vitest and the Tiptap editor that only a new major version of each would clear.
-The install worked if it exits without an error.
+On macOS, the system may ask to let Terminal find devices on your local network. Agentbox does not need that, so Don't Allow is fine.
 
-**In your browser.** One command, nothing to install first:
+### Install on Windows
+
+There is no Windows download, so you build it from this repo. Building it needs Git and Node 22.18 or newer.
+
+1. Open PowerShell. If you do not have both yet, install them with winget, then close the PowerShell window and open a new one so it finds them.
+
+   ```
+   winget install --id Git.Git -e
+   winget install --id OpenJS.NodeJS.LTS -e
+   ```
+
+2. Get Agentbox and start it.
+
+   ```
+   git clone https://github.com/savannahfeder/agentbox.git
+   cd agentbox
+   npm install
+   npm start
+   ```
+
+   If PowerShell says running scripts is disabled on this system, allow scripts for your own account and run `npm install` again.
+
+   ```
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
+The first `npm start` downloads Electron, builds the app and opens it. It also adds Agentbox to the Start menu, so you can open it from there next time.
+
+### Install on Linux
+
+There is no Linux download, so you build it from this repo. Building it needs Git and Node 22.18 or newer. The terminal inside the app also needs `make` and a C++ compiler, which `sudo apt install build-essential` gives you on Debian or Ubuntu. Without them everything works except the terminal, which says what to install.
+
+```
+git clone https://github.com/savannahfeder/agentbox.git
+cd agentbox
+npm install
+npm start
+```
+
+`npm install` puts `agentbox` on `~/.local/bin` and adds the app to the launcher, so after the first `npm start` you can open it from there. The entry is `$XDG_DATA_HOME/applications/agentbox.desktop` (`~/.local/share/applications` when that variable is unset).
+
+### Run it in your browser on a Mac or Linux
+
+It needs Node 22.18 or newer.
 
 ```
 npx agentbox-app
 ```
 
-It starts on your machine and opens a tab. On Linux that open goes through `xdg-open`. Nothing is hosted: it listens only on `127.0.0.1`, and the address carries a key that is new every run. Add `--help` to see the options. `--no-open` prints the address and leaves the browser to you.
+It starts on your machine and opens a tab, through `xdg-open` on Linux. Nothing is hosted. It listens only on `127.0.0.1`, and the address carries a key that is new every run. `--no-open` prints the address and leaves the browser to you, and `--help` lists the other options. On Linux the terminal needs `make` and a C++ compiler here too.
 
-The terminal is the one piece that is compiled while it installs, and on Linux that needs `make` and a C++ compiler. Without them the install leaves the terminal out, everything else works, and the command says so each time it starts. On Debian or Ubuntu, `sudo apt install build-essential` and install again.
-
-From a checkout, build the screen once, then start it the same way. The install links the checkout's own command, so `npx` runs this copy rather than looking for `agentbox` on your PATH:
+From a checkout, build the screen once, then start it the same way. The install links the checkout's own command, so `npx` runs this copy rather than looking for `agentbox` on your PATH.
 
 ```
 npm install
@@ -73,13 +121,11 @@ npm run build
 npx agentbox-app
 ```
 
-On Linux, `npm install` puts `agentbox` on `~/.local/bin` and adds the app to the launcher. The entry is `$XDG_DATA_HOME/applications/agentbox.desktop` (`~/.local/share/applications` when that variable is unset), and it runs `agentbox`. That command starts this checkout, and it is written before Electron has downloaded its binary, so the first launch off the launcher does that download. Open the app from the launcher.
+### When npm install prints warnings
 
-Two of this repo's dependencies need an install script to work: `node-pty`, which is the terminal and is the one optional dependency here, and `esbuild`. `package.json` names them in `allowScripts`, by name rather than pinned to a version, so a dependency bump does not need re-approving. `electron-winstaller` is denied there: it is only for packing a Windows installer, which this repo does not do. npm 11 and newer print anything in neither list on every install, and `npm approve-scripts --allow-scripts-pending` lists them.
+`npm install` ends with a count of vulnerabilities. What is left after `npm audit fix` are advisories on Vite, Vitest and the Tiptap editor that only a new major version of each would clear. The install worked if it exits without an error.
 
-`npm start` builds the app and opens it. On first run it walks you through connecting Claude Code or Codex and choosing a folder to work in.
-
-On macOS, the system may ask to let Terminal find devices on your local network. Agentbox does not need that, so Don't Allow is fine.
+`node-pty`, which is the terminal, and `esbuild` need their install scripts to work. `package.json` names them in `allowScripts`, by name rather than pinned to a version, so a dependency bump does not need re-approving. `electron-winstaller` is denied there, because it only packs a Windows installer and this repo builds none. npm 11 and newer print anything in neither list on every install, and `npm approve-scripts --allow-scripts-pending` lists them.
 
 ## The chat window is the bottleneck
 
@@ -215,6 +261,26 @@ own subscription. When you first open it, it finds the agents you have already
 set up and offers to bring them in. There is no server, no account to make, and
 nothing new to pay for.
 
+## Agentcloud gives every agent its own computer
+
+Each agent runs on a Linux machine in the cloud with 8 GB of memory. Your
+laptop no longer limits how many run at once, and they keep working after you
+close it.
+
+<img src="docs/readme/agentcloud.webp" alt="Four threads, each wired to its own computer whose screen shows that agent's commands; one finishes and its thread asks to merge" width="100%">
+
+- **Answer from your phone.** Start threads and reply to the ones that need
+  you while your laptop is shut.
+- **The same inbox.** Cloud threads sit next to the ones on your Mac, and their
+  work comes back to your folder.
+- **Your own plans.** Agents run on the Claude Code and Codex plans you already
+  have, signed in inside the cloud. Your Mac's login never leaves your Mac.
+- **You choose what goes.** Send every thread to the cloud, or only the ones
+  your Mac has no room for.
+
+Agentcloud is optional, and every account can try it for free from the cloud
+button in the app.
+
 ---
 
 ## Reference
@@ -263,10 +329,12 @@ Nothing, unless you are running a released copy: the Mac app, or
 released. A build made from this repo has no key, so a clone and a fork are
 silent, and with no key the whole path is off at every send.
 
-A released copy counts nineteen things, and they are counts:
+A released copy counts twenty-one things, and they are counts:
 
 - the app was opened
 - the app was used today, once a day
+- how heavy the app was on a day, sent once, the next day the app is used
+- the app froze during setup or an import, sent as it happens
 - a setup step was reached, by its number
 - first run finished
 - a repo was connected
@@ -286,15 +354,20 @@ A released copy counts nineteen things, and they are counts:
 - counts were turned off
 
 Each carries a random install id, the app and platform version, whether it
-came from the Mac app or the browser copy, which of two first runs a new install was shown, and at most
+came from the Mac app or the browser copy, which first run a new install was shown, and at most
 eight other things: how long something took, how many of a thing there were,
 which kind of row it was out of six fixed words, whether an agent or you did
 it, whether an agent's run failed, whether it happened in setup's practice
 project, which coding agent ran it, Claude Code or Codex, and why an agent
 could not start yet, out of eighteen fixed words.
+The two about how heavy the app was carry numbers about the app itself instead.
+They say how much memory and CPU it used, how often it woke the Mac, how long it
+froze and in which of its own functions, how short of memory the Mac was, how
+many agents were running, and how long the app had been open when each
+happened, never the time of day.
 No file contents, no prompts, no paths, no titles, nothing you typed.
 `shared/analytics-events.mts` is the whole list, and anything a caller attaches
-beyond those eight is dropped rather than sent, so nobody can widen it by
+beyond those is dropped rather than sent, so nobody can widen it by
 accident. Crash reports travel the same way and are scrubbed first
 (`shared/crash-scrub.mts`).
 
@@ -315,6 +388,10 @@ key, and it only happens in a packaged build.
 The thing that sends the most is not ours at all. This app drives Claude Code
 and Codex, so whatever a session reads and writes goes to Anthropic or OpenAI
 under their terms, exactly as it would if you ran those tools yourself.
+
+Agentcloud, once you turn it on, copies each cloud thread's folder to that
+thread's computer and brings back what it makes. Without it, your work leaves
+your machine only through Claude Code and Codex.
 
 </details>
 

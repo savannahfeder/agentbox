@@ -4,27 +4,29 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { Person, TeamBillingDetails } from './types';
-import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FindLimit, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
+import type { AppsThatOpen, Person, PictureIn, TeamBillingDetails } from './types';
+import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, FilesTrashed, FilesCloudStatus, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { NotePlace } from '../../shared/artifact-marks.mts';
 import type { AgentFile as AgentFileRow } from './onboarding';
 import type { AgentFolder, SessionThread } from './agent-import-card';
 import type { EngineSetupState } from './plan-setup';
 import { fixtureAgents, fixtureSnapshot, fixtureUrgentArrival,fixtureDashboards, fixtureRepeats, fixtureRuns, fixtureMock, fixtureMockDashboards, fixtureTraces, fixtureHistory, fixtureSettings, fixtureConversation, fixtureAgentFiles, fixtureSessionThreads, fixtureSearchableThreads } from './fixtures';
-import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine } from './fixtures';
+import { fixtureEngineWorld, fixtureEngineSettings, fixtureSecondEngine, fixtureFurtherHarness } from './fixtures';
 import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import type { CarryState } from '../../shared/carried-files.mts';
-import type { FindAnswer, FindCandidate } from '../../shared/find-by-description.mts';
+import type { WasBeforeClose } from '../../shared/reopen-as-it-was.mts';
 
 // Preload calls the bridge type in types.ts does not list yet.
 interface LaterBridge {
   liveRoom?(p: { product: string; project?: string | null; name: string }): Promise<LiveRoomTicket | null>;
   gitHubSignIn?(p: { token: string }): Promise<{ ok: boolean; again?: string[]; error?: string }>;
   gitHubBrowserSignIn?(): Promise<{ ok: boolean; code?: string; url?: string; error?: string }>;
+  gitHubCloudSignIn?(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }>;
   signInAnswer?(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }>;
-  cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }>;
+  signInKeep?(p: { product: string; id: string; ask: string; keep: boolean }): Promise<{ ok: boolean; error?: string }>;
+  cloudAccountPay?(p: { plan: 'pro' | 'plus' | 'max' | 'team' }): Promise<{ ok: boolean; where?: 'checkout' | 'billing' | 'started'; error?: string; message?: string }>;
   cloudAccountTeamBilling?(): Promise<{ ok: boolean; owner?: boolean } & Partial<TeamBillingDetails>>;
 }
 const laterBridge = () => window.zero as (Omit<NonNullable<Window['zero']>, keyof LaterBridge> & LaterBridge) | undefined;
@@ -63,6 +65,7 @@ import { withoutFileHomes } from '../../shared/file-home.mts';
 import { installBrowserBridge } from './browser-bridge';
 import { installCloudBridge } from './cloud-bridge';
 import { onASharedFilePage } from './shared-file/route';
+import { shownSnapshots } from './shown-snapshot';
 
 // The Mac's own page first; the phone with the Mac shut only on its own site.
 // A shared file's page is neither: it is for people with no app at all.
@@ -79,6 +82,8 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
 // The inbox and the open threads' agent logs as last answered, so each read
 // asks only for what changed since.
 const snapshots = snapshotReader();
+// A document's holder thread is the app's, so no list of threads draws it.
+const shown = shownSnapshots<Snapshot['items'][number], Snapshot>(withoutFileHomes);
 const traces = traceReader();
 // Which thread is on screen: only its agent's live detail is sent.
 let openThread: { product: string | null; id: string } | null = null;
@@ -124,6 +129,19 @@ const mockFixtures = params.get('fixtures') === 'mock';
 // script already photographs and is the rule it records. The four
 // machines and the whole argument are in ./fixtures, beside the data.
 const engineFixtures = fixtureEngineWorld(params.get('engines'));
+// The harnesses of the world asked for: the second coding agent, then any further harness (`?further=opencode`).
+const withEngines = (snap: Snapshot): Snapshot => fixtureFurtherHarness(fixtureSecondEngine(snap, engineFixtures), params.get('further'));
+// &codexout: Codex's week spent until Sunday 6:10pm, over ?fixtures=empty or the full world.
+function codexOut(snap: Snapshot): Snapshot {
+  if (!params.has('codexout')) return snap;
+  const sunday = new Date();
+  sunday.setDate(sunday.getDate() + ((7 - sunday.getDay()) % 7 || 7));
+  sunday.setHours(18, 10, 0, 0);
+  const until = sunday.getTime();
+  snap.supervisor.outOfUsage = { codex: { tool: 'Codex', until } };
+  snap.usageByEngine = [{ engine: 'codex', at: Date.now(), limits: [{ span: 'week', qualifier: null, name: 'This week', percent: 100, resetsText: null, resetsOn: null, resetsAt: until, zone: null }] }];
+  return snap;
+}
 // Twenty-two names, because the point of this world is a sidebar with more in it
 // than fits. The duplicates and the "(2)" suffixes are the shape that matters,
 // not the words: near-copies of one product are what make a crowded sidebar
@@ -198,6 +216,16 @@ if (params.get('codexaccounts') === 'two' && fixtureSettingsState.workspace.code
     { profile: 'default', email: 'work@example.com', name: null, plan: 'Free', accountId: null, signedIn: true, chosen: true },
     { profile: 'codex-2', email: 'you@example.com', name: null, plan: 'Plus', accountId: null, signedIn: true, chosen: false },
   ];
+}
+// With ?engines=codex: &localonly is this Mac's one Codex login and none in the
+// cloud; &cloudday is that login at its week's limit (use with &cloudcodex).
+const CLOUDDAY_RESET = Date.now() + 2.5 * 86_400_000;
+if ((params.has('localonly') || params.has('cloudday')) && fixtureSettingsState.workspace.codex) {
+  const limited = params.has('cloudday') ? { atLimit: true, limitResetsAt: CLOUDDAY_RESET, limitAt: Date.now() - 600_000 } : {};
+  fixtureSettingsState.workspace.codex.accounts = [
+    { profile: 'default', email: 'you@example.com', name: null, plan: 'Plus', accountId: null, signedIn: true, chosen: true, ...limited },
+  ];
+  if (params.has('cloudday')) fixtureSettingsState.workspace.codex.trouble = 'Codex is at its usage limit, so its tasks are waiting. They start again on their own when it resets.';
 }
 if (params.has('codextrouble') && fixtureSettingsState.workspace.codex) {
   fixtureSettingsState.workspace.codex.trouble = `Codex sessions are dying on arrival, so its tasks are not moving. ${NAME} keeps trying.`;
@@ -305,6 +333,14 @@ function fixtureAccountUsage(): AccountUsageReading[] {
 
 // &codexaccounts=two: the Plus login not in use has its own session and week.
 function fixtureCodexAccountUsage(): AccountUsageReading[] {
+  if (params.has('localonly') || params.has('cloudday')) {
+    const now = Date.now();
+    const full = params.has('cloudday');
+    const window = (span: 'session' | 'week', percent: number, resetsAt: number) => ({
+      span, qualifier: null, name: span === 'session' ? 'This session' : 'This week', percent, resetsText: null, resetsOn: null, resetsAt, zone: null,
+    });
+    return [{ profile: 'default', at: now - 120_000, limits: [window('session', full ? 0 : 18, now + 3 * 3_600_000), window('week', full ? 100 : 31, full ? CLOUDDAY_RESET : now + 4 * 86_400_000)] }];
+  }
   if (params.get('codexaccounts') !== 'two') return [];
   const now = Date.now();
   const window = (span: 'session' | 'week', percent: number, resetsAt: number) => ({
@@ -453,9 +489,9 @@ export const api = {
       // builds its own object; layering it here is what lets
       // ?fixtures=empty&engines=codex photograph the corner naming an agent on
       // the idle page. A world of `null` hands the snapshot straight back.
-      return fixtureSecondEngine(empty, engineFixtures);
+      return codexOut(withEngines(empty));
     }
-    if (mockFixtures) return fixtureSecondEngine(structuredClone(fixtureMock), engineFixtures);
+    if (mockFixtures) return withEngines(structuredClone(fixtureMock));
     if (crowdedFixtures) {
       const base = structuredClone(fixtureSnapshot);
       base.products = CROWDED_NAMES.map((name) => ({
@@ -471,7 +507,7 @@ export const api = {
       // live supervisor to write to.
       base.supervisor.hiddenProducts = (params.get('hidden') ?? '').split(',').filter(Boolean);
       if (!params.has('approvals')) base.approvals = [];
-      return fixtureSecondEngine(base, engineFixtures);
+      return withEngines(base);
     }
     if (useFixtures) {
       const base = structuredClone(fixtureSnapshot);
@@ -606,6 +642,9 @@ export const api = {
           base.cloud.movable = here;
           if (cloud === 'all') base.supervisor.whyNotCloud = Object.fromEntries(here.map((id) => [id, { at: 'mac' as const, why: 'moving' }]));
         }
+        // &movedhere draws the second running thread moved to this Mac after the cloud could not start it.
+        const second = base.supervisor.running[1];
+        if (params.has('movedhere') && second) base.supervisor.whyNotCloud = { ...base.supervisor.whyNotCloud, [second.itemId]: { at: 'mac' as const, why: 'cloud-refused' } };
       }
       // &cloud=managed draws Agentbox Cloud signed in through its server, and
       // &noroom=hours|agents the server saying it had no room a moment ago.
@@ -619,6 +658,11 @@ export const api = {
         const queued = base.items.filter((i) => /^(Can the welcome email|Bring back a list)/.test(i.title)).map((i) => i.id);
         base.supervisor.queued = queued;
         base.supervisor.capacity = base.supervisor.running.filter((r) => (r as { where?: string }).where !== 'cloud').length;
+      // &longwait has a Later thread wait on a long free-typed name, as long as a wait can be.
+      if (params.has('longwait')) {
+        const row = base.items.find((i) => i.title.startsWith('Name the five card rarities'));
+        if (row) base.items.push({ ...row, id: 'w-longwait', title: 'Pay the card art studio', label: undefined, parent: undefined, blockedBy: ['name:the signed vendor contract and the legal review of part 4'], wrote: { blockedBy: { ts: Date.now() - 3_600_000, source: 'founder' } } });
+      }
       }
       // &team=signedout: a build that can sign in, with nobody signed in and no team.
       if (params.get('team') === 'signedout') {
@@ -634,10 +678,8 @@ export const api = {
         base.usage = { engine: 'codex', limits, at: now - 6 * 3_600_000 };
         base.usageByEngine = [base.usage];
       }
-      return fixtureSecondEngine(base, engineFixtures);
+      return codexOut(withEngines(base));
     }
-    // A document's holder thread is the app's, so no list of threads draws it.
-    const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
     const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
     if (got) return shown(got);
     // Built on a list this window no longer holds: a whole one, which take() never refuses.
@@ -656,7 +698,7 @@ export const api = {
     try { await window.zero?.looking?.({ product: at?.product ?? null, id: at?.id ?? null }); } catch { /* the card simply stays where it was */ }
   },
 
-  async refreshUsage(engine: 'claude' | 'codex' = 'claude'): Promise<{ ok: boolean; reading?: Usage; error?: string }> {
+  async refreshUsage(engine: 'claude' | 'codex' = 'claude', { ask = false }: { ask?: boolean } = {}): Promise<{ ok: boolean; reading?: Usage; error?: string }> {
     if (useFixtures) {
       if (params.get('account') === 'unreadable') return { ok: false, error: USAGE_UNREADABLE };
       if (codexMonth && engine === 'codex') return { ok: true, reading: { engine, limits: codexMonth, profile: 'default', at: Date.now() } };
@@ -664,7 +706,7 @@ export const api = {
       return reading ? { ok: true, reading: { ...structuredClone(reading), profile: 'default', at: Date.now() } } : { ok: false, error: 'No usage reading yet.' };
     }
     if (!window.zero?.refreshUsage) return { ok: false, error: RESTART_NOTE };
-    try { return await window.zero.refreshUsage({ engine }); }
+    try { return await window.zero.refreshUsage({ engine, ask }); }
     catch { return { ok: false, error: USAGE_UNREADABLE }; }
   },
 
@@ -818,7 +860,8 @@ export const api = {
     if (!zero?.bringSharedFile) return { ok: false, error: `quit and reopen ${NAME} to bring in shared files` };
     return zero.bringSharedFile(p);
   },
-  async fileLinkComment(p: { token: string; text: string; place?: NotePlace | null }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
+  /** With `product`, `thread` and `src`, the reply also answers that thread's link comments. */
+  async fileLinkComment(p: { token: string; text: string; place?: NotePlace | null; product?: string; thread?: string; src?: string }): Promise<{ ok: boolean; error?: string; comments?: LinkComment[] }> {
     const zero = window.zero;
     if (!zero?.fileLinkComment) return { ok: false, error: `quit and reopen ${NAME} to answer comments` };
     return zero.fileLinkComment(p);
@@ -907,10 +950,18 @@ export const api = {
 
   // Hand a file to the operating system, the way every link on a card already
   // does. The pane's first mark, and what a png or a pdf still does.
-  async openArtifactExternally(p: { product: string; src: string }): Promise<{ ok: boolean; error?: string }> {
+  // `app` opens it in one of the apps `appsThatOpen` listed; `reveal` shows it in Finder.
+  async openArtifactExternally(p: { product: string; src: string; thread?: string; app?: string; reveal?: boolean }): Promise<{ ok: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.openArtifact) { window.open(p.src, '_blank'); return { ok: true }; }
-    return zero.openArtifact(p);
+    const { reveal, ...ask } = p;
+    return zero.openArtifact(reveal ? { ...ask, mode: 'reveal' } : ask);
+  },
+
+  // The open mark's menu. The phone's door has no such channel and throws, which reads as no list.
+  async appsThatOpen(p: { product: string; src: string; thread?: string }): Promise<AppsThatOpen> {
+    try { return (await window.zero?.openWith?.(p)) ?? { ok: false, apps: [] }; }
+    catch { return { ok: false, apps: [] }; }
   },
 
   // Everything that happened on one task: the raw ledger lines, which the
@@ -981,7 +1032,7 @@ export const api = {
   // once instead of after it (main/claude-input.mts `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean }): Promise<WorkItem | null> {
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: WasBeforeClose; reopen?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
   },
@@ -1007,10 +1058,20 @@ export const api = {
   async teamSignOut(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignOut()); },
   async teamSignInEmail(email: string, password: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignInEmail({ email, password })); },
   async teamSignUp(name: string, email: string, password: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamSignUp({ name, email, password })); },
+  async teamConfirmation(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamConfirmation()); },
+  async teamResendConfirmation(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamResendConfirmation()); },
   async teamCreate(name: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCreate({ name })); },
   async teamAcceptInvite(teamId: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAcceptInvite({ teamId })); },
   async teamInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamInvite({ email })); },
   async teamRename(name: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRename({ name })); },
+  async teamUpdateMe(p: { name?: string; photo?: PictureIn | null }): Promise<TeamCallResult> {
+    if (!window.zero?.teamUpdateMe) return { ok: false, error: RESTART_NOTE };
+    return teamCall(() => window.zero!.teamUpdateMe!(p));
+  },
+  async teamSetLogo(photo: PictureIn | null): Promise<TeamCallResult> {
+    if (!window.zero?.teamSetLogo) return { ok: false, error: RESTART_NOTE };
+    return teamCall(() => window.zero!.teamSetLogo!({ photo }));
+  },
   async teamRemoveMember(personId: string, handover: { handTo: string; mates: { id: string; to: string | null }[] } | null = null): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamRemoveMember({ personId, ...(handover ?? {}) })); },
   async teamLeave(): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamLeave()); },
   async teamCancelInvite(email: string): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamCancelInvite({ email })); },
@@ -1027,20 +1088,13 @@ export const api = {
     return window.zero.teamThreadWork(p);
   },
   // Lines, files and comments inside threads (main/everything-found.mts).
-  async findInThreads(p: { query: string; limit?: FindLimit }): Promise<FoundInThreads> {
-    const none: FoundInThreads = { lines: [], files: [], comments: [], threads: [], total: { lines: 0, files: 0, comments: 0 } };
+  async findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number }; opened?: Record<string, number> }): Promise<FoundInThreads> {
+    const none: FoundInThreads = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } };
     if (!window.zero?.findInThreads) return none;
     const got = await window.zero.findInThreads(p).catch(() => none);
-    // A main from before the per-thread tally answers without it.
-    return got.ok === false ? none : { ...got, threads: got.threads ?? [] };
+    return got.ok === false ? none : got;
   },
   warmFindInThreads(): void { void window.zero?.warmFindInThreads?.()?.catch?.(() => {}); },
-  /** Null when this copy's main cannot ask an agent. */
-  findByDescription: (): ((p: { description: string; candidates: FindCandidate[] }) => Promise<FindAnswer>) | null => {
-    const ask = window.zero?.findByDescription;
-    if (!ask) return null;
-    return (p) => ask(p).catch((err: unknown) => ({ ok: false as const, error: String((err as Error)?.message ?? err) }));
-  },
   async teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
   async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
   async fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
@@ -1072,12 +1126,24 @@ export const api = {
   async connectionsCheck(p: { id: string }): Promise<ConnectionTile | null> { return (await window.zero?.connectionsCheck?.(p).catch(() => null)) ?? null; },
   async connectionsDisconnect(p: { id: string }): Promise<void> { await window.zero?.connectionsDisconnect?.(p); },
   async connectionsAccept(p: { id: string }): Promise<void> { await window.zero?.connectionsAccept?.(p); },
-  async filesPlace(): Promise<FilesPlaceList> {
-    return (await window.zero?.filesPlace?.().catch(() => null)) ?? { files: [], projects: [], folders: [] };
+  /** `soon`: the last list made, at once, for a page with nothing to draw yet. */
+  async filesPlace(opts?: { soon?: boolean }): Promise<FilesPlaceList> {
+    return (await window.zero?.filesPlace?.(opts).catch(() => null)) ?? { files: [], projects: [], folders: [] };
   },
-  async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null }> {
+  async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null; ids?: string[] }> {
     if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
     return window.zero.filesPlaceFolder(p);
+  },
+  async filesPlaceTrash(p: { keys: string[]; older?: boolean }): Promise<FilesTrashed> {
+    if (!window.zero?.filesPlaceTrash) return { ok: false, moved: 0, bytes: 0, error: `Quit and reopen ${NAME} to move files to the Trash.` };
+    return window.zero.filesPlaceTrash(p);
+  },
+  async filesPlaceUntrash(token: string): Promise<{ ok: boolean; back?: number; error?: string }> {
+    if (!window.zero?.filesPlaceUntrash) return { ok: false, error: `Quit and reopen ${NAME} to put files back.` };
+    return window.zero.filesPlaceUntrash({ token });
+  },
+  async filesCloud(): Promise<FilesCloudStatus | null> {
+    return (await window.zero?.filesCloud?.().catch(() => null)) ?? null;
   },
   async filesPlaceNew(p: { project: string; name: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ ok: boolean; error?: string; key?: string }> {
     if (!window.zero?.filesPlaceNew) return { ok: false, error: `Quit and reopen ${NAME} to make a document here.` };
@@ -1118,7 +1184,9 @@ export const api = {
   async teamSeen(p: { product: string; id: string }): Promise<boolean> { try { return !!(await window.zero?.teamSeen?.(p)); } catch { return false; } },
   async teamMoveToThread(p: { product: string; id: string; on: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMoveToThread(p)); },
   async teamMessageMate(p: { owner: string; mate: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamMessageMate(p)); },
-  async teamHandOn(p: { product: string; id: string; to: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
+  async teamHandOn(p: { product: string; id: string; to: string; note?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandOn(p)); },
+  async teamAsk(p: { product: string; id: string; to: string; kind: 'help' | 'review'; note?: string; step?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamAsk(p)); },
+  async teamHandBack(p: { product: string; id: string; verdict?: 'done' | 'yes' | 'changes'; words?: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamHandBack(p)); },
   async teamTaskBrief(p: { product: string; id: string }) { return window.zero!.teamTaskBrief(p); },
   async teamContinueBrief(p: { personId: string; threadId: string }) { return window.zero!.teamContinueBrief(p); },
   async teamContinued(p: { personId: string; threadId: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamContinued(p)); },
@@ -1154,6 +1222,11 @@ export const api = {
     if (useFixtures || !window.zero?.setThreadPins) return;
     await window.zero.setThreadPins({ pins });
   },
+  // What this window has opened, so the phone reads those threads as read too.
+  async seenHere(seen: Record<string, number>): Promise<void> {
+    if (useFixtures || !window.zero?.seenHere) return;
+    try { await window.zero.seenHere({ seen }); } catch { /* the dots on the phone wait for the next open */ }
+  },
 
   /** Keep a thread on this Mac (true), send it to the cloud (false), or leave it to the cloud setting (null). */
   async setThreadOnMac(onMac: Record<string, boolean | null>): Promise<void> {
@@ -1172,7 +1245,7 @@ export const api = {
     return out?.moving ?? (out?.ok ? ids.length : 0);
   },
 
-  async compose(p: { product: string; title: string; body?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem | null> {
+  async compose(p: { product: string; title: string; body?: string; label?: string; kind?: string; priority?: number; runAt?: number; start?: 'later' | 'now'; labels?: string[]; model?: string; engine?: string; effort?: string; assignee?: string; due?: string; visibility?: 'team' | 'people' | 'private'; visibleTo?: string[]; onMac?: boolean }): Promise<WorkItem | null> {
     // FIXTURES ANSWER WITH THE TASK, the way the real store does. Returning
     // null here meant the send had nothing to point at, and the caller reads
     // that as "no task was made" and puts no way back on the undo pile — so the
@@ -1736,11 +1809,25 @@ export const api = {
     return zero.gitHubBrowserSignIn();
   },
 
+  /** GitHub's own sign-in for a cloud thread that asked for GitHub: `start` gives the code and link, `token` waits for the approval. */
+  async gitHubCloudSignIn(p: { action: 'start' | 'token' }): Promise<{ ok: boolean; code?: string; url?: string; token?: string; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.gitHubCloudSignIn) return { ok: false, error: RESTART_NOTE };
+    return zero.gitHubCloudSignIn(p);
+  },
+
   /** What the person did with a sign-in link an agent on this thread is waiting on. */
   async signInAnswer(p: { product: string; id: string; ask: string; said: 'signed-in' | 'skipped' | 'landed' | 'code'; url?: string; code?: string }): Promise<{ ok: boolean; error?: string }> {
     const zero = laterBridge();
     if (!zero?.signInAnswer) return { ok: false, error: RESTART_NOTE };
     return zero.signInAnswer(p);
+  },
+
+  /** Whether a cloud sign-in an agent on this thread is waiting on is saved for every cloud thread. */
+  async signInKeep(p: { product: string; id: string; ask: string; keep: boolean }): Promise<{ ok: boolean; error?: string }> {
+    const zero = laterBridge();
+    if (!zero?.signInKeep) return { ok: false, error: RESTART_NOTE };
+    return zero.signInKeep(p);
   },
 
   /** Signing in to Agentbox Cloud itself, on the app's sign-in page: Google, email, a new account and its link again, or a password reset. */
@@ -1754,10 +1841,13 @@ export const api = {
   async cloudAccountSignOut(): Promise<void> { await window.zero?.cloudAccountSignOut?.(); },
   async cloudAccountPlan(): Promise<CloudPlan> {
     // &cloudplan=pro draws someone on Pro, 6 running and 88 of 400 hours used;
-    // &cloudplan=free someone on the free hours, 1 running and 1.5 of 5 used.
+    // &cloudplan=pro-trial the same Pro in its free week, 12 of its 50 hours used (&spent=1: all 50).
     if (useFixtures) {
-      if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: false, agents: 10, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
-      if (params.get('cloudplan') === 'free') return { signedIn: true, plan: 'free', unlimited: false, agents: 2, hoursPerMonth: 5, running: 1, usedSeconds: 1.5 * 3600, billing: null };
+      if (params.get('cloudplan') === 'pro') return { signedIn: true, plan: 'pro', unlimited: true, agents: null, hoursPerMonth: 400, running: 6, usedSeconds: 88 * 3600 };
+      if (params.get('cloudplan') === 'pro-trial') {
+        const used = (params.has('spent') ? 50 : 12) * 3600;
+        return { signedIn: true, plan: 'pro', unlimited: true, agents: null, hoursPerMonth: 400, running: params.has('spent') ? 0 : 2, usedSeconds: used, billing: 'stripe', trial: { hours: 50, usedSeconds: used } };
+      }
       // &cloudplan=team-trial|team-trial-card|team: on a team of 3, its trial 5 days from its end
       // (with the card in, not yet charged), or 3 seats paid for.
       if (['team-trial', 'team-trial-card', 'team'].includes(params.get('cloudplan') ?? '')) {
@@ -1774,15 +1864,21 @@ export const api = {
         const team = { trial, endsAt: trial ? Date.now() + 5 * 86_400_000 : null, seats: trial && !card ? 0 : 3, members: 3, owner: params.get('owner') !== '0', agents: null, running: people[0].running, hours: each, usedSeconds: people[0].usedSeconds, people };
         return { signedIn: true, plan: 'team', unlimited: true, agents: null, hoursPerMonth: team.hours, running: team.running, usedSeconds: team.usedSeconds, billing: null, team };
       }
-      if (params.get('cloudplan') === 'spent') return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, billing: null, free: { agents: 2, hours: 5, usedSeconds: 5 * 3600 } };
-      return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0 };
+      // No plan yet: every plan's free week is offered, as the server offers it before any subscription.
+      return { signedIn: true, plan: 'none', unlimited: false, agents: 0, hoursPerMonth: 0, running: 0, usedSeconds: 0, trialOffer: { days: 7, hours: 50 } };
     }
     return (await window.zero?.cloudAccountPlan?.()) ?? { signedIn: false };
   },
-  async cloudAccountPay(plan: 'pro' | 'plus' | 'max' | 'team'): Promise<{ ok: boolean; where?: 'checkout' | 'billing'; error?: string; message?: string }> {
+  async cloudAccountPay(plan: 'pro' | 'plus' | 'max' | 'team'): Promise<{ ok: boolean; where?: 'checkout' | 'billing' | 'started'; error?: string; message?: string }> {
     const zero = laterBridge();
     if (!zero?.cloudAccountPay) return { ok: false, message: RESTART_NOTE };
     return zero.cloudAccountPay({ plan });
+  },
+  /** Signs this computer in to the cloud with the team sign-in it already has. */
+  async cloudAccountFromTeam(acceptTerms: boolean): Promise<{ ok: boolean; error?: string; message?: string }> {
+    const zero = laterBridge();
+    if (!zero?.cloudAccountFromTeam) return { ok: false, message: RESTART_NOTE };
+    return zero.cloudAccountFromTeam({ acceptTerms });
   },
   async cloudAccountBilling(): Promise<{ ok: boolean; error?: string; message?: string }> {
     const zero = window.zero;

@@ -3,35 +3,47 @@
 // do with them in the header.
 import { useEffect, useState, type ReactNode } from 'react';
 import { agoQuiet } from '../../format';
-import { sendKeyFor } from '../../reply-keys';
+import { ChatSend } from '../ChatSend';
 import { MemberFace, MemberWord } from './TeamStrip';
 import type { Member } from './members';
 
 const BACK = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>;
+const PLUS = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>;
 
 /** One button over a place's chat: a list or the job, shown in the chat's place, or a page it goes to. */
 export type PlacePart = { key: string; label: string; count?: number; ask?: boolean; body?: ReactNode; onOpen?: () => void };
 
-export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, parts = [] }: {
+/** Which button over the chat is lit, for whose place; null is the chat. */
+export type PlaceView = { of: string; key: string } | null;
+
+export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, parts = [], chatLabel = 'Chat', side, view: held, onView }: {
   m: Member; waits?: number;
+  /** The first button's name, for what `chat` is: an AI teammate's page holds its tasks. */
+  chatLabel?: string;
   /** Under the name: their role, or whose AI teammate it is. */
   about?: string | null;
   /** Absent inside Chats, where the list beside it is the way back. */
   onBack?: () => void; backTo?: string;
   actions?: ReactNode; chat: ReactNode; parts?: PlacePart[];
+  /** Beside the chat while it is shown: your AI teammate's settings. */
+  side?: ReactNode;
+  /** Kept by the page around it when something outside the place, such as the window's corner, opens a button's view. */
+  view?: PlaceView; onView?: (next: PlaceView) => void;
 }) {
-  const [view, setView] = useState<{ of: string; key: string } | null>(null);
+  const [own, setOwn] = useState<PlaceView>(null);
+  const view = onView ? held ?? null : own;
+  const setView = onView ?? setOwn;
   const shown = view?.of === m.key ? parts.find((p) => p.key === view.key && p.body) ?? null : null;
   useEffect(() => {
     if (!shown) return undefined;
-    // Esc goes back to the chat, unless it is ending an edit in a box first.
+    // Esc goes back to the chat, unless it is ending an edit in a box or closing a menu first.
     const esc = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== 'Escape' || (e.target as HTMLElement | null)?.closest?.('textarea, input')) return;
+      if (e.key !== 'Escape' || (e.target as HTMLElement | null)?.closest?.('textarea, input') || document.querySelector('.th-menu, .prio-menu')) return;
       e.stopPropagation(); setView(null);
     };
     window.addEventListener('keydown', esc, true);
     return () => window.removeEventListener('keydown', esc, true);
-  }, [shown]);
+  }, [shown, setView]);
   return <section className="pl" aria-label={m.name}>
     <header className="pl-head">
       {onBack && <button type="button" className="pl-back" onClick={onBack} title={`Back to ${backTo} (Esc)`} aria-label={`Back to ${backTo}`}>{BACK}<span>{backTo}</span></button>}
@@ -45,16 +57,19 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, part
       {actions && <div className="pl-acts">{actions}</div>}
     </header>
     {parts.length > 0 && <div className="pl-parts" role="tablist" aria-label={m.name}>
-      <button type="button" role="tab" aria-selected={!shown} className="pl-btn pl-chip" onClick={() => setView(null)}>Chat</button>
+      <button type="button" role="tab" aria-selected={!shown} className="pl-btn pl-chip" onClick={() => setView(null)}>{chatLabel}</button>
       {parts.map((p) => <button type="button" key={p.key} role={p.body ? 'tab' : undefined} aria-selected={p.body ? shown === p : undefined}
         className={`pl-btn pl-chip${p.ask ? ' ask' : ''}`}
         onClick={() => { if (p.onOpen) p.onOpen(); else setView({ of: m.key, key: p.key }); }}>
         {p.ask && <i aria-hidden="true" />}{p.label}{p.count != null && <b>{p.count}</b>}
       </button>)}
     </div>}
-    <div className="pl-body">
-      <div className={`pl-chat${shown ? ' away' : ''}`}>{chat}</div>
-      {shown && <div className="pl-view" role="tabpanel" aria-label={shown.label}>{shown.body}</div>}
+    <div className="pl-main">
+      <div className="pl-body">
+        <div className={`pl-chat${shown ? ' away' : ''}`}>{chat}</div>
+        {shown && <div className="pl-view" role="tabpanel" aria-label={shown.label}>{shown.body}</div>}
+      </div>
+      {side && !shown && <aside className="pl-side" aria-label={`${m.name}'s settings`}>{side}</aside>}
     </div>
   </section>;
 }
@@ -74,6 +89,48 @@ function PlaceRows({ rows, now }: { rows: PlaceRow[]; now: number }) {
       {r.word && <span className="pl-w">{r.word}</span>}
     </button>
   </li>)}</ul>;
+}
+
+/** An AI teammate's page: a box that gives it a task, then what it has on. Its answers come to the inbox. */
+export function MateWork({ name, active, done, now, onGive }: {
+  name: string; active: PlaceRow[]; done: PlaceRow[]; now: number;
+  /** Null once the task went, or the reason it did not. */
+  onGive: (text: string) => Promise<string | null>;
+}) {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [doneOpen, setDoneOpen] = useState(false);
+  const give = async () => {
+    const words = text.trim();
+    if (!words || busy) return;
+    setBusy(true);
+    const failed = await onGive(words);
+    setBusy(false);
+    if (failed) { setError(failed); return; }
+    setError(null);
+    setText('');
+  };
+  const placeholder = `Give ${name} a task`;
+  return <div className="pl-work">
+    <div className="rm-compose tq-compose pl-give">
+      <textarea className="rm-compose-input" rows={2} value={text} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void give(); } }} />
+      <div className="rm-compose-bar">
+        <ChatSend ready={!!text.trim()} busy={busy} onSend={() => { void give(); }} />
+      </div>
+    </div>
+    {error && <p className="tq-error" role="alert">{error}</p>}
+    <h3 className="pl-work-h">Active{active.length > 0 && <b>{active.length}</b>}</h3>
+    {active.length ? <PlaceRows rows={active} now={now} /> : <p className="pl-work-none">Nothing on right now.</p>}
+    {done.length > 0 && <>
+      <button type="button" className="pl-work-fold" aria-expanded={doneOpen} onClick={() => setDoneOpen(!doneOpen)}>
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{doneOpen ? <path d="m4 6 4 4 4-4" /> : <path d="m6 4 4 4-4 4" />}</svg>
+        Done this week<b>{done.length}</b>
+      </button>
+      {doneOpen && <PlaceRows rows={done} now={now} />}
+    </>}
+  </div>;
 }
 
 /** Its job, in its own block, with Edit for the AI teammate you own. */
@@ -153,16 +210,16 @@ export function SendBox({ placeholder, note, onSend, empty }: {
       <textarea className="rm-compose-input" autoFocus rows={1} value={text} placeholder={placeholder} aria-label={placeholder} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); } }} />
       <div className="rm-compose-bar">
-        <button type="button" className="dock-send" disabled={!text.trim() || busy} title={`Send · ${sendKeyFor(true)}`} onClick={() => { void send(); }}>Send <kbd>{sendKeyFor(true)}</kbd></button>
+        <ChatSend ready={!!text.trim()} busy={busy} onSend={() => { void send(); }} />
       </div>
     </div>
     {note && <p className="pl-note">{note}</p>}
   </div>;
 }
 
-/** A button on a place's header. */
+/** A button on a place's header; the one that is not quiet is its main action and carries a plus. */
 export function PlaceAction({ children, onClick, quiet = false, title }: { children: ReactNode; onClick: () => void; quiet?: boolean; title?: string }) {
-  return <button type="button" className={`pl-btn${quiet ? ' quiet' : ''}`} onClick={onClick} title={title}>{children}</button>;
+  return <button type="button" className={`pl-btn pl-act${quiet ? ' quiet' : ''}`} onClick={onClick} title={title}>{!quiet && PLUS}{children}</button>;
 }
 
 /** Their AI teammates as a button over the chat: a face and a name each, which open its own place. */

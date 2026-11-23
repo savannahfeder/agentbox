@@ -7,6 +7,8 @@ import { drawSky, skyTheme } from '../home/sky';
 import { useHomeSettings } from '../home/home-settings';
 import { aRole, chooseFold, foldChosen, markSeen, offerCard, seenBefore, startsFolded } from '../teammate-offer';
 import type { WorkItem } from '../types';
+import { offerFace } from '../../../shared/teammate-face.mts';
+import { MateFace } from '../teammates/MateFace';
 import './teammate-offer.css';
 
 const Tick = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" /></svg>;
@@ -20,7 +22,7 @@ function Sky() {
     const canvas = ref.current;
     if (!canvas) return;
     const dark = document.documentElement.dataset.theme !== 'light';
-    const art = (skyTheme(worn) ?? skyTheme(dark ? 'ember' : 'sage'))!.art;
+    const art = (skyTheme(worn) ?? skyTheme(dark ? 'ember' : 'mountains'))!.art;
     const paint = () => drawSky(canvas, art, { from: 0, span: 6, dpr: Math.min(2, window.devicePixelRatio || 1) });
     paint();
     let width = canvas.clientWidth;
@@ -58,10 +60,10 @@ export function TeammateOffer({ item }: { item: WorkItem }) {
   const seenRef = useSeen(item, !!offer && !answered && !folded);
   if (!offer) return null;
   const card = offerCard(offer);
-  if (answered === 'made') {
-    return <p className="to-made"><span className="to-face to-face-small">{card.letter}</span>You made {aRole(offer.role)} for work like this.</p>;
-  }
-  if (answered === 'no' && !error) return null;
+  const face = offerFace(item.id);
+  // Only the press itself is answered with this line; an offer made on an earlier visit, or answered on another thread, draws nothing.
+  if (pressed === 'made') return <p className="to-made"><MateFace seed={face} className="to-face to-face-small" />You made {aRole(offer.role)} for work like this.</p>;
+  if (answered && !error) return null;
   const answer = (make: boolean) => {
     setError(null);
     setPressed(make ? 'made' : 'no');
@@ -70,7 +72,7 @@ export function TeammateOffer({ item }: { item: WorkItem }) {
   const fold = (to: boolean) => { setFolded(to); chooseFold(item, to); };
   if (folded) {
     return <button type="button" className="to-bar" onClick={() => fold(false)} aria-expanded="false">
-      <span className="to-face to-face-small">{card.letter}</span>
+      <MateFace seed={face} className="to-face to-face-small" />
       <span className="to-bar-head">{card.headline}</span>
       <span className="to-fold"><Chevron up={false} /></span>
     </button>;
@@ -78,7 +80,7 @@ export function TeammateOffer({ item }: { item: WorkItem }) {
   return <section ref={seenRef} className="to-card" aria-label={card.headline}>
     <Sky />
     <button type="button" className="to-fold to-fold-open" onClick={() => fold(true)} aria-expanded="true" aria-label="Fold this away" title="Fold this away"><Chevron up /></button>
-    <span className="to-face">{card.letter}</span>
+    <MateFace seed={face} className="to-face" />
     <div className="to-body">
       {/* Divs, not h3/ul: the answer's own heading and list styles would win. */}
       <div className="to-head" role="heading" aria-level={3}>{card.headline}</div>

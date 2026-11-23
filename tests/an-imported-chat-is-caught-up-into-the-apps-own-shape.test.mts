@@ -87,10 +87,73 @@ describe('the rewrite', () => {
     for (let i = 0; i < CATCH_UP_TRIES; i++) await sup.catchUpTheImports([imported()], i * 3_600_000);
     expect(writes).toEqual([['route', { labels: [THREAD_LABEL, 'thread:abc'] }]]);
   });
+  // See tests/an-imported-chat-is-rewritten-the-way-every-thread-reads: the
+  // model guessed the project from the person's own settings.
+  it('asks the model with the project named and what was typed in the terminal', async () => {
+    const sup = bare();
+    const root = dirs[dirs.length - 1];
+    const asked = path.join(root, 'asked.txt');
+    const fake = path.join(root, 'fake-claude');
+    fs.writeFileSync(fake, `#!/bin/sh\nprintf '%s' "$2" > '${asked}'\necho '${JSON.stringify(card)}'\n`, { mode: 0o755 });
+    sup.store = { listProducts: () => [{ slug: 'p', name: 'Shop' }], catchUpItem: () => {}, routeItem: () => {} };
+    sup._askSmall = async (ask) => ask({ claudeBin: fake, engine: 'claude', timeoutMs: 20_000 });
+    sup.store.readHistory = () => [{ source: 'agent', patch: { result: 'Mock or retry?' } }, { source: 'founder', patch: { saidOutside: 'Mock the clock.' } }];
+    await sup.catchUpTheImports([imported()]);
+    const prompt = fs.readFileSync(asked, 'utf8');
+    expect(prompt).toContain('--- the project ---\nShop\n');
+    expect(prompt).toContain('Mock the clock.');
+  });
+
+  // Measured on real chats carried on in their terminals: each answer there was
+  // written up again. The second one renamed the thread (2026-11-21), and one
+  // made up an apology and a first option to undo approved work (2026-11-22).
+  it('keeps the name a thread already has', async () => {
+    const { sup, writes } = watching(card);
+    await sup.catchUpTheImports([imported({ label: 'Naming the checkout module' })]);
+    expect(writes[0][1]).not.toHaveProperty('label');
+    expect(writes[0][1].result).toMatch(/^\*\*Should I merge it\?\*\*/);
+  });
+  it('leaves a later answer in its agent\'s own words, and renews only what the thread is about', async () => {
+    const { sup, writes } = watching(card);
+    await sup.catchUpTheImports([imported({ label: 'Naming it', wrote: { ...imported().wrote, problem: { ts: 5, source: 'agent' } } })]);
+    expect(writes).toEqual([['catchUp', { problem: 'The agent fixed a flaky test.' }], ['route', { labels: [THREAD_LABEL, 'thread:abc'] }]]);
+  });
+
+  // The model takes about 20 s, and a chat carried on in its terminal moves in that time.
+  it('is dropped, and still owed, when the chat moved on while it was written', async () => {
+    const moved = [
+      { result: '**Claude Code stopped to ask you a question. Answer it there.**' },
+      { saidOutside: 'Merge it.', wrote: { ...imported().wrote, saidOutside: { ts: 3, source: 'founder' } } },
+      { status: 'claimed' },
+      { status: 'done' },
+    ];
+    for (const over of moved) {
+      const { sup, writes } = watching(card);
+      sup.store.readItem = () => imported(over);
+      await sup.catchUpTheImports([imported()]);
+      expect(writes, JSON.stringify(over)).toEqual([]);
+    }
+    const { sup, writes } = watching(card);
+    sup.store.readItem = () => imported({ labels: [THREAD_LABEL, 'thread:abc', CATCH_UP_LABEL, 'seen'], priority: 3 });
+    await sup.catchUpTheImports([imported()]);
+    expect(writes.map(([k]) => k)).toEqual(['catchUp', 'route']);
+  });
+
   it('waits for a chat that has no answer to rewrite', async () => {
     const { sup, writes } = watching(card);
     await sup.catchUpTheImports([imported({ result: '' })]);
     expect(writes).toEqual([]);
+  });
+});
+
+describe('a chat being written up', () => {
+  // A later answer in a chat that follows its terminal read "Getting ready" in
+  // Needs you (2026-11-22), which a tester took for one that had not started.
+  it('says it is getting ready the first time only', async () => {
+    const { gettingReady } = await import('../shared/agent-import.mts');
+    expect(gettingReady(imported())).toBe(true);
+    expect(gettingReady(imported({ wrote: { ...imported().wrote, problem: { ts: 5, source: 'agent' } } }))).toBe(false);
+    expect(gettingReady(imported({ labels: [] }))).toBe(false);
   });
 });
 

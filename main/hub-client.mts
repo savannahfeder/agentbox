@@ -5,9 +5,10 @@
 // no agent, so what it costs this Mac does not change with how many agents the
 // hub is running (tests/a-window-can-be-a-client-of-a-hub-and-runs-no-agents).
 
-import { app, BrowserWindow, Notification, dialog, ipcMain, nativeImage, powerMonitor, shell } from 'electron';
+import { app, BrowserWindow, Notification, dialog, ipcMain, nativeImage, nativeTheme, powerMonitor, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tintWindowButtons, windowFrame } from './window-buttons.mts';
 import { installNotifier } from './notify.mts';
 import { mayOpenOutside, sameHub } from './hub-rules.mts';
 import { openInBrowser } from './open-in-browser.mts';
@@ -44,7 +45,7 @@ export function startHubClient(hub: HubAddress): void {
       minWidth: 720,
       minHeight: 600,
       backgroundColor: '#1a1a1c',
-      titleBarStyle: 'hiddenInset',
+      ...windowFrame(process.platform, nativeTheme.shouldUseDarkColors),
       webPreferences: { preload: path.join(here, 'hub-client-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
     });
     const { webContents } = window;
@@ -69,6 +70,9 @@ export function startHubClient(hub: HubAddress): void {
     installNotifier({ app, window, Notification, powerMonitor, ipcMain, nativeImage, openExternal: (url: string) => shell.openExternal(url) });
     load();
   };
+
+  // The hub's page has no way to the buttons, so they follow the system's light or dark.
+  if (process.platform === 'win32') nativeTheme.on('updated', () => tintWindowButtons(window, process.platform, nativeTheme.shouldUseDarkColors));
 
   ipcMain.handle('zero:badge', (_e, count: number) => {
     if (process.platform === 'darwin') app.dock!.setBadge(count > 0 ? String(count) : '');

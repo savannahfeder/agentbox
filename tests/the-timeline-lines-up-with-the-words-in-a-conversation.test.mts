@@ -7,7 +7,9 @@
 // text and the words 20px in, the drawing picked over a ring centred under the
 // faces.
 //
-// An agent's thread has no faces, so its timeline stays where it was.
+// An agent's thread has no faces, so its timeline stays where it was. Since
+// 2026-11-20 (w-f702d60afe) a conversation's words start at the column's edge
+// too, so its timeline needs no margin to line up with them.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -25,17 +27,17 @@ describe('in a conversation with a person', () => {
     expect(read('renderer/src/components/ItemThread.tsx')).toMatch(/className=\{`act-after\$\{chat \? ' is-chat' : ''\}`\}/);
   });
 
-  it('starts the whole line where the text starts: the 28px face and its 14px gap', () => {
-    expect(chat).toMatch(/grid-template-columns: 28px minmax\(0, 1fr\); column-gap: 14px/);
-    expect(chat).toMatch(/\.thread\.is-chat \.act-line, \.act-after\.is-chat \.act-line \{ margin-left: 42px; \}/);
+  it('starts the whole line where the text starts, at the column\'s edge', () => {
+    expect(chat).toMatch(/\.chat-msg > :not\(\.chat-gutter, \.msg-head\) \{ grid-column: 1 \/ -1;/);
+    expect(chat).not.toMatch(/\.act-line[^{]*\{[^}]*margin-left/);
   });
 
   it('moves the ring and its hairline with the line rather than placing them apart', () => {
     expect(chat).not.toMatch(/act-line::(before|after)/);
   });
 
-  it('moves the line that hands a message to an agent with the words', () => {
-    expect(chat).toMatch(/\.ts-hand \{ padding-left: 42px; \}/);
+  it('leaves the line that hands a message to an agent at the words\' edge', () => {
+    expect(chat).not.toMatch(/\.ts-hand \{[^}]*padding-left/);
   });
 });
 

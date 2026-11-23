@@ -52,6 +52,12 @@ describe('which files the suite claims as ours', () => {
     expect(wouldRun('some/deep/place/tests/row-summary.test.mts')).toBe(false);
   });
 
+  it('takes the private checkout\'s tests, and not a nested copy\'s', () => {
+    expect(wouldRun('.claude/skills/tests/a-power-test-runs-on-a-plain-node.test.mts')).toBe(true);
+    expect(wouldRun('.claude/worktrees/w-1/.claude/skills/tests/a.test.mts')).toBe(false);
+    expect(wouldRun('wt/clip-today/.claude/skills/tests/a.test.mts')).toBe(false);
+  });
+
   it('still refuses node_modules, which the defaults were doing for us', () => {
     expect(wouldRun('node_modules/whatever/tests/a.test.mjs')).toBe(false);
   });
@@ -76,7 +82,8 @@ describe('every test file the runner picks up here', () => {
       .map((l) => l.trim())
       .filter((l) => /\.m[jt]s$/.test(l));
     expect(files.length).toBeGreaterThan(150);
-    const strays = files.filter((f) => !path.resolve(root, f).startsWith(path.join(root, 'tests') + path.sep));
+    const ours = [path.join(root, 'tests') + path.sep, path.join(root, '.claude/skills/tests') + path.sep];
+    const strays = files.filter((f) => !ours.some((dir) => path.resolve(root, f).startsWith(dir)));
     expect(strays).toEqual([]);
   });
 });

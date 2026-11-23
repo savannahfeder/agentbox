@@ -27,6 +27,13 @@ if (process.argv[2] === 'exec') { log('exec'); process.exit(1); }
 let auth = '';
 try { auth = fs.readFileSync(path.join(home, 'auth.json'), 'utf8'); } catch {}
 const signedIn = auth.includes('"signed-in"');
+// `codex login status`, in codex-cli 0.165's words and exit codes.
+if (process.argv[2] === 'login' && process.argv[3] === 'status') {
+  log(`login status ${signedIn ? 'signed-in' : 'signed-out'}`);
+  if (signedIn) { process.stdout.write('Logged in using ChatGPT\n'); process.exit(0); }
+  process.stderr.write('Not logged in\n');
+  process.exit(1);
+}
 log(`start ${signedIn ? 'signed-in' : 'signed-out'}`);
 
 const send = (msg) => process.stdout.write(`${JSON.stringify(msg)}\n`);
@@ -74,6 +81,13 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
         return send({ method: 'turn/completed', params: { threadId, turn: { ...turn, status: 'completed' } } });
       }
       log('turn refused');
+      // Opt in with `$CODEX_HOME/at-limit`: a login out of usage, in codex-cli's own words.
+      if (fs.existsSync(path.join(home, 'at-limit'))) {
+        return send({ method: 'turn/completed', params: { threadId, turn: { ...turn, status: 'failed', error: {
+          message: fs.readFileSync(path.join(home, 'at-limit'), 'utf8'),
+          codexErrorInfo: 'usageLimitExceeded',
+        } } } });
+      }
       return send({ method: 'turn/completed', params: { threadId, turn: { ...turn, status: 'failed', error: {
         message: 'unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: https://api.openai.com/v1/responses',
         codexErrorInfo: 'unauthorized',

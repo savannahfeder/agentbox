@@ -16,6 +16,7 @@ import { editOfLine, resolveEdits } from '../shared/message-edits.mts';
 import { firstHit, fold, holds, queryOf, windowAround } from '../shared/word-match.mts';
 import { withoutFileHomes } from '../shared/file-home.mts';
 import { isCauseLedger, withoutBrief } from '../shared/causes.mts';
+import { openedBand } from '../shared/opened-lately.mts';
 import type { ArtifactProduct } from './artifact-path.mts';
 import type { FileFamily, FileVersion, LinePatch, NotePlace, ReviewKind, ThreadLine } from '../shared/artifact-marks.mts';
 import type { Store } from './store.mts';
@@ -43,7 +44,7 @@ type Folded<T> = T & { f: string };
 type FileRow = Folded<FoundFile> & { lines: Folded<{ text: string }>[] };
 
 type Where = Pick<FinderThread, 'kind' | 'updatedAt'> & { product: string | null; id: string | null; ownerId: string | null; threadId: string | null };
-type Ranked = { rank?: number; m?: { at: number }; n?: { at: number } };
+type Ranked = { lift: number; rank?: number; m?: { at: number }; n?: { at: number } };
 
 interface FinderEntry {
   version: unknown;
@@ -188,9 +189,10 @@ export function createFinder({ listThreads, loadThread, readText = async () => n
     for (const key of built.keys()) if (!threads.some((t) => t.key === key)) built.delete(key);
   }
 
-  async function search(query: string, { lines = 6, files = 5, comments = 5, threads: threadsWanted = 0 }: { lines?: number; files?: number; comments?: number; threads?: number } = {}) {
+  /** `opened`: when the window last opened each thread, by id (../shared/opened-lately). What is in one opened lately comes first. */
+  async function search(query: string, { lines = 6, files = 5, comments = 5, opened = {} }: { lines?: number; files?: number; comments?: number; opened?: Readonly<Record<string, number>> } = {}) {
     const q = queryOf(query);
-    const empty = { lines: [], files: [], comments: [], threads: [], total: { lines: 0, files: 0, comments: 0 } };
+    const empty = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 }, threads: [] };
     if (!q.terms.length) return empty;
     const threads = listThreads();
     const behind = threads.filter((t) => staleOf(t, built.get(t.key)));
@@ -200,50 +202,46 @@ export function createFinder({ listThreads, loadThread, readText = async () => n
     for (const t of should.slice(0, REBUILT_BEFORE_ANSWER)) await ensure(t);
     for (const t of should.slice(REBUILT_BEFORE_ANSWER)) void ensure(t);
 
-    const foundLines: Array<{ where: Where; m: Folded<FoundMessage>; rank: number }> = [];
-    const foundFiles: Array<{ where: Where; f: FileRow; name?: boolean; l?: Folded<{ text: string }> }> = [];
-    const foundNotes: Array<{ where: Where; n: Folded<FoundNote>; rank: number }> = [];
+    const foundLines: Array<{ where: Where; m: Folded<FoundMessage>; rank: number; lift: number }> = [];
+    const foundFiles: Array<{ where: Where; f: FileRow; name?: boolean; l?: Folded<{ text: string }>; lift: number }> = [];
+    const foundNotes: Array<{ where: Where; n: Folded<FoundNote>; rank: number; lift: number }> = [];
+    const at = now();
     for (const t of threads) {
       const entry = built.get(t.key);
       if (!entry) continue;
       const where: Where = { kind: t.kind, product: t.product ?? null, id: t.id ?? null, ownerId: t.ownerId ?? null, threadId: t.threadId ?? null, updatedAt: t.updatedAt ?? 0 };
+      const lift = t.id ? openedBand(opened[t.id], at) : 0;
       // Only references are kept while scanning: a snippet is cut for the few
       // that are shown, not for every hit of a common word.
       for (const m of entry.messages) {
-        if (holds(m.f, q)) foundLines.push({ where, m, rank: q.phrase && m.f.includes(q.phrase) ? 1 : 0 });
+        if (holds(m.f, q)) foundLines.push({ where, m, rank: q.phrase && m.f.includes(q.phrase) ? 1 : 0, lift });
       }
       for (const f of entry.files) {
-        if (holds(f.f, q)) { foundFiles.push({ where, f, name: true }); continue; }
+        if (holds(f.f, q)) { foundFiles.push({ where, f, name: true, lift }); continue; }
         const l = f.lines.find((x) => holds(x.f, q));
-        if (l) foundFiles.push({ where, f, l });
+        if (l) foundFiles.push({ where, f, l, lift });
       }
       for (const n of entry.notes) {
-        if (holds(n.f, q)) foundNotes.push({ where, n, rank: 0 });
+        if (holds(n.f, q)) foundNotes.push({ where, n, rank: 0, lift });
       }
     }
     // Every hit carries one of `m` and `n`.
-    const newest = (a: Ranked, b: Ranked): number => (b.rank ?? 0) - (a.rank ?? 0) || (b.m ?? b.n)!.at - (a.m ?? a.n)!.at;
-    const byName = (a: (typeof foundFiles)[number], b: (typeof foundFiles)[number]): number => (!!a.name === !!b.name ? b.f.at - a.f.at : a.name ? -1 : 1);
+    const newest = (a: Ranked, b: Ranked): number => b.lift - a.lift || (b.rank ?? 0) - (a.rank ?? 0) || (b.m ?? b.n)!.at - (a.m ?? a.n)!.at;
+    const byName = (a: (typeof foundFiles)[number], b: (typeof foundFiles)[number]): number => b.lift - a.lift || (!!a.name === !!b.name ? b.f.at - a.f.at : a.name ? -1 : 1);
     foundLines.sort(newest);
     foundFiles.sort(byName);
     foundNotes.sort(newest);
-    // One entry per thread, so a thread that talks about the words all the way
-    // through outranks one that said them once, and no thread fills every slot.
-    const perThread = new Map<string, { where: Where; m: Folded<FoundMessage>; hits: number; phrase: boolean }>();
-    for (const { where, m, rank } of foundLines) {
-      const key = `${where.kind}/${where.product ?? where.ownerId}/${where.id ?? where.threadId}`;
-      const had = perThread.get(key);
-      if (had) had.hits += 1;
-      else perThread.set(key, { where, m, hits: 1, phrase: rank > 0 });
-    }
-    const tallied = [...perThread.values()]
-      .sort((a, b) => Number(b.phrase) - Number(a.phrase) || b.hits - a.hits || b.m.at - a.m.at)
-      .slice(0, threadsWanted)
-      .map(({ where, m, hits, phrase }) => ({
-        ...where, hits, phrase, uid: m.uid, by: m.by, source: m.source, at: m.at, comment: !!m.comment, text: windowAround(m.text, firstHit(m.f, q), SNIPPET_CHARS),
-      }));
+    // The threads opened lately the words were found inside, each with the first thing found.
+    const inside = new Map<string, { product: string; id: string; text: string }>();
+    const note = (where: Where, text: () => string) => {
+      if (!where.product || !where.id || inside.has(`${where.product}/${where.id}`)) return;
+      inside.set(`${where.product}/${where.id}`, { product: where.product, id: where.id, text: text() });
+    };
+    for (const { where, m, lift } of foundLines) if (lift) note(where, () => windowAround(m.text, firstHit(m.f, q), SNIPPET_CHARS));
+    for (const { where, n, lift } of foundNotes) if (lift) note(where, () => windowAround(n.text, firstHit(n.f, q), SNIPPET_CHARS));
+    for (const { where, f, l, lift } of foundFiles) if (lift) note(where, () => (l ? windowAround(l.text, firstHit(l.f, q), SNIPPET_CHARS) : f.name));
     return {
-      threads: tallied,
+      threads: [...inside.values()],
       lines: foundLines.slice(0, lines).map(({ where, m }) => ({
         ...where, uid: m.uid, by: m.by, source: m.source, at: m.at, comment: !!m.comment, text: windowAround(m.text, firstHit(m.f, q), SNIPPET_CHARS),
       })),

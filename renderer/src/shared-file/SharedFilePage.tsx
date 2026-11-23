@@ -7,8 +7,8 @@ import { AppMark } from '../components/AppMark';
 import { PdfPages } from '../components/PdfPages';
 import type { CloudClient } from '../cloud-rest';
 import {
-  blobType, commentWhen, fileBytes, filmOf, initialOf, isTable, mayComment, mayEdit, mayLookBack, postComment, readFilm, readComments, readHistory, readSharedFile,
-  pictureAddress, readVersion, removeComment, restoreVersion, saidOf, saveEdit, sharedLine, titleOf, versionLine, versionWhen,
+  blobType, commentWhen, fileBytes, filmOf, initialOf, isTable, mayComment, mayEdit, mayLookBack, readFilm, readComments, readHistory, readSharedFile,
+  pictureAddress, readVersion, restoreVersion, saidOf, saveEdit, sendComment, takeBackComment, sharedLine, titleOf, versionLine, versionWhen,
   type FileComment, type LinkVersion, type Rpc, type SharedFile, type Shown,
 } from './shared-file';
 import { SharedSignIn, type SignInFor } from './SharedSignIn';
@@ -258,11 +258,11 @@ export function SharedFilePage({ token, client, finishing = null }: {
               where={draftWords(kind, sendTo)} canClear={!!sendTo} onClear={() => { if (draft) setDraft(null); else setWholeFilm(true); }}
               onWriting={() => setHold((n) => n + 1)}
               post={async (words) => {
-                await postComment(asMe, token, words, sendTo);
+                const list = await sendComment(asMe, anyone, token, words, sendTo);
                 setDraft(null); setWholeFilm(false);
-                setComments(await readComments(anyone, token));
+                if (list) setComments(list);
               }}
-              remove={async (id) => { await removeComment(asMe, id); setComments(await readComments(anyone, token)); }}
+              remove={async (id) => { const list = await takeBackComment(asMe, anyone, token, id); if (list) setComments(list); }}
             />
           )}
           {signedIn && (
@@ -390,7 +390,7 @@ interface Notes {
 /** The file on its own: its title, who shared it, and the file. */
 export function FilePage({ token, file, piece, notes, edit = null, peek = null }: { token: string; file: SharedFile; piece?: Piece; notes?: Notes; edit?: EditHands | null; peek?: Peek | null }) {
   const table = isTable(file);
-  const kept = table || file.kind === 'image' || file.kind === 'pdf' || file.kind === 'video';
+  const kept = file.kind === 'markdown' || file.kind === 'image' || file.kind === 'pdf' || file.kind === 'video';
   // An earlier copy of a page is framed from its words, as the site's /raw holds only the current one.
   const shown = peek ? { ...file, body: peek.body, anyone: false } : file;
   const saved = edit?.saved;
@@ -430,10 +430,10 @@ function PeekBar({ peek }: { peek: Peek }) {
 
 const openToAnyone = (file: Pick<SharedFile, 'anyone'>) => file.anyone !== false;
 
-/** From the site's own address when anyone may read it; otherwise from the copy this page already holds. */
+/** From the site's own address when anyone may read it; otherwise from the copy this page already holds. A doc is always from the copy: the site serves it as text to read, not to save. */
 function Download({ token, file }: { token: string; file: SharedFile }) {
   const local = useMemo(() => {
-    if (openToAnyone(file) || file.kind === 'video') return null;
+    if ((openToAnyone(file) && file.kind !== 'markdown') || file.kind === 'video') return null;
     try {
       const data = file.kind === 'image' || file.kind === 'pdf' ? fileBytes(file) : file.body;
       return URL.createObjectURL(new Blob([data as BlobPart], { type: blobType(file.kind, file.type) }));

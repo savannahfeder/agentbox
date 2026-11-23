@@ -1,0 +1,3 @@
+#!/bin/sh
+# The private checkout's push runs the public checkout's gate (scripts/private-push-gate.mjs).
+exec node "$(dirname "$0")/../private-push-gate.mjs" "$@"

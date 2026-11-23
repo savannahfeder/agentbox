@@ -169,6 +169,23 @@ export async function removeComment(rpc: Rpc, id: string): Promise<void> {
   await rpc('remove_file_link_comment', { c: id });
 }
 
+// Once the change went in, a failed read of the list must not say it failed:
+// the words would stay in the box and sending again would post them twice.
+// null leaves the list to the page's next read.
+const thenRead = async (anyone: Rpc, tok: string): Promise<FileComment[] | null> => {
+  try { return await readComments(anyone, tok); } catch { return null; }
+};
+
+export async function sendComment(asMe: Rpc, anyone: Rpc, tok: string, words: string, place: NotePlace | null = null): Promise<FileComment[] | null> {
+  await postComment(asMe, tok, words, place);
+  return thenRead(anyone, tok);
+}
+
+export async function takeBackComment(asMe: Rpc, anyone: Rpc, tok: string, id: string): Promise<FileComment[] | null> {
+  await removeComment(asMe, id);
+  return thenRead(anyone, tok);
+}
+
 /** An image's or a PDF's bytes, from the base64 the link carries. */
 export function fileBytes(file: Pick<SharedFile, 'body'>): Uint8Array {
   const raw = atob(file.body.replace(/\s+/g, ''));
@@ -195,9 +212,7 @@ export function pictureAddress(file: Pick<SharedFile, 'body' | 'type'>): string 
   return URL.createObjectURL(new Blob([fileBytes(file) as BlobPart], { type: blobType('image', file.type) }));
 }
 
-export function initialOf(name: string): string {
-  return (name.trim().match(/\p{L}|\p{N}/u)?.[0] ?? '?').toUpperCase();
-}
+export { initialsOf as initialOf } from '../team/rooms/room-rules';
 
 export function sharedOn(ts: number, now = Date.now()): string {
   const d = new Date(ts);

@@ -2,21 +2,28 @@
 //
 // Two testers, four times in one round: "The textarea says Comment to Theo,
 // but the button only says Comment." A note on a file already says "Send to
-// Lena" (artifact-pins noteSendWords), so the comment's button says the same.
-// Measured by reading the teammate thread page's source.
+// Lena" (artifact-pins noteSendWords), so the comment's button said the same.
+// 2026-11-21: the box is the thread's own reply box, and who gets it is said
+// beside Send, as it is there. Measured by drawing the box.
 import { describe, expect, it } from 'vitest';
-import fs from 'node:fs';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { CommentBox } from '../renderer/src/threads/TeammateThread.tsx';
 
-const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
+const box = (helping = false) => renderToStaticMarkup(React.createElement(CommentBox, {
+  owner: 'Theo', helping, draft: 'Looks right to me', setDraft() {}, sending: false, onSend() {}, open: true, onOpen() {}, onFold() {},
+}));
 
 describe("the comment box on a teammate's thread", () => {
-  it('names the owner on its button, as a file note does', () => {
-    expect(page).toContain('<button type="submit" disabled={!draft.trim() || sending}>Send to {owner}</button>');
+  it('says who gets it beside Send, as the reply box does', () => {
+    expect(box()).toMatch(/<span class="dim">Goes to Theo\.<\/span><\/span><span class="dock-send-pair solo"><button type="submit" class="dock-send"/);
+    expect(box(true)).toContain('<span class="dim">Goes to Theo&#x27;s agent.</span>');
   });
   it('still says what the box is for', () => {
-    expect(page).toContain('placeholder={`Comment to ${owner}`}');
+    expect(box()).toContain('placeholder="Reply to Theo"');
+    expect(box(true)).toContain('placeholder="Write to Theo&#x27;s agent"');
   });
   it('has no button that says only Comment', () => {
-    expect(page).not.toMatch(/>Comment<\/button>/);
+    expect(box()).not.toMatch(/>Comment( <kbd>[^<]*<\/kbd>)?(<svg[\s\S]*?<\/svg>)?<\/button>/);
   });
 });

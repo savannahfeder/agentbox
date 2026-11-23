@@ -39,6 +39,8 @@ interface Sighting {
   at: number;
   seq: number;
   card?: string | null;
+  /** The card the phone last drew: its answer signs this one, never the Mac's. */
+  phoneCard?: string | null;
 }
 
 export function spoolDir(storeRoot: string): string {
@@ -76,8 +78,8 @@ export function approvalPublicKey(): string {
 //
 // The digest is of what was displayed, not of the file at answer time: a
 // re-read lets a worker flip the file between a harmless body and the real one.
-// `listPending` is the only reader, and every caller acts on or draws exactly
-// what it returned, so the digest taken there is the card she saw.
+// `listPending` is the only reader, and only a read that draws the card
+// (`drawn`, the default) records its digest, so that digest is the card she saw.
 //
 // The digest itself is shared/approval-card.mts, so the cloud server takes the
 // same one of a card it puts on the phone.
@@ -280,7 +282,7 @@ function bornAt(dir: string, name: string): { ctime: bigint; ino: bigint } {
   } catch { return { ctime: 2n ** 63n, ino: 2n ** 63n }; } // gone or unreadable: never in front of something real
 }
 
-export function listPending(storeRoot: string, { now = Date.now }: { now?: () => number } = {}): ApprovalRequest[] {
+export function listPending(storeRoot: string, { now = Date.now, drawn = true, on = 'mac' }: { now?: () => number; drawn?: boolean; on?: 'mac' | 'phone' } = {}): ApprovalRequest[] {
   const dir = spoolDir(storeRoot);
   let files: string[] = [];
   try { files = fs.readdirSync(dir); } catch { return []; }
@@ -324,8 +326,12 @@ export function listPending(storeRoot: string, { now = Date.now }: { now?: () =>
     // `answer` signs this digest, so her press authorises the card she saw.
     // Kept from the last successful read, because an unreadable file also
     // leaves her screen, so the old digest is still the last card she saw.
+    // Only a read that draws the card sets it: a read at the press (the chord,
+    // the menu) may find a body the worker swapped in after the draw.
     if (request) {
-      seen.card = cardDigest(request);
+      // The phone draws on its own, so its read never sets what a press on the Mac signs.
+      if (drawn && on === 'phone') seen.phoneCard = cardDigest(request);
+      else if (drawn) seen.card = cardDigest(request);
       pending.push({ request, seq: seen.seq });
     }
   }
@@ -333,23 +339,26 @@ export function listPending(storeRoot: string, { now = Date.now }: { now?: () =>
   return pending.sort((a, b) => a.seq - b.seq).map((p) => p.request);
 }
 
-/** The digest of the card last shown for this request, or null if none was. */
-export function cardShown(storeRoot: string, id: string): string | null {
-  return seenAt.get(`${spoolDir(storeRoot)}\0${id}`)?.card ?? null;
+/** The digest of the card last shown for this request on the Mac, or on the phone, or null if none was. */
+export function cardShown(storeRoot: string, id: string, on: 'mac' | 'phone' = 'mac'): string | null {
+  const seen = seenAt.get(`${spoolDir(storeRoot)}\0${id}`);
+  return (on === 'phone' ? seen?.phoneCard : seen?.card) ?? null;
 }
 
-/** Whether `card` is the card last drawn for this request: a phone answers with the one it drew. */
+/** Whether `card` is the card the phone last drew for this request: a phone answers with the one it drew. */
 export function cardStillShown(storeRoot: string, id: string, card: unknown): boolean {
-  return typeof card === 'string' && !!card && cardShown(storeRoot, id) === card;
+  return typeof card === 'string' && !!card && cardShown(storeRoot, id, 'phone') === card;
 }
 
-export function answer(storeRoot: string, id: string, allow: unknown, note?: string | null): boolean {
+/** `phone.card` is the card a phone answered on, signed only when it is the one the phone last drew. */
+export function answer(storeRoot: string, id: string, allow: unknown, note?: string | null, phone?: { card: unknown }): boolean {
   if (!/^[\w-]+$/.test(String(id ?? ''))) return false;
   const dir = spoolDir(storeRoot);
   if (!spoolEntryExists(dir, `${id}.request.json`)) return false;
   // Every route that answers calls `listPending` first, so a card is always
   // here. Reading the file instead would sign something she may not have seen.
-  const card = cardShown(storeRoot, id);
+  if (phone && !cardStillShown(storeRoot, id, phone.card)) return false;
+  const card = phone ? cardShown(storeRoot, id, 'phone') : cardShown(storeRoot, id);
   if (!card) return false;
   const at = Date.now();
   const sig = crypto.sign(null, decisionBytes(id, !!allow, note ?? null, at, card), keys().privateKey).toString('base64');

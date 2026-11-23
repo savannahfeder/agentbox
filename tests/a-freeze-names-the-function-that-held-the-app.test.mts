@@ -36,11 +36,13 @@ describe('an app whose main thread stops answering', () => {
     const dir = path.join(tempDir(), 'app');
     fs.symlinkSync(tempDir(), dir);
     const script = path.join(dir, 'freezes.mjs');
+    // The loop keeps to whole numbers so it makes no garbage: a loop that does
+    // can spend more of the hold collecting it than in itself.
     fs.writeFileSync(script, `
       import { execFileSync } from 'node:child_process';
       import { startFreezeRecorder } from ${JSON.stringify(path.join(ROOT, 'main', 'freeze-recorder.mts'))};
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-      function holdsTheThreadInALoop(ms) { const end = Date.now() + ms; let x = 0; while (Date.now() < end) x += Math.sqrt(x + 1); return x; }
+      function holdsTheThreadInALoop(ms) { const end = Date.now() + ms; let x = 0; while (Date.now() < end) { for (let i = 0; i < 1e5; i += 1) x = (x + i) | 0; } return x; }
       function holdsTheThreadOnAProgram() { execFileSync('sleep', ['1']); }
       const rec = startFreezeRecorder({ dir: ${JSON.stringify(path.join(dir, 'log'))}, appDir: ${JSON.stringify(dir)} });
       await wait(800);

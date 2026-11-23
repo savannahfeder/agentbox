@@ -49,7 +49,7 @@ describe('a five hour window that ended since the reading', () => {
   });
 
   it('is said aloud as reset', () => {
-    expect(usageSentence(RELAUNCH.limits, NOW, 'Codex')).toBe('Codex. This session: reset since the last reading. This week: 30% used, 3d 16h left.');
+    expect(usageSentence(RELAUNCH.limits, NOW, 'Codex')).toBe('Codex. This session: reset since the last reading. This week: 30% used, resets in 3d 16h.');
   });
 });
 

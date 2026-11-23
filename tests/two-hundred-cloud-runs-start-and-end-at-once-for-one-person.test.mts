@@ -7,7 +7,7 @@
 // errors (25 at once: 10 errors), whatever the plan allowed; a server error on
 // a start sends the thread back to the computer. 200 done.json notices at once
 // failed the same way. Measured with scripts/cloud-load-test.mjs --standin.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { TERMS_VERSION } from '../cloud/gateway/terms.mjs';
 
@@ -81,10 +81,13 @@ describe('one person on Max starting and ending runs all at once', () => {
       if (k.startsWith('ledger/people/')) { tries += 1; await sleep(1); throw Object.assign(new Error('changed meanwhile'), { conflict: true }); }
       return put(k, body, opts);
     };
+    // The backoff is random, so the number of tries in 2 s was too: on a fair
+    // draw 8 tries fit and the test failed. Halfway draws give exactly 9.
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const began = Date.now();
-    const out = await start(0);
+    const out = await start(0).finally(() => random.mockRestore());
     expect(out.status).toBe(500);
-    expect(tries).toBeGreaterThan(8);
+    expect(tries).toBe(9);
     expect(Date.now() - began).toBeGreaterThanOrEqual(2000);
     // 2.3 s alone, 5.1 s inside a busy push gate; for ever is what this rules out.
     expect(Date.now() - began).toBeLessThan(10_000);

@@ -1,17 +1,21 @@
 // Pure rules for what each list shows, and what a click on a row or its select
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mts';
-import { teammateIdOf } from '../../shared/teammates.mts';
-import { answerSettled, filedByThePerson, wakesItselfAt } from '../../shared/answers.mts';
+import { asksSomething, teammateIdOf } from '../../shared/teammates.mts';
+import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../../shared/answers.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
+import { asksToClose } from '../../shared/asks-to-close.mts';
+import { rememberedFor } from '../../shared/remembered.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
+import { closedByItsShip } from '../../shared/ship-closes-its-thread.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
 import { shownTitle } from '../../shared/thread-title.mts';
-import { firstRealLine, offerIsLive, previewText, searchText } from './format';
+import { closesTheTask, firstRealLine, itemOptions, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 import { isCause } from '../../shared/causes.mts';
+import { heldOutside } from '../../shared/carried-on-outside.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -25,6 +29,8 @@ export interface InboxItem {
   labels?: string[];
   answer?: string;
   result?: string;
+  note?: string;
+  body?: string;
   answeredThrough?: number;
   runAt?: number;
   snoozedUntil?: number;
@@ -41,6 +47,8 @@ export interface InboxItem {
   createdAt?: number;
   updatedAt?: number;
   wrote?: Record<string, { ts: number; source: string } | undefined>;
+  claim?: { holder?: string | null; leaseUntil?: number } | null;
+  claimExpired?: boolean;
 }
 
 // The queue's own rule, so In progress never holds a thread it will not start.
@@ -82,6 +90,8 @@ const liveAnswer = (i: InboxItem) => (i.answer && i.answer !== '(withdrawn)' ? i
 export function stillAsksYou(i: InboxItem): boolean {
   if (i.kind !== 'question' && i.kind !== 'review') return false;
   if (i.status === 'done') return false;
+  // Answered where it started, and its agent is at work on that.
+  if (heldOutside(i)) return false;
   return !liveAnswer(i);
 }
 
@@ -127,6 +137,11 @@ export function gaveUpOnTheAnswer(i: InboxItem): boolean {
   return saysARunGotNowhere(i.result);
 }
 
+// Her last words asked for the close and the agent's done came after them:
+// that done is hers, as if she had pressed E. Kept per thread, as optionsFrom is.
+const closedAsSheAsked = rememberedFor((i: InboxItem): boolean => (
+  asksToClose(liveAnswer(i)) && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity)));
+
 // Who deferred a row decides what the deferral means. A future runAt an agent
 // wrote stops workers respawning (`isDue` in shared/work-items.mts) but does
 // not hide the row, or an agent could take its own question away from the
@@ -160,8 +175,31 @@ function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   // Something she said after scheduling it runs now, and its answer is hers to read now.
   const spokeSince = (i.wrote?.answer?.ts ?? 0) > (i.wrote?.runAt?.ts ?? 0);
   const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
-  const reminder = i.wrote?.snoozedUntil?.source === 'founder' ? i.snoozedUntil ?? 0 : 0;
+  // A pick lifts Later with no write of its own, so an answer after it lifts it here.
+  const answered = !!liveAnswer(i) && (i.wrote?.answer?.ts ?? 0) > (i.wrote?.snoozedUntil?.ts ?? 0);
+  const asked = askedSince(i, i.wrote?.snoozedUntil?.ts ?? Infinity);
+  const reminder = i.wrote?.snoozedUntil?.source === 'founder' && !answered && !asked ? i.snoozedUntil ?? 0 : 0;
   return Math.max(mine, reminder, legacySnooze);
+}
+
+// The agent's last answer came after `since` and asks the person something:
+// in words, or with a pick that is more than closing.
+function askedSince(i: InboxItem, since: number): boolean {
+  const r = i.wrote?.result;
+  if (!r || r.source === 'founder' || (r.ts ?? 0) <= since || (i.wrote?.note?.ts ?? 0) > r.ts) return false;
+  const options = itemOptions(i);
+  return options.length ? offerIsLive(i) && !options.every((o) => closesTheTask(o.text)) : asksSomething(i.result);
+}
+
+/**
+ * Its agent is waiting on you (`asking`: a permission card or a sign-in) and
+ * you put the thread in Later yourself. It waits in Later, not In progress,
+ * because nothing moves until you answer, and is back in Needs you at the time
+ * you picked. Only your own Later counts, so an agent's moment never hides its ask
+ * (tests/a-thread-you-put-in-later-stays-there-while-its-agent-waits-on-you).
+ */
+export function askPutOff(i: InboxItem, asking: boolean, now = Date.now()): boolean {
+  return asking && putAwayByThem(i) > now;
 }
 
 /** What a person said this thread waits on has ended, and they have not acted on it since. */
@@ -212,8 +250,12 @@ export function belongsInInbox(
   if (notStarted(i)) return false;
   // Its agent is stopped on a permission request, so it answers before the
   // status, the schedule and the waits do: each of those is a reason the thread
-  // would be elsewhere, and none is a reason the question has gone away.
-  if (asking) return true;
+  // would be elsewhere, and none is a reason the question has gone away. Except
+  // your own Later, which you chose (`askPutOff`).
+  if (asking) return !askPutOff(i, asking, now);
+  // A chat brought in, answered where it started while its agent works on that
+  // there (main/chat-follow.mts). The claim's lease brings it back.
+  if (heldOutside(i)) return false;
   // A session is still on it, so it is In progress until it exits. Unless it is
   // still asking you something (w-fe48447cab): the one thing a session may not
   // do is take away the question it is asking (`stillAsksYou`).
@@ -250,6 +292,9 @@ export function belongsInInbox(
     // `done` is the archive. A thread she spoke on is hers whoever filed it.
     if (!hers(i) && !liveAnswer(i)) return false;            // agent work she never touched is filed
     if (i.wrote?.status?.source === 'founder') return false; // she archived it herself
+    if (closedAsSheAsked(i)) return false;
+    if (closedByItsShip(i)) return false;
+
     return (i.wrote?.status?.ts ?? i.updatedAt ?? 0) > deliveredThrough;
   }
   // A stopped row is in the inbox whatever its kind. This must come before the
@@ -296,14 +341,24 @@ export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolea
 }
 
 /**
+ * Later holds a put-off or waiting row only once no run is on it or queued for
+ *  it. Until then it is In progress, which is "running or queued", so it is
+ *  counted in one tab (tests/a-queued-thread-put-off-stays-in-progress-until-its-run-ends).
+ */
+export function putOffInLater(i: InboxItem, { hiddenUntil, now, waitingOn, runOnIt }: { hiddenUntil: number; now: number; waitingOn: readonly string[]; runOnIt: boolean }): boolean {
+  return (hiddenUntil > now || waitsInLater(i, waitingOn)) && !runOnIt;
+}
+
+/**
  * The threads this one waits on that can still finish. It fails open, because
  * hiding a thread is the dangerous direction. Not a wait: a blocker that is
  * done, one this window cannot see (another project, archived, past the 8 MB
  * read), the thread itself, and a loop of threads that only wait on each
- * other, since nothing would ever resume them. A blocker counts when it is not
- * itself waiting, or when one of its own waits counts.
+ * other, since nothing would ever resume them, and a proposal, which ends
+ * only when a person says yes. A blocker counts when it is not itself
+ * waiting, or when one of its own waits counts.
  */
-export function waitsThatCanEnd<T extends Pick<InboxItem, 'status' | 'blockedBy'> & { id: string }>(
+export function waitsThatCanEnd<T extends InboxItem & { id: string }>(
   i: T,
   byId: ReadonlyMap<string, T>,
   path: ReadonlySet<string> = new Set([i.id]),
@@ -313,6 +368,7 @@ export function waitsThatCanEnd<T extends Pick<InboxItem, 'status' | 'blockedBy'
   return live(i).filter((id) => {
     if (path.has(id)) return false;
     const blocker = byId.get(id)!;
+    if (isProposal(blocker)) return false;
     if (!live(blocker).length) return true;
     return waitsThatCanEnd(blocker, byId, new Set(path).add(id)).length > 0;
   });
@@ -478,8 +534,20 @@ export function withdrawReply(statusWhenReplied: string): { answer: string; stat
 // A reply lifts a reminder, which only hides the row. A moment to run is left
 // alone: the reply runs now anyway (`wordWaits`, shared/work-items.mts) and the
 // moment stays for the run it was set for.
+/** When the window treats a thread's work as due: its moment, unless a reply
+ *  after the moment is running now, as the supervisor does (`isDue`). */
+export function deferredUntil(i: Parameters<typeof wordWaits>[0] & { runAt?: number }): number {
+  return wordWaits(i) ? 0 : i.runAt ?? 0;
+}
+
 export function replyClearsSchedule(i: InboxItem, now = Date.now()): boolean {
   return (i.snoozedUntil ?? 0) > now;
+}
+
+/** Whether a thread shows when it comes back. A word on its way (held for Z) lifts your Later before it is written. */
+export function showsWhenItComesBack(i: Pick<InboxItem, 'status' | 'snoozedUntil'>, scheduledUntil: number | undefined, onItsWay: boolean, now = Date.now()): boolean {
+  if (i.status === 'done' || !((scheduledUntil ?? 0) > 0)) return false;
+  return !(onItsWay && replyClearsSchedule(i as InboxItem, now));
 }
 
 export type ClickTarget = 'row' | 'box';
@@ -515,7 +583,9 @@ export function rowSummary(
   const said = i.wrote?.answer;
   if (i.answer && said?.by
     && said.ts >= Math.max(i.wrote?.body?.ts ?? 0, i.wrote?.result?.ts ?? 0)) {
-    return clipToSentence(firstRealLine(i.answer));
+    // A teammate's hand-back opens "Theo handed this back.", which the status says; their own words follow.
+    const theirs = (said as { teammate?: string }).teammate ? i.answer.split(/\n\s*\n/).slice(1).join('\n\n').trim() : '';
+    return clipToSentence(firstRealLine(theirs || i.answer));
   }
   const finished = view === 'done' || i.status === 'done';
   const resultIsNewer = (i.wrote?.result?.ts ?? 0) > (i.wrote?.body?.ts ?? 0);
@@ -552,10 +622,10 @@ export function rowTitle(i: {
   result?: string;
   wrote?: { title?: { ts: number; source?: string }; label?: { ts: number } };
 }): string {
-  // A teammate's thread reads as its message to you, and before it has said
-  // anything, as its own title, never a name guessed from its opening line.
-  if (teammateIdOf(i)) return (i.result ?? '').split('\n').map((l) => searchText(l).trim()).find(Boolean) || (i.title ?? '');
-  return shownTitle(i);
+  const name = shownTitle(i);
+  // A teammate's thread can start with no words of yours to name it by.
+  if (!name && teammateIdOf(i)) return (i.result ?? '').split('\n').map((l) => searchText(l).trim()).find(Boolean) ?? '';
+  return name;
 }
 
 // The schedule box names a thread the way the list does, not by its raw title
@@ -586,6 +656,11 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
   const space = window.lastIndexOf(' ');
   return `${text.slice(0, space > 40 ? space : budget).trimEnd()}…`;
 }
+
+// A message drawn as a row's title stops at about the length of the thread
+// names beside it, however wide the window.
+export const MESSAGE_ROW_BUDGET = 48;
+export const messageOnRow = (text: string): string => clipToSentence(text, MESSAGE_ROW_BUDGET);
 
 // Every ordered list sorts through this, so the inbox, In progress and the
 // fleet agree on which row comes next. `score` is the one in shared/rank.mts,
@@ -634,26 +709,3 @@ export function rowKeys(view: string, batch = false): RowKey[] {
   return [{ key: '⏎', word: 'Open' }];
 }
 
-/**
- * The row keys left while the onboarding walk is on. The walk swallows every
- * key except the current beat's, and only on the rows that beat is about, so a
- * row prints that key or nothing. With `walk` null every row prints its usual
- * keys.
- *
- * A beat with a null key is not the same as no walk: no row prints anything,
- * because closing the row the walk waits on would end the beat by accident.
- */
-export function walkRowKeys(
-  all: RowKey[],
-  /**
-   * The beat on screen: the key it asks for (may be null) and the rows that
-   * key is for. Null when no walk is on. */
-  walk: { key: string | null; rows: string[] } | null,
-  id: string,
-): RowKey[] {
-  if (!walk) return all;
-  const want = walk.key;
-  if (!want) return [];
-  if (!walk.rows.includes(id)) return [];
-  return all.filter((k) => k.key.toUpperCase() === want.toUpperCase());
-}

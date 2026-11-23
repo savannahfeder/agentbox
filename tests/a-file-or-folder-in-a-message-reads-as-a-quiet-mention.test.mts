@@ -59,9 +59,11 @@ describe('the name a mention shows', () => {
     expect(mentionName('decisions.md')).toBe('decisions.md');
   });
 
+  // Code keeps its folder too (a-code-reference-keeps-its-folder).
   it('keeps a line number, which is the point of naming one', () => {
-    expect(mentionName('renderer/src/App.tsx:12')).toBe('App.tsx:12');
-    expect(mentionName('main/x.mjs#L40')).toBe('x.mjs#L40');
+    expect(mentionName('renderer/src/App.tsx:12')).toBe('renderer/src/App.tsx:12');
+    expect(mentionName('main/x.mjs#L40')).toBe('main/x.mjs#L40');
+    expect(mentionName('App.tsx:12')).toBe('App.tsx:12');
   });
 
   it('is the last folder for a folder', () => {
@@ -147,9 +149,10 @@ describe('the stylesheet', () => {
     }
   });
 
-  it('moves in 120ms and back out in 200ms, never snapping', () => {
-    expect(css).toMatch(/\.mention\s*\{[^}]*transition:[^}]*200ms/);
-    expect(css).toMatch(/\.mention:hover[^{]*\{[^}]*transition-duration:\s*120ms/);
+  // The 120ms in and 200ms out she picked here (2026-10-11) was later
+  // overruled: hover answers at once everywhere (tests/hover-and-press-feedback-is-instant).
+  it('answers the pointer at once', () => {
+    expect(css).not.toMatch(/transition/);
   });
 
   it('draws neither a mention nor a folder\'s name in the accent orange', () => {

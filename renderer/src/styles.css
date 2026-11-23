@@ -241,12 +241,15 @@
      right-side details while the original font stays everywhere else. The body stays Avenir Next; only what reads var(--mono)
      takes Geist Mono. Its @font-face sits with Ember's block below. */
   --mono: 'Geist Mono', ui-monospace, "SF Mono", Menlo, 'DejaVu Sans Mono', monospace;
-  /* Three corners: the small one for what you press or type in, the artifact
-     one for cards, sheets, menus and what somebody made, and round for faces.
-     Rows, dividers, tabs and the window's panels stay square. --radius is the
-     small corner under its old name, so the Ember Grid skin can still square it. */
+  /* Four corners: the small one for what you press or type in, the artifact
+     one for cards, sheets, menus and what somebody made, the pane one for the
+     main card the app sits in, and round for faces. The pane corner is never
+     smaller than the artifact one, so nothing inside the card is rounder than
+     the card. Rows, dividers and tabs stay square. --radius is the small
+     corner under its old name, so the Ember Grid skin can still square it. */
   --artifact-corner: 10px;
   --artifact-corner-small: 6px;
+  --pane-corner: 10px;
   --radius: var(--artifact-corner-small);
   --pill: 999px;
   /* An AI teammate is round like a person; its dashed ring tells it apart. */
@@ -266,7 +269,8 @@
   --skin-pane-line: transparent;
   /* The corner marks, which only Ember Grid draws (workspace-navigation.css). */
   --skin-tick: transparent;
-  --skin-blur: 0px;
+  /* No blur, and not blur(0px), which Chromium still draws (skins.ts applyTune). */
+  --skin-blur: initial;
   /* The opaque writing surface. With no skin on there is no photograph to
      average, so it falls back to the card the app already had. */
   --skin-solid: var(--bg-raised);
@@ -575,7 +579,8 @@
   --skin-pane-line: transparent;
   /* The corner marks, which only Ember Grid draws (workspace-navigation.css). */
   --skin-tick: transparent;
-  --skin-blur: 0px;
+  /* No blur, and not blur(0px), which Chromium still draws (skins.ts applyTune). */
+  --skin-blur: initial;
   /* The opaque writing surface. With no skin on there is no photograph to
      average, so it falls back to the card the app already had. */
   --skin-solid: var(--bg-raised);
@@ -744,6 +749,9 @@
   --doc-page-held: #282625;
   --code-ground: #22201f;
   --work-fill: rgba(40, 38, 37, 0.9);
+  /* A fill this opaque hides any blur behind it, and the blur redrew every code
+     block on each frame of a scroll. */
+  --work-blur: none;
   --accent: #ee6018;
   --select-bar: #ee6018;
   --underline: rgba(238, 96, 24, 0.6);
@@ -796,7 +804,6 @@ html, body, #root { height: 100%; }
   border-radius: 10px;
   border: 3px solid transparent;
   background-clip: content-box;
-  transition: background 0.2s;
 }
 *:hover::-webkit-scrollbar-thumb { background: var(--line-strong); background-clip: content-box; }
 *::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: content-box; }
@@ -902,8 +909,8 @@ body {
 }
 .topbar button { -webkit-app-region: no-drag; }
 
-/* BACK AND FORWARD (Alpha features). The arrows lead the header and whatever
-   follows them keeps its place at the left, not the middle the bar's
+/* BACK AND FORWARD, on the inbox page only. The arrows lead the header and
+   whatever follows them keeps its place at the left, not the middle the bar's
    space-between would give a third item. */
 .back-forward { display: inline-flex; align-items: center; gap: 2px; margin-right: 12px; flex: none; }
 .topbar > .back-forward + * { margin-right: auto; }
@@ -916,21 +923,9 @@ body {
 .back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
 .back-forward svg { width: 15px; height: 15px; }
 .back-forward .back-forward-inbox { margin-right: 10px; }
-/* Home hides its header bar but keeps the arrows. */
-.app.home-shown > .topbar .back-forward { visibility: visible; }
-/* The arrows replace the one back arrow a thread and Settings already had. */
-.app.back-forward-on .thread-crumb-back svg,
-.app.back-forward-on .workspace-page-heading .workspace-back { display: none; }
+/* On an inbox thread the arrows stand in for the chevron of its own back. */
+.app.back-forward-on .thread-crumb-back svg { display: none; }
 .app.back-forward-on .thread-crumb-back { padding-left: 0; }
-/* Chats, Groups and Team pull their header's first column left to the card
-   edge so its line meets the list's. The arrows come first in the bar, so the
-   column pulls further by their width and its name starts after them. */
-.app.back-forward-on { --bf-w: 66px; }
-.app.back-forward-on .topbar > .back-forward { position: relative; z-index: 2; }
-.app.back-forward-on .topbar > .back-forward + .gc-head { margin-left: calc(-32px - var(--bf-w)); }
-.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head { margin-left: calc(-44px - var(--bf-w)); }
-.app.back-forward-on .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(32px + var(--bf-w)); }
-.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(44px + var(--bf-w)); }
 
 /* WHAT AN OPENED TASK HAS INSTEAD OF A TOP BAR. Nothing is drawn here. It
    exists for two things only, and both are invisible: 1. THE THREE BUTTONS
@@ -975,7 +970,6 @@ body {
   display: inline-flex;
   align-items: baseline;
   gap: 11px;
-  transition: color 0.14s, background 0.14s;
 }
 .tab:hover { color: var(--text-dim); }
 .tab.active:hover { color: var(--text); }
@@ -1025,7 +1019,6 @@ body {
   color: var(--text-faint);
   cursor: pointer;
   padding: 0;
-  transition: color 0.14s, background 0.14s;
   -webkit-app-region: no-drag;
 }
 .search-out:hover { color: var(--text); background: var(--wash); }
@@ -1064,7 +1057,6 @@ body {
   border-radius: var(--radius);
   color: var(--text-faint);
   cursor: pointer;
-  transition: color 0.14s, background 0.14s;
 }
 .icon-btn:hover { color: var(--text); background: var(--wash); }
 
@@ -1081,7 +1073,6 @@ body {
   border: none; background: none; border-radius: var(--radius);
   font-family: inherit; font-size: 11.5px; font-variant-numeric: tabular-nums;
   color: var(--text-faint); cursor: pointer;
-  transition: color 0.14s, background 0.14s;
 }
 .usage-pill:hover { color: var(--text); background: var(--wash); }
 
@@ -1096,7 +1087,7 @@ body {
 .usage-meter > i {
   display: block; height: 100%; border-radius: 2px;
   background: var(--text-faint);
-  transition: width 0.3s ease, background 0.14s;
+  transition: width 0.3s ease;
 }
 .usage-pill:hover .usage-meter > i { background: var(--text); }
 .usage-meter.wide { width: 100%; height: 5px; }
@@ -1389,13 +1380,12 @@ body {
    width, so the wash meets the card's left edge. The hairlines either side of
    it start there too, or the wash's corners poke past them. */
 .row.recent {
-  --wash: 255 255 255;
-  background: linear-gradient(90deg, rgb(var(--wash) / 0.02), rgb(var(--wash) / 0.012) 25%, rgb(var(--wash) / 0.004) 50%, transparent 70%);
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.02), rgb(255 255 255 / 0.012) 25%, rgb(255 255 255 / 0.004) 50%, transparent 70%);
 }
-/* On white any grey read as dirt, so light mode takes the accent instead,
-   over enough stops that the fade shows no steps. */
+/* Light takes the same faint fade in its own ink; the accent this wide
+   washed the whole row orange. */
 [data-theme="light"] .row.recent {
-  background: linear-gradient(90deg, rgb(238 96 24 / 0.07), rgb(238 96 24 / 0.045) 25%, rgb(238 96 24 / 0.015) 55%, transparent 85%);
+  background: linear-gradient(90deg, rgb(18 24 42 / 0.02), rgb(18 24 42 / 0.012) 25%, rgb(18 24 42 / 0.004) 50%, transparent 70%);
 }
 .row.recent::after,
 .row.recent + .row::after { left: 0; }
@@ -1411,9 +1401,12 @@ body {
 .row .subject {
   text-decoration: underline solid transparent 1.5px;
   text-underline-offset: 4px;
-  transition: text-decoration-color 0.12s ease;
 }
-.row:hover .subject { text-decoration-color: var(--line-strong); }
+/* `.pointed`, not `:hover`: J and K take the row back from a pointer that has
+   not moved, and `:hover` would keep a second underline on it. `.hovers` is a
+   list with key hints off, where the pointer never holds the keys. */
+.row.hovers:hover .subject,
+.row.pointed .subject { text-decoration-color: var(--line-strong); }
 .row.selected .subject,
 .row.checked .subject { text-decoration-color: var(--underline); }
 
@@ -1553,7 +1546,6 @@ body {
   */
   position: absolute; left: var(--gutter); top: 21.5px;
 }
-.mark .dot, .mark .box { transition: opacity .12s ease, border-color .12s ease, background .12s ease; }
 .mark .box {
   /* LEFT EDGE ON THE GUTTER, not centred in the hit area. Centred, the box sat
      at 10px while every hairline down the list starts at 8px, so a ticked row
@@ -1741,7 +1733,7 @@ body {
   display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
   margin: 4px 0 18px; padding: 10px 14px;
   background: var(--bg-raised); border: 1px solid transparent; border-radius: var(--radius);
-  font: inherit; color: var(--text); cursor: pointer; transition: border-color 0.15s;
+  font: inherit; color: var(--text); cursor: pointer;
 }
 .stalled-bar:hover { border-color: var(--text-faint); }
 .stalled-bar-label { color: var(--text-dim); font-size: 14px; flex: 1; }
@@ -2083,7 +2075,7 @@ body {
   font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-dim);
   background: var(--bg-raised); border: 1px solid var(--line-strong);
   border-radius: var(--radius); padding: 3px 10px; cursor: pointer;
-  opacity: 0; transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+  opacity: 0;
 }
 .code-wrap:hover .code-copy, .code-wrap .code-copy.copied { opacity: 1; }
 .code-wrap .code-copy:hover { color: var(--text); border-color: var(--text-faint); }
@@ -2124,11 +2116,13 @@ body {
    kept out of sight while the box shows.
 
    The button around a loading picture is as wide as the column, because a
-   button shrinks to what is in it and the box would be 4:3 of nothing.
-   `auto 4 / 3` takes the picture's own shape the moment its first bytes give
-   it. Four :root outweigh the phone's own picture rules in phone.css. */
-:root:root:root:root .inline-image-open:has(> .inline-image[data-phone-img="loading"]),
-:root:root:root:root .inline-image-open:has(> .inline-image.arriving) { width: 100%; }
+   button shrinks to what is in it and the box would be 4:3 of nothing. It is
+   marked by FittedImg and watchPicture; a :has() reading the picture's state
+   restyled the whole thread on every change. `auto 4 / 3` takes the picture's
+   own shape the moment its first bytes give it. Four :root outweigh the
+   phone's own picture rules in phone.css. */
+:root:root:root:root .inline-image-open[data-picture-loading],
+:root:root:root:root .inline-image-open[data-picture-arriving] { width: 100%; }
 :root:root:root:root .inline-image[data-phone-img="loading"],
 :root:root:root:root .doc-picture[data-phone-img="loading"] {
   display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: auto 4 / 3;
@@ -2155,6 +2149,10 @@ body {
   animation: phone-shimmer 1.3s linear infinite;
 }
 .inline-image.arriving { display: block; width: 100%; aspect-ratio: 4 / 3; }
+/* A picture more than a screen away is not fetched yet, and a moving
+   background is restyled and repainted every frame, so its box holds still
+   until it is on its way (tests/a-picture-not-yet-on-its-way-does-not-shimmer). */
+.arriving[data-far] { animation: none; }
 
 /* A sound or a film a worker named: its name, then the player, one per line
    even when five were written on one line (ArtifactMedia in Focus.tsx). */
@@ -2202,14 +2200,13 @@ body {
   background: none; cursor: pointer; font: inherit; text-align: left; color: var(--text);
 }
 .folder-preview-name .mention-icon { width: 15px; height: 15px; margin: 0; vertical-align: 0; }
-.folder-preview-name:hover .mention-icon { color: var(--text); transition-duration: 120ms; }
+.folder-preview-name:hover .mention-icon { color: var(--text); }
 .folder-preview-path {
   font-weight: 500;
   text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 4px;
-  transition: text-decoration-color 200ms cubic-bezier(.2, 0, 0, 1);
 }
 .folder-preview-count { color: var(--text-faint); font-size: 0.9em; margin-left: 2px; }
-.folder-preview-name:hover .folder-preview-path { text-decoration-color: var(--text-faint); transition-duration: 120ms; }
+.folder-preview-name:hover .folder-preview-path { text-decoration-color: var(--text-faint); }
 .folder-preview-grid {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 8px;
 }
@@ -2331,21 +2328,28 @@ body {
 
 .focus-actions {
   display: flex;
-  gap: 10px;
-  margin-top: 30px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
 }
+/* The same size and shape as the buttons in the thread's bar, each with its mark. */
 .focus-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px 0 9px;
   background: none;
   border: 1px solid var(--line);
   color: var(--text-dim);
   border-radius: var(--radius);
-  padding: 7px 14px;
   font-size: 13px;
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
 }
+.focus-actions button > svg { flex: none; color: var(--text-faint); }
+.focus-actions button:hover > svg { color: var(--text); }
 .focus-actions button:hover { color: var(--text); border-color: var(--text-faint); }
 .focus-actions b { color: var(--text); margin-right: 4px; }
 .focus-actions { align-items: center; }
@@ -2486,7 +2490,6 @@ body {
   border: 1px solid var(--line);
   border-radius: 0;
   box-shadow: 0 1px 0 transparent inset, var(--shadow-md);
-  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
   display: flex; flex-direction: column;
 }
 .dock-card:focus-within {
@@ -2525,7 +2528,7 @@ body {
   color: var(--text-dim); background: none;
   border: 1px solid var(--line-strong); border-radius: 0;
   padding: 5px 12px; cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.05s;
+  transition: transform 0.05s;
 }
 .dock-stop svg { width: 9px; height: 9px; display: block; }
 .dock-stop:hover { color: var(--text); background: var(--wash); border-color: var(--text-faint); }
@@ -2678,8 +2681,11 @@ body {
 /* One card in front, the queue as stacked edges peeking above it. The ghosts
    are pure chrome: depth without height, so ten pending asks occupy the same
    screen as one. */
-/* Extra scroll room belongs after the inbox, never inside an opened thread. */
-.app.asking .list-pane:not(.pinned)::after {
+/* The card floats over everything, so scroll room goes only after a list that
+   scrolls. A thread, chat or page that fills its pane would be squeezed by the
+   room, or slide up by it. */
+.app.asking .body:not(.tm-body) > .list-pane:not(.pinned, .rm-open, .tq-open, .pl-open)::after,
+.app.asking .team-page::after {
   content: ''; display: block;
   height: calc(var(--approval-room, 149px) + 16px);
 }
@@ -2770,7 +2776,7 @@ body {
   display: flex; align-items: baseline; gap: 5px; flex: 0 1 auto; min-width: 0;
   font: inherit; font-size: 12px; color: var(--text-dim);
   text-align: left; background: none; border: 0; padding: 0;
-  cursor: pointer; transition: color 0.14s;
+  cursor: pointer;
 }
 .approval-task:hover { color: var(--text); }
 .approval-task-title {
@@ -2815,7 +2821,7 @@ body {
 .approval-actions button {
   font: inherit; font-size: 13px; font-weight: 600; border-radius: var(--radius);
   height: 30px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px;
-  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  flex: none; white-space: nowrap; cursor: pointer;
 }
 /* Neutral, high-contrast: the green wash read as barely-there. Allow is the
    one solid-light button in the app, unmistakable on the dark card. */
@@ -2971,7 +2977,7 @@ body {
   display: inline-flex; align-items: center; gap: 7px;
   font: inherit; font-size: 12px; font-weight: 600; color: var(--text-faint);
   background: var(--wash); border: 1px solid var(--line-strong); border-radius: var(--radius);
-  padding: 4px 11px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  padding: 4px 11px; cursor: pointer;
 }
 .prio-tag:hover { border-color: var(--text-faint); color: var(--text-dim); }
 .prio-tag.set { color: var(--text-dim); }
@@ -3102,12 +3108,11 @@ body {
 .when-note { padding: 2px 9px 6px; font-size: 12px; color: var(--text-faint); }
 
 /* Both affordances live in the chip's reserved padding, out of flow, so
-   revealing them cannot move anything. Only opacity animates. */
+   revealing them cannot move anything. Only opacity changes. */
 .chip-grip {
   position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
   display: grid; grid-template-columns: 2px 2px; gap: 2px;
   opacity: 0; pointer-events: none;
-  transition: opacity 0.14s ease;
 }
 .chip-grip i { width: 2px; height: 2px; border-radius: 50%; background: var(--text-faint); display: block; }
 .compose-product:hover .chip-grip,
@@ -3122,7 +3127,7 @@ body {
   /* 0 rather than the standard corner. Send is part of the reply card, and that
      card stays square. Same button in the new-task card, which is also 0. */
   border-radius: 0; padding: 5px 16px; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+  transition: transform 0.05s;
 }
 .dock-send:hover { background: var(--wash-strong); border-color: var(--text-faint); }
 /* Darkens rather than moves: a button that moves under a press loses a press on its edge. */
@@ -3209,7 +3214,7 @@ body {
 .opt-row {
   display: flex; gap: 10px; align-items: baseline; width: 100%; text-align: left;
   background: transparent; border: none; font: inherit; color: var(--text-dim);
-  padding: 7px 16px; cursor: pointer; transition: background 0.15s, color 0.15s;
+  padding: 7px 16px; cursor: pointer;
   font-size: 14px; line-height: 1.45;
 }
 .opt-row:last-child { padding-bottom: 11px; }
@@ -3256,7 +3261,7 @@ body {
 .opt-named-row {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 30px; padding: 0 16px;
   appearance: none; background: transparent; border: 0; cursor: pointer; text-align: left;
-  font: inherit; font-size: 14px; color: var(--text); transition: background 0.15s;
+  font: inherit; font-size: 14px; color: var(--text);
 }
 .opt-named-row:hover { background: var(--wash); }
 .opt-named-row:focus-visible { outline: 1px solid var(--text-faint); outline-offset: -1px; }
@@ -3303,6 +3308,15 @@ body {
 .reply-dock .compose-note.attach-problem { padding-left: 0; padding-right: 0; }
 
 .attach-thumb { position: relative; }
+.attach-open {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--artifact-corner-small);
+  cursor: zoom-in;
+}
+.attach-open:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 2px; }
 .attach-thumb img {
   height: 84px;
   max-width: 220px;
@@ -3326,6 +3340,40 @@ body {
   line-height: 1;
 }
 .attach-remove:hover { color: var(--text); border-color: var(--text-faint); }
+
+/* A chat's box draws what is attached as tiles of one height (AttachRow's
+   `tiles`), each with its own ×, so pressing a file never takes it out. */
+.attach-tiles { gap: 8px; max-height: 192px; overflow-y: auto; }
+.dock-card .attach-tiles { padding: 4px 16px 12px; }
+.attach-tile { position: relative; flex: none; height: 56px; max-width: 100%; box-sizing: border-box; }
+.attach-tiles .attach-picture img { width: 56px; height: 56px; object-fit: cover; box-sizing: border-box; display: block; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); }
+.attach-tiles .attach-file {
+  display: flex; align-items: center; gap: 10px; width: 232px; padding: 0 30px 0 10px; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--artifact-corner-small); background: var(--wash);
+}
+.attach-tiles .attach-kind {
+  flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--artifact-corner-small);
+  background: var(--wash-strong); font: 9.5px var(--mono); letter-spacing: .04em; color: var(--text-dim);
+}
+.attach-tiles .attach-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.attach-tiles .attach-name { display: flex; min-width: 0; white-space: pre; font-size: 13px; line-height: 17px; color: var(--text); }
+.attach-tiles .attach-head { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.attach-tiles .attach-tail { flex: none; }
+.attach-tiles .attach-meta { font-size: 12px; line-height: 16px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.attach-tiles .attach-too-big { border-color: var(--text-faint); }
+.attach-tiles .attach-too-big .attach-meta { color: var(--text-dim); }
+.attach-tiles .attach-coming .attach-bar { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--text-faint); transition: width 0.2s linear; }
+.attach-tiles .attach-voice .voice-note { height: 56px; padding-right: 32px; border-radius: var(--artifact-corner-small); }
+.attach-x {
+  position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; padding: 0; display: grid; place-items: center;
+  border: 1px solid var(--line-strong); border-radius: 50%; background: var(--pop); color: var(--text-dim); cursor: pointer;
+  opacity: 0;
+}
+.attach-x svg { width: 10px; height: 10px; }
+.attach-x:hover { color: var(--text); border-color: var(--text-faint); }
+.attach-x:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 1px; }
+.attach-tile:hover > .attach-x, .attach-tile:focus-within > .attach-x { opacity: 1; }
+@media (hover: none) { .attach-tiles .attach-x { opacity: 1; } }
 
 /* The 0 is transparent-panel bookkeeping, not the corner exception retired
    on 2026-08-16: this panel has no background and no shadow, so there is no
@@ -3367,6 +3415,8 @@ img.product-mark { object-fit: cover; opacity: 1; }
    on the orange plate a team's initial sits on, in the text colour. */
 .th-mark.th-mark-app { background: none; color: var(--text); }
 .th-mark.th-mark-app svg { display: block; }
+/* A team's own logo, on no plate, so a transparent one shows the sidebar. */
+.th-mark.th-mark-logo { background: none; object-fit: contain; }
 /* In the panel it is dimmer than anywhere else it appears, because here it is
    the only mark on the screen and a full-strength logo in an empty corner is a
    spot of ink the eye goes to first. */
@@ -3688,6 +3738,9 @@ img.product-mark { object-fit: cover; opacity: 1; }
      strip drawn after it stands down in workspace-navigation.css. */
   -webkit-app-region: no-drag;
 }
+/* Over a file opened big, under the ⌘F box. Only then: the tour points at the
+   bar from 1000. */
+body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-backdrop { z-index: 9480; }
 
 /* THE IMPORT CARD THAT ENDS SETUP WAS DRAWN DIMMED. Setup's veil is 299 and
    this backdrop was 40, so the veil lay over the card. It goes at 301, with
@@ -3900,7 +3953,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   text-decoration: underline dotted var(--line-strong);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
-  transition: color 0.14s, text-decoration-color 0.14s;
 }
 /* TWO inks in the line and no more: prose is faint, every clickable value is
    dim, and full ink is reserved for the one you are pointing at. A third
@@ -3981,7 +4033,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   display: grid; place-items: center;
   font-size: 12px; line-height: 1; color: var(--text-faint);
   opacity: 0; pointer-events: none;
-  transition: opacity 0.14s ease, color 0.12s, background 0.12s;
 }
 .compose-product:hover .chip-hide { opacity: 1; pointer-events: auto; }
 .chip-hide:hover { color: var(--text); background: var(--wash-strong); }
@@ -3993,7 +4044,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   font: inherit; font-size: 12px; color: var(--text-faint);
   background: none; border: 1px dashed var(--line-strong); border-radius: var(--radius);
   padding: 3px 11px; cursor: pointer; flex: 0 0 auto;
-  transition: color 0.15s, border-color 0.15s;
 }
 .compose-reveal:hover, .compose-reveal.on { color: var(--text-dim); border-color: var(--text-faint); }
 .compose-product {
@@ -4019,7 +4069,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
      events do the dragging; touch-action keeps the gesture from being stolen
      by a scroll. */
   touch-action: none;
-  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1), border-color 0.15s, color 0.15s, background 0.15s;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 .compose-product.active { border-color: var(--text-dim); color: var(--text); background: var(--bg-selected); }
 .compose-product:hover { border-color: var(--text-dim); color: var(--text); }
@@ -4083,7 +4133,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.palette-item.selected { background: var(--wash); box-shadow: inset 2px 0 0 var(--accent); }
+.palette-item.selected { background: var(--wash); }
 /* Nothing matched. It sits on the first row's own line — same padding, same
    size — so the eye does not move to read it, and it is faint because it is a
    statement, not something to press..
@@ -4103,7 +4153,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   text-overflow: ellipsis;
   text-align: right;
 }
-.palette-key {
+.palette-key, .palette-k .palette-esc {
   min-width: 22px;
   height: 20px;
   display: inline-grid;
@@ -4127,29 +4177,20 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .cloud-off-ask-acts .cloud-off-ask-go { color: var(--text); border-color: var(--line-strong); }
 
 /* ⌘K in the website's look (w-391bc4efbe): magnifier and Esc on the input, a
-   mark per row, the keys in a footer. Scoped to `.palette-k` because the Later
+   line icon per row. Scoped to `.palette-k` because the Later
    box and Find a group reuse the rows above, and the selected row stays the
    shared one. */
 .palette-k .palette-query { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 16px 0 18px; border-bottom: 1px solid var(--line); }
 .palette-k .palette-query svg { width: 18px; height: 18px; flex: none; color: var(--text-faint); }
 .palette-k .palette-input { flex: 1; min-width: 0; width: auto; border: none; padding: 0; font-size: 17px; caret-color: var(--accent); }
 .palette-k .palette-input::placeholder { color: var(--agent-ink); }
-.palette-k .palette-esc {
-  flex: none; padding: 4px 6px; cursor: pointer; background: none;
-  border: 1px solid var(--line); border-radius: var(--radius);
-  font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint);
-}
+.palette-k .palette-esc { flex: none; cursor: pointer; line-height: 1; }
 .palette-k .palette-esc:hover { color: var(--text); }
 .palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }
 .palette-k .palette-item.selected { color: var(--text); }
-.palette-k .palette-glyph { flex: none; width: 18px; text-align: center; font: 400 13px/1 var(--mono); color: var(--agent-ink); }
-.palette-k .palette-item.selected .palette-glyph { color: var(--accent); }
+.palette-k .palette-glyph { flex: none; width: 18px; height: 18px; display: grid; place-items: center; color: var(--text-faint); }
+.palette-k .palette-item.selected .palette-glyph { color: var(--text); }
 .palette-k .palette-hint, .palette-k .palette-key { margin-left: auto; }
-.palette-k .palette-foot {
-  display: flex; gap: 18px; padding: 10px 18px; border-top: 1px solid var(--line);
-  font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
-}
-.palette-k .palette-foot b { font-weight: 500; color: var(--text-faint); }
 .palette-k .palette-section {
   padding: 14px 18px 6px; font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--agent-ink);
 }
@@ -4157,18 +4198,16 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* A long title gives way, never the project's name. */
 .palette-k .palette-thread .palette-hint { flex: none; }
 /* A line, file, comment or decision found inside something: its words, then who
-   and where under them in the faint ink. Two lines, so the row is taller. */
-.palette-k .palette-found { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
-.palette-k .palette-found .palette-glyph { padding-top: 3px; }
-.palette-k .palette-found .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.palette-k .palette-found .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+   and where under them in the faint ink. A thread: its title, then the line it
+   was found by. Two lines, so the row is taller. */
+.palette-k :is(.palette-found, .palette-two) { height: auto; min-height: 50px; padding: 7px 18px; align-items: flex-start; }
+.palette-k :is(.palette-found, .palette-two) .palette-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+/* Up by the title, a small mark read as floating at the top of the row. */
+.palette-k :is(.palette-found, .palette-two) .palette-glyph { align-self: center; }
+.palette-k :is(.palette-found, .palette-two) .palette-sub { font-size: 12px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .palette-k .palette-found .palette-file { margin-right: 8px; color: var(--text); font-weight: 500; }
-.palette-k .palette-found .hit { color: var(--text); font-weight: 600; }
-/* A found thread: its title with where it is and when it last moved on the
-   right, and what it is about, or where the words were said, under it. */
-.palette-k .palette-head { display: flex; align-items: baseline; gap: 16px; min-width: 0; }
-.palette-k .palette-when { margin-left: auto; flex: none; font-size: 12px; color: var(--text-faint); white-space: nowrap; }
-.palette-k .palette-project { margin-right: 8px; color: var(--text-dim); }
+.palette-k :is(.palette-found, .palette-two) .hit { color: var(--text); font-weight: 600; }
+.palette-k .palette-two .palette-hint { padding-top: 2px; }
 
 /* A found line, landed on from the results: marked for a moment. */
 [data-line] { transition: background-color .5s ease, box-shadow .5s ease; }
@@ -4254,7 +4293,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   font-size: 13px;
   font-family: inherit;
   cursor: pointer;
-  transition: color 0.14s, border-color 0.14s;
 }
 .zero-btn:hover { color: var(--text); border-color: var(--text-faint); }
 .zero-btn kbd {
@@ -4313,7 +4351,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .idle-zero-agents {
   font: inherit; color: var(--text-dim);
   background: none; border: 0; padding: 0; cursor: pointer;
-  transition: color 0.14s;
 }
 .idle-zero-agents:hover { color: var(--text); }
 .idle-zero-col .idle-field { margin-top: 16px; }
@@ -4337,7 +4374,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   cursor: pointer;
   -webkit-backdrop-filter: blur(var(--skin-blur));
   backdrop-filter: blur(var(--skin-blur));
-  transition: border-color 0.14s;
 }
 :root[data-skin] .idle-field { border-color: var(--skin-pane-line); }
 .idle-field:hover { border-color: var(--text-faint); }
@@ -4510,23 +4546,39 @@ img.product-mark { object-fit: cover; opacity: 1; }
 }
 @keyframes toast-drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
-/* AN URGENT THREAD THAT ARRIVED, in the top bar until it is opened
-   (./components/UrgentReady). Square, no fill, accent only on the dot and the word. */
+/* AN URGENT THREAD THAT ARRIVED, in the top bar until it is opened, closed or
+   its time runs out (./components/UrgentReady). No fill, accent only on the dot
+   and the word. On hover a small close sits on the top right corner, so it
+   never widens the mark and never lands where the pointer was going for O. */
 .ur {
-  display: inline-flex; align-items: center; gap: 8px;
-  order: -1; height: 30px; max-width: 420px; min-width: 0; margin-right: 6px; padding: 0 8px 0 10px;
-  background: none; border: 1px solid var(--line); border-radius: var(--tag-radius);
-  font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap;
+  position: relative; display: inline-flex; align-items: center;
+  order: -1; height: 30px; max-width: 420px; min-width: 0; margin-right: 6px;
+  border: 1px solid var(--line); border-radius: var(--tag-radius);
+  font-size: 13px; color: var(--text); white-space: nowrap;
+  animation: ur-goes linear forwards;
 }
+.ur:hover { animation-play-state: paused; }
+@keyframes ur-goes { 0%, 97% { opacity: 1; } 100% { opacity: 0; } }
+.ur-open {
+  display: inline-flex; align-items: center; gap: 8px; height: 100%; min-width: 0; padding: 0 8px 0 10px;
+  background: none; border: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.ur-close {
+  display: none; position: absolute; top: -6px; right: -6px; width: 13px; height: 13px;
+  padding: 0; border: 0; border-radius: 50%; background: var(--bg); color: var(--text-faint); cursor: pointer;
+}
+.ur:hover .ur-close { display: grid; place-items: center; }
+.ur .ur-close:hover { color: var(--text); }
+.ur-close svg { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
 .ur-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--chip-ask); animation: ur-arrive 1.2s ease-in-out 3; }
 @keyframes ur-arrive { 50% { opacity: .25; } }
 .ur-word { flex: none; color: var(--chip-ask); font-weight: 500; }
 .ur-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ur-kbd {
   flex: none; font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-faint);
-  border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0 4px; line-height: 15px;
+  box-sizing: border-box; width: 18px; text-align: center;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); line-height: 15px;
 }
-.ur:hover .ur-kbd { color: var(--text); border-color: var(--text-faint); }
 
 /* WHERE A REPLY WENT, above the reply box of the thread it moved her to
    (./components/SentLine). The box's own width and hairline, square, one
@@ -4580,6 +4632,8 @@ img.product-mark { object-fit: cover; opacity: 1; }
 /* A message with no task: its sentence is the whole card. */
 .toast-plain { width: auto; max-width: 360px; display: flex; gap: 12px; padding: 11px 16px; }
 .toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
+/* A warning is read whole, or it warns of nothing. */
+.toast-warns .toast-line { white-space: normal; }
 /* An agent's message in its Undo seconds: who it goes to over the words. */
 .agent-sending { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 3px; align-items: center; }
 .agent-sending .toast-title { grid-column: 1; font-size: 12px; color: var(--text-faint); }
@@ -4613,6 +4667,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   transition: opacity 0.22s ease;
 }
 .zoom-readout.up { opacity: 1; }
+:root[data-window-buttons="right"] .zoom-readout { right: 160px; }
 
 /* ⌘F. A small panel over whatever is on screen, in the toast's shape. The field is a tint of the theme,
    never white (the light-component rule, 2026-09-23).
@@ -4951,7 +5006,6 @@ img.product-mark { object-fit: cover; opacity: 1; }
   border: 1px solid transparent; border-radius: var(--radius);
   background: none; font: inherit; color: var(--text-dim);
   cursor: pointer; text-align: left;
-  transition: color .14s ease, border-color .14s ease, background .14s ease;
 }
 /* THE PAGE MARK THE ATTACHMENT CHIPS USED TO WEAR, kept here after that row
    was deleted, because it is the app's existing word for "this is a file and
@@ -5258,7 +5312,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
   display: grid; place-items: center;
   border: 1px solid var(--bg); border-radius: 50%;
   background: var(--text); color: var(--bg); cursor: pointer;
-  opacity: 0; transition: opacity 90ms ease;
+  opacity: 0;
 }
 .set-icon-clear svg { width: 10px; height: 10px; }
 .set-icon-pick:hover .set-icon-clear, .set-icon-clear:focus-visible { opacity: 1; }
@@ -5564,7 +5618,7 @@ img.product-mark { object-fit: cover; opacity: 1; }
 .set-sw {
   width: 38px; height: 22px; border-radius: 22px; flex: 0 0 auto; cursor: pointer;
   background: var(--wash-strong); border: 1px solid var(--line-strong);
-  position: relative; transition: background 0.15s, border-color 0.15s; padding: 0;
+  position: relative; padding: 0;
 }
 /* The knob is the one face that stays opaque under a picture, and the reason is
    that it MOVES: a translucent knob sliding over a track shows the track
@@ -5733,7 +5787,7 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .proj-search { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
 .proj-search-icon {
   position: absolute; left: 11px; width: 15px; height: 15px;
-  color: var(--text-faint); pointer-events: none; transition: color .12s;
+  color: var(--text-faint); pointer-events: none;
 }
 .proj-search:focus-within .proj-search-icon { color: var(--text-dim); }
 .proj-index-find {
@@ -5928,7 +5982,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   border: 1px solid var(--line);
   position: relative; overflow: hidden;
   display: block;
-  transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s;
   /* A TILE WEARS A 480px COPY, NOT THE WINDOW'S PICTURE. Every `.look-swatch.<id>`
      below reads `var(--look-<id>)`, which on :root is the full 3456x2304 file,
      up to 3.2 MB. Opening the picker or Settings decoded all of them at once to
@@ -6167,7 +6220,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
 .theme-dial-line {
   display: block; height: 2px;
   background: var(--wash-strong); border-radius: 1px; overflow: hidden;
-  transition: height 0.1s;
 }
 /* GREY, NOT --accent, and this change was picked by name. The app's
    accent is a strong blue, and two filled bars of it ran across the top right
@@ -6270,7 +6322,6 @@ a.set-ghost { text-decoration: none; display: inline-block; }
   width: 15px; height: 15px; border-radius: 50%; margin-top: -5.5px;
   background: var(--film-strong); border: 1px solid var(--line-strong);
   box-shadow: var(--control-shadow);
-  transition: border-color 0.12s;
 }
 .set-range:hover::-webkit-slider-thumb, .set-range:focus-visible::-webkit-slider-thumb { border-color: var(--accent); }
 
@@ -7146,7 +7197,6 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
   font: inherit; font-size: 12px; color: var(--text);
   opacity: 0.6; cursor: pointer;
   -webkit-app-region: no-drag;
-  transition: opacity 120ms ease, color 120ms ease;
 }
 .fr-out:hover { opacity: 1; color: var(--text); }
 .fr-out:focus-visible { opacity: 1; outline: 1px solid var(--line-strong); border-radius: var(--radius); }
@@ -7620,6 +7670,21 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
 }
 .doc-mark:hover { background: var(--doc-wash); color: var(--text); }
 .doc-mark svg { display: block; }
+/* The open mark's menu hangs from the mark, right edges in line. */
+.open-with { position: relative; display: inline-flex; }
+/* Pressed while its menu is open, over the bare corner marks' clear hover (direct-review.css, artifact-view.css). */
+.open-with > .doc-mark[aria-expanded="true"],
+:root[data-code-review] .workspace-layout .doc-marks .open-with > .doc-mark[aria-expanded="true"] { background: var(--doc-wash); color: var(--text); }
+.th-menu.ts-more-menu.open-with-menu { min-width: 236px; }
+.open-with-icon { width: 18px; height: 18px; display: block; }
+.open-with-menu[aria-busy="true"] .ts-more-row:not(.on) { opacity: .45; }
+/* Room for "Opening" on every row, so the menu does not widen as it appears. */
+.open-with-menu .open-with-detail { display: inline-flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 86px; }
+.open-with-spin {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1.6px solid var(--line-strong); border-top-color: var(--accent);
+  animation: cs-spin .8s linear infinite;
+}
 /* The file. An html page brings its own colour and the card cannot reach inside
    it; that join was measured before it shipped (33.5 points of step where a
    page brings its own black, 0 on markdown) and it is a stated cost of a card
@@ -8617,7 +8682,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   flex: none; width: 14px; height: 14px; border-radius: var(--radius);
   border: 1px solid var(--line-strong); background: none;
   display: inline-flex; align-items: center; justify-content: center;
-  color: var(--text); transition: border-color 90ms ease;
+  color: var(--text);
 }
 .ia-box.is-all, .ia-box.is-some { border-color: var(--line-strong); color: var(--text-dim); }
 .ia-agent:hover .ia-box, .ia-blk-head:hover .ia-box { border-color: var(--text-faint); color: var(--text); }
@@ -8679,7 +8744,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .ia-door {
   display: block; width: 100%; font: inherit; text-align: left; cursor: pointer;
   background: none; border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 15px 16px; transition: border-color 90ms ease, background 90ms ease;
+  padding: 15px 16px;
 }
 .ia-door:hover { border-color: var(--line-strong); background: var(--wash); }
 .ia-door:disabled { cursor: default; opacity: 0.55; }
@@ -8718,7 +8783,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    the row says which way it is rather than only that it moves. */
 .ia-caret {
   flex: none; align-self: center; margin-left: 2px; color: var(--text-faint);
-  transition: transform 140ms ease, color 140ms ease;
+  transition: transform 140ms ease;
 }
 .ia-blk.open .ia-caret { transform: rotate(90deg); color: var(--text-dim); }
 .ia-blk-main:hover .ia-caret { color: var(--text); }
@@ -9041,7 +9106,6 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   font: inherit; font-size: 13px; color: var(--text);
   background: var(--film-strong); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 6px 10px; cursor: pointer;
-  transition: border-color 0.14s;
 }
 .set-picker-now:hover { border-color: var(--line-strong); }
 .set-picker.open .set-picker-now { border-color: var(--line-strong); }
@@ -9147,7 +9211,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 */
 .hint-plate {
   position: fixed;
-  z-index: 90;
+  /* Over a file opened full screen and the bar over its selected words, whose buttons wear hints too. */
+  z-index: 9460;
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 4px 0;
@@ -9397,7 +9462,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .pv-missing { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--read-paper) 62%, transparent); }
 
 /* The controls fade once the pointer rests, leaving only the picture. */
-.pv-chrome { z-index: 2; transition: opacity .35s ease, background .15s, color .15s; }
+.pv-chrome { z-index: 2; transition: opacity .35s ease; }
 .pv-idle { cursor: none; }
 .pv-idle .pv-chrome { opacity: 0; pointer-events: none; }
 
@@ -9405,13 +9470,15 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .pv-top { position: absolute; top: 16px; left: 84px; right: 16px; height: 46px; display: flex; align-items: center; justify-content: space-between;
   gap: 16px; }
 :root[data-window="flat"] .pv-top { left: 16px; }
+/* And short of the Windows buttons, over the right-hand corner. */
+:root[data-window-buttons="right"] .pv-top { right: 150px; }
 .pv-title { display: flex; align-items: center; gap: 12px; min-width: 0; height: 46px; padding: 0 18px; }
 .pv-name { font-size: 13px; letter-spacing: .01em; color: color-mix(in srgb, var(--read-paper) 86%, transparent);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pv-count { font: 500 11px/1 var(--mono); letter-spacing: .12em; white-space: nowrap; color: color-mix(in srgb, var(--read-paper) 42%, transparent); }
 .pv-tools { display: flex; align-items: center; gap: 2px; flex: none; }
 .pv-icon { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; background: none; cursor: pointer;
-  border-radius: var(--radius); color: color-mix(in srgb, var(--read-paper) 62%, transparent); transition: color .15s, background .15s; }
+  border-radius: var(--radius); color: color-mix(in srgb, var(--read-paper) 62%, transparent); }
 .pv-icon svg { width: 20px; height: 20px; }
 .pv-icon:hover { color: var(--read-paper); background: color-mix(in srgb, var(--read-paper) 9%, transparent); }
 .pv-rule { width: 1px; height: 18px; margin: 0 6px; background: color-mix(in srgb, var(--read-paper) 14%, transparent); }
@@ -9420,7 +9487,7 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
   max-width: calc(100% - 64px); overflow-x: auto; }
 .pv-thumb { flex: none; width: 72px; height: 45px; padding: 0; border: 0; border-radius: var(--artifact-corner-small); overflow: hidden; cursor: pointer;
   background: color-mix(in srgb, var(--read-paper) 6%, transparent); opacity: .38;
-  outline: 1px solid transparent; outline-offset: 3px; transition: opacity .2s, outline-color .2s; }
+  outline: 1px solid transparent; outline-offset: 3px; }
 .pv-thumb:hover { opacity: .75; }
 .pv-thumb.is-on { opacity: 1; outline-color: color-mix(in srgb, var(--read-paper) 85%, transparent); }
 .pv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -9452,35 +9519,52 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
    cloud-slots/20). Your plan is outlined in the accent; the others carry the
    button that changes to them. */
 .set-group.cloud-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 36px; }
-.cloud-plan { display: flex; flex-direction: column; align-items: flex-start; padding: 18px 18px 18px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: color-mix(in srgb, var(--text) 3%, transparent); min-height: 196px; }
+.cloud-plan { display: flex; flex-direction: column; align-items: flex-start; padding: 18px 18px 18px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: color-mix(in srgb, var(--text) 3%, transparent); }
 .cloud-plan.mine { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .cloud-plan.waiting { border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong)); }
 .cloud-plan-head { display: flex; justify-content: space-between; width: 100%; font: 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-faint); }
 .cloud-plan-mine { color: var(--accent); }
 .cloud-plan-price { margin-top: 12px; font-size: 28px; letter-spacing: -0.02em; color: var(--text); }
 .cloud-plan-price span { font-size: 13px; letter-spacing: 0; color: var(--text-faint); }
-.cloud-plan-slots { margin-top: 18px; font-size: 17px; color: var(--text); }
-.cloud-plan-where { margin-top: 2px; font-size: 13px; color: var(--text-faint); }
-.cloud-plan-hours { margin: 2px 0 18px; font-size: 13px; color: var(--text-faint); }
+.cloud-plan-line { margin-top: 4px; font-size: 13px; color: var(--text-dim); }
+.cloud-plan-price + .cloud-plan-line { margin-top: 6px; }
+.cloud-plan-line:last-of-type { margin-bottom: 22px; }
 .cloud-plan-go { margin-top: auto; }
 .cloud-plan-use { margin-top: auto; width: 100%; font-size: 12.5px; color: var(--text-dim); }
 .cloud-plan-bar { display: block; height: 2px; margin-top: 8px; background: var(--line); }
 .cloud-plan-bar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .cloud-counts { margin: 0; padding: 4px 0 0 18px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-dim); user-select: text; -webkit-user-select: text; }
 .cloud-plans-say { margin: 14px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--text-faint); user-select: text; -webkit-user-select: text; }
+.cloud-plans-terms { color: var(--text-dim); }
+.cloud-plans-terms a { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
+
+/* Under a hand-back, the question it answers. */
+.msg-asked { color: var(--text-dim); }
 
 /* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }
 /* In a narrow column the label drops under the name whole, lined up with it, rather than breaking inside its box. */
 .msg-head:has(> .msg-kind) { flex-wrap: wrap; row-gap: 4px; }
-.msg-head > .msg-kind { margin-left: 0; white-space: nowrap; }
+/* A label longer than the column (a quoted sentence) wraps inside its box: held
+   on one line, it made the whole thread scroll sideways. */
+.msg-head > .msg-kind { margin-left: 0; max-width: 100%; overflow-wrap: anywhere; }
 .msg-head:has(> .msg-kind) > .msg-when { white-space: nowrap; }
 .msg-kind-why { color: var(--text-faint); letter-spacing: 0; }
 .msg-kind-why::before { content: '\00b7'; margin-right: 6px; }
 button.msg-kind { cursor: pointer; }
 button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 /* A comment is said beside the work, not to the agent: it reads at the size of what it answers. */
-.msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
+.msg.yours:has(> .msg-head > .msg-kind) .msg-body, .msg.yours:has(> .msg-head > .comment-on) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
+
+/* A comment on a file: "commented on sign-up-screens.md" after the name, and the
+   words it is about quoted as the notes beside the file quote them. */
+.msg-head:has(> .comment-on) { flex-wrap: wrap; row-gap: 2px; }
+.comment-on { min-width: 0; font-size: 14px; color: var(--text-dim); overflow-wrap: anywhere; }
+.comment-on-file { padding: 0; border: 0; background: none; font: inherit; color: var(--text); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.comment-on-file:hover { text-decoration-color: currentColor; }
+span.comment-on-file { cursor: default; }
+.comment-on-where::before { content: '\00b7'; margin: 0 6px; }
+.comment-quote { margin: 4px 0 6px; padding-left: 10px; border-left: 2px solid var(--line-strong); font-size: 14px; line-height: 20px; color: var(--text-dim); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 
 /* A thread a teammate gave you, above its title (team/HandedBy.tsx). */
 .handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text-dim); }
@@ -9488,3 +9572,5 @@ button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 .handed-who { flex: 0 0 auto; white-space: nowrap; }
 .handed-when { color: var(--text-faint); margin-left: 4px; }
 .handed-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); margin-left: 6px; }
+/* A thread you handed over, in place of the reply box while they have it. */
+.dock-handed { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text-dim); font-size: 14px; }

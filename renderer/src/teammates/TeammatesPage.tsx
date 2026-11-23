@@ -9,11 +9,14 @@ import { type TabView } from '../threads/Pages';
 import { api } from '../api';
 import { GREETING, MAX_HOPS, STARTERS, TEAMMATE_EFFORT, VOICES, VOICE_WORDS_MOST, starterAsks, teammateIdOf, voiceOf, yesFirst } from '../../../shared/teammates.mts';
 import { ModelPicker } from '../components/Model';
+import { ruleLabel } from '../../../shared/repeats.mts';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
-import { answerOf, answersMessage, chatEntries, chatWith, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
+import { answerOf, answersMessage, chatEntries, chatWith, openedLines, sentWord, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
+import { FacePick } from './MateFace';
+import { faceSeed } from '../../../shared/teammate-face.mts';
 import { AskBeforeDeleting } from '../team/MessageMore';
 import { keyInTheReplyBox, sendKeyFor } from '../reply-keys';
 import { Face } from '../team/people';
@@ -213,7 +216,7 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   onOpen: (open: string) => void; onOpenThread: (product: string, id: string) => void; onOpenFile: (product: string, src: string) => void; placeholder: string; error: string | null;
   tabOf: (item: WorkItem) => TabView | null;
 }) {
-  const entries = chatWith(view, t.id);
+  const entries = [...chatWith(view, t.id), ...openedLines(items, t.id)].sort((a, b) => a.ts - b.ts);
   const scroller = useRef<HTMLDivElement>(null);
   const last = entries.at(-1)?.id;
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight; }, [last, t.id]);
@@ -222,14 +225,15 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   let day = '';
   let prevFrom = '';
   let saved = false;
-  // Threads it sent one after another are one list, as they would be in the inbox.
+  // Threads it sent or opened one after another are one list, as they would be in the inbox.
   let sent: TeamRunLine[] | null = null;
+  const aThread = (e: ChatEntry) => e.kind === 'run' && (e.verb === 'sent' || e.verb === 'opened');
   const rows: ReactNode[] = [];
   for (const e of entries) {
     const d = dayOf(e.ts);
     if (d !== day) { rows.push(<div key={`day-${e.id}`} className="rm-day"><span className="rm-label">{d}</span></div>); day = d; prevFrom = ''; sent = null; }
-    if (e.kind === 'run' && e.verb === 'sent' && sent) { sent.push(e as TeamRunLine); continue; }
-    if (!(e.kind === 'run' && e.verb === 'sent')) sent = null;
+    if (aThread(e) && sent) { sent.push(e as TeamRunLine); continue; }
+    if (!aThread(e)) sent = null;
     // Several things saved in a row read as one line.
     if (e.kind === 'act' && SAVED_VERBS.has(e.verb ?? '')) {
       if (!saved) rows.push(<Saved key={e.id} onSee={() => onOpen(`about:${t.id}`)} />);
@@ -249,7 +253,7 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
         files={kept ? { product: kept.slug, dir: kept.dir } : null}
         asking={open.some((q) => q.id === e.id) ? asking : null} />);
       prevFrom = e.from;
-    } else if (e.kind === 'run' && e.verb === 'sent') {
+    } else if (aThread(e)) {
       sent = [e as TeamRunLine];
       rows.push(<SentCard key={e.id} runs={sent} items={items} tabOf={tabOf} onOpenThread={onOpenThread} />);
       // It stands apart from the messages, so the next one says who wrote it.
@@ -277,9 +281,7 @@ function ChatColumn({ view, items, products, team, t, me, mePic, call, sessions,
   </div>;
 }
 
-const SENT_WORDS: Partial<Record<TabView, string>> = { inbox: 'Waiting on you', progress: 'In progress', done: 'Done' };
-
-// What it sent you: one quiet line per thread, where it stands and its title, that opens it.
+// What it sent you or opened: one quiet line per thread, where it stands and its title, that opens it.
 function SentCard({ runs, items, tabOf, onOpenThread }: {
   runs: TeamRunLine[]; items: WorkItem[]; tabOf: (item: WorkItem) => TabView | null;
   onOpenThread: (product: string, id: string) => void;
@@ -290,7 +292,7 @@ function SentCard({ runs, items, tabOf, onOpenThread }: {
       const tab = item ? tabOf(item) : null;
       return <button key={r.id} type="button" className="tq-sent-line" onClick={() => onOpenThread(r.product, r.item)}>
         {tab === 'inbox' && <i className="tq-dot-need" aria-hidden="true" />}
-        <span className="v">{(tab && SENT_WORDS[tab]) ?? 'Sent you'}:</span> <span className="t">{r.said || r.title}</span>
+        <span className="v">{sentWord(r, tab)}:</span> <span className="t">{r.said || r.title}</span>
       </button>;
     })}
   </div>;
@@ -622,7 +624,7 @@ function Details(props: AboutProps) {
 }
 
 /** An AI teammate's About on its place: everything the sheet holds, its whole job, and every setting open. */
-export function TeammateAbout({ onChanged, models = NO_MODELS, ...props }: Omit<AboutProps, 'call' | 'models'> & { models?: TeammateModels; onChanged: () => void }) {
+export function TeammateAbout({ onChanged, models = NO_MODELS, atSettings = false, ...props }: Omit<AboutProps, 'call' | 'models'> & { models?: TeammateModels; onChanged: () => void; atSettings?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const call: Call = async (op, args) => {
     setError(null);
@@ -632,13 +634,15 @@ export function TeammateAbout({ onChanged, models = NO_MODELS, ...props }: Omit<
     return r.value ?? true;
   };
   return <div className="tq-details tq-about-page">
-    <AboutFields {...props} models={models} call={call} whole />
+    <AboutFields {...props} models={models} call={call} whole atSettings={atSettings} />
     {error && <p className="tq-error" role="alert">{error}</p>}
   </div>;
 }
 
-function AboutFields({ t, view, products, engines, models, call, onOpen, onNewProject, whole = false }: AboutProps & { whole?: boolean }) {
+function AboutFields({ t, view, products, engines, models, call, onOpen, onNewProject, whole = false, atSettings = false }: AboutProps & { whole?: boolean; atSettings?: boolean }) {
   const [saved, setSaved] = useState(false);
+  const settingsHead = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { if (atSettings) settingsHead.current?.scrollIntoView({ block: 'start' }); }, [atSettings]);
   useEffect(() => { if (!saved) return undefined; const timer = setTimeout(() => setSaved(false), 2000); return () => clearTimeout(timer); }, [saved]);
   const keep = (patch: Record<string, unknown>) => { void call('update', { id: t.id, patch }).then((ok) => { if (ok !== false) setSaved(true); }); };
   const real = placesToWork(products);
@@ -651,6 +655,8 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
   const settings = <dl>
     <dt>Name</dt>
     <dd><EditName key={t.name} name={t.name} onSave={(name) => keep({ name })} /></dd>
+    <dt>Face</dt>
+    <dd><FacePick seed={faceSeed(t)} onPick={(face) => keep({ face })} /></dd>
     <dt>Model</dt>
     <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
       effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>
@@ -693,10 +699,87 @@ function AboutFields({ t, view, products, engines, models, call, onOpen, onNewPr
       <dt>Its work</dt>
       <dd className="tq-sheet-links"><Inline onClick={() => onOpen(`log:${t.id}`)}>Log</Inline><Inline onClick={about}>Everything it knows and how it works</Inline></dd>
     </dl>
-    {whole ? <><h4 className="tq-about-h">Settings</h4>{settings}</>
+    {whole ? <><h4 className="tq-about-h" ref={settingsHead}>Settings</h4>{settings}</>
       : <details className="tq-sheet-more"><summary role="button">Settings</summary>{settings}</details>}
     {saved && <span className="tq-st" role="status">Saved</span>}
   </>;
+}
+
+// Pausing is a state you set, like the others, not a button of its own.
+const STATUS = [{ id: 'active', label: 'Active' }, { id: 'paused', label: 'Paused' }];
+
+/** Your AI teammate's settings beside its tasks, each one you can change drawn as a tag. */
+export function TeammateSettingsColumn({ t, products, models = NO_MODELS, onNewProject, onChanged, onJob }: {
+  t: Teammate; products: Product[]; models?: TeammateModels; onNewProject?: () => void; onChanged: () => void;
+  /** Opens About, where the whole job is read and changed. */
+  onJob: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const keep = (patch: Record<string, unknown>) => {
+    setError(null);
+    void api.teammates('update', { id: t.id, patch }).then((r) => { if (r.ok) onChanged(); else setError(r.error); });
+  };
+  const real = placesToWork(products);
+  const product = real.find((p) => p.slug === t.product);
+  const job = t.job?.trim() || null;
+  return <>
+    <dl className="tq-set-col" aria-label={`How ${t.name} works`}>
+      {t.status !== 'draft' && <>
+        <dt>Status</dt>
+        <dd><PickOne value={t.paused ? 'paused' : 'active'} label="Status" options={STATUS} onPick={(id) => keep({ paused: id === 'paused' })} /></dd>
+        <dt>Schedule</dt>
+        <dd><ScheduleWord t={t} keep={keep} /></dd>
+      </>}
+      <dt>Works in</dt>
+      <dd>{real.length > 1 || onNewProject
+        ? <PickOne value={t.product} label="Works in" options={real.map((p) => ({ id: p.slug, label: p.name }))} onPick={(slug) => keep({ product: slug })} more={newProjectRow(onNewProject)} />
+        : <span className="tq-set-text">{product?.name ?? t.product}</span>}</dd>
+      <dt>Model</dt>
+      <dd><ModelPicker value={t.model ?? null} onChange={(m) => keep({ model: m })} engine={t.engine ?? models.engine ?? null} codexModels={models.codex} codexDefault={models.codexDefault}
+        effort={t.effort ?? TEAMMATE_EFFORT} onEffortChange={(e) => keep({ effort: e })} /></dd>
+      <dt>This week</dt>
+      <dd className="tq-set-text">{t.runsThisWeek} of {t.limit} runs</dd>
+      {job && <><dt>Job</dt>
+        <dd><button type="button" className="tq-set-job" title={job} onClick={onJob}>{job}</button></dd></>}
+    </dl>
+    {error && <p className="tq-error" role="alert">{error}</p>}
+  </>;
+}
+
+/** When it works on its own, in words: its own schedule, or each duty's. */
+export function scheduleWords(t: Pick<Teammate, 'works' | 'duties'>): string {
+  const duties = t.duties ?? [];
+  const low = (s: string) => s.replace(/^./, (c) => c.toLowerCase());
+  if (duties.length > 2) return `${duties[0].when} and ${duties.length - 1} more`;
+  if (duties.length) return duties.map((d, i) => (i ? low(d.when) : d.when)).join(' and ');
+  return t.works ? ruleLabel(t.works).replace(/^./, (c) => c.toUpperCase()) : 'None';
+}
+
+// One word for the schedule, which opens what sets it: About's own controls.
+function ScheduleWord({ t, keep }: { t: Teammate; keep: (patch: Record<string, unknown>) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); } };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  const duties = t.duties ?? [];
+  return <span className="compose-word-wrap tq-pick" ref={wrap}>
+    <button type="button" className={`compose-word set${open ? ' open' : ''}`} aria-haspopup="dialog" aria-expanded={open} aria-label="Schedule" onClick={() => setOpen((o) => !o)}>{scheduleWords(t)}</button>
+    {open && <span className="prio-menu tq-sched-pop" role="dialog" aria-label="Schedule">
+      {duties.length
+        ? duties.map((d) => <span key={d.id} className="tq-duty">{d.what}
+          {d.after === 'ship' || !d.every || !d.at ? <small>{d.when}</small> : <When every={d.every} at={d.at} on={d.on} canStop={false}
+            onChange={(next) => keep({ duties: duties.map(({ when: _when, lastRan: _lastRan, ...x }) => (x.id === d.id ? { ...x, ...next } : x)) })} />}
+        </span>)
+        : <When every={t.works?.every ?? null} at={t.works?.at ? [t.works.at] : []} on={t.works?.on} canStop
+          onChange={(next) => keep({ works: next.every ? { every: next.every, at: next.at[0], ...(next.every === 'week' ? { on: next.on } : {}) } : null })} />}
+    </span>}
+  </span>;
 }
 
 // How it writes: the styles, the sample line of the one picked, or your own words.

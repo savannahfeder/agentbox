@@ -64,10 +64,9 @@ describe('the keys block', () => {
     expect(lineFor(keysForAgents(), 'L')).toMatch(/Later: put the task off until a time you pick/);
   });
 
-  it('says S is the summary, and nothing about S schedules', () => {
-    const s = lineFor(keysForAgents(), 'S');
-    expect(s).toMatch(/summary/i);
-    expect(s).not.toMatch(/snooze|later|schedul|put .* off/i);
+  // S opened the side summary until 2026-11 (w-d143fcb40a); nothing answers it now.
+  it('names no S key at all', () => {
+    expect(lineFor(keysForAgents(), 'S')).toBeUndefined();
   });
 
   it('says a key remembered from before is out of date', () => {

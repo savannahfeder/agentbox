@@ -47,7 +47,6 @@ const stripCss = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '');
 const FOOTERS = [
   'renderer/src/components/Focus.tsx',
   'renderer/src/components/Compose.tsx',
-  'renderer/src/components/Onboarding.tsx',
   'renderer/src/components/RepeatFocus.tsx',
 ];
 

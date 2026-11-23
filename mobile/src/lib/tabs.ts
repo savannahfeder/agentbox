@@ -16,7 +16,7 @@ import { stamp } from '../../../renderer/src/format';
 import { isUrgentRow } from '../../../renderer/src/urgent-arrival';
 import { priorityIdOf } from '../../../renderer/src/priority';
 import { toApproveWords, waitingCounts } from '../../../renderer/src/threads-made';
-import type { phoneView } from '../../../renderer/src/phone-rows';
+import { phoneSlug, type phoneView } from '../../../renderer/src/phone-rows';
 import type { ThreadStateWord, WorkItem } from '../../../renderer/src/types';
 import { teammateIdOf } from '../../../shared/teammates.mts';
 import { keepsAgent, type Harness } from './agent-filter';
@@ -30,7 +30,21 @@ export const TABS: { id: TabId; label: string }[] = [
   { id: 'done', label: 'Done' },
 ];
 
-type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued'>>;
+// `projectOrder` is your running order of projects (phoneProjectOrder), never the list's own order.
+type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'stranded'>> & { projectOrder?: string[] };
+
+/** Each computer's running order of projects (the desktop's `supervisor.productOrder`), from its newest settings copy. */
+export function phoneProjectOrder(rows: readonly { device: string; settings?: { workspace?: { productOrder?: unknown } } | null }[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const row of rows) {
+    if (seen.has(row.device)) continue;
+    seen.add(row.device);
+    const order = row.settings?.workspace?.productOrder;
+    for (const slug of Array.isArray(order) ? order : []) if (typeof slug === 'string' && slug) out.push(phoneSlug(row.device, slug));
+  }
+  return out;
+}
 export interface Row {
   key: string;
   id: string;
@@ -47,6 +61,8 @@ export interface Row {
   toApprove: string;
   /** Sent from a phone and not yet taken by the computer: "Queued" (renderer/src/status-word.ts). */
   queued: boolean;
+  /** Waiting on a computer that is away while another of yours is online: "Computer offline", in Needs you. */
+  away: boolean;
   /** High or Urgent, marked on the row; Low and Medium are most threads, so they go unmarked. */
   priority: 'high' | 'urgent' | null;
   /** "Claude Code" or "Codex", only when a row of the same title runs on the other one. */
@@ -72,6 +88,21 @@ export function tabsTighten({ view, content }: { view: number; content: number }
   return content + (tight ? saved : 0) > view + 1;
 }
 
+/** The smallest the tab words go before the row is left to scroll. */
+export const TABS_SMALLEST = 0.7;
+
+/**
+ * How much the tab words shrink so the tight row fits: large text on a narrow
+ * phone pushed Done off the edge. Only ever down for one width, so it settles;
+ * `measuredAt` is the width it was worked out for, and a new width starts over.
+ */
+export function tabsScale({ view, content }: { view: number; content: number }, tight: boolean, now: { scale: number; measuredAt: number }) {
+  if (view <= 0 || content <= 0) return now;
+  const from = now.measuredAt === view ? now.scale : 1;
+  if (!tight || content <= view + 1) return { scale: from, measuredAt: view };
+  return { scale: Math.max(TABS_SMALLEST, Math.floor(from * (view / content) * 100) / 100), measuredAt: view };
+}
+
 /** Whether a sideways row runs on past its right edge (a 1px slack for rounding). */
 export const moreToTheRight = ({ view, content, x }: { view: number; content: number; x: number }) =>
   view > 0 && content - (x + view) > 1;
@@ -80,6 +111,9 @@ export const moreToTheRight = ({ view, content, x }: { view: number; content: nu
 // (App.tsx `deliveredThrough`), years before any phone. Zero is that, for
 // every desktop the phone could be reading.
 const DELIVERED_THROUGH = 0;
+
+/** The moment a thread's row is dated by, in the list and in search: when it was closed, else when you last wrote. */
+export const rowTime = (i: WorkItem): number => (i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i));
 
 export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const items: WorkItem[] = view.items;
@@ -90,17 +124,17 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const waitingOn = (i: WorkItem) => waitsThatCanEnd(i, byId);
   const hiddenAt = (i: WorkItem) => hiddenUntil(i);
   const owed = threadsOwedAnAnswer(items, now);
+  const inProgress = (i: WorkItem) => (hiddenAt(i) <= now || live.has(i.id)) && belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
+  const strandedIds = new Set(view.stranded ?? []);
+  const stranded = new Set(items.filter((i) => strandedIds.has(i.id) && inProgress(i)).map((i) => i.id));
 
   const inbox = items.filter((i) => {
     if (live.has(i.id) && !stillAsksYou(i)) return false;
-    if (owed.has(i.id)) return true;
+    if (owed.has(i.id) || stranded.has(i.id)) return true;
     return belongsInInbox(i, { deliveredThrough: DELIVERED_THROUGH, hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i) });
   });
   const needsYou = new Set(inbox.map((i) => i.id));
-  const progress = inProgressTab(items.filter((i) => {
-    if (hiddenAt(i) > now && !live.has(i.id)) return false;
-    return belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
-  }), inbox);
+  const progress = inProgressTab(items.filter(inProgress), inbox);
   const snoozed = items.filter((i) => (notStarted(i) || isProposal(i) || hiddenAt(i) > now || (waitsInLater(i, waitingOn(i)) && !live.has(i.id)))
     && (i.status !== 'done' || i.wrote?.status?.source !== 'founder'));
   const done = items.filter((i) => !needsYou.has(i.id) && !live.has(i.id) && i.status === 'done');
@@ -117,12 +151,12 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
     agentsByTitle.set(t, (agentsByTitle.get(t) ?? new Set()).add(harnessOf(i)));
   }
   const agentOf = (i: WorkItem) => ((agentsByTitle.get(rowTitle(i))?.size ?? 0) > 1 ? (harnessOf(i) === 'codex' ? 'Codex' : 'Claude Code') : null);
-  const order = view.products.map((p: { slug: string }) => p.slug);
+  const order = view.projectOrder ?? [];
   // Later says when a thread comes back, and leaves waiting a turn to In progress (Pages.tsx `back`).
   const row = (i: WorkItem, tab: TabId): Row => ({
     key: `${i.product}/${i.id}`, id: i.id, product: i.product, title: rowTitle(i), projectName: names.get(i.product) ?? '',
-    when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(i.status === 'done' ? i.wrote?.status?.ts ?? i.updatedAt : sentAt(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
-    held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id), item: i,
+    when: (tab === 'snoozed' && backWords(i, now)) || updatedWords(rowTime(i), now), running: live.has(i.id), cloud: inCloud.has(i.id),
+    held: notStarted(i), toApprove: toApproveWords(toApprove.get(`${i.product}/${i.id}`)), queued: tab !== 'snoozed' && queued.has(i.id) && !live.has(i.id) && !stranded.has(i.id), away: stranded.has(i.id), item: i,
     priority: ((p) => (p === 'high' || p === 'urgent' ? p : null))(priorityIdOf(i.priority)), agent: agentOf(i),
   });
   const drawn = (list: WorkItem[], tab: TabId) => sorted(list, DEFAULT_DISPLAY.inbox, tab, order).map((i) => row(i, tab));
@@ -165,7 +199,7 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
   const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
   const columns = boardColumns({
     items: view.items.filter((i: WorkItem) => keepsAgent(i, agent)), products: view.products, display, now, me: null, live,
-    stateOf: (i) => state.get(i.id) ?? null, projectOrder: view.products.map((p: { slug: string }) => p.slug),
+    stateOf: (i) => state.get(i.id) ?? null, projectOrder: view.projectOrder ?? [],
   });
   // A card waiting its turn says Queued where the running mark would be (Pages.tsx `saysOnCard`).
   const queued = new Set(tabs.progress.filter((r) => r.queued).map((r) => r.id));
@@ -203,7 +237,7 @@ export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: 
       key: `${item.product}/${item.id}`, id: item.id, product: item.product,
       title: runs(rowTitle(item)), summary: runs(summary ?? ''), toApprove: asks.get(`${item.product}/${item.id}`) ?? '',
       bars: isUrgentRow(item) ? null : p >= 7 ? 3 : p <= 2 ? 1 : null,
-      projectName: item.productName ?? '', when: stamp(item.updatedAt, now),
+      projectName: item.productName ?? '', when: stamp(rowTime(item), now),
     };
   });
 }

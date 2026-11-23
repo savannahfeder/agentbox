@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { filmClickDoes, filmPinsAt, pinLean, type FilmMark, type FilmPin } from '../artifact-pins';
 import { useFilmPoster } from '../film-poster';
+import { pressFullScreen } from '../full-screen-button';
 import { keepFilmTime, keptFilmTime } from '../kept-scroll';
 import { OPEN_WITHIN_MS, didNotOpen } from '../opening-wait';
 import './file-views.css';
@@ -102,7 +103,7 @@ export function FilmBar({ film, marks = [], onMark, wide }: {
     <button type="button" className="film-tool" onClick={() => { if (el) el.muted = !el.muted; }} aria-label={muted ? 'Turn the sound on' : 'Turn the sound off'} title={muted ? 'Turn the sound on' : 'Turn the sound off'}>
       <Glyph><path d="M3 6.2v3.6h2.2L8.4 12.5v-9L5.2 6.2z" />{muted ? <path d="M11 6.2l3 3.6M14 6.2l-3 3.6" /> : <path d="M11 5.8a3.2 3.2 0 0 1 0 4.4M12.8 4a5.6 5.6 0 0 1 0 8" />}</Glyph>
     </button>
-    {wide && <button type="button" className="film-tool" onClick={() => { void wide()?.requestFullscreen?.(); }} aria-label="Full screen" title="Full screen">
+    {wide && <button type="button" className="film-tool" onClick={() => pressFullScreen(wide(), document)} aria-label="Full screen" title="Full screen">
       <Glyph><path d="M3 6V3h3M10 3h3v3M13 10v3h-3M6 13H3v-3" /></Glyph>
     </button>}
   </span>;

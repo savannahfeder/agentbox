@@ -4,6 +4,7 @@
 import type { TeamBackend, TeamSession } from './index.mts';
 import type { RoomEvent } from './rooms.mts';
 import type { CloudConfig } from './session.mts';
+import crypto from 'node:crypto';
 
 const CALL_MS = 120_000;
 const WAIT_MS = 35_000;
@@ -23,10 +24,13 @@ async function post<T>(url: string, door: string, body: unknown, ms = CALL_MS): 
 
 export function standinBackend(url: string, { token, personId, kind, methods }: StandinSignIn): TeamBackend {
   // Its calls are whatever the stand-in names at sign-in, each sent over as it is.
-  const backend: Record<string, unknown> & Partial<TeamBackend> = { kind, personId };
+  // The token is the person's id, as the stand-in hands it out; a cloud server
+  // pointed at the stand-in reads the same id from it (main/cloud/account.mts).
+  const backend: Record<string, unknown> & Partial<TeamBackend> = { kind, personId, liveToken: async () => token };
   for (const method of methods) {
     backend[method] = async (...args: unknown[]) => {
-      const sent = args.map((a) => (Buffer.isBuffer(a) ? { __bytes: a.toString('base64') } : a));
+      // A Set would cross as {}.
+      const sent = args.map((a) => (Buffer.isBuffer(a) ? { __bytes: a.toString('base64') } : a instanceof Set ? { __set: [...a] } : a));
       const { value } = await post<{ value: unknown }>(url, 'call', { token, method, args: sent });
       if (value && typeof value === 'object' && typeof (value as { __bytes?: unknown }).__bytes === 'string') return Buffer.from((value as { __bytes: string }).__bytes, 'base64');
       return value === null ? undefined : value;
@@ -73,6 +77,8 @@ export function standinBackend(url: string, { token, personId, kind, methods }: 
 export function standinSession({ cloudConfig, testLogin }: { cloudConfig: CloudConfig; testLogin?: string | null }): TeamSession {
   const url = String(cloudConfig.url).replace(/\/+$/, '');
   let signedIn: TeamBackend | null = null;
+  // Made up, and its own in each copy, so two copies that press Google are two people.
+  const googleEmail = `alex-${crypto.randomBytes(3).toString('hex')}@example.test`;
   const signIn = async (email: string, password: string, name?: string) => {
     signedIn = standinBackend(url, await post<StandinSignIn>(url, 'signin', { email, password, name }));
     return signedIn;
@@ -85,7 +91,7 @@ export function standinSession({ cloudConfig, testLogin }: { cloudConfig: CloudC
       const at = testLogin.indexOf(':');
       return signIn(testLogin.slice(0, at), testLogin.slice(at + 1));
     },
-    async signIn() { throw new Error('the stand-in cloud has no Google sign-in'); },
+    signIn: () => signIn(googleEmail, '', 'Alex Kim'),
     signInWithPassword: (email, password) => signIn(String(email ?? '').trim(), password),
     async signUp({ email, password, name }) { return { backend: await signIn(String(email ?? '').trim(), password, name) }; },
     cancelSignIn: () => {},

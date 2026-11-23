@@ -1,7 +1,7 @@
 {
   "name": "agentbox-app",
   "productName": "Agentbox",
-  "version": "0.1.24",
+  "version": "0.1.31",
   "description": "A desktop GUI for running dozens of Claude Code and Codex agents in parallel, each in its own git worktree.",
   "author": "Savannah Feder",
   "repository": {
@@ -76,8 +76,10 @@
     "setup:feedback": "node scripts/set-up-feedback.mjs",
     "feedback": "node scripts/run.mjs scripts/read-feedback.mjs",
     "fresh": "node scripts/run.mjs scripts/fresh-user.mjs",
+    "accounts": "node scripts/run.mjs scripts/accounts.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "check:public": "node scripts/check-before-public.mjs --all",
+    "check:harnesses": "node scripts/run.mjs scripts/check-harnesses.mts",
     "ship": "node scripts/ship.mjs",
     "phone:build": "vite build renderer --logLevel warn && node scripts/build-phone-site.mjs",
     "phone:deploy": "npm run phone:build && node scripts/deploy-phone-site.mjs",
@@ -89,6 +91,8 @@
     "app": "vite build renderer --logLevel warn && node scripts/prepare-terminal.mjs && node scripts/brand-electron.mjs && electron ."
   },
   "devDependencies": {
+    "@dicebear/core": "9.4.2",
+    "@dicebear/notionists": "9.4.2",
     "@electric-sql/pglite": "^0.5.8",
     "@fontsource-variable/source-sans-3": "^5.3.0",
     "@tiptap/core": "^3.32.1",

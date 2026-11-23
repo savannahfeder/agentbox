@@ -19,12 +19,19 @@ export const keptScroll = (key: string): number => kept.get(key) ?? 0;
 
 const filmAt = new Map<string, number>();
 
+/** A film and its other cuts share a place: `promo.mp4` and `promo-v2.mp4`. */
+const filmKey = (url: string): string => {
+  const clean = url.split(/[?#]/)[0];
+  const cut = clean.lastIndexOf('/') + 1;
+  return `${clean.slice(0, cut)}${baseName(clean.slice(cut))}`;
+};
+
 /** A film watched to its end opens at its start again. */
 export function keepFilmTime(url: string, seconds: number, ended: boolean): void {
-  if (ended || !(seconds > 0)) filmAt.delete(url); else filmAt.set(url, seconds);
+  if (ended || !(seconds > 0)) filmAt.delete(filmKey(url)); else filmAt.set(filmKey(url), seconds);
 }
 
-export const keptFilmTime = (url: string): number => filmAt.get(url) ?? 0;
+export const keptFilmTime = (url: string): number => filmAt.get(filmKey(url)) ?? 0;
 
 // The words of a file often arrive after its box, so the box is too short to
 // hold the place at first. It is put back each time the words grow, until the

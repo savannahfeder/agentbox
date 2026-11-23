@@ -17,10 +17,12 @@ import type { PipedChild } from '../claude-input.mts';
 import { claudeLaunchEnv } from '../claude-launch-env.mts';
 import { cloudClaudeMode, cloudPermissionArgs } from '../cloud-permission.mts';
 import { claudeActivity } from '../agent-activity.mts';
-import { captureStream, streamingText, summarizeStreamLine, traceStreamLine } from './claude-stream.mts';
+import { captureStream, streamingText, summarizeStreamLine, traceStreamLine, claudeTookTheWords } from './claude-stream.mts';
 import { definitionMethods, commonUpdatePlan } from './common.mts';
+import { chromeOnInClaudeCode, claudeJsonFor, yourChromeArgs } from '../your-chrome.mts';
 import type { BinKey, Env, HarnessItem, HarnessPlan, HarnessRecord, HarnessSpawnContext, HarnessSupervisor, SignInFilesWhere, UpdatePlanOptions } from './common.mts';
 import { findTranscript } from '../transcript-search.mts';
+import { streamLines } from '../stream-lines.mts';
 const definition = harnessDefinition('claude')!;
 
 // THE SETTINGS LAYER THAT TAKES A METERED KEY BACK OFF A RUN. Claude Code reads
@@ -29,6 +31,11 @@ const definition = harnessDefinition('claude')!;
 // outranks both (measured on 2.1.301, w-6d8c543a43). Every Claude Code run the
 // app starts carries it: workers in their settings file, small calls inline.
 export const NO_METERED_KEY = Object.freeze({ env: Object.freeze({ ANTHROPIC_API_KEY: '' }), apiKeyHelper: '' });
+
+/** A worker's line on this computer. A cloud run has no Chrome of the person's, so `cloudLaunch` never adds it. */
+export function localClaudeArgv(plan: Pick<HarnessPlan, 'args'>, { chromeOn }: { chromeOn: boolean }): string[] {
+  return streamInputArgs(definition.run, [...plan.args, ...yourChromeArgs(chromeOn, plan.args)]);
+}
 
 // A small-model question (a thread's name, a task's level, where Auto sends a
 // thread) is the question and nothing else: no tools, skills, MCP servers,
@@ -89,24 +96,16 @@ export const claudeHarness = {
     // The binary is the one this definition names, not a field spelled out
     // here: that is the last place an engine of this family needed code.
     const bin = sup.config[definition.binKey as BinKey];
-    const argv = streamInputArgs(definition.run, plan.args);
+    const argv = localClaudeArgv(plan, { chromeOn: chromeOnInClaudeCode(claudeJsonFor(profile, sup.config.home || os.homedir())) });
     const runEnv = { ...claudeLaunchEnv(bin, env), STORE_ACCOUNT_ID: sup.config.accountId, ...storeRootEnv(sup.config.storeRoot),
       ...(profile !== 'default' ? { [definition.homeEnv]: profile } : {}),
       ZERO_PRODUCT: item.product, ZERO_ITEM: item.id, ...sup.memoryGateEnv(item) };
     if (host) return new HostedRun({ sockPath: host, runId: crypto.randomUUID(), start: { bin, argv, env: runEnv, cwd, spool: sup._runSpool() } });
-    return spawn(bin!, argv, { cwd, env: runEnv, stdio: ['pipe', 'pipe', 'pipe'] });
+    return spawn(bin!, argv, { cwd, env: runEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   },
-  readers: () => ({ capture: captureStream, stream: streamingText, summarize: summarizeStreamLine, trace: traceStreamLine, activity: claudeActivity }),
+  readers: () => ({ capture: captureStream, stream: streamingText, summarize: summarizeStreamLine, trace: traceStreamLine, activity: claudeActivity, took: claudeTookTheWords }),
   subscribe(child: { stdout: Readable }, _session: unknown, absorb: (line: string) => void): void {
-    let buffer = '';
-    child.stdout.on('data', data => {
-      buffer += data.toString();
-      let index;
-      while ((index = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, index); buffer = buffer.slice(index + 1);
-        if (line.trim()) absorb(line);
-      }
-    });
+    child.stdout.on('data', streamLines((line) => { if (line.trim()) absorb(line); }));
   },
   attachInput: (child: PipedChild) => attachClaudeInput(child),
   transcript(sup: HarnessSupervisor, rec: HarnessRecord | null | undefined) {

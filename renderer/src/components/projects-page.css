@@ -42,7 +42,7 @@
 .pp-grip {
   position: absolute; inset: 0; margin: auto; width: 6px; height: 10px;
   display: grid; grid-template-columns: 2px 2px; gap: 2px;
-  opacity: 0; transition: opacity .12s;
+  opacity: 0;
 }
 .pp-grip i { width: 2px; height: 2px; border-radius: 50%; background: var(--text-dim); display: block; }
 .pp-row:hover .pp-num, .pp-row.dragging .pp-num { opacity: 0; }
@@ -58,7 +58,7 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* The row is a door: a chevron at its end says so, brighter under the pointer. */
-.pp-open { flex: none; width: 16px; height: 16px; color: var(--text-faint); opacity: .5; transition: opacity .12s; }
+.pp-open { flex: none; width: 16px; height: 16px; color: var(--text-faint); opacity: .5; }
 .pp-open svg { width: 16px; height: 16px; display: block; }
 .pp-row:hover .pp-open { opacity: 1; }
 .pp-row.can-move .pp-rank { cursor: grab; }
@@ -67,7 +67,6 @@
   font-size: 14px; line-height: 20px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   text-decoration: underline solid transparent 1.5px; text-underline-offset: 4px;
-  transition: text-decoration-color .12s ease;
 }
 .pp-row:hover .pp-name { text-decoration-color: var(--line-strong); }
 .pp-row:focus-visible .pp-name { text-decoration-color: var(--underline, var(--line-strong)); }
@@ -78,12 +77,11 @@
 .pp-acts button {
   font: inherit; background: none; color: var(--text-faint); cursor: pointer;
   border: 1px solid transparent; border-radius: var(--radius);
-  transition: color .12s, border-color .12s;
 }
 .pp-top {
   height: 26px; padding: 0 8px;
   font: 10.5px/1 var(--mono) !important; letter-spacing: .08em; text-transform: uppercase;
-  opacity: 0; transition: opacity .12s, color .12s, border-color .12s;
+  opacity: 0;
 }
 .pp-arrow { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; }
 .pp-arrow svg { width: 15px; height: 15px; }
@@ -105,7 +103,6 @@
   background: none; border: 0; cursor: pointer;
   color: var(--text);
   text-decoration: underline solid transparent 1px; text-underline-offset: 4px;
-  transition: text-decoration-color .12s, opacity .12s;
 }
 .pp-head-btn:hover:not(:disabled) { text-decoration-color: currentColor; }
 .pp-head-btn:disabled { color: var(--text-faint); opacity: .6; cursor: default; }
@@ -116,7 +113,6 @@
   width: 14px; height: 14px; display: grid; place-items: center;
   border: 1.5px solid var(--text-faint); border-radius: 4px;
   color: var(--bg, #1a1714);
-  transition: background-color .1s, border-color .1s;
 }
 .pp-check svg { width: 12px; height: 12px; display: block; }
 .pp-check.on { background: var(--text); border-color: var(--text); }

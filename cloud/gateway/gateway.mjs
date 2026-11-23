@@ -10,20 +10,27 @@
 // in tests, and behind a plain HTTP server (gatewayServer).
 import crypto from 'node:crypto';
 import http from 'node:http';
-import { FREE, PLANS, TEAM, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE } from './plans.mjs';
+import { PLANS, PLAN_TRIAL, TEAM, teamFreeDays, RUN_CEILING_MS, SIGNIN_CEILING_MS, SIGNINS_AT_ONCE, FILES_LAPSE_DAYS } from './plans.mjs';
 import { TERMS_VERSION } from './terms.mjs';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
 import { isKeyObject } from '../../shared/cloud-keys.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { JOIN_SCHEME } from '../../shared/room-links.mts';
+import { WEB_APP } from '../../shared/cloud-address.mts';
+import { paidHeadline } from './paid-words.mts';
 import { PAYING, planOfLookupKey } from './stripe.mjs';
 import { createPhoneCarry } from './phone.mjs';
 import { createPhoneRunStatus } from './phone-status.mjs';
 
 const PERSON = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SESSION = /^[A-Za-z0-9_-]{1,180}$/;
-const KEY = /^(runs|logins)\/([A-Za-z0-9._@+=-]+(?:\/[A-Za-z0-9._@+=-]+)*)$/;
+const KEY = /^(runs|logins|files)\/([A-Za-z0-9._@+=-]+(?:\/[A-Za-z0-9._@+=-]+)*)$/;
+// A kept file is named by its bytes' sha256, so two copies are one object.
+const FILE_KEY = /^files\/[0-9a-f]{64}$/;
+const FILES_WEIGH_MS = 60_000;
 const LINK_MAX_SECONDS = 12 * 60 * 60;
+// The most S3 takes in one PUT.
+const ONE_UPLOAD_MAX = 5 * 2 ** 30;
 const LOGIN_LINK_SECONDS = 30 * 60;
 // Lambda takes and gives at most 6 MB; past RELAY_BYTES a call or an answer
 // goes through the person's own `runs/calls/` in the bucket instead.
@@ -55,6 +62,7 @@ const NOTICE_WRITE_MS = 75_000;
 // which only links handed out before the cap was reached can make, the newest
 // objects are deleted. Worst case about $9 a month of S3 per person.
 export const STORAGE_BYTES = 200 * 2 ** 30;
+const SAVED_KEY_MAX_BYTES = 64 * 1024;
 const STORAGE_EVERY_MS = 15 * 60_000;
 const STORAGE_LIST_MAX = 100_000;
 const STORAGE_DELETES_AT_ONCE = 500;
@@ -128,7 +136,7 @@ export function memoryObjects() {
   };
 }
 
-export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, free = FREE, teamPlan = TEAM, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
+export function createGateway({ agentcore, links, removeObject, objects, whoIs, stripe = null, now = Date.now, plans = PLANS, teamPlan = TEAM, termsVersion = TERMS_VERSION, storageBytes = STORAGE_BYTES, log = () => {},
   // The phone's replies with the computer shut (./phone.mjs): { db, runFiles, sendPush }.
   phone = null,
   // The database (./phone.mjs supabaseRest), where who is subscribed is read
@@ -154,48 +162,114 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   const recOf = async (person) => ({ ...fresh(), ...(await readJson(personKey(person))) });
 
   const live = (rec, kind) => Object.values(rec.live).filter((s) => s.kind === kind);
-  // A run spends its person's plan, their team's hours (`s.team`) or their free hours (`s.free`).
-  const ownRuns = (rec) => live(rec, 'run').filter((s) => !s.free && !s.team);
+  // A run spends its person's plan or their team's hours (`s.team`).
+  const ownRuns = (rec) => live(rec, 'run').filter((s) => !s.team);
   // A run going counts against this month only for its time in this month.
   const usedNow = (rec, t) => (rec.used[month(t)] || 0) + ownRuns(rec).reduce((sum, s) => sum + (t - Math.max(s.at, monthStart(t))) / 1000, 0);
-  // With no plan, runs spend the team's hours or the free hours, which never come back.
-  const onFree = (rec) => !planOf(rec).agents;
-  const freeUsedNow = (rec, t) => (rec.freeUsed || 0) + live(rec, 'run').filter((s) => s.free).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
-  const freeSpent = (rec, t) => freeUsedNow(rec, t) >= free.hours * 3600;
-  const ownOver = (rec, t) => planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600;
+  // With no plan of their own, runs spend the team's hours or none.
+  const noPlan = (rec) => !planOf(rec).agents;
+  // A plan in its free week runs on the trial's hours, counted once, not the
+  // month's; so does one whose first charge has failed (past_due, never paid).
+  const inTrial = (rec) => !!plans[rec.plan]?.agents
+    && (rec.stripe?.status === 'trialing' || (rec.stripe?.status === 'past_due' && rec.stripe.paid === false));
+  const trialUsedNow = (rec, t) => (rec.trialUsed || 0) + ownRuns(rec).reduce((sum, s) => sum + (t - s.at) / 1000, 0);
+  const ownOver = (rec, t) => (inTrial(rec) ? trialUsedNow(rec, t) >= PLAN_TRIAL.hours * 3600
+    : planOf(rec).hoursPerMonth != null && usedNow(rec, t) >= planOf(rec).hoursPerMonth * 3600);
   // TEAMS. Each member has hours of their own, as a seat is one person's plan
   // (the owner, 2026-11-08): the trial's, once, or a seat's, each month. They
   // are kept in the member's own record, so a member is held to them as to a plan.
   const teamKey = (id) => `ledger/teams/${id}.json`;
   const teamAllot = (trial) => (trial ? teamPlan.trialHoursPerMember : teamPlan.hoursPerSeat) * 3600;
-  const teamUsedOf = (rec, id, trial, t) => (trial ? rec.teamTrialUsed?.[id] || 0 : rec.teamUsed?.[id]?.[month(t)] || 0)
-    + live(rec, 'run').filter((s) => s.team === id && !!s.trial === trial).reduce((sum, s) => sum + (t - (trial ? s.at : Math.max(s.at, monthStart(t)))) / 1000, 0);
+  // The trial's hours are the person's, across every team they have made or
+  // joined: a new team is not a new trial.
+  const teamTrialSpent = (rec) => Object.values(rec.teamTrialUsed || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+  const teamUsedOf = (rec, id, trial, t) => (trial ? teamTrialSpent(rec) : rec.teamUsed?.[id]?.[month(t)] || 0)
+    + live(rec, 'run').filter((s) => (trial ? !!s.trial && !!s.team : s.team === id && !s.trial)).reduce((sum, s) => sum + (t - (trial ? s.at : Math.max(s.at, monthStart(t)))) / 1000, 0);
   // A team's run ends once its person's own hours are spent; the sweep ends it when the trial or the team does.
-  const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : s.free ? freeSpent(rec, t) : onFree(rec) || ownOver(rec, t));
+  const runOver = (rec, s, t) => (s.team ? teamUsedOf(rec, s.team, !!s.trial, t) >= teamAllot(!!s.trial) : noPlan(rec) || ownOver(rec, t));
   // `people`: every member's own use, for the owner's page; a start needs only this person's.
+  // A TEAM PAYS FOR THE PEOPLE ON IT: one seat when it starts, one more when
+  // somebody accepts an invitation, one fewer when somebody leaves. Stripe is
+  // told when the two differ and its webhook writes the new count. A team asks
+  // at most once in ten minutes, so a Stripe that is down is not asked on
+  // every call, and what it said is logged.
+  const seatsAsked = new Map();
+  const SEATS_ASK_GAP_MS = 10 * 60_000;
+  async function seatsFollowMembers(teamId, bill, seats, members) {
+    const want = Math.max(1, members);
+    if (!stripe?.seats || !seats || !bill.stripe?.subscription || want === seats) return;
+    const t = now();
+    if (t - (seatsAsked.get(teamId) ?? -Infinity) < SEATS_ASK_GAP_MS) return;
+    seatsAsked.set(teamId, t);
+    try {
+      await stripe.seats(bill.stripe.subscription, want);
+      log(`team ${teamId} has ${want} ${want === 1 ? 'person' : 'people'} and paid for ${seats} seats, so Stripe was told ${want}`);
+    } catch (err) {
+      log(`team ${teamId} has ${want} people and pays for ${seats} seats, and Stripe would not change it: ${err?.message || err}`);
+    }
+  }
+
+  // What Stripe charges the team a seat, a code taken off, as its webhook last read it.
+  const seatDollarsOf = (bill) => (Number.isFinite(bill.seatCents) ? bill.seatCents / 100 : teamPlan.dollarsPerSeat);
+
+  // A trial's subscription can reach past_due never having been charged;
+  // a record from before `paid` was kept is taken as paid.
+  const seatsOf = (bill) => {
+    const neverPaid = bill.stripe?.status === 'past_due' && bill.stripe.paid === false;
+    return bill.plan === 'team' && PAYING.has(bill.stripe?.status) && !neverPaid ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
+  };
+
+  // WHETHER A TEAM PAYS, WHERE THE DATABASE'S INVITE AND SHARE GATES READ IT
+  // (20261121130000_team_features_need_pro.sql). The bill's `rev` moves with
+  // each Stripe event; a bill the database is behind on is written again on
+  // the next read, so a refused write is not lost.
+  const mirrorTried = new Map();
+  // A read retries at most once in ten minutes; Stripe's event always writes.
+  async function mirrorTeam(id, bill, { event = false } = {}) {
+    const rev = Number(bill.rev) || 0;
+    if (!db?.writeTeamPlan || !bill.stripe || bill.wrote === rev) return;
+    const t = now();
+    if (!event && t - (mirrorTried.get(id) ?? -Infinity) < SEATS_ASK_GAP_MS) return;
+    mirrorTried.set(id, t);
+    try {
+      await db.writeTeamPlan(id, { pays: seatsOf(bill) > 0, status: bill.stripe?.status ?? null, trialEndsAt: bill.stripe?.trialEnd ?? null, rev, at: now() });
+      await updateTeam(id, (b) => { if ((Number(b.rev) || 0) === rev) b.wrote = rev; });
+    } catch (err) {
+      log(`the database has not taken whether team ${id} pays: ${err?.message || err}`);
+    }
+  }
+
   async function teamNow(person, t, { people = false } = {}) {
     if (!teams) return null;
     const team = await teams(person);
     if (!team?.id || !Array.isArray(team.members)) return null;
     const bill = (await readJson(teamKey(team.id))) || {};
-    // A trial's subscription can reach past_due never having been charged;
-    // a record from before `paid` was kept is taken as paid.
-    const neverPaid = bill.stripe?.status === 'past_due' && bill.stripe.paid === false;
-    const seats = bill.plan === 'team' && PAYING.has(bill.stripe?.status) && !neverPaid ? Math.max(0, Math.floor(Number(bill.seats)) || 0) : 0;
-    const endsAt = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
-    // A card taken in the trial is not yet a charge: its seats wait for `active`,
-    // and a late charge after the free days keeps the trial rather than nothing.
-    const trial = seats ? bill.stripe.status === 'trialing' : t < endsAt;
+    const seats = seatsOf(bill);
+    // NO FREE WEEK WITHOUT A CARD (the founder, 2026-11-21): the trial is
+    // Stripe's, or free days the owner gave by hand (team_plans.free_until).
+    const given = Number(team.freeUntil) || 0;
+    const cardTrial = !!seats && bill.stripe.status === 'trialing';
+    const trial = seats ? cardTrial : t < given;
+    // A card trial from before Stripe's end was kept ended a week after the team was made.
+    const endsAt = cardTrial ? Number(bill.stripe.trialEnd) || Number(team.createdAt) + teamPlan.trialDays * DAY_MS : given;
+    await mirrorTeam(team.id, bill);
     if (!seats && !trial) return null;
     const members = team.members.filter((m) => PERSON.test(m));
+    await seatsFollowMembers(team.id, bill, seats, members.length);
     const tm = {
       id: team.id, trial, seats, endsAt: trial ? endsAt : null, members: members.length, owner: (team.owners || []).includes(person),
-      seconds: teamAllot(trial),
+      seconds: teamAllot(trial), dollarsPerSeat: seatDollarsOf(bill),
     };
     if (!people) return tm;
     const recs = await Promise.all(members.map(async (m) => [m, m === person ? null : await recOf(m).catch(() => fresh())]));
     return { ...tm, people: recs.map(([m, rec]) => ({ id: m, rec })) };
   }
+  // A team's paid seat keeps files as Pro does; a trial keeps none.
+  const filesCapOf = (rec, tm) => {
+    const own = planOf(rec).filesGB || 0;
+    const seat = tm && !tm.trial && tm.seats ? teamPlan.filesGBPerSeat || 0 : 0;
+    return Math.max(own, seat) * 2 ** 30;
+  };
   // A team that cannot be read is no team for this start; the sweep leaves its runs alone.
   const teamOrNone = (person, t, opts) => teamNow(person, t, opts).catch((err) => { log(`could not read ${person}'s team: ${err?.message || err}`); return null; });
   const teamLeft = (tm, rec, t) => !!tm && teamUsedOf(rec, tm.id, tm.trial, t) < tm.seconds;
@@ -209,18 +283,20 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     delete rec.live[sid];
     rec.retired = { ...(rec.retired || {}), [sid]: at };
     const charged = s.kind === 'run' && why !== 'not-started';
-    if (charged && s.free) rec.freeUsed = (rec.freeUsed || 0) + Math.max(0, (at - s.at) / 1000);
-    else if (charged && s.team && s.trial) rec.teamTrialUsed = { ...rec.teamTrialUsed, [s.team]: (rec.teamTrialUsed?.[s.team] || 0) + Math.max(0, (at - s.at) / 1000) };
+    if (charged && s.team && s.trial) rec.teamTrialUsed = { ...rec.teamTrialUsed, [s.team]: (rec.teamTrialUsed?.[s.team] || 0) + Math.max(0, (at - s.at) / 1000) };
     else if (charged && s.team) {
       const byMonth = { ...rec.teamUsed?.[s.team] };
       for (const [m, secs] of secondsByMonth(s.at, at)) byMonth[m] = (byMonth[m] || 0) + secs;
       rec.teamUsed = { ...rec.teamUsed, [s.team]: byMonth };
-    } else if (charged) for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
+    } else if (charged) {
+      for (const [m, secs] of secondsByMonth(s.at, at)) rec.used[m] = (rec.used[m] || 0) + secs;
+      if (inTrial(rec)) rec.trialUsed = (rec.trialUsed || 0) + Math.max(0, (at - s.at) / 1000);
+    }
     if (!stoppingOf(rec).some((e) => e.sid === sid)) rec.stopping = [...stoppingOf(rec), { sid, tries: 0 }];
     if (charged) {
       rec.unrecorded = [...(rec.unrecorded || []), {
         key: `ledger/runs/${ctx.person}/${month(at)}/${sid}-${s.at}.json`,
-        sessionId: sid, runId: s.runId, startedAt: s.at, endedAt: at, seconds: Math.max(0, Math.round((at - s.at) / 1000)), why, ...(s.free ? { free: true } : {}), ...(s.team ? { team: s.team } : {}),
+        sessionId: sid, runId: s.runId, startedAt: s.at, endedAt: at, seconds: Math.max(0, Math.round((at - s.at) / 1000)), why, ...(s.team ? { team: s.team } : {}),
       }];
     }
     ctx.ended.push(sid);
@@ -351,12 +427,13 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     return {
       plan: plans[rec.plan] ? rec.plan : 'none', unlimited: !!plan.unlimited, agents: plan.unlimited ? null : plan.agents, hoursPerMonth: plan.hoursPerMonth, running: live(rec, 'run').length, usedSeconds: rec.used[month(t)] || 0, month: month(t),
       billing: whoBills(rec),
+      filesCap: filesCapOf(rec, tm),
       terms: { accepted: rec.terms?.version ?? null, current: termsVersion },
-      // Apart from the plan, so an app from before the free hours still reads no plan.
-      ...(onFree(rec) ? { free: { agents: free.agents, hours: free.hours, usedSeconds: Math.min(free.hours * 3600, Math.round(rec.freeUsed || 0)) } } : {}),
+      ...(inTrial(rec) ? { trial: { hours: PLAN_TRIAL.hours, usedSeconds: Math.min(PLAN_TRIAL.hours * 3600, Math.round(trialUsedNow(rec, t))) } } : {}),
+      ...(stripe && !rec.stripe?.subscription ? { trialOffer: { days: PLAN_TRIAL.days, hours: PLAN_TRIAL.hours } } : {}),
       // Hours and agents are this person's own; `people` is every member's, this one's included.
       ...(tm ? { team: {
-        trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: null, running: teamRunning(tm, rec),
+        trial: tm.trial, endsAt: tm.endsAt, seats: tm.seats, members: tm.members, owner: tm.owner, agents: null, running: teamRunning(tm, rec), dollarsPerSeat: tm.dollarsPerSeat,
         hours: tm.seconds / 3600, usedSeconds: Math.min(tm.seconds, Math.round(teamUsedOf(rec, tm.id, tm.trial, t))),
         ...(tm.people ? { people: tm.people.map(({ id, rec: r }) => {
           const of = r ?? rec;
@@ -366,14 +443,17 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     };
   }
 
-  // Which hours a run spends: the person's plan, else their team's while it has a
-  // trial or seats (which replace the free hours, spent or not), else their free hours.
-  const paysFor = (rec, team) => (!onFree(rec) ? 'own' : team ? 'team' : 'free');
+  // Which hours a run spends: the person's plan, else their team's while it has a trial or seats.
+  const paysFor = (rec, team) => (!noPlan(rec) ? 'own' : team ? 'team' : 'none');
 
   // Why a run spending these hours cannot start now, or null when it can.
   function paysRefusal(rec, plan, pays, team, t) {
     if (pays === 'own') {
-      if (ownOver(rec, t)) return { ok: false, error: 'hours', message: `This month's ${plan.hoursPerMonth} cloud hours are used.` };
+      if (ownOver(rec, t)) {
+        return { ok: false, error: 'hours', message: inTrial(rec)
+          ? `Your ${PLAN_TRIAL.hours} trial hours are used. Start ${rec.plan[0].toUpperCase()}${rec.plan.slice(1)} now for its ${plan.hoursPerMonth.toLocaleString('en-US')} hours a month.`
+          : `This month's ${plan.hoursPerMonth} cloud hours are used.` };
+      }
       if (ownRuns(rec).length >= plan.agents) {
         return { ok: false, error: 'agents', message: plan.unlimited ? `${plan.agents} cloud agents are running, the most one account can run at once.` : `All ${plan.agents} of your cloud agents are running.` };
       }
@@ -386,8 +466,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         return { ok: false, error: 'hours', message: `${team.trial ? `Your ${h} trial hours` : `This month's ${h} cloud hours`} are used.${next}` };
       }
     } else {
-      if (freeSpent(rec, t)) return { ok: false, error: 'plan', message: `Your ${free.hours} free cloud hours are used. Choose a cloud plan to keep running agents there.` };
-      if (live(rec, 'run').filter((s) => s.free).length >= free.agents) return { ok: false, error: 'agents', message: 'Both of your free cloud agents are running.' };
+      return { ok: false, error: 'plan', message: 'Choose a cloud plan to run agents there.' };
     }
     return null;
   }
@@ -405,7 +484,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (stoppingOf(rec).some((e) => e.sid === sid) || rec.retired?.[sid] !== undefined) return { ok: false, error: 'busy', message: 'this session has ended; a new run takes a new one' };
     // Changed terms hold back what begins something new; a run going finishes.
     if (rec.terms?.version !== termsVersion) return { ok: false, error: 'terms', terms: termsVersion, message: `accept the terms of ${termsVersion} first` };
-    // Which hours this run spends: the person's plan, then their team's, then their free hours.
+    // Which hours this run spends: the person's plan, then their team's.
     let pays = null;
     if (kind === 'run') {
       const plan = planOf(rec);
@@ -417,7 +496,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       return { ok: false, error: 'signins', message: `${SIGNINS_AT_ONCE} sign-ins are already waiting.` };
     }
     const nonce = crypto.randomUUID();
-    rec.live[sid] = { kind, runId: typeof runId === 'string' ? runId : null, at: t, nonce, ...(pays === 'free' ? { free: true } : {}), ...(pays === 'team' ? { team: team.id, trial: team.trial } : {}) };
+    rec.live[sid] = { kind, runId: typeof runId === 'string' ? runId : null, at: t, nonce, ...(pays === 'team' ? { team: team.id, trial: team.trial } : {}) };
     return { ok: true, nonce, fresh: true };
   }
 
@@ -538,8 +617,74 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     return { ok: true };
   }
 
-  async function link(person, rec, { op, key, seconds }) {
+  async function weighFiles(person, t) {
+    const { items, truncated } = await objects.sizes(`files/u-${person}/`, { max: STORAGE_LIST_MAX });
+    const bytes = items.reduce((sum, o) => sum + o.size, 0);
+    const there = new Set(items.map((o) => o.key));
+    return update(person, (r) => {
+      r.files = { ...r.files, at: t, bytes, count: items.length, truncated };
+      // A file that landed is in the weight now, so its link stops counting.
+      if (r.filePuts) r.filePuts = Object.fromEntries(Object.entries(r.filePuts).filter(([k, p]) => !there.has(k) && p.until > t));
+      return r.files;
+    });
+  }
+
+  async function filesNow(person, rec) {
+    const t = now();
+    const cap = filesCapOf(rec, await teamOrNone(person, t));
+    const files = rec.files?.at && t - rec.files.at < FILES_WEIGH_MS ? rec.files : await weighFiles(person, t);
+    return { bytes: files.bytes || 0, count: files.count || 0, cap, full: !!cap && ((files.bytes || 0) >= cap || !!files.truncated) };
+  }
+
+  // Read and deleted on any plan, so a plan that ends can bring its files home.
+  // A link to upload counts against the cap until the sweep weighs what
+  // landed, at the size the app said, which the link is signed for. An older
+  // app says none, and its link counts as the largest one upload can be.
+  async function fileLink(person, rec, { op, key, seconds, size }) {
+    if (!FILE_KEY.test(key)) throw bad('a kept file is files/ and the sha256 of its bytes');
+    const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
+    const scoped = scopedKey(person, key);
+    const stated = size == null ? null : Number(size);
+    if (op === 'put') {
+      if (stated != null && !(Number.isSafeInteger(stated) && stated >= 0 && stated <= ONE_UPLOAD_MAX)) throw bad(`size is the upload's bytes, at most ${gib(ONE_UPLOAD_MAX)} GB`);
+      const t = now();
+      const cap = filesCapOf(rec, await teamOrNone(person, t));
+      if (!cap) throw new Refusal(403, 'files-plan', `Keeping files in the cloud comes with ${Name} Pro, Plus and Max.`);
+      const until = t + s * 1000;
+      await update(person, (r) => {
+        const others = Object.entries(r.filePuts || {}).filter(([k, p]) => k !== scoped && p.until > t);
+        const pending = others.reduce((sum, [, p]) => sum + p.size, 0);
+        if ((r.files?.bytes || 0) + pending + Math.max(stated ?? 0, 1) > cap || r.files?.truncated) throw new Refusal(403, 'files-full', `Your ${gib(cap)} GB of files in the cloud are full.`, { cap });
+        r.filePuts = Object.fromEntries([...others, [scoped, { size: stated ?? ONE_UPLOAD_MAX, until }]]);
+        r.filesUntil = Math.max(r.filesUntil || 0, until + LINK_NOTE_MS);
+      });
+    }
+    return { url: await (op === 'put' && stated != null ? links.put(scoped, s, stated) : links[op](scoped, s)) };
+  }
+
+  // A plan without files starts a clock; at FILES_LAPSE_DAYS what it kept is
+  // deleted. A team that cannot be read starts nothing.
+  async function sweepFiles(person, t, rec) {
+    if (!rec.files?.bytes && !rec.files?.lapsedAt) return;
+    let tm;
+    try { tm = await teamNow(person, t); } catch (err) { log(`could not read ${person}'s team for their files: ${err?.message || err}`); return; }
+    const cap = filesCapOf(rec, tm);
+    if (cap) {
+      if (rec.files.lapsedAt) await update(person, (r) => { delete r.files.lapsedAt; });
+      if ((rec.filesUntil || 0) > (rec.files.at || 0)) await weighFiles(person, t);
+      return;
+    }
+    if (!rec.files.lapsedAt) { await update(person, (r) => { r.files.lapsedAt = t; }); return; }
+    if (t - rec.files.lapsedAt < FILES_LAPSE_DAYS * DAY_MS) return;
+    const { items } = await objects.sizes(`files/u-${person}/`, { max: STORAGE_LIST_MAX });
+    for (let i = 0; i < items.length; i += 16) await Promise.all(items.slice(i, i + 16).map((o) => objects.del(o.key)));
+    log(`${person}'s plan has kept no files for ${FILES_LAPSE_DAYS} days; deleted their ${items.length} files (${gib(rec.files.bytes)} GB)`);
+    await update(person, (r) => { r.files = { at: t, bytes: 0, count: 0 }; });
+  }
+
+  async function link(person, rec, { op, key, seconds, size }) {
     if (!['get', 'put', 'head'].includes(op)) throw bad('op is get, put or head');
+    if (typeof key === 'string' && key.startsWith('files/')) return fileLink(person, rec, { op, key, seconds, size });
     const scoped = scopedKey(person, key);
     if (!scoped) throw bad('a key is a run\'s or a sign-in\'s, inside your own space');
     // A sign-in is written only by the sandbox, on a link the server makes. A
@@ -549,17 +694,25 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (op !== 'head' && key.startsWith('logins/') && !savesAKey) throw new Refusal(403, 'not-yours-to-touch', 'a sign-in is never read or written from a Mac');
     const s = Math.min(LINK_MAX_SECONDS, Math.max(60, Number(seconds) || LINK_MAX_SECONDS));
     if (op === 'put') {
-      const team = onFree(rec) ? await teamOrNone(person, now()) : null;
-      const refusal = onFree(rec) && paysRefusal(rec, planOf(rec), paysFor(rec, team), team, now());
+      const team = noPlan(rec) ? await teamOrNone(person, now()) : null;
+      const refusal = noPlan(rec) && paysRefusal(rec, planOf(rec), paysFor(rec, team), team, now());
       if (refusal && refusal.error !== 'agents') throw new Refusal(403, refusal.error, refusal.message);
       if (rec.storage?.full) throw new Refusal(403, 'storage', `Your cloud storage is full (${gib(storageBytes)} GB). It empties as runs older than a week are deleted.`);
       const until = now() + s * 1000;
       if (!(rec.linksUntil >= until)) await update(person, (r) => { r.linksUntil = Math.max(r.linksUntil || 0, until + LINK_NOTE_MS); });
     }
+    // A key is a few hundred bytes. A Mac that says its size gets a link
+    // signed for exactly that; one from before sizes were sent is weighed instead.
+    if (savesAKey && size != null) {
+      const n = Number(size);
+      if (!(Number.isSafeInteger(n) && n > 0 && n <= SAVED_KEY_MAX_BYTES)) throw bad('a saved key is at most 64 KB');
+      return { url: await links.put(scoped, s, n) };
+    }
     return { url: await links[op](scoped, s) };
   }
 
   async function remove(person, { key }) {
+    if (typeof key === 'string' && key.startsWith('files/') && !FILE_KEY.test(key)) throw bad('a kept file is files/ and the sha256 of its bytes');
     const scoped = scopedKey(person, key);
     if (!scoped) throw bad('a key is a run\'s or a sign-in\'s, inside your own space');
     await removeObject(scoped);
@@ -621,11 +774,6 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
   // BILLING. Stripe's page takes the card; its webhook sets the plan.
   const billingRefusal = () => new Refusal(503, 'billing', 'Paying for the cloud is not set up on this server.');
   const sellable = (plan) => typeof plan === 'string' && Object.hasOwn(plans, plan) && plans[plan].agents > 0;
-  const hostOf = (headers) => {
-    const host = headers.host || headers.Host;
-    if (typeof host !== 'string' || !/^[A-Za-z0-9.-]+(:\d+)?$/.test(host)) throw bad('no host');
-    return `https://${host}`;
-  };
 
   // ONE CHECKOUT OPEN AT A TIME. A second subscription would bill twice, and
   // until the webhook lands only the checkout this server opened knows one
@@ -647,39 +795,66 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     throw new Error('the team\'s ledger kept changing under this write');
   }
 
+  // The free days a team's checkout gives: a week for a team that never had a
+  // subscription, or the days given by hand if they run longer. The card is
+  // taken now and charged when they end.
+  const teamDaysFree = (team, bill, t) => {
+    const week = bill.stripe?.subscription ? 0 : t + teamPlan.trialDays * DAY_MS;
+    return teamFreeDays(Math.max(Number(team.freeUntil) || 0, week), t);
+  };
+
+  /** What the plan page promises: the free days Pro would start with for this person's team, or null off a team. */
+  async function freeDaysOfTeam(person, t) {
+    try {
+      const team = teams ? await teams(person) : null;
+      if (!team?.id) return null;
+      return teamDaysFree(team, (await readJson(teamKey(team.id))) || {}, t);
+    } catch (err) {
+      log(`could not read ${person}'s team for its free days: ${err?.message || err}`);
+      return null;
+    }
+  }
+
   // THE TEAM'S SEATS, bought by its owner, one a member.
-  async function teamCheckout(person, headers) {
+  async function teamCheckout(person) {
     const team = teams ? await teams(person) : null;
     if (!team?.id) throw new Refusal(404, 'no-team', 'You are not on a team.');
     if (!(team.owners || []).includes(person)) throw new Refusal(403, 'owner', 'Only your team\'s owner can pay for the team. Ask them to choose the team plan.');
-    const base = hostOf(headers);
     const bill = (await readJson(teamKey(team.id))) || {};
-    if (PAYING.has(bill.stripe?.status) && bill.stripe.customer) return { url: await stripe.billing({ customer: bill.stripe.customer, returnUrl: `${base}/v1/paid?billing=1` }), where: 'billing' };
+    const toBilling = async (customer) => ({ url: await stripe.billing({ customer, returnUrl: `${WEB_APP}/paid?billing=1` }), where: 'billing' });
+    if (PAYING.has(bill.stripe?.status) && bill.stripe.customer) return toBilling(bill.stripe.customer);
     if (bill.checkout?.id) {
-      const open = await stripe.session(bill.checkout.id).catch(() => null);
-      if (open?.status === 'open') return { url: open.url, where: 'checkout' };
+      const last = await stripe.session(bill.checkout.id).catch(() => null);
+      if (last?.status === 'open') return { url: last.url, where: 'checkout' };
+      // Paid before Stripe's webhook has landed.
+      if (last?.status === 'complete' && last.customer) return toBilling(last.customer);
     }
-    // Paid for inside the team's free days, the card is charged when they end.
-    // Stripe trials nothing that ends within 48 hours, so a team that close pays now.
-    const trialEnds = Number(team.createdAt) + teamPlan.trialDays * DAY_MS;
-    const trialEnd = trialEnds - now() > 2 * DAY_MS ? trialEnds : null;
-    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialEnd, successUrl: `${base}/v1/paid?plan=team`, cancelUrl: `${base}/v1/paid?cancelled=1` });
+    const trialDays = teamDaysFree(team, bill, now()) || null;
+    const made = await stripe.checkout({ person, plan: 'team', team: team.id, quantity: Math.max(1, team.members.length), customer: bill.stripe?.customer, trialDays, successUrl: `${WEB_APP}/paid?plan=team`, cancelUrl: `${WEB_APP}/paid?cancelled=1` });
     await updateTeam(team.id, (b) => { b.checkout = { id: made.id, url: made.url, by: person, at: now() }; });
     return { url: made.url, where: 'checkout' };
   }
 
-  async function checkout(person, { plan }, headers) {
+  async function checkout(person, { plan }) {
     if (!stripe) throw billingRefusal();
-    if (plan === 'team') return teamCheckout(person, headers);
+    if (plan === 'team') return teamCheckout(person);
     if (!sellable(plan)) throw bad('choose pro, plus or max');
-    const base = hostOf(headers);
-    const toBilling = async (customer) => ({ url: await stripe.billing({ customer, returnUrl: `${base}/v1/paid?billing=1` }), where: 'billing' });
+    const toBilling = async (customer) => ({ url: await stripe.billing({ customer, returnUrl: `${WEB_APP}/paid?billing=1` }), where: 'billing' });
     const rec = await recOf(person);
+    // The plan in its trial, asked for again, starts now: Stripe ends the trial
+    // and charges at once. A card that declines is mended on the billing page.
+    if (inTrial(rec) && rec.plan === plan && rec.stripe.subscription) {
+      const sub = await stripe.endTrial(rec.stripe.subscription);
+      if (sub?.status !== 'active') return toBilling(rec.stripe.customer);
+      await update(person, (r) => { if (r.stripe?.subscription === sub.id) r.stripe = { ...r.stripe, status: 'active', paid: true, at: now() }; });
+      log(`${person} started ${plan} before its trial ended`);
+      return { where: 'started' };
+    }
     // A change of plan is confirmed on the billing page, opened at that change.
     if (PAYING.has(rec.stripe?.status)) {
       if (rec.plan === plan || !rec.stripe.subscription) return toBilling(rec.stripe.customer);
       try {
-        return { url: await stripe.billing({ customer: rec.stripe.customer, returnUrl: `${base}/v1/paid?plan=${plan}`, switchTo: { subscription: rec.stripe.subscription, plan } }), where: 'billing' };
+        return { url: await stripe.billing({ customer: rec.stripe.customer, returnUrl: `${WEB_APP}/paid?plan=${plan}`, switchTo: { subscription: rec.stripe.subscription, plan } }), where: 'billing' };
       } catch (err) {
         log(`switching ${person} to ${plan} on Stripe's page failed, so the billing page opens instead: ${err.message}`);
         return toBilling(rec.stripe.customer);
@@ -695,7 +870,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     };
     const was = await settle(rec.checkout, rec.checkout?.plan === plan);
     if (was) return was;
-    const made = await stripe.checkout({ person, plan, customer: rec.stripe?.customer, successUrl: `${base}/v1/paid?plan=${plan}`, cancelUrl: `${base}/v1/paid?cancelled=1` });
+    // The free week is for someone who never had a subscription.
+    const trialDays = rec.stripe?.subscription ? null : PLAN_TRIAL.days;
+    const made = await stripe.checkout({ person, plan, customer: rec.stripe?.customer, trialDays, successUrl: `${WEB_APP}/paid?plan=${plan}`, cancelUrl: `${WEB_APP}/paid?cancelled=1` });
     // Another press may have opened one while this one was being made.
     let raced = null;
     await update(person, (r) => {
@@ -711,7 +888,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     return { url: made.url, where: 'checkout' };
   }
 
-  async function billing(person, headers) {
+  async function billing(person) {
     if (!stripe) throw billingRefusal();
     let { customer } = (await recOf(person)).stripe || {};
     // An owner who pays for the team and not for themselves manages the team's.
@@ -720,7 +897,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       if (team?.id && (team.owners || []).includes(person)) customer = (await readJson(teamKey(team.id)))?.stripe?.customer;
     }
     if (!customer) throw new Refusal(404, 'no-billing', 'You have not paid for a cloud plan yet.');
-    return { url: await stripe.billing({ customer, returnUrl: `${hostOf(headers)}/v1/paid?billing=1` }) };
+    return { url: await stripe.billing({ customer, returnUrl: `${WEB_APP}/paid?billing=1` }) };
   }
 
   // An event names a subscription; what it says is read from Stripe, so one
@@ -743,8 +920,11 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     await update(person, (rec) => {
       // An old subscription ending leaves alone a newer one that pays.
       if (!pays && rec.stripe?.subscription && rec.stripe.subscription !== sub.id && PAYING.has(rec.stripe.status)) return;
+      // As a team's: a past_due recorded before `paid` was kept is a renewal's retry.
+      const was = rec.stripe?.subscription === sub.id ? rec.stripe : null;
+      const paid = sub.status === 'active' || !!was && (was.paid === true || was.status === 'active' || (was.paid === undefined && was.status === 'past_due'));
       rec.plan = plan;
-      rec.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, at: now() };
+      rec.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, at: now() };
       if (pays) delete rec.checkout;
     });
     log(`${person} is on ${plan} (Stripe ${sub.status})`);
@@ -759,7 +939,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (!team?.id) throw new Refusal(404, 'no-team', 'You are not on a team.');
     if (!(team.owners || []).includes(person)) return { owner: false };
     const bill = (await readJson(teamKey(team.id))) || {};
-    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, card: null, email: null, invoices: [] };
+    const empty = { owner: true, periodStart: null, periodEnd: null, nextAt: null, nextAmount: null, endsAt: null, card: null, email: null, invoices: [] };
     if (!stripe || !bill.stripe?.customer) return empty;
     const [sub, customer, invoices] = await Promise.all([
       bill.stripe.subscription ? stripe.subscriptionWithCard(bill.stripe.subscription).catch(() => null) : null,
@@ -771,12 +951,17 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     // Newer Stripe keeps the period on the item, older on the subscription.
     const periodStart = at(item?.current_period_start ?? sub?.current_period_start);
     const periodEnd = at(item?.current_period_end ?? sub?.current_period_end);
-    const card = sub?.default_payment_method?.card ?? customer?.invoice_settings?.default_payment_method?.card ?? null;
-    const pays = PAYING.has(sub?.status) && !sub?.cancel_at_period_end;
+    // Paid with Link there is no card on the method, and "No card yet" was said to someone who had just paid.
+    const method = sub?.default_payment_method ?? customer?.invoice_settings?.default_payment_method ?? null;
+    const card = method?.card ?? (method?.type === 'link' ? { brand: 'Link', last4: '' } : null);
+    // Stripe marks a cancelled plan with the flag, or with an end date and no flag: either way no bill is coming.
+    const ending = PAYING.has(sub?.status) && (!!sub?.cancel_at_period_end || !!at(sub?.cancel_at));
+    const pays = PAYING.has(sub?.status) && !ending;
     return {
       ...empty, periodStart, periodEnd,
       nextAt: pays ? periodEnd : null,
-      nextAmount: pays ? (Math.floor(Number(item?.quantity)) || bill.seats || 0) * teamPlan.dollarsPerSeat : null,
+      nextAmount: pays ? Math.round((Math.floor(Number(item?.quantity)) || bill.seats || 0) * seatDollarsOf(bill) * 100) / 100 : null,
+      endsAt: ending ? (at(sub?.cancel_at) ?? periodEnd) : null,
       card: card ? { brand: String(card.brand || '').replace(/^./, (c) => c.toUpperCase()), last4: String(card.last4 || '') } : null,
       email: typeof customer?.email === 'string' ? customer.email : null,
       invoices: (invoices?.data ?? []).map((i) => ({
@@ -793,17 +978,27 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const pays = PAYING.has(sub.status);
     const item = sub.items?.data?.[0];
     if (pays && planOfLookupKey(item?.price?.lookup_key) !== 'team') { log(`subscription ${sub.id} is on a price no team plan sells`); return { received: true }; }
-    await updateTeam(team, (bill) => {
+    // A Stripe that will not say what a seat costs leaves the price last known.
+    const seatCents = pays && stripe.seatCents
+      ? await stripe.seatCents(sub).catch((err) => { log(`could not read what team ${team} pays a seat: ${err?.message || err}`); return null; })
+      : null;
+    const bill = await updateTeam(team, (bill) => {
       // An old subscription ending leaves alone a newer one that pays.
-      if (!pays && bill.stripe?.subscription && bill.stripe.subscription !== sub.id && PAYING.has(bill.stripe.status)) return;
+      if (!pays && bill.stripe?.subscription && bill.stripe.subscription !== sub.id && PAYING.has(bill.stripe.status)) return null;
       // A past_due recorded before `paid` was kept is a renewal's retry.
       const was = bill.stripe?.subscription === sub.id ? bill.stripe : null;
       const paid = sub.status === 'active' || !!was && (was.paid === true || was.status === 'active' || (was.paid === undefined && was.status === 'past_due'));
       bill.plan = pays ? 'team' : 'none';
       bill.seats = Math.max(0, Math.floor(Number(item?.quantity)) || 0);
-      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, at: now() };
+      if (!pays) delete bill.seatCents;
+      else if (Number.isFinite(seatCents)) bill.seatCents = seatCents;
+      const trialEnd = Number(sub.trial_end) > 0 ? Number(sub.trial_end) * 1000 : null;
+      bill.stripe = { customer: sub.customer, subscription: sub.id, status: sub.status, paid, ...(trialEnd ? { trialEnd } : {}), at: now() };
+      bill.rev = (Number(bill.rev) || 0) + 1;
       if (pays) delete bill.checkout;
+      return { ...bill };
     });
+    if (bill) await mirrorTeam(team, bill, { event: true });
     log(`team ${team} is on ${pays ? `${Math.floor(Number(item?.quantity)) || 0} seats` : 'no plan'} (Stripe ${sub.status})`);
     return { received: true };
   }
@@ -836,15 +1031,17 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         return { status: 200, body: { ok: true, terms: termsVersion } };
       }
       if (route === 'GET /v1/me') {
-        const tm = await teamOrNone(person, now(), { people: true });
-        return { status: 200, body: await update(person, (rec, ctx) => { settle(rec, ctx, now()); return summary(rec, now(), tm); }) };
+        const [tm, teamFreeDays] = await Promise.all([teamOrNone(person, now(), { people: true }), freeDaysOfTeam(person, now())]);
+        const body = await update(person, (rec, ctx) => { settle(rec, ctx, now()); return summary(rec, now(), tm); });
+        return { status: 200, body: teamFreeDays === null ? body : { ...body, teamFreeDays } };
       }
       if (route === 'POST /v1/invoke') return { status: 200, body: await invoke(person, data) };
       if (route === 'POST /v1/stop') return { status: 200, body: await stop(person, data) };
       if (route === 'POST /v1/link') return { status: 200, body: await link(person, rec, data) };
+      if (route === 'GET /v1/files') return { status: 200, body: await filesNow(person, rec) };
       if (route === 'POST /v1/delete') return { status: 200, body: await remove(person, data) };
-      if (route === 'POST /v1/checkout') return { status: 200, body: await checkout(person, data, headers) };
-      if (route === 'POST /v1/billing') return { status: 200, body: await billing(person, headers) };
+      if (route === 'POST /v1/checkout') return { status: 200, body: await checkout(person, data) };
+      if (route === 'POST /v1/billing') return { status: 200, body: await billing(person) };
       if (route === 'GET /v1/team-billing') return { status: 200, body: await teamBilling(person) };
       return { status: 404, body: { error: 'not-found' } };
     } catch (err) {
@@ -874,7 +1071,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     if (rec.disabled) return { ok: false, error: 'disabled' };
     if (rec.terms?.version !== termsVersion) return { ok: false, error: 'terms' };
     if ((await readJson(SWITCH))?.paused) return { ok: false, error: 'paused' };
-    const team = onFree(rec) ? await teamOrNone(person, t) : null;
+    const team = noPlan(rec) ? await teamOrNone(person, t) : null;
     const pays = paysFor(rec, team);
     const refusal = paysRefusal(rec, planOf(rec), pays, team, t);
     return refusal ? { ok: false, error: refusal.error } : { ok: true };
@@ -956,7 +1153,9 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
     const last = rec.storage?.at || 0;
     if (t - last < STORAGE_EVERY_MS || !((rec.linksUntil || 0) > last || rec.storage?.full)) return;
     const { items, truncated } = await objects.sizes(`runs/u-${person}/`, { max: STORAGE_LIST_MAX });
-    let bytes = items.reduce((sum, o) => sum + o.size, 0);
+    const keys = await objects.sizes(`logins/u-${person}/keys/`, { max: STORAGE_LIST_MAX });
+    const keyBytes = keys.items.reduce((sum, o) => sum + o.size, 0);
+    let bytes = items.reduce((sum, o) => sum + o.size, 0) + keyBytes;
     if (bytes > 2 * storageBytes) {
       const newest = [...items].sort((x, y) => (y.at > x.at ? 1 : y.at < x.at ? -1 : 0));
       const gone = [];
@@ -968,7 +1167,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
       for (let i = 0; i < gone.length; i += 16) await Promise.all(gone.slice(i, i + 16).map((o) => objects.del(o.key)));
       log(`${person} held over twice the ${gib(storageBytes)} GB cap in runs/; deleted the newest ${gone.length}`);
     }
-    const full = truncated || bytes >= storageBytes;
+    const full = truncated || keys.truncated || bytes >= storageBytes;
     if (full && !rec.storage?.full) log(`${person}'s cloud storage is full (${gib(bytes)} GB${truncated ? `, over ${STORAGE_LIST_MAX} objects` : ''}); no new links that write`);
     await update(person, (r) => { r.storage = { at: t, bytes, full }; });
   }
@@ -985,6 +1184,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
         try {
           const rec = await sweepOne(person, t, await recOf(person));
           await weighStorage(person, t, rec);
+          await sweepFiles(person, t, await recOf(person));
           if (behindTheDatabase(rec)) { behind += 1; await tellTheDatabase(person, rec); }
           swept += 1;
         } catch (err) {
@@ -1024,11 +1224,7 @@ export function createGateway({ agentcore, links, removeObject, objects, whoIs, 
 
 /** The page a browser lands on after Stripe's checkout or billing page, with the way back into the app. */
 export function paidPage(query) {
-  const plan = query.get('plan') ?? '';
-  const named = plan === 'team' ? ' for your team' : Object.hasOwn(PLANS, plan) && PLANS[plan].agents > 0 ? ` ${plan.charAt(0).toUpperCase()}${plan.slice(1)}` : '';
-  const head = query.has('cancelled') ? 'Nothing was charged'
-    : query.has('billing') ? 'All done on Stripe'
-      : `You’re on ${Name} Cloud${named}`;
+  const head = paidHeadline(query);
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${Name} Cloud</title>
 <style>html{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-items:center;font:15px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;background:#f8f8fa;color:#12182a}
 main{display:grid;justify-items:center;gap:28px;padding:24px;text-align:center}h1{margin:0;font-size:30px;font-weight:400;letter-spacing:-.01em}

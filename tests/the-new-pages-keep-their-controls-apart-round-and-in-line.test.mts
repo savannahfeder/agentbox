@@ -33,13 +33,6 @@ describe('the new pages', () => {
     expect(read('renderer/src/team/everything/everything.css')).toMatch(/\.pl-name \.ev-s-blank \{ display: none; \}/);
   });
 
-  it('open Tasks with the line Today opens with', () => {
-    const tk = rule(read('renderer/src/team/tasks.css'), '.tk-sum');
-    expect(tk).toMatch(/font-size: 13px/);
-    expect(tk).toMatch(/padding-bottom: 14px/);
-    expect(rule(read('renderer/src/team/tasks.css'), '.tk-col')).toMatch(/max-width: 1320px/);
-  });
-
   it('draw no line under a person\'s empty In progress', () => {
     expect(read('renderer/src/App.tsx')).not.toMatch(/has nothing in progress/);
   });

@@ -10,7 +10,7 @@
 // picking where it runs, and the two can never disagree the way two pickers did
 // (a Claude alias sent to Codex is a run the supervisor refuses outright).
 
-import { claudeModelRows, CODEX_OWN, DEFAULT_MODEL, engineModelPicked, type ModelChoice } from '../models';
+import { claudeModelRows, CODEX_OWN, DEFAULT_MODEL, engineModelPicked, type FurtherHarness, type ModelChoice } from '../models';
 import { splitMessage } from '../message-split';
 import { parseWhen } from '../format';
 import { firstName } from '../team/company';
@@ -20,12 +20,13 @@ import { isRepeatRule, ruleLabel, type RepeatShape } from '../../../shared/repea
 import { clockWords, dayDeadline } from '../../../shared/team-tasks.mts';
 import { threadOfLink } from '../../../shared/thread-link.mts';
 
-export type Harness = 'claude' | 'codex';
+/** `claude`, `codex`, or the id of a further harness on offer. */
+export type Harness = string;
 
 /** One model as the card holds it: where it runs, and the word that runs it. */
 export interface ModelPick {
   engine: Harness;
-  /** A Claude Code alias (`opus`), or a Codex slug (`gpt-6-astra`). */
+  /** A Claude Code alias (`opus`), a Codex slug (`gpt-6-astra`), or a further harness's own id for the model. */
   model: string;
 }
 
@@ -81,9 +82,11 @@ const WINDOW = 40;
  */
 export function recentModels(
   items: ReadonlyArray<{ createdAt?: number; model?: string; engine?: string; wrote?: { model?: { ts: number } | undefined } }>,
-  { codexModels = [], codexDefault = null, codexOffered, claudeOffered = true, limit = 3 }:
-    { codexModels?: readonly CodexRow[]; codexDefault?: string | null; codexOffered: boolean; claudeOffered?: boolean; limit?: number },
+  { codexModels = [], codexDefault = null, codexOffered, claudeOffered = true, limit = 3, further = [] }:
+    { codexModels?: readonly CodexRow[]; codexDefault?: string | null; codexOffered: boolean; claudeOffered?: boolean; limit?: number; further?: readonly FurtherHarness[] },
 ): ModelPick[] {
+  // A thread that ran on a further harness is a recent pick while that harness still lists the model.
+  const lists = (engine: string | undefined, model: string) => !!further.find((h) => h.id === engine)?.models?.some((m) => m.id === model);
   const out: ModelPick[] = [];
   const seen = new Set<string>();
   const add = (p: ModelPick) => {
@@ -96,15 +99,17 @@ export function recentModels(
   const pickedAt = (i: (typeof items)[number]) => Math.max(i.createdAt ?? 0, i.wrote?.model?.ts ?? 0);
   const used = items
     .filter((i) => typeof i.model === 'string' && i.model)
+    // A model of a harness that is gone, or that no longer lists it, is nobody else's to run.
+    .filter((i) => !i.engine || i.engine === 'claude' || i.engine === 'codex' || lists(i.engine, i.model as string))
     .map((i) => ({ i, at: pickedAt(i) }))
     .sort((a, b) => b.at - a.at)
     .slice(0, WINDOW)
     .map(({ i, at }) => {
       const model = i.model as string;
-      const engine: Harness = i.engine === 'codex' || i.engine === 'claude' ? i.engine : harnessOf(model, codexModels);
+      const engine: Harness = i.engine === 'codex' || i.engine === 'claude' || lists(i.engine, model) ? i.engine as string : harnessOf(model, codexModels);
       return { pick: { engine, model: engine === 'claude' ? claudeAliasOf(model) : model }, at };
     })
-    .filter(({ pick }) => (pick.engine === 'codex' ? codexOffered : claudeOffered));
+    .filter(({ pick }) => (pick.engine === 'codex' ? codexOffered : pick.engine === 'claude' ? claudeOffered : true));
   const tally = new Map<string, { pick: ModelPick; count: number; last: number }>();
   for (const { pick, at } of used) {
     const row = tally.get(keyOf(pick)) ?? { pick, count: 0, last: 0 };
@@ -126,20 +131,36 @@ export function recentModels(
   return out;
 }
 
-/** Everything behind "All models": Claude Code's list and, when offered, Codex's. */
-export function allModels({ codexModels = [], codexOffered, claudeOffered = true }: { codexModels?: readonly CodexRow[]; codexOffered: boolean; claudeOffered?: boolean }): {
-  claude: ModelPick[]; codex: ModelPick[];
-} {
+export type { FurtherHarness };
+
+/** One more column behind "All models", for a further harness that has models to offer. */
+export interface ModelColumn { engine: string; label: string; models: readonly ModelPick[] }
+
+export interface AllModels { claude: readonly ModelPick[]; codex: readonly ModelPick[]; others?: readonly ModelColumn[] }
+
+/** Everything behind "All models": Claude Code's list, Codex's when offered, then a column for each further harness. */
+export function allModels({ codexModels = [], codexOffered, claudeOffered = true, further = [] }: {
+  codexModels?: readonly CodexRow[]; codexOffered: boolean; claudeOffered?: boolean; further?: readonly FurtherHarness[];
+}): AllModels {
   return {
     claude: claudeOffered ? claudeModelRows().map((m) => ({ engine: 'claude' as const, model: m.id })) : [],
     codex: codexOffered ? codexModels.map((m) => ({ engine: 'codex' as const, model: m.id })) : [],
+    others: further
+      .filter((h) => h.models?.length)
+      .map((h) => ({ engine: h.id, label: h.label, models: h.models!.map((m) => ({ engine: h.id, model: m.id })) })),
   };
 }
 
 /** The "N more" on the All models row: what is in the columns and not in Recent. */
-export function moreCount(recent: readonly ModelPick[], all: { claude: readonly ModelPick[]; codex: readonly ModelPick[] }): number {
-  const listed = new Set([...all.claude, ...all.codex].map(keyOf));
+export function moreCount(recent: readonly ModelPick[], all: AllModels): number {
+  const listed = new Set([...all.claude, ...all.codex, ...(all.others ?? []).flatMap((c) => c.models)].map(keyOf));
   return listed.size - recent.filter((r) => listed.has(keyOf(r))).length;
+}
+
+/** What a further harness calls one of its models, or the id when it no longer lists it. */
+export function furtherModelLabel(further: readonly FurtherHarness[] | undefined, p: ModelPick): string | null {
+  const harness = further?.find((h) => h.id === p.engine);
+  return harness ? harness.models?.find((m) => m.id === p.model)?.label ?? p.model : null;
 }
 
 export const sameModel = (a: ModelPick | null | undefined, b: ModelPick | null | undefined) =>
@@ -150,7 +171,7 @@ export const sameModel = (a: ModelPick | null | undefined, b: ModelPick | null |
 
 type EngineRow = { id: string; label: string };
 
-/** The agents To offers, or nothing where there is only one. */
+/** The agents a model row is tagged with, or nothing where there is only one. */
 export function agentChoices(engines?: readonly EngineRow[]): { id: Harness; label: string }[] {
   const rows = engines ?? [];
   if (rows.length < 2) return [];
@@ -159,10 +180,10 @@ export function agentChoices(engines?: readonly EngineRow[]): { id: Harness; lab
     .map((e) => ({ id: e.id as Harness, label: e.label }));
 }
 
-/** The word on the To field: the agent's name, or "Agent" where there is one. */
-export function agentWordFor(engines: readonly EngineRow[] | undefined, engine: Harness): string {
-  const rows = agentChoices(engines);
-  return rows.find((e) => e.id === engine)?.label ?? 'Agent';
+/** Whether To is drawn. The model picks the agent, so To is only there when
+ *  someone besides the agent could get the thread. */
+export function toOffered({ people, auto, mates, chosen }: { people: boolean; auto: boolean; mates: boolean; chosen: boolean }): boolean {
+  return people || auto || mates || chosen;
 }
 
 /**
@@ -412,12 +433,29 @@ export function findInvited(
   return (sent ?? []).map((s) => s.email).filter((e) => !joined.has(e.toLowerCase()) && e.toLowerCase().startsWith(q));
 }
 
+/** The rows under the people that the To search leaves: Auto and the agents
+ *  by name, an AI teammate by name or role. `agent` is the lone Agent row of
+ *  a Mac with one agent. Someone new only shows with nothing typed. */
+export function findInTo<A extends { label: string }, M extends { name: string; role?: string | null }>(
+  query: string, { auto, agents, mates }: { auto: boolean; agents: readonly A[]; mates: readonly M[] },
+): { auto: boolean; agents: A[]; agent: boolean; mates: M[]; someoneNew: boolean } {
+  const q = (query ?? '').trim().toLowerCase();
+  const hit = (...words: (string | null | undefined)[]) => !q || words.some((w) => !!w && w.toLowerCase().includes(q));
+  return {
+    auto: auto && hit('Auto'),
+    agents: agents.filter((a) => hit(a.label)),
+    agent: hit('Agent'),
+    mates: mates.filter((t) => hit(t.name, t.role)),
+    someoneNew: !q,
+  };
+}
+
 export type ToSection = 'people' | 'auto' | 'agents' | 'mates';
 
 /** The To menu, top to bottom: the people on the team first, then the agents and AI teammates. */
-export function toSections({ people, auto, mates, adding }: { people: boolean; auto: boolean; mates: boolean; adding: boolean }): ToSection[] {
+export function toSections({ people, auto, agents = true, mates, adding }: { people: boolean; auto: boolean; agents?: boolean; mates: boolean; adding: boolean }): ToSection[] {
   if (adding) return people ? ['people'] : [];
-  return [...(people ? ['people' as const] : []), ...(auto ? ['auto' as const] : []), 'agents', ...(mates ? ['mates' as const] : [])];
+  return [...(people ? ['people' as const] : []), ...(auto ? ['auto' as const] : []), ...(agents ? ['agents' as const] : []), ...(mates ? ['mates' as const] : [])];
 }
 
 /** What the reply box on an open thread asks: the people in a conversation, the agent where one runs, else a note. */
@@ -694,7 +732,9 @@ export function tabAfterSending({ team, kind, first = false, later, view, covere
 
 /* ----------------------------- hand to an agent ----------------------------- */
 
-const FILE_LINK = /!?\[([^\]]*)\]\((attachments\/[^)\s]+)\)/g;
+// A plain name only, as the sync fetches: a teammate's words keep their link
+// targets as written, and `attachments/../..` would hand on any folder of yours.
+const FILE_LINK = /!?\[([^\]]*)\]\((attachments\/[A-Za-z0-9][^)\s/\\]*)\)/g;
 
 /** What the card opens on for the message pressed: its words, who wrote them, and its files. */
 export function handOffStart({ product, id, message, nameOf, dir }: {
@@ -764,9 +804,18 @@ export function taskHandOff({ from, brief, message, nameOf, handFrom, offered = 
   const where = projectOrAsk(handOffProject({ words: `${brief.title ?? ''}\n${brief.body}\n${pressed}`, cards, offered }));
   if (pressed && pressed !== brief.body.trim()) {
     const who = message?.by ? nameOf(message.by) : null;
-    return { to: 'agent', body: `${who ? `${who} wrote: ` : ''}${pressed}\n\n`, attachments, ...from_, ...where };
+    // Named for the task: a message's first line is often the link to the thread it came from.
+    const named = String(brief.title ?? '').trim();
+    const said = `${who ? `${who} wrote: ` : ''}${pressed}\n\n`;
+    return { to: 'agent', body: named ? `${named}\n\n${said}` : said, ...(named ? { named } : {}), attachments, ...from_, ...where };
   }
-  return { to: 'agent', body: from ? `${from} asked:\n\n${brief.body}\n\n` : `${brief.body}\n\n`, attachments, ...from_, ...where };
+  // The thread is called what the task is called; who asked is its first words.
+  const name = String(brief.title ?? '').trim();
+  // A hand-over carries the giver's agent's edits as a .change file; the agent starts from them rather than over.
+  const change = brief.files.find((f) => /\.change$/i.test(f.name));
+  const start = change ? `Start from the edits in ${change.name}, attached: they are ${from ? `${from}'s` : 'the'} agent's work so far, not yet on this computer.\n\n` : '';
+  const asked = from ? `${from} asked:\n\n${brief.body}\n\n${start}` : `${brief.body}\n\n${start}`;
+  return { to: 'agent', body: name && from ? `${name}\n\n${asked}` : asked, ...(name && from ? { named: name } : {}), attachments, ...from_, ...where };
 }
 
 export const handedFromLabel = (product: string, id: string) => `handed-from:${product}:${id}`;

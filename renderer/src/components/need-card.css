@@ -45,7 +45,12 @@
 
 /* A service's own sign-in link (SignInCard.tsx): its code, then Open, I've signed in and Not now. */
 .need-code-box { margin-top: 12px; display: flex; align-items: center; gap: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); }
-.need-code-label { font-size: 13px; color: var(--text-dim); }
-.need-code-value { flex: 1; font-family: var(--mono); font-size: 16px; letter-spacing: .14em; color: var(--text); }
+.need-code-label { font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+.need-code-value { flex: 1; white-space: nowrap; font-family: var(--mono); font-size: 16px; letter-spacing: .14em; color: var(--text); }
 .need-btn-arrow { display: inline-flex; margin-left: 6px; vertical-align: -1px; }
 .need-acts .need-skip { margin-left: 6px; align-self: center; }
+
+.need-check { position: relative; margin-top: 12px; display: flex; width: fit-content; align-items: center; gap: 8px; font-size: 13px; line-height: 18px; color: var(--text-dim); cursor: default; }
+.need-check input { position: absolute; left: 0; top: 1px; width: 16px; height: 16px; margin: 0; opacity: 0; z-index: 1; }
+.need-check-box { width: 16px; height: 16px; box-sizing: border-box; border: 1px solid var(--line-strong); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; color: var(--text); }
+.need-check input:focus-visible + .need-check-box { border-color: var(--text-faint); }

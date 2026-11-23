@@ -57,8 +57,9 @@ function ruleBehindThisRun({ env = process.env, now = Date.now() }: RunOptions =
   const item = readWorkItem(project.dir, itemId, now);
   if (!item) throw new Error(`no thread ${itemId} in ${project.name}`);
 
+  // The label is one an agent can write on its own thread; the id is the app's.
   const ruleId = ruleIdOf(item);
-  if (!ruleId) {
+  if (!ruleId || !itemId.startsWith(`${ruleId}-`)) {
     throw new Error(`${itemId} is not a run of a repeating task, so it has no standing instruction to change`);
   }
   const rule = rules.get(project.dir, ruleId, now);
@@ -151,12 +152,40 @@ function theirWords(thread: WorkItem): string[] {
     .map((f) => String(thread[f] ?? ''));
 }
 
-function personAskedToStop(thread: WorkItem | null, words: unknown): boolean {
+/** Whether `words` are quoted from what the person wrote themselves on `thread`. */
+export function personSaid(thread: WorkItem | null | undefined, words: unknown): boolean {
   if (!thread || !(thread.labels ?? []).includes('founder') || !filedByThePerson(thread)) return false;
-  if (!STOP.test(String(words ?? ''))) return false;
   const own = theirWords(thread);
   return own.length > 0 && saidToClose({ title: '', body: '', answer: own.join('\n') }, words);
 }
+
+/** The thread this session's run is on: null when it names one that is gone, undefined off a thread. */
+export function threadOfThisRun({ env = process.env, now = Date.now() }: RunOptions = {}): WorkItem | null | undefined {
+  const itemId = String(env.ZERO_ITEM ?? '').trim();
+  if (!itemId) return undefined;
+  const home = projectOf(itemId, String(env.ZERO_PRODUCT ?? '').trim() || null);
+  return readWorkItem(home.dir, itemId, now);
+}
+
+function personAskedToStop(thread: WorkItem | null, words: unknown): boolean {
+  return STOP.test(String(words ?? '')) && personSaid(thread, words);
+}
+
+// The words that pick a task out by its listed name, before any colon: not the
+// schedule ("daily") and not the stop itself.
+const wordsOf = (s: unknown) => String(s ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+function nameWords(title: string): string[] {
+  return wordsOf(title.split(':')[0]).filter((w) => w.length >= 4 && !REGULAR.test(w) && !STOP.test(w));
+}
+
+// Their words must name the task, except on one of its own runs, where
+// "Switch it off" can only mean it.
+function wordsNameIt(thread: WorkItem, words: unknown, rule: RepeatRule): boolean {
+  if (ruleIdOf(thread) === rule.id) return true;
+  const said = new Set(wordsOf(words));
+  return nameWords(rule.title).some((w) => said.has(w));
+}
+const notNamed = (title: string) => `Nothing was stopped: the person's quoted words have to name the task ("${title}"), unless this thread is one of its runs. If they named it, quote those words in askedBecause; if not, ask them which task they mean.`;
 
 /**
  * End a repeating task the person asked to stop, found by its id or its name.
@@ -190,6 +219,7 @@ export function stopRepeatingTask(ask: StopRepeatingTask, { env = process.env, n
     throw new Error(`no repeating task is called "${which}". Running now: ${names.join(', ') || 'none'}.`);
   }
 
+  if (thread && !hit.rule.endedAt && !wordsNameIt(thread, ask.askedBecause, hit.rule)) throw new Error(notNamed(hit.rule.title));
   const rule = hit.rule.endedAt ? hit.rule : rules.endRule(hit.project.dir, hit.rule.id, now)!;
   return { repeat: rule.id, product: hit.project.id, label: rule.title, schedule: ruleLabel(rule), ended: true, endedAt: rule.endedAt! };
 }

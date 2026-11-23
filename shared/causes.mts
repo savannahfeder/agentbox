@@ -2,8 +2,8 @@
 //
 // A thread stuck on something outside its own work (a sign-in, the computer,
 // git or GitHub, a broken main) parks behind a cause row instead of asking the
-// person itself. The cause row is an ordinary row the app starts on its own;
-// the agent on it is the lead, who clears the cause or asks once for every
+// person itself. The cause row waits in Needs you for the person's reply,
+// since any agent can open one; the agent their reply starts is the lead, who clears the cause or asks once for every
 // thread behind it. Closing it is what lets those threads carry on, through
 // the waits every row already has (`blockedBy`, resumeFinishedWaits).
 
@@ -70,10 +70,21 @@ export function causeWord(n: number): string {
   return `${n} waiting`;
 }
 
-/** Where the cause is, for the Project column: its own project, or every project when its threads span more than one. */
-export function causeWhere(cause: CauseRow, waiting: readonly CauseRow[], ownName: string): string {
-  const products = new Set([cause.product, ...waiting.map((i) => i.product)].filter(Boolean));
-  return products.size > 1 ? 'All projects' : ownName;
+/** Where the cause is, for the Project column: the project most of its threads are in, and how many others. */
+export function causePlace(cause: CauseRow, waiting: readonly CauseRow[], nameOf: (slug: string) => string): { name: string; more: number } {
+  const counts = new Map<string, number>();
+  if (cause.product) counts.set(cause.product, 0);
+  for (const i of waiting) if (i.product) counts.set(i.product, (counts.get(i.product) ?? 0) + 1);
+  const places = [...counts].filter(([, n]) => n > 0);
+  if (!places.length) return { name: cause.product ? nameOf(cause.product) : '', more: 0 };
+  // Map order breaks ties: the cause's own project, then the first thread's.
+  const first = places.reduce((best, p) => (p[1] > best[1] ? p : best));
+  return { name: nameOf(first[0]), more: places.length - 1 };
+}
+
+export function causeWhere(cause: CauseRow, waiting: readonly CauseRow[], nameOf: (slug: string) => string): string {
+  const { name, more } = causePlace(cause, waiting, nameOf);
+  return more ? `${name} +${more}` : name;
 }
 
 /** The open cause rows, newest first. */

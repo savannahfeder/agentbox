@@ -85,6 +85,9 @@ export function readLastEngine(store: Storage | undefined = globalThis.localStor
   } catch { return fallback; }
 }
 
+/** Sent on the window when the agent is chosen somewhere other than a new-thread box, so an open box takes it up. */
+export const ENGINE_CHOSEN = 'agentbox:engine-chosen';
+
 export function writeLastEngine(id: string | null, store: Storage | undefined = globalThis.localStorage): void {
   try {
     // An explicit Claude pick differs from never having picked an agent.

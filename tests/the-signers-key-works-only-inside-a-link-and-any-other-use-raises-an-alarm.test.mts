@@ -36,10 +36,10 @@ describe('the signer\'s rights', () => {
     }
   });
 
-  it('may list runs, so a missing run file answers 404, and never sign-ins, so a stolen key cannot find one', () => {
+  it('may list runs and kept files, so a missing one answers 404, and never sign-ins, so a stolen key cannot find one', () => {
     const list = signerPolicy(where).Statement.filter((s) => [].concat(s.Action).includes('s3:ListBucket'));
     expect(list).toHaveLength(1);
-    expect(list[0].Condition.StringLike['s3:prefix']).toEqual(['runs/*']);
+    expect(list[0].Condition.StringLike['s3:prefix']).toEqual(['runs/*', 'files/*']);
   });
 });
 

@@ -5,7 +5,9 @@ import { router } from '../lib/router';
 import { useState, type ReactNode } from 'react';
 import { Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, SvgXml } from 'react-native-svg';
+import { faceSeed, facePaper } from '../../../shared/teammate-face.mts';
+import { faceSvg } from '../../../renderer/src/teammates/face-drawing';
 import type { Room, Teammate } from '../../../renderer/src/types';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import { mateDraft, useDraft } from '../lib/drafts';
@@ -17,19 +19,30 @@ import { appStore } from '../platform/persist';
 import { Markdown } from './Markdown';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
-import { Face } from './Groups';
+import { filtered } from '../platform/word-filter';
+import { ChatRules, Face, NewChatSheet } from './Groups';
 import { Gear } from './icons';
-import { footRoom, IconButton, T, TopBar } from './parts';
+import { footRoom, IconButton, Sheet, T, TopBar } from './parts';
 import { color, corner, font, size } from './theme';
 
 /** The corner of an AI teammate's dashed mark, as `--mate-corner` is on the web: round, like a person. */
 export const mateCorner = (s: number) => s / 2;
 
-/** A teammate's mark: its letter in a dashed ring, with a dot when it waits on you (TeammatesRail.tsx). */
-export function TeammateMark({ t, size: s = 20, waiting = false }: { t: Pick<Teammate, 'letter' | 'name'> | null; size?: number; waiting?: boolean }) {
+/** A teammate's mark: its face, with a dot when it waits on you (TeammatesRail.tsx); a dashed + for a new one. */
+export function TeammateMark({ t, size: s = 20, waiting = false }: { t: (Pick<Teammate, 'name'> & Partial<Pick<Teammate, 'id' | 'letter' | 'face'>>) | null; size?: number; waiting?: boolean }) {
+  if (!t) {
+    return (
+      <View style={{ width: s, height: s, borderRadius: mateCorner(s), borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
+        <T style={{ fontFamily: font.mono, fontSize: Math.max(9.5, Math.round(s * 0.36 * 2) / 2), color: color.faint }}>+</T>
+      </View>
+    );
+  }
+  const seed = faceSeed(t);
   return (
-    <View style={{ width: s, height: s, borderRadius: mateCorner(s), borderWidth: 1, borderStyle: 'dashed', borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
-      <T style={{ fontFamily: font.mono, fontSize: Math.max(9.5, Math.round(s * 0.36 * 2) / 2), color: t ? color.dim : color.faint }}>{t ? t.letter || t.name.slice(0, 1) : '+'}</T>
+    <View style={{ width: s, height: s }}>
+      <View style={{ width: s, height: s, borderRadius: s / 2, overflow: 'hidden', backgroundColor: facePaper(seed) }}>
+        <SvgXml xml={faceSvg(seed)} width={s} height={s} />
+      </View>
       {waiting && <View style={{ position: 'absolute', top: -4, right: -4, width: 7, height: 7, borderRadius: 3.5, backgroundColor: color.accent }} />}
     </View>
   );
@@ -200,6 +213,8 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
   const team = c.team;
   const mates = team ? matesInOrder(team.view.list) : [];
   const rooms: Room[] = g.on ? groupsInOrder(g.state.rooms) : [];
+  const [starting, setStarting] = useState(false);
+  const [rules, setRules] = useState(false);
   return (
     <>
       <TopBar title="Chats" right={<IconButton label="Settings" onPress={() => router.push('/settings')}><Gear /></IconButton>} below={tabs} />
@@ -220,9 +235,18 @@ export function ChatsPlace({ tabs, openGroup }: { tabs: ReactNode; openGroup: (i
               <ChatRow key={r.id} first={i === 0} lead={r.kind === 'group' ? <Face name={groupName(r)} size={32} /> : <View style={{ width: 32, alignItems: 'center' }}><T style={{ fontFamily: font.mono, fontSize: 17, color: color.faint }}>#</T></View>}
                 name={groupName(r)} line={r.unread > 0 ? 'New messages' : updatedWords(r.lastAt, c.now)} need={r.unread > 0} onPress={() => openGroup(r.id)} />
             ))}
+            <ChatRow first={rooms.length === 0} lead={<View style={{ width: 32, alignItems: 'center' }}><T style={{ fontSize: 20, color: color.faint }}>+</T></View>} name="New chat" onPress={() => (g.agreed ? setStarting(true) : setRules(true))} />
           </>
         )}
       </ScrollView>
+      {g.on && <NewChatSheet open={starting} close={() => setStarting(false)} mates={g.mates} start={async (people, name) => {
+        const out = await g.act('create', { people, name: filtered(name), kind: 'group' });
+        if (!out.error && typeof out.value === 'string') openGroup(out.value);
+        return out.error;
+      }} />}
+      <Sheet open={rules} close={() => setRules(false)}>
+        <View style={{ paddingTop: 12, paddingBottom: 8, marginHorizontal: -18 }}><ChatRules onAgree={() => { g.agree(); setRules(false); setStarting(true); }} /></View>
+      </Sheet>
     </>
   );
 }

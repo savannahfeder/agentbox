@@ -24,6 +24,7 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState, type Rea
 import { createPortal } from 'react-dom';
 import { ThreadPanel } from '../team/ThreadPanel';
 import { TeamContext } from '../team/people';
+import { AskAboutContext } from '../team/AsksLine';
 import { useReactionsNow, type Press } from '../team/reactions-now';
 import { api } from '../api';
 import { onPhone } from '../phone-screen';
@@ -52,8 +53,8 @@ import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { FileMarkOpener } from './FileMarkLine';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { catchUpDue } from '../../../shared/agent-import.mts';
-import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
+import { gettingReady } from '../../../shared/agent-import.mts';
+import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, footOf, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
 import { gapIndex } from '../../../shared/agents.mts';
 import { askMarkUnread, say } from '../team/chat-events';
 import { seenLine } from '../team/seen-line';
@@ -94,7 +95,9 @@ const REFRESH_MS = 8_000;
 // screen is the kind of drift this row exists to end.
 const THEM = 'The agent';
 
-export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk = null, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
+export function ItemThread({ askAbout = false, onOpenFileMark, item, engine, engineChoice, codexModels = [], codexModelDefault = null, session, opening, sending, filed = [], onOpenFiled, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk = null, onOpenOrigin, onSendNow, md, clean, onOpenDoc, chat = false, onQuote, onHandToAgent, thread, queue }: {
+  /** Whether a person can be asked about one of the agent's messages (team/AsksLine.tsx). */
+  askAbout?: boolean;
   /** What a "on onboarding-a.png, Pin 1" link in this thread opens. */
   onOpenFileMark?: (link: FileMarkLink) => void;
   /** One thing at a time (w-65bcefb857): the summary on top, the newest answer, the rest folded. */
@@ -227,7 +230,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // worker writes, because losing the messages she just went looking for every
   // eight seconds is the same fault wearing a timer.
   const [whole, setWhole] = useState(false);
-  useEffect(() => { setWhole(!!kept?.whole); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setWhole(kept ? !!kept.whole : false); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // The regular read below has only the newest runs; the middle needs them all.
   const [everyRun, setEveryRun] = useState<TraceSession[]>([]);
   useEffect(() => {
@@ -240,7 +243,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     return () => { live = false; };
   }, [item.product, item.id, whole]);
   const [earlierOpen, setEarlierOpen] = useState(false);
-  useEffect(() => { setEarlierOpen(!!kept?.earlier); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setEarlierOpen(kept ? !!kept.earlier : false); }, [item.product, item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Not keyed on the thread: on the render that changes thread these still hold
   // the last one's, and writing them then would file them under the new one.
   useEffect(() => { keepPlace(place, { earlier: earlierOpen, whole }); }, [earlierOpen, whole]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -407,7 +410,8 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   const signInHere = signInAsk && <SignInCard key={signInAsk.id} ask={signInAsk} cloud={session?.where === 'cloud'}
     open={(href) => { void api.openArtifactExternally({ product: item.product, src: href }); }}
     copy={(text) => { void navigator.clipboard?.writeText(text).then(() => say('Copied'), () => say('That did not copy.')); }}
-    answer={async (said) => { const r = await api.signInAnswer({ product: item.product, id: item.id, ask: signInAsk.id, ...said }); return r.ok ? null : r.error ?? 'That did not reach the agent. Try again.'; }} />;
+    answer={async (said) => { const r = await api.signInAnswer({ product: item.product, id: item.id, ask: signInAsk.id, ...said }); return r.ok ? null : r.error ?? 'That did not reach the agent. Try again.'; }}
+    choose={async (keep) => { const r = await api.signInKeep({ product: item.product, id: item.id, ask: signInAsk.id, keep }); return r.ok ? null : r.error ?? 'That did not reach the agent. Try again.'; }} />;
 
   // THE ANSWER, WHOLE, AT THE FOOT OF THE CONVERSATION.
   //
@@ -420,10 +424,13 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     ranWords({ engineChoice, ran: e.ran, codexModels, codexDefault: codexModelDefault });
   const ranSaid = outcome ? ranOf(outcome) : null;
   const answerAt = answerTurn(events, omitted, chat);
-  const unshipped = outcome?.field === 'note' && !!notShipped(item);
+  const foot = footOf(outcome, item);
+  const unshipped = foot === 'unshipped';
   const signInWhy = unshipped && !onPhone() && asksForGitHubSignIn(notShipped(item)?.why) ? notShipped(item)!.why : null;
   const answer = outcome && (
-    resultLeads(item) && outcome.field === 'result'
+    foot === 'app'
+      ? <div className="one-app-note" data-exchange={answerAt}>{md(clean(outcome.text))}</div>
+      : resultLeads(item) && outcome.field === 'result'
       ? <div className="outcome" data-exchange={answerAt}>{md(clean(outcome.text))}</div>
       : (
         <div className="appendix appendix-foot" data-exchange={answerAt}>
@@ -467,6 +474,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   // The app's own note ("Shipped to main as …") goes under the agent's answer rather than in its place.
   const byApp = !!queue && appWrote(outcome, item.wrote);
   const newest = queue ? newestAnswer(events, byApp ? null : outcome) : null;
+  const helper = newest?.fromId ? team?.byId.get(newest.fromId) ?? null : null;
   // While an agent works, its sentences are steps, not answers: drawn from where this round began.
   const working = !!queue && !!session;
   // Answered since (a reply or a pick the agent is working on): drawn from that answer down.
@@ -495,7 +503,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     </div>
   );
   // A chat just brought in is being written up as a thread (main/catch-up.mts). Its raw end stays readable until then.
-  if (queue && catchUpDue(item)) {
+  if (queue && gettingReady(item) && !earlierOpen) {
     return (
       <>
         {queueHead}
@@ -510,7 +518,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
     return (
       <>
         {queueHead}
-        <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} />
+        <QueueAnswer text={clean(newest.text)} md={md} name={pageTitle(item)} by={signer ? { t: signer, at: newest.at } : null} person={helper ? { p: helper, at: newest.at } : null} />
         <TeammateOffer item={item} />
         {byApp && outcome && <p className="one-app-note">{clean(outcome.text)}</p>}
         {afterList}
@@ -522,7 +530,7 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
   }
 
   return (
-    <FileMarkOpener.Provider value={onOpenFileMark ?? null}>
+    <AskAboutContext.Provider value={askAbout}><FileMarkOpener.Provider value={onOpenFileMark ?? null}>
       {queueHead}
       <Thread
         events={from >= 0 ? events.slice(from) : events}
@@ -601,6 +609,6 @@ export function ItemThread({ onOpenFileMark, item, engine, engineChoice, codexMo
       {/* AND WHAT THE NEWEST TURN FILED, under its own last word. */}
       {madeList(made.atFoot)}
       {askTurn < Math.max(from, 0) && askHere}
-    </FileMarkOpener.Provider>
+    </FileMarkOpener.Provider></AskAboutContext.Provider>
   );
 }

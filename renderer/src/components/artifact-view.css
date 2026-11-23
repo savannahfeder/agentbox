@@ -11,6 +11,15 @@
   padding-left: 84px;
 }
 :root[data-window="flat"] .av-top { padding-left: 16px; }
+/* The view cuts the whole window out of the drag region, so this bar is the
+   only place left to move the window from. Every child is cut again so its
+   controls and the Share panel hanging below take clicks; the name and the
+   spring hold none, so they drag too. */
+.av-top { -webkit-app-region: drag; }
+.av-top * { -webkit-app-region: no-drag; }
+.av-top .av-name, .av-top .av-spring { -webkit-app-region: drag; }
+/* Short of the Windows buttons, which sit over the other corner. */
+:root[data-window-buttons="right"] .av-top { padding-right: 150px; }
 /* The side pane's corner marks (direct-review.css), which only reach inside the main layout. */
 .av-top .doc-marks { gap: 6px; }
 .av-top :is(.doc-mark, .focus-bare) {
@@ -25,6 +34,21 @@
 /* The glyph, not its hit area, lines up with the content edge. */
 .av-top > .av-back { margin: 0 -4px 0 -6px; }
 .av-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+/* A name that renames takes clicks, so it cannot drag the window. */
+.av-top .av-name:is(.av-name-edit, .av-name-box) { -webkit-app-region: no-drag; }
+.av-name-edit {
+  height: 28px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: var(--radius);
+  background: none; font: inherit; text-align: left; cursor: text;
+}
+.av-name-edit:hover { background: var(--wash); }
+.av-name-box {
+  height: 28px; box-sizing: border-box; margin: 0 -6px; padding: 0 5px; max-width: 50vw;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg);
+  font: inherit; outline: none;
+}
+.av-name-box:focus { border-color: var(--underline); }
+/* Gives way before the name does. */
+.av-label { flex: 0 4 auto; min-width: 0; max-width: 60ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
 .av-versions { flex: none; display: inline-flex; align-items: center; gap: 4px; color: var(--text-dim); }
 .av-of { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; padding: 0 2px; white-space: nowrap; }
 .av-newest { flex: none; height: 24px; margin-left: 4px; padding: 0 6px; background: none; border: 0; border-radius: var(--radius); font: inherit; font-size: 13px; color: var(--text); white-space: nowrap; }
@@ -127,7 +151,6 @@
 .selection-bar .link-pop-btn { padding: 4px 8px; color: var(--text-dim); }
 .selection-bar-comment { display: inline-flex; align-items: center; gap: 6px; }
 
-
 .av-side { flex: none; width: 340px; display: flex; flex-direction: column; border-left: 1px solid var(--line); min-height: 0; }
 .av-verdict { flex: none; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .av-verdict-who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-dim); }
@@ -170,9 +193,6 @@
 .av-reply .av-note-head { font-size: 12.5px; }
 .av-reply .av-note-text { margin-top: 3px; font-size: 13px; }
 .av-reply-write { margin: 10px 0 0 9px; padding-left: 17px; border-left: 1px solid var(--line-strong); }
-/* Under a link's comments, on the cards' own edge. */
-.av-link-acts { margin: 0; padding: 0 10px; }
-.av-reply-write.av-link-reply { margin: 0 10px; }
 .av-reply-write .av-note-acts { justify-content: flex-end; margin-top: 6px; }
 .av-reply-write textarea {
   display: block; width: 100%; box-sizing: border-box; min-height: 32px; resize: none; padding: 6px 9px;
@@ -195,6 +215,10 @@
 }
 .av-unsent-dot, .av-note-sent.is-waiting::before { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .av-note-sent.is-waiting::before { content: ''; }
+.av-unsent-bar[data-state] { padding-right: 14px; }
+.av-unsent-bar[data-state="sending"] .av-unsent-dot { animation: pulse 1.2s ease-in-out infinite; }
+.av-unsent-bar[data-state="sent"] .av-glyph { color: var(--text-dim); }
+@media (prefers-reduced-motion: reduce) { .av-unsent-bar[data-state="sending"] .av-unsent-dot { animation: none; } }
 .av-unsent-send { background: var(--wash-strong); border-color: var(--text-faint); }
 .av-unsent-send kbd { margin-left: 6px; padding: 0; border: 0; background: none; font: 11px var(--mono); color: var(--text-dim); }
 .av-trouble { margin: 8px 16px 0; font-size: 12.5px; line-height: 1.4; color: var(--text); }

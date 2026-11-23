@@ -5,10 +5,8 @@
 
 import { itemThread } from '../../../renderer/src/item-thread';
 import { itemOptions, offerIsLive, optionsFrom, stripOptionsSection, type ParsedOption } from '../../../renderer/src/format';
-import { rowTitle } from '../../../renderer/src/list-rules';
 import { pageTitle } from '../../../renderer/src/one-thing-at-a-time';
-import { askHeading } from '../../../renderer/src/ask-line';
-import { phoneHistory, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
+import { phoneHistory, phoneRuns, type PhoneRows, type phoneView } from '../../../renderer/src/phone-rows';
 import { approvalReads } from '../../../renderer/src/approval-card';
 import { recapFor, resultLeads } from '../../../renderer/src/recap';
 import { withoutTrailingWork } from '../../../renderer/src/trailing-work';
@@ -16,6 +14,9 @@ import { herTurnEnds, herTurnStarts } from '../../../renderer/src/her-turns';
 import { filedOnTurn } from '../../../renderer/src/filed-in-thread';
 import { approvableFiled, doItHereWords, threadsMade } from '../../../renderer/src/threads-made';
 import { closeAsk } from '../../../renderer/src/close-asks-first';
+import { figuresFrom } from '../../../renderer/src/change-figures';
+import { referencedFiles } from '../../../renderer/src/referenced-files';
+import { agentSaidNotReady, changedFiles, onlyNamedFiles, saidNotToShip, shipOfferFor, shipOfferLive, standingFrom } from '../../../renderer/src/ship-offer';
 import { conversationGap, gapIndex } from '../../../shared/agents.mts';
 import { groupWork } from '../../../shared/work-lines.mts';
 import type { AgentSaid, AgentWork, ThreadStateWord, WorkItem } from '../../../renderer/src/types';
@@ -52,7 +53,10 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const mine = view.waiting.filter((w) => w.product === product && w.id === id);
   // A thread sent from here that the computer has not taken: its message is the first thing she said,
   // unless the title on the page already says all of it.
-  const message = String(item.body || item.title || '').trim();
+  // A one-line message is the title, so a body of only file links needs it put back on top.
+  const body = String(item.body ?? '').trim();
+  const onlyFiles = !!body && body.split('\n').every((l) => !l.trim() || /^!?\[[^\]]*\]\([^)]*\)$/.test(l.trim()));
+  const message = (onlyFiles && item.title && !String(item.title).startsWith('Attached: ') ? `${String(item.title).trim()}\n\n${body}` : String(item.body || item.title || '')).trim();
   const sent = item.waitsForMac && message && message !== pageTitle(item).trim() ? [{ at: item.createdAt ?? 0, text: message }] : [];
   const pending = [...sent, ...mine.map((w) => ({ at: w.at, text: w.text, ...(w.refused ? { refused: w.refused } : {}) }))];
   // A reply Agentbox Cloud took with the computer away says so (shared/cloud-kit.mts).
@@ -60,7 +64,7 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   // Taken, and not in the thread's copy yet: sent, and drawn until the copy has it.
   const sentAt = new Set(mine.filter((w) => w.sent).map((w) => w.at));
   const session = view.running.find((r: { itemId: string; product: string }) => r.itemId === id && r.product === product) ?? null;
-  const built = itemThread(lines, [], null, { whole, pending, me });
+  const built = itemThread(lines, phoneRuns(rows, product, id, view.aliases), null, { whole, pending, me });
   // The offer's own list comes out of the text while it is drawn as buttons
   // (Focus.tsx `cleanMessage`); "## Gist" is a heading old workers wrote.
   const live = offerIsLive(item);
@@ -101,9 +105,16 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
   const waitingFiled = filed.filter((f) => f.approve);
 
   const outcome = built.outcome ? { ...built.outcome, text: clean(built.outcome.text) } : null;
+  // What the last run changed, and the decision the desktop asks over it when the agent offered none (Focus.tsx `shipAsk`).
+  const change = (view.changes ?? {})[`${product}/${id}`] ?? null;
+  const figures = change ? figuresFrom(change) : null;
+  const dir = view.products.find((p) => p.slug === product)?.dir || null;
+  const shipAsk = !item.waitsForMac && shipOfferLive(item, { change: !!figures, running: !!session })
+    ? shipOfferFor(standingFrom(change), onlyNamedFiles(changedFiles(change), referencedFiles(item.result, item.note, item.body, item.answer, { dir }), dir), { held: saidNotToShip(item.body, item.answer) || agentSaidNotReady(item.result) })
+    : null;
   return {
     item,
-    title: rowTitle(item),
+    title: pageTitle(item),
     projectName: view.products.find((p) => p.slug === product)?.name ?? '',
     running: !!session,
     session,
@@ -119,9 +130,10 @@ export function threadOf(rows: PhoneRows, view: View, product: string, id: strin
     // A result an agent finished the thread on leads unlabelled (ItemThread.tsx).
     outcome: outcome && { ...outcome, label: resultLeads(item) && outcome.field === 'result' ? null : outcome.field === 'result' ? 'Result' : 'Latest checkpoint' },
     after: [...built.after, ...receiptsFor(view, product, id)].sort((a, b) => (a.at ?? 0) - (b.at ?? 0)),
-    options: (live ? itemOptions(item) : []) as ParsedOption[],
-    // The question the options answer, the options card's heading (OptionsOffer.tsx).
-    ask: live ? askHeading(item) : '',
+    options: (live ? itemOptions(item) : shipAsk?.options ?? []) as ParsedOption[],
+    // The choices are bare unless the ship offer asks its own question (Focus.tsx `bare`).
+    ask: shipAsk?.headed ? shipAsk.ask : '',
+    change: figures && change ? { ...figures, list: change.files, more: change.more ?? 0 } : null,
     parent,
     filed,
     filedOnTurn: placed.onTurn,

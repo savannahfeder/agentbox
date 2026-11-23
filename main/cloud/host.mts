@@ -56,7 +56,7 @@ let hosts = 0;
 // without JSON::PP.
 export function perlRunsTheShim(perl: string) {
   try {
-    return spawnSync(perl, ['-MIO::Socket::UNIX', '-MIO::Select', '-MMIME::Base64', '-MJSON::PP', '-MCwd', '-MPOSIX', '-e1'], { stdio: 'ignore', timeout: 10_000 }).status === 0;
+    return spawnSync(perl, ['-MIO::Socket::UNIX', '-MIO::Select', '-MMIME::Base64', '-MJSON::PP', '-MCwd', '-MPOSIX', '-e1'], { stdio: 'ignore', timeout: 10_000, windowsHide: true }).status === 0;
   } catch { return false; }
 }
 

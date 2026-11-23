@@ -77,7 +77,9 @@ function prebuildsDir() {
 }
 
 try {
-  const dir = prebuildsDir();
+  // Windows has no exec bit to fix and no spawn-helper to run: Node reports
+  // every file there as 666, so this would print a fix on every install.
+  const dir = process.platform === 'win32' ? null : prebuildsDir();
   if (!dir) process.exit(0);
   let fixed = 0;
   for (const platform of fs.readdirSync(dir)) {

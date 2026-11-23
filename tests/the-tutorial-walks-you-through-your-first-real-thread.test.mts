@@ -150,7 +150,7 @@ describe('the empty inbox during the tutorial', () => {
     const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(pages).toContain("{first ? 'Give an agent its first task' : 'Nothing needs you'}");
-    expect(app).toContain('<InboxClear slot={setClearSlot} first={firstTask(tour)} />');
+    expect(app).toContain('<InboxClear slot={setClearSlot} first={firstTask(tour)} sky={skyOnInbox && sky ? sky.art : null} />');
   });
   it('offers the suggestions only once the project has a folder', async () => {
     const fs = await import('node:fs');
@@ -168,7 +168,7 @@ describe('a tip on a screen still arriving', () => {
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     expect(tour).toMatch(/const SETTLE_MS = 500;/);
     expect(tour).toMatch(/const SEEN_MS = 1000;/);
-    expect(tour).toContain('if (was && seenFor >= SEEN_MS && !covered && learnedBy(was, before.current, screen))');
+    expect(tour).toContain("if (was && seenFor >= SEEN_MS && !covered && !(practiceId && was === 'answered') && learnedBy(was, before.current, screen))");
   });
   // Measured 2026-10-29 walking the first run with the machine busy: the
   // folder was chosen and the suggestions were up, and "Choose the folder this
@@ -264,15 +264,12 @@ describe('the practice tutorial does not offer itself on top', () => {
   // "It just strangely opened this modal layered on top. I don't think we
   // should ask people for permission." The practice round's offer on a new
   // project is for people who came through the old first run.
-  it('is never offered to someone the new first run took through', async () => {
-    const { offerOnNewProject } = await import('../renderer/src/tutorial.ts');
-    expect(offerOnNewProject({ made: true, walking: false, offered: false, touring: true })).toBe(false);
-    expect(offerOnNewProject({ made: true, walking: false, offered: false, touring: false })).toBe(true);
-  });
-  it('and the app says which people those are', async () => {
+  // Since 2026-11-21 there is no offer on a new project at all: the old walk it
+  // offered is gone, and ⌘K's Take the tutorial is this walkthrough.
+  it('is never offered on a new project, to anybody', async () => {
     const fs = await import('node:fs');
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toContain('touring: tourRef.current !== null,');
+    expect(app).not.toMatch(/TutorialOffer|offerOnNewProject|setOffer\(/);
   });
 });
 
@@ -448,7 +445,9 @@ describe('the folder chip before a choice', () => {
   // And then: "I thought it was actually a folder ... that can run code. It's just for personal tasks."
   it('says in the menu what a project with no folder is for', async () => {
     const box = await read();
-    expect(box).toContain('{!p.repoPath && <span className="tc-row-note">For personal tasks</span>}');
+    expect(box).toContain('!p.repoPath && <span className="tc-row-note">For personal tasks</span>}');
+    // A project a teammate shared has no folder here either, and says it is the team's.
+    expect(box).toContain('{p.team?.projectId ? <span className="tc-row-note">Shared with your team</span> : ');
   });
 });
 
@@ -486,7 +485,9 @@ describe('a key a tip counts', () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
     const key = tour.slice(tour.indexOf('const key = (e: KeyboardEvent) => {'), tour.indexOf("window.addEventListener('pointerdown'"));
-    expect(key).toContain('const later = (t: TourState) => setTimeout(() => onChange(t), 0);');
+    // And onto what is saved by then (tests/the-practice-thread-shows-its-agent-thinking-until-it-answers).
+    expect(tour).toContain('const learnSoon = (l: Lesson) => setTimeout(() => {');
+    expect(key).toContain('learnSoon(lessonOf(step));');
     expect(key).not.toMatch(/\bonChange\(finishLesson/);
   });
   it('E counts the close, and not the command bar', async () => {
@@ -529,7 +530,9 @@ describe('a thread the agent closed itself', () => {
   it('counts as the close, so the tutorial goes on to the command bar', async () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }");
+    // Once the absence has lasted (tests/a-newcomer-can-tell-they-are-in-the-walkthrough).
+    expect(tour).toContain("const closedByItsAgent = wanted === 'close' && !!document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done');");
+    expect(tour).toContain("{ onChange(finishLesson(tour, 'close')); return; }");
   });
 });
 

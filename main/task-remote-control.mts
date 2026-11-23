@@ -66,6 +66,9 @@ export async function taskRemoteControl(sup: RemoteSupervisor,product: string,id
  sup._remoteControls??=new Map();
  const current=()=>sup._remoteControls!.get(key);
  const publish=(state: string,extra: Partial<RemoteControlState>={})=>{const value={state,at:Date.now(),...extra};sup._remoteControls!.set(key,value);sup.onChange?.();return value;};
+ // The open thread asks every second, and a thread never put under remote
+ // control has nothing the row could add.
+ if(action==='status'&&!current())return null;
  const item=sup.store.readItem(product,id);
  if(!item||item.agent)throw Error('This task is not available.');
  if(action==='status')return current()??null;

@@ -24,8 +24,13 @@ import { memorySession } from '../main/team/session.mts';
 import { resolveArtifact } from '../main/artifact-path.mts';
 import { MAX_MESSAGE_FILE_BYTES } from '../main/team/sync.mts';
 
+// Every folder made here goes when its test ends: each test left a 41 MB
+// store in the temp folder, and one wide run on a cloud machine left 117.
+const made = [];
+const tmp = (prefix) => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); made.push(dir); return dir; };
+
 async function aMac(cloud, personId, { wrap = (b) => b } = {}) {
-  const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'carry-'));
+  const storeRoot = tmp('carry-');
   const accountRoot = path.join(storeRoot, 'accounts', 'a');
   fs.mkdirSync(accountRoot, { recursive: true });
   const store = await new Store({ storeRoot, accountId: 'a', accountRoot, products: [] }).init();
@@ -84,7 +89,10 @@ beforeEach(async () => {
   await maya.service.syncNow();
   await dev.service.syncNow();
 });
-afterEach(async () => { for (const m of [maya, dev, sofia]) await m.service.signOut(); });
+afterEach(async () => {
+  for (const m of [maya, dev, sofia]) await m.service.signOut();
+  for (const dir of made.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
 
 describe('wherever on the sender\'s computer the file lives', () => {
   it('opens a report named only by its bare name, for the reader and the sender', async () => {
@@ -103,7 +111,7 @@ describe('wherever on the sender\'s computer the file lives', () => {
   });
 
   it('opens a file in the project\'s code repository', async () => {
-    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'repo-'));
+    const repo = tmp('repo-');
     write(repo, 'docs/cut.mp4', 'film');
     const { slug } = maya.store.createProduct({ name: 'App', repoPath: repo });
     await maya.service.share(slug, { visibility: 'team' });

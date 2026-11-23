@@ -10,8 +10,9 @@
 //
 // This is a reading of the repo's own relative imports, not vitest's module
 // graph, and it is used only to decide whether that graph will be too big to
-// run and to rank what runs instead. Under the cap the gate still hands the
-// job to `vitest related`, which is the accurate answer.
+// run and to rank what runs instead. Under the cap the gate walks vitest's
+// graph as well (scripts/lib/tests-the-graph-reaches.mjs), which is the
+// accurate answer.
 //
 // Usage: node scripts/lib/tests-that-import.mjs <changed files...>
 //   prints one test file per line.

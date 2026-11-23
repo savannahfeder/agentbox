@@ -8,8 +8,10 @@ import type { ArtifactMark, FileElsewhere, FileMarks, Person, WorkItem } from '.
 import { ArtifactView, NO_MARKS, type ArtifactOpen } from './ArtifactView';
 import { useFileLine } from '../file-numbers';
 import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
-import { withRunsSaid } from '../runs-said';
+import { withRunsSaid } from '../../../shared/runs-said.mts';
 import type { TraceSession } from '../notes';
+
+const FOLLOW_MS = 3000;
 
 /** This thread's marks with those from the other copies, every pin numbered in the order it was made. */
 export function withElsewhere(own: FileMarks, elsewhere: FileElsewhere[]): FileMarks {
@@ -77,8 +79,8 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
   }, [item.product, item.id, copiesKey]);
   const marks = useMemo(() => withElsewhere(item.artifacts ?? NO_MARKS, elsewhere), [item.artifacts, elsewhere]);
   // Every version the files' lines hold, made here or anywhere else, numbered as Files numbers them.
-  // Only when this thread says more: asking on every change in the app rebuilt Files each time.
-  const numbered = useFileLine(item.product, item.id, lines.length, false);
+  // A cloud run's files land after its answer, so the open file asks again, though not on every change in the app.
+  const numbered = useFileLine(item.product, item.id, lines.length, FOLLOW_MS);
   const allLines = useMemo(() => (numbered.lines.length ? [...lines, ...numbered.lines as LedgerLine[]] : lines), [lines, numbered]);
   const people: Person[] = team ? [...team.byId.values()].filter((p) => !item.people?.length || item.people.includes(p.id)) : [];
   return <ArtifactView
@@ -97,11 +99,13 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
       return key ? api.filesPlaceMark({ key, mark }) : api.fileMark({ product: item.product, id: item.id, mark });
     }}
     withAgent={withAgent}
+    onHandToAgent={withAgent ? undefined : (files) => { onClose(); window.dispatchEvent(new CustomEvent('zero:hand-comments', { detail: { product: item.product, id: item.id, files } })); }}
     onNewVersion={async (_name, text, path, _id, since) => {
       const out = await api.fileNewVersion({ product: item.product, id: item.id, path, text, since });
       return out.ok ? null : out.error ?? 'That did not save.';
     }}
     onOutside={(src) => { void api.openArtifactExternally({ product: item.product, src }).then((r) => { if (!r.ok) onNotice(r.error || `${src} could not be opened.`); }); }}
+    onNotice={onNotice}
     onClose={onClose}
     onBeside={onBeside}
   />;

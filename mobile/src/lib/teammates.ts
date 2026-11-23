@@ -3,13 +3,20 @@
 // rules (renderer/src/teammates/chat-lines.ts), with your messages shown the
 // moment you send them.
 import {
-  answerOf, asksYou, chatWith, clockOf, dayOf, heldFor, heldTitle, idleLine, matesInOrder, nameOf, SAVED_VERBS, type ChatEntry,
+  answerOf, asksYou, chatWith, clockOf, dayOf, heldFor, heldTitle, idleLine, matesInOrder, nameOf, openedLines, SAVED_VERBS, sentWord, type ChatEntry,
 } from '../../../renderer/src/teammates/chat-lines';
 import { MAX_HOPS, teammateIdOf } from '../../../shared/teammates.mts';
 import { phoneSlug, type PhoneRows } from '../../../renderer/src/phone-rows';
 import type { Teammate, TeamChatLine, TeamRunLine, TeammatesView } from '../../../renderer/src/types';
 
-export { clockOf, matesInOrder };
+export { clockOf, matesInOrder, sentWord };
+
+/** The list a thread is on now (tabs.ts `phoneTabs`), for the word before it in a chat. */
+export function tabOfThread<T extends string>(tabs: Record<T, readonly { product: string; id: string }[]>, product: string, id: string): T | null {
+  return (Object.keys(tabs) as T[]).find((tab) => tabs[tab].some((r) => r.product === product && r.id === id)) ?? null;
+}
+
+const aThread = (e: ChatEntry | Pending) => e.kind === 'run' && (e.verb === 'sent' || e.verb === 'opened');
 
 export interface PhoneTeam {
   device: string;
@@ -205,9 +212,9 @@ export type ChatRow =
   | { kind: 'act'; key: string; e: ChatEntry };
 
 /** One teammate's chat as the phone draws it (TeammatesPage.tsx `ChatColumn`). */
-export function chatRows(view: TeammatesView, id: string, pending: readonly Pending[] = [], now = Date.now()): ChatRow[] {
+export function chatRows(view: TeammatesView, id: string, pending: readonly Pending[] = [], now = Date.now(), items: Parameters<typeof openedLines>[0] = []): ChatRow[] {
   const mine = pending.filter((p) => p.to.includes(id));
-  const entries: (ChatEntry | Pending)[] = [...chatWith(view, id), ...mine].sort((a, b) => a.ts - b.ts);
+  const entries: (ChatEntry | Pending)[] = [...chatWith(view, id), ...openedLines(items, id), ...mine].sort((a, b) => a.ts - b.ts);
   const rows: ChatRow[] = [];
   let day = '';
   let prevFrom = '';
@@ -216,8 +223,8 @@ export function chatRows(view: TeammatesView, id: string, pending: readonly Pend
   for (const e of entries) {
     const d = dayOf(e.ts, now);
     if (d !== day) { rows.push({ kind: 'day', key: `day-${e.id}`, label: d }); day = d; prevFrom = ''; sent = null; }
-    if (e.kind === 'run' && e.verb === 'sent' && sent) { sent.push(e as TeamRunLine); continue; }
-    if (!(e.kind === 'run' && e.verb === 'sent')) sent = null;
+    if (aThread(e) && sent) { sent.push(e as TeamRunLine); continue; }
+    if (!aThread(e)) sent = null;
     if (e.kind === 'act' && SAVED_VERBS.has(e.verb ?? '')) {
       if (!saved) rows.push({ kind: 'saved', key: e.id, ts: e.ts });
       saved = true;
@@ -233,7 +240,7 @@ export function chatRows(view: TeammatesView, id: string, pending: readonly Pend
       const answer = e.options?.length ? answerOf(view, e) : null;
       rows.push({ kind: 'msg', key: e.id, m: e, lead: e.from !== prevFrom, mine: e.from === 'you', waiting: !!p && !p.refused, refused: p?.refused ?? null, answered: answer?.text ?? null });
       prevFrom = e.from;
-    } else if (e.kind === 'run' && e.verb === 'sent') {
+    } else if (aThread(e)) {
       sent = [e as TeamRunLine];
       rows.push({ kind: 'sent', key: e.id, runs: sent });
       prevFrom = '';

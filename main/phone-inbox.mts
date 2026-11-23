@@ -34,7 +34,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
-import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mts';
+import { threadSnapshot, threadsWorthCarrying, snapshotKey, checkCommand, madeHere, hideSecrets, bytesOf, phoneChoices, phoneApproval, phoneRepeatsOf, phoneTeammatesOf, phoneChangeOf, SNAPSHOT_LIMITS, TEAMMATES_LIMITS } from '../shared/phone-snapshot.mts';
+import { changePath, readChangeSummary } from './code-change.mts';
+import { machineryDir } from './store/home.mts';
 import { phoneSettingsOf, settingRoute } from '../shared/phone-settings.mts';
 import { createPhoneUploads, UPLOAD_LIMITS } from './phone-uploads.mts';
 import type { PhoneBackend, ThreadSnapshot, UploadedFile } from './phone-uploads.mts';
@@ -44,7 +46,7 @@ import { runOfClaim, cloudCard } from '../shared/cloud-kit.mts';
 import { isCarried } from '../shared/cloud-carry.mts';
 import { heldForUndo } from '../shared/phone-undo.mts';
 import type { CarriedCommand, CarriedReply } from '../shared/cloud-carry.mts';
-import type { PhoneWait, TeammatesViewSeen } from '../shared/phone-snapshot.mts';
+import type { PhoneWait, SnapshotRun, TeammatesViewSeen } from '../shared/phone-snapshot.mts';
 import type { SettingChange, SettingsModel } from '../shared/phone-settings.mts';
 import { leftByAMove } from '../shared/move-thread.mts';
 
@@ -169,6 +171,7 @@ export interface PhoneInboxOptions {
   projects: () => PhoneProject[];
   listItems: (slug: string) => PhoneItem[];
   historyOf: (slug: string, id: string, options?: { all?: boolean }) => (PhoneHistoryLine | null)[];
+  runsOf?: (slug: string, id: string) => SnapshotRun[];
   apply: (command: PhoneCommand) => Promise<ChannelResult | null | undefined>;
   stateFile: string;
   home?: string;
@@ -177,6 +180,10 @@ export interface PhoneInboxOptions {
   log?: (line: string) => void;
   build?: typeof threadSnapshot;
   liveOf?: (slug: string, id: string) => PhoneLiveRun | null;
+  /** The saved change of the thread's last run, without its rows; null when it has none. */
+  changeOf?: (dir: string, id: string) => Parameters<typeof phoneChangeOf>[0];
+  /** Where that saved change is on disk, rows and all, so the phone can open its code. */
+  changeFileOf?: (dir: string, id: string) => string;
   waitsOf?: () => { byId?: Record<string, PhoneWait>; paused?: boolean } | null;
   approvalsOf?: () => PhoneApprovalAsk[];
   readSettings?: (() => SettingsModel | null | Promise<SettingsModel | null>) | null;
@@ -230,7 +237,22 @@ export interface PhoneState {
 type Snapshot = ReturnType<typeof threadSnapshot>;
 type Manifest = ReturnType<ReturnType<typeof createPhoneUploads>['manifest']>;
 type LiveCopy = { since: number; where: 'cloud' | 'mac'; doing: { label: string; startedAt: number }[]; at: number; movable?: boolean; runId?: string };
-type BuiltCopy = { inputs: string; key: string; live: LiveCopy | null; files: Manifest | null; askKey: string; waitKey: string; base: Snapshot | null };
+type BuiltCopy = { inputs: string; key: string; live: LiveCopy | null; files: Manifest | null; askKey: string; waitKey: string; changeKey: string; base: Snapshot | null };
+
+// A frozen row is the same object until its thread changes, and a thread's
+// lines are only added to: the same row with as many lines and the same first
+// and last is the same thread, with no need to write it all out again.
+const inputsKept = new WeakMap<object, { lines: number; first: unknown; last: unknown; inputs: string }>();
+/** What a thread's copy is built from, as one short text: the same row and lines give the same one. */
+export function inputsOf(item: unknown, history: unknown): string {
+  const row = typeof item === 'object' && item !== null && Object.isFrozen(item) ? item : null;
+  const lines = Array.isArray(history) ? history : null;
+  const was = row && lines ? inputsKept.get(row) : undefined;
+  if (was && was.lines === lines!.length && was.first === lines![0] && was.last === lines![lines!.length - 1]) return was.inputs;
+  const inputs = crypto.createHash('sha1').update(JSON.stringify(item)).update('\0').update(JSON.stringify(history)).digest('base64');
+  if (row && lines) inputsKept.set(row, { lines: lines.length, first: lines[0], last: lines[lines.length - 1], inputs });
+  return inputs;
+}
 
 export function createPhoneInbox({
   backend,
@@ -243,6 +265,8 @@ export function createPhoneInbox({
   projects,
   listItems, // (slug) -> folded rows
   historyOf, // (slug, id, { all }) -> the thread's history lines (store.readHistory); all of them when asked
+  // (slug, id) -> its runs' logs. Read only when a copy is rebuilt: a new run writes its pickup to the history.
+  runsOf = () => [],
   apply, // async (command) -> the handler's answer; throws to refuse
   stateFile,
   home = os.homedir(),
@@ -255,6 +279,8 @@ export function createPhoneInbox({
   build = threadSnapshot,
   // (slug, id) -> { since, where: 'mac' | 'cloud', doing: [{ label, startedAt }] } while an agent runs on it, else null.
   liveOf = () => null,
+  changeFileOf = (dir: string, id: string) => path.join(machineryDir(dir), changePath(id)),
+  changeOf = (dir: string, id: string) => { try { return readChangeSummary(changeFileOf(dir, id)); } catch { return null; } },
   // () -> { byId: { [id]: { state, tool?, until? } }, paused } (shared/phone-snapshot.mts phoneWaitsOf),
   // why each thread nothing runs on is waiting, read once a pass; none says nothing.
   waitsOf = () => null,
@@ -338,7 +364,6 @@ export function createPhoneInbox({
   // seconds. A copy is made of the row and its lines and nothing else, so the
   // same row and lines make the same copy.
   const built = new Map<string, BuiltCopy>();
-  const inputsOf = (item: unknown, history: unknown) => crypto.createHash('sha1').update(JSON.stringify(item)).update('\0').update(JSON.stringify(history)).digest('base64');
   // What each running thread's copy last said about the run, by thread.
   const lives = new Map<string, LiveCopy>();
   const liveNow = (sk: string, slug: string, id: string): LiveCopy | null => {
@@ -416,22 +441,26 @@ export function createPhoneInbox({
         const askKey = JSON.stringify(waitingOn);
         const wait = waitOf(item);
         const waitKey = wait ? JSON.stringify(wait) : '';
+        const change = p.dir && !item.agent ? phoneChangeOf(changeOf(p.dir, item.id), { home }) : null;
+        const changeKey = change ? JSON.stringify(change) : '';
         const was = built.get(sk);
         // Only the run or its files moved: the copy of the row and its lines is the one already made.
         let base = was?.inputs === inputs ? was.base : null;
-        const made = () => (base ??= build(item, history, SNAPSHOT_LIMITS, { home }));
-        const files = uploads && p.dir ? uploads.manifest(sk, made as () => ThreadSnapshot, { dir: p.dir, repoPath: p.repoPath, updatedAt: item.updatedAt ?? 0, base: inputs }) : null;
-        if (was && was.inputs === inputs && was.live === live && was.files === files && was.askKey === askKey && was.waitKey === waitKey && state.sent[sk] === was.key) continue;
+        const made = () => (base ??= build(item, history, SNAPSHOT_LIMITS, { home, runs: runsOf(p.slug, item.id) }));
+        const changeFile = change && p.dir ? { key: changePath(item.id), file: changeFileOf(p.dir, item.id) } : null;
+        const files = uploads && p.dir ? uploads.manifest(sk, made as () => ThreadSnapshot, { dir: p.dir, repoPath: p.repoPath, updatedAt: item.updatedAt ?? 0, base: `${inputs}\0${changeKey}`, change: changeFile }) : null;
+        if (was && was.inputs === inputs && was.live === live && was.files === files && was.askKey === askKey && was.waitKey === waitKey && was.changeKey === changeKey && state.sent[sk] === was.key) continue;
         let snap: Record<string, unknown> = live ? { ...made(), live } : made();
         if (waitingOn.length) snap = { ...snap, approvals: waitingOn };
         if (wait) snap = { ...snap, wait };
+        if (change) snap = { ...snap, change };
         // Where the files are on this Mac, written from her home as the words are, so the phone can follow a path the words give in full.
         if (files) {
           const attached = { dir: homeWritten(p.dir), ...(p.repoPath ? { repo: homeWritten(p.repoPath) } : {}), ...files };
           if (bytesOf(snap) + bytesOf(attached) < SNAPSHOT_LIMITS.bytes) snap = { ...snap, attached };
         }
         const k = snapshotKey(snap);
-        built.set(sk, { inputs, key: k, live, files, askKey, waitKey, base: live || files || waitingOn.length || wait ? base : null });
+        built.set(sk, { inputs, key: k, live, files, askKey, waitKey, changeKey, base: live || files || waitingOn.length || wait || change ? base : null });
         if (state.sent[sk] === k) continue;
         const failed = state.failed[sk];
         if (failed && failed.key === k && now() < failed.next) continue;
@@ -632,7 +661,7 @@ export function createPhoneInbox({
                 const ownAlerts = cmd.kind === 'setting' && !!alerts?.takesSetting(ready.payload);
                 const out: ChannelResult | null | undefined = ownAlerts ? await alerts!.setting(ready.payload as AlertsChange) : await apply(ready);
                 if (cmd.kind === 'new' && typeof out?.id === 'string') state.made[madeHere(cmd.id)] = { id: out.id, at: now() };
-                if (cmd.kind === 'setting' && !ownAlerts) changedSettings = true;
+                if (cmd.kind === 'setting' && !ownAlerts && (ready.payload as { key?: string } | null)?.key !== 'seen') changedSettings = true;
                 outcome = 'done';
               } catch (err) {
                 outcome = `refused: ${String((err as Thrown)?.message || err).slice(0, 200)}`;

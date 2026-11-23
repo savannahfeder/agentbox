@@ -24,6 +24,10 @@ export const waitingSince = (i: Partial<Pick<WorkItem, 'wrote' | 'updatedAt'>>):
 export const isUnread = (i: Dated, seenAt: Readonly<Record<string, number>>, since: number, me: string | null = null): boolean =>
   arrivedAt(i, me) > (seenAt[i.id] ?? since);
 
+/** Opened on the phone at `at`: read here from then, unless opened here since. */
+export const seenElsewhere = (seenAt: Readonly<Record<string, number>>, id: string, at: number): Readonly<Record<string, number>> =>
+  ((seenAt[id] ?? 0) >= at ? seenAt : { ...seenAt, [id]: at });
+
 /** Which of Mark Read and Mark Unread would change one of these threads, judged by the same rule as the dot. */
 export const readMoves = (items: readonly Dated[], seenAt: Readonly<Record<string, number>>, since: number) => ({
   read: items.some((i) => isUnread(i, seenAt, since)),
