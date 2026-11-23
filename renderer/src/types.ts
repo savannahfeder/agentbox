@@ -818,6 +818,8 @@ export interface RunningSession {
   startedAt: number;
   /** When the reply this cloud run is working on went in; absent on its first turn. Timers read `runningSince`. */
   turnStartedAt?: number;
+  /** How long its next command has waited for memory on this computer; absent while none waits. */
+  memoryHeldMs?: number;
   /**
    * WHICH CODING AGENT REALLY STARTED THIS RUN, written at the spawn — a fact,
    *  where `snapshot.engines.byItem` is the supervisor's answer for the NEXT

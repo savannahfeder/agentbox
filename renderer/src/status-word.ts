@@ -60,6 +60,8 @@ export interface StatusFacts extends LiveFacts {
 // they wear different marks.
 const WAITING_ITS_TURN = new Set(['queued', 'next', 'shipping']);
 
+export const MEMORY_HELD_LINE = 'This computer is short of memory, so the agent\'s next command waits for heavier work to finish.';
+
 /** A row on Later: one word for everything that comes back at the time beside
  *  it. `null` is a repeating task with no run going. */
 export function laterCell(item: WorkItem | null, facts: StatusFacts = {}): StatusCell {
@@ -113,6 +115,9 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   if (live?.state === 'working') {
     const cloud = facts.session?.where === 'cloud';
     const local = !cloud && away?.at === 'mac';
+    if (facts.session?.memoryHeldMs != null) {
+      return { word: 'Waiting for memory', mark: 'working', agent: true, live: true, cloud, title: MEMORY_HELD_LINE };
+    }
     return {
       word: local ? (away?.why === 'moving' ? 'Moving to cloud' : 'Working locally') : shortWord('working'), mark: 'working', agent: true, live: true, cloud,
       title: local ? titled(live.line) : live.line, ...(local ? { why } : {}),
@@ -139,7 +144,7 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   }
   if (live) {
     const waiting = WAITING_ITS_TURN.has(live.state) && live.state !== 'shipping' && (away?.at === 'wait-cloud' || away?.at === 'wait-mac');
-    const cell = says(shortWord(live.state), WAITING_ITS_TURN.has(live.state) ? 'queued' : 'held', true, waiting ? titled(live.line) : live.line);
+    const cell = says(live.word ?? shortWord(live.state), WAITING_ITS_TURN.has(live.state) ? 'queued' : 'held', true, waiting ? titled(live.line) : live.line);
     return waiting ? { ...cell, why } : cell;
   }
   if (state === 'waiting' && shipped) return shipped;

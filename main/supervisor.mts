@@ -9175,6 +9175,14 @@ export class Supervisor {
     // they have shipped or gone back to their agent.
     let shipping: string[] = [];
     try { shipping = this.shipQueue.waitingIds(allThreads(), this.store.listProducts?.() ?? []); } catch {}
+    // A run whose next command the memory gate holds, and for how long: its
+    // step was asked for, so it would read Running the whole time it waits.
+    const heldForMemory = new Map<string, number>();
+    try {
+      for (const w of this._memoryGate?.gate?.snapshot?.().waiting ?? []) {
+        if (w.item) heldForMemory.set(w.item, Math.max(heldForMemory.get(w.item) ?? 0, w.waitedMs));
+      }
+    } catch {}
     return {
       paused: this.paused,
       shipping,
@@ -9196,6 +9204,7 @@ export class Supervisor {
         product: s.product,
         startedAt: s.startedAt,
         ...('turnStartedAt' in s && s.turnStartedAt ? { turnStartedAt: s.turnStartedAt } : {}),
+        ...(heldForMemory.has(s.itemId) ? { memoryHeldMs: heldForMemory.get(s.itemId) } : {}),
         // WHICH CODING AGENT REALLY STARTED THIS ONE. `engineFacts` below is the
         // answer for the NEXT spawn on a row; this is the one that happened, so
         // the byline says what is in front of her rather than what would be next
