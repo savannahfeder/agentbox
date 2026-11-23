@@ -55,7 +55,9 @@ function labelIn(text: string, paths: readonly string[]): string | null {
   const ours = rows.findIndex((r) => r.paths.some((p) => paths.some((q) => samePath(p, q))));
   if (ours < 0) return null;
   const own = rows[ours].words;
-  if (own) return isLabel(own) ? own : null;
+  // Words on a line that names another file too are a sentence about both, with a hole where each name was.
+  const another = rows[ours].paths.some((p) => !paths.some((q) => samePath(p, q)));
+  if (own) return isLabel(own) && !another ? own : null;
   // The nearest line of words above or below a line that only names files, never past another file.
   const near = (i: number, by: 1 | -1): string | null => {
     let j = i + by;
