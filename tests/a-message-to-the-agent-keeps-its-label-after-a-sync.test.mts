@@ -57,9 +57,10 @@ describe("on Sam's copy", () => {
     expect(messageKind(find(events, 'staging key first'), { helper: true })).toEqual({ word: 'To the agent' });
     expect(tagOn(find(events, 'staging key first'), 'sam')).toContain('To the agent');
   });
+  // A hand-back now reads as the words Theo sent ("All set."), not "Theo handed this back."
   it("Theo's hand-back does not", () => {
-    expect(messageKind(find(events, 'handed this back'), { helper: true })).toBe(null);
-    expect(tagOn(find(events, 'handed this back'), 'sam')).toBe('');
+    expect(messageKind(find(events, 'All set.'), { helper: true })).toBe(null);
+    expect(tagOn(find(events, 'All set.'), 'sam')).toBe('');
   });
   it('an answer from someone not on the team, like an AI teammate, does not', () => {
     const ai = said([line(1, { body: 'Fix it.' }), line(2, { answer: 'Over to you.', from: { teammate: 'ai-1', name: 'Scout' } }, { source: 'system' })]);
@@ -79,7 +80,9 @@ describe("on Theo's copy", () => {
   });
   it('his hand-back is not relabelled', () => {
     const shown = shownOnTheirThread(said(synced), { me: 'theo', helping: false });
-    expect(messageKind(find(shown, 'handed this back'), { helper: true })).toBe(null);
+    const back = find(shown, 'All set.');
+    expect(back.says).toBe('hand-back');
+    expect(messageKind(back, { helper: true })).toBe(null);
   });
   it('before the sync, his comment reads as to the agent while he helps, and as a comment when he does not', () => {
     const before = [line(1, { body: 'Fix the login.' }, { by: 'sam' }), line(2, { comment: { text: 'Try the staging key first.' } }, { source: 'system', by: 'theo', uid: 'comment-1' })];

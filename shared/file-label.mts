@@ -1,6 +1,7 @@
 // What a thread's messages called a file: the short line a message put beside
 // it ("Before:", "Option 2: faces only"), so the big view can show it.
 import type { ThreadLine } from './artifact-marks.mts';
+import { isHandBack } from './thread-asks.mts';
 
 const EXT = 'png|jpe?g|gif|webp|svg|mp4|mov|m4v|webm|pdf|md|markdown|pptx|html?|csv|tsv';
 const PATHISH = String.raw`(?:\.?\/)?[\w.~-]+(?:\/[\w.~-]+)*\.(?:${EXT})`;
@@ -83,7 +84,8 @@ export function labelSaidFor(lines: readonly (ThreadLine | null | undefined)[] |
   for (const l of [...all.filter((x) => x.source === 'agent'), ...all.filter((x) => x.source !== 'agent')]) {
     for (const field of ['result', 'answer', 'note', 'body'] as const) {
       const text = l.patch?.[field];
-      if (typeof text !== 'string') continue;
+      // A hand-back names the files it approved; that is a verdict, not what anyone called them.
+      if (typeof text !== 'string' || (field === 'answer' && isHandBack(text))) continue;
       const found = labelIn(text, wanted);
       if (found) return found;
     }
