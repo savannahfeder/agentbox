@@ -5,7 +5,9 @@
 // kept too, because a freeze can start before a rotation and end after it.
 import { Session } from 'node:inspector';
 import { parentPort, workerData } from 'node:worker_threads';
-import { freezeFrom, writeFreeze } from './freeze-recorder.mts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { busyFrom, freezeFrom, writeBusy, writeFreeze, CPU_ASK } from './freeze-recorder.mts';
 import type { CpuProfile, FreezeLine } from './freeze-recorder.mts';
 
 interface FreezeWorkerData {
@@ -39,6 +41,23 @@ let previous: StoppedProfile | null = null; // { profile, offsetUs } of the last
 const seen: { fromUs: number; toUs: number }[] = [];     // freezes ended and not yet cut out of a profile
 let busy = false;
 
+// WHAT THE THREAD IS BUSY WITH WHEN IT IS NOT STUCK: the stretch just profiled,
+// written every quarter of an hour and whenever the ask file is there, so a
+// thread busy all day in pieces too short to be a freeze can be read too.
+const CPU_EVERY_MS = 15 * 60_000;
+let cpuAt = Date.now();
+function noteBusy(profiles: StoppedProfile[]) {
+  try {
+    const ask = path.join(dir, CPU_ASK);
+    const asked = fs.existsSync(ask);
+    if (!asked && Date.now() - cpuAt < CPU_EVERY_MS) return;
+    cpuAt = Date.now();
+    // The ask goes first, so a line that cannot be written is not tried every turn.
+    if (asked) fs.rmSync(ask, { force: true });
+    writeBusy(dir, { at: new Date().toISOString(), ...busyFrom(profiles, { appDir }) });
+  } catch { /* the freeze log matters more than this line */ }
+}
+
 async function start() {
   const before = nowUs();
   await post('Profiler.start');
@@ -51,6 +70,7 @@ async function rotate() {
   await start();
   const profiles = [previous, stopped].filter(Boolean) as StoppedProfile[];
   previous = stopped;
+  noteBusy(profiles);
   for (const f of seen.splice(0)) {
     const read = freezeFrom(profiles, { fromUs: f.fromUs, toUs: f.toUs, appDir });
     if (read.busy < BUSY_ENOUGH) continue;
