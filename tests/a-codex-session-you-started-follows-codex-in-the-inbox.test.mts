@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readCodexLive, codexConversation, runsIn, approvalAsked, CODEX_STALE_TURN_MS } from '../main/codex-live.mts';
+import { readCodexLive, codexConversation, runsIn, codexChildren, approvalAsked, CODEX_STALE_TURN_MS } from '../main/codex-live.mts';
 import { reachesInbox, progressAfterReply, putAway, replyIsSwallowed, agentAnswer, agentContext, agentRow } from '../shared/agents.mts';
 import { theirWords } from '../shared/session-layout.mts';
 
@@ -51,7 +51,7 @@ function write(id: string, lines: string[], mtime: number) {
 }
 const name = (id: string, thread: string) => fs.appendFileSync(path.join(codex, 'session_index.jsonl'), JSON.stringify({ id, thread_name: thread, updated_at: iso(NOW) }) + '\n');
 let running: string[] = [];
-const live = (now = NOW) => readCodexLive({ home, codexDirs: [codex], now, isRunning: (c) => running.includes(c) });
+const live = (now = NOW) => readCodexLive({ home, codexDirs: [codex], now, isRunning: (c: string) => running.includes(c) });
 const one = (id: string, now = NOW) => live(now).find((a) => a.sessionId === id)!;
 
 const ASK = 'move the config to the new loader, keep the public settings the same';
@@ -354,17 +354,38 @@ describe('reading every refresh stays cheap', () => {
 });
 
 describe('telling a granted command from one still waiting', () => {
-  const ps = ['/sbin/init', '/usr/bin/node /x/tools/false-alarm.mjs --ls', '/bin/bash -lc git grep "Book your first"', 'sleep 45'];
-  it('a command its shell is running is granted', () => {
-    expect(runsIn(ps, 'git grep "Book your first"')).toBe(true);
-    expect(runsIn(ps, 'sleep 45')).toBe(true);
+  const table = [
+    '    1     0 /sbin/init',
+    '  100     1 /usr/local/bin/codex',
+    '  110   100 /bin/bash -lc git grep "Book your first"',
+    '  111   110 git grep Book your first',
+    '  200     1 /bin/zsh',
+    '  210   200 npm test',
+    '  300     1 tmux -L power send-keys -t work -l please run git status --short',
+    '  400     1 /opt/codex/bin/codex app-server --listen',
+    '  410   400 /bin/bash -lc sleep 30 && git log -1 --oneline',
+  ].join('\n');
+  const kids = codexChildren(table).map(({ command }) => ({ command, cwd: '/w/web' }));
+  it('only processes Codex started count', () => {
+    expect(codexChildren(table).map((k) => k.pid).sort()).toEqual([110, 111, 410]);
+  });
+  it('a command Codex is running is granted', () => {
+    expect(runsIn(kids, 'git grep "Book your first"', '/w/web')).toBe(true);
+  });
+  it('the same command in your own terminal is not Codex running it', () => {
+    expect(runsIn(kids, 'npm test', '/w/web')).toBe(false);
+    expect(runsIn(kids, 'git status --short', '/w/web')).toBe(false);
   });
   it('a short command found inside some other line is not', () => {
-    expect(runsIn(ps, 'ls')).toBe(false);
-    expect(runsIn(ps, 'git grep')).toBe(false);
+    expect(runsIn(kids, 'ls', '/w/web')).toBe(false);
+    expect(runsIn(kids, 'git grep', '/w/web')).toBe(false);
+  });
+  it('two sessions asking for the same command: allowing one does not allow the other', () => {
+    expect(runsIn(kids, 'sleep 30 && git log -1 --oneline', '/w/web')).toBe(true);
+    expect(runsIn(kids, 'sleep 30 && git log -1 --oneline', '/w/pay')).toBe(false);
   });
   it('no command, no match', () => {
-    expect(runsIn(ps, '')).toBe(false);
+    expect(runsIn(kids, '', '/w/web')).toBe(false);
   });
 });
 

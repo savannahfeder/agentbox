@@ -253,30 +253,81 @@ export function codexStatus(fold: CodexFold, mtime: number, now: number): 'busy'
 
 interface Owner { slug?: string | null; name?: string | null; repoPath?: string | null }
 
+/** A process Codex started, with the folder it runs in when that can be read. */
+export interface CodexChild { command: string; cwd: string | null }
+
+/** The processes under a Codex process, out of `ps -o pid=,ppid=,command=`. */
+export function codexChildren(table: string): (CodexChild & { pid: number })[] {
+  const rows = new Map<number, { ppid: number; command: string }>();
+  for (const line of table.split('\n')) {
+    const m = line.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+    if (m) rows.set(Number(m[1]), { ppid: Number(m[2]), command: m[3].trimEnd() });
+  }
+  const codex = (cmd: string) => /(^|\/)codex(\s|$)|\bcodex app-server\b/.test(cmd);
+  const out: (CodexChild & { pid: number })[] = [];
+  for (const [pid, row] of rows) {
+    if (codex(row.command)) continue;
+    let up = row.ppid;
+    for (let i = 0; i < 8 && up > 1; i++) {
+      const parent = rows.get(up);
+      if (!parent) break;
+      if (codex(parent.command)) { out.push({ pid, command: row.command, cwd: null }); break; }
+      up = parent.ppid;
+    }
+  }
+  return out;
+}
+
+function cwdOf(pids: number[]): Promise<Map<number, string>> {
+  const found = new Map<number, string>();
+  if (!pids.length) return Promise.resolve(found);
+  if (process.platform === 'linux') {
+    for (const pid of pids) { try { found.set(pid, fs.readlinkSync(`/proc/${pid}/cwd`)); } catch { /* gone */ } }
+    return Promise.resolve(found);
+  }
+  return new Promise((resolve) => {
+    execFile('/usr/sbin/lsof', ['-a', '-d', 'cwd', '-Fpn', '-p', pids.join(',')], { timeout: 3_000, encoding: 'utf8', windowsHide: true }, (_err, out) => {
+      let pid = 0;
+      for (const l of String(out ?? '').split('\n')) {
+        if (l.startsWith('p')) pid = Number(l.slice(1));
+        else if (l.startsWith('n') && pid) found.set(pid, l.slice(1));
+      }
+      resolve(found);
+    });
+  });
+}
+
 // Codex writes nothing between asking to run a command and the command
-// finishing, so a granted command is told from a pending one by the command
-// being in the process list. Read in the background, at most every few seconds.
-let ps: { at: number; lines: string[]; busy: boolean } = { at: 0, lines: [], busy: false };
-export function runningCommands(now = Date.now()): string[] {
+// finishing, so a granted command is told from a pending one by Codex running
+// it. Read in the background, at most every few seconds.
+let ps: { at: number; children: CodexChild[]; busy: boolean } = { at: 0, children: [], busy: false };
+export function codexRunning(now = Date.now()): CodexChild[] {
   if (now - ps.at > 3_000 && !ps.busy) {
     ps.busy = true;
-    execFile('/bin/ps', ['-Aww', '-o', 'command='], { timeout: 3_000, maxBuffer: 16 << 20, encoding: 'utf8', windowsHide: true }, (err, out) => {
-      ps = { at: Date.now(), lines: err ? ps.lines : String(out).split('\n'), busy: false };
+    execFile('/bin/ps', ['-Aww', '-o', 'pid=,ppid=,command='], { timeout: 3_000, maxBuffer: 16 << 20, encoding: 'utf8', windowsHide: true }, (err, out) => {
+      if (err) { ps = { ...ps, at: Date.now(), busy: false }; return; }
+      const kids = codexChildren(String(out));
+      void cwdOf(kids.map((k) => k.pid)).then((cwds) => {
+        ps = { at: Date.now(), children: kids.map((k) => ({ command: k.command, cwd: cwds.get(k.pid) ?? null })), busy: false };
+      });
     });
   }
-  return ps.lines;
+  return ps.children;
 }
 /**
- * Whether some process is running that command: Codex hands it to a shell
- * (`bash -lc <command>`), so a process line ends with it. A short command
- * like `ls` appears inside half the lines on a machine, so containing it is
- * not enough (a power tester's open approval read as granted).
+ * Whether Codex is running that command for a session in that folder. Codex
+ * hands it to a shell (`bash -lc <command>`), so its line ends with it. Only a
+ * process Codex started counts, in the session's own folder: a short `ls` is
+ * inside half the lines on a machine, your own `npm test` in another terminal
+ * is not Codex's, and two sessions can ask for the same command (power testers).
  */
-export function runsIn(lines: readonly string[], command: string): boolean {
+export function runsIn(children: readonly CodexChild[], command: string, cwd: string): boolean {
   const c = command.trim();
-  return !!c && lines.some((l) => { const t = l.trimEnd(); return t === c || t.endsWith(` ${c}`); });
+  if (!c) return false;
+  const here = (d: string | null) => !d || d === cwd || d.startsWith(`${cwd}${path.sep}`) || cwd.startsWith(`${d}${path.sep}`);
+  return children.some((k) => { const t = k.command.trimEnd(); return (t === c || t.endsWith(` ${c}`)) && here(k.cwd); });
 }
-const commandRuns = (command: string) => runsIn(runningCommands(), command);
+const commandRuns = (command: string, cwd: string) => runsIn(codexRunning(), command, cwd);
 
 export interface CodexLiveOptions {
   home?: string;
@@ -285,8 +336,8 @@ export interface CodexLiveOptions {
   now?: number;
   /** Session ids this app is running, which are its own work. */
   ours?: Set<string>;
-  /** Whether a command is running on this machine now. */
-  isRunning?: (command: string) => boolean;
+  /** Whether Codex is running a command for a session in that folder now. */
+  isRunning?: (command: string, cwd: string) => boolean;
 }
 
 const kept = new Map<string, { size: number; mtimeMs: number; value: ReturnType<typeof readCodexSession> }>();
@@ -322,7 +373,7 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
       if (!fold.asked.length && !firstSaid) continue;
       const prev = byId.get(meta.id);
       if (prev && prev.lastActiveAt >= Math.max(fold.lastActiveAt, st.mtimeMs)) continue;
-      const granted = !!fold.approval && isRunning(fold.approval.command);
+      const granted = !!fold.approval && isRunning(fold.approval.command, meta.cwd);
       const status = codexStatus(granted ? { ...fold, approval: null } : fold, st.mtimeMs, now);
       const asked = fold.asked.length ? fold.asked : [{ at: meta.startedAt, text: firstSaid }];
       byId.set(meta.id, {
@@ -360,15 +411,15 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
 }
 
 /** The whole conversation of one Codex session, for "Show the full conversation". */
-export function codexConversation(file: string, { now = Date.now(), isRunning = commandRuns }: { now?: number; isRunning?: (command: string) => boolean } = {}): { ok: true; turns: ThreadEvent[]; omitted: number; total: number } | { ok: false; reason: string } {
+export function codexConversation(file: string, { now = Date.now(), isRunning = commandRuns }: { now?: number; isRunning?: (command: string, cwd: string) => boolean } = {}): { ok: true; turns: ThreadEvent[]; omitted: number; total: number } | { ok: false; reason: string } {
   const read = readCodexSession(file, { whole: true });
   if (!read) return { ok: false, reason: 'That Codex conversation could not be read.' };
-  const { fold } = read;
+  const { fold, meta } = read;
   let mtime = 0;
   try { mtime = fs.statSync(file).mtimeMs; } catch { mtime = 0; }
   // A permission it is waiting on is its newest word, though Codex keeps it in a tool call.
   const a = fold.approval;
-  const waits = a && !isRunning(a.command) && codexStatus(fold, mtime, now) === 'waiting';
+  const waits = a && !isRunning(a.command, meta.cwd) && codexStatus(fold, mtime, now) === 'waiting';
   const turns = waits ? [...fold.events, { who: 'it' as const, at: fold.lastActiveAt, text: [a.reason && `**${a.reason}**`, a.command && `\`\`\`\n${a.command}\n\`\`\``].filter(Boolean).join('\n\n') }] : fold.events;
   return { ok: true, turns, omitted: 0, total: turns.length };
 }
