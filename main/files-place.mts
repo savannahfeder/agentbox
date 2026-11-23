@@ -118,7 +118,7 @@ type HistoryReader = (id: string, o: { max?: number }) => readonly ThreadLine[];
  */
 export interface FileSizes { bytes: number | null; onMac: number; older: number; movable: number; trashable: boolean; cloud?: boolean; poster?: string | null }
 
-export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null; title?: string } & FileSizes;
+export type ListedFile = Omit<LinedFile, 'chain' | 'notes' | 'approvals' | 'seen'> & { folder: string | null; folderFollows?: boolean; opened: string | null; title?: string; versionNames?: string[] } & FileSizes;
 
 export type MarkAnswer =
   | { ok: true; wrote?: { product: string; id: string } }
@@ -1112,8 +1112,10 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const sizes = await sizesOf(f, roots);
       const title = lib.titleOf(f.key) ?? (filed ? lib.titleOf(filed.key) : null);
       const icon = lib.iconOf(f.key) ?? (filed ? lib.iconOf(filed.key) : null);
+      // The file is listed under its first name; a thread may show a later one, and search finds it by that too.
+      const versionNames = [...new Set(chain.map((v) => v.name))].filter((n) => n && n !== row.name);
       // A newest version in the cloud draws its poster, not an older version still here.
-      return { ...row, ...(title ? { title } : {}), ...(icon ? { icon } : {}), project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
+      return { ...row, ...(title ? { title } : {}), ...(icon ? { icon } : {}), ...(versionNames.length ? { versionNames } : {}), project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
     })).then((all) => all.filter((f) => f.opened || f.cloud || (f.kind !== 'page' && f.kind !== 'code')));
     consider();
     const projects: string[] = [];

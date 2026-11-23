@@ -318,6 +318,8 @@ export interface PlacedFile {
   name: string;
   /** The name a person gave it in Files; `name` stays its name on disk. */
   title?: string;
+  /** Its later versions' own names, when they differ from `name`. */
+  versionNames?: string[];
   /** The icon a person picked for its tile. */
   icon?: string;
   kind: FileKind | null;
