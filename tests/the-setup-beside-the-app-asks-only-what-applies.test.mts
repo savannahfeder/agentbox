@@ -59,11 +59,10 @@ describe('the looks offered', () => {
   it('puts the look you have first, then Match my system, then the dark orange sky', () => {
     expect(lookChoices('sage', true).slice(0, 3)).toEqual(['sage', 'match', 'ember']);
   });
-  // F-207 (QA session 41, Nov 9 2026): setup left out Light purple sky, which
-  // Settings offers, so the two lists disagreed.
-  it('offers every sky Settings offers, the light purple one too', () => {
+  // F-207 (QA session 41, Nov 9 2026): setup left out a sky Settings offers,
+  // so the two lists disagreed.
+  it('offers every sky Settings offers', () => {
     for (const sky of SKY_THEMES) expect(lookChoices('light', true)).toContain(sky.id);
-    expect(lookChoices('dusk-light', true)[0]).toBe('dusk-light');
   });
   it('lists each look once', () => {
     const l = lookChoices('ember', true);

@@ -128,8 +128,8 @@ export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */
-const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'mountains', 'sage', 'dusk-light', 'light', 'dark'];
-const LIGHT_SKIES = ['mountains', 'sage', 'dusk-light'];
+const LOOK_ORDER = [MATCH_SKY, 'ember', 'dusk', 'aurora', 'mountains', 'sage', 'light', 'dark'];
+const LIGHT_SKIES = ['mountains', 'sage'];
 /** The look you have first, then Match my system, then every sky Settings offers.
  *  A sky is drawn only on Home, so without it the choice is Light or Dark. */
 export function lookChoices(current: string, skies: boolean): string[] {

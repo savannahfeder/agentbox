@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
 import { machineryPath } from '../main/store/home.mts';
-import { traceLines } from '../renderer/src/terminal.ts';
+import { traceLines } from '../shared/trace-lines.mts';
 import {
   PRACTICE_ANSWER, PRACTICE_FLAG, PRACTICE_NAME, PRACTICE_ROWS, PRACTICE_SLUG, PRACTICE_TASK,
 } from '../shared/first-run-practice.mts';

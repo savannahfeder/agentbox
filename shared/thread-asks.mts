@@ -9,6 +9,7 @@
 // Handing back is closing the task with words and a verdict. The thread stays
 // the owner's throughout: their computer runs it, and it comes back to their
 // Needs you saying what was said.
+import { toldBy } from './answers.mts';
 import { isTaskRow, taskGiver } from './team-rules.mts';
 import { handedFrom } from './thread-link.mts';
 import type { AskPatch, Verdict } from './work-items.mts';
@@ -16,7 +17,7 @@ import type { AskPatch, Verdict } from './work-items.mts';
 export type AskKind = AskPatch['kind'];
 export type Ask = AskPatch;
 
-interface AskRow {
+export interface AskRow {
   id: string;
   status?: string;
   assignee?: string | null;
@@ -217,6 +218,10 @@ const HANDED_BACK = /^\S+ (?:handed this back|reviewed this(?: and it looks good
 /** Whether words on a thread are a hand-back `handedBackWords` wrote. */
 export const isHandBack = (text: string | null | undefined): boolean => HANDED_BACK.test(String(text ?? ''));
 
+// Nothing runs on a teammate's hand-back until the owner replies, even once a
+// run's own status has replaced the hold (`heldForHer`).
+export const handBackWaits = (item: Parameters<typeof toldBy>[0] & { answer?: string | null }): boolean => !!toldBy(item) && isHandBack(item?.answer);
+
 /**
  * A hand-back as one reader sees it: the stored words name both people, so the
  * asker reads "You asked" and the helper "You reviewed this".
@@ -229,11 +234,18 @@ export function handBackReadBy(text: string, reader: 'asker' | 'helper' | 'other
 }
 
 /** The first lines of the task the helper gets: who asked, for what, and the step if one was picked. */
+const REVIEW_LEAD = 'Say whether it looks good or what to change.';
+const helpLead = (owner: string, helper: string | null) => `${helper ? `${helper}, write` : 'Write'} to ${owner}'s agent on ${owner}'s thread. A reply here goes to ${owner}.`;
+const LEAD = /(^|\n\n)(?:Say whether it looks good or what to change\.|(?:\S+, write|Write) to (\S+)'s agent on \2's thread\. A reply here goes to \2\.)(?=\n\n|$)/g;
+
 export function askBody({ kind, owner, helper = null, note, step }: { kind: AskKind; owner: string; helper?: string | null; note: string; step?: string | null }): string {
   // The line over the message says who asked and what for; this says only what it means.
-  const lead = kind === 'help'
-    ? `${helper ? `${helper}, write` : 'Write'} to ${owner}'s agent on ${owner}'s thread. A reply here goes to ${owner}.`
-    : 'Say whether it looks good or what to change.';
+  const lead = kind === 'help' ? helpLead(owner, helper) : REVIEW_LEAD;
   const quoted = step?.trim() ? step.trim().split('\n').map((l) => `> ${l}`).join('\n') : '';
   return [note.trim(), quoted, lead].filter(Boolean).join('\n\n');
+}
+
+/** An ask's words without the line `askBody` says only to the person asked: what an agent is handed. */
+export function withoutAskLead(text: string): string {
+  return text.replace(LEAD, '').replace(/^\n\n/, '');
 }

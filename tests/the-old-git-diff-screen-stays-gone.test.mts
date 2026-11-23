@@ -67,7 +67,9 @@ describe('the code an agent wrote comes out of the conversation, never out of gi
     for (const f of files) {
       // 2026-09-16: an explicit /diff command is approved migration parity.
       // The automatic task diff screen remains absent.
-      if (f === 'git-change.mts' || f === 'task-commands.mts') continue;
+      // handed-commits.mts lists only the NAMES of files a carried branch
+      // touches, to refuse one that changes what starts an agent; it shows no code.
+      if (f === 'git-change.mts' || f === 'task-commands.mts' || f === 'handed-commits.mts') continue;
       const src = code(read(path.join('main', f)));
       expect(src, `${f} runs git diff`).not.toMatch(/'diff'|"diff"|git diff/);
     }

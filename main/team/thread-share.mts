@@ -23,7 +23,7 @@ import path from 'node:path';
 import { artifactRoots, resolveArtifact } from '../artifact-path.mts';
 import { bytesOf, hideSecrets } from '../../shared/phone-snapshot.mts';
 import { isShared, runnerOf } from '../../shared/team-rules.mts';
-import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, threadFiles } from '../../shared/artifact-marks.mts';
+import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, TEAMMATE_MARK, threadFiles } from '../../shared/artifact-marks.mts';
 import { saveNextVersion } from '../file-version.mts';
 import { MAX_MESSAGE_FILE_BYTES } from './sync.mts';
 import { MAX_SHARED_SENT_BYTES as MAX_SENT_BYTES, PART_BYTES } from '../../shared/carried-files.mts';
@@ -125,7 +125,7 @@ export interface ThreadShareOptions {
   /** A teammate's name by their id, carried on their comment for the owner's agent. */
   nameOf?: (personId: string) => string | null | undefined;
   /** True when a comment on your thread was taken as words to its agent, so it is not filed as a comment too. */
-  relay?: (comment: ThreadComment, thread: { item: PhoneItem; product: TeamProduct }) => boolean;
+  relay?: (comment: ThreadComment, thread: { item: PhoneItem; product: TeamProduct }, orElse: () => void) => boolean;
 }
 
 export interface ThreadShare {
@@ -528,7 +528,7 @@ export function createThreadShare({
 
   const asLine = (row: ThreadFileMark): (SharedLine & { uid: string; patch: { artifact: Mark } }) | null => {
     const artifact = cleanMark(row.mark);
-    return artifact ? { id: row.threadId, ts: row.at, source: 'system', by: row.by, uid: `mark-${row.id}`, patch: { artifact } } : null;
+    return artifact ? { id: row.threadId, ts: row.at, source: 'system', by: row.by, uid: `${TEAMMATE_MARK}${row.id}`, patch: { artifact } } : null;
   };
 
   /** Everything marked on one teammate's thread: what its owner published, what the cloud holds, what is waiting to go. */
@@ -644,15 +644,18 @@ export function createThreadShare({
     if (!unsaid.length && fileMarks.every((m) => m.owner !== me || m.by === me || deliveredMarks.has(m.id))) return;
     const threads = listThreads();
     let added = 0;
+    // The name is for the owner's agent, which has no team list to look it up in.
+    const file = (c: ThreadComment, dir: string) => {
+      const name = nameOf(c.by);
+      return disk.appendForeignLines(dir, [{
+        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
+      }]);
+    };
     for (const c of unsaid) {
       const thread = threads.get(c.threadId);
       if (!thread) continue;
-      if (relay?.(c, thread)) { delivered.add(c.id); added += 1; continue; }
-      // The name is for the owner's agent, which has no team list to look it up in.
-      const name = nameOf(c.by);
-      added += disk.appendForeignLines(thread.product.dir, [{
-        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
-      }]);
+      if (relay?.(c, thread, () => { if (file(c, thread.product.dir)) onChange(); })) { delivered.add(c.id); added += 1; continue; }
+      added += file(c, thread.product.dir);
       delivered.add(c.id);
     }
     for (const m of fileMarks) {

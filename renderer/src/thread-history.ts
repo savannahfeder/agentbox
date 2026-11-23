@@ -22,7 +22,7 @@ import { readNotes, type Notes, type TraceSession } from './notes';
 import { commandPrompt } from '../../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../../shared/engines.mts';
 import { instructionOf } from '../../shared/repeats.mts';
-import { baseName, familyName, filesInLines, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
+import { baseName, familyName, filesInLines, fromATeammatesCopy, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
 import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
@@ -323,6 +323,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       if (mark.do === 'note' && mark.id) {
         const n = (pinsSoFar.get(mark.file ?? '') ?? 0) + (mark.place?.kind === 'pin' || hasSpot(mark.place) ? 1 : 0);
         pinsSoFar.set(mark.file ?? '', n);
+        // A teammate's note addressed to nobody waits for their reply, which says it (TeammateThread `notesWithYourReply`).
+        if (fromATeammatesCopy(line.uid) && mark.wait && !(mark.mentions ?? []).some((m) => m !== line.by)) continue;
         events.push({
           at, who: 'you', said: 'Commented', words: mark.text ?? '', message: true,
           fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}), ...(mark.wait && !sentNotes.has(mark.id) && !(mark.mentions ?? []).some((m) => m !== line.by) ? { unsent: true as const } : {}) },
@@ -603,6 +605,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         // repeated once per attempt over a thread out of usage
         // (tests/an-out-of-usage-thread-does-not-say-it-handed-this-back).
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
+        // Nor is the app reopening the row for a teammate's words (`tellItem`).
+        if (line.source === 'system' && events.at(-1)?.from && events.at(-1)?.field === 'answer') continue;
         const said = mine ? 'You sent it back' : 'It handed this back';
         // One press can write the reopening twice (the notes path does), so the same words within a second are one.
         const last = events.at(-1);

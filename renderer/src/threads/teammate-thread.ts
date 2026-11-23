@@ -1,14 +1,15 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
 import type { AgentEvent, LinkCommentWaiting, ThreadCard } from '../types';
-import { handBackReadBy, isHandBack } from '../../../shared/thread-asks.mts';
-import { filesInLines, threadFiles, versionForPath, type ThreadLine } from '../../../shared/artifact-marks.mts';
+import { askIsOpen, askOf, handBackReadBy, isHandBack, type AskRow } from '../../../shared/thread-asks.mts';
+import { filesInLines, otherFilesInLines, otherKind, placeWords, threadFiles, versionForPath, type FileNote, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 /**
  * The owner's thread as you read it: what you wrote to their agent is yours and
  * says so, both your comment before their copy passes it on and the line it
  * writes once it has (`from` you on an answer), which outlives the ask.
  */
-export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping, owner = '' }: { me: string | null; helping: boolean; owner?: string }): AgentEvent[] {
+export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping, owner = '' }: { me: string | null; helping: boolean | ((at: number) => boolean); owner?: string }): AgentEvent[] {
+  const helped = typeof helping === 'function' ? helping : () => helping;
   return events.map((e) => {
     if (e.kind || !me) return e;
     // The owner's copy wrote "You asked" for its owner; here the reader is the helper.
@@ -17,7 +18,21 @@ export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping,
       const { from: _from, fromId: _fromId, ...rest } = e;
       return { ...rest, who: 'you' as const, by: me, says: 'to-agent' as const };
     }
-    return helping && e.says === 'comment' && e.by === me ? { ...e, says: 'to-agent' as const } : e;
+    return e.says === 'comment' && e.by === me && helped(e.at) ? { ...e, says: 'to-agent' as const } : e;
+  });
+}
+
+/**
+ * Whether a help ask on you covered words you wrote on this thread at `at`, so
+ * the owner's copy passes them to its agent (`helpAskCovering` on that side).
+ */
+export function helpedWhen(rows: readonly AskRow[], me: string | null, owner: string, thread: string, at: number): boolean {
+  return rows.some((r) => {
+    const a = askOf(r);
+    if (!a || a.kind !== 'help' || a.owner !== owner || a.thread !== thread || !me || r.assignee !== me) return false;
+    if (at < (r.wrote?.ask?.ts ?? r.createdAt ?? 0)) return false;
+    if (r.status !== 'done' && r.wrote?.status?.by === me) return false;
+    return askIsOpen(r) || at <= (r.wrote?.verdict?.ts ?? r.wrote?.status?.ts ?? r.updatedAt ?? 0);
   });
 }
 
@@ -30,6 +45,41 @@ export function keyInTheBox(e: { key: string; ctrlKey?: boolean; metaKey?: boole
   if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return null;
   if (!reviewing) return 'send';
   return (e.ctrlKey || e.metaKey) && words.trim() ? 'changes' : null;
+}
+
+/**
+ * What folds behind "Show earlier messages" and what is drawn under the newest
+ * answer: anything said after it, so a reply you just sent is never folded.
+ * `answer` is the event lifted out, or null when the answer is the row's result.
+ */
+export function aroundTheAnswer<E extends { at: number }>(events: readonly E[], answer: E | null, answerAt: number | null): { before: E[]; after: E[] } {
+  const rest = events.filter((e) => e !== answer);
+  if (answerAt == null) return { before: rest, after: [] };
+  return { before: rest.filter((e) => e.at <= answerAt), after: rest.filter((e) => e.at > answerAt) };
+}
+
+/**
+ * Whether words you handed back are still on their way to the owner's thread,
+ * so the page draws them itself: until a line said since holds them. The line
+ * is stamped by the owner's computer, whose clock may run a little behind.
+ */
+const CLOCKS_DIFFER_MS = 2 * 60_000;
+export function stillOnItsWay(events: readonly AgentEvent[], sent: { at: number; text: string } | null): boolean {
+  if (!sent) return false;
+  return !events.some((e) => !e.kind && e.at >= sent.at - CLOCKS_DIFFER_MS && String((e as { text?: string }).text ?? '').includes(sent.text));
+}
+
+/**
+ * The notes you left on a teammate's files while their review was on you, held
+ * for your reply: said under each file's name, in the order you wrote them.
+ */
+export function notesWithYourReply(notes: readonly FileNote[], names: readonly { id: string; name: string }[], me: string | null, since: number): { text: string; ids: string[] } {
+  const held = notes.filter((n) => n.by === me && n.wait && !n.sent && !n.resolved && !n.toAgent && n.ts >= since && !(n.mentions ?? []).some((m) => m !== me));
+  const byFile = new Map<string, FileNote[]>();
+  for (const n of held) byFile.set(n.file, [...(byFile.get(n.file) ?? []), n]);
+  const nameOf = new Map(names.map((v) => [v.id, v.name]));
+  const parts = [...byFile].map(([file, these]) => [`Notes on ${nameOf.get(file) ?? 'a file'}:`, ...these.map((n) => `- ${placeWords(n)}: ${n.text}`)].join('\n'));
+  return { text: parts.join('\n\n'), ids: [...byFile.values()].flat().map((n) => n.id) };
 }
 
 /**
@@ -108,18 +158,22 @@ export function endWasInView(scroll: { scrollHeight: number; scrollTop: number; 
 /** Under the "Waiting on Dev" at the top of a teammate's thread: what that means, in one line. */
 export function standingLine(state: ThreadCard['state'], owner: string, waits: string | null): string | null {
   if (state === 'running') return `${owner}'s agent is working on it.`;
-  if (state === 'waiting') return waits ? 'It starts again when that is done.' : `The agent stopped. ${owner} looks at it next.`;
+  if (state === 'waiting') return waits ? 'It starts again when that is done.' : `Nothing is running. ${owner} looks at it next.`;
   return null;
 }
 
 /**
- * The files beside a teammate's thread: each file once, at its newest version,
- * with the notes on any of its versions. The same families the file view
- * pages through (shared/artifact-marks.mts), so a note counted here is one it shows.
+ * The files beside a teammate's thread, pages and tables among them: each file
+ * once, at its newest version, with the notes on any of its versions. The same
+ * families the file view pages through (shared/artifact-marks.mts), so a note
+ * counted here is one it shows. A name said in words is no copy of the file, so
+ * the newest version drawn is the newest one that has a folder in its path.
  */
 export function filesOnThread(lines: readonly ThreadLine[], notes: { file: string }[]): { src: string; name: string; notes: number }[] {
-  return threadFiles(filesInLines(lines)).map((family) => {
-    const newest = family.versions[family.versions.length - 1];
+  const pages = otherFilesInLines(lines).filter((f) => otherKind(f.path) !== 'code');
+  return threadFiles([...filesInLines(lines), ...pages]).map((family) => {
+    const copies = family.versions.filter((v) => v.path.includes('/'));
+    const newest = (copies.length ? copies : family.versions)[(copies.length ? copies : family.versions).length - 1];
     const ids = new Set(family.versions.map((v) => v.id));
     return { src: newest.path, name: newest.name, notes: notes.filter((n) => ids.has(n.file)).length };
   });

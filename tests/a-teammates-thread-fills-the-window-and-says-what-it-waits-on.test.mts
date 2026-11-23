@@ -19,8 +19,10 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const rule = (css, sel) => css.match(new RegExp(`^${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`, 'm'))?.[1] ?? '';
 
 describe('what it waits on, in words', () => {
-  it('says whose move it is when the agent has stopped', () => {
-    expect(standingLine('waiting', 'Dev', null)).toBe('The agent stopped. Dev looks at it next.');
+  // A power test, 2026-11-22: four times a reviewer who had just handed a review back read "The agent
+  // stopped" and took it for something they had broken. Nothing stopped; nothing is running.
+  it('says whose move it is when no agent is running on it', () => {
+    expect(standingLine('waiting', 'Dev', null)).toBe('Nothing is running. Dev looks at it next.');
   });
   it('says it is moving while an agent runs', () => {
     expect(standingLine('running', 'Dev', null)).toBe("Dev's agent is working on it.");
@@ -37,7 +39,7 @@ describe('what it waits on, in words', () => {
   it('heads the page with the state and the line', () => {
     const card = { personId: 'dev', threadId: 't', visible: true, title: 'Reminder emails', project: 'Sandbox', state: 'waiting', priority: 2, problem: 'x', progress: null, solution: null, blockedBy: [], blocks: [], people: null, updatedAt: 1_000 };
     const html = renderToStaticMarkup(React.createElement(TeammateStanding, { card, person: { id: 'dev', name: 'Dev Rao' } }));
-    expect(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).toBe('Waiting on Dev The agent stopped. Dev looks at it next.');
+    expect(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).toBe('Waiting on Dev Nothing is running. Dev looks at it next.');
   });
 });
 
