@@ -1,13 +1,15 @@
 // PURE. A sentence that names pictures and films stays whole: each file stays in
 // it as its name, and what draws or plays sits in one row under it.
 type Node = {
-  type: string; value?: string; url?: string; alt?: string | null;
+  type: string; value?: string; url?: string; alt?: string | null; title?: string | null;
   children?: Node[];
   data?: { hName?: string; hProperties?: Record<string, unknown> };
 };
 
 export const MEDIA_ROW = 'media-row';
 export const NAME_ONLY = 'data-name-only';
+/** A link's title asking for its file's name alone, with nothing drawn: `[a.png](<a.png> "name")`. */
+export const JUST_ITS_NAME = 'name';
 
 const DRAWN = /\.(?:png|jpe?g|gif|webp|svg|mp4|mov|m4v|webm)(?:[?#]|$)/i;
 const ELSEWHERE = /^(?:https?|data|mailto):/i;
@@ -19,6 +21,7 @@ const baseName = (at: string) => at.split(/[?#]/)[0].split('/').pop() ?? at;
 
 /** Where the node points, when it is something that draws or plays. */
 function drawnAt(node: Node): string | null {
+  if (node.data?.hProperties?.[NAME_ONLY]) return null;
   if (node.type === 'image' || node.type === 'link') return isFile(node.url) ? node.url! : null;
   if (node.type === 'inlineCode') return isFile(node.value) && !/\s/.test(node.value!) ? node.value! : null;
   return null;
@@ -46,7 +49,8 @@ export function mediaUnderSentences(tree: Node): void {
   for (let i = 0; i < list.length; i += 1) {
     const node = list[i];
     if (node.type !== 'paragraph') { mediaUnderSentences(node); continue; }
-    const kids = node.children ?? [];
+    node.children = (node.children ?? []).map((k) => (k.type === 'link' && k.title === JUST_ITS_NAME && isFile(k.url) ? nameOf(k, k.url!) : k));
+    const kids = node.children;
     const media = kids.filter((k) => drawnAt(k));
     if (!media.length) continue;
     const hasWords = kids.some((k) => !drawnAt(k) && isWords(k));

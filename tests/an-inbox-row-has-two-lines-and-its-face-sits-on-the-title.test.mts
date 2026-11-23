@@ -110,6 +110,20 @@ describe('on the desktop', () => {
   it('every face has the agents\' semi-rounded corner and one soft edge', () => {
     expect(rule('.th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, i.mate-face, .harness-mark)')).toMatch(/border-radius: 7px;/);
     expect(desk).toMatch(/--face-ring: color-mix\(in srgb, var\(--text\) 8%, transparent\);/);
+    expect(rule('.th-table .row:not(.th-head) .th-slot :is(.tm-av, .harness-mark)')).toMatch(/border-color: var\(--face-ring\);/);
+  });
+
+  // Approved on the thread (claude-tile-2-white-light.png, version 1): the grey tile read as orange behind
+  // the starburst, so Claude Code's and Codex's marks sit on a white tile, at the size they had. A
+  // teammate's initials keep the app's own grey tile. A bare 22px mark shipped first by mistake.
+  it("Claude Code's and Codex's marks sit on a white tile at their usual size", () => {
+    expect(rule('.th-table .row:not(.th-head) .th-slot .harness-mark')).toMatch(/^ ?background: var\(--surface\); ?$/);
+    expect(rule('.th-table .row:not(.th-head) .th-slot .harness-mark > svg')).toMatch(/width: 19\.68px; height: 19\.68px;/);
+  });
+
+  it("a teammate's initials keep the app's own grey tile", () => {
+    expect(desk).not.toMatch(/\.th-slot span\.tm-av \{/);
+    expect(desk).not.toMatch(/\.th-slot :is\([^)]*\.tm-av[^)]*\) \{[^}]*background/);
   });
 
   it('status, project, priority and time span both lines and sit in their middle', () => {

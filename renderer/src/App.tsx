@@ -2448,6 +2448,7 @@ export default function App() {
   const sky = skyPicked && skyPicked.dark === darkWindow ? skyPicked : null;
   useEffect(() => {
     const root = document.documentElement;
+    if (sky?.dark) root.dataset.skyDark = ''; else delete root.dataset.skyDark;
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
     else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }  }, [sky]);
   // GLASS (Alpha features): only a window main/window-glass.mts can blur behind goes see-through.
@@ -9023,8 +9024,8 @@ export default function App() {
           onSetTune={setTune}
           onResetTune={resetTune}
           cloud={snap.cloud?.setUp ? snap.cloud : null}
-          onCloudSignIn={(key, email) => {
-            void api.cloudSignIn({ action: 'start', engine: 'claude', key });
+          onCloudSignIn={(key, email, engine = 'claude') => {
+            void api.cloudSignIn({ action: 'start', engine, key });
             setCloudSignInAs(email);
             setCloudSetupOpen(true);
           }}

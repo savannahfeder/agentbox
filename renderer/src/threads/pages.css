@@ -705,6 +705,8 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
   .th-table .row:not(.th-head) .th-cell-title > .th-slot { position: absolute; left: 0; top: 5px; width: 24px; height: 24px; margin: 0; display: flex; align-items: flex-start; justify-content: center; transform: translateY(-0.36px); }
   .th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, .th-mate, .harness-mark, .agent-face) { width: 24px; height: 24px; }
   .th-table .row:not(.th-head) .th-slot .tm-av { line-height: 22px; font-size: 10px; }
+  /* A white tile: on grey, the starburst's soft edges made the tile read as orange. */
+  .th-table .row:not(.th-head) .th-slot .harness-mark { background: var(--surface); }
   .th-table .row:not(.th-head) .th-slot .harness-mark > svg { width: 19.68px; height: 19.68px; }
   .th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, i.mate-face, .harness-mark) { border-radius: 7px; }
   .th-table .row:not(.th-head) .th-slot :is(.tm-av, .harness-mark) { border-color: var(--face-ring); }
