@@ -9,17 +9,13 @@
 // pages. It is an app, so each crash is a box, and its Reopen button starts
 // it again without the keychain flags. The headless shell installed beside it
 // is a bare program, not an app, and loaded the same pages each time. Measured
-// by which binary the two pickers return with both installed.
+// by which binary the picker returns with both installed.
+//
+// The test drives' own picker (findChrome) is tested in the skills repository,
+// not here: a task folder's copy of that repository can be older than its
+// remote, and this file once failed a ship by reading the older copy.
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { hiddenBrowser, startableChrome } from '../shared/hidden-browser.mts';
-
-const ROOT = path.resolve(import.meta.dirname, '..');
-// The skills are a private checkout, absent on GitHub and in a public clone.
-const CDP = path.join(ROOT, '.claude/skills/verify-agentbox/scripts/cdp.mjs');
-const cdp = fs.existsSync(CDP) ? await import(pathToFileURL(CDP).href) : null;
 
 const CFT = '/cache/chromium-1254/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing';
 const SHELL = '/cache/chromium_headless_shell-1254/chrome-headless-shell-mac-arm64/chrome-headless-shell';
@@ -40,19 +36,5 @@ describe('the hidden browser on a Mac', () => {
 
   it('is none when neither is installed', () => {
     expect(hiddenBrowser({ forTesting: () => [], shells: () => [] })).toBe(null);
-  });
-});
-
-describe.skipIf(!cdp)('the browser a test drive starts on a Mac', () => {
-  it('is the headless shell when Chrome for Testing is installed beside it', () => {
-    expect(cdp.findChrome('darwin', {}, undefined, () => [CFT], () => [SHELL])).toBe(SHELL);
-  });
-
-  it('is Chrome for Testing when VERIFY_CHROME names it', () => {
-    expect(cdp.findChrome('darwin', { VERIFY_CHROME: CFT }, undefined, () => [CFT], () => [SHELL])).toBe(CFT);
-  });
-
-  it('is Chrome for Testing only when there is no headless shell', () => {
-    expect(cdp.findChrome('darwin', {}, undefined, () => [CFT], () => [])).toBe(CFT);
   });
 });
