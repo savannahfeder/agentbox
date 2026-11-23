@@ -3,10 +3,12 @@
 // What broke: on 2026-11-23 the question "was it Agentbox or something else"
 // took five one-off scripts over a week of minute lines, and the answer was
 // not the one assumed. Of 1,101 short minutes on a 16 GB Mac, Agentbox was
-// over its allowance in 448; in 360 only other programs were big (a backup at
-// 3 to 4 GB in most), and the app froze nine times in a hundred of those
-// against forty-one in a hundred where Agentbox was. A count of short minutes
-// alone had been read as Agentbox's doing for days.
+// over its allowance in 448; in 182 only other programs were big (a backup at
+// 3.9 GB in most); and in 471 neither was, the computer's everyday load with
+// the app itself at a median 3.0 GB. The app froze in 37 of a hundred minutes
+// where Agentbox was over, 6 where only other programs were big, 10 where
+// neither was, and 3 of the normal ones. A count of short minutes alone had
+// been read as Agentbox's doing for days.
 //
 // scripts/read-memory-log.mjs answers it for each day from the app's own
 // logs. Its arithmetic is pinned here because a reading that adds up wrong
@@ -110,6 +112,27 @@ describe('one day', () => {
   it('names the other programs behind the short minutes that were theirs', () => {
     expect(day.others[0]).toEqual({ name: 'bztransmit', minutes: 3, meanMb: 4200 });
     expect(day.others.map((o) => o.name)).toContain('Google Chrome Helper');
+  });
+
+  it('puts what the window said of its own lag with the minute it was said in', () => {
+    const lag = (longMs: number, slow: number, worst: number) => ({ windowLag: { longMs, longest: longMs, slow, worst } });
+    const said = summariseDay([
+      { ...line(1, 'normal', { others: USUAL }), ...lag(400, 1, 120) },
+      { ...line(3, 'tight', { app: 4000, tasks: TESTERS, others: USUAL }), ...lag(9000, 7, 2600) },
+      { ...line(4, 'tight', { app: 4000, tasks: TESTERS, others: USUAL }), ...lag(3050, 2, 900) },
+      { ...line(5, 'tight', { app: 2000, others: BACKUP }), ...lag(1500, 0, 0) },
+      // A minute no window spoke in adds nothing.
+      line(6, 'tight', { app: 2000, others: BACKUP }),
+    ], [], { ramMb: RAM });
+    expect(said.window).toEqual({
+      minutes: 4, worstMs: 2600,
+      heldS: { agentbox: 12.1, both: 0, others: 1.5, neither: 0, unlisted: 0, normal: 0.4 },
+      slow: { agentbox: 9, both: 0, others: 0, neither: 0, unlisted: 0, normal: 1 },
+    });
+  });
+
+  it('a day from before the window said anything has no reading of it, not a nought', () => {
+    expect(day.window).toBe(null);
   });
 
   it('a day with nothing short says so in noughts, not blanks', () => {

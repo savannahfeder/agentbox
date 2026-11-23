@@ -201,6 +201,7 @@ import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
+import type { WindowLagCollector } from './window-lag.mts';
 import { StartBudget, cloudStartPressure } from './cloud/start-budget.mts';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
 import { asksToClose } from '../shared/asks-to-close.mts';
@@ -1356,6 +1357,8 @@ export class Supervisor {
   declare count: ((name: string, props?: Record<string, unknown>) => void) | undefined;
   declare idleMs: (() => number | null | undefined) | undefined;
   declare stalls: { take(): Record<string, unknown> | undefined; longestNow?(): number } | undefined;
+  /** What the window said of its own lag this minute (main/window-lag.mts). */
+  declare windowLag: WindowLagCollector | undefined;
   /** The app's own memory and CPU (main/own-use.mts); the desktop sets it. */
   declare ownUse: (() => unknown) | undefined;
   declare hostRuns: boolean | undefined;
@@ -1908,7 +1911,7 @@ export class Supervisor {
     clearInterval(this._memoryLogTimer);
     this._memoryLog ??= new MemoryLog({
       dir: path.join(this.userDir, 'memory-log'),
-      facts: () => ({ running: this._load(), capacity: this._capacity(), holding: this.startHoldStatus().holding, ...this.stalls?.take() }),
+      facts: () => ({ running: this._load(), capacity: this._capacity(), holding: this.startHoldStatus().holding, ...this.stalls?.take(), ...this.windowLag?.take() }),
       own: () => this.ownUse?.() ?? null,
     });
     this._memoryLogTimer = setInterval(() => this._memoryLog!.tick(), 60_000);

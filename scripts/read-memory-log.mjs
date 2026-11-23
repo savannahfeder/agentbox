@@ -57,8 +57,10 @@ function ranked(rows) {
  * One day's minute lines and freeze lines as counts. `over` is every minute
  * Agentbox was over its allowance; `causes` splits the short minutes;
  * `freezeS` is the seconds the app's main thread was held in each kind of
- * minute; `tasks` and `programs` are behind the minutes over the allowance,
- * `others` behind the short minutes other programs had a hand in.
+ * minute and `window` the same for the window's own thread, with the clicks
+ * and keys it answered late; `tasks` and `programs` are behind the minutes
+ * over the allowance, `others` behind the short minutes other programs had a
+ * hand in.
  */
 export function summariseDay(lines, freezes = [], { ramMb }) {
   const minutes = (lines ?? []).filter((l) => l && 'pressure' in l);
@@ -73,10 +75,21 @@ export function summariseDay(lines, freezes = [], { ramMb }) {
   const out = { minutes: minutes.length, short: 0, critical: 0, swapping: 0, over: 0, overBeforeShort: 0 };
   const overRows = { tasks: [], programs: [] };
   const otherRows = [];
+  const windowMs = { ...causes, normal: 0 };
+  const windowSlow = { ...causes, normal: 0 };
+  const window = { minutes: 0, worstMs: 0 };
   for (const line of minutes) {
     const cause = causeOf(line, ramMb);
     const over = cause === 'agentbox' || cause === 'both';
     const held = frozen.get(Math.floor(Date.parse(line.at) / 60_000)) ?? 0;
+    const lag = line.windowLag;
+    if (lag) {
+      const kind = short(line) ? cause : 'normal';
+      window.minutes += 1;
+      window.worstMs = Math.max(window.worstMs, Number(lag.worst) || 0);
+      windowMs[kind] += Number(lag.longMs) || 0;
+      windowSlow[kind] += Number(lag.slow) || 0;
+    }
     if (line.pressure === 'critical') out.critical += 1;
     if ((line.swapInMbps ?? 0) >= 4) out.swapping += 1;
     if (over) {
@@ -93,10 +106,13 @@ export function summariseDay(lines, freezes = [], { ramMb }) {
     freezeMs[cause] += held;
     if (cause === 'others' || cause === 'both') for (const o of line.others ?? []) otherRows.push([o.name, o.mb]);
   }
+  const seconds = (byKind) => Object.fromEntries(Object.entries(byKind).map(([k, ms]) => [k, Math.round(ms / 100) / 10]));
   return {
     ...out,
     causes,
-    freezeS: Object.fromEntries(Object.entries(freezeMs).map(([k, ms]) => [k, Math.round(ms / 100) / 10])),
+    freezeS: seconds(freezeMs),
+    // Null for a day whose app never wrote it, which is not a day the window was never held.
+    window: window.minutes ? { ...window, heldS: seconds(windowMs), slow: windowSlow } : null,
     tasks: ranked(overRows.tasks),
     programs: ranked(overRows.programs),
     others: ranked(otherRows),
@@ -130,6 +146,12 @@ function main(argv) {
     console.log(`  Agentbox over its allowance: ${d.over} minutes, ${d.overBeforeShort} of them before the computer said short`);
     console.log(`  short minutes by who held the memory: Agentbox ${d.causes.agentbox}, both ${d.causes.both}, other programs ${d.causes.others}, neither ${d.causes.neither}, no listing ${d.causes.unlisted}`);
     console.log(`  seconds frozen: Agentbox ${d.freezeS.agentbox}, both ${d.freezeS.both}, other programs ${d.freezeS.others}, neither ${d.freezeS.neither}, normal minutes ${d.freezeS.normal}`);
+    if (d.window) {
+      const w = d.window;
+      const late = Object.values(w.slow).reduce((n, x) => n + x, 0);
+      console.log(`  seconds the window was held: Agentbox ${w.heldS.agentbox}, both ${w.heldS.both}, other programs ${w.heldS.others}, neither ${w.heldS.neither}, normal minutes ${w.heldS.normal}`);
+      console.log(`  clicks and keys answered late: ${late}, ${w.slow.normal} of them in normal minutes, the worst after ${w.worstMs} ms`);
+    }
     if (d.over) console.log(`  tasks behind the minutes over: ${top(d.tasks)}\n  their programs: ${top(d.programs)}`);
     if (d.others.length) console.log(`  other programs behind theirs: ${top(d.others)}`);
     console.log('');
