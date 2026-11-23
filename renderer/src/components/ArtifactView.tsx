@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  addressedTo, agentOfVersion, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
+  addressedTo, agentOfVersion, approvalSince, approveAsk, carriedNotes, editClash, familyName, filesInLines, fileNewsFor, latestPicturesSaid, marksOnVersions, nextStep, noteGoesTo, offeredTogether, otherFilesInLines, pathsAPressKeeps, placeWords, resolvedInWords, reviewKind, sharedByWords, stepsThrough, stillInHand, stillWaiting, tagsYourAgent, threadFiles, versionNamed, viewKind, whereAPressLands, whoseIsTheFile, withFilesAsked,
 } from '../../../shared/artifact-marks.mts';
 import { labelSaidFor } from '../../../shared/file-label.mts';
 import { AgentFace } from './AgentFace';
@@ -139,7 +139,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     return withFilesAsked(said, [path, ...(open.drawn ?? open.steps ?? [])]);
   }, [lines, open.path, open.note, open.steps, open.drawn, given.notes]);
   // What the page drew has bytes, so Files not having numbered it yet does not drop it.
-  const kept = useMemo(() => [open.path, ...(open.steps ?? []), ...(open.drawn ?? [])].filter((p): p is string => !!p), [open.path, open.steps, open.drawn]);
+  const kept = useMemo(() => pathsAPressKeeps(open, given.notes), [open.path, open.steps, open.drawn, open.note, given.notes]);
   const families = useMemo(() => threadFiles(files, numbers, { keep: kept }), [files, numbers, kept]);
   // A note made on another computer, or before a rename of how copies are read, still sits on its file here.
   const marks = useMemo(() => marksOnVersions(given, families), [given, families]);
