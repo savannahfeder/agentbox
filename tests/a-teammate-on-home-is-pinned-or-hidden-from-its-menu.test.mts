@@ -56,14 +56,15 @@ async function open({ hidden = false, noMenu = false } = {}) {
 const row = (page, name) => page.locator('.hm-mate-wrap', { has: page.getByText(name, { exact: true }) });
 const menuWords = (page) => page.locator('.chat-menu .chat-menu-row').allInnerTexts();
 const acts = (page) => page.evaluate(() => window.ACTS);
+const shown = (el) => el.evaluate((n) => getComputedStyle(n).opacity === '1' && getComputedStyle(n).pointerEvents !== 'none');
 
 describe.skipIf(!browserAvailable)('a teammate on Home is pinned or hidden from its menu', () => {
   it('hides a teammate from the ⋯ that shows when you point at their row (the reported case)', async () => {
     const page = await open();
-    const more = row(page, 'Sam Reyes').locator('.hm-mate-more');
-    expect(await more.isVisible()).toBe(false);
+    const more = row(page, 'Sam Reyes').locator('.hm-mate-act');
+    expect(await shown(more)).toBe(false);
     await row(page, 'Sam Reyes').hover();
-    expect(await more.isVisible()).toBe(true);
+    await expect.poll(() => shown(more)).toBe(true);
     await more.click();
     expect(await menuWords(page)).toEqual(['Pin to top', 'Hide from Home']);
     await page.getByRole('menuitem', { name: 'Hide from Home' }).click();
@@ -77,7 +78,7 @@ describe.skipIf(!browserAvailable)('a teammate on Home is pinned or hidden from 
     expect(await row(page, 'Lena Ortiz').locator('.hm-pin').count()).toBe(1);
     expect(await row(page, 'Sam Reyes').locator('.hm-pin').count()).toBe(0);
     await row(page, 'Lena Ortiz').hover();
-    await row(page, 'Lena Ortiz').locator('.hm-mate-more').click();
+    await row(page, 'Lena Ortiz').locator('.hm-mate-act').click();
     expect(await menuWords(page)).toEqual(['Unpin', 'Hide from Home']);
     await page.close();
   }, 30_000);
@@ -92,18 +93,20 @@ describe.skipIf(!browserAvailable)('a teammate on Home is pinned or hidden from 
     await page.close();
   }, 30_000);
 
-  it('says how many are hidden, lists them when asked, and offers to show each on Home again', async () => {
+  it('says how many are hidden, lists them when asked, and shows one on Home again in one press', async () => {
     const page = await open({ hidden: true });
     const foot = page.locator('.hm-hidden');
     expect((await foot.innerText()).trim()).toBe('2 hidden');
+    expect(await foot.getAttribute('aria-expanded')).toBe('false');
     expect(await page.getByText('Theo Brandt').count()).toBe(0);
     await foot.click();
+    expect(await foot.getAttribute('aria-expanded')).toBe('true');
     expect(await row(page, 'Theo Brandt').getAttribute('class')).toContain('gone');
     await row(page, 'Theo Brandt').hover();
-    await row(page, 'Theo Brandt').locator('.hm-mate-more').click();
-    expect(await menuWords(page)).toEqual(['Show on Home']);
-    await page.getByRole('menuitem', { name: 'Show on Home' }).click();
+    await page.getByRole('button', { name: 'Show Theo Brandt on Home' }).click();
     expect(await acts(page)).toEqual([['show', 'person:theo']]);
+    await row(page, 'Priya Raman').click({ button: 'right' });
+    expect(await menuWords(page)).toEqual(['Show on Home']);
     await page.close();
   }, 30_000);
 
@@ -112,7 +115,7 @@ describe.skipIf(!browserAvailable)('a teammate on Home is pinned or hidden from 
     expect(await page.locator('.hm-hidden').count()).toBe(0);
     await page.close();
     const bare = await open({ noMenu: true });
-    expect(await bare.locator('.hm-mate-more').count()).toBe(0);
+    expect(await bare.locator('.hm-mate-act').count()).toBe(0);
     await bare.locator('.hm-mate-wrap').first().click({ button: 'right' });
     expect(await bare.locator('.chat-menu').count()).toBe(0);
     await bare.close();
