@@ -79,8 +79,8 @@ export interface ItemOutcome {
   /** What wrote it (thread-history.ts, `ran`), so the newest answer is signed
    *  like the ones still in the stream. */
   ran?: { engine?: string; model?: string };
-  /** Whether it is the app's own note. Read off the message itself: the row's
-   *  newest note may be one the thread does not draw. */
+  /** On a note, whether the app wrote it. Read off the message itself: the
+   *  row's newest note may be one the thread does not draw. */
   app?: boolean;
 }
 
@@ -759,7 +759,7 @@ export function itemThread(
   // finished result or checkpoint with nothing spoken under it. See ItemOutcome
   // above for why this exists and what draws it.
   const outcome: ItemOutcome | null = answer && answer.i === spokeAt
-    ? { at: answer.at, text: answer.text, field: answer.field, ...(answer.ran ? { ran: answer.ran } : {}), app: !!answer.app }
+    ? { at: answer.at, text: answer.text, field: answer.field, ...(answer.ran ? { ran: answer.ran } : {}), ...(answer.field === 'note' ? { app: !!answer.app } : {}) }
     : null;
   // Counted before it is lifted: it is still a message on this task, and the
   // head line says how many there are, not how many are in the stream.
