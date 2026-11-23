@@ -393,18 +393,37 @@ async function fileOnThreadBranch(repoPath: string | null | undefined, raw: stri
     const kept = await branchCopies.get(key);
     if (kept && fsDefault.existsSync(kept))
         return kept;
-    if (branchCopies.size > 256)
-        branchCopies.clear();
+    // The oldest goes, not all of them: a pass over every thread asks thousands.
+    if (branchCopies.size >= BRANCH_COPIES_KEPT)
+        branchCopies.delete(branchCopies.keys().next().value!);
     const copying = copyFromCommit(repoPath, tip, raw, String(thread));
     branchCopies.set(key, copying);
     return copying;
+}
+const BRANCH_COPIES_KEPT = 4096;
+// What a branch's own commits touched, by its tip: asked of git once for the
+// branch, not once for each name asked of it.
+const branchFiles = new Map<string, Promise<string[]>>();
+function filesOnBranch(repoPath: string, tip: string): Promise<string[]> {
+    const key = `${repoPath}\0${tip}`;
+    const kept = branchFiles.get(key);
+    if (kept)
+        return kept;
+    if (branchFiles.size >= 512)
+        branchFiles.delete(branchFiles.keys().next().value!);
+    const listing = gitOut(repoPath, ['log', '--format=', '--name-only', '-z', `HEAD..${tip}`])
+        .then((out) => String(out).split('\0').map((f) => f.trim()).filter(Boolean));
+    // A read that failed is asked again next time.
+    listing.catch(() => { if (branchFiles.get(key) === listing) branchFiles.delete(key); });
+    branchFiles.set(key, listing);
+    return listing;
 }
 async function copyFromCommit(repoPath: string, tip: string, raw: string, thread: string): Promise<string | null> {
     try {
         // Only a file the thread's own commits touched: the rest of its branch is
         // main as it was when the thread began, older than the checkout's copy.
         // An answer names a file it committed by its name as often as by its path.
-        const changed = String(await gitOut(repoPath, ['log', '--format=', '--name-only', '-z', `HEAD..${tip}`])).split('\0').map((f) => f.trim()).filter(Boolean);
+        const changed = await filesOnBranch(repoPath, tip);
         const file = changed.find((f) => f === raw) ?? changed.find((f) => f.endsWith(`/${raw}`));
         // A fetched branch can carry a tree entry named "..", which git lists as
         // part of the path and path.join would climb out of the copies with.
