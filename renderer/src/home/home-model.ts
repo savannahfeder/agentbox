@@ -139,22 +139,13 @@ export function unpinMate(c: TeamCardChoice, key: string): TeamCardChoice {
   return { pinned: without(c.pinned, key), hidden: [...c.hidden] };
 }
 
+/** A pin outlives a hide, so whoever comes back comes back pinned. */
 export function hideMate(c: TeamCardChoice, key: string): TeamCardChoice {
-  return { pinned: without(c.pinned, key), hidden: [...without(c.hidden, key), key] };
+  return { pinned: [...c.pinned], hidden: [...without(c.hidden, key), key] };
 }
 
 export function showMate(c: TeamCardChoice, key: string): TeamCardChoice {
   return { pinned: [...c.pinned], hidden: without(c.hidden, key) };
-}
-
-/** Z after a hide: shown again, and pinned again in the place they had if they were. */
-export function undoHide(c: TeamCardChoice, key: string, before: TeamCardChoice): TeamCardChoice {
-  const shown = showMate(c, key);
-  const at = before.pinned.indexOf(key);
-  if (at < 0 || shown.pinned.includes(key)) return shown;
-  const pinned = [...shown.pinned];
-  pinned.splice(Math.min(at, pinned.length), 0, key);
-  return { pinned, hidden: shown.hidden };
 }
 
 type Marked<T> = T & { pinned: boolean; hidden: boolean };
@@ -165,7 +156,7 @@ type Marked<T> = T & { pinned: boolean; hidden: boolean };
 export function teamCard<T extends { key: string; state: TeamRowState; week: readonly number[]; total: number }>(rows: readonly T[], choice: TeamCardChoice): { shown: Marked<T>[]; hidden: Marked<T>[] } {
   const pinned = new Set(choice.pinned);
   const hid = new Set(choice.hidden);
-  const marked = rows.map((r) => ({ ...r, pinned: pinned.has(r.key), hidden: hid.has(r.key) }));
+  const marked = rows.map((r) => ({ ...r, pinned: pinned.has(r.key) && !hid.has(r.key), hidden: hid.has(r.key) }));
   const waiting = marked.filter((r) => r.state === 'waiting');
   const rest = marked.filter((r) => r.state !== 'waiting' && !r.hidden);
   const byPin = (r: Marked<T>) => choice.pinned.indexOf(r.key);

@@ -4,7 +4,7 @@
 // Needs you was from it. Measured on the rules Home draws the card with.
 import { describe, it, expect } from 'vitest';
 import {
-  hideMate, pinMate, readTeamCardChoice, showMate, teamCard, teamRowLine, undoHide, unpinMate, writeTeamCardChoice,
+  hideMate, pinMate, readTeamCardChoice, showMate, teamCard, teamRowLine, unpinMate, writeTeamCardChoice,
   type TeamCardChoice, type TeamRowState,
 } from '../renderer/src/home/home-model.ts';
 
@@ -63,10 +63,11 @@ describe('Team this week shows who you pinned and not who you hid', () => {
 });
 
 describe('pinning and hiding', () => {
-  it('hiding a pinned teammate unpins them, and pinning a hidden one shows them', () => {
+  it('hiding a pinned teammate keeps their pin for when they come back, and pinning a hidden one shows them', () => {
     const hidden = hideMate(pinMate(none, 'person:lena'), 'person:lena');
-    expect(hidden).toEqual({ pinned: [], hidden: ['person:lena'] });
-    expect(pinMate(hidden, 'person:lena')).toEqual({ pinned: ['person:lena'], hidden: [] });
+    expect(hidden).toEqual({ pinned: ['person:lena'], hidden: ['person:lena'] });
+    expect(teamCard([row('person:lena', 'quiet')], hidden).hidden[0]).toMatchObject({ pinned: false, hidden: true });
+    expect(pinMate(hideMate(none, 'person:lena'), 'person:lena')).toEqual({ pinned: ['person:lena'], hidden: [] });
   });
   it('pins and hides each teammate once', () => {
     expect(pinMate(pinMate(none, 'a'), 'a').pinned).toEqual(['a']);
@@ -79,21 +80,20 @@ describe('pinning and hiding', () => {
   });
 });
 
-// A tester pinned a teammate, hid them and pressed Z: they came back unpinned.
-describe('undoing a hide', () => {
+// Two testers pinned a teammate and hid them; Z, or Show on Home later,
+// brought them back unpinned.
+describe('showing a hidden teammate again', () => {
   it('brings a pinned teammate back pinned, in the place they had (the reported case)', () => {
     const before = { pinned: ['a', 'person:lena', 'b'], hidden: [] };
-    expect(undoHide(hideMate(before, 'person:lena'), 'person:lena', before)).toEqual(before);
+    expect(showMate(hideMate(before, 'person:lena'), 'person:lena')).toEqual(before);
+    expect(keys(teamCard([row('a', 'quiet'), row('person:lena', 'quiet'), row('b', 'quiet')], showMate(hideMate(before, 'person:lena'), 'person:lena')).shown)).toEqual(['a', 'person:lena', 'b']);
   });
   it('brings an unpinned teammate back unpinned', () => {
     const before = { pinned: ['a'], hidden: ['c'] };
-    expect(undoHide(hideMate(before, 'person:lena'), 'person:lena', before)).toEqual(before);
+    expect(showMate(hideMate(before, 'person:lena'), 'person:lena')).toEqual(before);
   });
-  it('keeps what changed since, and does not pin twice', () => {
-    const before = { pinned: ['person:lena'], hidden: [] };
-    const since = pinMate(hideMate(hideMate(before, 'person:lena'), 'person:theo'), 'b');
-    expect(undoHide(since, 'person:lena', before)).toEqual({ pinned: ['person:lena', 'b'], hidden: ['person:theo'] });
-    expect(undoHide(before, 'person:lena', before).pinned).toEqual(['person:lena']);
+  it('unpinning a hidden teammate leaves them hidden', () => {
+    expect(unpinMate(hideMate(pinMate(none, 'person:lena'), 'person:lena'), 'person:lena')).toEqual({ pinned: [], hidden: ['person:lena'] });
   });
 });
 

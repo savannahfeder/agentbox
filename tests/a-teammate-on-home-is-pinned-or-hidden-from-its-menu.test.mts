@@ -102,8 +102,11 @@ describe.skipIf(!browserAvailable)('a teammate on Home is pinned or hidden from 
     await foot.click();
     expect(await foot.getAttribute('aria-expanded')).toBe('true');
     expect(await row(page, 'Theo Brandt').getAttribute('class')).toContain('gone');
-    await row(page, 'Theo Brandt').hover();
-    await page.getByRole('button', { name: 'Show Theo Brandt on Home' }).click();
+    // A tester looked at the open list and found no way back: the control is there before you point at the row.
+    const show = page.getByRole('button', { name: 'Show Theo Brandt on Home' });
+    expect(await shown(show)).toBe(true);
+    expect((await show.innerText()).trim()).toBe('Show');
+    await show.click();
     expect(await acts(page)).toEqual([['show', 'person:theo']]);
     await row(page, 'Priya Raman').click({ button: 'right' });
     expect(await menuWords(page)).toEqual(['Show on Home']);

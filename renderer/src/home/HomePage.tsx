@@ -84,7 +84,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
         {m.total > 0 && !gone && <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>}
       </button>
       {onMate && (gone
-        ? <button type="button" className="hm-mate-act" aria-label={`Show ${m.name} on Home`} title="Show on Home" onClick={() => onMate(m.key, 'show')}>{EYE}</button>
+        ? <button type="button" className="hm-mate-act hm-show" aria-label={`Show ${m.name} on Home`} title="Show on Home" onClick={() => onMate(m.key, 'show')}>Show</button>
         : <button type="button" className="hm-mate-act" aria-label={`More for ${m.name}`} title="More"
           onClick={(e) => setMenu(menu?.m.key === m.key ? null : { m, at: e.currentTarget.getBoundingClientRect() })}>{DOTS}</button>)}
     </div>
