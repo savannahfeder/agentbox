@@ -58,6 +58,15 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
   const onScreen = useRef(false);
   const [drawn, setDrawn] = useState<{ for: string; url: string } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // The open button around it holds the column's width while it waits (styles.css);
+  // before the room is measured below, so the measure is of that width.
+  const waiting = failed !== src && drawn?.for !== src;
+  useLayoutEffect(() => {
+    const door = waiting ? place.current?.parentElement : null;
+    if (!door?.classList.contains('inline-image-open')) return;
+    door.setAttribute('data-picture-arriving', '');
+    return () => door.removeAttribute('data-picture-arriving');
+  }, [waiting]);
   useLayoutEffect(() => {
     if (room) return;
     const el = place.current;
@@ -108,8 +117,9 @@ export function FittedImg({ src, cover = false, maxHeight, minWidth = 0, ...img 
   if (failed === src) return <img {...img} src={src} />;
   if (drawn?.for !== src) {
     // An empty picture holding the place: what draws it, and the viewer, read `data-full`.
+    // `data-far` keeps it still until it is on its way (styles.css).
     const { onError: _e, onLoad: _l, alt: _a, ...still } = img;
-    return <img {...still} ref={place} className={`${img.className ?? ''} arriving`} alt="" aria-hidden="true" data-full={src} />;
+    return <img {...still} ref={place} className={`${img.className ?? ''} arriving`} alt="" aria-hidden="true" data-full={src} data-far={near ? undefined : ''} />;
   }
   return <img {...img} src={drawn.url} data-full={src} />;
 }

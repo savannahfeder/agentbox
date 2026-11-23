@@ -473,6 +473,8 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 onStep={(next) => stepLine(key, next)}
                 code={code}
               />
+            : e.says === 'app'
+            ? <div className="one-app-note">{md(e.text ?? '')}</div>
             : slot ? (<>
               {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face sits beside
                   the name once per run. None of the agent thread's chapters: no

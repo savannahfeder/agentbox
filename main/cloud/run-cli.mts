@@ -131,6 +131,7 @@ export async function cloudRunFromArgs({ args, env, cwd, stdin, stdout, stderr, 
     // An account at its usage limit sits out until it resets; the next run
     // takes another cloud account, or this Mac.
     onLimit: ({ until }) => { if (rec) markCloudLogin(engine, dir!, rec.id, { limitedUntil: until }); },
+    onRefused: ({ until }) => { if (rec) markCloudLogin(engine, dir!, rec.id, { refusedUntil: until }); },
     imageCaps: imageCapsToTry(config),
     onCaps: (caps) => noteImageCaps(config, caps),
     remoteCommand: codex ? 'codex' : 'claude',

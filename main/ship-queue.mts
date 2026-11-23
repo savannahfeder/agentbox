@@ -32,6 +32,7 @@ import { notPushedNote, pushNeedsGitHubSignIn } from '../shared/github-push-sign
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
 import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';
+import { waitingForMemory } from '../shared/notes-for-the-agent.mts';
 import type { GateAnswer, GateRequest, GateReply } from './memory-gate.mts';
 
 export const SHIP_LABEL = 'ship';
@@ -597,7 +598,7 @@ export class ShipQueue {
     const red = redOnMain(this.userDir);
     const gate = this.memoryGate();
     const giveBack = gate && await shipSlot(gate, item, this.shipScore(item), {
-      onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before shipping.'); } catch { /* the ship still waits */ } },
+      onWait: () => { try { this.store.noteItem?.(item.product, item.id, waitingForMemory('shipping')); } catch { /* the ship still waits */ } },
     });
     let ran;
     let signIn: ReturnType<ShipQueue['pushSignIn']> = null;

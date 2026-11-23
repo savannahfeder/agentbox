@@ -909,8 +909,8 @@ body {
 }
 .topbar button { -webkit-app-region: no-drag; }
 
-/* BACK AND FORWARD (Alpha features). The arrows lead the header and whatever
-   follows them keeps its place at the left, not the middle the bar's
+/* BACK AND FORWARD, on the inbox page only. The arrows lead the header and
+   whatever follows them keeps its place at the left, not the middle the bar's
    space-between would give a third item. */
 .back-forward { display: inline-flex; align-items: center; gap: 2px; margin-right: 12px; flex: none; }
 .topbar > .back-forward + * { margin-right: auto; }
@@ -923,21 +923,9 @@ body {
 .back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
 .back-forward svg { width: 15px; height: 15px; }
 .back-forward .back-forward-inbox { margin-right: 10px; }
-/* Home hides its header bar but keeps the arrows. */
-.app.home-shown > .topbar .back-forward { visibility: visible; }
-/* The arrows replace the one back arrow a thread and Settings already had. */
-.app.back-forward-on .thread-crumb-back svg,
-.app.back-forward-on .workspace-page-heading .workspace-back { display: none; }
+/* On an inbox thread the arrows stand in for the chevron of its own back. */
+.app.back-forward-on .thread-crumb-back svg { display: none; }
 .app.back-forward-on .thread-crumb-back { padding-left: 0; }
-/* Chats, Groups and Team pull their header's first column left to the card
-   edge so its line meets the list's. The arrows come first in the bar, so the
-   column pulls further by their width and its name starts after them. */
-.app.back-forward-on { --bf-w: 66px; }
-.app.back-forward-on .topbar > .back-forward { position: relative; z-index: 2; }
-.app.back-forward-on .topbar > .back-forward + .gc-head { margin-left: calc(-32px - var(--bf-w)); }
-.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head { margin-left: calc(-44px - var(--bf-w)); }
-.app.back-forward-on .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(32px + var(--bf-w)); }
-.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(44px + var(--bf-w)); }
 
 /* WHAT AN OPENED TASK HAS INSTEAD OF A TOP BAR. Nothing is drawn here. It
    exists for two things only, and both are invisible: 1. THE THREE BUTTONS
@@ -2128,11 +2116,13 @@ body {
    kept out of sight while the box shows.
 
    The button around a loading picture is as wide as the column, because a
-   button shrinks to what is in it and the box would be 4:3 of nothing.
-   `auto 4 / 3` takes the picture's own shape the moment its first bytes give
-   it. Four :root outweigh the phone's own picture rules in phone.css. */
-:root:root:root:root .inline-image-open:has(> .inline-image[data-phone-img="loading"]),
-:root:root:root:root .inline-image-open:has(> .inline-image.arriving) { width: 100%; }
+   button shrinks to what is in it and the box would be 4:3 of nothing. It is
+   marked by FittedImg and watchPicture; a :has() reading the picture's state
+   restyled the whole thread on every change. `auto 4 / 3` takes the picture's
+   own shape the moment its first bytes give it. Four :root outweigh the
+   phone's own picture rules in phone.css. */
+:root:root:root:root .inline-image-open[data-picture-loading],
+:root:root:root:root .inline-image-open[data-picture-arriving] { width: 100%; }
 :root:root:root:root .inline-image[data-phone-img="loading"],
 :root:root:root:root .doc-picture[data-phone-img="loading"] {
   display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: auto 4 / 3;
@@ -2159,6 +2149,10 @@ body {
   animation: phone-shimmer 1.3s linear infinite;
 }
 .inline-image.arriving { display: block; width: 100%; aspect-ratio: 4 / 3; }
+/* A picture more than a screen away is not fetched yet, and a moving
+   background is restyled and repainted every frame, so its box holds still
+   until it is on its way (tests/a-picture-not-yet-on-its-way-does-not-shimmer). */
+.arriving[data-far] { animation: none; }
 
 /* A sound or a film a worker named: its name, then the player, one per line
    even when five were written on one line (ArtifactMedia in Focus.tsx). */

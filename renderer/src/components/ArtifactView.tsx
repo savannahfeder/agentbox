@@ -14,8 +14,8 @@ import { canPaintQuotes, paintQuotes } from '../paint-quotes';
 import { firstName, Face } from '../team/people';
 import { clock, type LedgerLine } from '../thread-history';
 import type { ArtifactMark, FileMarks, FileNote, NotePlace, Person } from '../types';
-import { ADD_TO_YOUR_REPLY, hasSpot, letterGoesToTheNote, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
-import { commentsInList, notesWithSaving, settleLocally, UNDO_MS } from '../note-saving';
+import { ADD_TO_YOUR_REPLY, hasSpot, letterGoesToTheNote, sendingWords, noteBoxKey, noteSendWords, noteSentWords, notesToSendTheAgent, notesToSendTheAgentAnywhere, otherFilesOpen, sendAllBesideTheNotes, withItsAgent, unsentWords, pageSpot, PIN_FRAME_S, pinned, sentWithTheNote, viewOffers, whereANoteGoes, whoTalksOnFile, type Found } from '../artifact-pins';
+import { commentsInList, notesWithSaving, SENT_LANDS_WITHIN_MS, SENT_SHOWN_MS, sentLocally, settleLocally, UNDO_MS } from '../note-saving';
 import { keptDraft, opensForTyping, SAVE_AFTER_A_PAUSE_MS, savedVersionArrived, wordsToSave } from '../edit-sitting';
 import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
@@ -147,7 +147,13 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const kept = useMemo(() => pathsAPressKeeps(open, given.notes), [open.path, open.steps, open.drawn, open.note, given.notes]);
   const families = useMemo(() => threadFiles(files, numbers, { keep: kept }), [files, numbers, kept]);
   // A note made on another computer, or before a rename of how copies are read, still sits on its file here.
-  const marks = useMemo(() => marksOnVersions(given, families), [given, families]);
+  const marksSaid = useMemo(() => marksOnVersions(given, families), [given, families]);
+  // The app can take two seconds to answer Send, and its marks arrive after that: the press says Sending at once,
+  // and once the app has the comments they read as sent before its marks catch up.
+  const [handing, setHanding] = useState<{ ids: string[]; phase: 'sending' | 'sent' | 'quiet' } | null>(null);
+  const handed = useRef(new Set<string>());
+  const flying = useRef(0);
+  const marks = useMemo(() => (handing && handing.phase !== 'sending' ? { ...marksSaid, notes: sentLocally(marksSaid.notes, handing.ids) } : marksSaid), [marksSaid, handing]);
   const flat = useMemo(() => families.flatMap((f, fi) => f.versions.map((v, vi) => ({ fi, vi, v }))), [families]);
   const handedSteps = useMemo(() => stepsThrough(families, open.steps), [families, open.steps]);
   const latestSteps = useMemo(() => stepsThrough(families, latestPicturesSaid(lines)), [families, lines]);
@@ -377,7 +383,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       setPictures(sentPictures);
       return;
     }
-    if (!withIt.length || (await toAgent(withIt))) setJustSent(went);
+    if (!withIt.length || (await handOver(withIt))) setJustSent(went);
     setNamed([]);
     // A pinned comment was covering the notes you carried; they come back once it is sent.
     const d = draftOf.current;
@@ -435,13 +441,39 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (!on.length) return true;
     return !failed(await write({ do: 'toagent', on }), 'Those notes did not reach the agent.');
   };
+  // A second press while the first is on its way hands nothing over twice.
+  const handOver = async (ids: string[]) => {
+    const fresh = ids.filter((id) => !handed.current.has(id));
+    if (!fresh.length) return true;
+    for (const id of fresh) handed.current.add(id);
+    flying.current += 1;
+    setHanding((h) => ({ ids: [...(h?.ids ?? []), ...fresh], phase: 'sending' }));
+    const ok = await toAgent(fresh);
+    flying.current -= 1;
+    if (!ok) for (const id of fresh) handed.current.delete(id);
+    setHanding((h) => {
+      const left = (h?.ids ?? []).filter((id) => ok || !fresh.includes(id));
+      return left.length ? { ids: left, phase: flying.current ? 'sending' : 'sent' } : null;
+    });
+    return ok;
+  };
   const unsent = withAgent ? notesToSendTheAgentAnywhere(marks, families, version?.id ?? null, people, me) : { ids: [], elsewhere: 0, elsewhereKind: 'picture' as const };
-  const sendAll = () => toAgent(unsent.ids);
+  const unsentSaid = withAgent && handing ? notesToSendTheAgentAnywhere(marksSaid, families, version?.id ?? null, people, me).ids : [];
+  const landed = !!handing && !handing.ids.some((id) => unsentSaid.includes(id));
+  useEffect(() => {
+    if (!handing || handing.phase === 'sending') return;
+    const done = () => { handed.current.clear(); setHanding(null); };
+    if (handing.phase === 'quiet' && landed) { done(); return; }
+    const timer = window.setTimeout(() => (handing.phase === 'sent' ? setHanding({ ...handing, phase: 'quiet' }) : done()), handing.phase === 'sent' ? SENT_SHOWN_MS : SENT_LANDS_WITHIN_MS);
+    return () => clearTimeout(timer);
+  }, [handing, landed]);
+  const barSays = handing && handing.phase !== 'quiet' ? handing.phase : null;
+  const sendAll = () => handOver(unsent.ids);
   const sendBeside = sendAllBesideTheNotes(kind);
   const canSendAll = offers.comment && unsent.ids.length > 0;
   const handable = !!onHandToAgent && !withAgent && !!family && openNotes.length > 0;
   const sendNotes = withAgent && version ? notesToSendTheAgent(marks, withItsAgent(family!.versions, version), family!.versions.length, people, me) : [];
-  const pressSend = () => toAgent(sendNotes);
+  const pressSend = () => handOver(sendNotes);
   const waitingHere = offers.comment ? openNotes.filter((n) => sendNotes.includes(n.id)) : [];
   const sentAlready = openNotes.filter((n) => !waitingHere.includes(n));
   const authors = [...new Set(openNotes.map((n) => n.by))].slice(0, 3);
@@ -873,24 +905,28 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
             <button type="button" className="av-step av-prev" disabled={!stepTo(-1)} onClick={() => stepFile(-1)} aria-label="Previous file">‹</button>
             <button type="button" className="av-step av-next" disabled={!stepTo(1)} onClick={() => stepFile(1)} aria-label="Next file">›</button>
           </>}
-          {canSendAll && !sendBeside && !link && (
-            <div className="av-unsent-bar" role="status">
-              <span className="av-unsent-dot" aria-hidden="true" />
-              <span>{unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)}</span>
-              <button type="button" className="av-btn av-unsent-send" onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>
+          {(canSendAll || barSays) && !sendBeside && !link && (
+            <div className="av-unsent-bar" data-state={barSays ?? undefined} role="status">
+              {barSays === 'sent' ? <NoteGlyph name="check" /> : <span className="av-unsent-dot" aria-hidden="true" />}
+              <span>{barSays === 'sending' ? sendingWords(handing!.ids.length) : barSays === 'sent' ? 'Sent to your agent' : unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)}</span>
+              {!barSays && <button type="button" className="av-btn av-unsent-send" onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
             </div>
           )}
           {link && <FileLinkBrowser key={link} url={link} product={product} backTo={kind ? `the ${KIND_WORD[kind].toLowerCase()}` : 'the file'} onClose={closeLink} />}
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0 || linkNotes.comments.length > 0) && <aside className="av-side" aria-label="Notes">
           <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
-          {(offers.approve || othersApproved.length > 0 || earlier || (canSendAll && sendBeside) || handable) && (
+          {(offers.approve || othersApproved.length > 0 || earlier || ((canSendAll || barSays) && sendBeside) || handable) && (
             <div className="av-verdict">
               <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
                 {othersApproved.length > 0 ? `${othersApproved.map((a) => nameOf(a.by)).join(', ')} approved`
                   : earlier ? (version?.edited ? approvalSince(family, at!.vi, marks.approvals, nameOf) : `v${earlier.n} approved, this version is not`) : null}
               </span>
-              {canSendAll && sendBeside && <button type="button" className="av-btn av-unsent-send" title={unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>Send all<kbd>{SEND}</kbd></button>}
+              {(canSendAll || barSays) && sendBeside && (
+                <button type="button" className="av-btn av-unsent-send" disabled={!!barSays} title={barSays ? undefined : unsentWords(unsent.ids.length, unsent.elsewhere, unsent.elsewhereKind)} onClick={() => void sendAll()}>
+                  {barSays === 'sending' ? 'Sending…' : barSays === 'sent' ? <><NoteGlyph name="check" />Sent</> : <>Send all<kbd>{SEND}</kbd></>}
+                </button>
+              )}
               {handable && <button type="button" className="av-btn" onClick={() => onHandToAgent!([family!.versions.at(-1)!.path])}><NoteGlyph name="agent" />Hand to an agent</button>}
               {/* In a review your reply is the answer, so there is no approving a picture on its own. */}
               {offers.approve && !withYourReply && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
