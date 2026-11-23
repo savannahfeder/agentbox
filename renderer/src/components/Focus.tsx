@@ -2601,12 +2601,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         {/* Offered on any agent that has not stopped for her, which since
             w-9348b8d148 includes ones she can also write to: a quiet session
             takes a message AND is sometimes just the thing she wants to go sit
-            in. This is honestly named: it brings the APPLICATION the session is
-            running inside to the front, which is the whole of what is actually
-            available. Nothing public focuses one pane inside another app. */}
+            in. It brings up the very tab the session runs in (main/bring-to-front.mts),
+            in the words the bar under a session uses. */}
         {agent && !agentTakesReply && onReveal && agent.engine !== 'codex' && (
-          <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
-          <span className="focus-when">Opens the app it is running in</span></>
+          <button className="focus-stop" onClick={onReveal}>Respond in terminal</button>
         )}
         {/* A blocked thread has no buttons here: its reply goes to the agent,
             as on every thread, and asking someone is in Share. "Send back to
