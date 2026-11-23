@@ -381,6 +381,8 @@ export interface ClaimRegistry {
   release(id: string): WorkItem | null;
   file(product: string, fields: ItemFields): ProductItem & { alsoFiled?: string };
   holding(): string[];
+  /** This session holds the row or held it, so what it writes there is its own. */
+  knows(id: string): boolean;
   _beat(): void;
   _stop(): void;
 }
@@ -636,6 +638,7 @@ export function createClaimRegistry({ heartbeatMs = HEARTBEAT_MS, holder }: { he
     },
 
     holding: () => [...held.entries()].filter(([, h]) => h.live).map(([id]) => id),
+    knows: (id) => held.has(id),
     // Test seams; not part of normal use.
     _beat: beat,
     _stop: () => { if (timer) clearInterval(timer); timer = null; held.clear(); },
