@@ -111,6 +111,9 @@ export function stoppedByHer(item: Item): boolean {
 export function filedByThePerson(item: Item): boolean {
     return (item?.labels ?? []).includes('founder') && item?.wrote?.labels?.source !== 'agent';
 }
+// The answer that starts a thread an agent filed: what Approve writes, and what
+// a filing writes when the person had asked for it (mcp/core/work.mts).
+export const RUN_IT = 'Approved. Run it.';
 // The teammate whose words are this row's newest reply, or null when the
 // newest reply is the person's own.
 export function toldBy(item: Item): { name: string; teammate: string | null } | null {

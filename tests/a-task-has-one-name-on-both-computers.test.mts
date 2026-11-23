@@ -103,13 +103,16 @@ describe('a task handed to an agent', () => {
     expect(start.named).toBe('Cancel button auth headers');
     expect(splitMessage(start.body)).toEqual({ title: 'Cancel button auth headers', body: 'Theo Okafor asked:\n\nLena, can you take this web app bug?' });
   });
-  it('is as it was for a task with no name, and for one message pressed inside a task', () => {
+  it('is as it was for a task with no name', () => {
     const bare = taskHandOff({ from: 'Theo Okafor', brief: { body: 'Take the bug.', files: [] }, message: null, nameOf: () => 'Theo' });
     expect(bare.named).toBeUndefined();
     expect(bare.body).toBe('Theo Okafor asked:\n\nTake the bug.\n\n');
+  });
+  // Named from its first line, it was "Lena wrote: [List page empty state](https://…)" (2026-11-22).
+  it('takes the task\'s name too for one message pressed inside it, with that message under it', () => {
     const one = taskHandOff({ from: 'Theo Okafor', brief: { title: 'Cancel button auth headers', body: 'Take the bug.', files: [] }, message: { text: 'Which header is it?', by: 'u-theo' }, nameOf: () => 'Theo' });
-    expect(one.named).toBeUndefined();
-    expect(one.body).toBe('Theo wrote: Which header is it?\n\n');
+    expect(one.named).toBe('Cancel button auth headers');
+    expect(splitMessage(one.body)).toEqual({ title: 'Cancel button auth headers', body: 'Theo wrote: Which header is it?' });
   });
   it('keeps that name: the composer sends it as the thread\'s name while the first line still says it', () => {
     const composer = read('renderer/src/threads/ThreadComposer.tsx');

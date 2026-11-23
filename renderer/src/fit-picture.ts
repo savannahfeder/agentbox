@@ -242,24 +242,51 @@ export class PictureMissing extends Error {
 
 // Two at a time, so opening a thread of thirty does not decode thirty at once.
 // Only the decoding takes a turn: a file slow to arrive holds none.
+// A picture on screen goes before any that is not, in the order asked. One off
+// screen takes one turn at most, and only while nothing on screen is still on
+// its way, so whatever comes on screen next has a turn free.
 const AT_ONCE = 2;
-let running = 0;
-const waiting: (() => void)[] = [];
+type Ask = { onScreen: () => boolean; state: 'coming' | 'waiting' | 'running' | 'done'; forScreen?: boolean; go?: () => void };
+const asks = new Set<Ask>();
+
+function mayStart(ask: Ask, forScreen: boolean): boolean {
+  let running = 0;
+  let runningOff = 0;
+  let screenAhead = false;
+  for (const a of asks) {
+    if (a.state === 'running') { running += 1; if (!a.forScreen) runningOff += 1; }
+    else if (a !== ask && a.state !== 'done' && a.onScreen()) screenAhead = true;
+  }
+  return running < AT_ONCE && (forScreen || (runningOff === 0 && !screenAhead));
+}
+
+function admit() {
+  for (const forScreen of [true, false]) {
+    for (const a of asks) {
+      if (a.state !== 'waiting' || a.onScreen() !== forScreen || !mayStart(a, forScreen)) continue;
+      a.state = 'running';
+      a.forScreen = forScreen;
+      a.go?.();
+    }
+  }
+}
+
 const gone = () => new DOMException('The picture left the screen.', 'AbortError');
-async function inTurn<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+async function inTurn<T>(ask: Ask, work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   if (signal?.aborted) throw gone();
-  if (running >= AT_ONCE) {
+  ask.state = 'waiting';
+  admit();
+  // Let in at once, it starts before anything let in beside it.
+  if (ask.state === 'waiting') {
     await new Promise<void>((go, stop) => {
-      const leave = () => { waiting.splice(waiting.indexOf(next), 1); stop(gone()); };
-      const next = () => { signal?.removeEventListener('abort', leave); go(); };
-      waiting.push(next);
+      const leave = () => { ask.state = 'done'; stop(gone()); admit(); };
+      ask.go = () => { signal?.removeEventListener('abort', leave); go(); };
       signal?.addEventListener('abort', leave, { once: true });
     });
   }
-  running += 1;
   try { return await work(); } finally {
-    running -= 1;
-    waiting.shift()?.();
+    ask.state = 'done';
+    admit();
   }
 }
 
@@ -267,9 +294,20 @@ async function inTurn<T>(work: () => Promise<T>, signal?: AbortSignal): Promise<
  * A link to draw `url` from in a box of `box` points: a shrunk copy when the
  * picture is bigger than the box needs, else the file itself. The caller
  * revokes it when it stops drawing it. Throws when the picture cannot be read,
- * and an AbortError once `signal` says it is no longer wanted.
+ * and an AbortError once `signal` says it is no longer wanted. `onScreen` says,
+ * whenever it is asked, whether the picture is in view now.
  */
-export async function fitPicture(url: string, box: Box, tools: FitTools = browser, signal?: AbortSignal): Promise<{ url: string; shrunk: boolean }> {
+export async function fitPicture(url: string, box: Box, tools: FitTools = browser, signal?: AbortSignal, onScreen: () => boolean = () => true): Promise<{ url: string; shrunk: boolean }> {
+  const ask: Ask = { onScreen, state: 'coming' };
+  asks.add(ask);
+  try { return await fitted(ask, url, box, tools, signal); } finally {
+    ask.state = 'done';
+    asks.delete(ask);
+    admit();
+  }
+}
+
+async function fitted(ask: Ask, url: string, box: Box, tools: FitTools, signal?: AbortSignal): Promise<{ url: string; shrunk: boolean }> {
   if (signal?.aborted) throw gone();
   const res = await tools.fetch(url, signal);
   if (!res.ok) throw new PictureMissing(res.status);
@@ -284,7 +322,7 @@ export async function fitPicture(url: string, box: Box, tools: FitTools = browse
     tools.kept?.put(key!, had);
     return { url: tools.link(had.blob), shrunk: had.shrunk };
   }
-  const copy = await inTurn(() => (tools.shrink
+  const copy = await inTurn(ask, () => (tools.shrink
     ? tools.shrink(blob, box, pixels)
     : shrinkPicture(blob, box, pixels, tools.decode, tools.encode)), signal);
   if (key !== null) {
