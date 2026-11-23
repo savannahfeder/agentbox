@@ -5510,7 +5510,7 @@ export default function App() {
   const runNow = useCallback(async (item: WorkItem) => {
     const r = await window.zero?.runNow?.({ product: item.product, id: item.id });
     // Started, it names the thread for O (w-5513afd09a); a refusal names nothing.
-    showToast(r?.ok ? 'Up next. It starts as soon as an agent is free.'
+    showToast(r?.ok ? 'Starts as soon as an agent is free.'
       : r?.reason === 'running' ? 'Already running.'
       : r?.reason === 'paused' ? 'Agents are paused. Turn them back on to run this.'
       : r?.reason === 'scheduled' ? 'This task is scheduled for later.'

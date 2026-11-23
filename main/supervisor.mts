@@ -18,6 +18,7 @@ import { gitJob, warmGitThread } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes } from './notes-wake.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
+import { shownTitle } from '../shared/thread-title.mts';
 import { editedFilesLine } from '../shared/artifact-marks.mts';
 import { readItemHistory, updateWorkItem } from './store/work-items.mts';
 import { reconcileRows, type ReconcilePatch } from './version-reconcile.mts';
@@ -2995,6 +2996,8 @@ export class Supervisor {
       || (b.session.startedAt ?? 0) - (a.session.startedAt ?? 0));
     const taken = candidates[0];
     this._kill(taken.session);
+    // Said on the paused thread, or its agent just stops with no reason given.
+    try { this.store.noteItem?.(taken.victim.product, taken.id, `Paused so “${shownTitle(item)}” could run first. This carries on when an agent is free.`); } catch { /* the pause still holds */ }
     this._preempted.set(taken.id, {
       at: Date.now(),
       forItem: item.id,
