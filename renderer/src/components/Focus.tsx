@@ -1031,7 +1031,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // Codex working on her message in its own window: nothing here to answer, so no box at all.
   const codexAtWork = agent?.engine === 'codex' && !agent.approval && answeredWhereItRuns(agent);
   // The bar says what there is to do there: allow a command, answer a question, or reply to a report.
-  const codexVerb = agent?.approval ? 'Allow or deny it' : agent && agentLayout(agent).kind === 'asks' ? 'Answer it' : 'Reply';
+  const codexVerb = agent?.approval ? 'allow or deny it' : agent && agentLayout(agent).kind === 'asks' ? 'answer it' : 'reply';
+  // Pressing it takes her there: the Codex app, or the very terminal tab or editor the session is in.
+  const codexPlace = agent?.app === 'Codex app' ? 'the Codex app' : agent?.app === 'Codex in your editor' ? 'your editor' : 'its terminal';
 
   // A SUMMARISED THREAD is work with a ledger: not a message between two people
   // (main/team/projects.mts makeDirect), and not a running agent's row, the
@@ -2674,16 +2676,18 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                THIS IS THE ONLY ONE. A quiet agent used to get this pill too,
                saying there was nothing there to answer, and that was false: it
                is sitting at its prompt and it is listening. w-9348b8d148. */
-            codexAtWork ? null : agent?.engine === 'codex' && agent.app === 'Codex app' && onReveal ? (
+            codexAtWork ? null : agent?.engine === 'codex' && onReveal ? (
               <button type="button" className="dock-pill" onClick={onReveal}>
-                <span className="dock-pill-text">{codexVerb} in the Codex app</span>
+                <span className="dock-pill-text">Open {codexPlace} to {codexVerb}</span>
+              </button>
+            ) : onReveal ? (
+              <button type="button" className="dock-pill" onClick={onReveal}>
+                <span className="dock-pill-text">Answer this one in its own window. A message from here would wait behind the box it is stuck on.</span>
               </button>
             ) : (
             <div className="dock-pill dock-pill-static">
               <span className="dock-pill-text">
-                {agent?.engine === 'codex'
-                  ? agent.app === 'Codex in your editor' ? `${codexVerb} in Codex, in your editor.` : `${codexVerb} in the terminal Codex is running in.`
-                  : 'Answer this one in its own window. A message from here would wait behind the box it is stuck on.'}
+                Answer this one in its own window. A message from here would wait behind the box it is stuck on.
               </span>
             </div>
             )

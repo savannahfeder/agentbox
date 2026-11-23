@@ -1606,12 +1606,10 @@ export default function App() {
   // HOW MANY OF HER AGENTS THE INBOX TAKES: all of them, only the ones stopped
   // on a question, or none.
   //
-  // NONE IS THE DEFAULT NOW: a session started in a terminal is kept separate
-  // from the inbox unless the setting says otherwise. The real default is
-  // decided once, in main/settings.mts; this fallback only covers the moment
-  // before the first snapshot arrives, and it agrees with it so the inbox
-  // cannot flash a row it is about to drop.
-  const agentMode = snap?.config?.outsideAgents ?? 'off';
+  // ALL IS THE DEFAULT (2026-11-23), decided once, in main/settings.mts; this
+  // fallback only covers the moment before the first snapshot arrives, and it
+  // agrees with it so the inbox cannot flash a row it is about to drop.
+  const agentMode = snap?.config?.outsideAgents ?? 'all';
 
   // Execution schedules gate work; inbox snoozes only gate her attention.
   // A word held for Z lifts now what its write will lift (laterHerWordLifts).

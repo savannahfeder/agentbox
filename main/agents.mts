@@ -18,6 +18,7 @@ import {
   WORK_CHARS, agentKey, changedFile, commandWork, fullSubject, isBookkeeping, saidCount, sameInstant, threadWindow, workSubject, workVerb,
 } from '../shared/agents.mts';
 import type { ToolQuestion } from '../shared/session-layout.mts';
+import { bringToFront } from './bring-to-front.mts';
 
 const run = promisify(execFile);
 
@@ -856,14 +857,10 @@ export async function owningApp(pid: number) {
   return null;
 }
 
-export async function reveal(pid: number) {
-  const app = await owningApp(pid);
-  if (!app) return { ok: false, reason: `${Name} cannot tell which window it is running in.` };
-  return new Promise<RevealResult>((resolve) => {
-    execFile('/usr/bin/open', ['-a', app.path], (err) => {
-      resolve(err ? { ok: false, reason: `${app.name} would not come to the front.` } : { ok: true, name: app.name });
-    });
-  });
+export async function reveal(pid: number): Promise<RevealResult> {
+  // The very tab where the app can be told which (main/bring-to-front.mts).
+  const out = await bringToFront(pid);
+  return out.ok ? out : { ok: false, reason: out.reason.replace(/^It cannot tell/, `${Name} cannot tell`) };
 }
 
 // The conversation: what both sides said, read only when the user asks for it.

@@ -18,6 +18,7 @@ import { codexDataDirs } from './agent-homes.mts';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
 import { theirWords, type ToolQuestion } from '../shared/session-layout.mts';
 import type { Agent, ThreadEvent } from './agents.mts';
+import { bringToFront, codexProcessFor, parsePs, type BringResult, type ProcRow } from './bring-to-front.mts';
 
 /** Sessions written to in this long are read; older ones have left the inbox. */
 export const CODEX_LIVE_MS = 24 * 3_600_000;
@@ -278,7 +279,7 @@ export function codexChildren(table: string): (CodexChild & { pid: number })[] {
   return out;
 }
 
-function cwdOf(pids: number[]): Promise<Map<number, string>> {
+export function cwdOf(pids: number[]): Promise<Map<number, string>> {
   const found = new Map<number, string>();
   if (!pids.length) return Promise.resolve(found);
   if (process.platform === 'linux') {
@@ -425,12 +426,27 @@ export function codexConversation(file: string, { now = Date.now(), isRunning = 
 }
 
 /** "Take me to it" for a Codex session: the Codex app when it runs there. A terminal or editor cannot be found from here. */
-export async function revealCodex(agent: Pick<Agent, 'app'> | null, { platform = process.platform, open = openApp }: { platform?: NodeJS.Platform; open?: (name: string) => Promise<boolean> } = {}): Promise<{ ok: true; name: string } | { ok: false; reason: string }> {
+/** A Codex session's terminal or editor tab, found by its process, else where to look. */
+export async function revealCodex(agent: Pick<Agent, 'app' | 'sessionId' | 'cwd'> | null, {
+  platform = process.platform, open = openApp, bring = bringToFront, ps = readPs, cwds = cwdOf,
+}: { platform?: NodeJS.Platform; open?: (name: string) => Promise<boolean>; bring?: (pid: number) => Promise<BringResult>; ps?: () => Promise<string>; cwds?: (pids: number[]) => Promise<Map<number, string>> } = {}): Promise<BringResult> {
   if (!agent) return { ok: false, reason: 'That Codex session has closed.' };
-  if (agent.app !== 'Codex app') return { ok: false, reason: `It is running in ${agent.app === 'Codex in your editor' ? 'your editor' : 'a terminal'}. Switch to it there.` };
-  if (platform !== 'darwin') return { ok: false, reason: 'Open the Codex app to answer it.' };
-  return (await open('Codex')) ? { ok: true, name: 'Codex' } : { ok: false, reason: 'The Codex app could not be opened.' };
+  const where = agent.app === 'Codex in your editor' ? 'your editor' : 'the terminal it is running in';
+  if (agent.app === 'Codex app') {
+    if (platform !== 'darwin') return { ok: false, reason: 'Open the Codex app to answer it.' };
+    return (await open('Codex')) ? { ok: true, name: 'Codex' } : { ok: false, reason: 'The Codex app could not be opened.' };
+  }
+  let table: Map<number, ProcRow>;
+  try { table = parsePs(await ps()); } catch { return { ok: false, reason: `Switch to ${where} to answer it.` }; }
+  const codexLike = [...table.values()].filter((r) => /(^|\/)codex(\s|$)/.test(r.command)).map((r) => r.pid);
+  const pid = codexProcessFor(table, await cwds(codexLike), { sessionId: agent.sessionId ?? '', cwd: agent.cwd });
+  if (!pid) return { ok: false, reason: `That Codex has closed. Switch to ${where} to answer it.` };
+  return bring(pid);
 }
+
+const readPs = () => new Promise<string>((resolve, reject) => {
+  execFile('/bin/ps', ['-Aww', '-o', 'pid=,ppid=,tty=,command='], { timeout: 3_000, maxBuffer: 16 << 20, encoding: 'utf8', windowsHide: true }, (err, out) => (err ? reject(err) : resolve(String(out))));
+});
 
 function openApp(name: string): Promise<boolean> {
   return new Promise((resolve) => {
