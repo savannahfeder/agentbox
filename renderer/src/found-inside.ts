@@ -84,7 +84,8 @@ export function insideGroups(input: InsideInput): InsideGroup[] {
   if (!q.terms.length) return [];
   const byItem = new Map(input.items.map((i) => [`${i.product}/${i.id}`, i]));
   const byCard = new Map(input.cards.map((c) => [`${c.personId}/${c.threadId}`, c]));
-  const who = (by: string | null, source: string) => (by ? (by === input.me ? 'You' : input.nameOf(by)) : source === 'agent' ? 'Agent' : 'You');
+  // A team copy stamps `by` (whose Mac wrote it) on the agent's lines too, so who spoke comes first.
+  const who = (by: string | null, source: string) => (source === 'agent' ? 'Agent' : by ? (by === input.me ? 'You' : input.nameOf(by)) : 'You');
 
   // Where a found thing sits, or null when this screen cannot open it.
   const placeOf = (w: FoundWhere): { where: string; at: (extra: { line?: string; file?: string; note?: { file: string; id: string } }) => InsideOpen } | null => {
