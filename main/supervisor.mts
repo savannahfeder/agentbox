@@ -219,6 +219,7 @@ import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { GitHubPushSignIn } from './github-push-sign-in.mts';
 import { SignInReturns } from './sign-in-returns.mts';
 import { openSignIn } from '../shared/sign-in-ask.mts';
+import { causeCleared, waitingForMemory } from '../shared/notes-for-the-agent.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyItem, ReplyPayload } from './live-replies.mts';
@@ -2512,7 +2513,7 @@ export class Supervisor {
       this._resumedWaits.add(key);
       // Its own last words say it is waiting, so it is told the cause is gone.
       for (const b of blockers) {
-        if (isCause(b)) try { this.store.noteItem?.(item.product, item.id, `${b!.title} is cleared. Carry on from where this stopped.`); } catch { /* the resume still goes ahead */ }
+        if (isCause(b)) try { this.store.noteItem?.(item.product, item.id, causeCleared(b!.title)); } catch { /* the resume still goes ahead */ }
       }
       this.store.answerItem(item.product, item.id, { status: 'open' });
       this._resumeQueue.add(item.id);
@@ -5984,7 +5985,7 @@ export class Supervisor {
     if (product && this.shipsThroughTheApp(product)) return null;
     // A push runs the project's own hooks, so it takes its turn at the memory check as a ship does.
     const beforePush = () => shipSlot(this._memoryGate?.gate ?? null, item, this.memoryGateScore(item.product, item.id) ?? 0, {
-      onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before pushing.'); } catch { /* the push still waits */ } },
+      onWait: () => { try { this.store.noteItem?.(item.product, item.id, waitingForMemory('pushing')); } catch { /* the push still waits */ } },
     });
     const done = mergeHome(cwd, { beforePush }).then((merge) => {
       this._mergingHome?.delete(item.id);

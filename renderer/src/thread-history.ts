@@ -28,6 +28,7 @@ import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { handBackReadBy } from '../../shared/thread-asks.mts';
 import { Name } from '../../shared/product-name.mjs';
+import { forTheAgent } from '../../shared/notes-for-the-agent.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
@@ -510,6 +511,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     }
 
     if (words(patch.note)) {
+      // Trouble the app is seeing to by itself is for the next run, not for her.
+      if (line.source === 'system' && forTheAgent(words(patch.note)!)) continue;
       // The app's own news on the row is the app's quiet line, never a
       // checkpoint signed with the model the agent runs on
       // (tests/the-apps-own-note-is-never-signed-as-the-agents).

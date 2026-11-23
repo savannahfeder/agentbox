@@ -11,10 +11,13 @@
 // all the same, because every note took the row's model whoever wrote it
 // (thread-history.ts `ranNow`).
 //
-// Now a note the app wrote is signed with the app's name in the thread, and at
-// the foot it is the quiet line the Needs you page already draws for one
-// (the-page-leads-with-the-agents-answer-not-the-apps-shipped-note). A failed
-// ship is still drawn as Not shipped, which asks something of the person.
+// That note is no longer drawn at all
+// (trouble-the-app-handles-itself-is-not-drawn-on-the-thread). Every other note
+// the app writes, "Shipped to main as ..." among them, is signed with the app's
+// name in the thread, and at the foot it is the quiet line the Needs you page
+// already draws for one (the-page-leads-with-the-agents-answer-not-the-apps-
+// shipped-note). A failed ship is still drawn as Not shipped, which asks
+// something of the person.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,7 +35,7 @@ const quiet = fs.readFileSync(path.join(root, 'renderer/src/one-thing-at-a-time.
 
 const T0 = Date.parse('2026-11-21T04:00:00Z');
 const line = (ts: number, source: string, patch: Record<string, unknown>) => ({ id: 'w-0a1b2c3d4e', ts, source, patch });
-const STOPPED = "This thread's cloud machine stopped 2 minutes into its run, before it finished, so the run never sent its work back. The thread picks up from where it was before that run.";
+const SHIPPED = 'Shipped to main as 14c45bfb.';
 const born = [
   line(T0, 'system', { title: 'Plan the garden', status: 'open', kind: 'directive', priority: 5, labels: ['founder'] }),
   line(T0 + 4, 'founder', { title: 'Plan the garden', body: 'Which beds get the tomatoes?', model: 'opus' }),
@@ -43,8 +46,8 @@ const notes = (lines: unknown[]) => threadEvents(lines as never).filter((e) => e
 
 describe('a note the app wrote on the row', () => {
   it("is signed with the app's name, never the model the agent runs on", () => {
-    const [note] = notes([...born, line(T0 + 240_000, 'system', { note: STOPPED })]);
-    expect(note.words).toBe(STOPPED);
+    const [note] = notes([...born, line(T0 + 240_000, 'system', { note: SHIPPED })]);
+    expect(note.words).toBe(SHIPPED);
     expect(note.from).toBe(Name);
     expect(note.ran).toBeUndefined();
   });
@@ -58,7 +61,7 @@ describe('a note the app wrote on the row', () => {
 
   it('stays a quiet line once the agent has answered under it, with no Checkpoint label', () => {
     const [note] = notes([...born,
-      line(T0 + 240_000, 'system', { note: STOPPED }),
+      line(T0 + 240_000, 'system', { note: SHIPPED }),
       line(T0 + 400_000, 'agent', { result: 'The herbs go by the door.' })]);
     expect(note.says).toBe('app');
     expect(messageKind(note)).toBeNull();
@@ -76,7 +79,7 @@ describe('at the foot of the thread', () => {
   const noteOutcome = (text: string) => ({ at: T0 + 240_000, text, field: 'note' as const, ran: { model: 'opus' } });
 
   it("draws the app's note as its quiet line, not the agent's latest checkpoint", () => {
-    expect(footOf(noteOutcome(STOPPED), { note: STOPPED, wrote: wrote('system') })).toBe('app');
+    expect(footOf(noteOutcome(SHIPPED), { note: SHIPPED, wrote: wrote('system') })).toBe('app');
   });
 
   it("keeps an agent's checkpoint as the agent's", () => {
@@ -90,8 +93,8 @@ describe('at the foot of the thread', () => {
 
   it("keeps a result as the agent's, and draws nothing with nothing to draw", () => {
     const result = { at: T0 + 300_000, text: 'The herbs go by the door.', field: 'result' as const };
-    expect(footOf(result, { note: STOPPED, wrote: { ...wrote('system'), result: { ts: T0 + 300_000, source: 'agent' } } })).toBe('agent');
-    expect(footOf(null, { note: STOPPED, wrote: wrote('system') })).toBeNull();
+    expect(footOf(result, { note: SHIPPED, wrote: { ...wrote('system'), result: { ts: T0 + 300_000, source: 'agent' } } })).toBe('agent');
+    expect(footOf(null, { note: SHIPPED, wrote: wrote('system') })).toBeNull();
   });
 
   it('is the quiet line on every thread page, not only in Needs you', () => {

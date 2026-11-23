@@ -38,7 +38,7 @@ const said = (e: AgentEvent): e is AgentTurn & { kind?: undefined } => e.kind !=
 
 /** A note the app wrote on the row (the ship queue's "Shipped to main as …"), not an answer to lead with. */
 export function appWrote(outcome: ItemOutcome | null, wrote?: Record<string, { source?: string } | undefined>): boolean {
-  return !!outcome && outcome.field === 'note' && wrote?.note?.source === 'system';
+  return !!outcome && outcome.field === 'note' && (outcome.app ?? wrote?.note?.source === 'system');
 }
 
 /** How the newest answer is drawn at the foot of a thread: the app's own note as its quiet line, a ship that failed as Not shipped, anything else as the agent's. */
