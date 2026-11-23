@@ -26,7 +26,7 @@ import { fillNewThreadKit, newThreadKitKey } from '../../shared/cloud-kit.mts';
 import { madeHere, newThreadSnapshot } from '../../shared/phone-snapshot.mts';
 import { codexOpenLines, codexTurnLines, codexReadLines, codexAnswersIn } from '../../shared/cloud-kit.mts';
 import { phoneBanner } from '../../shared/notify-rules.mts';
-import { handsBack, HAND_BACK } from '../../shared/cloud-hand-back.mts';
+import { handsBack, handBackWhat } from '../../shared/cloud-hand-back.mts';
 import { LOGIN_NAME } from '../../shared/cloud-login-name.mts';
 import { askId, approvalAnswerLine } from '../../shared/cloud-kit.mts';
 import { phoneApproval } from '../../shared/phone-snapshot.mts';
@@ -286,7 +286,7 @@ export function createPhoneCarry({ db, runFiles, links, objects, start, input, s
   const answerText = (a) => {
     if (!a || a.isError || !a.text.trim()) return NO_ANSWER;
     if (handsBack(a.text)) {
-      const what = a.text.split('\n').find((l) => l.trimStart().startsWith(HAND_BACK)).trim().slice(HAND_BACK.length).trim();
+      const what = handBackWhat(a.text, Infinity);
       return `This needs your computer${what ? ` (${what})` : ''}. It carries on there when your computer is back.`;
     }
     return a.text;

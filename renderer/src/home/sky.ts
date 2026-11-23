@@ -47,11 +47,13 @@ const AURORA: Palette = { core: [50, 215, 150], hot: [170, 255, 205], halo: [50,
 
 const DARK_BASE = { y0: 1.0, y1: 0.36, bend: -0.1, dim: 0.95, peak: 0.7, coreW: 0.024, haloW: 0.3, grain: 0.1 };
 
-// The card stays a step off black so rows and text keep their contrast.
+// The same deep black as --surface on the dark skies (home.css), a step off pure black.
+const DARK_CARD = '#131315';
+
 const DARK_SKIES: Sky[] = [
-  { id: 'dusk', name: 'Dark purple sky', dark: true, art: { ...DARK_BASE, palette: DUSK, bg: '#1a171d' } },
-  { id: 'ember', name: 'Dark orange sky', dark: true, art: { ...DARK_BASE, palette: EMBER, bg: '#1b1917', y0: 0.25, y1: 1.0, peak: 0.3 } },
-  { id: 'aurora', name: 'Dark green sky', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: '#161a19', y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
+  { id: 'dusk', name: 'Dark purple sky', dark: true, art: { ...DARK_BASE, palette: DUSK, bg: DARK_CARD } },
+  { id: 'ember', name: 'Dark orange sky', dark: true, art: { ...DARK_BASE, palette: EMBER, bg: DARK_CARD, y0: 0.25, y1: 1.0, peak: 0.3 } },
+  { id: 'aurora', name: 'Dark green sky', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: DARK_CARD, y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
 ];
 
 const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyArt => ({

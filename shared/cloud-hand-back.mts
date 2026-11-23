@@ -4,15 +4,29 @@
 // bracket: a trace line that starts with one is read as a tool call.
 export const HAND_BACK = 'AGENTBOX-NEEDS-THE-COMPUTER:';
 
+// A run's last message opens in bold and names code in backticks, and a run
+// told to end on this one line writes it that way.
+const DRESSING = /^\s*(?:>\s*)?[*_`]*/;
+
+/** What follows `marker` on a line that opens with it, or null on any other line. */
+function saidAfter(line: string, marker: string): string | null {
+  const opened = DRESSING.exec(line)![0];
+  if (!line.startsWith(marker, opened.length)) return null;
+  const said = line.slice(opened.length + marker.length);
+  return /[*_`]/.test(opened) ? said.replace(/[*_`\s]+$/, '') : said;
+}
+
+const linesOf = (result: string | null | undefined) => String(result ?? '').split('\n');
+
 /** Whether a reply hands its thread back: the marked line, at a line's start. */
 export function handsBack(result: string | null | undefined): boolean {
-  return String(result ?? '').split('\n').some((line) => line.trimStart().startsWith(HAND_BACK));
+  return linesOf(result).some((line) => saidAfter(line, HAND_BACK) !== null);
 }
 
 /** A reply without its marked line, for drawing: that line is the app's to read. */
 export function withoutHandBack(result: string): string {
   if (!handsBack(result)) return result;
-  return result.split('\n').filter((line) => !line.trimStart().startsWith(HAND_BACK)).join('\n').trim();
+  return result.split('\n').filter((line) => saidAfter(line, HAND_BACK) === null).join('\n').trim();
 }
 
 // THE OTHER WAY:a run on this computer whose request needs the cloud
@@ -20,13 +34,13 @@ export function withoutHandBack(result: string): string {
 export const SEND_TO_CLOUD = 'AGENTBOX-NEEDS-THE-CLOUD:';
 
 export function asksForCloud(result: string | null | undefined): boolean {
-  return String(result ?? '').split('\n').some((line) => line.trimStart().startsWith(SEND_TO_CLOUD));
+  return linesOf(result).some((line) => saidAfter(line, SEND_TO_CLOUD) !== null);
 }
 
 /** What the run said it was missing, cut to fit a card; null when it said nothing. */
 export function handBackWhat(result: string | null | undefined, max = 90): string | null {
-  const line = String(result ?? '').split('\n').map((l) => l.trimStart()).find((l) => l.startsWith(HAND_BACK));
-  const what = line?.slice(HAND_BACK.length).trim().replace(/[.\s]+$/, '') ?? '';
+  const said = linesOf(result).map((l) => saidAfter(l, HAND_BACK)).find((s) => s !== null);
+  const what = said?.trim().replace(/[.\s]+$/, '') ?? '';
   if (!what) return null;
   if (what.length <= max) return what;
   const cut = what.lastIndexOf(' ', max);

@@ -37,6 +37,10 @@
 //   - SWAPPING COUNTS (w-8918e86ce0). Heavy swapping is critical and holds at
 //     any count; light swapping is tight and is set aside below `roomy`, as
 //     the warn is.
+//   - AGENTBOX OVER ITS OWN ALLOWANCE HOLDS AT ANY COUNT, as tight does
+//     (main/memory-allowance.mts). The warn is set aside below `roomy`
+//     because it says nothing about whose memory it is; this is the app's
+//     and its agents' own, measured, and two agents can hold eight gigabytes.
 //
 // Pure, so every one of those is a test (tests/no-new-agent-starts-while-memory-is-short).
 
@@ -58,6 +62,8 @@ export interface StartDecisionInput {
   lastStartAt?: number;
   heldSince?: number | null;
   roomy?: number;
+  /** The app and its agents are over their allowance (main/memory-allowance.mts). */
+  over?: boolean;
   staleMs?: number;
   maxHoldMs?: number;
   settleMs?: number;
@@ -112,24 +118,27 @@ export function worstPressure(readings: (PressureSample | null | undefined)[] | 
  * `recent` is the readings before it; the worst inside `settleMs` decides.
  * `heldSince` is when the current hold began (null when nothing is held);
  * `lastStartAt` is when an agent last started. Under `roomy` agents running,
- * the kernel's warn level is not counted.
+ * the kernel's warn level is not counted. `over` is its own reading, judged
+ * fresh by whoever passes it, so it holds with no reading from the kernel.
  */
 export function startDecision({
   on, reading, recent = [], now, running,
   urgent = false, asked = false, swap = false,
-  lastStartAt = 0, heldSince = null, roomy = 0,
+  lastStartAt = 0, heldSince = null, roomy = 0, over = false,
   staleMs = STALE_MS, maxHoldMs = MAX_HOLD_MS, settleMs = SETTLE_MS,
 }: StartDecisionInput): { start: boolean; why: string } {
   if (!on) return { start: true, why: 'off' };
   if (!(running > 0)) return { start: true, why: 'nothing-running' };
   if (swap) return { start: true, why: 'swap' };
   const at = Number(reading?.at);
-  const known = reading && (Number.isFinite(reading.level) || Number.isFinite(reading.freePct) || Number.isFinite(reading.swapInMbps));
-  if (!known || !Number.isFinite(at) || Math.abs(now - at) > staleMs) return { start: true, why: 'no-reading' };
+  const known = !!reading && (Number.isFinite(reading.level) || Number.isFinite(reading.freePct) || Number.isFinite(reading.swapInMbps))
+    && Number.isFinite(at) && Math.abs(now - at) <= staleMs;
+  if (!known && !over) return { start: true, why: 'no-reading' };
   const readings = running < roomy
     ? [reading, ...recent].map((r) => (r ? withoutWarnOrLightSwap(r) : r))
     : [reading, ...recent];
-  const pressure = worstPressure(readings, now, settleMs);
+  const said = known ? worstPressure(readings, now, settleMs) : 'normal';
+  const pressure: Pressure = said === 'normal' && over ? 'tight' : said;
   if (pressure === 'normal') return { start: true, why: 'normal' };
   if (pressure === 'tight' && (urgent || asked)) return { start: true, why: 'urgent' };
   const waitingSince = Math.max(heldSince ?? now, Number(lastStartAt) || 0);
