@@ -10,7 +10,7 @@ import { REST_HEADING, URGENT_HEADING, clickIntent, rowSummary, rowTitle } from 
 import { isUrgentRow } from '../urgent-arrival';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
+import { cameBackEmpty, cannotStartLine, cannotStartWord, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { isTroubleRow } from '../trouble-row';
@@ -702,7 +702,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                         : shipping?.includes(item.id)
                           ? <span className="time" title="The app is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.">shipping</span>
                         : queued?.includes(item.id) && cannotStart?.[item.id] && cannotStartLine(cannotStart[item.id])
-                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>not started</span>
+                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>{cannotStartWord(cannotStart[item.id]).toLowerCase()}</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && tab === 'progress'

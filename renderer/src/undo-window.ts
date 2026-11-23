@@ -102,6 +102,14 @@ export function undoAsk(undoes: string): string {
 }
 
 /**
+ * An undo's words with the thread's name as it is now. An entry keeps the
+ *  words it was made with, and a thread renamed since is named by its new name. */
+export function namedNow(text: string, was: string, now: string): string {
+  if (!was || !now || was === now) return text;
+  return text.split(was).join(now);
+}
+
+/**
  * What Z inside the grace window says. Nothing was written, so the true answer
  * depends on what was held: a reply's words are back in the box, a close
  * leaves the thread open, and anything else changed nothing. `said` is the

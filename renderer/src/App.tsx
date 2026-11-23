@@ -31,7 +31,7 @@ import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
 import { arrowRows, pageTitle, spotIn, stepIn } from './one-thing-at-a-time';
 import { AIMED_AT_THE_THREAD_YOU_LEFT, CLICK_FOR_THE_THREAD_YOU_LEFT, clickAimedHere, pickLandsHere, type Arrival, type Point } from './pick-settles';
-import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
+import { followedAfter, freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { LogoOrbit } from './components/LogoOrbit';
 import { cameBackFromACrash, keepHeldWriter, RELOADED_AFTER_A_CRASH } from './after-a-crash';
@@ -49,7 +49,7 @@ import { NOTES_CLOSED_KEY, notesSidebarOpen, rememberNotesSidebar, takesNotesSid
 import { putAwayTheNewest } from './escape-steps';
 import { docKind, EVEN_SPLIT, escapeClosesDoc, escapeInTheFileClosesIt, focusIsInTheFile, readSplit, writeSplit } from './doc-pane';
 import { changeOwnsKey } from './code-keys';
-import { askStillStands, bringsBack, closesAgain, graceUndoneLine, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
+import { askStillStands, bringsBack, closesAgain, graceUndoneLine, namedNow, nextUndo, shownAfterUndo, ticksAfterUndo, undoAsk, HOLDS_A_KEY, NOTHING_TO_UNDO, UNDID_CLOSING } from './undo-window';
 import { answeredAlready, TOO_LATE_TO_WITHDRAW, UNDID_SENDING, withoutWithdrawnSends } from './withdraw-send';
 import { addUndoMark, readUndoMarks, UNDO_MARKS_EVENT, type UndidSpec } from './undo-marks';
 import { whatTheFileSentUp } from '../../shared/artifact-keys.mts';
@@ -106,12 +106,13 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
+import { newToDraw, useKeptSet, type Drawn } from './shown-snapshot';
 import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
-import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
+import { eOnThisList, keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { enterIsTheButtons } from './focused-button';
 import { commandATicksTheList, selectWhatYouAreReading } from './select-all';
 import { modelCommands } from './thread-model-commands';
@@ -163,7 +164,7 @@ import { MentionCards, MentionRows } from './team/rooms/MentionRows';
 import { AgentsLine, MateThreads, NeedsFaces, PersonThreads, SpaceBar, TeamThreads } from './team/everything/TeamStrip';
 import { ChatStart, EmptyChat, JobBlock, MateWork, Place as MemberPlace, PlaceAction, SendBox, listPart, matesPart, type PlaceRow, type PlaceView } from './team/everything/PlacePage';
 import { nowAndFinished, personThreads, pressOpensIn, waitsOnYou, youWaitOn, type HomeLayout } from './team/everything/place';
-import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, type Hidden, type Member } from './team/everything/members';
+import { buildMembers, mateRunsOf, orderMembers, personCardsOf, readHidden, readOrder, splitHidden, teamRunsOf, withMyThreadNamed, type Hidden, type Member } from './team/everything/members';
 import { boardItems, cardOpens, evColumns, flipEvView, readEvView, whoseBoard, writeEvView, type EvTab, type EvView } from './team/everything/whose-board';
 import { needsByWho, readFolded, readNeedsGroup, stackRows, toggleFolded, whoIsWaiting, writeNeedsGroup, type NeedsGroup, type StackKey } from './threads/stack-rules';
 import { FeedbackCard } from './components/FeedbackCard';
@@ -183,7 +184,7 @@ import { planBar, type BarWords, type Plan } from './plan-setup';
 import { PRACTICE_SLUG } from '../../shared/first-run-practice.mts';
 import { ModeScreen, isModeVariant } from './components/ModeScreen';
 import { practiceRemembered, rememberProject, rememberedProject } from './compose-project';
-import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
+import { holdForStoppedAgent, neverWarned, pressAgainGoesAhead, rememberWarned } from './stopped-agent';
 import { FirstRunFlow } from './components/FirstRun';
 import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
@@ -415,6 +416,15 @@ function Booting() {
 
 export default function App() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
+  // What the refresh last drew, and what is on screen, so an answer that changed
+  // nothing draws nothing (./shown-snapshot.ts).
+  const drawn = useRef<Drawn<Snapshot, WorkItem> | null>(null);
+  const snapOnScreen = useRef(snap);
+  snapOnScreen.current = snap;
+  // THE LISTS' CLOCK. Each list is worked out over every thread, and it asked
+  // the time of each draw, so every key and every line an agent printed worked
+  // them all out again. It moves when the threads drawn change and on every poll.
+  const [listNow, setListNow] = useState(() => Date.now());
   // WHERE SHE WAS BEFORE ⌘R, read once, on the way in.
   //
   // A ref rather than state because it is never rendered and never changes: it
@@ -469,6 +479,8 @@ export default function App() {
   const [stoppedWarned, setStoppedWarned] = useState<boolean>(() => {
     try { return !neverWarned(localStorage); } catch { return true; }
   });
+  // The thread the last E warning was about, `product:id`.
+  const heldFor = useRef<string | null>(null);
   const [selected, setSelected] = useState(0);
   // A TEAMMATE'S ROW THE KEYBOARD IS ON (w-fb16bcaeba), by `stopKey`. Their
   // card has no place in `list`, which is your threads only, so while this is
@@ -1525,7 +1537,13 @@ export default function App() {
     if (worn) justMade.current = worn.held;
     // A module value, like the model names: set before the repaint the next line causes.
     setFurtherHarnesses(next?.engines?.further);
-    setSnap(next && { ...next, items: overlayPins(overlayPlaces(worn!.items, unsavedPlaces.current), unsavedPins.current) });
+    const items = next && overlayPins(overlayPlaces(worn!.items, unsavedPlaces.current), unsavedPins.current);
+    if (next && !newToDraw(drawn.current, next, items!, snapOnScreen.current)) return next;
+    const shown = next && { ...next, items: items! };
+    const newThreads = items !== drawn.current?.items;
+    drawn.current = next && { from: next, items: items!, shown };
+    if (newThreads) setListNow(Date.now());
+    setSnap(shown);
     return next;
   }, []);
   // A new thread in the list the moment the computer says it is written, a
@@ -1550,7 +1568,13 @@ export default function App() {
     };
     first();
     const off = api.onChanged(refresh);
-    const poll = setInterval(refresh, pollEvery(10_000, onPhone()));
+    // The poll draws the app every time, changed or not: ages, and threads
+    // coming back from Later, are worked out as it draws.
+    const tick = () => {
+      const before = drawn.current;
+      refresh().then(() => { if (!gone && drawn.current === before) setListNow(Date.now()); }, () => {});
+    };
+    const poll = setInterval(tick, pollEvery(10_000, onPhone()));
     return () => { gone = true; clearTimeout(again); off(); clearInterval(poll); };
   }, [refresh]);
 
@@ -1629,7 +1653,7 @@ export default function App() {
   const agentRows = useMemo(() => {
     const live = (snap?.agents ?? []).filter(agentIsListed);
     return [...live].sort(byRecency).map((a) => {
-      const { title, body } = agentRow(a, now);
+      const { title, body } = agentRow(a, listNow);
       return {
         id: `agent:${a.pid}`,
         product: a.product ?? '',
@@ -1661,7 +1685,7 @@ export default function App() {
         agent: a,
       } as WorkItem;
     });
-  }, [snap?.agents, now]);
+  }, [snap?.agents, listNow]);
 
   const agentList = agentRows;
 
@@ -1752,7 +1776,7 @@ export default function App() {
   // at" — so silence has a deadline, and what comes back is the THREAD rather
   // than the agent-to-agent rows it filed. The rule respects a thread you
   // closed yourself; finishing by an agent still allows a reminder.
-  const owedAnAnswer = useMemo(() => threadsOwedAnAnswer(items, now), [items, now]);
+  const owedAnAnswer = useMemo(() => threadsOwedAnAnswer(items, listNow), [items, listNow]);
 
   const runningRows = useMemo(() => snap?.supervisor.running ?? [], [snap?.supervisor.running]);
   // THE THREADS AN AGENT IS ON RIGHT NOW: the turning mark (threads/Pages.tsx),
@@ -1761,7 +1785,8 @@ export default function App() {
   // list below reads it.
   const runningIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
   // The lists also hold a thread whose run is being started, so Try again moves it at once.
-  const liveIds = useMemo(() => agentOnOrComing({ running: runningRows, starting: snap?.supervisor.starting }), [runningRows, snap?.supervisor.starting]);
+  // The running rows change with every line an agent prints; who is running, far less.
+  const liveIds = useKeptSet(useMemo(() => agentOnOrComing({ running: runningRows, starting: snap?.supervisor.starting }), [runningRows, snap?.supervisor.starting]));
   // AND THE THREADS WHOSE AGENT IS STOPPED ON A PERMISSION REQUEST. Each
   // approval in the spool names the thread it came from, and that one fact
   // turns a Working row into a row that needs you, in both lists.
@@ -1800,7 +1825,7 @@ export default function App() {
   // they have shipped or gone back to their agent.
   const shippingIds = useMemo(() => new Set(snap?.supervisor.shipping ?? []), [snap?.supervisor.shipping]);
   // The threads nothing will start again on its own: Needs you, not In progress.
-  const stalledIds = useMemo(() => stoppedIds(snap?.supervisor ?? {}), [snap?.supervisor]);
+  const stalledIds = useKeptSet(useMemo(() => stoppedIds(snap?.supervisor ?? {}), [snap?.supervisor]));
   // AND THE THREADS A THREAD IS WAITING ON (w-5244c90c33). A waiting thread is
   // in Later and resumes by itself when they finish; only the window can see
   // the other rows, so it works this out and hands it to each list.
@@ -1861,10 +1886,10 @@ export default function App() {
     // Above the team branch, which answers before the rule does: a permission
     // request is not something a project's sharing has any view on. Your own
     // Later still holds it, as in the rule.
-    if (asking(i)) return !askPutOff(i, true, now);
-    if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
-    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id), seen: seenAt[i.id] ?? unreadSince });
-  }), [items, hiddenAt, now, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName, askedOut]);
+    if (asking(i)) return !askPutOff(i, true, listNow);
+    if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > listNow) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
+    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now: listNow, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id), seen: seenAt[i.id] ?? unreadSince });
+  }), [items, hiddenAt, listNow, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName, askedOut]);
   // A task asked for in a chat answers in that chat: Needs you lists the chat
   // instead (team/answers-in-the-chat.ts), and closing the chat closes them.
   const liftedBy = useRef(new Map<string, WorkItem[]>());
@@ -1877,9 +1902,9 @@ export default function App() {
       const key = keyOf(i);
       if (hide.has(key)) return false;
       if (own.has(i)) return true;
-      return lift.has(key) && !pendingIds.has(i.id) && !(hiddenAt(i) > now);
+      return lift.has(key) && !pendingIds.has(i.id) && !(hiddenAt(i) > listNow);
     });
-  }, [items, inboxCandidates, asking, stalledIds, pendingIds, hiddenAt, now]);
+  }, [items, inboxCandidates, asking, stalledIds, pendingIds, hiddenAt, listNow]);
 
   // WHAT MATTERS MOST, ONE COPY, read by every list that claims to be in an
   // order. A product's place in her running order is worth a hundred item
@@ -1911,7 +1936,7 @@ export default function App() {
     // question is an interruption like any other and sorts like one; a quiet one
     // carries priority 1, so the whole sweep sits underneath everything that is
     // actually asking her something rather than on top of it.
-    const asking = agentList.filter((r) => !pendingIds.has(r.id) && r.agent && reachesInbox(r.agent, now, agentMode));
+    const asking = agentList.filter((r) => !pendingIds.has(r.id) && r.agent && reachesInbox(r.agent, listNow, agentMode));
     const rows = [...inboxWithChats, ...asking]
       .sort(byRunningOrder(score));
     // AND ABOVE ALL OF THEM, WHEN NOTHING IS RUNNING, THE ROW THAT SAYS SO.
@@ -1960,13 +1985,13 @@ export default function App() {
     // AND ABOVE THOSE, WHAT IS PAST ITS DEADLINE: a lift
     // for the same reason urgent is one.
     const me = team?.me ?? null;
-    const late = me ? rest.filter((i) => lateForMe(i, me, now)) : [];
+    const late = me ? rest.filter((i) => lateForMe(i, me, listNow)) : [];
     const onTime = late.length ? rest.filter((i) => !late.includes(i)) : rest;
     const urgent = onTime.filter(isUrgentRow);
     const ordinary = urgent.length ? onTime.filter((i) => !isUrgentRow(i)) : onTime;
     const top = [...(troubleItem ? [troubleItem] : []), ...fresh];
     return [...top, ...late, ...urgent, ...ordinary];
-  }, [inboxWithChats, agentList, agentMode, score, now, pendingIds, troubleItem, seen, team?.me]);
+  }, [inboxWithChats, agentList, agentMode, score, listNow, pendingIds, troubleItem, seen, team?.me]);
 
   // Every list of products the user picks from reads in their running order.
   // Anything nobody has placed follows it, oldest first, so a project made
@@ -2006,12 +2031,12 @@ export default function App() {
       if (askedOut.has(i.id) && i.status !== 'done') return true;
       if (handedOut.has(i.id)) return true;
       const deferredUntil = dueAt(i);
-      if (hiddenAt(i) > now && !liveIds.has(i.id)) return false;
+      if (hiddenAt(i) > listNow && !liveIds.has(i.id)) return false;
       // The grace window: the write waits for Z, the signal must not, because a
       // sent thing still sitting in the inbox reads as not sent. A deferred row
       // is the exception, and it has somewhere to be: Scheduled.
-      if (startingIds.has(i.id) && deferredUntil <= now) return true;
-      if (askPutOff(i, asking(i), now)) return false;
+      if (startingIds.has(i.id) && deferredUntil <= listNow) return true;
+      if (askPutOff(i, asking(i), listNow)) return false;
       // A message waits on whoever did not speak last, and the row names them, so
       // it never reads as an agent at work.
       if (isDirect(snap?.products.find((p) => p.slug === i.product)) && !isTaskRow(i)) return iSpokeLast(i, team?.products.get(i.product), team?.me ?? null);
@@ -2022,9 +2047,9 @@ export default function App() {
         const product = team.products.get(i.product);
         return i.status !== 'done' && !(isGivenTask(i, product) && inMyInbox(i, product, team.me));
       }
-      return belongsInProgress(i, { deferredUntil, now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), stopped: stalledIds.has(i.id) });
+      return belongsInProgress(i, { deferredUntil, now: listNow, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), stopped: stalledIds.has(i.id) });
     }),
-    ...agentList.filter((r) => r.agent && progressAfterReply(r.agent, now, agentMode)),
+    ...agentList.filter((r) => r.agent && progressAfterReply(r.agent, listNow, agentMode)),
     // IN THE ORDER THEY WILL RUN IN, which is the one thing this list is for.
     // It sorted by `updatedAt` alone until 2026-08-20, so it read as "most
     // recently touched", and a row waiting its turn is by definition the least
@@ -2039,7 +2064,7 @@ export default function App() {
     // threads/page-rules.ts): a queued row is told by its Status cell, and
     // what you just sent is on top.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut, handedOut, asking]);
+  [items, agentList, agentMode, startingIds, dueAt, hiddenAt, score, listNow, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut, handedOut, asking]);
 
   // AND THE TAB COUNTS EACH THREAD ONCE: the list, less what Needs you holds,
   // the way `tabState` below has it for the board and `done` for the archive.
@@ -2120,13 +2145,13 @@ export default function App() {
     // AND A FIFTH (w-5244c90c33): a thread waiting on another one, unless a
     // session, the run queue or the ship queue has it, which is In progress. A put-off one too.
     ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i)
-        || putOffInLater(i, { hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i), runOnIt: liveIds.has(i.id) || queuedIds.has(i.id) || shippingIds.has(i.id) || pendingIds.has(i.id) })
+        || putOffInLater(i, { hiddenUntil: hiddenAt(i), now: listNow, waitingOn: waitingOn(i), runOnIt: liveIds.has(i.id) || queuedIds.has(i.id) || shippingIds.has(i.id) || pendingIds.has(i.id) })
         // A run waiting on you is not moving, so Later holds it (`askPutOff`).
-        || (askPutOff(i, asking(i), now) && !pendingIds.has(i.id)))
+        || (askPutOff(i, asking(i), listNow) && !pendingIds.has(i.id)))
       && (i.status !== 'done' || i.wrote?.status?.source !== 'founder')
 ),
-    ...agentList.filter((r) => (r.runAt ?? 0) > now),
-  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, queuedIds, shippingIds, pendingIds, asking, now]);
+    ...agentList.filter((r) => (r.runAt ?? 0) > listNow),
+  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, queuedIds, shippingIds, pendingIds, asking, listNow]);
 
   // Repeating tasks. They are RULES, on their own channel, which is why nothing
   // in the item list rules has to know they exist. They are read up here, ahead
@@ -3184,7 +3209,9 @@ export default function App() {
     ];
     // With the inbox they arrived in, which the phone's alert counts on its icon.
     if (arrivals.length) window.zero?.notify?.(arrivals, inbox.filter((i) => i.product).map((i) => ({ id: i.id, product: i.product as string })));
-  }, [snap, inbox, runningRows]);
+    // Not every snapshot: a line an agent prints changes none of these, and
+    // each run sends the whole of Needs you to the corner tag.
+  }, [!snap, inbox, snap?.approvals, runningRows.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The corner tag's "Turn off…" lands on the switch that turns it off.
   useEffect(() => {
@@ -4092,7 +4119,7 @@ export default function App() {
     }
     const built = buildMembers({
       me: me ? { id: me.id, name: me.name, avatarUrl: me.avatarUrl } : null,
-      people: team?.state.people ?? [], wall: teamRoom?.wall ?? null, cards, tasksHeld,
+      people: team?.state.people ?? [], wall: withMyThreadNamed(teamRoom?.wall ?? null, items), cards, tasksHeld,
       teammates: teammatesUi.list, mateAgents, theirMates: teamMates,
       chats: roomsUi.live ? roomsUi.groups : [], personChats, teamRoomId: teamRoom?.id ?? null,
       myAgents: mine, myNow,
@@ -4224,8 +4251,9 @@ export default function App() {
   const nudgeOnStopped = useCallback((rows: WorkItem[], key: 'E' | 'L') => {
     const held = holdForStoppedAgent({ rows, key, warned: stoppedWarned });
     if (!held) return false;
-    setStoppedWarned(true);
-    rememberWarned(localStorage);
+    // Learned once a press went ahead on the thread it warned about, not when shown.
+    if (pressAgainGoesAhead(heldFor.current, held.goes)) { heldFor.current = null; setStoppedWarned(true); rememberWarned(localStorage); return false; }
+    heldFor.current = `${held.goes.product}:${held.goes.id}`;
     showToast(held.say, { ...held.goes, warns: true });
     return true;
   }, [stoppedWarned, showToast]);
@@ -4523,7 +4551,7 @@ export default function App() {
     // nothing: the other person may be mid-work, and a close from you would land
     // in theirs. It comes back when they next write.
     if (isGivenTask(item, team?.products.get(item.product)) && !closeTask) {
-      const title = clipToSentence(item.title, TOAST_TITLE);
+      const title = clipToSentence(rowTitle(item), TOAST_TITLE);
       if (!stay) window.dispatchEvent(new CustomEvent(THREAD_CLOSED));
       await deferCommit(item, async () => {
         await api.answer({ product: item.product, id: item.id, putAway: true });
@@ -4546,8 +4574,8 @@ export default function App() {
   }, [deferCommit, closeAgentRow, closeTroubleRow, snap?.supervisor.spawnTrouble?.since, showToast, pushUndo, nudgeOnStopped, waitingFiled, focused, markSeen, team, tour]);
 
   const reopenDone = useCallback(async (item: WorkItem) => {
-    const title = clipToSentence(item.title, TOAST_TITLE);
-    try { await api.answer({ product: item.product, id: item.id, status: 'open' }); } catch (err) { showToast(`Not reopened: ${(err as Error).message}`); return; }
+    const title = clipToSentence(rowTitle(item), TOAST_TITLE);
+    try { await api.answer({ product: item.product, id: item.id, status: 'open', reopen: true }); } catch (err) { showToast(`Not reopened: ${(err as Error).message}`); return; }
     pushUndo({ label: `Done again: ${title}`, undoes: `mark “${title}” done again`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'done' }); } });
     showToast(`Reopened: ${title}${SAYS_UNDO}`);
   }, [pushUndo, showToast]);
@@ -4623,8 +4651,8 @@ export default function App() {
     const undid = [{ product: child.product, id: child.id, words: 'Undid doing it here' }];
     await deferCommit(child, async () => {
       for (const w of writes) await api.answer(w);
-      pushUndo({ label: `Back as its own thread: ${clipToSentence(child.title, TOAST_TITLE)}. The message already went.`, undoes: `reopen “${clipToSentence(child.title, TOAST_TITLE)}”`, brings: child, undid, run: async () => { await api.answer({ product: child.product, id: child.id, status: 'open' }); } });
-    }, `Doing it in this thread: ${clipToSentence(child.title, TOAST_TITLE)}`, undefined, true, { product: parent.product, id: parent.id }, undid);
+      pushUndo({ label: `Back as its own thread: ${clipToSentence(rowTitle(child), TOAST_TITLE)}. The message already went.`, undoes: `reopen “${clipToSentence(rowTitle(child), TOAST_TITLE)}”`, brings: child, undid, run: async () => { await api.answer({ product: child.product, id: child.id, status: 'open' }); } });
+    }, `Doing it in this thread: ${clipToSentence(rowTitle(child), TOAST_TITLE)}`, undefined, true, { product: parent.product, id: parent.id }, undid);
   }, [items, deferCommit, pushUndo]);
 
   // START ALL AND DISMISS ALL (w-fe64f35bdd), from the count line over one
@@ -4793,7 +4821,7 @@ export default function App() {
     const isRunning = running && !later;
     const runStays = later && running;
     if (isRunning) {
-      setFollowing({ product: item.product, id: item.id });
+      setFollowing({ product: item.product, id: item.id, reply: true });
       setModal(null);
       // ON THE SCREEN BEFORE ANYTHING IS ASKED OF ANYBODY. The moment she
       // presses send, her message is the last thing in the conversation, where
@@ -4976,7 +5004,7 @@ export default function App() {
     const priorSnooze = item.snoozedUntil ?? 0;
     // The store lifts a time she set when the reply lands (laterHerWordLifts); Z puts it back.
     const runLifted = !later && !waiting && laterHerWordLifts(item).runAt;
-    if (stay) setFollowing({ product: item.product, id: item.id });
+    if (stay) setFollowing(followedAfter(item, text, engine));
     const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
     await deferCommit(item, async () => {
       // In a conversation, any agent it mentions starts now and the message is
@@ -5570,7 +5598,7 @@ export default function App() {
   const runNow = useCallback(async (item: WorkItem) => {
     const r = await window.zero?.runNow?.({ product: item.product, id: item.id });
     // Started, it names the thread for O (w-5513afd09a); a refusal names nothing.
-    showToast(r?.ok ? 'Up next. It starts as soon as an agent is free.'
+    showToast(r?.ok ? 'Starts as soon as an agent is free.'
       : r?.reason === 'running' ? 'Already running.'
       : r?.reason === 'paused' ? 'Agents are paused. Turn them back on to run this.'
       : r?.reason === 'scheduled' ? 'This task is scheduled for later.'
@@ -5728,9 +5756,12 @@ export default function App() {
     }
     const asked = undoAskRef.current;
     const answeringIt = asked?.entry === last && askStillStands(asked.at, now);
+    const then = last.brings;
+    const fresh = then ? selectable.find((i) => i.id === then.id && i.product === then.product) : undefined;
+    const nowNamed = (words: string) => (then && fresh ? namedNow(words, clipToSentence(rowTitle(then), TOAST_TITLE), clipToSentence(rowTitle(fresh), TOAST_TITLE)) : words);
     if (!instant && !answeringIt) {
       undoAskRef.current = { entry: last, at: now };
-      showToast(undoAsk(last.undoes));
+      showToast(undoAsk(nowNamed(last.undoes)));
       return 'old' as const;
     }
     undoAskRef.current = null;
@@ -5772,10 +5803,11 @@ export default function App() {
     // boxes are different places and she has to be told which one to look in. A
     // bare "Undone" left her hunting for a task Z had silently pulled out of
     // every view.
+    const label = nowNamed(last.label);
     showToast(
-      item ? `${last.label} · your message is back in the reply box`
-        : restored ? `${last.label} · your thread is back in the new thread card`
-          : last.label,
+      item ? `${label} · your message is back in the reply box`
+        : restored ? `${label} · your thread is back in the new thread card`
+          : label,
     );
     await refresh();
     setMultiSel((m) => ticksAfterUndo(last.ticks, m));
@@ -5789,7 +5821,7 @@ export default function App() {
     if (shown.open) { setFocused(shown.open); markSeen(shown.open); }
     else if (shown.compose) { setFocused(null); setModal('compose'); }
     return 'done' as const;
-  }, [undoStack, focused, refresh, showToast, markSeen, leaveUndoMarks, letRowGo]);
+  }, [undoStack, focused, refresh, showToast, markSeen, leaveUndoMarks, letRowGo, selectable]);
 
   // INTO THE ROW THE TOAST IS ABOUT, from a click on it or from O
   // (w-f0bfe32859). One path, so the key can never open something the click
@@ -6189,10 +6221,11 @@ export default function App() {
         }
         // What is typed with no box under it goes in the box of the thread on
         // screen, and a key that closes things waits out a change of screen.
-        const means = !e.defaultPrevented && !focused.agent
-          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc, sheetOpen: !!document.querySelector('.th-menu[role="dialog"]') })
+        const means = !e.defaultPrevented
+          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc && !focused.agent, sheetOpen: !!document.querySelector('.th-menu[role="dialog"]'), strayLately: Date.now() - nowhereAt.current < STILL_TYPING_MS })
           : 'shortcut';
         if (means === 'the sheet') { e.preventDefault(); return; }
+        if (means === 'nowhere') { e.preventDefault(); nowhereAt.current = Date.now(); return; }
         if (means === 'to the box') {
           e.preventDefault();
           typeIntoTheBox(focused, e.key);
@@ -6305,7 +6338,7 @@ export default function App() {
         // On Your threads a row's keys are its own section's, the way its tab's were (./threads/stack-rules).
         const view = keyTab;
         if (!e.defaultPrevented) {
-          const means = keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), nothingToActOn });
+          const means = keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), nothingToActOn, stillTyping: Date.now() - nowhereAt.current < STILL_TYPING_MS });
           if (means === 'held') { showToast(HELD_AFTER_A_CHANGE); return; }
           if (means === 'nowhere') {
             const box = clearSlot?.querySelector('textarea');
@@ -6369,6 +6402,7 @@ export default function App() {
           else if (multiSel.size) batchDone(multiSel);
           else if (pointed && view === 'inbox') markDone(pointed);
           else if (chatRow && view === 'inbox') void chatRowDone(chatRow);
+          else if (pointed) showToast(eOnThisList(view));
           break;
         case 'r': case 'R': if (!multiSel.size && pointed && replyKeyWorksIn(view)) { e.preventDefault(); const whose = replyingTo({ people: conversationNames(pointed) }); if (whose) showToast(whose); setFocused(pointed); markSeen(pointed); setModal('reply'); } break;
         // 1 AND 2 ANSWER A CODEX CONVERSATION'S ROW WITHOUT OPENING IT, and I
@@ -6742,7 +6776,7 @@ export default function App() {
     const undid = [{ product: item.product, id: item.id, words: UNDID_CLOSING }];
     await deferCommit(item, async () => {
       await api.answer({ product: item.product, id: item.id, status: 'done' });
-      pushUndo({ label: `Reopened: ${clipToSentence(item.title, TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(item.title, TOAST_TITLE)}”`, brings: item, undid, run: async () => {
+      pushUndo({ label: `Reopened: ${clipToSentence(rowTitle(item), TOAST_TITLE)}`, undoes: `reopen “${clipToSentence(rowTitle(item), TOAST_TITLE)}”`, brings: item, undid, run: async () => {
         await endIt();
         await api.answer({ product: item.product, id: item.id, status: 'open', reopenAs: wasBeforeClose(item) });
       } });
@@ -9363,7 +9397,7 @@ export default function App() {
           </>
         );
         const card = toast.goes
-          ? <button key={toastShown.current} type="button" className={`toast toast-goes${aboutTitle ? '' : ' toast-plain'}${toastInBar ? ' toast-in-bar' : ''}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
+          ? <button key={toastShown.current} type="button" className={`toast toast-goes${aboutTitle ? '' : ' toast-plain'}${toast.goes.warns ? ' toast-warns' : ''}${toastInBar ? ' toast-in-bar' : ''}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
           : <div key={toastShown.current} className={`toast toast-plain${toastInBar ? ' toast-in-bar' : ''}`}>{face}</div>;
         return toastInBar && cornerHeaderTarget ? createPortal(card, cornerHeaderTarget) : card;
       })()}

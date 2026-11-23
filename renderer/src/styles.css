@@ -4632,6 +4632,8 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 /* A message with no task: its sentence is the whole card. */
 .toast-plain { width: auto; max-width: 360px; display: flex; gap: 12px; padding: 11px 16px; }
 .toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
+/* A warning is read whole, or it warns of nothing. */
+.toast-warns .toast-line { white-space: normal; }
 /* An agent's message in its Undo seconds: who it goes to over the words. */
 .agent-sending { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 3px; align-items: center; }
 .agent-sending .toast-title { grid-column: 1; font-size: 12px; color: var(--text-faint); }
