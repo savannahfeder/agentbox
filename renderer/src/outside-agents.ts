@@ -30,7 +30,7 @@ export function outsideCommands(mode: AgentMode): { id: string; label: string; h
 }
 
 /** The press that makes one of those sessions a thread here, and what it says once it has. */
-export const BRING_IN = `Move to ${Name}`;
+export const BRING_IN = `Continue in ${Name}`;
 export const BROUGHT_IN = `Moved to ${Name}. The session in its terminal is left as it was.`;
 
 /** What a toast says once it is changed from somewhere the inbox is not in view. */

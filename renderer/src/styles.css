@@ -2566,6 +2566,10 @@ body {
 .dock-pill-go { cursor: pointer; }
 .dock-pill-go .dock-pill-key { color: var(--text-faint); }
 .dock-pill-go:hover .dock-pill-text, .dock-pill-go:hover .dock-pill-key { color: var(--text-dim); }
+/* Two halves of one bar, each a whole target: where it runs, and here. */
+.dock-split { display: flex; align-items: stretch; width: 100%; }
+.dock-split > .dock-pill { flex: 1 1 0; min-width: 0; }
+.dock-split > .dock-pill + .dock-pill { border-left: 1px solid var(--line); }
 .dock-pill-static .dock-pill-text { padding-right: 16px; }
 /* THE BOX GROWS AS SHE WRITES. The height is written by dock-height.ts on every
    render, because the ceiling is 40% of the PANE and no stylesheet can read

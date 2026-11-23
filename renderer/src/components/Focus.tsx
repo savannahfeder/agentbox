@@ -129,6 +129,7 @@ import type { LiveFacts } from '../live-line';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { AgentThread } from './AgentThread';
+import { BRING_IN } from '../outside-agents';
 import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
@@ -756,6 +757,8 @@ const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
 /** Out of the app, to the window the session runs in. */
 const GO_MARK = <span className="dock-pill-key" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6" /><path d="m20 4-9 9" /><path d="M18 14v5H5V6h5" /></svg></span>;
+/** The same box with the arrow coming in: from where it runs into here. */
+const IN_MARK = <span className="dock-pill-key" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 7v6h6" /><path d="m11 13 9-9" /><path d="M18 14v5H5V6h5" /></svg></span>;
 
 export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, outside = 'all', onOutside, onBringIn, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
   /** `supervisor.outOfUsage`, for the reply box's model chip. */
@@ -1039,6 +1042,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // Codex working on her message in its own window: nothing here to answer, so no box at all.
   const codexAtWork = agent?.engine === 'codex' && !agent.approval && answeredWhereItRuns(agent);
   // Pressing it takes her there: the Codex app, or the very terminal tab or editor the session is in.
+  // Only a session with a project to go to and an id to file it under can move here.
+  const bringIn = agent?.product && agent.sessionId && onBringIn ? onBringIn : null;
+  // The bar offers it beside Respond in terminal; only a session without that bar has it in ⋯.
+  const barBringsIn = !!bringIn && !update && !trouble && replyBlocked && !codexAtWork && !!onReveal;
   const respondIn = agent?.app === 'Codex app' ? 'Respond in Codex' : agent?.app === 'Codex in your editor' ? 'Respond in your editor' : 'Respond in terminal';
 
   // A SUMMARISED THREAD is work with a ledger: not a message between two people
@@ -2033,7 +2040,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onPriority={canFinish && !agent && !direct && onPriority ? (id) => onPriority(priorityValueOf(id)) : undefined}
       outside={agent ? outside : null}
       onOutside={agent ? onOutside : undefined}
-      onBringIn={agent?.product && agent.sessionId && onBringIn ? onBringIn : null}
+      onBringIn={barBringsIn ? null : bringIn}
     />
   );
 
@@ -2685,16 +2692,18 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                THIS IS THE ONLY ONE. A quiet agent used to get this pill too,
                saying there was nothing there to answer, and that was false: it
                is sitting at its prompt and it is listening. w-9348b8d148. */
-            codexAtWork ? null : agent?.engine === 'codex' && onReveal ? (
-              <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
-                <span className="dock-pill-text">{respondIn}</span>
-                {GO_MARK}
-              </button>
-            ) : onReveal ? (
-              <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
-                <span className="dock-pill-text">Respond in terminal</span>
-                {GO_MARK}
-              </button>
+            /* The two places it can be answered, side by side: where it runs, or here. */
+            codexAtWork ? null : onReveal ? (
+              <div className="dock-split">
+                <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
+                  <span className="dock-pill-text">{agent?.engine === 'codex' ? respondIn : 'Respond in terminal'}</span>
+                  {GO_MARK}
+                </button>
+                {bringIn && <button type="button" className="dock-pill dock-pill-go" onClick={bringIn}>
+                  <span className="dock-pill-text">{BRING_IN}</span>
+                  {IN_MARK}
+                </button>}
+              </div>
             ) : (
             <div className="dock-pill dock-pill-static">
               <span className="dock-pill-text">

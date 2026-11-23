@@ -167,6 +167,29 @@ describe('a moved session is in one place', () => {
   });
 });
 
+// "Logically should be here but not a fan of this UI", on a bordered button
+// inside the Respond in terminal bar; and the words beside Done needed to be
+// clearer, with a better icon (the founder, 2026-11-24).
+describe('where it is offered', () => {
+  const read = (p: string) => fs.readFileSync(path.join(import.meta.dirname, '..', p), 'utf8');
+  const focus = () => read('renderer/src/components/Focus.tsx');
+  it('is the other half of the bar Respond in terminal is in, in the words Continue in Agentbox', async () => {
+    const { BRING_IN } = await import('../renderer/src/outside-agents.ts');
+    expect(BRING_IN).toBe('Continue in Agentbox');
+    expect(focus()).toMatch(/<div className="dock-split">[\s\S]*?onClick=\{onReveal\}[\s\S]*?onClick=\{bringIn\}[\s\S]*?\{IN_MARK\}/);
+  });
+  it('and in ⋯ only on a session whose bar does not offer it, so it has one place', () => {
+    expect(focus()).toContain('const barBringsIn = !!bringIn && !update && !trouble && replyBlocked && !codexAtWork && !!onReveal;');
+    expect(focus()).toContain('onBringIn={barBringsIn ? null : bringIn}');
+  });
+  it('as a menu row, first, when the menu has it, and never beside Done', async () => {
+    const { threadMenuRows } = await import('../renderer/src/threads/ThreadMenu.tsx');
+    expect(threadMenuRows({ change: false, terminal: 'closed', finish: true, bringIn: true })[0]).toMatchObject({ id: 'bring-in', label: 'Continue in Agentbox' });
+    expect(threadMenuRows({ change: false, terminal: 'closed', finish: true }).some((r) => r.id === 'bring-in')).toBe(false);
+    expect(read('renderer/src/threads/ThreadMenu.tsx')).not.toContain('ts-bring-in');
+  });
+});
+
 describe('the app around it', () => {
   const read = (p: string) => fs.readFileSync(path.join(import.meta.dirname, '..', p), 'utf8');
   it('takes the session\'s own row out of the inbox the way Done does', () => {
@@ -187,6 +210,6 @@ describe('the app around it', () => {
     expect(read('main/main.mts')).toMatch(/const codexWatch = startCodexWatch\(\{/);
   });
   it('offers it only on a session with a project to go to and an id to file it under', () => {
-    expect(read('renderer/src/components/Focus.tsx')).toContain('onBringIn={agent?.product && agent.sessionId && onBringIn ? onBringIn : null}');
+    expect(read('renderer/src/components/Focus.tsx')).toContain('const bringIn = agent?.product && agent.sessionId && onBringIn ? onBringIn : null;');
   });
 });

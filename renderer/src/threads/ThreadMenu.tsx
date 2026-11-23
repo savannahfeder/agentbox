@@ -54,7 +54,7 @@ import type { AgentMode } from '../types';
 /** ⌘K asking a person: the thread's menu opens its sheet for them. */
 export const ASK_PERSON_EVENT = 'zero:ask-person';
 
-export type ThreadMenuRowId = 'follow' | 'continue' | 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'outside' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
+export type ThreadMenuRowId = 'follow' | 'continue' | 'share' | 'run' | 'code' | 'terminal' | 'people' | 'later' | 'priority' | 'outside' | 'bring-in' | 'pin' | 'rename' | 'move' | 'give' | 'wait' | 'shipped' | 'stop-repeat' | 'close-task' | 'reopen' | 'done';
 
 /**
  * WHERE THIS THREAD RUNS: in the cloud now (`cloud`), free to go there
@@ -101,7 +101,7 @@ export interface ThreadMenuRow {
  * door to one verb; on a phone there was no door at all and the Later tab
  * could not be filled. It names no key for the same reason.
  */
-export function threadMenuRows({ change, terminal, finish, follow = null, carryOn = false, runNow = false, share = false, shareButton = false, shareSays = null, people = false, later = false, priority = null, outside = null, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, stopRepeat = false, closeTask = false, reopen = false }: {
+export function threadMenuRows({ change, terminal, finish, follow = null, carryOn = false, runNow = false, share = false, shareButton = false, shareSays = null, people = false, later = false, priority = null, outside = null, bringIn = false, pin = null, rename = false, move = false, give = false, wait = false, shipped = null, stopRepeat = false, closeTask = false, reopen = false }: {
   /** A teammate's thread: whether you are told when it is done, or null where that cannot change. */
   follow?: 'on' | 'off' | null;
   /** A teammate's thread you can carry on in one of your own. */
@@ -136,10 +136,13 @@ export function threadMenuRows({ change, terminal, finish, follow = null, carryO
   priority?: PriorityId | null;
   /** On a session started outside Agentbox: how many of those the inbox takes. */
   outside?: AgentMode | null;
+  /** And that it can carry on as a thread here. */
+  bringIn?: boolean;
   pin?: 'pinned' | 'unpinned' | null;
   give?: boolean;
 }): ThreadMenuRow[] {
   const rows: ThreadMenuRow[] = [];
+  if (bringIn) rows.push({ id: 'bring-in', label: BRING_IN, key: null });
   if (follow) rows.push({ id: 'follow', label: 'Tell me when it is done', key: null, on: follow === 'on' });
   if (carryOn) rows.push({ id: 'continue', label: 'Continue it yourself', key: null });
   // One door for both: someone looking to hand it off goes to Share first (founder, 2026-11-21).
@@ -248,9 +251,9 @@ function FollowMark() {
   return <svg {...mark}><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5h4" /></svg>;
 }
 /** An arrow turning off the line: carry it on from here. */
-/** An arrow down into a tray: in here from now on. */
+/** The box Respond in terminal leaves by, with the arrow coming in. */
 function BringInMark() {
-  return <svg {...mark}><path d="M12 3.5v9m-3.5-3.5 3.5 3.5 3.5-3.5" /><path d="M3.5 14.5h4.5l1.5 2.5h5l1.5-2.5h4.5V20h-17z" /></svg>;
+  return <svg {...mark}><path d="M11 7v6h6" /><path d="m11 13 9-9" /><path d="M18 14v5H5V6h5" /></svg>;
 }
 function InboxMark() {
   return <svg {...mark}><path d="M3 13.5h5l1.5 2.5h5l1.5-2.5h5" /><path d="M5.5 5h13L21 13.5V19H3v-5.5z" /></svg>;
@@ -259,7 +262,7 @@ function ContinueMark() {
   return <svg {...mark}><path d="M6 4.5v7a3.5 3.5 0 0 0 3.5 3.5H19" /><path d="m15 11 4 4-4 4" /></svg>;
 }
 const TICK = <svg className="ts-more-tick" {...mark}><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>;
-const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { follow: FollowMark, continue: ContinueMark, reopen: ReopenMark, share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, outside: InboxMark, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': CloseTaskMark, done: DoneMark };
+const MARKS: Record<ThreadMenuRowId, typeof CodeMark> = { follow: FollowMark, continue: ContinueMark, reopen: ReopenMark, share: PeopleMark, run: RunMark, code: CodeMark, terminal: TerminalMark, people: PeopleMark, later: LaterMark, priority: () => <PriorityIcon id="medium" />, outside: InboxMark, 'bring-in': BringInMark, pin: () => <PinMark />, rename: RenameMark, move: MoveMark, give: GiveMark, wait: WaitMark, shipped: ShippedMark, 'stop-repeat': StopRepeatMark, 'close-task': CloseTaskMark, done: DoneMark };
 
 /** Three square dots, because every shape in this skin is square. */
 function Dots() {
@@ -402,7 +405,7 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
   // A phone's bar has no room for it, so there Share is the menu's first row.
   const shareButton = !!share && canGive && !onPhone();
   const shareSays = share?.face && share.face.mark !== 'share' ? share.face.words : null;
-  const { done, menu: rows } = splitDone(threadMenuRows({ follow: following === null || !onFollow ? null : following ? 'on' : 'off', carryOn: !!onContinue, change: !!change && !codeButton, share: !!share, shareButton, shareSays, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, outside: onOutside ? outside : null, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: canGive, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
+  const { done, menu: rows } = splitDone(threadMenuRows({ follow: following === null || !onFollow ? null : following ? 'on' : 'off', carryOn: !!onContinue, change: !!change && !codeButton, share: !!share, shareButton, shareSays, people: !!addPeople && !!onAddPeople, terminal, finish: !!onFinish, runNow: !!onRunNow, later: onLater ? (onPhone() ? true : 'key') : false, priority: onPriority ? priority : null, outside: onOutside ? outside : null, bringIn: !!onBringIn, rename: !!onRename, move: !!onMove, pin: pinned === null || !onPin ? null : pinned ? 'pinned' : 'unpinned', give: canGive, wait: waitChoices.length > 0 && !!onWait && !!onFinish ? (blocks ? 'blocked' : true) : false, shipped: shipped === null || !onShipped ? null : shipped ? 'marked' : 'unmarked', stopRepeat: !!onStopRepeating, closeTask: !!onCloseTask, reopen: !!onReopen && !!handedTo }));
   const [open, setOpen] = useState(false);
   const [giving, setGiving] = useState(false);
   const [givingTo, setGivingTo] = useState<{ id: string; name: string } | null>(null);
@@ -559,6 +562,7 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
     if (id === 'people') { askToAdd(); return; }
     if (id === 'priority') { setLeveling(true); return; }
     if (id === 'outside') { setShowing(true); return; }
+    if (id === 'bring-in') { close(false); onBringIn?.(); return; }
     if (id === 'share') { setSharing('list'); return; }
     close(id === 'terminal');
     if (id === 'follow') onFollow?.();
@@ -577,7 +581,7 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
     else onFinish?.();
   };
 
-  if (!rows.length && !done && !place && !onReopen && !files && !codeButton && !onBringIn) return null;
+  if (!rows.length && !done && !place && !onReopen && !files && !codeButton) return null;
   return (
     <span className="ts-more-wrap" ref={wrap}>
       {files}
@@ -593,7 +597,6 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
         onClick={() => { if (open && sharing) { close(false); return; } close(false); setOpen(true); setSharing('list'); setShareDirect(true); }}>
         <ShareButtonFace face={share.face} />
       </button>}
-      {onBringIn && <button type="button" className="ts-done ts-bring-in" onClick={onBringIn}><BringInMark /><span>{BRING_IN}</span></button>}
       {done && (
         <button
           type="button"

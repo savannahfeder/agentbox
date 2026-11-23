@@ -140,7 +140,7 @@ describe('the bar that takes you there', () => {
   const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
   it('says only where to respond', () => {
     expect(focus).toContain("const respondIn = agent?.app === 'Codex app' ? 'Respond in Codex' : agent?.app === 'Codex in your editor' ? 'Respond in your editor' : 'Respond in terminal';");
-    expect(focus).toContain('<span className="dock-pill-text">Respond in terminal</span>');
+    expect(focus).toContain("<span className=\"dock-pill-text\">{agent?.engine === 'codex' ? respondIn : 'Respond in terminal'}</span>");
   });
   it('and no longer spells out what to do there', () => {
     expect(focus).not.toMatch(/to allow or deny it|Answer this one in its own window\. A message from here would wait behind the box it is stuck on\.<\/span>\s*\{GO_MARK\}/);
