@@ -122,7 +122,7 @@ import { optionIsClipped, optionPeek } from '../option-peek';
 import { agentSaidNotReady, changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, saidNotToShip, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw, stripUnderThePointer } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
-import { agentLayout, answeredWhereItRuns, replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
+import { answeredWhereItRuns, replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
@@ -1036,10 +1036,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const replyBlocked = agent ? replyIsSwallowed(agent) : false;
   // Codex working on her message in its own window: nothing here to answer, so no box at all.
   const codexAtWork = agent?.engine === 'codex' && !agent.approval && answeredWhereItRuns(agent);
-  // The bar says what there is to do there: allow a command, answer a question, or reply to a report.
-  const codexVerb = agent?.approval ? 'allow or deny it' : agent && agentLayout(agent).kind === 'asks' ? 'answer it' : 'reply';
   // Pressing it takes her there: the Codex app, or the very terminal tab or editor the session is in.
-  const codexPlace = agent?.app === 'Codex app' ? 'the Codex app' : agent?.app === 'Codex in your editor' ? 'your editor' : 'its terminal';
+  const respondIn = agent?.app === 'Codex app' ? 'Respond in Codex' : agent?.app === 'Codex in your editor' ? 'Respond in your editor' : 'Respond in terminal';
 
   // A SUMMARISED THREAD is work with a ledger: not a message between two people
   // (main/team/projects.mts makeDirect), and not a running agent's row, the
@@ -2686,12 +2684,12 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                is sitting at its prompt and it is listening. w-9348b8d148. */
             codexAtWork ? null : agent?.engine === 'codex' && onReveal ? (
               <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
-                <span className="dock-pill-text">Open {codexPlace} to {codexVerb}</span>
+                <span className="dock-pill-text">{respondIn}</span>
                 {GO_MARK}
               </button>
             ) : onReveal ? (
               <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
-                <span className="dock-pill-text">Answer this one in its own window. A message from here would wait behind the box it is stuck on.</span>
+                <span className="dock-pill-text">Respond in terminal</span>
                 {GO_MARK}
               </button>
             ) : (

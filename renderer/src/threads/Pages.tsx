@@ -12,7 +12,7 @@ import { createPortal } from 'react-dom';
 import { scrollerOf, useRowDrag } from './row-drag';
 import { chord } from '../this-keyboard';
 import type { AgentMode, CloudPlan, Person, Product, ThreadCard, ThreadStateWord, View, WorkItem } from '../types';
-import { OUTSIDE_MODES } from '../outside-agents';
+import { OUTSIDE_MODES, OUTSIDE_TITLE } from '../outside-agents';
 import { priorityIdOf, priorityLabelOf, PRIORITIES, type PriorityId } from '../priority';
 import { Face, TeamContext, dueWords, firstName, personOf } from '../team/people';
 import { handedBy, taskWords } from '../team/company';
@@ -457,7 +457,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
     </span></div>
     {/* Not a filter of this view: it is what comes into the inbox at all, so
         Clear filters leaves it and it lights no dot. */}
-    {outside && <><div className="rule" /><div className="line"><span className="lab lab-two">Outside {Name}</span><span className="opts">
+    {outside && <><div className="rule" /><div className="line"><span className="lab lab-two">{OUTSIDE_TITLE}</span><span className="opts">
       {OUTSIDE_MODES.map((m) => <button type="button" key={m.value} className={outside.mode === m.value ? 'on' : ''} onClick={() => outside.onMode(m.value)}>{m.label}</button>)}
     </span></div></>}
     <div className="rule" />

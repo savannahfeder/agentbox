@@ -27,7 +27,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { OUTSIDE_MODES } from '../outside-agents';
+import { OUTSIDE_MODES, OUTSIDE_TITLE } from '../outside-agents';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { onCloudPhone, onPhone, phoneSized } from '../phone-screen';
 import { setSidebarShrinks, useSidebarShrinks } from '../sidebar-shrinks';
@@ -2604,12 +2604,12 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                 They are rows in the Inbox and in no other list since
                 2026-08-17; this is the only place that decides how many of
                 them get there. */}
-            <Group id="outside" label="Agents you started yourself">
+            <Group id="outside" label={OUTSIDE_TITLE}>
               <Row
                 label="Show while they run"
                 desc={`Claude Code and Codex, started in a terminal or the Codex app. ${AGENT_SENTENCE[w.outsideAgents]}`}
               >
-                <Picker bare label="Agents you started yourself" value={w.outsideAgents} options={AGENT_OPTIONS} onChange={(v) => setWorkspace('outsideAgents', v)} />
+                <Picker bare label={OUTSIDE_TITLE} value={w.outsideAgents} options={AGENT_OPTIONS} onChange={(v) => setWorkspace('outsideAgents', v)} />
               </Row>
               {/* The moment after the row above: a chat that has stopped. */}
               <Row
@@ -2999,9 +2999,9 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
           </ReadRow>
         </Group>
         {/* Bring in new chats is not in the copy, so it is not drawn here. */}
-        <Group id="outside" label="Agents you started yourself">
+        <Group id="outside" label={OUTSIDE_TITLE}>
           <ReadRow label="Show while they run" reading={outside} desc={`Claude Code and Codex, started in a terminal or the Codex app. ${AGENT_SENTENCE[outside.value as AgentMode] ?? ''}`}>
-            <Picker bare label="Agents you started yourself" value={outside.value as string} options={AGENT_OPTIONS} onChange={(v) => onWorkspace('outsideAgents', v)} />
+            <Picker bare label={OUTSIDE_TITLE} value={outside.value as string} options={AGENT_OPTIONS} onChange={(v) => onWorkspace('outsideAgents', v)} />
           </ReadRow>
         </Group>
       </Page>

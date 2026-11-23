@@ -7,6 +7,9 @@
 // though, is not discoverable." The only control was one row on the Running
 // page of Settings. It is now also on each of those sessions' ⋯ menu, on the
 // inbox's View and filters, and in ⌘K, all in the Settings row's words.
+// "Agents you started yourself: All of them, Only the stuck ones, None" was
+// then sent back as long and unclear; it is Terminal sessions, shown Always,
+// When they need you or Never.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -25,7 +28,7 @@ const base = { change: false, terminal: null, finish: true } as const;
 describe('the ⋯ menu on one of those sessions', () => {
   it('has a row naming the setting and what it is now', () => {
     const row = threadMenuRows({ ...base, outside: 'waiting' }).find((r) => r.id === 'outside');
-    expect(row).toMatchObject({ label: 'Agents you started yourself', detail: 'Only the stuck ones' });
+    expect(row).toMatchObject({ label: 'Terminal sessions', detail: 'When they need you' });
   });
   it('is not on a thread Agentbox started', () => {
     expect(threadMenuRows({ ...base }).some((r) => r.id === 'outside')).toBe(false);
@@ -43,13 +46,13 @@ describe('the inbox View and filters', () => {
   const draw = (outside: unknown) => renderToStaticMarkup(React.createElement(DisplayMenu, { page: 'inbox', display, onDisplay: () => {}, products: [], tab: 'inbox', outside } as never));
   it('offers the three choices with the one in force lit', () => {
     const html = draw({ mode: 'off', onMode: () => {} });
-    expect(html).toContain('Outside Agentbox');
+    expect(html).toContain('Terminal sessions');
     for (const m of OUTSIDE_MODES) expect(html).toContain(`>${m.label}</button>`);
-    expect(html).toContain('class="on">None</button>');
-    expect(html).not.toContain('class="on">All of them</button>');
+    expect(html).toContain('class="on">Never</button>');
+    expect(html).not.toContain('class="on">Always</button>');
   });
   it('and none of it where the page gives no setting (the team page)', () => {
-    expect(draw(null)).not.toContain('Outside Agentbox');
+    expect(draw(null)).not.toContain('Terminal sessions');
   });
   it('is handed the inbox\'s setting, and changing it there raises no toast over the list it changes', () => {
     expect(read('renderer/src/App.tsx')).toContain("outside={{ mode: agentMode, onMode: (mode) => chooseOutside(mode, { say: false }) }}");
@@ -61,9 +64,9 @@ describe('⌘K', () => {
     const rows = outsideCommands('all');
     expect(rows.map((r) => r.to)).toEqual(['all', 'waiting', 'off']);
     expect(rows.map((r) => r.label)).toEqual([
-      'Agents you started yourself: all of them',
-      'Agents you started yourself: only the stuck ones',
-      'Agents you started yourself: none',
+      'Show terminal sessions: always',
+      'Show terminal sessions: when they need you',
+      'Show terminal sessions: never',
     ]);
     expect(rows.filter((r) => r.hint).map((r) => r.to)).toEqual(['all']);
   });
@@ -78,8 +81,8 @@ describe('⌘K', () => {
 describe('one set of words', () => {
   it('Settings reads the same three choices', () => {
     expect(read('renderer/src/components/Settings.tsx')).toContain('const AGENT_OPTIONS = OUTSIDE_MODES;');
-    expect(OUTSIDE_TITLE).toBe('Agents you started yourself');
-    expect(outsideLabel('off')).toBe('None');
+    expect(OUTSIDE_TITLE).toBe('Terminal sessions');
+    expect(outsideLabel('off')).toBe('Never');
   });
   it('a toast for each, without a colon', () => {
     for (const m of OUTSIDE_MODES) expect(OUTSIDE_SAID[m.value]).not.toContain(':');

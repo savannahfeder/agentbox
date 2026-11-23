@@ -48,7 +48,7 @@ import type { Person } from '../types';
 import { ChooseList, CopiedSheet, EveryoneMark, GiveSheet, PanelBack, SeeList, SendSheet, ShareList, pointsAtStep } from './SharePanel';
 import { readAskDraft, saveAskDraft, type AskDraft, type ItemRef } from '../drafts';
 import type { SeenBy, ShareFace } from './share-rules';
-import { OUTSIDE_MODES, OUTSIDE_TITLE, outsideLabel } from '../outside-agents';
+import { OUTSIDE_ASK, OUTSIDE_MODES, OUTSIDE_TITLE, outsideLabel } from '../outside-agents';
 import type { AgentMode } from '../types';
 
 /** ⌘K asking a person: the thread's menu opens its sheet for them. */
@@ -647,7 +647,7 @@ export function ThreadMenu({ thread = null, following = null, onFollow, onContin
       )}
       {open && showing && (
         <div className="th-menu ts-more-menu" role="menu" aria-label={OUTSIDE_TITLE}>
-          <p className="ts-menu-say">Show in your inbox</p>
+          <p className="ts-menu-say">{OUTSIDE_ASK}</p>
           {OUTSIDE_MODES.map((m) => <button key={m.value} type="button" role="menuitem" aria-current={m.value === outside ? 'true' : undefined} tabIndex={-1} className="row-i ts-more-row" onClick={() => { close(false); if (m.value !== outside) onOutside?.(m.value); }}>
             <span className="ts-more-label">{m.label}</span>
             {m.value === outside && TICK}
