@@ -10,11 +10,11 @@
 // list, E did nothing and ⌘K offered no command for it. Only the small Mark
 // done in the chat's banner worked, and it left you in the chat.
 //
-// Now the chat's row takes E and ⌘K's Mark done, the open chat's ⌘K offers
-// Mark done (its box has the caret, so E there is still a letter), and a
-// chat marked done from the inbox goes back to the list, as a closed thread
-// does. The row leaves on the press, not when the Mac's next picture of the
-// rooms comes in; a newer message brings it back.
+// Now the chat's row takes E and ⌘K's Mark done, with Z to put it back, and
+// ⌘K over a chat open from Needs you offers the Done its E and bar give it
+// (tests/a-chat-opened-from-needs-you-answers-keys-like-a-thread). Every Done
+// on a chat takes its row out of Needs you on the press, not when the window
+// next reads the Mac's rooms; a newer message or Z brings it back.
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import fs from 'node:fs';
 import { build } from 'esbuild';
@@ -97,6 +97,7 @@ beforeAll(async () => {
       const draw = () => flushSync(() => root.render(<ChatsContext.Provider value={chats}><Harness key={copy} /></ChatsContext.Provider>));
       draw();
       window.act = (step) => flushSync(() => { new Function('ui', step)(ui); });
+      window.run = (step) => new Function('ui', 'return ' + step)(ui);
       // A fresh copy: the rooms as they were and no marks.
       window.restart = () => { copy += 1; draw(); };
       window.newMessage = () => flushSync(() => setRooms((r) => ({ ...r, mentions: [...r.mentions, asked('r-maya', 'Maya C.', 'm2', 'p-maya', 'Maya Chen', 'One more thing.', 1000)] })));
@@ -123,35 +124,17 @@ const drawn = () => page.evaluate(() => ({
 }));
 const act = async (step: string) => { await page.evaluate((s) => window.act(s), step); };
 const settle = () => page.evaluate(() => new Promise((r) => setTimeout(r, 30)));
+// An async call, then a moment for React to draw what it changed.
+const run = async (step: string) => { const res = await page.evaluate((s) => window.run(s), step); await settle(); return res; };
 beforeEach(async () => {
   if (!page) return;
   await page.evaluate(() => { window.restart(); window.calls = []; window.toasts = []; window.answer = { ok: true, value: null }; });
 });
 
 describe.skipIf(!browserAvailable)('a chat opened from Needs you', () => {
-  it('can be marked done from ⌘K, which goes back to the list without its row', async () => {
+  it('leaves its Done to the bar and E, as a thread does, with no banner of its own', async () => {
     await page.locator('.rm-mention', { hasText: 'refund copy' }).click();
-    expect(await drawn()).toMatchObject({ openId: 'r-maya', inInbox: true, canMarkDone: true });
-    await act('ui.markDoneHere()');
-    await settle();
-    const d = await drawn();
-    expect(d).toMatchObject({ openId: null, calls: [['markDone', 'r-maya']] });
-    expect(d.rows).toHaveLength(1);
-    expect(d.rows[0]).toContain('phone app');
-  });
-
-  it('goes back to the list from the Mark done in its banner too', async () => {
-    await page.locator('.rm-mention', { hasText: 'refund copy' }).click();
-    await page.locator('.gr-waits button', { hasText: 'Mark done' }).click();
-    await settle();
-    const d = await drawn();
-    expect(d).toMatchObject({ openId: null, calls: [['markDone', 'r-maya']] });
-    expect(d.rows).toHaveLength(1);
-  });
-
-  it('offers no Mark done once nothing in it waits on you', async () => {
-    await act("ui.open('r-quiet', 'inbox')");
-    expect(await drawn()).toMatchObject({ openId: 'r-quiet', canMarkDone: false, banner: null });
+    expect(await drawn()).toMatchObject({ openId: 'r-maya', inInbox: true, canMarkDone: false, banner: null });
   });
 });
 
@@ -163,21 +146,36 @@ describe.skipIf(!browserAvailable)('a chat opened from the Team page', () => {
     await settle();
     expect(await drawn()).toMatchObject({ openId: 'r-maya', banner: null, calls: [['markDone', 'r-maya']], canMarkDone: false });
   });
-});
 
-describe.skipIf(!browserAvailable)('a chat row in Needs you', () => {
-  it('is marked done in place, as E on it does, and leaves the list on the press', async () => {
-    await act('ui.markChatDone(ui.mentions.find((m) => m.roomId === "r-theo"))');
+  it('offers no Mark done once nothing in it waits on you', async () => {
+    await act("ui.open('r-quiet')");
+    expect(await drawn()).toMatchObject({ openId: 'r-quiet', canMarkDone: false, banner: null });
+  });
+
+  it('says why when the banner’s Mark done does not go through', async () => {
+    await page.evaluate(() => { window.answer = { ok: false, error: 'The team cloud did not answer.' }; });
+    await act("ui.open('r-maya')");
+    await act('ui.markDoneHere()');
     await settle();
     const d = await drawn();
+    expect(d.banner).toContain('waiting on you here');
+    expect(d.toasts).toEqual(['The team cloud did not answer.']);
+  });
+});
+
+describe.skipIf(!browserAvailable)('Done on a chat', () => {
+  it('takes its row out of Needs you on the press, and answers the earlier mark for Z', async () => {
+    await page.evaluate(() => { window.answer = { ok: true, value: 1234 }; });
+    const res = await run('ui.markDone("r-theo")');
+    const d = await drawn();
+    expect(res).toEqual({ ok: true, value: 1234 });
     expect(d).toMatchObject({ openId: null, calls: [['markDone', 'r-theo']] });
     expect(d.rows).toHaveLength(1);
     expect(d.rows[0]).toContain('refund copy');
   });
 
-  it('comes back when a newer message arrives in that chat', async () => {
-    await act('ui.markChatDone(ui.mentions.find((m) => m.roomId === "r-maya"))');
-    await settle();
+  it('brings the row back when a newer message arrives in that chat', async () => {
+    await run('ui.markDone("r-maya")');
     expect((await drawn()).rows).toHaveLength(1);
     await page.evaluate(() => window.newMessage());
     const rows = (await drawn()).rows;
@@ -185,13 +183,24 @@ describe.skipIf(!browserAvailable)('a chat row in Needs you', () => {
     expect(rows.join(' ')).toContain('One more thing.');
   });
 
-  it('comes back and says why when the mark does not go through', async () => {
-    await page.evaluate(() => { window.answer = { ok: false, error: 'The team cloud did not answer.' }; });
-    await act('ui.markChatDone(ui.mentions.find((m) => m.roomId === "r-maya"))');
+  it('brings the row back at once when Z takes it back', async () => {
+    await run('ui.markDone("r-maya")');
+    expect((await drawn()).rows).toHaveLength(1);
+    await run('ui.undoDone("r-maya", 0)');
     await settle();
     const d = await drawn();
     expect(d.rows).toHaveLength(2);
-    expect(d.toasts).toEqual(['The team cloud did not answer.']);
+    expect(d.calls).toEqual([['markDone', 'r-maya'], ['undoDone', 'r-maya', 0]]);
+  });
+
+  it('brings the row back when the mark does not go through, and leaves saying so to whoever pressed', async () => {
+    await page.evaluate(() => { window.answer = { ok: false, error: 'The team cloud did not answer.' }; });
+    const res = await run('ui.markDone("r-maya")');
+    await settle();
+    const d = await drawn();
+    expect(res).toEqual({ ok: false, error: 'The team cloud did not answer.' });
+    expect(d.rows).toHaveLength(2);
+    expect(d.toasts).toEqual([]);
   });
 });
 
@@ -203,26 +212,35 @@ describe('in the app', () => {
   });
 
   it('gives ⌘K over an open chat its Mark done and nothing for a thread hidden behind it', () => {
+    // From Needs you, the same Done as E and the bar's button.
+    expect(app).toContain("if (roomShown && chatInInbox) return [{ id: 'done', label: `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); void chatDone(); } }];");
     expect(app).toContain("if (roomShown) return roomsUi.markDoneHere ? [{ id: 'done', label: `Mark ${DONE.verb.toLowerCase()}`, run: () => { setModal(null); roomsUi.markDoneHere?.(); } }] : [];");
     // Above the ticked rows and the hidden row, which would otherwise answer.
     expect(app.indexOf('if (roomShown) return roomsUi.markDoneHere')).toBeLessThan(app.indexOf('if (multiSel.size && !focused) {'));
   });
 
+  it('marks a chat done from its bar, E and ⌘K through the one Done that hides its row', () => {
+    const done = app.slice(app.indexOf('const chatDone = async'), app.indexOf('const chatRowDone = '));
+    expect(done).toContain('const res = await roomsUi.markDone(id);');
+  });
+
   it('gives ⌘K on a chat row its Mark done, with E beside it', () => {
     // A phone draws no row the keyboard is on.
-    expect(app).toContain("if (!target && chatRow && !onPhone()) return [{ id: 'done', label: `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); chatRowDone(chatRow); } }];");
+    expect(app).toContain("if (!target && chatRow && !onPhone()) return [{ id: 'done', label: `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); void chatRowDone(chatRow); } }];");
   });
 
   it('marks a chat row done with E, and a task row is still closed as before', () => {
-    expect(app).toMatch(/else if \(pointed && view === 'inbox'\) markDone\(pointed\);\s*else if \(chatRow && view === 'inbox'\) chatRowDone\(chatRow\);/);
+    expect(app).toMatch(/else if \(pointed && view === 'inbox'\) markDone\(pointed\);\s*else if \(chatRow && view === 'inbox'\) void chatRowDone\(chatRow\);/);
   });
 
   // Measured on the stand-in team before this: E on the first of two chat rows
   // put the keyboard on the first thread, below the second chat, so a second E
   // closed a thread.
-  it('puts the keyboard on the row under a chat row marked done', () => {
-    const done = app.slice(app.indexOf('const chatRowDone = '), app.indexOf('roomsUi.markChatDone(row);'));
+  it('puts the keyboard on the row under a chat row marked done, and Z puts the chat back', () => {
+    const done = app.slice(app.indexOf('const chatRowDone = '), app.indexOf('const [chatLater, setChatLater]'));
     expect(done).toContain('const next = at >= 0 ? heldLeads.rows[at + 1] ?? null : null;');
     expect(done).toContain('if (next) setCardSel(`lead/${next.key}`);');
+    expect(done).toMatch(/const res = await roomsUi\.markDone\(row\.roomId\);[\s\S]*pushUndo\([\s\S]*roomsUi\.undoDone\(row\.roomId, was\)/);
+    expect(done).toContain('showToast(`${DONE.verb}: ${row.roomName}${SAYS_UNDO}`);');
   });
 });

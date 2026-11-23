@@ -116,20 +116,21 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const leave = () => { setOpenId(null); setEmpty(false); setBoardOn(false); setFinderOpen(false); };
 
   const waiting = live ? notMarkedDone(rooms!.mentions, chatsDone.done) : [];
-  // Every Mark done on a chat: its banner, ⌘K, and E on its row in Needs you.
-  // Opened from Needs you, it goes back to the list, as closing a thread does.
-  const markChatDone = (row: Pick<RoomMention, 'roomId'>) => {
-    const id = row.roomId;
-    const at = Math.max(...waiting.filter((m) => m.roomId === id).map((m) => m.at));
-    if (!Number.isFinite(at)) return;
-    chatsDone.mark(id, at);
-    if (openId === id && inInbox) leave();
-    void call('markDone', id).then((res) => {
-      if (res.ok) return;
-      chatsDone.mark(id, null);
-      toast(res.error ?? 'Not marked done');
-    });
+  // Every Done on a chat goes through here: E, ⌘K and the bar's Done on it,
+  // E on its row in Needs you, and its banner. Answers the Mac's earlier mark,
+  // for Z to give back to `undoDone`.
+  const markDone = async (roomId: string) => {
+    const at = Math.max(...waiting.filter((m) => m.roomId === roomId).map((m) => m.at));
+    if (Number.isFinite(at)) chatsDone.mark(roomId, at);
+    const res = await call<number>('markDone', roomId);
+    if (!res.ok) chatsDone.mark(roomId, null);
+    return res;
   };
+  const undoDone = (roomId: string, was: number) => {
+    chatsDone.mark(roomId, null);
+    return call('undoDone', roomId, was);
+  };
+  const doneOnTheBanner = (roomId: string) => void markDone(roomId).then((res) => { if (!res.ok) toast(res.error ?? 'Not marked done'); });
 
   // Joining a team opens its group, which may not have reached this window yet.
   const wantTeam = useRef(false);
@@ -367,15 +368,16 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     page = <div className="rm-empty gr-none"><span className="t">You are not in any groups yet.</span></div>;
   } else if (open && rooms && onChat) {
     const bare = inline || inInbox;
-    page = <GroupPage key={open.id} inline={bare}
-      notice={<><GroupWaits row={waitsHere} onDone={() => markChatDone({ roomId: open.id })} />
+    // In the inbox, Done is in the bar and on E, as on a thread.
+    page = <GroupPage key={open.id} inline={bare} inbox={inInbox}
+      notice={<>{!inInbox && <GroupWaits row={waitsHere} onDone={() => doneOnTheBanner(open.id)} />}
         {rooms.me && noticeShown(open, answered) ? <OpenGroupNotice me={rooms.me}
           onLeave={() => void groupAction(open, 'leave', new DOMRect())}
           onHide={() => void call('saveProfile', { show_working: 'team' })} onOk={() => answerNotice(open.id)} /> : null}</>}
       chat={(() => {
         const c = pairChat(open);
         return <RoomChat room={c.room} messages={c.messages} people={withMe(chatPeople(c.room, meId), meInChat)} meId={meId} now={now}
-          full hang head={<></>} {...c.calls} />;
+          full hang folded={inInbox} head={<></>} {...c.calls} />;
       })()}
       people={bare && (open.teamId || open.members <= 2) ? null : <PeoplePanel room={open} onPerson={(id) => openPerson(id, open.wall, () => setPane(`person:${id}`))} threadOf={threadOf} />}      list={<GroupsColumn rows={rows} current={`room:${open.id}`} now={now} onOpen={pickGroup} />} />;
     heading = { title: <GroupsHead current={currentRow} onFind={() => setFinderOpen(true)} /> };
@@ -483,9 +485,15 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
     open: (id: string, from: 'inbox' | null = null) => openRoom(id, from), close, leave, page, dialogs, join, invisible, settingsPane,
     /** The sidebar's Groups: the group open last, or none. */
     openTab,
-    mentions, openMention, faces, heading, markChatDone,
-    /** Mark done for the chat on screen, or null when nothing in it waits on you. */
-    markDoneHere: waitsHere ? () => markChatDone(waitsHere) : null,
+    mentions, openMention, faces, heading,
+    /** Groups put off with L, for the Later tab. */
+    laterRows: live ? rooms!.later ?? [] : [],
+    /** E and Done on a group; its row leaves Needs you on the press. */
+    markDone, undoDone,
+    /** The banner's Mark done on a chat opened from the Team page, or null; in the inbox the chat's Done is the thread's. */
+    markDoneHere: waitsHere && !inInbox ? () => doneOnTheBanner(waitsHere.roomId) : null,
+    /** L on a group; `until` 0 brings it back now. Answers what it replaced, for Z. */
+    putOff: (roomId: string, until: number, seen?: number) => call<{ until: number; seen: number } | null>('later', roomId, until, ...(seen === undefined ? [] : [seen])),
     dialogOpen: !!members || finderOpen || !!listing,
     /** After a team invite is taken up. */
     openTeamGroup: () => { wantTeam.current = true; },

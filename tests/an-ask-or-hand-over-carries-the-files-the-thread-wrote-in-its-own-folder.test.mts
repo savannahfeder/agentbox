@@ -83,6 +83,49 @@ describe('a doc the agent wrote in the thread\'s own checkout', () => {
     expect(carried(theTask(), files[0])).toBe('For developers only.\n');
   });
 
+  // A power test, 2026-11-22: Priya handed her reviewed checkout thread to Lena, and the newest
+  // page the agent made, clinic-checkout-v3.html, reached her as words she could not open.
+  it('goes with a hand-over when it is a page the agent made', async () => {
+    const t = aThread(() => 'The prototype is [clinic-checkout-v3.html](clinic-checkout-v3.html).');
+    write(checkout(t.id, 'clinic-checkout-v3.html'), '<h1>Visit checkout</h1>\n');
+    await sam.service.syncNow();
+    await sam.service.handOn({ product: 'api', id: t.id, to: priya.personId });
+    await both();
+    const files = linked(theTask().body);
+    expect(files.some((f) => /clinic-checkout-v3\.html$/.test(f))).toBe(true);
+    expect(carried(theTask(), files.find((f) => /clinic-checkout-v3\.html$/.test(f))!)).toBe('<h1>Visit checkout</h1>\n');
+  });
+
+  // The third round: the review that came back said "Notes on bookings-empty-states.html:", the bare
+  // name was taken as the page's newest copy, nothing held it, and the page stayed "On Priya's computer".
+  it('goes with a hand-over when a review that came back names it in words', async () => {
+    const at = (id) => path.join(sam.dir, 'designs', id, 'bookings-empty-states.html');
+    const t = aThread((id) => `The two states:\n\n${at(id)}`);
+    write(at(t.id), '<h1>No bookings yet</h1>\n');
+    sam.store.tellItem('api', t.id, { text: 'Priya reviewed this.\n\nNotes on bookings-empty-states.html:\n- Pin 1: Say New booking.', from: { teammate: priya.personId, name: 'Priya Shah' }, hold: true });
+    await sam.service.syncNow();
+    await sam.service.handOn({ product: 'api', id: t.id, to: priya.personId });
+    await both();
+    const page = linked(theTask().body).find((f) => /bookings-empty-states\.html$/.test(f));
+    expect(page).toBeTruthy();
+    expect(carried(theTask(), page!)).toBe('<h1>No bookings yet</h1>\n');
+    // Where the agent wrote the page's whole path, the task links the copy, not the bare name that opens nothing.
+    expect(theTask().body).toContain(`The two states:\n\n[bookings-empty-states.html](${page})`);
+    expect(theTask().body).not.toMatch(/^bookings-empty-states\.html$/m);
+  });
+
+  it('draws a picture the agent wrote by its whole path as the picture it carried', async () => {
+    const at = (id) => path.join(sam.dir, 'designs', id, 'first-visit.png');
+    const t = aThread((id) => `The picture:\n\n${at(id)}`);
+    write(at(t.id), 'png bytes');
+    await sam.service.syncNow();
+    await sam.service.handOn({ product: 'api', id: t.id, to: priya.personId });
+    await both();
+    const pic = linked(theTask().body).find((f) => /first-visit\.png$/.test(f));
+    expect(theTask().body).toContain(`The picture:\n\n![first-visit.png](${pic})`);
+    expect(theTask().body.match(/first-visit\.png\]\(attachments/g)).toHaveLength(1);
+  });
+
   it('is said to be left behind when it is over the size a message carries', async () => {
     const t = aThread(() => 'Wrote [amount-errors.md](amount-errors.md).');
     write(checkout(t.id, 'amount-errors.md'), '');

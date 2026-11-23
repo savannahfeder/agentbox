@@ -258,11 +258,15 @@ describe('the rules, without a cloud', () => {
     expect(handedBackBy({ ...back, status: 'open' })).toBeNull();
     expect(handedBackBy({ status: 'blocked', wrote: { answer: { ts: 5 } } })).toBeNull();
   });
-  // Round three: Theo handed Sam's thread back, and the agent's two options could no longer be picked.
-  it('a hand-back leaves the agent\'s options open for you to pick', () => {
-    const offer = { result: 'Which way?\n\n## Options\n1. Keep it\n2. Drop it', answer: 'Theo handed this back.', wrote: { result: { ts: 1, source: 'agent' }, answer: { ts: 2, source: 'system', teammate: 'theo' } } };
-    expect(offerIsLive(offer as never)).toBe(true);
+  // Round three kept the agent's options open after a hand-back. On 2026-11-22 the founder saw Sam's
+  // "Ask Theo to review it" still offered under Theo's review: "I don't want deterministic things ever
+  // to be here." A teammate's words answer the options as yours do; you reply to the agent in your own.
+  it('a hand-back takes the agent\'s options away, as your own reply does', () => {
+    const offer = { result: 'Which way?\n\n## Options\n1. Ask Theo to review it\n2. Ship it without a review', answer: 'Theo handed this back.', wrote: { result: { ts: 1, source: 'agent' }, answer: { ts: 2, source: 'system', teammate: 'theo' } } };
+    expect(offerIsLive(offer as never)).toBe(false);
     expect(offerIsLive({ ...offer, wrote: { ...offer.wrote, answer: { ts: 2, source: 'founder' } } } as never)).toBe(false);
+    // Options the agent offers after the hand-back are its answer to it, and stay.
+    expect(offerIsLive({ ...offer, wrote: { result: { ts: 3, source: 'agent' }, answer: { ts: 2, source: 'system', teammate: 'theo' } } } as never)).toBe(true);
   });
   // Round three: the returned row previewed words the status already said, not Theo's answer.
   it('a handed-back row previews the helper\'s own words', () => {
