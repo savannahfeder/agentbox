@@ -15,7 +15,9 @@ export interface FolderOp { op: 'folder'; id: string; project: string; name: str
 export interface PlaceOp { op: 'place'; key: string; project?: string | null; family?: string; folder: string | null; by?: string | null; at: number }
 /** The name a person gave a file, kept apart from its name on disk so every version and every thread that names it still finds it. */
 export interface NameOp { op: 'name'; key: string; project?: string | null; name: string; by?: string | null; at: number }
-export type FolderLogOp = FolderOp | PlaceOp | NameOp;
+/** The icon a person picked for a file's tile; empty puts it back to the one Files picks. */
+export interface IconOp { op: 'icon'; key: string; project?: string | null; icon: string; by?: string | null; at: number }
+export type FolderLogOp = FolderOp | PlaceOp | NameOp | IconOp;
 
 export interface FileFolder { id: string; project: string; name: string; parent: string | null; at: number }
 /** A folder removed, kept so putting it back keeps its id, and so its files return to it. */
@@ -29,6 +31,7 @@ export interface FolderShelf {
   placeOf(key: string): string | null;
   /** The name a person gave the file, or null for its name on disk. */
   titleOf(key: string): string | null;
+  iconOf(key: string): string | null;
 }
 
 export const projectKey = (name: string | null | undefined): string => String(name ?? '').trim().toLowerCase();
@@ -62,6 +65,7 @@ export function foldFolders(ops: readonly FolderLogOp[]): FolderShelf {
   const rows = new Map<string, FileFolder & { first: number; gone: boolean }>();
   const places = new Map<string, PlaceOp>();
   const titles = new Map<string, NameOp>();
+  const icons = new Map<string, IconOp>();
   for (const op of ops) {
     if (op.op === 'folder') {
       const was = rows.get(op.id);
@@ -72,6 +76,9 @@ export function foldFolders(ops: readonly FolderLogOp[]): FolderShelf {
     } else if (op.op === 'name') {
       const was = titles.get(op.key);
       if (!was || was.at <= op.at) titles.set(op.key, op);
+    } else if (op.op === 'icon') {
+      const was = icons.get(op.key);
+      if (!was || was.at <= op.at) icons.set(op.key, op);
     }
   }
   // A folder under a removed one goes with it, and a removed name is free to use again.
@@ -102,6 +109,9 @@ export function foldFolders(ops: readonly FolderLogOp[]): FolderShelf {
     },
     titleOf(key: string): string | null {
       return titles.get(key)?.name || null;
+    },
+    iconOf(key: string): string | null {
+      return icons.get(key)?.icon || null;
     },
   };
 }

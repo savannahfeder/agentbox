@@ -49,6 +49,8 @@ import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
+import { handedIn, type HandedComment } from './comments-to-hand';
+import { rememberHanded } from './send-back';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
 import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { cardPick, clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
@@ -126,6 +128,8 @@ export interface ComposeStart {
   caret?: [number, number];
   /** Files already on disk that go with it: what a handed-over message or task carries. */
   attachments?: PendingAttachment[];
+  /** The comments on the files it carries, which go to the agent unless unticked. */
+  comments?: HandedComment[];
   /** The message this card was opened from, when it was handed to an agent. */
   handFrom?: HandFrom;
   /** The task's name, which the thread keeps while its first line still says it. */
@@ -295,6 +299,9 @@ export function ThreadComposer({
   const [dropped, setDropped] = useState(0);
   const { attaching, collect } = useAttaching();
   const onThisWork = initial?.handFrom ? agentOnThisWork(items, initial.handFrom) : null;
+  // The comments are lines of the words; the ones still there when it is sent are the ones it carried.
+  const comments = initial?.comments ?? [];
+  const commenter = (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null) || 'A teammate';
 
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
@@ -696,6 +703,7 @@ export function ThreadComposer({
           ...(scripted ? { labels: scripted.labels } : {}),
         });
         dropComposeDraft(taken, undefined, place);
+        if (made?.id && !person) rememberHanded(product.slug, made.id, handedIn(typed, comments, { nameOf: commenter }));
         if (initial?.continueFrom) void api.teamContinued(initial.continueFrom);
         // The person who handed it over can follow the work to where it went (round two of the team test).
         const startedAt = initial?.handFrom && made?.id && team?.me ? threadLink(team.me, made.id) : null;
@@ -993,15 +1001,15 @@ export function ThreadComposer({
     />
   );
 
-  // IS THIS A TASK OR A MESSAGE. Both are drawn, because a word that only showed
+  // IS THIS A TO-DO OR A MESSAGE. Both are drawn, because a word that only showed
   // its other choice when pressed was missed. Picking Message puts the day away:
-  // a message has nothing to be due.
+  // a message has nothing to be due. The store still calls a to-do a task.
   const sendAsChoice = (
     <span className="tc-seg" role="group" aria-label="Send as">
       {(['message', 'task'] as SendAs[]).map((k) => (
-        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={`Send as a ${k}`}
+        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={k === 'task' ? 'Send as a to-do' : 'Send as a message'}
           onClick={() => { setSendAs(k); if (k === 'message') setDue(null); textRef.current?.focus(); }}>
-          {k === 'task' ? 'Task' : 'Message'}
+          {k === 'task' ? 'To-do' : 'Message'}
         </button>
       ))}
     </span>
@@ -1275,7 +1283,7 @@ export function ThreadComposer({
             <button type="button" aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`} onClick={() => setAlso((was) => was.filter((x) => x !== p.id))}>×</button>
           </span>
         ))}
-        {/* A task goes to one person, so Home offers no second one for it. */}
+        {/* A to-do goes to one person, so Home offers no second one for it. */}
         {person && others.length > group.length && !(quiet && sendAs === 'task' && !extra.length) && (
           <button type="button" className="tc-add" aria-label="Add someone" title="Add someone"
             onClick={() => { setAdding(true); setQuery(''); if (open !== 'to') toggle('to'); }}>+</button>
@@ -1431,7 +1439,7 @@ export function ThreadComposer({
       {fieldNode('To')}
       {person ? (<>
         {sendAsChoice}
-        {taskToMany && <span className="tc-why">A task goes to one person.</span>}
+        {taskToMany && <span className="tc-why">A to-do goes to one person.</span>}
         <span className="tc-gap" />
         {sendAs === 'task' ? (<>{fieldNode('Due On')}{fieldNode('Blocked By')}{seesChip(taskSees)}</>) : fieldNode('Subject')}
         {priorityChip}
@@ -1500,7 +1508,7 @@ export function ThreadComposer({
         <PhoneStatus message={statusLine} className="tc-note tc-connection-status" />
         <textarea
           ref={textRef}
-          className={`tc-text ${named.over}`}
+          className={`tc-text ${named.over}${comments.length && !person ? ' tc-text-tall' : ''}`}
           rows={inline ? 1 : undefined}
           value={text}
           onChange={(e) => { talk.typed(); setText(e.target.value); setCaret(e.target.selectionStart); named.track(e.target); }}
@@ -1571,7 +1579,7 @@ export function ThreadComposer({
         {person ? (
           <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
-            {taskToMany && <span className="tc-why">A task goes to one person.</span>}
+            {taskToMany && <span className="tc-why">A to-do goes to one person.</span>}
             {team && sendAs === 'task' && seesChip(taskSees)}
             {/* HOW URGENT IT IS, AND NOTHING ELSE (w-7ba439c883, approved
                 2026-10-05). The corner used to carry "Goes to Maya's inbox.",

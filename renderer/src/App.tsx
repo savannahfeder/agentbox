@@ -23,7 +23,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, firstRowStaysFirst, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, FileNote, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan, setFurtherHarnesses } from './models';
@@ -189,7 +189,7 @@ import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, replyTeaches, walkBackTo, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipFromPalette, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, FIRST_RUN_LABEL, firstRunDone, firstRunNeeded, projectsOfTheirOwn, restartFirstRun,
   finishFirstRun, TASK_BODY, TASK_TITLE, practiceDraftLeft, whyNotMade, replyWritten,
@@ -247,7 +247,9 @@ import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mts';
 import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mts';
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
-import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
+import { familyOfName, fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
+import { commentsToHand, withComments, type HandedComment } from './threads/comments-to-hand';
+import { notesOnThread } from './threads/thread-notes';
 import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, NOTHING_INSIDE, type InsideFound, type InsideGroupKey, type InsideRow } from './found-inside';
@@ -282,7 +284,7 @@ import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sk
 import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
-import { stopOnScreen, useBackAndForward, type Stop as TrailStop } from './back-and-forward';
+import { onInboxPage, stopOnScreen, useBackAndForward, type Screen as TrailScreen, type Stop as TrailStop } from './back-and-forward';
 import { BackForward } from './components/BackForward';
 
 
@@ -785,32 +787,83 @@ export default function App() {
     setFocused(convo);
     setModal('reply');
   }, []);
-  const handToAgent = useCallback((item: WorkItem, message?: AgentTurn) => {
+  // Who wrote a comment, by first name, on its line in a hand-over's words.
+  const commenter = useCallback((id: string | null) => teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer)?.byId.get(id ?? '')?.name?.split(/\s+/)[0] || 'A teammate',
+    [snap?.team, snap?.products, snap?.alpha?.multiplayer]);
+  // `files`: only the comments on these, when a file's own notes asked.
+  const handToAgent = useCallback((item: WorkItem, message?: AgentTurn, files?: string[]) => {
     const seen = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer);
+    // The comments the notes panel shows, other copies of the same files included.
+    const comments = notesOnThread(item);
     // A task's files sit in the record it rides in, which a new thread cannot
     // read, so they go on the card and the links come out of the words.
     if (isTaskRow(item)) {
       const from = item.createdBy ? seen?.byId.get(item.createdBy)?.name : null;
       // As main's taskBrief does to the brief, so the two still match.
       if (message?.text && askOf(item)) message = { ...message, text: withoutAskLead(message.text) };
-      void api.teamTaskBrief({ product: item.product, id: item.id })
-        .then((b) => {
+      void Promise.all([api.teamTaskBrief({ product: item.product, id: item.id }), comments])
+        .then(([b, notes]) => {
           const { attachments, ...start } = taskHandOff({ from, brief: b, message: message ?? null, nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
             handFrom: { product: item.product, id: item.id, message: message?.uid ?? 'first' }, offered: snap?.products ?? [], cards: snap?.team?.cards ?? [] });
-          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}) });
+          const handed = commentsToHand(notes, { me: seen?.me ?? null, files: files ?? null });
+          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(handed.length ? { comments: handed, body: withComments(start.body, handed, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
           setModal('compose');
         })
         .catch((err) => showToast(String(err?.message ?? err)));
       return;
     }
     const dir = snap?.products.find((p) => p.slug === item.product)?.dir ?? null;
-    setComposeInitial(handOffStart({
+    const words = message?.text ?? (files?.length ? files.map((f) => `[${shownName(f)}](${f})`).join('\n') : item.body ?? item.title);
+    const start = handOffStart({
       product: item.product, id: item.id, dir,
-      message: { uid: message?.uid, at: message?.at, text: message?.text ?? item.body ?? item.title, by: message?.by ?? item.createdBy },
+      message: { uid: message?.uid, at: message?.at, text: words, by: message || !files?.length ? message?.by ?? item.createdBy : null },
       nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
-    }));
-    setModal('compose');
-  }, [snap?.team, snap?.products]);
+    });
+    // The files a message carries are the ones whose comments go with it.
+    const linked = files ?? start.attachments.map((a) => a.srcPath.slice((dir?.length ?? 0) + 1));
+    // From a file's notes there is no message to carry, so the thread is named for
+    // the file and carries it, wherever its newest version is kept.
+    const named = !message && files?.length ? {
+      body: `Changes from the comments on ${[...new Set(files.map((f) => shownName(f)))].join(', ')}\n\n`,
+      attachments: files.map((f) => ({ name: shownName(f), srcPath: f.startsWith('/') || !dir ? f : `${dir}/${f}`, image: /\.(png|jpe?g|gif|webp)$/i.test(f) })),
+    } : {};
+    void comments.then((notes) => {
+      const handed = linked.length ? commentsToHand(notes, { me: seen?.me ?? null, files: linked }) : [];
+      const words = (named as { body?: string }).body ?? start.body;
+      setComposeInitial({ ...start, ...named, ...(handed.length ? { comments: handed, body: withComments(words, handed, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
+      setModal('compose');
+    });
+  }, [snap?.team, snap?.products, commenter]);
+  useEffect(() => {
+    const ask = (e: Event) => {
+      const { product, id, files } = (e as CustomEvent<{ product: string; id: string; files: string[] }>).detail ?? {};
+      const row = snap?.items.find((i) => i.product === product && i.id === id);
+      if (row) handToAgent(row, undefined, files);
+    };
+    window.addEventListener('zero:hand-comments', ask);
+    return () => window.removeEventListener('zero:hand-comments', ask);
+  }, [snap?.items, handToAgent]);
+  // A file opened outside any thread of yours (a chat's, or one in Files): a new
+  // thread with the file and its comments written into the words.
+  useEffect(() => {
+    const ask = (e: Event) => {
+      const { name, srcPath, product, src, notes } = (e as CustomEvent<{ name: string; srcPath?: string | null; product?: string; src?: string; notes: FileNote[] }>).detail ?? {};
+      const me = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer)?.me ?? null;
+      void (srcPath ? Promise.resolve(srcPath) : api.resolveDoc({ product: product ?? '', src: src ?? '' }).then((r) => r.opened ?? null)).then((path) => {
+        const handed = commentsToHand(notes, { me, files: [name] });
+        setComposeInitial({
+          to: 'agent',
+          body: withComments(`Changes from the comments on ${name}`, handed, { nameOf: commenter }),
+          caret: [0, 0],
+          ...(handed.length ? { comments: handed } : {}),
+          ...(path ? { attachments: [{ name, srcPath: path, image: /\.(png|jpe?g|gif|webp)$/i.test(name) }] } : {}),
+        });
+        setModal('compose');
+      });
+    };
+    window.addEventListener('zero:hand-file-comments', ask);
+    return () => window.removeEventListener('zero:hand-file-comments', ask);
+  }, [snap?.team, snap?.products, snap?.alpha?.multiplayer, commenter]);
   // ADD PEOPLE on an open conversation: New thread, with everyone already in
   // that conversation in To. Nothing is written to the conversation on screen,
   // because adding somebody makes the group's conversation and leaves this one
@@ -1223,7 +1276,7 @@ export default function App() {
     // through to whatever the Mac preferred and a light Mac turned the walk
     // white after the third screen.
     //
-    // WHAT IT SEEDS IS PLAIN DARK, NOT A PICTURE. The `else` branch that used
+    // WHAT IT SEEDS IS LIGHT, NOT A PICTURE. The `else` branch that used
     // to sit under this line put Gouache Valley on any Mac that had chosen no
     // picture, every time the walk ran, and that is how a look nobody
     // picked reached the window. It is deleted, and so is the function behind
@@ -1342,7 +1395,9 @@ export default function App() {
     if (!tourGone || !tour?.practice) return;
     // Skipped with the practice thread open: it goes with its project, and you land back on your list.
     if (focused?.product === tour.practice.slug) setFocused(null);
-    void api.firstRunPracticeEnd().then(() => refreshRef.current?.());
+    // E on the practice thread can be what ended it, and is still held for Z: it is written before its project goes.
+    const held = pendingRef.current?.item.product === tour.practice.slug ? flushPending().catch(() => {}) : Promise.resolve();
+    void held.then(() => api.firstRunPracticeEnd()).then(() => refreshRef.current?.());
   }, [tourGone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Starting a setup or the walkthrough from ⌘K hands it the whole window, so
@@ -2440,11 +2495,19 @@ export default function App() {
     setFocused(null);
     openTeammateCard(card);
   }, [weekCards, openTeammateCard]);
-  const continueTeammateThread = useCallback((card: ThreadCard) => {
+  // `files`: from one file's notes, which carries that file's newest version and no other.
+  const continueTeammateThread = useCallback((card: ThreadCard, comments: HandedComment[] = [], files?: string[]) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
-      .then((b) => { setComposeInitial(continueStart(b, card, snap?.products ?? [])); setModal('compose'); })
+      .then((b) => {
+        const start = continueStart(b, card, snap?.products ?? []);
+        const families = new Set((files ?? []).map((f) => familyOfName(f)));
+        const ofTheFile = start.attachments.filter((a) => families.has(familyOfName(a.name)));
+        const attachments = files?.length && ofTheFile.length ? { attachments: ofTheFile.slice(-1) } : {};
+        setComposeInitial({ ...start, ...attachments, ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
+        setModal('compose');
+      })
       .catch((err) => showToast(String(err?.message ?? err)));
-  }, [snap?.products]);
+  }, [snap?.products, commenter]);
   const [teamBody, setTeamBody] = useState<HTMLElement | null>(null);
   // The card on screen is the newest one, and once its owner takes it back it
   // is not on screen at all: words they made private must not stay up.
@@ -4652,7 +4715,7 @@ export default function App() {
     return true;
   };
   const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick, runAt?: number) => {
-    if (tourLive(tourRef.current)) {
+    if (replyTeaches(tourRef.current, item)) {
       let t = finishLesson(tourRef.current!, 'reply');
       if (isTourPractice(t, item)) t = practiceReplied(t);
       setTour(t);
@@ -6857,52 +6920,64 @@ export default function App() {
   // opened from Needs you lands back on the Chats screen with another reply box.
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setOpenCard(null); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setChatsPlace(null); setHomeOpen(false); };
 
-  // BACK AND FORWARD, on every computer. Above the early returns below, because
-  // it is a hook; `homeShown` is worked out again here for the same reason.
+  // THE WALKTHROUGH'S WAY BACK, from a page it has no tip on to where its last tip stood.
+  const walkElsewhere = settingsOpen || teamShown || filesShown || connectionsShown || teammatesShown || roomShown || chatsPlaceShown || search !== null;
+  const walkAway = awayFromWalk(tour, { elsewhere: walkElsewhere, home: homeOpen && !focused && !walkElsewhere, thread: !!focused, practiceThread: !!focused && focused.id === tourPractice?.item });
+  const walkSpot = useRef<{ view: View; home: boolean; item: WorkItem | null } | null>(null);
+  // Only when the tip changes: a change of page reaches here before its tip has gone.
+  useEffect(() => {
+    if (tourNow && !walkAway) walkSpot.current = { view, home: homeOpen, item: focused };
+  }, [tourNow]); // eslint-disable-line react-hooks/exhaustive-deps
+  const backToWalk = () => {
+    const s = walkSpot.current;
+    if (!s) { const to = walkBackTo(tour); openView('inbox'); if (to === 'home') setHomeOpen(true); else if (to === 'practice' && practiceRow) setFocused(practiceRow); return; }
+    openView(s.view); if (s.home) setHomeOpen(true); if (s.item) setFocused(s.item);
+  };
+
+  // BACK AND FORWARD WALK THE LIST AND THE THREADS YOU WERE IN, on every
+  // computer and only on the inbox page. A thread opened inside another page
+  // keeps that page's own back. Above the early returns below, because it is a
+  // hook; `homeShown` is worked out again here for the same reason.
   const backForwardOn = !onPhone();
   const homeHere = homeOn && homeOpen && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
-  const groupHere = roomShown && roomsUi.openId !== 'groups' ? roomsUi.openId : null;
-  const stopHere = stopOnScreen({
-    settings: settingsOpen ? { pane: settingsAt } : null,
-    thread: focused ? { product: focused.product, id: focused.id } : null,
-    card: teamShown && openCard ? { person: openCard.personId, thread: openCard.threadId } : null,
-    home: homeHere,
-    files: filesShown ? { project: filesPage?.project ?? null } : null,
-    connections: connectionsShown,
-    group: groupHere,
-    groupInInbox: roomShown && roomsUi.inInbox,
-    teammate: teammatesShown ? teammatesUi.open : null,
-    teamPlace: chatsPlaceShown ? chatsPlace : null,
-    unrecorded: search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || !!focusedRepeat || todayOn,
-    view,
-  });
+  // A teammate's direct record is one of your groups, so Groups is the page it is on.
+  const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
+  const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
+  // A chat pressed in Needs you is drawn in the inbox, as a thread is.
+  const groupInInbox = roomShown && roomsUi.inInbox && roomsUi.openId !== 'groups' ? roomsUi.openId : null;
+  // The Inbox button is only on an inbox thread: anywhere else the sidebar's
+  // own Inbox is as close, and on the inbox it would lead to itself.
+  const onInboxThread = (!!focused && !settingsOpen && !inChats) || (roomShown && roomsUi.inInbox);
+  // A teammate's thread opened from the Inbox is an inbox thread too.
+  const onTeammateThread = teamShown && !!openCard && !cardFromPlace;
+  const screenHere: TrailScreen = {
+    thread: focused && !settingsOpen && !inChats && !teamOpen && !(directOpen && roomsUi.openId) ? { product: focused.product, id: focused.id } : null,
+    card: openCard && onTeammateThread && !roomsUi.roomName ? { person: openCard.personId, thread: openCard.threadId } : null,
+    group: groupInInbox,
+    list: !focused && !settingsOpen && !teamShown && !homeHere && !filesShown && !connectionsShown && !roomShown && !teammatesShown && !chatsPlaceShown ? view : null,
+  };
   const cardOf = (s: { person: string; thread: string }) => cards.find((c) => c.personId === s.person && c.threadId === s.thread);
   const trail = useBackAndForward({
     on: backForwardOn,
-    here: stopHere,
+    inbox: onInboxPage(screenHere),
+    here: stopOnScreen(screenHere),
     exists: (s) => s.at === 'thread' ? selectable.some((i) => i.id === s.id && i.product === s.product)
       : s.at === 'card' ? !!cardOf(s)
-      : s.at === 'team' ? s.place === 'team' || members.some((m) => m.key === s.place)
       : true,
+    // The list comes back as Esc leaves it, cursor and all, unless it was on
+    // another tab. Anything else opens over the inbox, so its own back says Inbox.
     go: (s) => {
-      if (s.at === 'home') { openView('inbox'); setHomeOpen(true); }
-      else if (s.at === 'list') openView(s.view);
-      else if (s.at === 'files') openFiles(s.project);
-      else if (s.at === 'connections') openConnectionsPage(null);
-      else if (s.at === 'team') openChatsPlace(s.place);
-      else if (s.at === 'group') { openView(view); roomsUi.open(s.id, s.inbox ? 'inbox' : null); }
-      else if (s.at === 'teammate') teammatesUi.go(s.id);
+      if (s.at === 'list') {
+        if (s.view !== view) openView(s.view);
+        else { roomsUi.leave(); setOpenCard(null); setTeamOpen(false); setFocused(null); }
+      } else if (s.at === 'group') { openView(view); roomsUi.open(s.id, 'inbox'); }
       else if (s.at === 'card') {
         const card = cardOf(s);
-        // The page it was opened from stays, so its Back still names it.
-        if (card) { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); openTeammateCard(card); }
-      } else if (s.at === 'settings') {
-        setTeamOpen(false); closeSearch(); setFocused(null);
-        setSettingsPane(s.pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true);
+        if (card) { openView(view); openTeammateCard(card); }
       } else {
-        const card = selectable.find((i) => i.id === s.id && i.product === s.product);
-        if (card) { openView(view); setFocused(card); }
+        const item = selectable.find((i) => i.id === s.id && i.product === s.product);
+        if (item) { openView(view); setFocused(item); }
       }
     },
   });
@@ -6910,15 +6985,9 @@ export default function App() {
     const thread = selectable.find((i) => i.id === s.id && i.product === s.product);
     return thread ? rowTitle(thread) : 'the thread';
   };
-  const stopName = (s: TrailStop): string => s.at === 'home' ? 'Home'
-    : s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
-    : s.at === 'files' ? 'Files'
-    : s.at === 'connections' ? 'Connections'
-    : s.at === 'settings' ? 'Settings'
-    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : members.find((m) => m.key === s.place)?.name ?? 'Team')
-    : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
-    : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
+  const stopName = (s: TrailStop): string => s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
     : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
+    : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
     : threadName(s);
   useEffect(() => {
     if (!onPhone()) return;
@@ -7280,15 +7349,7 @@ export default function App() {
   // neither, so only there does the list draw a magnifier, and it opens ⌘K.
   const searchInTheList = onPhone() ? () => setModal('palette') : undefined;
   const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks, pointedAt: railOpen });
-  // A teammate's direct record is one of your groups, so Groups is the page it is on.
-  const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
-  const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
-  // The Inbox button is only on an inbox thread: anywhere else the sidebar's
-  // own Inbox is as close, and on the inbox it would lead to itself.
-  const onInboxThread = (!!focused && !settingsOpen && !inChats) || (roomShown && roomsUi.inInbox);
-  // A teammate's thread opened from the Inbox is an inbox thread too.
-  const onTeammateThread = teamShown && !!openCard && !cardFromPlace;
-  const backForward = backForwardOn
+  const backForward = backForwardOn && onInboxPage(screenHere)
     ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward}
       onInbox={onInboxThread ? () => openView('inbox') : onTeammateThread ? () => { setOpenCard(null); setTeamOpen(false); openView('inbox'); } : undefined} name={stopName} />
     : null;
@@ -7927,7 +7988,7 @@ export default function App() {
                   }}
                   backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
-                  onContinue={() => continueTeammateThread(openCard)}
+                  onContinue={(comments, files) => continueTeammateThread(openCard, comments, files)}
                   onMessage={() => messageAbout(openCard.personId, openCard.title)} />
               </div>
             ) : (
@@ -8517,7 +8578,7 @@ export default function App() {
               const said = firstNames(how.toMany ?? [how.to ?? '']);
               // Named for O, like a new thread (w-5513afd09a). No Z: a message
               // has reached the team cloud by now and there is no taking it back.
-              showToast(how.given ? `Task sent to ${said}` : said ? `Sent to ${said}` : 'Message sent', how.made ? { product: how.made.product, id: how.made.id } : undefined);
+              showToast(how.given ? `To-do sent to ${said}` : said ? `Sent to ${said}` : 'Message sent', how.made ? { product: how.made.product, id: how.made.id } : undefined);
               await refresh();
               return;
             }
@@ -8864,7 +8925,7 @@ export default function App() {
         // is one line however many projects she has (w-aa3fa4cbf0).
         onOpenFilter={() => setModal('filter')}
         onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
-        onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}
+        onEndTutorial={tourLive(tour) ? () => { setTour(skipFromPalette(tour!)); setModal(null); } : undefined}
         onView={(v) => { setModal(null); openView(v); }}
         teamLayout={!!teamTabs}
         onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
@@ -9056,7 +9117,7 @@ export default function App() {
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
-        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light' })} skies={homeOn}
+        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light', follows: theme === 'match' })} skies={homeOn}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
         onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
         onSetup={() => {
@@ -9064,11 +9125,11 @@ export default function App() {
           if (homeOn) setHomeOpen(true);
         }}
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
-      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
+      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} away={walkAway} onBack={backToWalk} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
       {finishing && <TourFinished covered={settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
-      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
+      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} practiceOpen={!!focused && focused.id === tourPractice?.item} view={view} thread={!!focused}
         answering={practiceAnswering}
-        covered={settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
+        covered={settingsOpen || teamOpen || newProject || walkElsewhere || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
         onChange={setTour}
         onStep={setTourNow}

@@ -28,7 +28,7 @@ describe('pictures in a group message', () => {
   });
 
   it('hold a loading box no bigger than one preview', () => {
-    const button = ':root:root:root:root .rm-cm .inline-image-open:has(> .inline-image[data-phone-img="loading"])';
+    const button = ':root:root:root:root .rm-cm .inline-image-open[data-picture-loading]';
     expect(px(value(rooms, button, 'width'))).toBeLessThanOrEqual(360);
   });
 });

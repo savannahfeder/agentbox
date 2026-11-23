@@ -63,6 +63,7 @@ import { teamForWindow } from './team/index.mts';
 import { isOnTeam } from '../shared/rooms-on.mts';
 import { liveForTheWholeTeam, liveRoomFor } from './team/live-room.mts';
 import { openForThePerson } from './opens-a-program.mts';
+import { appsThatOpen, type AppThatOpens } from './open-with.mts';
 import { addClaudeAccount, addCodexAccount, alphaFeatures, cornerTagTurnedOff, countsTurnedOff, lookAgainFor, outsideAgentsMode, permissionMode, pointAtEngineBin, readSettings, searchForEngineBin, setProjectSetting, setWorkspaceSetting } from './settings.mts';
 import { ICON_KINDS, clearProjectIcon, setProjectIcon, setProjectName } from './project-identity.mts';
 import { ClaudeUsage } from './claude-usage.mts';
@@ -144,6 +145,7 @@ export interface IpcHost<W extends IpcWindow = IpcWindow> {
     quit(): void;
     focus?(options?: { steal: boolean }): void;
     accessibilitySupportEnabled?: boolean;
+    getFileIcon?(path: string, options?: { size?: 'small' | 'normal' | 'large' }): Promise<{ toDataURL(): string }>;
   };
   dialog: { showOpenDialog(window: W, options: IpcOpenDialog): Promise<{ canceled: boolean; noDialog?: boolean; filePaths: string[] }> };
   shell?: IpcShell;
@@ -208,6 +210,8 @@ export interface IpcDeps<W extends IpcWindow = IpcWindow> {
   liveAt?: string | null;
   /** Turns the window's glass on or off when the Alpha switch flips. */
   glass?: (on: boolean) => void;
+  /** The apps that can open a file (main/open-with.mts). */
+  listApps?: (file: string) => Promise<AppThatOpens[]>;
 }
 
 export interface TeammateArgs {
@@ -237,6 +241,7 @@ interface FilesPlace {
   renameFolder(ask: { id: string; name?: string }): Promise<{ id?: string }>;
   moveFile(ask: { key: string; folder: string | null }): Promise<{ id?: string }>;
   renameFile(ask: { key: string; name: string }): Promise<{ id?: string }>;
+  setIcon(ask: { key: string; icon: string }): Promise<{ id?: string }>;
   removeFolder(ask: { id: string }): Promise<{ ids: string[] }>;
   restoreFolders(ask: { ids: string[] }): Promise<{ back: number }>;
   newDocument(ask: { project: string; name?: string; kind: 'document' | 'table'; folder: string | null }): Promise<{ key: string; title: string }>;
@@ -302,7 +307,7 @@ const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', '
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'undoDone', 'later', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute'] as const);
 type RoomOp = typeof ROOM_OPS extends Set<infer O> ? O : never;
 
-export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, froze = null, liveAt = null, glass = () => {} }: IpcDeps<W>) {
+export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, froze = null, liveAt = null, glass = () => {}, listApps = (file) => appsThatOpen(file) }: IpcDeps<W>) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -2770,13 +2775,14 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   ipcMain.handle('zero:files-place', async () => {
     try { return await filesPlaceNow().list(); } catch { return { files: [], projects: [], folders: [] }; }
   });
-  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; ids?: unknown; key?: unknown; folder?: string | null } = {}) => {
+  ipcMain.handle('zero:files-place-folder', async (_e, { do: what, ...p }: { do?: string; project?: string; name?: string; parent?: string | null; id?: unknown; ids?: unknown; key?: unknown; folder?: string | null; icon?: unknown } = {}) => {
     try {
       const place = filesPlaceNow();
       const out = what === 'make' ? await place.makeFolder({ project: p.project, name: p.name, parent: p.parent ?? null })
         : what === 'rename' ? await place.renameFolder({ id: String(p.id ?? ''), name: p.name })
           : what === 'move' ? await place.moveFile({ key: String(p.key ?? ''), folder: p.folder ?? null })
             : what === 'name' ? await place.renameFile({ key: String(p.key ?? ''), name: String(p.name ?? '') })
+              : what === 'icon' ? await place.setIcon({ key: String(p.key ?? ''), icon: String(p.icon ?? '') })
               : what === 'remove' ? await place.removeFolder({ id: String(p.id ?? '') })
                 : what === 'restore' ? await place.restoreFolders({ ids: Array.isArray(p.ids) ? p.ids.map(String) : [] })
                   : null;
@@ -2885,15 +2891,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     return true;
   });
   ipcMain.handle('zero:connections-accept', async (_e, { id }: { id?: unknown } = {}) => { await connections?.acceptTools(String(id ?? '')); push(); return true; });
-  ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode, thread }: { product: string; src?: unknown; mode?: string; thread?: unknown }) => {
-    const shell = await shellNow();
-    if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
-    if (/^https?:/.test(src)) {
-      if (mode === 'resolve') return { ok: true, opened: src };
-      const opened = await openInBrowser(src, { shell });
-      return opened.ok ? { ok: true, opened: src } : opened;
-    }
-    let found = await resolveArtifact({
+  const findToOpen = async (product: string, src: string, thread: unknown) => {
+    const found = await resolveArtifact({
       src,
       product,
       thread: typeof thread === 'string' ? thread : null,
@@ -2902,11 +2901,43 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       storeRoot: config.storeRoot,
       nameOf: team?.firstNameOf,
     });
-    if (!found.ok) {
-      // A document's picture can name a version that was sent under another name.
-      const inFiles = await filesPlaceNow().pictureNamed(src).catch(() => null);
-      if (!inFiles) return found;
-      found = { ...found, ok: true, path: inFiles };
+    if (found.ok) return found;
+    // A document's picture can name a version that was sent under another name.
+    const inFiles = await filesPlaceNow().pictureNamed(src).catch(() => null);
+    return inFiles ? { ...found, ok: true as const, path: inFiles } : found;
+  };
+  // THE OPEN MARK'S MENU: the apps this Mac offers for the file, default first.
+  // A copy whose shell cannot open files offers none, as its mark opened nothing.
+  ipcMain.handle('zero:open-with', async (_e, { product, src, thread }: { product?: string; src?: unknown; thread?: unknown } = {}) => {
+    if (typeof src !== 'string' || !src || /^https?:/.test(src)) return { ok: false, apps: [] };
+    const shell = await shellNow();
+    const found = await findToOpen(String(product ?? ''), src, thread);
+    if (!found.ok) return { ok: false, apps: [] };
+    const apps = shell.openPath ? await listApps(found.path) : [];
+    const icon = async (p: string) => {
+      try { return (await host.app.getFileIcon?.(p, { size: 'normal' }))?.toDataURL() ?? null; } catch { return null; }
+    };
+    return {
+      ok: true,
+      apps: await Promise.all(apps.map(async (a) => ({ ...a, icon: await icon(a.path) }))),
+      reveal: !!shell.showItemInFolder,
+      finder: process.platform === 'darwin',
+    };
+  });
+  ipcMain.handle('zero:open-artifact', async (_e, { product, src, mode, thread, app }: { product: string; src?: unknown; mode?: string; thread?: unknown; app?: unknown }) => {
+    const shell = await shellNow();
+    if (typeof src !== 'string' || !src) return { ok: false, error: 'no path' };
+    if (/^https?:/.test(src)) {
+      if (mode === 'resolve') return { ok: true, opened: src };
+      const opened = await openInBrowser(src, { shell });
+      return opened.ok ? { ok: true, opened: src } : opened;
+    }
+    const found = await findToOpen(product, src, thread);
+    if (!found.ok) return found;
+    if (mode === 'reveal') {
+      if (!shell.showItemInFolder) return { ok: false, error: 'This copy cannot show files in a folder.' };
+      shell.showItemInFolder(found.path);
+      return { ok: true, opened: found.path };
     }
     if (mode === 'resolve') {
       // RESOLVING FOR THE PANE IS WHAT OPENS THE DOOR. An html page is drawn
@@ -2926,7 +2957,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       try { await openSourceFile(found.path); return { ok: true, opened: found.path }; }
       catch (error) { return { ok: false, error: (error as Error).message || 'The text editor could not be opened.' }; }
     }
-    const err = await openForThePerson(shell, found.path);
+    // An app is opened only if the Mac offers it for this very file.
+    if (typeof app === 'string' && app && !(await listApps(found.path)).some((a) => a.path === app)) {
+      return { ok: false, error: 'That app does not open this kind of file.' };
+    }
+    const err = await openForThePerson(shell, found.path, typeof app === 'string' && app ? { app } : {});
     return err ? { ok: false, error: err } : { ok: true, opened: found.path };
   });
 

@@ -26,6 +26,7 @@ function local(why: string, detail: WhyNotCloud['detail']): string {
     case 'cloud-no-room': return noRoom(detail);
     case 'version': return `The cloud has a different version of ${engineName(detail)} from this computer.`;
     case 'cloud-account-limited': return 'The cloud’s account is at its usage limit, so this runs on the account this computer uses.';
+    case 'cloud-account-refused': return 'Claude is refusing the cloud’s account, so this runs on the account this computer uses.';
     case 'started-before': return 'It started before the cloud was set to Everything.';
     default: return 'The cloud couldn’t take it when it started.';
   }

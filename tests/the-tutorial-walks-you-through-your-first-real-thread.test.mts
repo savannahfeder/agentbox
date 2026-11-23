@@ -530,7 +530,9 @@ describe('a thread the agent closed itself', () => {
   it('counts as the close, so the tutorial goes on to the command bar', async () => {
     const fs = await import('node:fs');
     const tour = fs.readFileSync(new URL('../renderer/src/components/Tour.tsx', import.meta.url), 'utf8');
-    expect(tour).toContain("if (wanted === 'close' && document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done')) { onChange(finishLesson(tour, 'close')); return; }");
+    // Once the absence has lasted (tests/a-newcomer-can-tell-they-are-in-the-walkthrough).
+    expect(tour).toContain("const closedByItsAgent = wanted === 'close' && !!document.querySelector('.focus-body .one-title') && !document.querySelector('.ts-done');");
+    expect(tour).toContain("{ onChange(finishLesson(tour, 'close')); return; }");
   });
 });
 

@@ -318,6 +318,8 @@ export interface PlacedFile {
   name: string;
   /** The name a person gave it in Files; `name` stays its name on disk. */
   title?: string;
+  /** The icon a person picked for its tile. */
+  icon?: string;
   kind: FileKind | null;
   /** Made in Files and nothing written in it yet. */
   blank?: boolean;
@@ -372,6 +374,7 @@ export type FileFolderAct =
   | { do: 'rename'; id: string; name: string }
   | { do: 'move'; key: string; folder: string | null }
   | { do: 'name'; key: string; name: string }
+  | { do: 'icon'; key: string; icon: string }
   | { do: 'remove'; id: string }
   | { do: 'restore'; ids: string[] };
 
@@ -423,7 +426,7 @@ export interface FilesPlaceView {
 type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?: Record<string, unknown> };
 
 /** What a comment or approval in the thread links to. */
-export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true }
+export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true; /** A reply under a comment, not a comment of its own. */ reply?: true }
 
 /** A comment on a thread, or a note on one of its files (main/team/thread-share.mts `talk`), for the person's page. */
 export interface ThreadTalk {
@@ -1180,8 +1183,8 @@ export interface AgentTurn {
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment, or an agent's checkpoint (thread-history.ts). */
-  says?: 'comment' | 'progress' | 'to-agent';
+  /** A teammate's comment, an agent's checkpoint, or the app's own note (thread-history.ts). */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app';
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
@@ -2028,8 +2031,10 @@ declare global {
       phoneLink?(p: { action: 'status' | 'on' | 'off' | 'reset' | 'via' | 'stop-alerts'; via?: PhoneRoute; device?: string }): Promise<PhoneLink>;
       sessionTrace?(p: { product: string; id: string; whole?: boolean; have?: Record<string, string> }): Promise<{ sessions: Array<{ startedAt: number; text: string }> }>;
       itemHistory?(p: { product: string; id: string; before?: number }): Promise<{ ok: boolean; lines: LedgerLine[]; error?: string }>;
-      // `mode`: 'resolve' finds the file without opening it, 'source' opens it in the editor.
-      openArtifact?(p: { product: string; src: string; mode?: string; thread?: string }): Promise<OpenedFile>;
+      // `mode`: 'resolve' finds the file without opening it, 'source' opens it in the editor,
+      // 'reveal' shows it in Finder. `app` is one `openWith` listed for the file.
+      openArtifact?(p: { product: string; src: string; mode?: string; thread?: string; app?: string }): Promise<OpenedFile>;
+      openWith?(p: { product: string; src: string; thread?: string }): Promise<AppsThatOpen>;
       folderPictures?(p: { product: string; src: string }): Promise<{ ok: boolean; folder?: string; pictures?: string[]; total?: number; error?: string }>;
       readDoc?(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }>;
       writeDoc?(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }>;
@@ -2122,6 +2127,9 @@ export interface AgentUpdate { engine: string; state: string; message?: string; 
 
 /** Where a path in a message resolved to (main/ipc.mts zero:open-artifact). */
 export interface OpenedFile { ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }
+/** What main/ipc.mts zero:open-with answers: the apps, default first, and whether the file can be shown in its folder. */
+export interface OpenWithApp { path: string; name: string; isDefault: boolean; icon?: string | null }
+export interface AppsThatOpen { ok: boolean; apps: OpenWithApp[]; reveal?: boolean; finder?: boolean }
 export interface AddedAccount { ok: boolean; command?: string; home?: string; error?: string }
 export interface EngineSetupAnswer {
   ok: boolean; error?: string; phase?: EngineSetupState['phase']; log?: string;

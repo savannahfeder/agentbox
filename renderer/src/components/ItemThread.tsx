@@ -53,8 +53,8 @@ import type { AgentTurn, FileMarkLink, RunningSession, WorkItem } from '../types
 import { ActLine, Thread, ThreadWaiting, answerTurn } from './Thread';
 import { FileMarkOpener } from './FileMarkLine';
 import { QueueAnswer, QueueSummary } from './OneThingAtATime';
-import { catchUpDue } from '../../../shared/agent-import.mts';
-import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
+import { gettingReady } from '../../../shared/agent-import.mts';
+import { appWrote, broughtIn, drawnWhole, earlierCount, earlierThan, footOf, newestAnswer, pageTitle, standsAt, workingContext, workingFrom } from '../one-thing-at-a-time';
 import { gapIndex } from '../../../shared/agents.mts';
 import { askMarkUnread, say } from '../team/chat-events';
 import { seenLine } from '../team/seen-line';
@@ -424,10 +424,13 @@ export function ItemThread({ askAbout = false, onOpenFileMark, item, engine, eng
     ranWords({ engineChoice, ran: e.ran, codexModels, codexDefault: codexModelDefault });
   const ranSaid = outcome ? ranOf(outcome) : null;
   const answerAt = answerTurn(events, omitted, chat);
-  const unshipped = outcome?.field === 'note' && !!notShipped(item);
+  const foot = footOf(outcome, item);
+  const unshipped = foot === 'unshipped';
   const signInWhy = unshipped && !onPhone() && asksForGitHubSignIn(notShipped(item)?.why) ? notShipped(item)!.why : null;
   const answer = outcome && (
-    resultLeads(item) && outcome.field === 'result'
+    foot === 'app'
+      ? <div className="one-app-note" data-exchange={answerAt}>{md(clean(outcome.text))}</div>
+      : resultLeads(item) && outcome.field === 'result'
       ? <div className="outcome" data-exchange={answerAt}>{md(clean(outcome.text))}</div>
       : (
         <div className="appendix appendix-foot" data-exchange={answerAt}>
@@ -500,7 +503,7 @@ export function ItemThread({ askAbout = false, onOpenFileMark, item, engine, eng
     </div>
   );
   // A chat just brought in is being written up as a thread (main/catch-up.mts). Its raw end stays readable until then.
-  if (queue && catchUpDue(item)) {
+  if (queue && gettingReady(item) && !earlierOpen) {
     return (
       <>
         {queueHead}

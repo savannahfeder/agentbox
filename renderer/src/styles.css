@@ -909,8 +909,8 @@ body {
 }
 .topbar button { -webkit-app-region: no-drag; }
 
-/* BACK AND FORWARD (Alpha features). The arrows lead the header and whatever
-   follows them keeps its place at the left, not the middle the bar's
+/* BACK AND FORWARD, on the inbox page only. The arrows lead the header and
+   whatever follows them keeps its place at the left, not the middle the bar's
    space-between would give a third item. */
 .back-forward { display: inline-flex; align-items: center; gap: 2px; margin-right: 12px; flex: none; }
 .topbar > .back-forward + * { margin-right: auto; }
@@ -923,21 +923,9 @@ body {
 .back-forward button:disabled { color: var(--text-faint); opacity: .45; cursor: default; }
 .back-forward svg { width: 15px; height: 15px; }
 .back-forward .back-forward-inbox { margin-right: 10px; }
-/* Home hides its header bar but keeps the arrows. */
-.app.home-shown > .topbar .back-forward { visibility: visible; }
-/* The arrows replace the one back arrow a thread and Settings already had. */
-.app.back-forward-on .thread-crumb-back svg,
-.app.back-forward-on .workspace-page-heading .workspace-back { display: none; }
+/* On an inbox thread the arrows stand in for the chevron of its own back. */
+.app.back-forward-on .thread-crumb-back svg { display: none; }
 .app.back-forward-on .thread-crumb-back { padding-left: 0; }
-/* Chats, Groups and Team pull their header's first column left to the card
-   edge so its line meets the list's. The arrows come first in the bar, so the
-   column pulls further by their width and its name starts after them. */
-.app.back-forward-on { --bf-w: 66px; }
-.app.back-forward-on .topbar > .back-forward { position: relative; z-index: 2; }
-.app.back-forward-on .topbar > .back-forward + .gc-head { margin-left: calc(-32px - var(--bf-w)); }
-.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head { margin-left: calc(-44px - var(--bf-w)); }
-.app.back-forward-on .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(32px + var(--bf-w)); }
-.app.back-forward-on.gt-inset .topbar > .back-forward + .gc-head > .gc-head-col { padding-left: calc(44px + var(--bf-w)); }
 
 /* WHAT AN OPENED TASK HAS INSTEAD OF A TOP BAR. Nothing is drawn here. It
    exists for two things only, and both are invisible: 1. THE THREE BUTTONS
@@ -2128,11 +2116,13 @@ body {
    kept out of sight while the box shows.
 
    The button around a loading picture is as wide as the column, because a
-   button shrinks to what is in it and the box would be 4:3 of nothing.
-   `auto 4 / 3` takes the picture's own shape the moment its first bytes give
-   it. Four :root outweigh the phone's own picture rules in phone.css. */
-:root:root:root:root .inline-image-open:has(> .inline-image[data-phone-img="loading"]),
-:root:root:root:root .inline-image-open:has(> .inline-image.arriving) { width: 100%; }
+   button shrinks to what is in it and the box would be 4:3 of nothing. It is
+   marked by FittedImg and watchPicture; a :has() reading the picture's state
+   restyled the whole thread on every change. `auto 4 / 3` takes the picture's
+   own shape the moment its first bytes give it. Four :root outweigh the
+   phone's own picture rules in phone.css. */
+:root:root:root:root .inline-image-open[data-picture-loading],
+:root:root:root:root .inline-image-open[data-picture-arriving] { width: 100%; }
 :root:root:root:root .inline-image[data-phone-img="loading"],
 :root:root:root:root .doc-picture[data-phone-img="loading"] {
   display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: auto 4 / 3;
@@ -2159,6 +2149,10 @@ body {
   animation: phone-shimmer 1.3s linear infinite;
 }
 .inline-image.arriving { display: block; width: 100%; aspect-ratio: 4 / 3; }
+/* A picture more than a screen away is not fetched yet, and a moving
+   background is restyled and repainted every frame, so its box holds still
+   until it is on its way (tests/a-picture-not-yet-on-its-way-does-not-shimmer). */
+.arriving[data-far] { animation: none; }
 
 /* A sound or a film a worker named: its name, then the player, one per line
    even when five were written on one line (ArtifactMedia in Focus.tsx). */
@@ -7676,6 +7670,21 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
 }
 .doc-mark:hover { background: var(--doc-wash); color: var(--text); }
 .doc-mark svg { display: block; }
+/* The open mark's menu hangs from the mark, right edges in line. */
+.open-with { position: relative; display: inline-flex; }
+/* Pressed while its menu is open, over the bare corner marks' clear hover (direct-review.css, artifact-view.css). */
+.open-with > .doc-mark[aria-expanded="true"],
+:root[data-code-review] .workspace-layout .doc-marks .open-with > .doc-mark[aria-expanded="true"] { background: var(--doc-wash); color: var(--text); }
+.th-menu.ts-more-menu.open-with-menu { min-width: 236px; }
+.open-with-icon { width: 18px; height: 18px; display: block; }
+.open-with-menu[aria-busy="true"] .ts-more-row:not(.on) { opacity: .45; }
+/* Room for "Opening" on every row, so the menu does not widen as it appears. */
+.open-with-menu .open-with-detail { display: inline-flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 86px; }
+.open-with-spin {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1.6px solid var(--line-strong); border-top-color: var(--accent);
+  animation: cs-spin .8s linear infinite;
+}
 /* The file. An html page brings its own colour and the card cannot reach inside
    it; that join was measured before it shipped (33.5 points of step where a
    page brings its own black, 0 on markdown) and it is a stated cost of a card
@@ -9542,7 +9551,17 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 button.msg-kind { cursor: pointer; }
 button.msg-kind:hover { color: var(--text); border-color: var(--text-faint); }
 /* A comment is said beside the work, not to the agent: it reads at the size of what it answers. */
-.msg.yours:has(> .msg-head > .msg-kind) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
+.msg.yours:has(> .msg-head > .msg-kind) .msg-body, .msg.yours:has(> .msg-head > .comment-on) .msg-body { font-size: 15px; line-height: 1.6; font-weight: 400; }
+
+/* A comment on a file: "commented on sign-up-screens.md" after the name, and the
+   words it is about quoted as the notes beside the file quote them. */
+.msg-head:has(> .comment-on) { flex-wrap: wrap; row-gap: 2px; }
+.comment-on { min-width: 0; font-size: 14px; color: var(--text-dim); overflow-wrap: anywhere; }
+.comment-on-file { padding: 0; border: 0; background: none; font: inherit; color: var(--text); cursor: pointer; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.comment-on-file:hover { text-decoration-color: currentColor; }
+span.comment-on-file { cursor: default; }
+.comment-on-where::before { content: '\00b7'; margin: 0 6px; }
+.comment-quote { margin: 4px 0 6px; padding-left: 10px; border-left: 2px solid var(--line-strong); font-size: 14px; line-height: 20px; color: var(--text-dim); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 
 /* A thread a teammate gave you, above its title (team/HandedBy.tsx). */
 .handed-line { display: flex; align-items: center; gap: 9px; min-width: 0; margin: 4px 0 18px; padding: 10px 14px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: 10px; font-size: 14px; color: var(--text-dim); }

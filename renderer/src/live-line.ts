@@ -36,6 +36,7 @@ import { openSignIn } from '../../shared/sign-in-ask.mts';
 import { MAC } from './this-keyboard';
 import { whyWords, type WhyCard } from './where-why';
 import { FIRST_RUN_LABEL } from './onboarding';
+import { heldOutside } from '../../shared/carried-on-outside.mts';
 import type { RunningSession, WhyNotCloud, WorkItem } from './types';
 
 // THE FIFTH STATE, AND IT IS THE ONE SOMEBODY OUTSIDE THIS BUILDING ASKED FOR.
@@ -441,7 +442,8 @@ export function liveLine(item: WorkItem, facts: LiveFacts = {}): LiveLine | null
   // out, at a limit, paused), none of which stops an agent somewhere else. A run
   // killed outright leaves its claim for up to a lease (LEASE_MS), so the
   // sentence does not promise the agent is busy this second.
-  if (item.status === 'claimed' && item.claim && !item.claimExpired && !facts.remoteHeld) {
+  // The phone's copy of a chat carried on where it started has no claim on it.
+  if ((item.status === 'claimed' && item.claim && !item.claimExpired && !facts.remoteHeld) || heldOutside(item)) {
     return {
       state: 'elsewhere',
       line: 'An agent is working on this outside this window, in a terminal or on another computer, so its steps do not show here.',

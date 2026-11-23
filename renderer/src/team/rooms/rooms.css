@@ -122,6 +122,9 @@
 .rm-cm .h { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text); line-height: 18px; }
 .rm-cm .h em { font: normal 10.5px var(--mono); color: var(--text-faint); }
 .rm-cm .tx { font-size: 13.5px; line-height: 20px; color: var(--text); margin-top: 3px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A comment on one of the chat's files, at the chat's own sizes. */
+.rm-cm .h .comment-on { font-size: inherit; min-width: 0; }
+.rm-cm .comment-quote { margin: 4px 0 0; font-size: 13px; line-height: 19px; }
 .rm-cm .tx b { font-weight: 400; background: var(--wash-strong); padding: 0 3px; }
 .rm-cm.cont { padding-top: 0; }
 .rm-cm.cont .tx { margin-top: 0; }
@@ -173,7 +176,7 @@
 .rm-cm .tx p:has(> .inline-image-open),
 .rm-cm .tx p:has(> .inline-image) { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; margin-top: 6px; white-space: normal; }
 .rm-cm .tx p:has(> .inline-image-open) .inline-image { margin: 0; }
-:root:root:root:root .rm-cm .inline-image-open:has(> .inline-image[data-phone-img="loading"]) { width: min(100%, 360px); }
+:root:root:root:root .rm-cm .inline-image-open[data-picture-loading] { width: min(100%, 360px); }
 :root:root:root:root .rm-cm .inline-image[data-phone-img="loading"] { max-height: 240px; }
 /* Two or more are smaller tiles, so two options sit side by side. */
 .rm-cm .tx p:has(> .inline-image-open ~ .inline-image-open) > .inline-image-open { max-width: calc(50% - 4px); }
