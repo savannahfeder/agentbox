@@ -7668,6 +7668,21 @@ button.cs-row:hover .cs-row-go { color: var(--text); }
 }
 .doc-mark:hover { background: var(--doc-wash); color: var(--text); }
 .doc-mark svg { display: block; }
+/* The open mark's menu hangs from the mark, right edges in line. */
+.open-with { position: relative; display: inline-flex; }
+/* Pressed while its menu is open, over the bare corner marks' clear hover (direct-review.css, artifact-view.css). */
+.open-with > .doc-mark[aria-expanded="true"],
+:root[data-code-review] .workspace-layout .doc-marks .open-with > .doc-mark[aria-expanded="true"] { background: var(--doc-wash); color: var(--text); }
+.th-menu.ts-more-menu.open-with-menu { min-width: 236px; }
+.open-with-icon { width: 18px; height: 18px; display: block; }
+.open-with-menu[aria-busy="true"] .ts-more-row:not(.on) { opacity: .45; }
+/* Room for "Opening" on every row, so the menu does not widen as it appears. */
+.open-with-menu .open-with-detail { display: inline-flex; align-items: center; justify-content: flex-end; gap: 7px; min-width: 86px; }
+.open-with-spin {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1.6px solid var(--line-strong); border-top-color: var(--accent);
+  animation: cs-spin .8s linear infinite;
+}
 /* The file. An html page brings its own colour and the card cannot reach inside
    it; that join was measured before it shipped (33.5 points of step where a
    page brings its own black, 0 on markdown) and it is a stated cost of a card

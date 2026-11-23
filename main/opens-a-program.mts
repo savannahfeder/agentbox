@@ -28,12 +28,18 @@ const runFile: Run = (cmd, args, opts) => new Promise((resolve, reject) => {
   execFile(cmd, args, { ...opts, windowsHide: true }, (err) => (err ? reject(err) : resolve(undefined)));
 });
 
-/** Opens a file for the person, or shows it in Finder when opening would run it. */
-export async function openForThePerson(shell: OpeningShell, p: string, { platform = process.platform, run = runFile }: { platform?: NodeJS.Platform; run?: Run } = {}): Promise<string> {
+/**
+ * Opens a file for the person, or shows it in Finder when opening would run it.
+ * `app` is an app the Mac listed for this file (main/open-with.mts); only a Mac has that list.
+ */
+export async function openForThePerson(shell: OpeningShell, p: string, { app, platform = process.platform, run = runFile }: { app?: string; platform?: NodeJS.Platform; run?: Run } = {}): Promise<string> {
   if (opensAProgram(p)) { shell.showItemInFolder?.(p); return ''; }
   if (!shell.openPath) return '';
   // On a Mac, shell.openPath blocks the main thread until the receiving app
   // has started, and the window freezes with it.
-  if (platform === 'darwin') return run('/usr/bin/open', [path.resolve(p)], { timeout: OPEN_MS }).then(() => '', () => 'Failed to open path');
+  if (platform === 'darwin') {
+    const args = app ? ['-a', path.resolve(app), path.resolve(p)] : [path.resolve(p)];
+    return run('/usr/bin/open', args, { timeout: OPEN_MS }).then(() => '', () => 'Failed to open path');
+  }
   return shell.openPath(p);
 }

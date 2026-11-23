@@ -2026,8 +2026,10 @@ declare global {
       phoneLink?(p: { action: 'status' | 'on' | 'off' | 'reset' | 'via' | 'stop-alerts'; via?: PhoneRoute; device?: string }): Promise<PhoneLink>;
       sessionTrace?(p: { product: string; id: string; whole?: boolean; have?: Record<string, string> }): Promise<{ sessions: Array<{ startedAt: number; text: string }> }>;
       itemHistory?(p: { product: string; id: string; before?: number }): Promise<{ ok: boolean; lines: LedgerLine[]; error?: string }>;
-      // `mode`: 'resolve' finds the file without opening it, 'source' opens it in the editor.
-      openArtifact?(p: { product: string; src: string; mode?: string; thread?: string }): Promise<OpenedFile>;
+      // `mode`: 'resolve' finds the file without opening it, 'source' opens it in the editor,
+      // 'reveal' shows it in Finder. `app` is one `openWith` listed for the file.
+      openArtifact?(p: { product: string; src: string; mode?: string; thread?: string; app?: string }): Promise<OpenedFile>;
+      openWith?(p: { product: string; src: string; thread?: string }): Promise<AppsThatOpen>;
       folderPictures?(p: { product: string; src: string }): Promise<{ ok: boolean; folder?: string; pictures?: string[]; total?: number; error?: string }>;
       readDoc?(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }>;
       writeDoc?(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }>;
@@ -2120,6 +2122,9 @@ export interface AgentUpdate { engine: string; state: string; message?: string; 
 
 /** Where a path in a message resolved to (main/ipc.mts zero:open-artifact). */
 export interface OpenedFile { ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }
+/** What main/ipc.mts zero:open-with answers: the apps, default first, and whether the file can be shown in its folder. */
+export interface OpenWithApp { path: string; name: string; isDefault: boolean; icon?: string | null }
+export interface AppsThatOpen { ok: boolean; apps: OpenWithApp[]; reveal?: boolean; finder?: boolean }
 export interface AddedAccount { ok: boolean; command?: string; home?: string; error?: string }
 export interface EngineSetupAnswer {
   ok: boolean; error?: string; phase?: EngineSetupState['phase']; log?: string;
