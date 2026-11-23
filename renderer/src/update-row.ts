@@ -38,19 +38,12 @@ export function isUpdateRow(i: { id?: string } | null | undefined): boolean {
  *  of this rule is how the news disappears from one surface and stays on the
  *  other.
  *
- * NOT DURING THE WALK.
- *
- *  The walk shows one thing at a time and every sentence on the screen points
- *  at it, so nothing about a new version appears until it ends. It is a delay
- *  and never a loss: the code is already on the disk.
- *
  *  `closed` is a version not to mention. Nothing sets one any more, since the
  *  row that could be closed is gone; both callers pass an empty string. */
 export function announcesUpdate(
   state: UpdateState | null | undefined,
-  at: { walking: boolean; closed: string },
+  at: { closed: string },
 ): boolean {
-  if (at.walking) return false;
   // WHILE IT REBUILDS THE CARD STAYS. On a copy run from source the restart
   // takes about a minute, and a card that vanished the moment Restart was
   // pressed would read as the press doing nothing.
@@ -65,16 +58,15 @@ export function announcesUpdate(
  *  card and ⌘K both ask it, and two copies of the rule is how one surface
  *  keeps offering a move the other has forgotten.
  *
- *  NOT DURING THE WALK, and not while a restart is running. `closed` is a
+ *  Not while a restart is running. `closed` is a
  *  place whose card was closed with its × (`MOVE_CLOSED_KEY`), which hides the
  *  card and leaves ⌘K and the Settings row offering it: this is the one press
  *  that will ever get this copy an update, so nothing may throw it away.
  */
 export function announcesMove(
   state: UpdateState | null | undefined,
-  at: { walking: boolean; closed: string },
+  at: { closed: string },
 ): boolean {
-  if (at.walking) return false;
   if (!state?.canMove || state.installing) return false;
   return !(at.closed && at.closed === (state.place ?? ''));
 }

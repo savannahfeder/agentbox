@@ -29,6 +29,8 @@ export interface WorkItem {
   // PINNED TO THE TOP OF THE LIST (w-20323283e6). Kept by the supervisor, on
   // this Mac, like the place; absent on every row nobody has pinned.
   pinned?: boolean;
+  /** The level a row a teammate sent you has for you. Never stored: the window works it out (`levelForYou`). */
+  levelForYou?: number;
   /** Kept on this Mac whatever the cloud is set to (Supervisor#setThreadOnMac). */
   onMac?: boolean;
   /** What the cloud handed this thread back for, in the run's own words ("your Stripe key"). */
@@ -421,7 +423,7 @@ export interface FilesPlaceView {
 type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?: Record<string, unknown> };
 
 /** What a comment or approval in the thread links to. */
-export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true }
+export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true; /** A reply under a comment, not a comment of its own. */ reply?: true }
 
 /** A comment on a thread, or a note on one of its files (main/team/thread-share.mts `talk`), for the person's page. */
 export interface ThreadTalk {
@@ -494,6 +496,8 @@ export interface FoundInThreads {
   files: FoundFile[];
   comments: FoundComment[];
   total: { lines: number; files: number; comments: number };
+  /** The threads you opened lately that the words are inside, each with the first line found. */
+  threads?: { product: string; id: string; text: string }[];
 }
 
 export type ThreadStateWord ='waiting' | 'running' | 'scheduled' | 'done';
@@ -569,6 +573,8 @@ export interface TeamState {
   error: string | null;
   /** False only when the cloud said this person's team is not let into multiplayer yet. */
   multiplayer?: boolean | null;
+  /** False only when the cloud said this person's team has no Pro and no free days, so it neither invites nor shares. */
+  pro?: boolean | null;
   /** Rooms (alpha), while switched on in Alpha features (main/team/rooms.mts). */
   rooms?: RoomsState | null;
 }
@@ -718,6 +724,8 @@ export interface RoomsState {
   ranks: Record<string, number>;
   invites: { roomId: string; roomName: string; invitedBy: string | null; invitedByName: string | null }[];
   mentions: RoomMention[];
+  /** Rows put off with L, soonest back first. */
+  later?: (RoomMention & { until: number })[];
   error: string | null;
 }
 
@@ -936,10 +944,14 @@ export interface CloudPlan {
   trial?: { hours: number; usedSeconds: number };
   /** Before any subscription: every paid plan's free week and its hours, the same on each. */
   trialOffer?: { days: number; hours: number };
+  /** On a team: the free days its Pro would start with now. */
+  teamFreeDays?: number;
   /** The team's hours: a trial until `endsAt`, or `seats` paid for; `seats` in a trial means the card is in and not yet charged. */
   /** Hours are this person's own, with no limit at once; `people` is every member's own use (names come from the team). */
   team?: {
     trial: boolean; endsAt: number | null; seats: number; members: number; owner: boolean; agents?: null; running: number; hours: number; usedSeconds: number;
+    /** What Stripe charges a seat, a code taken off. Absent from servers before 2026-11-21. */
+    dollarsPerSeat?: number;
     people?: { id: string; usedSeconds: number; running: number; name?: string }[];
   };
   /** Who bills the plan: Stripe, or nobody because it was set by hand. Absent from older servers. */
@@ -988,6 +1000,8 @@ export interface SupervisorStatus {
   queued?: string[];
   // Of those, the ones being set up or asked for by name, which count as In progress.
   starting?: string[];
+  // Of those, only the ones whose folder is being made now.
+  settingUp?: string[];
   // Sessions this app holds open between Remote Control turns, which `running` leaves out.
   remoteHeld?: string[];
   // With the cloud on Everything, why a thread runs locally or waits (Supervisor#status).
@@ -1164,8 +1178,8 @@ export interface AgentTurn {
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment, or an agent's checkpoint (thread-history.ts). */
-  says?: 'comment' | 'progress' | 'to-agent';
+  /** A teammate's comment, an agent's checkpoint, or the app's own note (thread-history.ts). */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app';
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
@@ -1383,6 +1397,8 @@ export interface Snapshot {
    *  typechecks. */
   engines?: {
     choices: Engine[];
+    /** Any harness on offer besides Claude Code and Codex, each with its models. Read by the model menu and nothing else. */
+    further?: Engine[];
     workspace: string;
     byItem: Record<string, string>;
   };
@@ -1475,6 +1491,8 @@ export interface AccountSetting {
   // emails.
   email: string | null;
   accountUuid: string | null;
+  /** Main's answer. A login with no email on file can still be signed in. */
+  signedIn?: boolean;
   /**
    * Whether her work runs on THIS account and no other. False on every row
    * until she picks one, and then every account runs as it always has. */
@@ -1771,6 +1789,8 @@ declare global {
       // The thread on screen, or null anywhere that is not one thread. Optional:
       // a preload from before this channel existed simply never says.
       looking?(p: { product: string | null; id: string | null }): Promise<boolean>;
+      // How long this window's own thread held (./window-holds.ts).
+      windowHeld?(ms: number): Promise<boolean>;
       refreshUsage?(p?: { engine?: 'claude' | 'codex'; ask?: boolean }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
       accountUsage?(p: { refresh?: boolean; engine?: 'claude' | 'codex' }): Promise<{ readings: AccountUsageReading[] }>;
       // Whether a screen reader is running, which is what decides xterm's
@@ -1836,7 +1856,7 @@ declare global {
       teamSync(): Promise<TeamCallResult>;
       teamRoute(p: { product: string; id: string; route: 'agent' | 'me' | 'back' }): Promise<TeamCallResult>;
       teamThreadWork(p: { personId: string; threadId: string }): Promise<TeammateThreadWork>;
-      findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads>;
+      findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number }; opened?: Record<string, number> }): Promise<FoundInThreads>;
       warmFindInThreads(): Promise<boolean>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
       fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
@@ -2006,8 +2026,10 @@ declare global {
       phoneLink?(p: { action: 'status' | 'on' | 'off' | 'reset' | 'via' | 'stop-alerts'; via?: PhoneRoute; device?: string }): Promise<PhoneLink>;
       sessionTrace?(p: { product: string; id: string; whole?: boolean; have?: Record<string, string> }): Promise<{ sessions: Array<{ startedAt: number; text: string }> }>;
       itemHistory?(p: { product: string; id: string; before?: number }): Promise<{ ok: boolean; lines: LedgerLine[]; error?: string }>;
-      // `mode`: 'resolve' finds the file without opening it, 'source' opens it in the editor.
-      openArtifact?(p: { product: string; src: string; mode?: string; thread?: string }): Promise<OpenedFile>;
+      // `mode`: 'resolve' finds the file without opening it, 'source' opens it in the editor,
+      // 'reveal' shows it in Finder. `app` is one `openWith` listed for the file.
+      openArtifact?(p: { product: string; src: string; mode?: string; thread?: string; app?: string }): Promise<OpenedFile>;
+      openWith?(p: { product: string; src: string; thread?: string }): Promise<AppsThatOpen>;
       folderPictures?(p: { product: string; src: string }): Promise<{ ok: boolean; folder?: string; pictures?: string[]; total?: number; error?: string }>;
       readDoc?(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; text?: string; mtime?: number; error?: string; coming?: boolean; waits?: boolean; carry?: CarryState }>;
       writeDoc?(p: { product: string; src: string; text: string; mtime: number; thread?: string }): Promise<{ ok: boolean; mtime?: number; error?: string; stale?: boolean }>;
@@ -2100,6 +2122,9 @@ export interface AgentUpdate { engine: string; state: string; message?: string; 
 
 /** Where a path in a message resolved to (main/ipc.mts zero:open-artifact). */
 export interface OpenedFile { ok: boolean; opened?: string; url?: string; error?: string; coming?: boolean; waits?: boolean; note?: string; carry?: CarryState }
+/** What main/ipc.mts zero:open-with answers: the apps, default first, and whether the file can be shown in its folder. */
+export interface OpenWithApp { path: string; name: string; isDefault: boolean; icon?: string | null }
+export interface AppsThatOpen { ok: boolean; apps: OpenWithApp[]; reveal?: boolean; finder?: boolean }
 export interface AddedAccount { ok: boolean; command?: string; home?: string; error?: string }
 export interface EngineSetupAnswer {
   ok: boolean; error?: string; phase?: EngineSetupState['phase']; log?: string;

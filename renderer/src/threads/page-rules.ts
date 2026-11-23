@@ -14,7 +14,7 @@ import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
 import { dayAndTime, firstRealLine, itemOptions } from '../format';
 import { asksSomething } from '../../../shared/teammates.mts';
 import { threadState } from '../../../shared/thread-cards.mts';
-import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
+import { DEFAULT_PRIORITY, dropPlaces, oneLevelUp, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
 import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, taskGiver, whatWaits, type TeamRow } from '../../../shared/team-rules.mts';
 import { handedFrom } from '../../../shared/thread-link.mts';
@@ -443,10 +443,10 @@ export function emptyTabWords(view: View | string, starting = false, waiting = 0
     return `Nothing is running. ${waiting === 1 ? 'One thread waits' : `${waiting} threads wait`} in Needs you.`;
   }
   // A finished thread waits in Needs you until its owner closes it, which a
-  // persona read as the app losing it.
+  // persona read as the app losing it. One short line, like In progress's.
   return {
-    snoozed: 'Nothing is waiting for later. "Add it to Later" on a new thread writes one down without starting it.',
-    done: 'Nothing closed yet. A finished thread waits in Needs you until you close it.',
+    snoozed: 'Nothing is waiting for later.',
+    done: 'Nothing done yet. Finished threads wait in Needs you.',
   }[view as string] ?? 'Nothing here.';
 }
 
@@ -501,6 +501,33 @@ export const conversationSlugs = (products: readonly Product[] = []): ReadonlySe
   new Set(products.filter(isDirect).map((p) => p.slug));
 
 /**
+ * The level a row a teammate sent you has for you: one up from the level it
+ * came with (`oneLevelUp`, shared/rank.mts). Null keeps the row's own. Only a
+ * conversation's rows are sent to you; of those, a task you gave keeps your
+ * level, and so does any level you picked yourself. An AI teammate's thread
+ * lives in a project, so it ranks as the agent it is.
+ */
+export function levelForYou(item: WorkItem, product: Product | undefined | null, me: string | null): number | null {
+  if (!me || !isDirect(product)) return null;
+  if (isTaskRow(item) && item.assignee !== me) return null;
+  const set = item.wrote?.priority;
+  if (set?.source === 'founder' && set.by === me) return null;
+  const came = Number(item.priority);
+  return oneLevelUp(came > 0 ? came : DEFAULT_PRIORITY);
+}
+
+/** Every row wearing its `levelForYou`, so the list, the board, Home and the
+ *  thread page read one level. A row it does not raise comes back as it was. */
+export function withLevelsForYou(items: WorkItem[], products: readonly Product[], me: string | null): WorkItem[] {
+  if (!me) return items;
+  const bySlug = new Map(products.map((p) => [p.slug, p]));
+  return items.map((i) => {
+    const level = levelForYou(i, bySlug.get(i.product), me);
+    return level === null || level === i.levelForYou ? i : { ...i, levelForYou: level };
+  });
+}
+
+/**
  * WHO AN OPEN CONVERSATION WOULD HAND TO NEW THREAD, in the shape the card's
  * `initial` takes: the first person in To, everyone else beside them.
  *
@@ -537,13 +564,13 @@ export function peopleInConversation(
   return { to: ids[0], also: ids.slice(1) };
 }
 
-/** Who the small menu on an agent thread offers. */
+/** Who the small menu on an agent thread offers. Nobody on a thread of your own, where Share is the one door to people. */
 export function peopleToAdd<P extends { id: string }>({ item, me, company }: {
-  item: { visibleTo?: string[] };
+  item: { visibleTo?: string[]; createdBy?: string | null };
   me: string | null;
   company: readonly P[];
 }): P[] {
-  if (!me) return [];
+  if (!me || (item.createdBy ?? me) === me) return [];
   const on = new Set(item.visibleTo ?? []);
   return company.filter((p) => p.id !== me && !on.has(p.id));
 }
@@ -671,6 +698,7 @@ export function waitingWord(item: Pick<WorkItem, 'assignee' | 'people' | 'wrote'
  * (main/message-priority.mts) or the person setting it is what makes it real.
  */
 export function messagePriority(item: WorkItem): number | null {
+  if (Number.isFinite(item.levelForYou)) return item.levelForYou!;
   const set = item.wrote?.priority;
   return set && set.source !== 'system' ? item.priority ?? null : null;
 }
@@ -701,7 +729,11 @@ export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'
   return asksSomething(said);
 }
 
-/** The level a row names: none at Medium, which is what an unset thread runs at. */
+/**
+ * The level a small mark beside other words names, on a board card or a Home
+ * row: none at Medium, which is what an unset thread runs at. The table's
+ * Priority column names every level (RowCells).
+ */
 export function rowPriorityId(priority: number | null): PriorityId | null {
   if (priority === null) return null;
   const id = priorityIdOf(priority);
@@ -1007,15 +1039,13 @@ export function handedTo(item: { status?: string; answer?: string | null }): str
   return handedOn(item) ? String(item.answer).split('\n')[0].slice('Given to '.length).replace(/\.$/, '') : null;
 }
 
-export function handedInitials(name: string): string {
-  const words = name.split(/\s+/).filter(Boolean);
-  return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)).toUpperCase();
-}
+export { initialsOf as handedInitials } from '../team/rooms/room-rules';
 
 /** The task a thread became when it was handed on: its link leads back here, from the one who gave it. */
 export function taskHandedFrom<T extends TeamRow & { id: string; body?: string | null }>(items: readonly T[], threadId: string, me: string | null = null): T | null {
   return items.find((t) => {
-    if (!isTaskRow(t)) return false;
+    // An ask links back to the thread too, and is not a hand-over.
+    if (!isTaskRow(t) || (t as { ask?: unknown }).ask) return false;
     const giver = taskGiver(t);
     return (!me || giver === me) && handedFrom(t.body, giver)?.id === threadId;
   }) ?? null;

@@ -1,7 +1,8 @@
 // ⌘K TAKES THE WEBSITE'S LOOK AND KEEPS ITS OWN PICK (w-391bc4efbe, 2026-10-26).
 //
 // The website's ⌘K picture had a magnifier and an Esc key on the input, a
-// small icon on every row and the keys in a footer; the app's box had none of
+// small icon on every row and the keys in a footer (the footer went again on
+// 2026-11-21); the app's box had none of
 // them (measured on a capture of the built app). "There is a Command K bar in
 // this component that I feel looks better than our current Command K bar."
 // The selected row stays the app's own, pinned in
@@ -19,7 +20,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { Palette } from '../renderer/src/components/Palette';
-import { glyphFor, NO_GLYPH } from '../renderer/src/palette-glyphs.ts';
+import { ICONS, iconFor, PLAIN_ICON } from '../renderer/src/palette-glyphs.ts';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const noop = () => {};
@@ -41,11 +42,9 @@ describe('the box', () => {
     expect(html).toMatch(/<button type="button" class="palette-esc"[^>]*>esc<\/button>/);
   });
 
-  it('says what the keys do in its footer, and Enter selects', () => {
-    const foot = draw().match(/<div class="palette-foot"[^>]*>(.*?)<\/div>/)?.[1] ?? '';
-    expect(foot).toContain('move');
-    expect(foot).toContain('select');
-    expect(foot).not.toMatch(/\brun\b/i);
+  // The footer of keys went on 2026-11-21 (tests/the-command-bar-draws-line-icons-like-the-menus).
+  it('has no footer of keys', () => {
+    expect(draw()).not.toContain('palette-foot');
   });
 
   // The cases that must NOT come back.
@@ -103,21 +102,21 @@ describe('every row has an icon of its own', () => {
   });
 
   it('draws one for each of them', () => {
-    const bare = [...ids].filter((id) => glyphFor({ id, label: '' }) === NO_GLYPH);
+    const bare = [...ids].filter((id) => iconFor({ id, label: '' }) === PLAIN_ICON);
     expect(bare).toEqual([]);
   });
 
-  it('never draws an emoji, which would come out in colour', () => {
-    for (const id of ids) expect(glyphFor({ id, label: '' })).not.toMatch(/\p{Emoji_Presentation}/u);
+  it('draws each as a line drawing, not a character', () => {
+    for (const id of ids) expect(ICONS[iconFor({ id, label: '' })].length).toBeGreaterThan(0);
   });
 
   it('pauses with one icon and unpauses with another', () => {
-    expect(glyphFor({ id: 'pause', label: 'Pause agents' })).not.toBe(glyphFor({ id: 'pause', label: 'Unpause agents' }));
+    expect(iconFor({ id: 'pause', label: 'Pause agents' })).not.toBe(iconFor({ id: 'pause', label: 'Unpause agents' }));
   });
 
-  // The boundary: an id nobody has drawn yet still gets a quiet mark, not a gap.
-  it('falls back to a quiet mark for an id it does not know', () => {
-    expect(glyphFor({ id: 'something-new', label: 'Something new' })).toBe(NO_GLYPH);
-    expect(NO_GLYPH.length).toBeGreaterThan(0);
+  // The boundary: an id nobody has drawn yet still gets the plain icon, not a gap.
+  it('falls back to the plain icon for an id it does not know', () => {
+    expect(iconFor({ id: 'something-new', label: 'Something new' })).toBe(PLAIN_ICON);
+    expect(ICONS[PLAIN_ICON].length).toBeGreaterThan(0);
   });
 });

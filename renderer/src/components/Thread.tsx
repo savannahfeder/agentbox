@@ -39,7 +39,7 @@ import { NOT_ANSWERING_MS, THREAD_NOT_ANSWERING_MS, threadWaitWords } from '../n
 import { onCloudPhone, onPhone } from '../phone-screen';
 import { threadPieces, typedParts } from '../typed-message';
 import { TicketLink } from './TicketReference';
-import { MessageKind, FileMarkOpener } from './FileMarkLine';
+import { MessageKind, FileMarkOpener, CommentOn, CommentQuote } from './FileMarkLine';
 import { clock, dayHeading } from '../thread-history';
 import { laterHint } from '../threads/composer-rules';
 import { chatLayout, newestSaid } from '../team/chat-layout';
@@ -473,6 +473,8 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 onStep={(next) => stepLine(key, next)}
                 code={code}
               />
+            : e.says === 'app'
+            ? <div className="one-app-note">{md(e.text ?? '')}</div>
             : slot ? (<>
               {/* A MESSAGE BETWEEN PEOPLE (w-2e8aa16f0f). The face sits beside
                   the name once per run. None of the agent thread's chapters: no
@@ -485,6 +487,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 {slot.head && (
                   <div className="msg-head">
                     <span className="msg-who">{voiceOf(e) ?? teammateOf(e)?.name ?? (e.who === 'you' ? 'You' : name)}</span>
+                    <CommentOn e={e} />
                     {headFacts(e, clock(e.at))}
                     <MessageKind e={e} />
                     {e.edited && <span className="msg-edited" title="Edited">edited</span>}
@@ -497,7 +500,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     onEmpty={() => { setEditing(null); setDeleting(e.uid!); }} />
                   : e.deleted
                     ? <div className="msg-body msg-deleted">{e.text}</div>
-                    : <ChatFold lines={e.who === 'you'} newest={n === newest}>{md(e.text ?? '')}</ChatFold>}
+                    : <><CommentQuote e={e} /><ChatFold lines={e.who === 'you'} newest={n === newest}>{md(e.text ?? '')}</ChatFold></>}
                 {e.edited && !slot.head && editing !== e.uid && <span className="msg-edited chat-edited-cont">edited</span>}
                 {n === asked && underAsk && <div className="chat-under">{underAsk}</div>}
                 {/* THE CHIPS, AND THE BAR WHEN YOU POINT AT IT (w-560647d4db).
@@ -560,10 +563,11 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                 {(!e.same || e.resumed) && (
                   <div className="msg-head">
                     <span className="msg-who">{whoSaid(e)}</span>
+                    <CommentOn e={e} />
                     {headFacts(e, when(e.at))}
                     <MessageKind e={e} />
                     {askAbout && e.who !== 'you' && !helperOf(e) && !voiceOf(e) && e.text && (
-                      <button type="button" className="msg-ask" onClick={() => askAboutStep(e.text ?? '')}>Ask a teammate</button>
+                      <button type="button" className="msg-ask" onClick={() => askAboutStep(e.text ?? '')}>Ask about this</button>
                     )}
                   </div>
                 )}
@@ -582,6 +586,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                     attached to the message is a markdown line the app added,
                     and drawn as typed a pasted screenshot read as its own
                     brackets (typed-message.ts). Those lines are drawn. */}
+                <CommentQuote e={e} />
                 {e.who === 'you'
                   ? <div className="msg-body typed">{typedParts(e.text ?? '').map((p, k, all) => ('embed' in p
                     ? <div key={k} className="typed-embed">{md(p.embed)}</div>

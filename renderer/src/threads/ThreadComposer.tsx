@@ -43,11 +43,14 @@ import { TeamContext, Face, firstName } from '../team/people';
 import { whereAMessageGoes } from '../team/one-conversation';
 import { AgentFace } from '../components/AgentFace';
 import { AutoFace } from '../components/AutoFace';
+import { EngineLogo } from '../components/EngineLogos';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
 import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
+import { handedIn, type HandedComment } from './comments-to-hand';
+import { rememberHanded } from './send-back';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
 import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { cardPick, clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
@@ -67,7 +70,7 @@ import { dropRank, useFitRow } from './fit-row';
 import { useThreadMentions } from '../components/ThreadMentions';
 import {
   agentChoices, toOffered, autoOffered,
-  allModels, findPeople, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
+  allModels, findPeople, furtherModelLabel, harnessFields, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, moreCount,
   joinNames, placeholderFor, projectsOffered, projectSwatch, recentModels,
   sharingFields, cardProject, startingVisibility, startingChosen, teammates, threadMessage, tomorrowMorning, chosenWords, VISIBILITY_ROWS,
   dueChoices, dueWords, headRows, NOT_BLOCKED, keyOnTheNewThreadCard, modEnterSendsTheCard, messageSubject, toSections, findInTo, findInvited, type ToSection,
@@ -125,6 +128,8 @@ export interface ComposeStart {
   caret?: [number, number];
   /** Files already on disk that go with it: what a handed-over message or task carries. */
   attachments?: PendingAttachment[];
+  /** The comments on the files it carries, which go to the agent unless unticked. */
+  comments?: HandedComment[];
   /** The message this card was opened from, when it was handed to an agent. */
   handFrom?: HandFrom;
   /** The task's name, which the thread keeps while its first line still says it. */
@@ -142,7 +147,7 @@ export interface ComposeStart {
 }
 
 export function ThreadComposer({
-  products, items, engines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, toChat, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor, outOfUsage,
+  products, items, engines, furtherEngines, workspaceEngine, codexModels, codexModelDefault, defaultProduct, initial, scripted, onOpenMenu, onClose, onSent, onSending, onFailed, onOpenConversation, toChat, onReorderProjects, onNewProject, selectProject, agentMates, onToTeammate, inline = false, onWriting, handOver, statusLine, ideas, askFolder = false, onSendToAgent, blockChoicesFor, outOfUsage,
 }: {
   /** `supervisor.outOfUsage`: each agent whose account is out of usage, and when it comes back. */
   outOfUsage?: Record<string, { tool: string; until: number }>;
@@ -169,6 +174,8 @@ export function ThreadComposer({
   items: WorkItem[];
   /** The coding agents this Mac really offers, off the snapshot. Absent means Claude Code alone. */
   engines?: Engine[];
+  /** Any harness on offer besides those two, each with the models it listed (`snapshot.engines.further`). */
+  furtherEngines?: Engine[];
   /** Codex's models as read off this Mac, with their own effort levels. */
   codexModels: ModelChoice[];
   codexModelDefault: string | null;
@@ -292,6 +299,9 @@ export function ThreadComposer({
   const [dropped, setDropped] = useState(0);
   const { attaching, collect } = useAttaching();
   const onThisWork = initial?.handFrom ? agentOnThisWork(items, initial.handFrom) : null;
+  // The comments are lines of the words; the ones still there when it is sent are the ones it carried.
+  const comments = initial?.comments ?? [];
+  const commenter = (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null) || 'A teammate';
 
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
@@ -351,11 +361,14 @@ export function ThreadComposer({
   const claudeOffered = engineRows.some((e) => e.id === 'claude');
   const codexDefault = codexModelDefault ?? null;
   const modelOpts = { codexModels, codexDefault };
+  // A harness besides the two is never the default: it is picked by picking one of its models.
+  const further = furtherEngines ?? [];
+  const furtherIds = further.map((e) => e.id).join(',');
   // The agent is the default from Settings, not the last one picked: a pick
   // carried silently into the next thread sent work to the wrong agent. Each
   // agent's own last model is still remembered.
   const remembered = (): ModelPick => {
-    const kept = cardPick(opened.current, engineRows.map((e) => e.id));
+    const kept = cardPick(opened.current, [...engineRows, ...further].map((e) => e.id));
     if (kept) return { engine: kept.engine as Harness, model: kept.model };
     const engine: Harness = startingEngine(workspaceEngine ?? null, engines);
     return { engine, model: readLastModel(undefined, engine, codexDefault) ?? defaultModelFor(engine, codexDefault) };
@@ -367,7 +380,9 @@ export function ThreadComposer({
     if (pick.engine === 'codex' && !codexOffered) setPick({ engine: 'claude', model: readLastModel(undefined, 'claude') ?? defaultModelFor('claude') });
     // And the other way (w-db6f5e331e): a Mac with Codex and no Claude Code.
     if (pick.engine === 'claude' && !claudeOffered && codexOffered) setPick({ engine: 'codex', model: readLastModel(undefined, 'codex', codexDefault) ?? defaultModelFor('codex', codexDefault) });
-  }, [codexOffered, claudeOffered]);
+    // And a further harness that is no longer here.
+    if (pick.engine !== 'claude' && pick.engine !== 'codex' && !further.some((e) => e.id === pick.engine)) setPick(remembered());
+  }, [codexOffered, claudeOffered, furtherIds]);
   const [effort, setEffort] = useState<string | null>(() => readLastEffort(undefined, pick.engine));
   // The setup asks which agent while this box is already open behind it.
   useEffect(() => {
@@ -394,17 +409,17 @@ export function ThreadComposer({
     setEffort(next);
     writeLastEffort(next, undefined, pick.engine);
   };
-  const labelOf = (p: ModelPick) => engineModelLabel(p.engine, p.model, modelOpts);
+  const labelOf = (p: ModelPick) => furtherModelLabel(further, p) ?? engineModelLabel(p.engine, p.model, modelOpts);
   // Recent rows say which agent runs them, where there are two.
-  const engineTags = agentChoices(engineRows).length > 0;
+  const engineTags = agentChoices(engineRows).length > 0 || further.length > 0;
   // Said before Send, so nobody files a task expecting an agent that cannot start.
   const outHere = person || mate ? null : outOfUsage?.[pick.engine] ?? null;
   const outNote = outOfUsageNote(outHere);
   const recent = useMemo(
-    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered }),
-    [items, codexModels, codexDefault, codexOffered, claudeOffered],
+    () => recentModels(items, { codexModels, codexDefault, codexOffered, claudeOffered, further }),
+    [items, codexModels, codexDefault, codexOffered, claudeOffered, furtherEngines],
   );
-  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered }), [codexModels, codexOffered, claudeOffered]);
+  const every = useMemo(() => allModels({ codexModels, codexOffered, claudeOffered, further }), [codexModels, codexOffered, claudeOffered, furtherEngines]);
   const more = moreCount(recent, every);
 
   /* ------------------------------ menus --------------------------------- */
@@ -656,7 +671,7 @@ export function ThreadComposer({
       const harness = harnessFields({
         engine: pick.engine, model: pick.model,
         effort: effortPicked(effort, effortRows) ? effort : null,
-        engineCount: engineRows.length, codexDefault,
+        engineCount: engineRows.length + further.length, codexDefault,
       });
       const priority = sentPriority(prio);
       if (when.repeat) {
@@ -688,6 +703,7 @@ export function ThreadComposer({
           ...(scripted ? { labels: scripted.labels } : {}),
         });
         dropComposeDraft(taken, undefined, place);
+        if (made?.id && !person) rememberHanded(product.slug, made.id, handedIn(typed, comments, { nameOf: commenter }));
         if (initial?.continueFrom) void api.teamContinued(initial.continueFrom);
         // The person who handed it over can follow the work to where it went (round two of the team test).
         const startedAt = initial?.handFrom && made?.id && team?.me ? threadLink(team.me, made.id) : null;
@@ -886,6 +902,10 @@ export function ThreadComposer({
   const peopleHere = !!team && (others.length > 0 || !!team.state.sent?.length);
   const matesHere = !!agentMates && !!onToTeammate;
   const toShown = toOffered({ people: peopleHere, auto: autoHere, mates: matesHere, chosen: !!person || !!mate });
+  // Home's box on a team draws what nobody changed as a mark, as approved
+  // (tests/homes-box-on-a-team-shows-what-you-have-not-changed-as-a-mark).
+  // An AI teammate in To keeps its own short bar.
+  const quiet = inline && toShown && !mate;
   const sections = toSections({
     people: peopleHere,
     auto: toFound.auto,
@@ -957,7 +977,7 @@ export function ThreadComposer({
     </div>
   );
 
-  const engineLabel = (id: string) => engineRows.find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id;
+  const engineLabel = (id: string) => [...engineRows, ...further].find((e) => e.id === id)?.label ?? ENGINES.find((e) => e.id === id)?.label ?? id;
 
   // The menu itself is ./ModelMenu.tsx, which the reply box draws too.
   const modelMenu = (
@@ -981,16 +1001,15 @@ export function ThreadComposer({
     />
   );
 
-  // IS THIS A TASK OR A MESSAGE. Both are drawn, because a word that only showed
+  // IS THIS A TO-DO OR A MESSAGE. Both are drawn, because a word that only showed
   // its other choice when pressed was missed. Picking Message puts the day away:
-  // a message has nothing to be due.
+  // a message has nothing to be due. The store still calls a to-do a task.
   const sendAsChoice = (
     <span className="tc-seg" role="group" aria-label="Send as">
       {(['message', 'task'] as SendAs[]).map((k) => (
-        // Named in full: a bare "Task" is also the Tasks tab behind the card.
-        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={`Send as a ${k}`}
+        <button key={k} type="button" className={sendAs === k ? 'on' : ''} aria-pressed={sendAs === k} aria-label={k === 'task' ? 'Send as a to-do' : 'Send as a message'}
           onClick={() => { setSendAs(k); if (k === 'message') setDue(null); textRef.current?.focus(); }}>
-          {k === 'task' ? 'Task' : 'Message'}
+          {k === 'task' ? 'To-do' : 'Message'}
         </button>
       ))}
     </span>
@@ -1100,9 +1119,9 @@ export function ThreadComposer({
      the reply dock drifted apart the first time (components/Priority.tsx). */
   const priorityChip = (
     <span className="tc-anchor" ref={anchor('priority')} data-drop={inline ? dropRank('priority') : undefined}>
-      <button type="button" data-trigger className={`tc-chip ${open === 'priority' ? 'open' : ''}`} title="Priority"
+      <button type="button" data-trigger className={`tc-chip ${open === 'priority' ? 'open' : ''}${prio === null ? ' tc-at-rest' : ''}`} title={quiet ? `Priority: ${choiceLabelOf(prio)}` : 'Priority'}
         aria-haspopup="listbox" aria-expanded={open === 'priority'} onClick={() => toggle('priority')} onKeyDown={triggerKeys('priority')}>
-        <PrioGlyph id={prio} />{choiceLabelOf(prio)}
+        <PrioGlyph id={prio} /><span className="tc-chip-text">{choiceLabelOf(prio)}</span>
       </button>
       {open === 'priority' && priorityMenu}
     </span>
@@ -1250,10 +1269,13 @@ export function ThreadComposer({
   const fields: { label: string; node: ReactNode }[] = [
     ...(toShown ? [{ label: 'To', node: (
       <span className="tc-anchor" ref={anchor('to')} data-drop={inline && !mate && !person ? dropRank('to') : undefined}>
-        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'}
+        <button type="button" data-trigger className={trigger('to')} aria-haspopup="listbox" aria-expanded={open === 'to'} title={inline && !mate && !person && !onAuto ? 'To: Agent' : undefined}
           onClick={() => toggle('to')} onKeyDown={triggerKeys('to')}>
-          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : inline ? null : onAuto ? <AutoFace /> : <AgentFace />}
-          <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>
+          {mate ? (mateRow ? <TeammateMark t={mateRow} /> : <i className="tq tq-sm tq-hash" aria-hidden="true">+</i>) : person ? <Face person={person} /> : onAuto ? <AutoFace /> : <AgentFace />}
+          {/* On the page's narrow box the agent is its face alone, so the bar keeps room for the level. */}
+          {inline && !mate && !person && !onAuto
+            ? <span className="tc-word-text tc-face-only">Agent</span>
+            : <span className="tc-word-text">{mate ? mateRow?.name ?? 'Someone new' : person ? person.name : onAuto ? 'Auto' : 'Agent'}</span>}
         </button>
         {extra.map((p) => (
           <span key={p.id} className="tc-also">
@@ -1261,7 +1283,8 @@ export function ThreadComposer({
             <button type="button" aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`} onClick={() => setAlso((was) => was.filter((x) => x !== p.id))}>×</button>
           </span>
         ))}
-        {person && others.length > group.length && (
+        {/* A to-do goes to one person, so Home offers no second one for it. */}
+        {person && others.length > group.length && !(quiet && sendAs === 'task' && !extra.length) && (
           <button type="button" className="tc-add" aria-label="Add someone" title="Add someone"
             onClick={() => { setAdding(true); setQuery(''); if (open !== 'to') toggle('to'); }}>+</button>
         )}
@@ -1269,28 +1292,37 @@ export function ThreadComposer({
       </span>
     ) }] : []),
     ...(rows.includes('sendAs') ? [{ label: 'Send As', node: sendAsChoice }] : []),
-    ...(rows.includes('subject') ? [{ label: 'Subject', node: (
-      <input className="tc-subject" value={subject} aria-label="Subject" spellCheck
-        placeholder={inline ? 'Subject, for a thread of its own' : 'Name the work to give it a thread of its own'}
+    ...(rows.includes('subject') ? [{ label: 'Subject', node: quiet ? (
+      // One word of hint, so it never runs out of room; what a subject does is its tooltip.
+      <label className={`tc-chip tc-subject-chip${subject.trim() ? '' : ' tc-at-rest'}`} title="A subject gives it a thread of its own">
+        <SubjectIcon />
+        <input className="tc-subject-in tc-chip-text" value={subject} aria-label="Subject" spellCheck placeholder="Subject"
+          onChange={(e) => setSubject(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) { e.preventDefault(); textRef.current?.focus(); } }} />
+      </label>
+    ) : (
+      <input className="tc-subject" value={subject} aria-label="Subject" spellCheck placeholder="Name the work to give it a thread of its own"
         onChange={(e) => setSubject(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !(e.metaKey || e.ctrlKey)) { e.preventDefault(); textRef.current?.focus(); } }} />
     ) }] : []),
     ...(rows.includes('dueOn') ? [{ label: 'Due On', node: (
       <span className="tc-anchor" ref={anchor('dueOn')}>
-        <button type="button" data-trigger className={trigger('dueOn')} aria-haspopup="listbox" aria-expanded={open === 'dueOn'}
-          onClick={() => toggle('dueOn')} onKeyDown={triggerKeys('dueOn')}>
+        <button type="button" data-trigger className={`${trigger('dueOn')}${due ? '' : ' tc-at-rest'}`} aria-haspopup="listbox" aria-expanded={open === 'dueOn'}
+          title={quiet ? 'Due On' : undefined} onClick={() => toggle('dueOn')} onKeyDown={triggerKeys('dueOn')}>
+          {quiet && <CalendarIcon />}
           {/* A day nobody set is drawn in the faint ink a placeholder
               uses: it is an answer, but a quiet one. */}
-          <span className={`tc-word-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
+          <span className={`tc-chip-text tc-word-text${due ? '' : ' tc-unset'}`}>{dueWords(due)}</span>
         </button>
         {open === 'dueOn' && dueOnMenu}
       </span>
     ) }] : []),
     ...(rows.includes('blockedBy') && blockOffers.length ? [{ label: 'Blocked By', node: (
       <span className="tc-anchor" ref={anchor('blockedBy')}>
-        <button type="button" data-trigger className={trigger('blockedBy')} aria-haspopup="listbox" aria-expanded={open === 'blockedBy'}
-          onClick={() => toggle('blockedBy')} onKeyDown={triggerKeys('blockedBy')}>
-          <span className={`tc-word-text${blockedBy ? '' : ' tc-unset'}`}>{blockLabel}</span>
+        <button type="button" data-trigger className={`${trigger('blockedBy')}${blockedBy ? '' : ' tc-at-rest'}`} aria-haspopup="listbox" aria-expanded={open === 'blockedBy'}
+          title={quiet ? 'Blocked By' : undefined} onClick={() => toggle('blockedBy')} onKeyDown={triggerKeys('blockedBy')}>
+          {quiet && <WaitIcon />}
+          <span className={`tc-chip-text tc-word-text${blockedBy ? '' : ' tc-unset'}`}>{blockLabel}</span>
         </button>
         {open === 'blockedBy' && blockedByMenu}
       </span>
@@ -1299,6 +1331,7 @@ export function ThreadComposer({
       <span className="tc-anchor" ref={anchor('model')} data-drop={inline ? dropRank('model') : undefined}>
         <button type="button" data-trigger className={trigger('model')} aria-haspopup="listbox" aria-expanded={open === 'model'}
           title={outNote ?? undefined} onClick={() => toggle('model')} onKeyDown={triggerKeys('model')}>
+          <EngineLogo engine={pick.engine} size={14} />
           <span className="tc-word-text">{labelOf(pick)}</span>
           <OutUntil out={outHere} drop={inline ? dropRank('out-when') : undefined} />
         </button>
@@ -1341,10 +1374,97 @@ export function ThreadComposer({
     </div>
   ) : null;
 
+  // One copy of each piece the bars draw, so Home's and the pop-up's cannot drift apart.
+  const fieldNode = (label: string) => fields.find((f) => f.label === label)?.node ?? null;
+  const seesChip = (sees: Visibility) => (
+    <span className="tc-anchor" ref={anchor('visibility')}>
+      <button type="button" data-trigger className={`tc-chip ${open === 'visibility' ? 'open' : ''}${picked === null ? ' tc-at-rest' : ''}`} title="Who sees it"
+        aria-haspopup="listbox" aria-expanded={open === 'visibility'} onClick={() => toggle('visibility')} onKeyDown={triggerKeys('visibility')}>
+        {sees === 'private' ? <LockIcon /> : <PeopleIcon />}
+        <span className="tc-chip-text">{sees === 'team' ? 'Team' : sees === 'private' ? 'Private' : chosenWords(chosenHere, others)}</span>
+      </button>
+      {open === 'visibility' && visibilityMenu}
+    </span>
+  );
+  const projectChip = (
+    <span className="tc-anchor" ref={anchor('project')} data-tour="project">
+      <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
+        aria-haspopup="listbox" aria-expanded={open === 'project'} onClick={() => toggle('project')} onKeyDown={triggerKeys('project')}>
+        {product && !unpicked && <Swatch slug={product.slug} />}
+        <span ref={projName} className={`tc-chip-name ${projCut ? 'cut' : ''}`}>{unpicked ? 'Choose a folder' : product?.name ?? 'No project'}</span>
+      </button>
+      {open === 'project' && projectMenu}
+    </span>
+  );
+  const clipButton = (
+    <button type="button" className="tc-icon" title="Attach files" aria-label="Attach files" data-drop={inline ? dropRank('attach') : undefined} onClick={() => fileRef.current?.click()}>
+      <ClipIcon />
+    </button>
+  );
+  const fileInput = <input ref={fileRef} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />;
+  const sendSolo = (
+    <span className="tc-send solo">
+      <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={`Send · ${SEND}`}>
+        Send <kbd data-drop={inline ? dropRank('send-keys') : undefined}>{SEND}</kbd>
+      </button>
+    </span>
+  );
+  const sendSplit = (
+    <span className="tc-send" ref={anchor('later')}>
+      <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? outNote ?? `Send · ${SEND}`}>
+        Send <kbd data-drop={inline ? dropRank('send-keys') : undefined}>{SEND}</kbd>
+      </button>
+      {/* A picked time is said here, on the half that changes it. */}
+      <button type="button" data-trigger className={`tc-send-caret${when ? ' set' : ''}`} disabled={sending}
+        aria-label={when ? `Sends ${whenWords(when)}. Change when` : 'Send later'} title={when ? 'Change when it sends' : 'Send later'}
+        aria-haspopup="menu" aria-expanded={open === 'later'} onClick={() => toggle('later')} onKeyDown={triggerKeys('later')}>
+        {when && <span className="tc-send-when">{whenWords(when)}</span>}
+        <CaretIcon />
+      </button>
+      {open === 'later' && laterMenu}
+    </span>
+  );
+  // WHY SEND IS OFF, WHEN IT IS OFF FOR WANT OF A PROJECT. My Workspace is made
+  // for everybody at boot, so this should never draw; it draws when making it
+  // failed, which used to be a log line and a dead button.
+  const stopperNote = stopper && (
+    <span className="tc-why">
+      {stopper.reason}{' '}
+      {onNewProject && stopper.action ? <button type="button" className="tc-why-do" onClick={onNewProject}>{stopper.action}</button> : stopper.action}
+    </span>
+  );
+  // Who sees it sits before the level here, as in the approved picture.
+  const quietBar = quiet && (
+    <div className="tc-bar tc-fit" ref={fitBar}>
+      {fieldNode('To')}
+      {person ? (<>
+        {sendAsChoice}
+        {taskToMany && <span className="tc-why">A to-do goes to one person.</span>}
+        <span className="tc-gap" />
+        {sendAs === 'task' ? (<>{fieldNode('Due On')}{fieldNode('Blocked By')}{seesChip(taskSees)}</>) : fieldNode('Subject')}
+        {priorityChip}
+        {clipButton}
+        {fileInput}
+        {sendSolo}
+      </>) : (<>
+        {fieldNode('Model')}
+        {projectChip}
+        <span className="tc-gap" />
+        {team && seesChip(visibility)}
+        {priorityChip}
+        {stopperNote}
+        {talk.on ? <Listening talk={talk} /> : clipButton}
+        {talk.allowed && !talk.on && <MicButton talk={talk} />}
+        {fileInput}
+        {sendSplit}
+      </>)}
+    </div>
+  );
+
   const box = (
       <div
         ref={card}
-        className={`tc-card${inline ? ' tc-inline' : ''}`}
+        className={`tc-card${inline ? ' tc-inline' : ''}${quiet ? ' tc-quiet' : ''}`}
         role={inline ? 'group' : 'dialog'}
         aria-label="New thread"
         data-tour-folder={product?.repoPath || projectChosen || !askFolder ? '1' : '0'}
@@ -1388,7 +1508,7 @@ export function ThreadComposer({
         <PhoneStatus message={statusLine} className="tc-note tc-connection-status" />
         <textarea
           ref={textRef}
-          className={`tc-text ${named.over}`}
+          className={`tc-text ${named.over}${comments.length && !person ? ' tc-text-tall' : ''}`}
           rows={inline ? 1 : undefined}
           value={text}
           onChange={(e) => { talk.typed(); setText(e.target.value); setCaret(e.target.selectionStart); named.track(e.target); }}
@@ -1454,20 +1574,13 @@ export function ThreadComposer({
         {error && <div className="tc-note tc-error" role="alert">{error}</div>}
         {!talk.on && talk.problem && <div className="tc-note">{talk.problem}</div>}
 
+        {quietBar}
+        {!quiet && <>
         {person ? (
           <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
-            {taskToMany && <span className="tc-why">A task goes to one person.</span>}
-            {team && sendAs === 'task' && (
-              <span className="tc-anchor" ref={anchor('visibility')}>
-                <button type="button" data-trigger className={`tc-chip ${open === 'visibility' ? 'open' : ''}`} title="Who sees it"
-                  aria-haspopup="listbox" aria-expanded={open === 'visibility'} onClick={() => toggle('visibility')} onKeyDown={triggerKeys('visibility')}>
-                  {taskSees === 'private' ? <LockIcon /> : <PeopleIcon />}
-                  {taskSees === 'team' ? 'Team' : taskSees === 'private' ? 'Private' : chosenWords(chosenHere, others)}
-                </button>
-                {open === 'visibility' && visibilityMenu}
-              </span>
-            )}
+            {taskToMany && <span className="tc-why">A to-do goes to one person.</span>}
+            {team && sendAs === 'task' && seesChip(taskSees)}
             {/* HOW URGENT IT IS, AND NOTHING ELSE (w-7ba439c883, approved
                 2026-10-05). The corner used to carry "Goes to Maya's inbox.",
                 which was put there because a bare corner reads as a control
@@ -1476,15 +1589,9 @@ export function ThreadComposer({
                 already says. The chip is the task card's own, because a message
                 lands in a list sorted by the same four words. */}
             {priorityChip}
-            <button type="button" className="tc-icon" title="Attach files" aria-label="Attach files" data-drop={inline ? dropRank('attach') : undefined} onClick={() => fileRef.current?.click()}>
-              <ClipIcon />
-            </button>
-            <input ref={fileRef} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />
-            <span className="tc-send solo">
-              <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={`Send · ${SEND}`}>
-                Send <kbd data-drop={inline ? dropRank('send-keys') : undefined}>{SEND}</kbd>
-              </button>
-            </span>
+            {clipButton}
+            {fileInput}
+            {sendSolo}
           </div>
         ) : mate ? (
           <div className="tc-bar tc-fit" ref={fitBar}>
@@ -1508,59 +1615,17 @@ export function ThreadComposer({
         ) : (
           <div className="tc-bar tc-fit" ref={fitBar}>
             {headChips}
-            <span className="tc-anchor" ref={anchor('project')} data-tour="project">
-              <button type="button" data-trigger className={`tc-chip ${open === 'project' ? 'open' : ''}`} title={product?.name ?? 'Which project'}
-                aria-haspopup="listbox" aria-expanded={open === 'project'} onClick={() => toggle('project')} onKeyDown={triggerKeys('project')}>
-                {product && !unpicked && <Swatch slug={product.slug} />}
-                <span ref={projName} className={`tc-chip-name ${projCut ? 'cut' : ''}`}>{unpicked ? 'Choose a folder' : product?.name ?? 'No project'}</span>
-              </button>
-              {open === 'project' && projectMenu}
-            </span>
+            {projectChip}
             {priorityChip}
-            {team && (
-              <span className="tc-anchor" ref={anchor('visibility')}>
-                <button type="button" data-trigger className={`tc-chip ${open === 'visibility' ? 'open' : ''}`} title="Who sees it"
-                  aria-haspopup="listbox" aria-expanded={open === 'visibility'} onClick={() => toggle('visibility')} onKeyDown={triggerKeys('visibility')}>
-                  {visibility === 'private' ? <LockIcon /> : <PeopleIcon />}
-                  {visibility === 'team' ? 'Team' : visibility === 'private' ? 'Private' : chosenWords(chosenHere, others)}
-                </button>
-                {open === 'visibility' && visibilityMenu}
-              </span>
-            )}
-            {talk.on ? <Listening talk={talk} /> : (
-            <button type="button" className="tc-icon" title="Attach files" aria-label="Attach files" data-drop={inline ? dropRank('attach') : undefined} onClick={() => fileRef.current?.click()}>
-              <ClipIcon />
-            </button>
-            )}
+            {team && seesChip(visibility)}
+            {talk.on ? <Listening talk={talk} /> : clipButton}
             {talk.allowed && !talk.on && <MicButton talk={talk} />}
-            <input ref={fileRef} type="file" multiple hidden onChange={async (e) => { await addFiles(e.target.files); e.target.value = ''; }} />
-            {/* WHY SEND IS OFF, WHEN IT IS OFF FOR WANT OF A PROJECT. My
-                Workspace is made for everybody at boot, so this should never
-                draw; it draws when making it failed, which used to be a log
-                line and a dead button. */}
-            {stopper && (
-              <span className="tc-why">
-                {stopper.reason}{' '}
-                {onNewProject && stopper.action
-                  ? <button type="button" className="tc-why-do" onClick={onNewProject}>{stopper.action}</button>
-                  : stopper.action}
-              </span>
-            )}
-            <span className="tc-send" ref={anchor('later')}>
-              <button type="button" className="tc-send-main" disabled={!canSend} onClick={() => void send()} title={refusal ?? stopper?.reason ?? outNote ?? `Send · ${SEND}`}>
-                Send <kbd data-drop={inline ? dropRank('send-keys') : undefined}>{SEND}</kbd>
-              </button>
-              {/* A picked time is said here, on the half that changes it. */}
-              <button type="button" data-trigger className={`tc-send-caret${when ? ' set' : ''}`} disabled={sending}
-                aria-label={when ? `Sends ${whenWords(when)}. Change when` : 'Send later'} title={when ? 'Change when it sends' : 'Send later'}
-                aria-haspopup="menu" aria-expanded={open === 'later'} onClick={() => toggle('later')} onKeyDown={triggerKeys('later')}>
-                {when && <span className="tc-send-when">{whenWords(when)}</span>}
-                <CaretIcon />
-              </button>
-              {open === 'later' && laterMenu}
-            </span>
+            {fileInput}
+            {stopperNote}
+            {sendSplit}
           </div>
         )}
+        </>}
         {inline && ideaRows}
       </div>
   );
@@ -1587,6 +1652,21 @@ const PeopleIcon = () => (
 const LockIcon = () => (
   <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
     <rect x="5.5" y="10.5" width="13" height="9" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+  </svg>
+);
+const SubjectIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+    <path d="M6 7h12M12 7v11" />
+  </svg>
+);
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+    <rect x="4.5" y="5.5" width="15" height="14" rx="2.5" /><path d="M4.5 10h15M8.5 3.5v3.5M15.5 3.5v3.5" />
+  </svg>
+);
+const WaitIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M7.5 4.5h9M7.5 19.5h9M8.5 4.5c0 4 7 4.2 7 7.5s-7 3.5-7 7.5M15.5 4.5c0 4-7 4.2-7 7.5s7 3.5 7 7.5" />
   </svg>
 );
 const ClipIcon = () => (

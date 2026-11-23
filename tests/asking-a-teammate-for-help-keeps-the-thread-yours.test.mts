@@ -115,7 +115,7 @@ describe('an ask for help', () => {
     await both();
     await both();
     const back = told.filter((x) => x.hold);
-    expect(back).toEqual([{ slug: 'api', id: t.id, hold: true, from: { teammate: theo.personId, name: 'Theo Okafor' }, text: 'Theo handed this back.\n\nSafe to drop. I told your agent to do it concurrently.\n\nSam had asked: “Is dropping the index safe?”' }]);
+    expect(back).toEqual([{ slug: 'api', id: t.id, hold: true, from: { teammate: theo.personId, name: 'Theo Okafor' }, text: 'Theo handed this back.\n\nSam had asked: “Is dropping the index safe?”\n\nSafe to drop. I told your agent to do it concurrently.' }]);
   });
 });
 
@@ -186,7 +186,7 @@ describe('an ask for a review', () => {
     await both();
     await both();
     expect(told.filter((x) => !x.hold)).toEqual([]);
-    expect(told.filter((x) => x.hold).map((x) => x.text)).toEqual(['Theo reviewed this and asked for changes.\n\nSay "Book a visit", not Submit.\n\nSam had asked: “Is dropping the index safe?”']);
+    expect(told.filter((x) => x.hold).map((x) => x.text)).toEqual(['Theo reviewed this and asked for changes.\n\nSam had asked: “Is dropping the index safe?”\n\nSay "Book a visit", not Submit.']);
   });
 });
 
@@ -258,11 +258,15 @@ describe('the rules, without a cloud', () => {
     expect(handedBackBy({ ...back, status: 'open' })).toBeNull();
     expect(handedBackBy({ status: 'blocked', wrote: { answer: { ts: 5 } } })).toBeNull();
   });
-  // Round three: Theo handed Sam's thread back, and the agent's two options could no longer be picked.
-  it('a hand-back leaves the agent\'s options open for you to pick', () => {
-    const offer = { result: 'Which way?\n\n## Options\n1. Keep it\n2. Drop it', answer: 'Theo handed this back.', wrote: { result: { ts: 1, source: 'agent' }, answer: { ts: 2, source: 'system', teammate: 'theo' } } };
-    expect(offerIsLive(offer as never)).toBe(true);
+  // Round three kept the agent's options open after a hand-back. On 2026-11-22 the founder saw Sam's
+  // "Ask Theo to review it" still offered under Theo's review: "I don't want deterministic things ever
+  // to be here." A teammate's words answer the options as yours do; you reply to the agent in your own.
+  it('a hand-back takes the agent\'s options away, as your own reply does', () => {
+    const offer = { result: 'Which way?\n\n## Options\n1. Ask Theo to review it\n2. Ship it without a review', answer: 'Theo handed this back.', wrote: { result: { ts: 1, source: 'agent' }, answer: { ts: 2, source: 'system', teammate: 'theo' } } };
+    expect(offerIsLive(offer as never)).toBe(false);
     expect(offerIsLive({ ...offer, wrote: { ...offer.wrote, answer: { ts: 2, source: 'founder' } } } as never)).toBe(false);
+    // Options the agent offers after the hand-back are its answer to it, and stay.
+    expect(offerIsLive({ ...offer, wrote: { result: { ts: 3, source: 'agent' }, answer: { ts: 2, source: 'system', teammate: 'theo' } } } as never)).toBe(true);
   });
   // Round three: the returned row previewed words the status already said, not Theo's answer.
   it('a handed-back row previews the helper\'s own words', () => {
@@ -302,7 +306,8 @@ describe('the wiring', () => {
   // Round two: Priya messaged Dana from Dana's thread and had to spell out which thread she meant.
   it('a message started from a teammate\'s thread starts by naming that thread', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toContain("const about = openCard.title ? `About “${openCard.title}”: ` : '';");
+    expect(app).toContain("const about = title ? `About “${title}”: ` : '';");
+    expect(app).toContain('onMessage={() => messageAbout(openCard.personId, openCard.title)} />');
     expect(app).toContain('if (about && !readDraft(convo).trim()) { saveDraft(convo, about);');
   });
   // Rounds three and four: Home said a teammate had nothing running while their profile showed two in progress.
@@ -372,13 +377,13 @@ describe('the sheet after you pick a person', () => {
     expect(help).toContain('Theo can write to your agent, then hands it back to you.');
     expect(help).not.toContain('from now on');
     const give = sheet({ start: 'give' });
-    expect(give).toContain('It becomes Theo’s thread from now on.');
+    expect(give).toContain('Theo owns it from now on, with its conversation and files. You can take it back.');
     expect(give).not.toContain('write to your agent');
     expect(sheet({ start: 'review' })).toContain('Theo reads it and tells you it looks good or what to change.');
   });
   it('offers only handing over when asking is not possible', () => {
     const html = renderToStaticMarkup(h(GiveSheet, { to: { id: 'u', name: 'Theo Okafor' }, onGive() {} }));
     expect(html).not.toContain('role="radiogroup"');
-    expect(html).toContain('Give to Theo');
+    expect(html).toContain('Hand over to Theo');
   });
 });

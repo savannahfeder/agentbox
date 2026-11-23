@@ -13,14 +13,16 @@ import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { standingLine, filesOnThread } from '../renderer/src/threads/teammate-thread';
-import { TeammateCard, TeammateStanding } from '../renderer/src/threads/Summary.tsx';
+import { TeammateSummary, TeammateStanding } from '../renderer/src/threads/Summary.tsx';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const rule = (css, sel) => css.match(new RegExp(`^${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`, 'm'))?.[1] ?? '';
 
 describe('what it waits on, in words', () => {
-  it('says whose move it is when the agent has stopped', () => {
-    expect(standingLine('waiting', 'Dev', null)).toBe('The agent stopped. Dev looks at it next.');
+  // A power test, 2026-11-22: four times a reviewer who had just handed a review back read "The agent
+  // stopped" and took it for something they had broken. Nothing stopped; nothing is running.
+  it('says whose move it is when no agent is running on it', () => {
+    expect(standingLine('waiting', 'Dev', null)).toBe('Nothing is running. Dev looks at it next.');
   });
   it('says it is moving while an agent runs', () => {
     expect(standingLine('running', 'Dev', null)).toBe("Dev's agent is working on it.");
@@ -32,14 +34,16 @@ describe('what it waits on, in words', () => {
     expect(standingLine('done', 'Dev', null)).toBe(null);
     expect(standingLine('scheduled', 'Dev', null)).toBe(null);
   });
-  it('heads the page with the state, the line and when it moved', () => {
+  // When it moved went up beside whose thread it is (w-8a8eac7620): at the
+  // column's right edge it was far from the words it dated.
+  it('heads the page with the state and the line', () => {
     const card = { personId: 'dev', threadId: 't', visible: true, title: 'Reminder emails', project: 'Sandbox', state: 'waiting', priority: 2, problem: 'x', progress: null, solution: null, blockedBy: [], blocks: [], people: null, updatedAt: 1_000 };
-    const html = renderToStaticMarkup(React.createElement(TeammateStanding, { card, person: { id: 'dev', name: 'Dev Rao' }, now: 61_000 }));
-    expect(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).toBe('Waiting on Dev The agent stopped. Dev looks at it next. Updated 1 min ago');
+    const html = renderToStaticMarkup(React.createElement(TeammateStanding, { card, person: { id: 'dev', name: 'Dev Rao' } }));
+    expect(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).toBe('Waiting on Dev Nothing is running. Dev looks at it next.');
   });
 });
 
-describe('the files it made are listed beside it', () => {
+describe('the files it made are listed in its summary', () => {
   it('once each, by its own name, with the notes on it', () => {
     const lines = [
       { source: 'agent', patch: { result: 'Rules in [reminder-rules.md](attachments/46a7b09ba2b8-reminder-rules.md), a draft in [apology-draft.md](attachments/5429351f754c-apology-draft.md).' } },
@@ -52,12 +56,12 @@ describe('the files it made are listed beside it', () => {
   });
   it('as tiles with the number of notes on each', () => {
     const card = { personId: 'dev', threadId: 't', visible: true, title: 'x', project: null, state: 'waiting', priority: null, problem: 'x', progress: null, solution: null, blockedBy: [], blocks: [], people: null, updatedAt: 1 };
-    const html = renderToStaticMarkup(React.createElement(TeammateCard, { card, person: null, files: [{ src: 'attachments/a.md', name: 'apology-draft.md', notes: 2, open: () => {} }] }));
+    const html = renderToStaticMarkup(React.createElement(TeammateSummary, { card, owner: 'Dev', files: [{ src: 'attachments/a.md', name: 'apology-draft.md', notes: 2, open: () => {} }] }));
     expect(html).toContain('<span class="ts-tk-fname">apology-draft.md</span><span class="ts-tk-notes">2 notes</span>');
   });
   it('and draw no "Blocked by Nothing" when nothing blocks it', () => {
-    const card = { personId: 'dev', threadId: 't', visible: true, title: 'x', project: null, state: 'waiting', priority: null, problem: 'x', progress: null, solution: null, blockedBy: [], blocks: [], people: null, updatedAt: 1 };
-    const html = renderToStaticMarkup(React.createElement(TeammateCard, { card, person: null }));
+    const card = { personId: 'dev', threadId: 't', visible: true, title: 'x', project: null, state: 'waiting', priority: null, problem: 'Reminders went out twice.', progress: null, solution: null, blockedBy: [], blocks: [], people: null, updatedAt: 1 };
+    const html = renderToStaticMarkup(React.createElement(TeammateSummary, { card, owner: 'Dev' }));
     expect(html).not.toContain('Blocked by');
     expect(html).not.toContain('Nothing');
   });
@@ -73,16 +77,16 @@ describe('the comment box explains nothing', () => {
 
 describe('the page uses the window', () => {
   const css = read('renderer/src/threads/pages.css');
-  // 2026-11-20 (w-f702d60afe): the founder found the two-column page did not
-  // match an opened thread of her own. The conversation now takes the task
-  // page's column, and About puts the card beside it when pressed.
-  it('sets the conversation in the opened-thread column, with About beside it on asking', () => {
-    expect(css).toMatch(/--tp-measure: min\(calc\(var\(--tp-type\) \* 47\.5\), calc\(100cqi - 96px\)\)/);
-    expect(rule(css, '.tp-grid.tp-with-about')).toMatch(/grid-template-columns: minmax\(0, var\(--tp-measure\)\) 300px/);
-    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/\{about && <aside className="tp-side"/);
-    // 2026-11-21: in the thread page's own column, reply box at the foot.
-    expect(read('renderer/src/threads/TeammateThread.tsx')).toContain('<div className="focus-pane tp-thread" ref={pageEl}>');
-    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/<div className="focus-dock">[\s\S]*?<div className="dock-card">/);
+  // 2026-11-20 (w-f702d60afe): the two-column page did not match an opened
+  // thread of the founder's own. 2026-11-21: it is drawn in the thread page's
+  // own column with the reply box at the foot, and About became the summary at
+  // its top (w-8a8eac7620), so nothing sits beside it.
+  it('sets the conversation in the opened-thread column, with its summary at the top', () => {
+    const page = read('renderer/src/threads/TeammateThread.tsx');
+    expect(page).toContain('<div className="focus-pane tp-thread">');
+    expect(page).toMatch(/<div className="focus-dock" ref=\{dockEl\}>[\s\S]*?<CommentBox /);
+    expect(page.indexOf('<TeammateSummary')).toBeLessThan(page.indexOf('<QueueAnswer'));
+    expect(page).not.toMatch(/<aside/);
   });
   it('no longer caps the whole page at 760px', () => {
     expect(css).not.toMatch(/\.th-card-page \{[^}]*max-width: 760px/);

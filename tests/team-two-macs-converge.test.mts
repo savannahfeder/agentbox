@@ -148,11 +148,12 @@ describe('the cards a Mac publishes', () => {
     expect(seen.map((c) => [c.personId, c.threadId, c.visible, c.state])).toEqual([[maya.personId, 'w-open-1', true, 'running']]);
   });
 
+  // A private card's change is not one: nothing of it goes up.
   it('are not republished when nothing changed', async () => {
-    maya.cards.push(blank('w-1', 'waiting'));
+    maya.cards.push({ ...blank('w-1', 'waiting'), visible: true, title: 'Acme renewal terms' });
     let writes = 0;
     const put = maya.backend.putCards;
-    maya.backend.putCards = async (t, c) => { writes += 1; return put(t, c); };
+    maya.backend.putCards = async (...args) => { writes += 1; return put(...args); };
     await maya.sync.syncOnce();
     await maya.sync.syncOnce();
     expect(writes).toBe(1);

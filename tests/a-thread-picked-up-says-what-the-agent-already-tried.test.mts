@@ -18,7 +18,7 @@ import { createMemoryCloud, signUpMemory, memoryBackend } from '../main/team/mem
 import { createTeamService } from '../main/team/index.mts';
 import { memorySession } from '../main/team/session.mts';
 import { isGivenTask } from '../shared/team-rules.mts';
-import { TeammateCard } from '../renderer/src/threads/Summary.tsx';
+import { TeammateSummary } from '../renderer/src/threads/Summary.tsx';
 import { machineryPath } from '../main/store/home.mts';
 import { changePath } from '../main/code-change.mts';
 globalThis.React = React;
@@ -67,6 +67,40 @@ describe('the task a hand-over makes', () => {
     const task = await handed('Reproduced it with two POSTs 50ms apart\n- Tried a lock on the row, which **deadlocked** under load\nFound the retry path skips the key check');
     expect(task.body).toContain('What the agent already tried:\n\n- Reproduced it with two POSTs 50ms apart\n- Tried a lock on the row, which deadlocked under load\n- Found the retry path skips the key check\n\nWhere it got to:\n\nThe retry path skips the key check.');
   });
+  // 2026-11-22, a power test: Dana asked Priya to review her thread, Priya's review came back, and Dana
+  // handed the thread to Lena. Lena's task showed the old draft and not a word of Priya's review, so
+  // Dana's note ("use Priya's copy") pointed at words Lena could not see.
+  it('carries the review that came back, after where it got to', async () => {
+    const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Drafted: "Your payment failed."' });
+    theo.store.tellItem('api', t.id, { text: 'Lena reviewed this.\n\nUse "Your payment didn\'t go through" as the heading.', from: { teammate: lena.personId, name: 'Lena Fischer' }, hold: true });
+    await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
+    for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
+    const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
+    expect(task.body).toContain('Where it got to:\n\nDrafted: "Your payment failed."\n\nWhat Lena said back:\n\nLena reviewed this.\n\nUse "Your payment didn\'t go through" as the heading.');
+  });
+  it('carries no review when nobody handed one back', async () => {
+    const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Drafted it.' });
+    theo.store.answerItem('api', t.id, { answer: 'Make it shorter.' });
+    await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
+    for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
+    const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
+    expect(task.body).not.toContain('said back');
+  });
+  // The second round: Priya asked her agent for v3 with Dana's changes after Dana's review came back,
+  // then handed the thread to Lena, whose task had no word of the review.
+  it('carries the newest review even when the giver has written since', async () => {
+    const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Drafted it.' });
+    theo.store.tellItem('api', t.id, { text: 'Lena reviewed this.\n\nKeep the amount in the button.', from: { teammate: lena.personId, name: 'Lena Fischer' }, hold: true });
+    theo.store.answerItem('api', t.id, { answer: 'Make v3 with Lena\'s change.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Made v3.' });
+    await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
+    for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
+    const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
+    expect(task.body).toContain('Where it got to:\n\nMade v3.\n\nWhat Lena said back:\n\nLena reviewed this.\n\nKeep the amount in the button.');
+  });
   it('says nothing about it when the agent kept no list', async () => {
     const task = await handed();
     expect(task.body).not.toContain('already tried');
@@ -91,18 +125,18 @@ describe('the task a hand-over makes', () => {
 
 describe('a teammate\'s thread page', () => {
   const page = fs.readFileSync(new URL('../renderer/src/threads/TeammateThread.tsx', import.meta.url), 'utf8');
-  it('shows the list under the thread\'s name, before the conversation', () => {
-    const at = page.indexOf('<section className="tp-tried"');
-    expect(at).toBeGreaterThan(page.indexOf('<QueueSummary title={title}'));
+  // 2026-11-21 (w-8a8eac7620): the list is part of the summary at the top, which About became.
+  it('shows the list in the summary under the thread\'s name, before the conversation', () => {
+    const at = page.indexOf('<TeammateSummary card={card} owner={owner} files={files} />');
+    expect(at).toBeGreaterThan(page.indexOf('<h2 className="one-title">{title}</h2>'));
     expect(at).toBeLessThan(page.indexOf('<Thread events={before}'));
-    expect(page).toContain("const tried = card.visible ? doneSteps(card.progress) : [];");
   });
-  it('does not show it twice when About is open', () => {
+  it('shows it once, with what the thread is about', () => {
     const card = { personId: 'theo', threadId: 'w', visible: true, title: 'T', project: null, state: 'working', priority: null, problem: 'Retries charge twice.', progress: 'Tried a lock', solution: null, blockedBy: [], blocks: [], people: null, updatedAt: 1 };
-    const withDone = renderToStaticMarkup(React.createElement(TeammateCard, { card: card as never, person: null }));
-    const without = renderToStaticMarkup(React.createElement(TeammateCard, { card: card as never, person: null, done: false }));
-    expect(withDone).toContain('Tried a lock');
-    expect(without).not.toContain('Tried a lock');
-    expect(without).toContain('Retries charge twice.');
+    const html = renderToStaticMarkup(React.createElement(TeammateSummary, { card: card as never, owner: 'Theo' }));
+    expect(html.match(/Tried a lock/g)).toHaveLength(1);
+    expect(html).toContain('What Theo&#x27;s agent already tried');
+    expect(html).toContain('Retries charge twice.');
+    expect(page).not.toMatch(/tp-tried|TeammateCard/);
   });
 });

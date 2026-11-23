@@ -13,7 +13,10 @@ import { Face, TeamContext, dueWords, firstName, type TeamView } from './people'
 import { agentOnTask, agentOnTaskWord } from './tasks';
 import { TeammatesContext } from '../teammates/row-lead';
 import { shownTitle } from '../../../shared/thread-title.mts';
-import { askWord } from '../../../shared/thread-asks.mts';
+import { askIsOpen, askWord } from '../../../shared/thread-asks.mts';
+import { clearDraft, readDraft } from '../drafts';
+import { handedFrom } from '../../../shared/thread-link.mts';
+import { commentsToHand } from '../threads/comments-to-hand';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
 export function teamHeld(item: WorkItem, team: TeamView | null): boolean {
@@ -37,6 +40,8 @@ export function TeamSaid({ item }: { item: WorkItem }) {
     ? ask ? (closer === item.assignee
       ? `${mine ? 'you' : name} ${item.verdict === 'changes' ? 'asked for changes' : item.verdict === 'yes' ? 'said it looks good' : 'handed this back'}`
       : `${mine ? name : 'you'} took this back`)
+      // A thread handed over and closed by whoever handed it: they took it back.
+      : handedFrom(item.body, taskGiver(item)) && closer === taskGiver(item) ? `${closer === team.me ? 'you' : name} took this back`
       : `${closer === team.me ? 'you' : firstName(team.byId.get(closer ?? '') ?? team.byId.get(other ?? ''))} marked this done`
     : ask ? (mine ? `${name} asked you` : `asked ${name}`)
     : mine ? `${name} gave you this` : `with ${name}`;
@@ -130,7 +135,7 @@ export function teamRouteChoices(item: WorkItem, team: TeamView | null): { route
   if (!team || !teamHeld(item, team) || item.assignee !== team.me) return [];
   // A task someone gave you stays yours and writing back does not return it, so
   // the one choice is who does the work.
-  if (isGivenTask(item, team.products.get(item.product))) return item.status === 'done' ? [] : [{ route: 'agent', label: 'Give it to an agent' }];
+  if (isGivenTask(item, team.products.get(item.product))) return item.status === 'done' ? [] : [{ route: 'agent', label: 'Carry on with an agent' }];
   // A message is talk, not a task (approved 2026-10-01): work comes out of it
   // only by @-mentioning an agent in the reply box, which works in the project
   // its mention names. There is no line under the conversation offering to
@@ -154,8 +159,28 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
   const [error, setError] = useState<string | null>(null);
   const choices = teamRouteChoices(item, team);
   const on = isGivenTask(item, team?.products.get(item.product)) ? agentOnTask(items, item, [...mates.values()]) : null;
-  // An ask is answered on the asker's thread, from the bar above (team/AskBar.tsx).
-  if (item.ask) return null;
+  // An ask to you is handed back from here, with what you typed in the reply box as your words.
+  if (item.ask) {
+    if (!team || item.assignee !== team.me || !askIsOpen(item as never)) return null;
+    const first = firstName(team.byId.get(item.ask.owner) ?? null) || 'them';
+    const backs: { label: string; verdict: 'done' | 'yes' | 'changes' }[] = item.ask.kind === 'review'
+      ? [{ label: `Looks good, hand back to ${first}`, verdict: 'yes' }, { label: `Needs changes, hand back to ${first}`, verdict: 'changes' }]
+      : [{ label: `Hand back to ${first}`, verdict: 'done' }];
+    const handBack = async (verdict: 'done' | 'yes' | 'changes') => {
+      const words = readDraft(item).trim();
+      if (verdict === 'changes' && !words) { setError(`Write what ${first} should change below, then pick this.`); return; }
+      setBusy(true); setError(null);
+      const out = await api.teamHandBack({ product: item.product, id: item.id, verdict, ...(words ? { words } : {}) });
+      setBusy(false);
+      if (out.ok) clearDraft(item); else setError(out.error ?? 'That did not work.');
+    };
+    return <div className="opt-strip">
+      {backs.map(({ label, verdict }, i) => <button key={verdict} className="opt-row" disabled={busy} onClick={() => void handBack(verdict)}>
+        <span className="opt-key">{i + 1}</span><span className="opt-text">{label}</span>
+      </button>)}
+      {error && <div className="opt-head"><span className="tm-error">{error}</span></div>}
+    </div>;
+  }
   if (on && item.status !== 'done') {
     return <div className="opt-strip">
       <button type="button" className="opt-row" onClick={() => onOpenItem?.(on.item)}>
@@ -173,10 +198,13 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
   };
   // Where it stands now, which is the agent's last word when there is one, not the first ask.
   const ask = (item.result || item.body || item.title).split('\n').find((l) => l.trim())?.replace(/\*\*/g, '').trim() ?? item.title;
+  // The comments on its files go to the agent with it, so the choice says how many.
+  const comments = isGivenTask(item, team?.products.get(item.product)) ? commentsToHand(item.artifacts?.notes, { me: team?.me ?? null }).length : 0;
   return <div className="opt-strip">
     {!isGivenTask(item, team?.products.get(item.product)) && <div className="opt-head opt-head-ask"><span>{ask}</span></div>}
     {choices.map(({ label, route: r }, i) => <button key={r} className="opt-row" disabled={busy} onClick={() => route(r)}>
       <span className="opt-key">{i + 1}</span><span className="opt-text">{label}</span>
+      {r === 'agent' && comments > 0 && <span className="tm-with-thread">{comments === 1 ? '1 comment goes with it' : `${comments} comments go with it`}</span>}
     </button>)}
     {error && <div className="opt-head"><span className="tm-error">{error}</span></div>}
   </div>;

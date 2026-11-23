@@ -29,7 +29,7 @@ const selectors = (sel) => [...css.matchAll(/([^{}]+)\{[^{}]*\}/g)]
 describe('the placeholder for a picture on its way', () => {
   for (const sel of [
     '.inline-image[data-phone-img="loading"]',
-    '.inline-image-open:has(> .inline-image[data-phone-img="loading"])',
+    '.inline-image-open[data-picture-loading]',
     '.doc-picture[data-phone-img="loading"]',
     '.attach-row img[data-phone-img="loading"]',
     '.inline-image[data-phone-img="ready"]',
@@ -46,7 +46,7 @@ describe('the placeholder for a picture on its way', () => {
     const widened = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
       .filter((m) => m[1].includes('.inline-image-open') && /(?<![-\w])width:\s*100%/.test(m[2]));
     expect(widened.length).toBeGreaterThan(0);
-    expect(widened.every((m) => m[1].includes('data-phone-img="loading"'))).toBe(true);
+    expect(widened.every((m) => m[1].includes('[data-picture-loading]'))).toBe(true);
   });
 });
 

@@ -48,9 +48,7 @@ describe('the empty Inbox over a sky', () => {
     expect(rule(`${zero}`)).toBeNull();
   });
 
-  // Except on the light purple sky (the-light-purple-skys-empty-inbox-softens-its-sky-and-fills-its-controls).
   it('changes colour only: nothing laid over the sky', () => {
-    const others = css.split('\n').filter((l) => !l.startsWith(':root[data-sky-frame="dusk-light"]')).join('\n');
-    expect(others).not.toMatch(/\.inbox-sky-zero\)[^{]*\{[^}]*(text-shadow|background)/);
+    expect(css).not.toMatch(/\.inbox-sky-zero\)[^{]*\{[^}]*(text-shadow|background)/);
   });
 });

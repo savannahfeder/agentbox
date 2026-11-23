@@ -31,19 +31,21 @@ import { type ThemeChoice } from './theme';
 import { DONE } from './done-word';
 import { agoShort } from './home/home-model';
 import { localDate } from './local-dates';
+import type { ThreadStateWord } from './types';
+import { threadState, type CardItem } from '../../shared/thread-cards.mts';
 
 /* ------------------------------- threads --------------------------------- */
 
-export type ThreadResult = { sub: string; hint: string; done: boolean };
+export type ThreadResult = { sub: string; hint: string; state: ThreadStateWord };
 
-/** A thread ⌘K found: the line it was found by, where it is and how old, and whether it is finished. */
+/** A thread ⌘K found: the line it was found by, where it is and how old, and which list it sits in. */
 export function threadResult(
-  item: { status: string; updatedAt?: number; createdAt: number },
-  { summary, project, now }: { summary: string; project: string; now: number },
+  item: CardItem & { updatedAt?: number; createdAt: number },
+  { summary, project, now, state }: { summary: string; project: string; now: number; state: ThreadStateWord | null },
 ): ThreadResult {
   const at = item.updatedAt ?? item.createdAt;
   const age = now - at < 86_400_000 ? agoShort(at, now) : localDate(at, { month: 'short', day: 'numeric' });
-  return { sub: summary, hint: `${project} · ${age}`, done: item.status === 'done' };
+  return { sub: summary, hint: `${project} · ${age}`, state: state ?? threadState(item, now) };
 }
 
 /* ------------------------------- matching -------------------------------- */
@@ -115,6 +117,16 @@ export function pageRows({ team }: { team: boolean }): PageRow[] {
     { id: 'view-later', label: 'Go to Later', keywords: LATER_KEYWORDS, view: 'snoozed' },
     { id: 'view-done', label: `Go to ${DONE.short}`, keywords: 'finished closed', view: 'done' },
   ];
+}
+
+/** What a newcomer's first ⌘K lists: the things the walkthrough is about, and the way out of it.
+ *  Priority: Urgent is there only with a thread selected, and its last tip names it. */
+const WALK_ROWS = ['new-thread', 'priority-urgent', 'view-home', 'view-inbox', 'view-progress', 'end-tutorial'];
+
+/** The walkthrough's list: those rows in that order, and everything else a word away. */
+export function walkRows<T extends { id: string; unlisted?: boolean }>(rows: readonly T[]): T[] {
+  const listed = WALK_ROWS.flatMap((id) => rows.filter((r) => r.id === id));
+  return [...listed, ...rows.filter((r) => !WALK_ROWS.includes(r.id)).map((r) => ({ ...r, unlisted: true }))];
 }
 
 // Then a row whose name starts with what was typed: "go to" is Go to Inbox,

@@ -84,7 +84,8 @@ export function stillRunningNote(tasks: BackgroundTask[]) {
   const names = helperNames(tasks);
   return `This is ${Name}, not the person. Your turn ended with ${tasks.length === 1 ? 'this' : 'these'} still running in the background: ${names}. `
     + 'Your run stays open, and your answer is not delivered, until nothing you started is still running. '
-    + 'Stop any you no longer need. If you are waiting on one, say what for in one line and end your turn.';
+    + 'Stop any you no longer need. If one is a server for the person, stop it and do what your brief says about leaving one running. '
+    + 'If you are waiting on one, say what for in one line and end your turn.';
 }
 
 // Said by a cloud run's relay as the run ends with helpers lost (main/cloud/run.mts).

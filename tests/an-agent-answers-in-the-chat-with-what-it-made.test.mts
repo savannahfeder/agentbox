@@ -58,12 +58,20 @@ describe('the agent’s answer under the message', () => {
     expect(html).toContain('>In progress<');
   });
 
-  it('lists the task itself when it has filed nothing yet, so there is a way in', () => {
+  // A card for the agent's own thread read as a second, separate thread: "I
+  // also don't know why, in this chat, there's a separate thread" (founder, on
+  // the demo's Launch email chat, 2026-11-21). Its name already opens it.
+  it('draws no card for its own thread when it filed nothing, and its name opens that thread', () => {
+    const answered = draw(sent(), ctx({ filed: () => [] }));
+    expect(answered).toContain('>Made three tasks in Agentbox Team.<');
+    expect(answered).not.toContain('made-row');
+    expect(answered).not.toContain('chat-agent-made');
+    expect(answered).toMatch(/<button type="button" class="msg-who chat-agent-name">Claude Code<\/button>/);
     const running = { ...task, status: 'claimed', result: undefined };
-    const one = draw(sent(), ctx({ find: () => running, stateOf: () => 'running', filed: () => [] }));
-    expect(one).toContain('Working on it in Agentbox Team.');
-    expect(one.match(/class="made-row"/g)).toHaveLength(1);
-    expect(one).toContain('>Make tasks from findings 1 to 3<');
+    const working = draw(sent(), ctx({ find: () => running, stateOf: () => 'running', filed: () => [] }));
+    expect(working).toContain('Working on it in Agentbox Team.');
+    expect(working).not.toContain('made-row');
+    expect(working).toMatch(/<button type="button" class="msg-who chat-agent-name">Claude Code<\/button>/);
   });
 });
 

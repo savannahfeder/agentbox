@@ -28,6 +28,7 @@
 // IF A THREAD CANNOT START, THE JOB RUNS HERE, the old way. A packaged build
 // reads its code out of an asar archive, and a folder made slowly is better
 // than a task that never gets one.
+import fs from 'node:fs';
 import { Worker } from 'node:worker_threads';
 import * as folders from './task-folders.mts';
 import { stripTypesFlags } from './strip-types.mts';
@@ -35,13 +36,15 @@ import { noteThread } from './thread-heaps.mts';
 
 export type FolderJobName =
   | 'restoreTaskFolder' | 'releaseTaskFolder' | 'parkTaskFolder' | 'listTaskFolders'
-  | 'inventoryWorktrees' | 'strayWorktrees' | 'pruneMissingWorktrees';
+  | 'inventoryWorktrees' | 'strayWorktrees' | 'pruneMissingWorktrees'
+  | 'makeSpareFolder' | 'dropSpareFolder';
 
 const JOBS = new Set<string>([
   'restoreTaskFolder', 'releaseTaskFolder', 'parkTaskFolder', 'listTaskFolders',
   // Looking over every copy of the project, which is a `git worktree list` plus
   // a `stat` each and belongs on this thread for the same reason as the rest.
   'inventoryWorktrees', 'strayWorktrees', 'pruneMissingWorktrees',
+  'makeSpareFolder', 'dropSpareFolder',
 ]);
 
 export type FolderLaneName = 'start' | 'tidy';
@@ -86,12 +89,24 @@ interface Job {
 interface Lane { thread: FolderThread | null; current: Job | null; queue: Job[]; timer: ReturnType<typeof setTimeout> | null }
 
 const ONE_FOLDER = new Set<FolderJobName>(['restoreTaskFolder', 'parkTaskFolder', 'releaseTaskFolder']);
+const SPARE = new Set<FolderJobName>(['makeSpareFolder', 'dropSpareFolder']);
+
+/** A thread whose folder is not there yet, which is the only kind that may take the one made ahead. */
+function couldTakeTheSpare(job: Job): boolean {
+  if (job.name !== 'restoreTaskFolder') return false;
+  try { return !fs.existsSync(folders.taskFolderPath(String(job.args[0]), job.args[1])); } catch { return true; }
+}
 
 // A prune drops registrations whose folder is missing, and a folder being made
-// is briefly missing while git moves it into place.
+// is briefly missing while git moves it into place. A new thread may take the
+// folder made ahead, so making or dropping that one and making the new
+// thread's folder wait for each other. A reply to a thread whose folder is
+// there waits for neither.
 function clash(a: Job, b: Job): boolean {
   if (String(a.args[0]) !== String(b.args[0])) return false;
   if (a.name === 'pruneMissingWorktrees' || b.name === 'pruneMissingWorktrees') return true;
+  const takes = (j: Job) => SPARE.has(j.name) || couldTakeTheSpare(j);
+  if (SPARE.has(a.name) || SPARE.has(b.name)) return takes(a) && takes(b);
   return ONE_FOLDER.has(a.name) && ONE_FOLDER.has(b.name) && String(a.args[1]) === String(b.args[1]);
 }
 
@@ -122,6 +137,11 @@ export class FolderLanes {
       this.lanes[laneOf(name)].queue.push({ id: ++this.seq, name, args, resolve, reject });
       this._pumpAll();
     });
+  }
+
+  /** Starts a lane's thread before its first job needs it. False when no thread can start, and jobs run here. */
+  warm(name: FolderLaneName): boolean {
+    return !!this._threadFor(this.lanes[name]);
   }
 
   _here(job: Job) {
@@ -265,6 +285,11 @@ const lanes = new FolderLanes({
   },
   runHere: (name, args) => (folders[name] as (...args: unknown[]) => unknown)(...args),
 });
+
+/** The thread that makes a thread's folder, started before the first one is asked for. */
+export function warmFolderThread(): boolean {
+  return lanes.warm('start');
+}
 
 /** Run one of task-folders.mts's exports without blocking this thread. */
 export function folderJob<N extends FolderJobName>(name: N, ...args: Parameters<(typeof folders)[N]>): Promise<Awaited<ReturnType<(typeof folders)[N]>>> {

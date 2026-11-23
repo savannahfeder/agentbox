@@ -80,8 +80,11 @@ describe('searching Chats', () => {
     expect(inChats(createElement(GroupsHead, { current: undefined, onFind: () => {} }))).not.toContain('gc-find');
     expect(inChats(createElement(ChatsColumn, { current: 'room:r1' }))).toContain('class="cx-search"');
   });
-  it('shows G on the box, since G is how you reach it', () => {
-    expect(inChats(createElement(ChatsColumn, { current: 'room:r1' }))).toMatch(/class="cx-search"[\s\S]*?<kbd>G<\/kbd><\/label>/);
+  // Since 2026-11-21 the lone G key cap in the box is gone, as the app's own search has none; its tooltip names G.
+  it('names G in the box\'s tooltip, without a key cap in the box', () => {
+    const html = inChats(createElement(ChatsColumn, { current: 'room:r1' }));
+    expect(html).toMatch(/class="cx-search"[\s\S]*?title="Search your chats \(G\)"/);
+    expect(html).not.toContain('<kbd');
   });
   it('keeps the finder button on the Groups page, which has no box', () => {
     expect(renderToStaticMarkup(createElement(GroupsHead, { current: undefined, onFind: () => {} }))).toContain('gc-find');

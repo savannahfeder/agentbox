@@ -130,6 +130,12 @@ export interface MemoryCloud extends MemoryRoomsFields {
   events: EventEmitter;
   unconfirmed?: Set<string>;
   refuseShares?: string;
+  /** Set, a team invites, takes people on and shares only while it is in `paying`, as
+   *  20261121130000_team_features_need_pro.sql has it. Unset, every team pays, as before. */
+  freeTeams?: boolean;
+  paying?: Set<string>;
+  /** Emails whose next team pays from the moment it is made. */
+  payingOwners?: Set<string>;
   phoneCommands?: MemoryPhoneCommand[];
   phoneProjects?: Map<string, MemoryPhoneProject>;
   phoneThreads?: Map<string, MemoryPhoneThread>;
@@ -207,6 +213,9 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     people: cloud.projectPeople.filter((pp) => pp.projectId === p.id).map((pp) => pp.personId),
   });
   const refuse: (what: string) => never = (what) => { throw new Error(`not allowed: ${what}`); };
+  const pays = (teamId: string) => !cloud.freeTeams || !!cloud.paying?.has(teamId);
+  // The database's own words (20261121130000_team_features_need_pro.sql).
+  const needsPro = (teamId: string, words: string) => { if (!pays(teamId)) throw new Error(words); };
   // What this person may do with a link, as file_link_can_of decides it.
   type LinkPersonRow = { email: string; can: LinkCan; at: number };
   const peopleOf = (token: string): LinkPersonRow[] => (cloud.fileLinkPeople ??= new Map<string, LinkPersonRow[]>()).get(token) ?? [];
@@ -265,12 +274,16 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         .map((inv) => ({ teamId: inv.teamId, teamName: cloud.teams.get(inv.teamId)?.name ?? '', invitedBy: inv.invitedBy ?? null, invitedByName: cloud.people.get(inv.invitedBy)?.name ?? null }));
     },
 
+    // Only a cloud that keeps teams on Free asks, as a database without the table cannot answer.
+    ...(cloud.freeTeams ? { async teamPays() { return myTeams().some(pays); } } : {}),
+
     // One team, on a yes, and the invite is used up.
     async acceptInvite(teamId: string) {
       const email = confirmedEmail();
       if (!email) refuse('join a team without a confirmed email');
       const at = cloud.invites.findIndex((inv) => inv.teamId === teamId && inv.email.toLowerCase() === email);
       if (at < 0) refuse('join a team that did not invite you');
+      needsPro(teamId, 'This team needs Pro to take anyone new. Ask its owner to start it.');
       cloud.invites.splice(at, 1);
       if (!cloud.members.some((m) => m.teamId === teamId && m.personId === personId)) cloud.members.push({ teamId, personId, role: 'member' });
       cloud.events.emit('rooms', { kind: 'membership' });
@@ -319,6 +332,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       cloud.teamsMade += 1;
       cloud.teams.set(id, { id, name, createdBy: personId, made: cloud.teamsMade });
       cloud.members.push({ teamId: id, personId, role: 'owner' });
+      if (cloud.payingOwners?.has(String(cloud.people.get(personId)?.email).toLowerCase())) cloud.paying?.add(id);
       return { id, name };
     },
 
@@ -385,6 +399,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
 
     async invite(teamId: string, email: unknown) {
       if (!myTeams().includes(teamId)) refuse('invite to a team you are not on');
+      needsPro(teamId, 'Inviting teammates needs Pro. Start it in Settings, Team.');
       const clean = String(email).trim();
       if (!cloud.invites.some((i) => i.teamId === teamId && i.email.toLowerCase() === clean.toLowerCase())) {
         cloud.invites.push({ teamId, email: clean, invitedBy: personId });
@@ -430,21 +445,24 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         .slice(0, limit).map((l) => ({ seq: l.seq, line: asPulled(structuredClone(l.body), { by: l.byPerson, at: l.createdAt, me: personId }) }));
     },
 
-    async putCards(teamId: string, cards: { threadId: string; visible?: unknown; people?: string[] | null; [key: string]: unknown }[]) {
+    async putCards(teamId: string, cards: { threadId: string; visible?: unknown; people?: string[] | null; [key: string]: unknown }[], changed?: ReadonlySet<string>) {
       if (!myTeams().includes(teamId)) throw new Error('not on that team');
       const had = [...cloud.cards.values()].filter((c) => c.personId === personId).map((c) => c.threadId);
-      for (const key of [...cloud.cards.keys()]) if (key.startsWith(`${personId}:`)) cloud.cards.delete(key);
       // A private card never goes up at all, whatever the Mac handed over, as
       // supabase-backend does; the database refuses words on one besides.
-      for (const c of cards) {
-        if (c.visible !== true) continue;
-        // NO LIST IS THE WHOLE TEAM, and an empty one is refused rather than
-        // stored, as the table's own check does: it would have to mean both
-        // everyone and nobody (20261001000800_chosen_people.sql).
+      const shown = cards.filter((c) => c.visible === true);
+      // NO LIST IS THE WHOLE TEAM, and an empty one is refused rather than
+      // stored, as the table's own check does: it would have to mean both
+      // everyone and nobody (20261001000800_chosen_people.sql). Refused before
+      // anything is written, as the database's one upsert is.
+      const writing = shown.filter((c) => !changed || changed.has(c.threadId)).map((c) => {
         const people = c.people == null ? null : [...new Set(c.people.filter((p) => typeof p === 'string' && p))];
         if (people && !people.length) refuse('share a thread with nobody');
-        cloud.cards.set(`${personId}:${c.threadId}`, { ...structuredClone(c), people, personId, teamId });
-      }
+        return { ...structuredClone(c), people, personId, teamId };
+      });
+      for (const c of writing) cloud.cards.set(`${personId}:${c.threadId}`, c);
+      const listed = new Set(shown.map((c) => c.threadId));
+      for (const threadId of had) if (!listed.has(threadId)) cloud.cards.delete(`${personId}:${threadId}`);
       // A thread's work goes with its card (the foreign keys in
       // 20261030120000_shared_threads_carry_their_work.sql).
       for (const threadId of had) {
@@ -485,6 +503,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
     async putThreadWork(teamId: string, { threadId, hash, work }: { threadId: string; hash: string; work: unknown }) {
       if (!myTeams().includes(teamId)) refuse('share into a team you are not on');
       if (!cloud.cards.has(`${personId}:${threadId}`)) refuse('share the work of a thread with no card');
+      needsPro(teamId, 'Sharing threads needs Pro.');
       if (new TextEncoder().encode(JSON.stringify(work)).length > MAX_WORK_BYTES) refuse('a thread that big');
       cloud.threadWork.set(`${personId}:${threadId}`, { owner: personId, threadId, teamId, hash, work: structuredClone(work), updatedAt: cloud.now() });
       cloud.events.emit('work', {});

@@ -6,8 +6,8 @@
 // title, an AI teammate's with a dashed letter and its name, a message with a
 // face and a bold name, a task with a face and a first name, so the titles
 // began at four different places. Picked from five photographed layouts
-// (w-585619d660): every row now has one slot before the title (a face, or a
-// plain ring on your own threads) and the name in grey after the title.
+// (w-585619d660): every row now has one slot before the title (a face, or the
+// mark of its harness on your own threads) and the name in grey after the title.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import React from 'react';
@@ -36,11 +36,10 @@ const nameOf = (html) => titleCell(html).match(/<span class="th-who-name">([^<]*
 const slotOf = (html) => titleCell(html).match(/^<span class="th-slot">([\s\S]*?)<\/span>(?=[^<]|<span class="th-(title-text|who-name)|$)/)?.[1] ?? null;
 
 describe('every row starts with the same slot', () => {
-  // The agent's face with two eyes, as everywhere else an agent is drawn (2026-11-20).
-  it("your own thread has the agent's face and no name", () => {
+  // The mark of the harness it runs on, since w-8e34f549aa (tests/your-own-thread-wears-the-mark-of-its-harness).
+  it("your own thread has its harness's mark and no name", () => {
     const html = draw(row());
-    expect(slotOf(html)).toContain('class="agent-face"');
-    expect(slotOf(html)).toContain('agent-eyes');
+    expect(slotOf(html)).toContain('class="harness-mark claude"');
     expect(nameOf(html)).toBeNull();
   });
 
@@ -49,7 +48,7 @@ describe('every row starts with the same slot', () => {
     const handed = row({ createdBy: MAYA, people: [MAYA, ME], assignee: ME });
     const withPhoto = renderToStaticMarkup(React.createElement(TeamContext.Provider, { value: photo }, React.createElement(TeammatesContext.Provider, { value: mates }, React.createElement(ThreadCells, { item: handed, product: shared, now: T + 60_000, tab: 'inbox' }))));
     expect(slotOf(withPhoto)).toContain('maya.jpg');
-    expect(slotOf(draw(handed))).toMatch(/class="tm-av"[^>]*>Ma</);
+    expect(slotOf(draw(handed))).toMatch(/class="tm-av"[^>]*>MC</);
     expect(nameOf(withPhoto)).toBe('Maya Chen');
   });
 

@@ -18,11 +18,11 @@ import { color, corner, font } from './theme';
 
 type Page = 'menu' | 'priority' | 'rename' | 'move';
 
-export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onReport, onClose, closed = false,
+export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onReport, closed = false,
   tryAgain = false, onTryAgain, restart = false, onRestart, resume = null, onResume, reopen = false, onReopen, priority = null, onPriority, name = null, onRename,
   projects = [], onMove, place = null, onPlace, repeats = false, onEndRepeat }: {
   open: boolean; close: () => void; now: number;
-  /** Closed already: the lists never put it in Later, so neither Later nor Close is offered. */
+  /** Closed already: the lists never put it in Later, so Later is not offered. Done is the bar's, as on the desktop (`splitDone`). */
   closed?: boolean;
   /** Already put off: "Now (back to inbox)" comes first. */
   laterNow: boolean;
@@ -40,7 +40,6 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
   onMoveToCloud?: () => void;
   /** Report what an agent wrote here (App Review 1.2). */
   onReport?: () => void;
-  onClose: () => void;
   tryAgain?: boolean; onTryAgain?: () => void;
   restart?: boolean; onRestart?: () => void;
   resume?: 'done' | null; onResume?: () => void;
@@ -106,6 +105,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
   }
   return (
     <TypingSheet open={open} close={done}>
+      {runNow && <SheetRow label="Run now" onPress={() => { done(); onRunNow(); }} />}
       {!closed && <>
       <SheetHead>Later</SheetHead>
       <TimeBox value={text} onChange={(t) => { setText(t); setRefused(false); }} placeholder="Try: 30m, 3h, 8am, tomorrow, next week"
@@ -116,7 +116,6 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       <SheetSep />
       </>}
       {moveToCloud && <SheetRow label="Move to cloud" aside="On your computer now" onPress={() => { done(); onMoveToCloud?.(); }} />}
-      {runNow && <SheetRow label="Run now" onPress={() => { done(); onRunNow(); }} />}
       {tryAgain && <SheetRow label="Try again" onPress={act(onTryAgain)} />}
       {restart && <SheetRow label="Restart the agent (it stopped)" onPress={act(onRestart)} />}
       {resume && <SheetRow label="Resume this agent (reopen and carry on)" onPress={act(onResume)} />}
@@ -129,7 +128,6 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       {repeats && <SheetRow label="Stop repeating" onPress={act(onEndRepeat)} />}
       {onUnread && <SheetRow label="Mark unread" onPress={() => { done(); onUnread(); }} />}
       {onReport && <SheetRow label="Report this thread" onPress={() => { done(); onReport(); }} />}
-      {!closed && <SheetRow label="Close this thread" onPress={() => { done(); onClose(); }} />}
     </TypingSheet>
   );
 }

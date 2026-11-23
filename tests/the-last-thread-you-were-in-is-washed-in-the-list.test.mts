@@ -16,43 +16,43 @@ import { lastThreadAfter, type Stop } from '../renderer/src/back-and-forward';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => fs.readFileSync(path.join(here, '..', rel), 'utf8');
 
-const inbox: Stop = { at: 'list', view: 'inbox' };
-const home: Stop = { at: 'home' };
 const thread = (id: string): Stop => ({ at: 'thread', product: 'p', id });
-// Every place you stood on, in the order you stood on it, however you got
-// there: a click, esc, or the back and forward arrows.
+const card: Stop = { at: 'card', person: 'm', thread: 'x' };
+// Every thread you stood on, in the order you stood on it, however you got
+// there: a click, E, or the back and forward arrows. The list is not a stop.
 const stoodOn = (...stops: Stop[]) => stops.reduce(lastThreadAfter, null as ReturnType<typeof lastThreadAfter>);
 
 describe('the last thread you were in', () => {
   it('is the thread you just left for the inbox', () => {
-    expect(stoodOn(inbox, thread('a'), inbox)).toEqual({ product: 'p', id: 'a' });
+    expect(stoodOn(thread('a'))).toEqual({ product: 'p', id: 'a' });
   });
 
   it('is only the most recent one, not the one before it', () => {
-    expect(stoodOn(inbox, thread('a'), inbox, thread('b'), home, inbox)).toEqual({ product: 'p', id: 'b' });
+    expect(stoodOn(thread('a'), thread('b'))).toEqual({ product: 'p', id: 'b' });
   });
 
-  it('is nothing before you have opened a thread', () => {
+  it('is nothing before you have opened a thread of your own', () => {
     expect(stoodOn()).toBeNull();
-    expect(stoodOn(home, inbox)).toBeNull();
+    expect(stoodOn(card)).toBeNull();
   });
 
-  // The reported case: the wash sat on an older thread, not the one just left.
-  // Back from B lands on the inbox stop that came before B, and the old rule
-  // read the trail only up to there, so it found A.
-  it('is the thread you left with the back arrow, not one from before it', () => {
-    expect(stoodOn(inbox, thread('a'), inbox, thread('b'), inbox)).toEqual({ product: 'p', id: 'b' });
+  // The reported case: the wash sat on an older thread, not the one just left,
+  // because the old rule read the trail only up to where back had moved it.
+  it("is your own thread you left last, not a teammate's opened after it", () => {
+    expect(stoodOn(thread('a'), thread('b'), card)).toEqual({ product: 'p', id: 'b' });
   });
 
   it('is the thread back or forward took you into', () => {
-    expect(stoodOn(inbox, thread('a'), inbox, thread('b'), inbox, thread('a'), inbox)).toEqual({ product: 'p', id: 'a' });
+    expect(stoodOn(thread('a'), thread('b'), thread('a'))).toEqual({ product: 'p', id: 'a' });
   });
 
   it('is noted for every place the arrows take you to, not only new visits', () => {
     const hook = read('renderer/src/back-and-forward.ts');
     const settle = hook.slice(hook.indexOf('settledPlaces((s) => {'), hook.indexOf('settledPlaces((s) => {') + 400);
-    expect(settle.indexOf('lastThreadAfter')).toBeGreaterThan(-1);
-    expect(settle.indexOf('lastThreadAfter')).toBeLessThan(settle.indexOf('return;'));
+    const noted = settle.indexOf('lastThreadAfter');
+    const ends = settle.indexOf('return;');
+    expect(noted).toBeGreaterThan(-1);
+    expect(ends === -1 || noted < ends).toBe(true);
   });
 });
 
@@ -72,14 +72,17 @@ describe('its row', () => {
     expect(rule![1]).not.toMatch(/margin|inset|left:|right:/);
   });
 
-  it('fades in the light theme in a whisper of the accent, over enough stops to show no steps', () => {
-    // Two greys were turned down on white: they read as a dirty slab.
+  // The accent wash washed the whole row orange on white (2026-11-21), so the
+  // light theme takes the dark theme's faint fade in its own ink.
+  it('fades in the light theme in the same faint fade, in a neutral ink and not the accent', () => {
     const css = read('renderer/src/styles.css');
     const light = css.match(/\[data-theme="light"\] \.row\.recent\s*\{([^}]*)\}/);
     expect(light, 'a light-theme rule').toBeTruthy();
-    expect(light![1]).toMatch(/rgb\(238 96 24 \/ 0\.0\d+\)/);
-    expect(light![1]).not.toMatch(/rgb\(17 25 48|rgb\(0 0 0/);
-    expect((light![1].match(/rgb\(/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect(light![1]).toMatch(/rgb\(18 24 42 \/ 0\.0\d+\)/);
+    expect(light![1]).not.toMatch(/238 96 24|accent/);
+    const alphas = [...light![1].matchAll(/\/ (0\.\d+)\)/g)].map((m) => Number(m[1]));
+    expect(alphas.length).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...alphas)).toBeLessThanOrEqual(0.02);
   });
 
   // Reported twice as "too strong/visible/distracting": at 0.055 it read as a

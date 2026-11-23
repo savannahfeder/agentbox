@@ -10,7 +10,9 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { resolveClaudeBin, candidatePaths } from './claude-bin.mts';
-import { warmShellAnswers, type EngineFrom } from './engine-bin.mts';
+import { warmShellAnswers, resolveEngine, type EngineFrom } from './engine-bin.mts';
+import { ENGINES } from '../shared/engines.mts';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 import { resolveCodexBin } from './codex-bin.mts';
 import { defaultStoreRoot } from './store/home.mts';
 import { machineSlots } from './machine.mts';
@@ -307,11 +309,23 @@ export function loadConfig(appDir: string, { home = os.homedir(), env = process.
   config.codexFound = codex.found;
   config.codexCertain = codex.certain !== false;
   config.codexFrom = codex.from;
+  // ANY FURTHER HARNESS ON OFFER, by the same search, and optional as Codex is:
+  // a miss is null, which reads as "this computer cannot run it".
+  let furtherFound = false;
+  for (const { id } of ENGINES) {
+    if (id === 'claude' || id === 'codex') continue;
+    const { binKey } = harnessDefinition(id)!;
+    const set = (overrides as Record<string, unknown>)[binKey];
+    const found = resolveEngine(id, typeof set === 'string' && set ? set : null);
+    (config as Record<string, unknown>)[binKey] = found.found ? found.path : null;
+    furtherFound ||= found.found;
+  }
   // AND AN OLDER INSTALL WITH CODEX ON IT OPENS THE CHOICE TOO (w-d5d632e503).
   // Only a Mac with no config file did, so a person who installed before
   // that, or who added Codex later, never saw Codex anywhere. Written at the
-  // end, once `appDir` is on the config to save through.
-  const codexOpened = codexChoiceToOpen(config, codex.found);
+  // end, once `appDir` is on the config to save through. A further harness
+  // found opens it the same way: the choice is which harness, not only Codex.
+  const codexOpened = codexChoiceToOpen(config, codex.found || furtherFound);
   // HOW MANY AGENTS AT ONCE, WHEN NOBODY HAS SAID, IS WHAT THIS COMPUTER
   // CARRIES (main/machine.mts). The Claude plan has no say: its limit is a
   // budget over hours and a week, and an account that spends it waits for the

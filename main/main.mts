@@ -20,7 +20,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { configDir, loadConfig, saveConfig } from './config.mts';
-import { installMenu, applyZoom, requestFind } from './menu.mts';
+import { installMenu, applyZoom, announceZoom, requestFind, sizeTheAppWindowWith } from './menu.mts';
+import { keepTheAppSizedForItsScreen, openingSize } from './app-size.mts';
 import { zoomDeltaFor } from './zoom-keys.mts';
 import { copySelection } from './copy-selection.mts';
 import { screenDetailFor } from './screen-detail.mts';
@@ -32,10 +33,13 @@ import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
-import { readCodexThreadsOffThread } from './codex-threads.mts';
+import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
+import { ownUseReader } from './own-use.mts';
+import { sendLastDaysHealth } from './health-day.mts';
+import { setupFreezeCounter } from './setup-freezes.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { startMemoryRecorder } from './memory-recorder.mts';
 import { threadHeaps } from './thread-heaps.mts';
@@ -438,8 +442,14 @@ async function createWindow() {
   // died are finally sent, because a report is written while the process is
   // dying and delivery cannot be synchronous.
   const analytics = createAnalytics({ config, version: app.getVersion(), dir: crashDir });
-  // "Used today", once a day, at launch and whenever the window comes forward.
-  const usedToday = createDailyCount((name) => analytics.track(name));
+  // "Used today", once a day, at launch and whenever the window comes forward,
+  // and with it how heavy the app was on the last day it was open.
+  const usedToday = createDailyCount((name) => {
+    analytics.track(name);
+    try { sendLastDaysHealth({ dir: path.join(userDir, 'memory-log'), track: (n, props) => analytics.track(n, props) }); }
+    catch (err) { console.warn(`zero: could not count how heavy the app was: ${(err as Error).message}`); }
+  });
+  const froze = setupFreezeCounter({ track: (n, props) => analytics.track(n, props) });
   // The seam is filled whenever there is somewhere to send to. Whether anything
   // actually goes is asked again inside, at every send, so her switch stops it
   // from the moment she moves it rather than at the next launch.
@@ -466,6 +476,10 @@ async function createWindow() {
     ensurePersonalProject(config.accountRoot);
   } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
+  try {
+    const closed = store.closeShippedThreads();
+    if (closed) console.log(`zero: closed ${closed} shipped thread(s) that only offered closing`);
+  } catch (err) { console.warn(`zero: could not close shipped threads: ${(err as Error).message}`); }
   // Where the window's own pictures may come from (main/img-scheme.mts). The
   // account root holds every product's docs, attachments, designs and the
   // `.staging` folder a pasted screenshot lands in; a product's repo is where a
@@ -477,17 +491,25 @@ async function createWindow() {
   supervisor.hostRuns = runHostWorksOn();
   // And their store tools come from one shared process (main/tool-host.mts).
   supervisor.shareTools = true;
+  // The next thread's folder is made ahead, on a Mac, where the copy shares
+  // its blocks with the checkout. Elsewhere it would be a second full copy.
+  supervisor.spareFolders = process.platform === 'darwin';
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).
   supervisor.idleMs = () => powerMonitor.getSystemIdleTime() * 1000;
   const stalls = stallWatch();
   supervisor.stalls = stalls;
+  supervisor.ownUse = ownUseReader(() => app.getAppMetrics());
   // AND WHICH OF OUR FUNCTIONS HELD THE THREAD, each time it froze.
   const freezes = startFreezeRecorder({
     dir: path.join(userDir, 'memory-log'),
     appDir,
-    onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
+    onFreeze: (f) => {
+      stalls.noteFreeze(f);
+      console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`);
+      froze.held({ ms: f.ms, where: f.where, part: 'main' });
+    },
   });
   powerMonitor.on('suspend', () => freezes.asleep());
   powerMonitor.on('resume', () => freezes.awake());
@@ -808,9 +830,10 @@ async function createWindow() {
 
   const liquidGlass = loadWindowGlass();
   const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass, !!liquidGlass);
+  const opening = openingSize(electronScreen.getPrimaryDisplay(), config.zoomByScreen);
   window = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: opening.width,
+    height: opening.height,
     // Half of a 1440-point screen, so the window tiles; under 700 is the phone layout.
     minWidth: 720,
     minHeight: 600,
@@ -820,8 +843,8 @@ async function createWindow() {
       fresh: runningAsAFreshUser(),
       name: NAME,
       screen: electronScreen.getPrimaryDisplay()?.workArea,
-      width: 1440,
-      height: 900,
+      width: opening.width,
+      height: opening.height,
     }),
     ...glass,
     ...windowFrame(process.platform),
@@ -894,6 +917,15 @@ async function createWindow() {
     electronScreen.removeListener('display-removed', tellScreenDetail);
   });
 
+  // How big it draws, from the screen it is on (main/app-size.mts).
+  sizeTheAppWindowWith(keepTheAppSizedForItsScreen({
+    window,
+    screen: electronScreen,
+    chosen: config.zoomByScreen,
+    save: (picks) => saveConfig(config, { zoomByScreen: Object.keys(picks).length ? picks : undefined }),
+    announce: announceZoom,
+  }));
+
   // The junk browser's session presents as plain Chrome. Electron's default
   // UA carries "Electron/x Zero/x", which makes Google-family logins refuse
   // even though a human is typing. This is identity cleanup for an embedded
@@ -963,7 +995,7 @@ async function createWindow() {
   });
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
-    store, supervisor, config, window, analytics, docGrants, updater,
+    store, supervisor, config, window, analytics, docGrants, updater, froze,
     glass: (on) => applyGlass(window, process.platform, on, liquidGlass),
     host: filingHost,
     team,
@@ -1156,6 +1188,7 @@ async function createWindow() {
       }
     };
     supervisor.start();
+    supervisor.warmTheStartPath();
     powerMonitor.on('suspend', () => supervisor.noteSleep());
     powerMonitor.on('resume', () => {
       supervisor.noteWake();
@@ -1459,6 +1492,12 @@ if (!app.requestSingleInstanceLock()) {
     for (const scheme of DOC_SCHEMES) protocol.handle(scheme, async (request) => {
       const file = docPath(request.url);
       if (!file || !docGrants.allows(file)) return new Response('Not available.', { status: 403 });
+      // A page's own pictures and films, which no thread names, may be in the cloud too.
+      if (comeBackAt && !fs.existsSync(file)) {
+        let timer: NodeJS.Timeout | undefined;
+        await Promise.race([comeBackAt(file).catch(() => false), new Promise((r) => { timer = setTimeout(r, COME_BACK_WAIT_MS); })]);
+        clearTimeout(timer);
+      }
       try {
         // The file is streamed exactly as it is on disk, pictures and all.
         // Nothing is injected into a page any more; see doc-scheme.mts for the

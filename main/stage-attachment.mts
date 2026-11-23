@@ -13,6 +13,18 @@ const WEEK = 7 * 24 * 60 * 60 * 1000;
 const SIPS_MS = 30_000;
 
 /**
+ * A name safe on disk, at most 80 characters. A long one is cut before its
+ * ending, never through it: the window draws only a file whose ending is a
+ * picture's (img-scheme.mts `servable`).
+ */
+export function stagedName(name: string): string {
+  const safe = name.replace(/[^\w.-]+/g, '-');
+  if (safe.length <= 80) return safe;
+  const ending = /\.[A-Za-z0-9]{1,8}$/.exec(safe)?.[0] ?? '';
+  return safe.slice(0, 80 - ending.length) + ending;
+}
+
+/**
  * Answers `{ path }`, and `name` too when the file was turned into another
  * format, which is the name it goes on under.
  */
@@ -28,7 +40,7 @@ export async function stageAttachment(dir: string, { name, dataBase64, srcPath }
       try { if (fs.statSync(p).mtimeMs < week) fs.unlinkSync(p); } catch { /* leave it */ }
     }
   } catch { /* a sweep that cannot run is not a paste that failed */ }
-  const safe = String(name ?? 'pasted.png').replace(/[^\w.-]+/g, '-').slice(0, 80);
+  const safe = stagedName(String(name ?? 'pasted.png'));
   const abs = path.join(dir, `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${safe}`);
   // A path is a drag, bytes are a paste. Already inside the folder we serve
   // from is left alone: copying it would only make a second file to sweep.
@@ -56,7 +68,7 @@ export type StagedPart = { id?: unknown; name?: unknown; at?: unknown; dataBase6
 
 export function stageAttachmentPart(dir: string, { id, name, at, dataBase64 }: StagedPart = {}): { path: string; size: number } {
   if (typeof id !== 'string' || !/^[a-z0-9]{8,40}$/.test(id)) throw new Error('That piece of the file has no proper name.');
-  const safe = String(name ?? 'file').replace(/[^\w.-]+/g, '-').replace(/^\.+/, '').slice(0, 80) || 'file';
+  const safe = stagedName(String(name ?? 'file').replace(/^\.+/, '')) || 'file';
   const file = path.join(dir, `${id}-${safe}`);
   const bytes = Buffer.from(String(dataBase64 ?? ''), 'base64');
   if (at === 0) {

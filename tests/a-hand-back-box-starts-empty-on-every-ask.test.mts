@@ -14,7 +14,7 @@ const read = (p: string) => fs.readFileSync(new URL(`../${p}`, import.meta.url),
 describe('the hand-back box', () => {
   it('is drawn anew for each ask, on the task page and on the thread', () => {
     expect(read('renderer/src/App.tsx')).toMatch(/<AskBar key=\{`\$\{focused\.product\}\/\$\{focused\.id\}`\} task=\{focused\}/);
-    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/<AskBar key=\{`\$\{ask\.product\}\/\$\{ask\.id\}`\} task=\{ask\}/);
+    expect(read('renderer/src/threads/TeammateThread.tsx')).toMatch(/<AskBar key=\{`\$\{shownAsk\.product\}\/\$\{shownAsk\.id\}`\} task=\{shownAsk\}/);
   });
 });
 

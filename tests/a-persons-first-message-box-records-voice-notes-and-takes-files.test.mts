@@ -33,7 +33,7 @@ describe('the box before the first message', () => {
   });
   it('sends with the chat’s own button', () => {
     expect(html).toMatch(/<div class="rm-compose">/);
-    expect(html).toMatch(/class="dock-send"/);
+    expect(html).toMatch(/class="dock-send chat-send"/);
   });
 });
 

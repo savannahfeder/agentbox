@@ -37,14 +37,17 @@ describe('the open file header', () => {
 
   it('has the side pane\'s full-screen toggle, which puts the file beside the chat, just left of the cross', () => {
     expect(header).toMatch(/onBeside && family && <FocusControl style="corners-bare" focused onClick=\{\(\) => onBeside\([^\n]*\)\} \/>/);
-    expect(header.lastIndexOf('<FocusControl')).toBeGreaterThan(header.indexOf('aria-label="Open outside"'));
+    expect(header.indexOf('<OpenWithMark')).toBeGreaterThan(-1);
+    expect(header.lastIndexOf('<FocusControl')).toBeGreaterThan(header.indexOf('<OpenWithMark'));
     expect(header.lastIndexOf('<FocusControl')).toBeLessThan(header.indexOf('aria-label="Close"'));
   });
 
   it('offers Open outside and Share as icons alone', () => {
-    const outside = buttons.find((b) => b.includes('aria-label="Open outside"')) ?? '';
-    expect(outside).toMatch(/className="doc-mark"/);
-    expect(outside).not.toMatch(/>Open outside</);
+    // Open outside is the open mark with its menu of apps (OpenWith.tsx): a doc-mark holding only the glyph.
+    expect(header).toMatch(/<OpenWithMark [^>]*title="Open outside"[^>]*><ArtifactControlGlyph kind="open" \/><\/OpenWithMark>/);
+    const mark = read('renderer/src/components/OpenWith.tsx').match(/<button type="button" className="doc-mark"[\s\S]*?<\/button>/)?.[0] ?? '';
+    expect(mark).toMatch(/>\s*\{children\}\s*<\/button>/);
+    expect(header).not.toMatch(/>Open outside</);
     expect(header).toMatch(/<ShareLink icon /);
   });
 

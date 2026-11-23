@@ -197,7 +197,7 @@ interface Opening { body: string; yours: boolean }
 
 const CHAT_FOR_SCREEN = 400;
 
-const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
+const TROUBLE_VERB: Record<string, string> = { run: 'start a run', answer: 'get your message', replied: 'put its answer in the chat', say: 'put its question in the chat',tell: 'take a hand-off', release: 'start its next run', seen: 'mark a message read', served: 'mark its round served', dutyServed: 'mark a duty done', due: 'bring its duty to its thread', firstServed: 'mark its first run started', reopen: 'put its setup answer in your inbox' };
 
 // When each project last shipped, from the note the ship queue leaves.
 function shippedByProduct(items?: TeamItem[] | null) {
@@ -621,6 +621,9 @@ export class Teammates {
           // An answer is made from a message, and a message always carries its words.
           await deliver?.(a.product, a.item, a.text as string);
           if (a.priority) workItemsDisk.updateWorkItem(this.store.productDir(a.product), a.item, { priority: a.priority }, { source: 'founder', now });
+        } else if (a.type === 'due') {
+          if (!tell) throw new Error('nothing here can wake a thread');
+          await tell(a.product, a.item, { text: a.text, from: { teammate: t.id, name: t.name }, hold: false, hop: 0 });
         } else if (a.type === 'tell') {
           if (!tell) throw new Error('nothing here can hand work to a thread');
           await tell(a.product, a.item, { text: a.text, from: a.from, hold: a.hold, hop: a.hop });
@@ -642,6 +645,7 @@ export class Teammates {
         done.push(a);
       } catch (err) {
         if (a.msg) failed.add(a.msg);
+        if (a.type === 'due') failed.add(`${a.teammate}#${a.duty}@${a.key}`);
         if (a.trigger?.msg) failed.add(a.trigger.msg);
         if (a.trigger?.key) failed.add(a.trigger.kind === 'duty' ? `${a.teammate}#${a.trigger.duty}@${a.trigger.key}` : `${a.teammate}@${a.trigger.key}`);
         this.noteTrouble(`${t?.name ?? 'A teammate'} could not ${TROUBLE_VERB[a.type] ?? 'carry on'}: ${(err as Error).message}`, now);
@@ -1018,7 +1022,7 @@ export class Teammates {
         ? '- When the person corrects, approves, turns down or decides something, act on it at once, and note it with team_remember: one line, their words, the date. That is all the note-keeping a working run does. Your look-back folds the notes into your method while you are idle, so do not rewrite your method for them; change it with team_method only when the person asks you to.'
         : `- When the person corrects, approves, turns down or decides something, put it in your method with team_method: quote their words with the date and thread, and change what it contradicts rather than adding a second rule beside it. Write only what they said or showed; mark your own reading as yours. Say in one line what changed.`,
       '- Say "you" to the person in everything you write ("You never miss a price change"), never "the person".',
-      '- Need a teammate to do something? Hand it over with team_pass (to, title, details). In the details, point at the threads, files and links it needs rather than retelling them, so nothing is lost on the way. It waits for the person\'s yes unless they told that teammate otherwise. Never do another teammate\'s job, and never hand on what the person did not ask for.',
+      '- Need a teammate to do something? Hand it over with team_pass (to, title, details). In the details, point at the threads, files and links it needs rather than retelling them, so nothing is lost on the way. It waits for the person\'s yes unless they asked for it on this run or told that teammate otherwise. Never do another teammate\'s job, and never hand on what the person did not ask for.',
       '- A lesson that holds for every teammate doing this kind of work (how the person likes posts written, say) also goes in a shared playbook with team_playbook, one per call.',
       '- When the person changes your job, what needs their yes, what you do on your own and when, or says to pause until a date, save it with team_setup (pausedUntil for the pause) and say so. Your schedule is yours to set; never send them to a menu for it.',
       '- Reach the person only to show finished work, or for a decision, a yes before anything that leaves the team (sends, posts, ships, merges, pays), or a sign-in only they have. Then end this run with that as your answer, written like any agent thread\'s last message: the bold line, then plain sentences, then numbered options, your recommendation first. It reaches their inbox. Leave this item open. A message to people is the exception: team_tell and team_task ask your owner for that yes themselves, on one card with your exact words, so never ask for it again in your answer.',

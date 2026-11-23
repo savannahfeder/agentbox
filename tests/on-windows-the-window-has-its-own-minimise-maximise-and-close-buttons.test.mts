@@ -13,7 +13,7 @@
 // client's page cannot reach the buttons, so there they follow the system's
 // light or dark. The Mac and Linux keep `hiddenInset` exactly.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -115,6 +115,26 @@ describe('the windows the app makes', () => {
   });
 });
 
+// The tests above read App.tsx as text, so they still pass when the WINDOWS it
+// imports from this-keyboard.ts is gone.
+describe('the page that tints them', () => {
+  it.each([['Win32', true], ['MacIntel', false], ['Linux x86_64', false], ['iPhone', false]])('knows it is on Windows from a navigator that says %s', async (platform, windows) => {
+    vi.resetModules();
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('navigator', { platform, userAgent: '' });
+    try {
+      expect((await import('../renderer/src/this-keyboard.ts')).WINDOWS).toBe(windows);
+    } finally {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
+  });
+
+  it('is not on Windows when there is no window', async () => {
+    expect((await import('../renderer/src/this-keyboard.ts')).WINDOWS).toBe(false);
+  });
+});
+
 describe('the page keeps the corner clear', () => {
   function marks(platform: NodeJS.Platform, file = 'preload.cjs') {
     const preloadPath = path.join(import.meta.dirname, '..', file);
@@ -167,9 +187,10 @@ describe('the page keeps the corner clear', () => {
       ['renderer/src/styles.css', '.pv-top', 'right'],
       ['renderer/src/components/file-views.css', '.file-sheet-head', 'padding-right'],
       ['renderer/src/styles.css', '.zoom-readout', 'right'],
-      ['renderer/src/components/tour-frame.css', '.tour-frame .tf-skip', 'right'],
       ['renderer/src/team/sign-in.css', '.si-skip-corner', 'right'],
     ];
+    // The walkthrough's column, Skip included, keeps to the window's left edge.
+    expect(read('renderer/src/components/tour-frame.css')).toMatch(/\.tour-frame \{[^}]*position: fixed; left: 0; top: 0; bottom: 0; width: var\(--tf-w\);/);
     for (const [file, sel, prop] of views) {
       const css = read(file);
       const m = new RegExp(`:root\\[data-window-buttons="right"\\] ${sel.replace('.', '\\.')} \\{[^}]*${prop}:\\s*(\\d+)px`).exec(css);

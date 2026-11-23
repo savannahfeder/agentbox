@@ -61,8 +61,17 @@ describe('opening a file for the person', () => {
   it('opens anything else as before', async () => {
     const shell = fakeShell();
     const p = file('report.pdf');
-    expect(await openForThePerson(shell, p)).toBe('');
+    expect(await openForThePerson(shell, p, { platform: 'linux' })).toBe('');
     expect(shell.calls).toEqual([['open', p]]);
+  });
+
+  it('shows a program in Finder on a Mac too, where files open another way', async () => {
+    const shell = fakeShell();
+    const ran: string[][] = [];
+    const p = file('notes.command', 0o755);
+    expect(await openForThePerson(shell, p, { platform: 'darwin', run: async (cmd, args) => { ran.push([cmd, ...args]); } })).toBe('');
+    expect(ran).toEqual([]);
+    expect(shell.calls).toEqual([['finder', p]]);
   });
 });
 

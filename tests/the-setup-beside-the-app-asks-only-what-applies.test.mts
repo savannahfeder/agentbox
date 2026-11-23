@@ -59,11 +59,10 @@ describe('the looks offered', () => {
   it('puts the look you have first, then Match my system, then the dark orange sky', () => {
     expect(lookChoices('sage', true).slice(0, 3)).toEqual(['sage', 'match', 'ember']);
   });
-  // F-207 (QA session 41, Nov 9 2026): setup left out Light purple sky, which
-  // Settings offers, so the two lists disagreed.
-  it('offers every sky Settings offers, the light purple one too', () => {
+  // F-207 (QA session 41, Nov 9 2026): setup left out a sky Settings offers,
+  // so the two lists disagreed.
+  it('offers every sky Settings offers', () => {
     for (const sky of SKY_THEMES) expect(lookChoices('light', true)).toContain(sky.id);
-    expect(lookChoices('dusk-light', true)[0]).toBe('dusk-light');
   });
   it('lists each look once', () => {
     const l = lookChoices('ember', true);
@@ -152,6 +151,8 @@ describe('the look a new install starts on', () => {
   // As the pair that follows the Mac since w-fbe5e95dea (2026-11-10): she
   // switched macOS to light during the setup and it stayed dark.
   // Nothing picked wears the pair by main's own rule (w-1bf65f4322), so the setup ticks Match my system.
+  // Since w-9687db6270 (2026-11-22) a new install is light and ticks the light mountains
+  // (tests/a-new-install-opens-in-the-light-mountains-on-every-computer); these are a window that follows the computer.
   it('wears the pair: dark orange on a dark Mac, light green on a light one', () => {
     expect(setupLook({ skies: true, picked: false, worn: 'ember', light: false })).toBe('match');
     expect(setupLook({ skies: true, picked: false, worn: 'sage', light: true })).toBe('match');
@@ -163,9 +164,10 @@ describe('the look a new install starts on', () => {
 
 describe('the first page', () => {
   // The founder picked the sky design, "with a better title like 'An inbox for hundreds of agents'".
+  // On 2026-11-22 it took the website's words and mountains (tests/the-light-default-is-orange-mountains-with-birds-that-fly).
   const first = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
   it('says what the app is', () => {
-    expect(first).toContain('An inbox for hundreds of agents.');
+    expect(first).toContain('Your team and its agents, in one place.');
     expect(first).not.toContain('Give your agents an inbox');
   });
   it('stands on the sky the setup will wear', () => {

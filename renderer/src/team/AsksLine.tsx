@@ -35,11 +35,13 @@ export function AskSentLine({ task, onOpenThread }: { task: WorkItem; onOpenThre
 }
 
 /** In the thread's header while someone you asked has it: small, and the rest on pressing it. */
-export function AsksChip({ item, items, now = Date.now(), onTakeBack }: {
+export function AsksChip({ item, items, now = Date.now(), onTakeBack, onMessage }: {
   item: WorkItem;
   items: readonly WorkItem[];
   now?: number;
   onTakeBack: (task: WorkItem) => void;
+  /** Nudging them is a message about this thread, not taking it back. */
+  onMessage?: (personId: string) => void;
 }) {
   const team = useContext(TeamContext);
   const [open, setOpen] = useState(false);
@@ -61,7 +63,7 @@ export function AsksChip({ item, items, now = Date.now(), onTakeBack }: {
   return (
     <span className="asks-chip-wrap" ref={box}>
       <button type="button" className="ts-done asks-chip" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span className="asks-faces">{asks.map((a) => <Face key={a.row.id} person={team.byId.get(a.to) ?? null} size={18} />)}</span>
+        <span className="asks-faces">{[...new Set(asks.map((a) => a.to))].map((to) => <Face key={to} person={team.byId.get(to) ?? null} size={18} />)}</span>
         {label}
       </button>
       {open && <div className="th-menu asks-pop" role="dialog" aria-label="Who you asked">
@@ -76,6 +78,7 @@ export function AsksChip({ item, items, now = Date.now(), onTakeBack }: {
               {a.ask.note && <p className="asks-note">{a.ask.note}</p>}
               <div className="asks-pop-foot">
                 <span className="asks-when">{seenAt >= a.at ? `Seen ${updatedWords(seenAt, now)}` : `Asked ${updatedWords(a.at, now)}, not opened yet`}</span>
+                {onMessage && <button type="button" className="asks-take" onClick={() => { setOpen(false); onMessage(a.to); }}>Message {first}</button>}
                 <button type="button" className="asks-take" onClick={() => { setOpen(false); onTakeBack(a.row as WorkItem); }}>Take it back</button>
               </div>
             </div>

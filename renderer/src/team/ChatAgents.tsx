@@ -285,7 +285,7 @@ const Chevron = () => <svg className="car" viewBox="0 0 10 10" width="10" height
 /**
  * THE AGENT'S ANSWER, under the message that asked for it: its face, its name,
  * where it works and on what, what it said (or where it is if it has not said
- * anything yet), and the threads it filed in the list a task draws them in.
+ * anything yet), and any threads it filed in the list a task draws them in.
  */
 export function AgentAnswers({ text, md, newest = false }: { text: string; md: (t: string) => ReactNode; newest?: boolean }) {
   const links = agentLinks(text).filter((l) => l.task && l.project);
@@ -304,7 +304,8 @@ function AgentAnswer({ link, md, newest }: { link: AgentLink; md: (t: string) =>
   const meta = [where, engineModelLabel(link.engine, link.model, opts), effortLabelOf(link.effort, effortChoicesFor(link.engine, link.model, opts))].filter(Boolean).join(' · ');
   const at = task?.wrote?.result?.ts ?? task?.updatedAt ?? card?.updatedAt ?? null;
   const filed = task ? ctx!.filed(task) : [];
-  const rows = (filed.length ? filed : task ? [task] : []).map((i) => ({ id: i.id, title: shownTitle(i), state: ctx!.stateOf(i) }));
+  // Only what it filed: its own thread opens from its name, and a card for it read as a second thread.
+  const rows = filed.map((i) => ({ id: i.id, title: shownTitle(i), state: ctx!.stateOf(i) }));
   const said = task?.result
     ? <ChatFold newest={newest}>{md(task.result)}</ChatFold>
     : <div className="msg-body chat-agent-state">{
@@ -322,7 +323,7 @@ function AgentAnswer({ link, md, newest }: { link: AgentLink; md: (t: string) =>
         <span className="msg-when">{meta}{at ? ` · ${clock(at)}` : ''}</span>
       </div>
       {said}
-      {rows.length > 0 && <div className="chat-agent-made"><ThreadsMade rows={rows} onOpen={(id) => { const hit = [...filed, ...(task ? [task] : [])].find((i) => i.id === id); if (hit) ctx!.open(hit); }} /></div>}
+      {rows.length > 0 && <div className="chat-agent-made"><ThreadsMade rows={rows} onOpen={(id) => { const hit = filed.find((i) => i.id === id); if (hit) ctx!.open(hit); }} /></div>}
     </div>
   );
 }

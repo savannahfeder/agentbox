@@ -6,13 +6,13 @@
 .su-top h2 { margin: 0; font-size: 22px; font-weight: 500; letter-spacing: -.02em; color: var(--text); }
 .su-date { font-size: 14px; color: var(--text-faint); }
 .su-r { margin-left: auto; display: flex; align-items: center; gap: 10px; align-self: center; }
-.su-tog { display: inline-flex; align-items: center; gap: 9px; height: 28px; padding: 0 6px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
+.su-tog { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 6px; border: 0; border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
 .su-tog:hover { color: var(--text-dim); }
-.su-tog i { position: relative; width: 28px; height: 16px; border-radius: 8px; background: var(--line-strong); transition: background .15s; }
+.su-tog i { position: relative; width: 28px; height: 16px; border-radius: 8px; background: var(--line-strong); }
 .su-tog i::after { content: ''; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); transition: left .15s; }
 .su-tog[aria-checked="true"] i { background: var(--text-dim); }
 .su-tog[aria-checked="true"] i::after { left: 14px; }
-.su-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text-faint); cursor: pointer; }
+.su-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer; }
 .su-icon:hover, .su-icon.on { color: var(--text); border-color: var(--line-strong); }
 
 /* Settings open under the heading, in the page, never over it. */
@@ -23,26 +23,34 @@
 .su-chip { height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 14px; background: none; font: inherit; font-size: 13px; color: var(--text-faint); cursor: pointer; }
 .su-chip:hover { color: var(--text-dim); }
 .su-chip.on { color: var(--text); border-color: var(--line-strong); background: var(--bg-selected); }
-.su-select { height: 30px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--pop, var(--bg-raised)); font: inherit; font-size: 13px; color: var(--text); }
+.su-select { height: 30px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--pop, var(--bg-raised)); font: inherit; font-size: 13px; color: var(--text); }
 .su-tz { font-size: 13px; color: var(--text-faint); }
-.su-btn { height: 30px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg-raised); font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
+.su-btn { height: 30px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg-raised); font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
 
 .su-days { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
-.su-ar { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: none; color: var(--text-faint); cursor: pointer; }
+.su-ar { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--radius); background: none; color: var(--text-faint); cursor: pointer; }
 .su-ar:hover:not(:disabled) { color: var(--text); background: var(--wash); }
 .su-ar:disabled { opacity: .35; cursor: default; }
-.su-day { height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: 15px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+/* The arrow's point, not its button, lines up with the day's title. */
+.su-ar:first-child { margin-left: -11px; }
+.su-day { height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: var(--radius); background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
 .su-day:hover:not(:disabled) { color: var(--text); }
+.su-day:hover:not(:disabled, .on) { background: var(--wash); }
 .su-day.on { color: var(--text); border-color: var(--line-strong); background: var(--bg-selected); }
 .su-day:disabled { opacity: .45; cursor: default; }
-.su-search { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text-faint); }
-.su-search input { width: 150px; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text); outline: none; }
+/* The search box every page shares, at the 30px of this row. */
+.su-search { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 30px; box-sizing: border-box; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--artifact-corner-small); background: var(--wash); color: var(--text-faint); }
+.su-search:focus-within { border-color: var(--line-strong); }
+.su-search svg { flex: none; width: 15px; height: 15px; stroke-width: 1.5; }
+.app.sky-shown:not(.home-shown) .su-search { background-color: color-mix(in srgb, var(--sky-under, var(--bg)) 82%, transparent); }
+.su-search input { width: 150px; border: 0; background: none; font: inherit; font-size: 13px; color: var(--text); outline: none; }
 .su-search input::placeholder { color: var(--text-faint); }
 
 .su-sep { display: flex; align-items: center; gap: 14px; margin: 14px 0 2px; font-size: 13px; color: var(--text-faint); }
 .su-sep::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .su-empty { margin: 12px 0; font-size: 13.5px; color: var(--text-faint); }
 .su-quiet { margin: 4px 0 8px 46px; font-size: 13.5px; color: var(--text-faint); }
+.su-quiet.alone { margin: 12px 0; }
 
 .su-post { display: flex; gap: 14px; padding: 14px 0 16px; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
 .su-dayfeed .su-post:last-child { border-bottom: 0; }

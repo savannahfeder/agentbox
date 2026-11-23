@@ -94,10 +94,12 @@ describe('the cloud server, for an account with no plan and no team', () => {
 });
 
 describe('the trial a team starts', () => {
-  it('runs from the day the team is made, with no card', async () => {
+  // Until 2026-11-21 it ran from the day the team was made, with no card.
+  it('runs nothing without a card, and offers its free week for when the card goes in', async () => {
     const { start, me } = setup({ team: { createdAt: Date.UTC(2026, 10, 16, 11, 0, 0) } });
-    expect((await start(1)).body.ok).toBe(true);
-    expect((await me()).team).toMatchObject({ trial: true, hours: 50, seats: 0 });
+    expect((await start(1)).body).toMatchObject({ ok: false, error: 'plan' });
+    expect((await me()).team).toBeUndefined();
+    expect((await me()).teamFreeDays).toBe(planFile.TEAM.trialDays);
   });
 
   it('ends after its 7 days with nothing free to fall back to', async () => {

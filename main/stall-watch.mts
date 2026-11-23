@@ -27,7 +27,8 @@ interface EventLoopMonitor {
 }
 
 export function stallWatch(
-  { clock = () => performance.now(), loop = monitorEventLoopDelay({ resolution: 20 }) }:
+  // Each sample is a timer on the main thread; the limit it feeds is 500 ms.
+  { clock = () => performance.now(), loop = monitorEventLoopDelay({ resolution: 100 }) }:
     { clock?: () => number; loop?: EventLoopMonitor } = {},
 ) {
   loop.enable();

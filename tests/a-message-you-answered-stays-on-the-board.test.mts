@@ -64,6 +64,6 @@ describe('a message you have answered', () => {
 
 it('the In progress list reads it, so it is on the board', () => {
   const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-  const progress = app.slice(app.indexOf('const progress = useMemo'), app.indexOf('const progress = useMemo') + 900);
+  const progress = app.slice(app.indexOf('const progress = useMemo'), app.indexOf('const progress = useMemo') + 1000);
   expect(progress).toMatch(/iSpokeLast\(/);
 });

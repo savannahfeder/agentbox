@@ -17,10 +17,10 @@ import { Face, TeamContext, dueWords, firstName, personOf } from '../team/people
 import { handedBy, taskWords } from '../team/company';
 import { agentSaidLast } from '../team/answers-in-the-chat';
 import { PriorityIcon } from '../components/Priority';
-import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
+import { asideBesides, messageOnRow, notStarted, rowTitle, waitCameBack } from '../list-rules';
 import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { waitWords } from '../../../shared/thread-waits.mts';
-import { askedOutWord, handedBackBy } from '../../../shared/thread-asks.mts';
+import { askedOutWord, asksOnThread, backWord, handedBackBy } from '../../../shared/thread-asks.mts';
 import { needsLeft, needsWord } from '../../../shared/cloud-needs.mts';
 import { closedOverWords, iSpokeLast, isWorkThread } from '../../../shared/team-rules.mts';
 import { commentLine, linkCommentLine } from './teammate-thread';
@@ -32,7 +32,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { asksForYourWords, cellUnderTab, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
+import { asksForYourWords, cellUnderTab, handedTo as handedOnTo, taskHandedFrom, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -40,9 +40,9 @@ import { PinMark } from './ThreadMenu';
 import { bandDrag, cardClickIntent, clickMarks, marqueeMarks, type Box } from './board-select';
 import { shownToPeople } from '../../../shared/thread-cards.mts';
 import { Name } from '../../../shared/product-name.mjs';
-import { FleetContext } from '../fleet';
+import { FleetContext, harnessOn } from '../fleet';
 import { TeammateLead, useTeammateWho } from '../teammates/row-lead';
-import { AgentFace } from '../components/AgentFace';
+import { HarnessMark } from '../components/EngineLogos';
 import { factsFor, laterCell, saysOnCard, statusCell, type StatusCell } from '../status-word';
 import { offersTryAgain } from '../try-again';
 import { voiceName } from '../../../shared/agent-voice.mts';
@@ -482,6 +482,14 @@ export const INBOX_TABS: { view: TabView; label: string }[] = [
  */
 const COUNTED: TabView[] = ['inbox', 'progress', 'snoozed'];
 
+/** A tab just clicked keeps `data-clicked` until the pointer leaves it, and
+ *  pages.css hides the hint plate while it is hovered: the Tab plate is for a
+ *  resting pointer, not one that has already acted. */
+const quietOnceClicked = {
+  onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => { e.currentTarget.dataset.clicked = ''; },
+  onPointerLeave: (e: ReactPointerEvent<HTMLButtonElement>) => { delete e.currentTarget.dataset.clicked; },
+};
+
 /** With a team on the page (w-b5f23cff71): two tabs, Needs you and Everything else, and the team's faces at the end. */
 export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => void; corner?: ReactNode;
   /** On a computer: Needs you, In progress, Later and Done, each its own tab;
@@ -489,14 +497,12 @@ export type TeamTabs = { on: boolean; onNeeds: () => void; onEverything: () => v
   states?: { away: boolean; onTab: (v: TabView) => void };
   /** The team's day (team/TodayPage.tsx). */
   today?: { on: boolean; onToday: () => void };
-  /** Every task on the team (team/TasksPage.tsx). */
-  tasks?: { on: boolean; onTasks: () => void };
   /** Your finished threads, on the layout whose tabs are only states. */
   done?: { on: boolean; onDone: () => void } };
 export const EVERYTHING_ELSE = 'Everything else';
 
 /** `needs` renames the first tab (Waiting, once a teammate is on the page). */
-export function StateTabs({ view, counts, onView, needs, onSearch, lit = false, after, dim = false, into = null, team = null, keepLater = false }: {
+export function StateTabs({ view, counts, onView, needs, onSearch, lit = false, after, dim = false, into = null, team = null }: {
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string;
   /** Draws Search at the row's right end (w-3c51d02de5). */
   onSearch?: () => void;
@@ -508,30 +514,28 @@ export function StateTabs({ view, counts, onView, needs, onSearch, lit = false, 
   into?: HTMLElement | null;
   team?: TeamTabs | null;
   /** Later stays drawn while nothing is in it: the walk teaches it. */
-  keepLater?: boolean;
 }) {
-  const row = <StateTabsRow view={view} counts={counts} onView={onView} needs={needs} onSearch={onSearch} lit={lit} after={after} dim={dim} team={team} keepLater={keepLater} />;
+  const row = <StateTabsRow view={view} counts={counts} onView={onView} needs={needs} onSearch={onSearch} lit={lit} after={after} dim={dim} team={team} />;
   return into ? createPortal(row, into) : row;
 }
 
-function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, after, dim = false, team = null, keepLater = false }: {
+function StateTabsRow({ view, counts, onView, needs, onSearch, lit = false, after, dim = false, team = null }: {
   view: TabView; counts: Partial<Record<TabView, number>>; onView: (v: TabView) => void; needs?: string;
-  onSearch?: () => void; lit?: boolean; after?: ReactNode; dim?: boolean; team?: TeamTabs | null; keepLater?: boolean;
+  onSearch?: () => void; lit?: boolean; after?: ReactNode; dim?: boolean; team?: TeamTabs | null;
 }) {
   // On a phone with a team, In progress, Later and Done are under Everything else.
   const states = team?.states;
   const tabs = team && !states ? INBOX_TABS.filter((t) => t.view === 'inbox')
-    : INBOX_TABS.filter((t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view, walking: keepLater }));
+    : INBOX_TABS.filter((t) => t.view !== 'snoozed' || laterTabShown({ count: counts.snoozed ?? 0, view }));
   const on = (t: TabView) => (states ? view === t && !states.away && !dim
-    : team ? t === 'inbox' && !team.on && !team.today?.on && !team.tasks?.on && !team.done?.on : view === t && !dim);
+    : team ? t === 'inbox' && !team.on && !team.today?.on && !team.done?.on : view === t && !dim);
   const press = (t: TabView) => (states ? (t === 'inbox' ? team!.onNeeds() : states.onTab(t)) : team ? team.onNeeds() : onView(t));
   return <div className="th-bar"><div className="tm-tabs">
     {/* Every tab wears the Tab plate (hint-plate.ts, 'state-tab'). */}
-    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} {...actsOnPress(() => press(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
-    {team && !states && <button type="button" data-hint="state-tab" className={`tm-tab${team.on ? ' on' : ''}`} {...actsOnPress(team.onEverything)}>{EVERYTHING_ELSE}</button>}
-    {team?.today && <button type="button" data-hint="state-tab" className={`tm-tab${team.today.on ? ' on' : ''}`} {...actsOnPress(team.today.onToday)}>Today</button>}
-    {team?.tasks && <button type="button" data-hint="state-tab" className={`tm-tab${team.tasks.on ? ' on' : ''}`} {...actsOnPress(team.tasks.onTasks)}>Tasks</button>}
-    {team?.done && <button type="button" data-hint="state-tab" className={`tm-tab${team.done.on ? ' on' : ''}`} {...actsOnPress(team.done.onDone)}>{DONE.short}</button>}
+    {tabs.map((t) => <button type="button" key={t.view} data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${on(t.view) ? ' on' : ''}${!team && t.view === 'inbox' && lit && view !== 'inbox' ? ' fresh' : ''}${team?.on && t.view === 'inbox' && lit ? ' fresh' : ''}`} {...actsOnPress(() => press(t.view))}>{t.view === 'inbox' && needs ? needs : t.label}{COUNTED.includes(t.view) && !!counts[t.view] && <b>{counts[t.view]}</b>}</button>)}
+    {team && !states && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.on ? ' on' : ''}`} {...actsOnPress(team.onEverything)}>{EVERYTHING_ELSE}</button>}
+    {team?.today && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.today.on ? ' on' : ''}`} {...actsOnPress(team.today.onToday)}>Today</button>}
+    {team?.done && <button type="button" data-hint="state-tab" {...quietOnceClicked} className={`tm-tab${team.done.on ? ' on' : ''}`} {...actsOnPress(team.done.onDone)}>{DONE.short}</button>}
     {after}
   </div>{team?.corner}{onSearch && <SearchButton onSearch={onSearch} />}</div>;
 }
@@ -692,7 +696,8 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   /** Who the thread is from: a person, an AI teammate, or you. */
   who?: Who;
 }) {
-  const id = rowPriorityId(priority);
+  // Every level, Medium included: a blank here read as a gap in the column.
+  const id = priority === null ? null : priorityIdOf(priority);
   return <div className={`row-main th-grid${person !== undefined ? ' with-person' : ''}`}>
     {/* EVERY ROW READS THE SAME WAY (w-585619d660): a mark in one slot, the
         title, then who it is from in grey. The titles line up because the
@@ -712,9 +717,9 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   </div>;
 }
 
-/** Who a row is from: their face, and their name in grey after the title. Your own threads carry the agent's face and no name. */
+/** Who a row is from: their face, and their name in grey after the title. Your own threads carry their harness's mark and no name. */
 export type Who = { face: ReactNode; name?: string };
-export const YOURS: Who = { face: <AgentFace /> };
+const yours = (engine: string): Who => ({ face: <HarnessMark engine={engine} /> });
 
 /** A message's line: the other person's face and name, then what was said,
  *  "You: " first when you spoke last. A group names everyone else. `mark`
@@ -777,11 +782,19 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // A cloud run that asked for a key is waiting on it, not finished (round one of the key power test).
   const wants = inNeedsYou && !cell.live && !waits && !peopleWaitOnYou ? needsWord(needsLeft(item, savedKeys)) : null;
   // Handed back by someone you asked (shared/thread-asks.mts): their words are the newest thing on it.
-  const toldBy = inNeedsYou ? handedBackBy(item as Parameters<typeof handedBackBy>[0]) : null;
-  const backFrom = toldBy && team?.byId.has(toldBy) ? `Back from ${nameFirst(toldBy)}` : null;
+  const asksHere = inNeedsYou && team ? asksOnThread(allItems ?? [], team.me, item.id) : [];
+  const lastAsk = Math.max(0, ...asksHere.map((a) => a.at));
+  const toldBy = inNeedsYou ? handedBackBy(item as Parameters<typeof handedBackBy>[0], lastAsk) : null;
+  const backFrom = toldBy && team?.byId.has(toldBy) ? backWord(nameFirst(toldBy), asksHere.find((a) => !a.open && a.to === toldBy)?.verdict ?? null) : null;
   // Out with someone you asked: say who, not that nothing is running.
   const askedOut = team && !cell.live && !backFrom ? askedOutWord(allItems ?? [], team.me, item.id, (id) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null;
-  const shownWord = wants ?? backFrom ?? askedOut ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
+  // Handed on, it did not finish: it says who has it now.
+  const handedOnName = handedOnTo(item);
+  const handedTask = handedOnName && team ? taskHandedFrom(allItems ?? [], item.id, team.me) : null;
+  const handedWord = !handedOnName ? null
+    : handedTask?.status === 'done' && handedTask.wrote?.status?.by === handedTask.assignee ? `${handedOnName.split(/\s+/)[0]} finished it`
+      : handedTask && handedTask.status !== 'done' ? `With ${handedOnName.split(/\s+/)[0]}` : `Handed to ${handedOnName.split(/\s+/)[0]}`;
+  const shownWord = wants ?? backFrom ?? askedOut ?? handedWord ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
   // Out with a person, it is no agent's state, so it wears no agent mark and offers no try again.
   const status = shownWord === null ? undefined : askedOut && shownWord === askedOut ? { ...worded, word: shownWord, agent: false, title: undefined } : { ...worded, word: shownWord };
   // WHO SEES IT, AT A GLANCE (2026-10-01). One mark after the title, always: the
@@ -823,7 +836,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
     const text = fileNews ?? (agent ? `${agent.who}: ${agent.text}` : said.text);
     const subject = item.label || (isWorkThread(item) ? item.title : null);
     const from: Who = { face: <Face person={team?.byId.get(said.people[0] ?? '') ?? null} />, name: said.people.map((id) => (said.people.length > 1 ? nameFirst(id) : fullName(team?.byId.get(id) ?? null))).join(', ') };
-    return <RowCells status={status} who={from} title={subject ?? (!fileNews && !agent && said.fromMe ? `You: ${text}` : text)} aside={subject ? text : due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
+    return <RowCells status={status} who={from} title={subject ?? messageOnRow(!fileNews && !agent && said.fromMe ? `You: ${text}` : text)} aside={subject ? text : due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={messagePriority(item)} updatedAt={when} when={back} now={now} action={action} />;
   }
   // ONLY THE UNUSUAL CASE WEARS A MARK (2026-10-02). Shared with the team is
@@ -841,7 +854,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // is untouched and still decides whether the cloud offers itself.
   const handed = team ? handedBy(item, product ?? undefined, team.me) : null;
   const handedFrom: Who | null = handed ? { face: <Face person={team?.byId.get(handed.from) ?? null} />, name: fullName(team?.byId.get(handed.from) ?? null) } : null;
-  const from: Who = handedFrom ?? mateFrom ?? YOURS;
+  const from: Who = handedFrom ?? mateFrom ?? yours(harnessOn(item, fleet));
   const commented = (handed?.note ?? null) ?? fileNewsLine(fileNewsFor(item, team?.me ?? null, { myName: team?.byId.get(team.me ?? '')?.name ?? null }), (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null))
     ?? commentLine(item.waitingComments, (id) => firstName(team?.byId.get(id) ?? null))
     ?? linkCommentLine(item.linkComments)
@@ -1137,7 +1150,6 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           {/* THE HANDLE COMES UP WHEN YOU ARE OVER THE COLUMN: "a little drag
               icon comes up subtly". Only where a drag does something. */}
           {onReorderColumns && <GripIcon />}</div>
-        {count === 0 && <div className="th-col-empty">Nothing here.</div>}
         {ahead?.cards}
         {/* A card says who can see it the way a row does: the lock on what
             only you can see, the people mark on what a few chosen people

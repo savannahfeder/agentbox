@@ -10,6 +10,7 @@ import { LOCAL_APP_SANDBOX, previewShows, previewStatus, useLocalPreview } from 
 import { LocalPreviewStatus } from './LocalPreviewStatus';
 import { WebsitePane, type Browsing, type PageControl } from './WebsitePane';
 import { BrowserChrome, type WebChromeKind } from './BrowserChrome';
+import { OpenWithMark } from './OpenWith';
 import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../shared/websites.mts';
 // THE DOCUMENT PANE. The right half of the window is the file itself.
 //
@@ -329,16 +330,14 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
   // A page being browsed has an address rather than a breadcrumb; the bar
   // above it draws that (BrowserChrome).
   const browsingKind: WebChromeKind | null = kind === 'website' ? 'website' : app.local ? 'local' : null;
-  const crumb = crumbParts(resolved ?? doc.src, roots);
+  // A run's change is named by what it is, not by the folder the app keeps it in.
+  const crumb = /(^|\/)runs\/w-[0-9a-f]+\/the-change-it-made\.change$/.test(resolved ?? doc.src) ? ['The change'] : crumbParts(resolved ?? doc.src, roots);
   const canSave = paneCanSave(resolved, roots);
-  // WHAT THE FIRST MARK DOES, AND FOR A CHANGE IT IS HER EDITOR.On a markdown
-  // file or a page it is unchanged and still hands the file to the operating
-  // system, which is what she approved on 08-20. ON A WEBSITE IT IS THE
-  // BROWSER YOU ACTUALLY USE, and it hands over the page you have walked to
+  // A file's open mark is a menu of the apps that open it (OpenWith.tsx). A
+  // website goes straight to the browser you use, at the page you walked to
   // rather than the one the thread named.
   const openOutside = () => {
-    const src = browsingKind ? here.url : kind === 'code' ? (fileAt ?? doc.src) : doc.src;
-    api.openArtifactExternally({ product: doc.product, src, thread }).then((r) => {
+    api.openArtifactExternally({ product: doc.product, src: here.url, thread }).then((r) => {
       if (!r.ok) onNotice(r.error ?? 'That file could not be opened.');
     });
   };
@@ -384,7 +383,7 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
             {crumb.map((part, i) => (
               <span key={`${part}-${i}`} className="doc-crumb-part">
                 {i > 0 && <span className="doc-crumb-sep">›</span>}
-                <span className={i === crumb.length - 1 ? 'doc-crumb-leaf' : undefined}>{i === crumb.length - 1 ? shownName(resolved ?? doc.src) || part : part}</span>
+                <span className={i === crumb.length - 1 ? 'doc-crumb-leaf' : undefined}>{i === crumb.length - 1 && part !== 'The change' ? shownName(resolved ?? doc.src) || part : part}</span>
               </span>
             ))}
           </div>
@@ -392,14 +391,15 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
             {firstMark}
             {onMode && (focusControlStyle ? <FocusControl style={focusControlStyle} focused={!!headerTarget} onClick={() => onMode(headerTarget ? 'beside' : 'focus')}/> : !headerTarget && <button type="button" className="artifact-expand" aria-label="Expand preview" title="Expand preview to Focus" onClick={() => onMode('focus')}><Glyph><path d="M14 5h5v5M19 5l-6 6M10 19H5v-5M5 19l6-6" /></Glyph><span>Focus</span></button>)}
             {/* The two marks she approved, and nothing beside them. */}
-            <button
-              type="button"
-              className="doc-mark"
+            <OpenWithMark
+              product={doc.product}
+              src={kind === 'code' ? (fileAt ?? doc.src) : doc.src}
+              thread={thread}
               title={kind === 'code' ? 'Open this file in your editor' : `Open outside ${NAME}`}
-              onClick={openOutside}
+              onFailed={onNotice}
             >
               {focusControlStyle ? <ArtifactControlGlyph kind="open"/> : <OpenGlyph />}
-            </button>
+            </OpenWithMark>
             <button type="button" className="doc-mark" title={headerTarget ? 'Exit Focus' : 'Close this document (esc)'} onClick={onClose}>
               {focusControlStyle ? <ArtifactControlGlyph kind="close"/> : <CloseGlyph />}
             </button>

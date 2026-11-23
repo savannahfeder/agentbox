@@ -152,6 +152,45 @@ export function saveDraftPick(item: ItemRef, pick: DraftPick | null, store?: Dra
   } catch { /* a refused store is not a reason to lose the send */ }
 }
 
+/** The ask or hand-over sheet as it was left on a thread. */
+export interface AskDraft {
+  /** Each person's note, kept until it is sent to them. */
+  notes: Record<string, string>;
+  /** Whose sheet a close left, and on which choice, for Ask a teammate to open again. */
+  last: { to: { id: string; name: string }; mode: 'help' | 'review' | 'give' } | null;
+}
+
+export function askDraftKey(item: ItemRef): string {
+  return `zero.askdraft.${item.product}:${item.id}`;
+}
+
+export function readAskDraft(item: ItemRef, store?: DraftStore): AskDraft {
+  const none: AskDraft = { notes: {}, last: null };
+  try {
+    const d = JSON.parse(backing(store).getItem(askDraftKey(item)) ?? 'null');
+    if (!d || typeof d !== 'object') return none;
+    const notes = d.notes && typeof d.notes === 'object' && !Array.isArray(d.notes)
+      ? Object.fromEntries(Object.entries(d.notes).filter((e): e is [string, string] => typeof e[1] === 'string' && !!e[1]))
+      : {};
+    const l = d.last;
+    const last = l && typeof l.to?.id === 'string' && typeof l.to?.name === 'string' && ['help', 'review', 'give'].includes(l.mode)
+      ? { to: { id: l.to.id, name: l.to.name }, mode: l.mode } : null;
+    return { notes, last };
+  } catch {
+    return none;
+  }
+}
+
+/** Nothing to keep removes it. */
+export function saveAskDraft(item: ItemRef, draft: AskDraft, store?: DraftStore): void {
+  const s = backing(store);
+  const notes = Object.fromEntries(Object.entries(draft.notes).filter(([, n]) => n));
+  try {
+    if (Object.keys(notes).length || draft.last) s.setItem(askDraftKey(item), JSON.stringify({ notes, last: draft.last }));
+    else s.removeItem(askDraftKey(item));
+  } catch { /* kept for as long as the sheet is open */ }
+}
+
 /* ------------------------------ the images ------------------------------- */
 
 /** The images of the same draft, beside the words and never mixed into them. */
