@@ -28,6 +28,8 @@ import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
 import { handBackReadBy } from '../../shared/thread-asks.mts';
 import { carriedOnIn, saidBeforeTheStop, saysItStopped } from '../../shared/carried-on-outside.mts';
+import { Name } from '../../shared/product-name.mjs';
+import { forTheAgent } from '../../shared/notes-for-the-agent.mts';
 import type { AgentVoice, ArtifactMark, FileMarkLink } from './types';
 
 const fileShownName = (id: string) => id.replace(/#\d+$/, '');
@@ -104,8 +106,8 @@ export interface ThreadEvent {
   voice?: AgentVoice;
   /** A comment or approval on a file: which file, and for a comment where on it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment (reaches the owner, starts nothing) or an agent's checkpoint. */
-  says?: 'comment' | 'progress' | 'to-agent';
+  /** A teammate's comment (reaches the owner, starts nothing), an agent's checkpoint, or the app's own note. */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app';
   // The runs that began at this pickup, oldest first. Set by withRuns, and
   // an array because a session that never got its claim in still has to land
   // somewhere rather than disappear.
@@ -542,7 +544,13 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     }
 
     if (words(patch.note)) {
-      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', says: 'progress', ...(ranNow() ? { ran: ranNow() } : {}) });
+      // Trouble the app is seeing to by itself is for the next run, not the person.
+      if (line.source === 'system' && forTheAgent(words(patch.note)!)) continue;
+      // The app's own news on the row is the app's quiet line, never a
+      // checkpoint signed with the model the agent runs on
+      // (tests/the-apps-own-note-is-never-signed-as-the-agents).
+      const signed = line.source === 'system' ? { says: 'app' as const, from: Name } : { says: 'progress' as const, ...(ranNow() ? { ran: ranNow() } : {}) };
+      events.push({ at, who: 'agent', said: 'It checked in', words: words(patch.note)!, message: true, field: 'note', ...signed });
       continue;
     }
 

@@ -1178,8 +1178,8 @@ export interface AgentTurn {
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment, or an agent's checkpoint (thread-history.ts). */
-  says?: 'comment' | 'progress' | 'to-agent';
+  /** A teammate's comment, an agent's checkpoint, or the app's own note (thread-history.ts). */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app';
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
