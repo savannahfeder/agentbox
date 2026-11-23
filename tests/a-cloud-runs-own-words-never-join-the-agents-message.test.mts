@@ -6,7 +6,7 @@
 // took any unstamped line as the sentence above it running on. Measured with
 // traceLines on that trace: one say line, the answer plus the stderr text.
 import { describe, it, expect } from 'vitest';
-import { traceLines } from '../renderer/src/terminal.ts';
+import { traceLines } from '../shared/trace-lines.mts';
 import { readNotes } from '../renderer/src/notes.ts';
 
 const startedAt = Date.parse('2026-11-09T22:00:00Z');

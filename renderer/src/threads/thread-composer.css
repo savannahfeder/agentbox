@@ -33,6 +33,8 @@
   padding-top: 0;
   padding-bottom: 10vh;
 }
+/* N opens it over a file opened big, under the ⌘F box, as ⌘K's bar is. */
+body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.tc-veil { z-index: 9480; }
 
 .tc-card {
   position: relative;
@@ -257,6 +259,10 @@
 /* flex: 1 so one column, on a Mac with one engine, fills the menu rather than
    lighting a row half its width (w-db6f5e331e). */
 .tc-col { display: flex; flex-direction: column; gap: 1px; min-width: 176px; flex: 1; }
+/* A further harness's column is as wide as its longest name, and eight rows
+   tall however many models it lists: the height Claude Code's column has. */
+.tc-col-more { flex: 1 0 auto; }
+.tc-col-rows { display: flex; flex-direction: column; gap: 1px; max-height: 279px; overflow-y: auto; }
 
 /* "Free plan" and "Update" beside a column's agent name. Line height 1 so the
    heading stays the height of its neighbour and the rows below stay level. */

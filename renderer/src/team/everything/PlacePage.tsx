@@ -13,7 +13,10 @@ const PLUS = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke=
 /** One button over a place's chat: a list or the job, shown in the chat's place, or a page it goes to. */
 export type PlacePart = { key: string; label: string; count?: number; ask?: boolean; body?: ReactNode; onOpen?: () => void };
 
-export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, parts = [], chatLabel = 'Chat' }: {
+/** Which button over the chat is lit, for whose place; null is the chat. */
+export type PlaceView = { of: string; key: string } | null;
+
+export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, parts = [], chatLabel = 'Chat', side, view: held, onView }: {
   m: Member; waits?: number;
   /** The first button's name, for what `chat` is: an AI teammate's page holds its tasks. */
   chatLabel?: string;
@@ -22,19 +25,25 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, part
   /** Absent inside Chats, where the list beside it is the way back. */
   onBack?: () => void; backTo?: string;
   actions?: ReactNode; chat: ReactNode; parts?: PlacePart[];
+  /** Beside the chat while it is shown: your AI teammate's settings. */
+  side?: ReactNode;
+  /** Kept by the page around it when something outside the place, such as the window's corner, opens a button's view. */
+  view?: PlaceView; onView?: (next: PlaceView) => void;
 }) {
-  const [view, setView] = useState<{ of: string; key: string } | null>(null);
+  const [own, setOwn] = useState<PlaceView>(null);
+  const view = onView ? held ?? null : own;
+  const setView = onView ?? setOwn;
   const shown = view?.of === m.key ? parts.find((p) => p.key === view.key && p.body) ?? null : null;
   useEffect(() => {
     if (!shown) return undefined;
-    // Esc goes back to the chat, unless it is ending an edit in a box first.
+    // Esc goes back to the chat, unless it is ending an edit in a box or closing a menu first.
     const esc = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== 'Escape' || (e.target as HTMLElement | null)?.closest?.('textarea, input')) return;
+      if (e.key !== 'Escape' || (e.target as HTMLElement | null)?.closest?.('textarea, input') || document.querySelector('.th-menu, .prio-menu')) return;
       e.stopPropagation(); setView(null);
     };
     window.addEventListener('keydown', esc, true);
     return () => window.removeEventListener('keydown', esc, true);
-  }, [shown]);
+  }, [shown, setView]);
   return <section className="pl" aria-label={m.name}>
     <header className="pl-head">
       {onBack && <button type="button" className="pl-back" onClick={onBack} title={`Back to ${backTo} (Esc)`} aria-label={`Back to ${backTo}`}>{BACK}<span>{backTo}</span></button>}
@@ -55,9 +64,12 @@ export function Place({ m, waits = 0, about, onBack, backTo, actions, chat, part
         {p.ask && <i aria-hidden="true" />}{p.label}{p.count != null && <b>{p.count}</b>}
       </button>)}
     </div>}
-    <div className="pl-body">
-      <div className={`pl-chat${shown ? ' away' : ''}`}>{chat}</div>
-      {shown && <div className="pl-view" role="tabpanel" aria-label={shown.label}>{shown.body}</div>}
+    <div className="pl-main">
+      <div className="pl-body">
+        <div className={`pl-chat${shown ? ' away' : ''}`}>{chat}</div>
+        {shown && <div className="pl-view" role="tabpanel" aria-label={shown.label}>{shown.body}</div>}
+      </div>
+      {side && !shown && <aside className="pl-side" aria-label={`${m.name}'s settings`}>{side}</aside>}
     </div>
   </section>;
 }

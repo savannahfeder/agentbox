@@ -1,6 +1,7 @@
 // What a click may open for the person. shell.openPath is a double-click, so a
 // file a worker wrote that macOS runs or launches is shown in Finder instead:
 // opened, it would run as the person, outside the worker's sandbox.
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -18,9 +19,21 @@ export function opensAProgram(p: string): boolean {
 }
 
 export interface OpeningShell { openPath?(p: string): Promise<string>; showItemInFolder?(p: string): void }
+type Run = (cmd: string, args: string[], opts: { timeout: number }) => Promise<unknown>;
+
+// Long enough for a big app's first start, which can take seconds.
+export const OPEN_MS = 60_000;
+
+const runFile: Run = (cmd, args, opts) => new Promise((resolve, reject) => {
+  execFile(cmd, args, { ...opts, windowsHide: true }, (err) => (err ? reject(err) : resolve(undefined)));
+});
 
 /** Opens a file for the person, or shows it in Finder when opening would run it. */
-export async function openForThePerson(shell: OpeningShell, p: string): Promise<string> {
+export async function openForThePerson(shell: OpeningShell, p: string, { platform = process.platform, run = runFile }: { platform?: NodeJS.Platform; run?: Run } = {}): Promise<string> {
   if (opensAProgram(p)) { shell.showItemInFolder?.(p); return ''; }
-  return (await shell.openPath?.(p)) ?? '';
+  if (!shell.openPath) return '';
+  // On a Mac, shell.openPath blocks the main thread until the receiving app
+  // has started, and the window freezes with it.
+  if (platform === 'darwin') return run('/usr/bin/open', [path.resolve(p)], { timeout: OPEN_MS }).then(() => '', () => 'Failed to open path');
+  return shell.openPath(p);
 }

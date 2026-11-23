@@ -527,6 +527,38 @@
 .gr-page .gr-l2 { font-size: 13.5px; line-height: 18px; }
 .gr-page .gr-pn, .gr-page .gr-ag { font-size: 13px; }
 
+/* A CHAT OPENED FROM NEEDS YOU IS SET ON A THREAD'S COLUMN: its measure, indent
+   and type come from the thread page's rule (one-thing-at-a-time.css), the
+   faces hang in the margin so the words start where a thread's do, and the box
+   waits folded at the column's foot until R. */
+.gr-page.in-inbox .rm-full .rm-chat-list { padding-left: var(--task-indent, 32px); padding-right: 32px; }
+.gr-page.in-inbox .rm-full .rm-chat-msgs { max-width: var(--task-measure, 760px); }
+@container (min-width: 900px) {
+  .gr-page.in-inbox .rm-full.hang .rm-cm { padding-left: 0; }
+  .gr-page.in-inbox .rm-full.hang .rm-cm .h > .tm-av:first-child { left: -44px; top: 12px; }
+}
+.gr-page.in-inbox .rm-full .rm-cm .h { font-size: calc(var(--task-type, 16px) * 0.9); line-height: 24px; }
+.gr-page.in-inbox .rm-full .rm-cm .tx { font-size: var(--task-type, 16px); line-height: 1.6; }
+.gr-page.in-inbox .rm-full .rm-chat-err { margin-left: var(--task-indent, 32px); }
+.gr-page.in-inbox .rm-full .rm-compose {
+  margin: 8px 32px 24px var(--task-indent, 32px); max-width: var(--task-measure, 760px);
+  border-color: var(--line); background: var(--bg-raised); box-shadow: var(--shadow-md);
+}
+.gr-page.in-inbox .rm-full .rm-compose:focus-within { border-color: var(--line-strong); background: var(--surface); }
+.gr-page.in-inbox .rm-compose.folded { flex-direction: row; align-items: center; cursor: text; }
+.gr-page.in-inbox .rm-compose.folded .rm-compose-input { flex: 1; min-width: 0; min-height: 0; padding: 11px 16px; font-size: max(14.5px, calc(var(--task-type, 16px) * 0.78)); line-height: 19px; }
+.gr-page.in-inbox .rm-compose.folded :is(.rm-compose-bar, .fmt-marks-slot) { display: none; }
+.rm-fold-key { padding-right: 14px; display: flex; align-items: center; }
+.rm-fold-key kbd {
+  font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
+  background: var(--wash); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 1.5px 5.5px;
+}
+/* Beside the message rather than over its words, where the margin has room for it. */
+@container (min-width: 1250px) {
+  .gr-page.in-inbox .rm-cm > .chat-acts { right: auto; left: calc(100% + 16px); top: 10px; }
+  .gr-page.in-inbox .rm-cm.cont > .chat-acts { top: -2px; }
+}
+
 /* 44 points from the frame to the words, on every page beside the narrow sidebar (round 13). */
 .gt-inset .list, .gt-inset .list-pane { --gutter: 20px; --text-x: 44px; --row-r: 32px; }
 .gt-inset.workspace-layout > .topbar { padding-left: 44px; padding-right: 28px; }

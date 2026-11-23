@@ -341,6 +341,10 @@ const clock = (s: number): string => {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 };
 
+/** How a mark a teammate's copy made is named on the thread (main/team/thread-share.mts `asLine`). */
+export const TEAMMATE_MARK = 'mark-';
+export const fromATeammatesCopy = (uid: string | null | undefined): boolean => String(uid ?? '').startsWith(TEAMMATE_MARK);
+
 /** "Pin 2", "0:12", "Slide 3", the quote, "Whole file". */
 export function placeWords(note: { place?: NotePlace | null; pin?: number | string } | null | undefined): string {
   const place = note?.place;
@@ -464,7 +468,10 @@ export function threadFiles(files: readonly ThreadFile[] | null | undefined, num
     const same = family.versions.filter((v) => v.name === name);
     // Another path is the same file only when one ends with the other: a bare
     // name or a relative path inside a whole one. Two folders are two files.
-    const written = same.filter((v) => [v.path, ...(v.also ?? [])].some((p) => endsWithPath(p, path) || endsWithPath(path, p))).at(-1);
+    // A bare name said in words ("Notes on option-2.png:") is the file of that
+    // name already here, though a sent copy's name carries a prefix.
+    const bare = !path.includes('/');
+    const written = (bare ? same : same.filter((v) => [v.path, ...(v.also ?? [])].some((p) => endsWithPath(p, path) || endsWithPath(path, p)))).at(-1);
     if (written && !SENT_COPY.test(path) && (line === undefined || written.line === undefined || written.line === line)) {
       (written.also ??= []).push(path);
       written.line ??= line;
@@ -551,6 +558,16 @@ export function whereAPressLands(families: readonly FileFamily[] | null | undefi
     return at(v ? flat.find((x) => x.v === v) : null);
   }
   return at(flat.at(-1));
+}
+
+/**
+ * The paths a press keeps on its file's version line when Files has not
+ * numbered them (threadFiles `keep`): what it names, and the file of the note
+ * it opens at, which a press from the note's line names only by the note.
+ */
+export function pathsAPressKeeps(open: { path?: string; steps?: readonly string[]; drawn?: readonly string[]; note?: string }, notes: readonly { id: string; file: string }[]): string[] {
+  const noted = open.note ? notes.find((n) => n.id === open.note)?.file.replace(/#\d+$/, '') : undefined;
+  return [open.path, ...(open.steps ?? []), ...(open.drawn ?? []), noted].filter((p): p is string => !!p);
 }
 
 /**

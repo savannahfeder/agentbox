@@ -8,7 +8,7 @@ import type { ArtifactMark, FileElsewhere, FileMarks, Person, WorkItem } from '.
 import { ArtifactView, NO_MARKS, type ArtifactOpen } from './ArtifactView';
 import { useFileLine } from '../file-numbers';
 import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
-import { withRunsSaid } from '../runs-said';
+import { withRunsSaid } from '../../../shared/runs-said.mts';
 import type { TraceSession } from '../notes';
 
 const FOLLOW_MS = 3000;
