@@ -56,7 +56,7 @@ import { whatTheFileSentUp } from '../../shared/artifact-keys.mts';
 import { ALIVE_EVERY_MS, markWindowAlive, type Place, placeIsSomewhere, readPlace, windowWasJustHere, writePlace, writeScroll } from './where-she-was';
 import { Rail } from './components/Rail';
 import { ThreadComposer, type ComposeStart } from './threads/ThreadComposer';
-import { continueStart } from './threads/continue-thread';
+import { carriedForFile, continueStart } from './threads/continue-thread';
 import { OpenTeammateThread } from './threads/ContinuedFrom';
 import { handOffStart, joinNames, laterHint, replyWaitsUntil, taskHandOff, tabAfterSending, writingMovesToTheDialog, projectsOffered, projectOnScreen, teammates } from './threads/composer-rules';
 import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, screenJustChanged, aWordFollows, HELD_AFTER_A_CHANGE, NOWHERE_TO_TYPE, STILL_TYPING_MS, WORD_FOLLOWS_MS } from './reply-keys';
@@ -247,7 +247,7 @@ import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mts';
 import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mts';
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
-import { familyOfName, fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
+import { fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
 import { commentsToHand, withComments, type HandedComment } from './threads/comments-to-hand';
 import { notesOnThread } from './threads/thread-notes';
 import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
@@ -2493,15 +2493,11 @@ export default function App() {
     setFocused(null);
     openTeammateCard(card);
   }, [weekCards, openTeammateCard]);
-  // `files`: from one file's notes, which carries that file's newest version and no other.
   const continueTeammateThread = useCallback((card: ThreadCard, comments: HandedComment[] = [], files?: string[]) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
       .then((b) => {
         const start = continueStart(b, card, snap?.products ?? []);
-        const families = new Set((files ?? []).map((f) => familyOfName(f)));
-        const ofTheFile = start.attachments.filter((a) => families.has(familyOfName(a.name)));
-        const attachments = files?.length && ofTheFile.length ? { attachments: ofTheFile.slice(-1) } : {};
-        setComposeInitial({ ...start, ...attachments, ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
+        setComposeInitial({ ...start, attachments: carriedForFile(start.attachments, files), ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
         setModal('compose');
       })
       .catch((err) => showToast(String(err?.message ?? err)));
