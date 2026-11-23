@@ -93,20 +93,20 @@ describe('the window reads the one rule in all three lists', () => {
 
   it('Needs you lets your Later answer before an agent that waits on you', () => {
     const needs = between('const inboxCandidates = useMemo(', 'const liftedBy = useRef(');
-    expect(needs).toMatch(/if \(asking\(i\)\) return !askPutOff\(i, true, now\);/);
+    expect(needs).toMatch(/if \(asking\(i\)\) return !askPutOff\(i, true, listNow\);/);
     expect(needs).not.toMatch(/if \(asking\(i\)\) return true;/);
   });
 
   it('In progress leaves it out, after a reply you just sent has had its say', () => {
     const progress = between('const progress = useMemo(() => [', 'const progressTab = useMemo(');
-    const starting = progress.indexOf('if (startingIds.has(i.id) && deferredUntil <= now) return true;');
-    const putOffHere = progress.search(/if \(askPutOff\(i, asking\(i\), now\)\) return false;/);
+    const starting = progress.indexOf('if (startingIds.has(i.id) && deferredUntil <= listNow) return true;');
+    const putOffHere = progress.search(/if \(askPutOff\(i, asking\(i\), listNow\)\) return false;/);
     expect(starting).toBeGreaterThan(-1);
     expect(putOffHere).toBeGreaterThan(starting);
   });
 
   it('Later holds it, unless something you did is still being held for undo', () => {
     const later = between('const snoozed = useMemo(() => [', '].sort((a, b) => whenShown(a) - whenShown(b))');
-    expect(later).toMatch(/askPutOff\(i, asking\(i\), now\) && !pendingIds\.has\(i\.id\)/);
+    expect(later).toMatch(/askPutOff\(i, asking\(i\), listNow\) && !pendingIds\.has\(i\.id\)/);
   });
 });

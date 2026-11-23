@@ -92,7 +92,7 @@ describe('the lists move it', () => {
 
   it('the window reads it from the app for both lists, and keeps the running mark to real runs', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
-    expect(app).toMatch(/const liveIds = useMemo\(\(\) => agentOnOrComing\(\{ running: runningRows, starting: snap\?\.supervisor\.starting \}\)/);
+    expect(app).toMatch(/const liveIds = useKeptSet\(useMemo\(\(\) => agentOnOrComing\(\{ running: runningRows, starting: snap\?\.supervisor\.starting \}\)/);
     expect(app).toMatch(/<LiveContext\.Provider value=\{runningIds\}>/);
   });
 });

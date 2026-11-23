@@ -65,6 +65,7 @@ import { withoutFileHomes } from '../../shared/file-home.mts';
 import { installBrowserBridge } from './browser-bridge';
 import { installCloudBridge } from './cloud-bridge';
 import { onASharedFilePage } from './shared-file/route';
+import { shownSnapshots } from './shown-snapshot';
 
 // The Mac's own page first; the phone with the Mac shut only on its own site.
 // A shared file's page is neither: it is for people with no app at all.
@@ -81,6 +82,8 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
 // The inbox and the open threads' agent logs as last answered, so each read
 // asks only for what changed since.
 const snapshots = snapshotReader();
+// A document's holder thread is the app's, so no list of threads draws it.
+const shown = shownSnapshots<Snapshot['items'][number], Snapshot>(withoutFileHomes);
 const traces = traceReader();
 // Which thread is on screen: only its agent's live detail is sent.
 let openThread: { product: string | null; id: string } | null = null;
@@ -659,8 +662,6 @@ export const api = {
       }
       return codexOut(withEngines(base));
     }
-    // A document's holder thread is the app's, so no list of threads draws it.
-    const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
     const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
     if (got) return shown(got);
     // Built on a list this window no longer holds: a whole one, which take() never refuses.
@@ -1013,7 +1014,7 @@ export const api = {
   // once instead of after it (main/claude-input.mts `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: WasBeforeClose }): Promise<WorkItem | null> {
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: WasBeforeClose; reopen?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
   },

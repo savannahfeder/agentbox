@@ -2,14 +2,14 @@
 // delete your own, copy its words, and mark the conversation unread from it.
 // The editor takes the message's place, Return saves and Escape puts it back;
 // deleting asks once, because it is taken back for everyone.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { RichReply, type RichBox } from './RichReply';
 import { chatDoc, chatMarkdown } from './chat-editor';
 import './chat.css';
 
 export type MoreItem =
-  | { label: string; onClick: () => void; danger?: boolean; hint?: string }
+  | { label: string; onClick: () => void; danger?: boolean; hint?: string; icon?: ReactNode }
   | 'rule';
 
 const MENU_W = 220;
@@ -17,20 +17,20 @@ const EDGE = 8;
 
 // Under a button the menu hangs from its right edge; at the pointer, from the
 // pointer, the way a right click menu opens.
-function placeMenu(at: DOMRect, height: number): CSSProperties {
-  const from = at.width === 0 ? at.left : at.right - MENU_W;
-  const left = Math.max(EDGE, Math.min(from, window.innerWidth - MENU_W - EDGE));
+function placeMenu(at: DOMRect, height: number, width = MENU_W): CSSProperties {
+  const from = at.width === 0 ? at.left : at.right - width;
+  const left = Math.max(EDGE, Math.min(from, window.innerWidth - width - EDGE));
   const below = at.bottom + 4;
   const top = below + height <= window.innerHeight - EDGE ? below : Math.max(EDGE, at.top - 4 - height);
-  return { left: Math.round(left), top: Math.round(top), width: MENU_W };
+  return { left: Math.round(left), top: Math.round(top), width };
 }
 
-export function MoreMenu({ at, items, onClose }: { at: DOMRect; items: MoreItem[]; onClose: () => void }) {
+export function MoreMenu({ at, items, onClose, width = MENU_W }: { at: DOMRect; items: MoreItem[]; onClose: () => void; width?: number }) {
   const box = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState<CSSProperties>({ left: -9999, top: -9999, width: MENU_W });
+  const [place, setPlace] = useState<CSSProperties>({ left: -9999, top: -9999, width });
   const [pick, setPick] = useState(0);
   const rows = items.filter((i): i is Exclude<MoreItem, 'rule'> => i !== 'rule');
-  useLayoutEffect(() => { setPlace(placeMenu(at, box.current?.offsetHeight ?? 200)); }, [at]);
+  useLayoutEffect(() => { setPlace(placeMenu(at, box.current?.offsetHeight ?? 200, width)); }, [at, width]);
   useEffect(() => {
     const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) onClose(); };
     const key = (e: KeyboardEvent) => {
@@ -53,7 +53,7 @@ export function MoreMenu({ at, items, onClose }: { at: DOMRect; items: MoreItem[
         return (
           <button key={item.label} type="button" role="menuitem" className={`chat-menu-row${item.danger ? ' danger' : ''}${me === pick ? ' on' : ''}`}
             onMouseEnter={() => setPick(me)} onClick={() => { onClose(); item.onClick(); }}>
-            <span>{item.label}</span>{item.hint && <kbd>{item.hint}</kbd>}
+            {item.icon && <span className="chat-menu-ico">{item.icon}</span>}<span>{item.label}</span>{item.hint && <kbd>{item.hint}</kbd>}
           </button>
         );
       })}

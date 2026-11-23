@@ -112,10 +112,10 @@ describe('what the panel says', () => {
 // The countdown belongs to the tooltip and the spoken sentence now, and to
 // nothing on screen. Its two shapes still have to agree with each other.
 describe('the countdown, which the spoken sentence still uses', () => {
-  it('rounds the same whether it carries "left" or not', () => {
+  it('rounds the same whether it carries "resets in" or not', () => {
     for (const ms of [30_000, 60_000, 59 * 60_000, 90 * 60_000, 25 * 3_600_000, 48 * 3_600_000]) {
       const bare = spanLeft(ms);
-      expect(untilReset(ms)).toBe(bare === 'any moment' ? bare : `${bare} left`);
+      expect(untilReset(ms)).toBe(bare === 'any moment' ? `resets ${bare}` : `resets in ${bare}`);
     }
   });
 });

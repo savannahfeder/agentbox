@@ -927,12 +927,20 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // answered at once (supervisor.sendNow).
   ipcMain.handle('zero:send-now', (_e, { product, id }: { product: string; id: string }) => supervisor.sendNow(product, id));
 
-  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, runAt, putAway, reopenAs }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean; runAt?: number; putAway?: unknown; reopenAs?: WasBeforeClose }) => {
+  ipcMain.handle('zero:answer', async (_e, { product, id, answer, status, priority, permissionMode, engine, model, effort, now, inReplyTo, fromPhone, closeUnshipped, runAt, putAway, reopenAs, reopen }: AnswerInput & { product: string; id: string; now?: unknown; inReplyTo?: unknown; closeUnshipped?: boolean; runAt?: number; putAway?: unknown; reopenAs?: WasBeforeClose; reopen?: boolean }) => {
     if (isAgentRow(id)) return { ok: false };
     if (reopenAs && status === 'open' && !answer) {
       const out = store.reopenAsItWas(product, id, reopenAs);
       push();
       if (out?.status === 'open') { supervisor.liftBrakeForHer?.(); supervisor.wake(); }
+      return out;
+    }
+    // Reopen on a done thread puts it back for you; the reply it had already
+    // heard does not run again.
+    if (reopen && status === 'open' && !answer) {
+      const out = store.answerItem(product, id, { status: 'open' });
+      if (out) supervisor.keepReplyHeard({ ...out, product });
+      push();
       return out;
     }
     // Out of your own Needs you, on a task between people: no reply, no close, no run.
