@@ -51,10 +51,13 @@ function noteBusy(profiles: StoppedProfile[]) {
     const ask = path.join(dir, CPU_ASK);
     const asked = fs.existsSync(ask);
     if (!asked && Date.now() - cpuAt < CPU_EVERY_MS) return;
+    const read = busyFrom(profiles, { appDir });
+    // A turn right after a start or a freeze covers a moment: wait for a fuller one.
+    if (read.ms < rotateMs / 2) return;
     cpuAt = Date.now();
     // The ask goes first, so a line that cannot be written is not tried every turn.
     if (asked) fs.rmSync(ask, { force: true });
-    writeBusy(dir, { at: new Date().toISOString(), ...busyFrom(profiles, { appDir }) });
+    writeBusy(dir, { at: new Date().toISOString(), ...read });
   } catch { /* the freeze log matters more than this line */ }
 }
 

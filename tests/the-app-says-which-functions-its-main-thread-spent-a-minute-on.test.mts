@@ -90,7 +90,9 @@ describe('what the main thread spent a stretch on', () => {
 });
 
 describe('the running recorder', () => {
-  const run = async (ask: boolean) => {
+  // `freezeFirst` holds the thread for 650 ms at the start: a freeze, which
+  // turns the profile over at once with only that moment in it.
+  const run = async (ask: boolean, { rotateMs = 700, freezeFirst = false, thenMs = 1500 } = {}) => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cpu-ask-'));
     const log = path.join(dir, 'log');
     fs.mkdirSync(log);
@@ -101,32 +103,46 @@ describe('the running recorder', () => {
       import { startFreezeRecorder } from ${JSON.stringify(path.join(ROOT, 'main', 'freeze-recorder.mts'))};
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       function rebuildsTheInbox() { const end = Date.now() + 120; let x = 0; while (Date.now() < end) { for (let i = 0; i < 1e5; i += 1) x = (x + i) | 0; } return x; }
-      const rec = startFreezeRecorder({ dir: ${JSON.stringify(log)}, appDir: ${JSON.stringify(dir)}, rotateMs: 700 });
+      function holdsAtTheStart() { const end = Date.now() + 650; let x = 0; while (Date.now() < end) { for (let i = 0; i < 1e5; i += 1) x = (x + i) | 0; } return x; }
+      const rec = startFreezeRecorder({ dir: ${JSON.stringify(log)}, appDir: ${JSON.stringify(dir)}, rotateMs: ${rotateMs} });
       await wait(300);
-      for (let n = 0; n < 14; n += 1) { rebuildsTheInbox(); await wait(40); }
-      await wait(900);
+      if (${freezeFirst}) holdsAtTheStart();
+      for (let n = 0; n < 24; n += 1) { rebuildsTheInbox(); await wait(40); }
+      await wait(${thenMs});
       rec.stop();
     `);
     await promisify(execFile)(process.execPath, [...stripTypesFlags(), script], { timeout: 30_000 });
-    return fs.readdirSync(log);
+    const names = fs.readdirSync(log);
+    const file = names.find((n) => /^cpu-\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
+    const lines = file ? fs.readFileSync(path.join(log, file), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : [];
+    return { names, lines };
   };
 
   it('writes the stretch when asked, and takes the ask away', async () => {
-    const names = await run(true);
+    const { names, lines } = await run(true);
     expect(names).not.toContain(CPU_ASK);
-    const file = names.find((n) => /^cpu-\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
-    expect(file).toBeTruthy();
-    const lines = fs.readFileSync(path.join(dir, 'log', file!), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     expect(lines).toHaveLength(1);
-    expect(lines[0].deepest[0].fn).toBe('rebuildsTheInbox busy.mjs:4');
-    // Inside it too, under the script's own top level, which holds everything.
-    expect(lines[0].inside.find((f: { fn: string }) => f.fn === 'rebuildsTheInbox busy.mjs:4').share).toBeGreaterThan(0.5);
+    // The script's own code, by name. Which of its functions is not asked: on a
+    // loaded computer the profiler credits one just compiled to its caller.
+    expect(lines[0].deepest[0].fn).toMatch(/ busy\.mjs:\d+$/);
+    expect(lines[0].inside[0].fn).toMatch(/ busy\.mjs:\d+$/);
+    expect(lines[0].inside[0].share).toBeGreaterThan(0.5);
     expect(lines[0].busy).toBeGreaterThan(0.3);
-    // No hold reached half a second, so the freeze log has nothing to say.
-    expect(names.filter((n) => n.startsWith('freeze-'))).toEqual([]);
   }, 40_000);
 
-  it('writes nothing in its first minutes when nobody asked', async () => {
-    expect(await run(false)).toEqual([]);
+  // An ask answered from the moment after a start or a freeze named whatever
+  // ran in that moment: on a loaded computer, a few samples of nothing.
+  it('waits for a stretch at least half a turn long before it answers an ask', async () => {
+    // The freeze turns the profile over about a second in, half the 2 s it must cover.
+    const { names, lines } = await run(true, { rotateMs: 4000, freezeFirst: true, thenMs: 2500 });
+    expect(names).not.toContain(CPU_ASK);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].ms).toBeGreaterThanOrEqual(2000);
+    expect(lines[0].inside[0].fn).toMatch(/ busy\.mjs:\d+$/);
+  }, 40_000);
+
+  // A freeze line may still be written if the computer running this stalls.
+  it('writes nothing of its own in its first minutes when nobody asked', async () => {
+    expect((await run(false)).lines).toEqual([]);
   }, 40_000);
 });

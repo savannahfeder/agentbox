@@ -99,8 +99,8 @@ function thread(): Worker | null {
   return mine;
 }
 
-/** For tests: the idle time, and how many threads have been started. */
-export const __gitThread = { idleMs(ms: number) { idleMs = ms; }, started: () => started };
+/** For tests: the idle time, how many threads have been started, and whether one is in use. */
+export const __gitThread = { idleMs(ms: number) { idleMs = ms; }, started: () => started, inUse: () => !!worker };
 
 /** Settles once no job is waiting on the thread. */
 export async function __gitJobsIdle() {
