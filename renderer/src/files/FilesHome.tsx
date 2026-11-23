@@ -213,7 +213,7 @@ function FolderHead({ folder, count, onFolder, acts, big = false }: { folder: Fi
   </Menu>;
   const name = renaming ? <NameInput start={folder.name} placeholder="Folder name" onCancel={() => setRenaming(false)} onDone={(n) => { setRenaming(false); acts.renameFolder(folder, n); }} /> : null;
   if (big) return <><h1>{name ?? folder.name}</h1>{!renaming && menuButton}{menuBox}</>;
-  return <>{name ?? <button type="button" className="fh-link" onClick={() => onFolder(folder.id)}>{folder.name}<Chevron /></button>}
+  return <>{name ?? <h2 className="fh-head-name"><button type="button" className="fh-link" onClick={() => onFolder(folder.id)}>{folder.name}</button></h2>}
     {count != null && <span className="fh-count">{count}</span>}{!renaming && menuButton}{menuBox}</>;
 }
 
@@ -227,9 +227,8 @@ function Section({ head, files, folder, more, dropOn, ...shared }: Shared & {
 }) {
   const [over, setOver] = useState(false);
   return <section className={`fh-sec${over ? ' is-over' : ''}`} {...(dropOn ? dropOn(setOver) : {})}>
-    <div className="fh-head">{head}</div>
+    <div className="fh-head">{head}{files.length > SHOWN_AT_FIRST && <button type="button" className="fh-see-all" onClick={more}>See all {files.length}</button>}</div>
     <Grid files={files} folder={folder} limit={SHOWN_AT_FIRST} {...shared} />
-    {files.length > SHOWN_AT_FIRST && <button type="button" className="fh-more" onClick={more}>See all {files.length}</button>}
   </section>;
 }
 
@@ -285,7 +284,7 @@ export function FilesHome({ title, crumbs, onCrumb, page, home, projects, found,
       </label>
       {newMenu}
     </div>
-    {found ? <section className="fh-sec"><div className="fh-head"><b>{found.length ? 'Matches' : 'No file matches'}</b>{found.length > 0 && <span className="fh-count">{found.length}</span>}</div>
+    {found ? <section className="fh-sec"><div className="fh-head"><h2 className="fh-head-name">{found.length ? 'Matches' : 'No file matches'}</h2>{found.length > 0 && <span className="fh-count">{found.length}</span>}</div>
       <Grid files={found} folder={null} limit={60} {...shared} /></section>
       : page.kind === 'folder' ? <Shelf files={page.files} folder={page.folder} dropOn={(setOver) => dropOn(page.folder.id, setOver)} {...shared} />
         : page.kind === 'loose' ? <Shelf files={page.files} folder={null} dropOn={(setOver) => dropOn(null, setOver)} {...shared} />
@@ -294,7 +293,7 @@ export function FilesHome({ title, crumbs, onCrumb, page, home, projects, found,
             {home.kept.map((s) => <Section key={s.folder.id} head={<FolderHead folder={s.folder} count={s.files.length} onFolder={onFolder} acts={shared.acts} />}
               files={s.files} folder={s.folder} more={() => onFolder(s.folder.id)} dropOn={(setOver) => dropOn(s.folder.id, setOver)} {...shared} />)}
             {home.empty.length > 0 && <p className="fh-empty">{andJoined(home.empty.map((f) => f.name))} {home.empty.length === 1 ? 'is' : 'are'} empty.</p>}
-            {home.loose.length > 0 && <Section head={<><button type="button" className="fh-link" onClick={() => onFolder(NOT_IN_A_FOLDER)}>Not in a folder<Chevron /></button><span className="fh-count">{home.loose.length}</span></>}
+            {home.loose.length > 0 && <Section head={<><h2 className="fh-head-name"><button type="button" className="fh-link" onClick={() => onFolder(NOT_IN_A_FOLDER)}>Not in a folder</button></h2><span className="fh-count">{home.loose.length}</span></>}
               files={home.loose} folder={null} more={() => onFolder(NOT_IN_A_FOLDER)} dropOn={(setOver) => dropOn(null, setOver)} {...shared} />}
             {nothing && <p className="fh-empty">Nothing in {title} yet.</p>}
             {loaded && !nothing && <button type="button" className="fh-every" onClick={onEverything}>Every file, with sizes and the Trash</button>}

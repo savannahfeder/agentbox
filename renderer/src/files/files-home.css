@@ -20,20 +20,18 @@
 }
 .fh-top .fp-new-box .fp-menu { top: 40px; }
 
-.fh-sec { margin-top: 26px; border-radius: 16px; }
+.fh-sec { margin-top: 38px; border-radius: 16px; }
 .fh-shelf { margin-top: 22px; }
 .fh-sec.is-over { background: var(--wash); box-shadow: 0 0 0 10px var(--wash); }
-.fh-head { position: relative; display: flex; align-items: center; gap: 8px; min-height: 26px; margin: 0 0 10px; font-size: 14px; line-height: 20px; color: var(--text); }
-.fh-head b { font-weight: 600; letter-spacing: -.003em; }
-.fh-link {
-  display: inline-flex; align-items: center; gap: 3px; height: 26px; padding: 0 6px; margin-left: -6px; border: 0; border-radius: 7px; background: none;
-  font: inherit; font-weight: 600; letter-spacing: -.003em; color: var(--text); cursor: pointer;
-}
-.fh-link .fh-chev { color: var(--text-faint); }
-.fh-link:hover { background: var(--wash); }
-.fh-link:hover .fh-chev { color: var(--text-dim); }
-.fh-count { font-size: 12.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.fh-head .fh-name-box { width: 260px; }
+.fh-head { position: relative; display: flex; align-items: center; gap: 10px; min-height: 28px; margin: 0 0 14px; color: var(--text); }
+/* A section's name is a heading that also opens its folder: no arrow, which read as a dropdown. */
+.fh-head-name { margin: 0; min-width: 0; font-size: 19px; line-height: 26px; font-weight: 600; letter-spacing: -.012em; color: var(--text); }
+.fh-link { padding: 0; border: 0; background: none; font: inherit; letter-spacing: inherit; color: inherit; text-align: left; cursor: pointer; }
+.fh-link:hover { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; text-decoration-color: var(--line-strong); }
+.fh-count { font-size: 14px; line-height: 26px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.fh-see-all { margin-left: auto; height: 28px; padding: 0 8px; margin-right: -8px; border: 0; border-radius: 7px; background: none; font: inherit; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+.fh-see-all:hover { color: var(--text); background: var(--wash); }
+.fh-head .fh-name-box { width: 280px; height: 30px; font-size: 17px; font-weight: 600; }
 
 .fh-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .fh-tile { position: relative; min-width: 0; }

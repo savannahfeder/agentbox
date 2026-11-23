@@ -180,4 +180,15 @@ describe('the page itself', () => {
   it('makes a section\'s name a way into its own page', () => {
     expect(tsx).toMatch(/className="fh-link"[^>]*onClick=\{\(\) => onFolder\(/);
   });
+  // Seen on r7-3: "There's a little arrow that makes me think this is a dropdown
+  // ... not that this is a header for these sections."
+  it('draws a section\'s name as a heading, with no arrow beside it', () => {
+    expect(tsx).not.toMatch(/className="fh-link"[^>]*>[^<]*\{?[^<]*<Chevron/);
+    expect(tsx).toMatch(/<h2 className="fh-head-name">/);
+    const rule = css.replace(/\/\*[\s\S]*?\*\//g, '').split('}').find((r) => r.trim().startsWith('.fh-head-name'));
+    expect(Number(/font-size: (\d+)px/.exec(rule ?? '')?.[1])).toBeGreaterThanOrEqual(18);
+  });
+  it('puts See all at the end of the heading\'s row, not under the tiles', () => {
+    expect(tsx).toMatch(/className="fh-see-all"/);
+  });
 });
