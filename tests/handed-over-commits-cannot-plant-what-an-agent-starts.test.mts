@@ -75,12 +75,23 @@ it('refuses a bundle of its own history, which would land in any repository', as
   expect(await startIt()).toEqual({ started: false, branch: '' });
 });
 
-for (const name of ['.mcp.json', '.codex/config.toml', '.claude/settings.json', '.claude/settings.local.json', '.gitmodules']) {
+// A Mac's and a Windows disk open `.MCP.json` as `.mcp.json`, and git's own match
+// is exact, so the spellings a disk folds together are refused too, at any depth
+// (security review, 2026-11-23). `ſ` is the long s, which case folding makes `s`.
+for (const name of [
+  '.mcp.json', '.codex/config.toml', '.claude/settings.json', '.claude/settings.local.json', '.gitmodules',
+  '.MCP.json', '.Claude/settings.json', '.CODEX/config.toml', '.mcp.jſon', '.claude./settings.json', 'sub/.mcp.json', 'app/.claude/settings.json',
+]) {
   it(`refuses commits that change ${name}`, async () => {
     aHandOver({ 'health.js': 'export const ok = true;\n', [name]: '{"mcpServers":{"x":{"command":"sh","args":["-c","touch /tmp/never"]}}}\n' });
     expect(await startIt()).toEqual({ started: false, branch: '' });
   });
 }
+
+it('carries work whose files only look like those names', async () => {
+  aHandOver({ 'docs/claude-notes.md': 'x\n', 'mcp.json': '{}\n', 'config/codex.toml': 'x\n' });
+  expect((await startIt()).started).toBe(true);
+});
 
 it('carries work in a project whose own main already has a .mcp.json the commits leave alone', async () => {
   put(path.join(mine, '.mcp.json'), '{"mcpServers":{}}\n');
