@@ -45,12 +45,12 @@ const rowsDrawn = (items, repeats) => {
 // The number App.tsx hands the tab bar for one tab, worked out from its own
 // expression with this file's rows in place of the window's.
 const countsBlock = app.slice(app.indexOf('<StateTabs'), app.indexOf('needs={team ?', app.indexOf('<StateTabs')));
-const tabCount = (tab, { later = [], rules = [], inbox = [] } = {}) => {
+const tabCount = (tab, { later = [], rules = [], inbox = [], chats = 0 } = {}) => {
   const expr = countsBlock.match(new RegExp(`\\n\\s*${tab}: ([^\\n]+),\\n`))?.[1];
   if (!expr) throw new Error(`no count for ${tab} in App.tsx`);
   const scope = {
     mineShown: true, shownCount: (rows) => rows.length, theirCount: () => 0,
-    inbox, progressTab: [], snoozed: later, done: [], repeats: rules,
+    inbox, progressTab: [], snoozed: later, done: [], repeats: rules, chatsLater: chats,
     leadCount: 0, sharedFileNews: [], followingNews: [],
   };
   return new Function(...Object.keys(scope), `return ${expr};`)(...Object.values(scope));
@@ -76,9 +76,16 @@ describe("Later's number on the tab bar is the rows its page draws", () => {
     expect(html).toMatch(/Later<b>1<\/b>/);
   });
 
+  // A chat put off with L is a row on Later too (a-chat-opened-from-needs-you-answers-keys-like-a-thread).
+  it('a chat put off counts, on the tab bar and in the sidebar, and alone keeps Later there', () => {
+    expect(tabCount('snoozed', { later: threads(2), chats: 1 })).toBe(3);
+    expect(tabCount('snoozed', { chats: 1 })).toBe(1);
+    expect(app).toContain('const scheduledCount = snoozed.length + repeats.length + chatsLater;');
+  });
+
   it('and Tab stops on Later whenever the tab bar draws it', () => {
     expect(app).toContain("laterTabShown({ count: scheduledCount, view })");
-    expect(app).toContain('const scheduledCount = snoozed.length + repeats.length;');
+    expect(app).toContain('const scheduledCount = snoozed.length + repeats.length + chatsLater;');
   });
 
   it('a repeating task never adds to Needs you, In progress or Done', () => {

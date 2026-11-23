@@ -386,8 +386,8 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
   const olderThan = (rank: number) => Object.entries(state.uploaded)
     .filter(([, u]) => (u.rank ?? 0) < rank)
     .sort((a, b) => (a[1].rank ?? 0) - (b[1].rank ?? 0) || (a[1].named ?? 0) - (b[1].named ?? 0));
-  const roomFor = (bytes: number, rank: number) => {
-    const over = total() + bytes - limits.totalBytes;
+  const roomFor = (bytes: number, rank: number, used = total()) => {
+    const over = used + bytes - limits.totalBytes;
     if (over <= 0) return true;
     if (now() - startedAt < LOOK_AGAIN_MS) return false;
     return olderThan(rank).reduce((n, [, u]) => n + (u.bytes || 0), 0) >= over;
@@ -451,6 +451,8 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
       for (const f of folders) for (const p of f.pictures) if (!all.has(p.key)) all.set(p.key, p.file);
       const files: Record<string, ManifestFile> = {};
       let bytes = 0;
+      // Nothing goes up or comes down inside this loop, so it is added up once.
+      let used: number | null = null;
       for (const [key, file] of [...all].slice(0, limits.files)) {
         let st: fs.Stats;
         try { st = fs.statSync(file); } catch { continue; }
@@ -465,7 +467,7 @@ export function createPhoneUploads({ backend, owner, device, alive = () => true,
           state.uploaded[name].rank = Math.max(state.uploaded[name].rank ?? 0, rank);
         } else {
           // Listed as coming, so the phone holds its place instead of calling it missing.
-          if (roomFor(st.size, rank)) {
+          if (roomFor(st.size, rank, (used ??= total()))) {
             const shape = shapeOf(file, st);
             files[key] = shape ? { s: st.size, soon: true, w: shape.w, h: shape.h } : { s: st.size, soon: true };
           }

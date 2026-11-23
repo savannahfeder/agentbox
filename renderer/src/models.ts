@@ -103,6 +103,17 @@ export function setCodexFreePlan(fact: { endedAt?: number | null } | null | unde
 }
 export function codexFreePlan(): { endedAt: number | null } | null { return CODEX_FREE; }
 
+/** A harness besides Claude Code and Codex that is on offer here, with the models it listed. */
+export interface FurtherHarness { id: string; label: string; models?: readonly { id: string; label: string }[] }
+// Set from each snapshot, beside the two above: every place that names a model reads it.
+const NO_FURTHER: readonly FurtherHarness[] = [];
+let FURTHER = NO_FURTHER;
+export function setFurtherHarnesses(list: readonly FurtherHarness[] | null | undefined): void {
+  // The one empty list, so a computer with no further harness hands every reader the same value for ever.
+  FURTHER = Array.isArray(list) && list.length ? list : NO_FURTHER;
+}
+export function furtherHarnesses(): readonly FurtherHarness[] { return FURTHER; }
+
 /**
  * @deprecated for new code: it is a snapshot of the committed table taken at
  * import time, so it cannot see a `claude update`. Call `claudeModelRows`.
@@ -222,6 +233,9 @@ export function engineModelLabel(
   id: string | null,
   opts: { codexModels?: ModelChoice[]; codexDefault?: string | null } = {},
 ): string {
+  // A further harness names its own models, and a thread on it that names none runs on the harness's choice.
+  const further = FURTHER.find((h) => h.id === engine);
+  if (further) return id ? further.models?.find((m) => m.id === id)?.label ?? id : further.label;
   const value = id ?? defaultModelFor(engine, opts.codexDefault ?? null);
   return engineModelChoices(engine, value, opts).find((m) => m.id === value)?.label ?? value;
 }
@@ -262,7 +276,7 @@ export const LAST_MODEL_KEY = 'zero.lastModel';
  * change untouched.
  */
 export function lastModelKey(engine: string | null = null): string {
-  return engine === 'codex' ? `${LAST_MODEL_KEY}.codex` : LAST_MODEL_KEY;
+  return engine && engine !== 'claude' ? `${LAST_MODEL_KEY}.${engine}` : LAST_MODEL_KEY;
 }
 
 // Remembered the moment she picks, exactly like the project and the level: a

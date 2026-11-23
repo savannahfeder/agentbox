@@ -25,13 +25,14 @@ import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-fi
 import { legacyRoot } from '../main/store/project.mts';
 import { listProductChats, readProductChat } from './core/chat.mts';
 import { lookAtPage } from './core/page.mts';
-import { askToSignIn, keepAfterSignIn, keyNamesFor, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
+import { askToSignIn, keepAfterSignIn, keyNamesFor, notToBeSaved, NOT_SAVED, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
 import { joinCause } from './core/causes.mts';
 import { addRuleToProduct } from './core/project-rules.mts';
 import { joinedWords } from '../shared/causes.mts';
+import { askToBringBack } from '../main/files-come-back.mts';
 // The descriptions below are read by every agent on every run, so the app is
 // named in them from the one place it is named. They said "the app" while this
 // server lived in that product's repo, which told every worker the wrong name
@@ -641,6 +642,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       if (keep) {
         if (!ask) throw new Error('keep goes with the ask of a sign-in that worked');
         if (typeof keepCloudKey !== 'function') return json({ status: 'kept_here', message: 'On this computer the login keeps its own sign-in, so there is nothing to keep.' });
+        if (notToBeSaved(id, ask, { product })) return json({ status: 'not_saved', message: NOT_SAVED });
         const said = (await waitForSignIn(id, asked.id, { product, waitMs: 0 })).status;
         if (said === 'skipped' || said === 'replied') return json({ status: 'denied', message: 'They did not sign in here, so there is nothing to keep.' });
         const names = keyNamesFor(asked.service);
@@ -653,6 +655,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       const inCloud = typeof keepCloudKey === 'function';
       const withKeep = <T extends { message: string }>(out: T, finishing = false): T => {
         if (!inCloud) return out;
+        if (notToBeSaved(id, asked.id, { product })) return { ...out, message: `${out.message} ${NOT_SAVED}` };
         const k = keepAfterSignIn(asked.service, { finishing });
         return { ...out, ...(k.keep ? { keep: k.keep } : {}), message: `${out.message} ${k.message}` };
       };
@@ -660,6 +663,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       const said = await waitForSignIn(id, asked.id, { product });
       return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' || said.status === 'code' ? withKeep(said, true) : said);
     },
+  });
+
+  // On a cloud machine the computer is asked with request_cloud_resource, which brings such a file back first.
+  if (typeof requestCloudResource !== 'function') tools.push({
+    name: 'bring_back_files',
+    description: `Bring back pictures, films and sound ${Name} moved to the cloud to free space on this computer. One nobody opened for a while leaves its folder, so a file or folder that should be there and is not may come back with this. Give the paths as you would open them, files or folders: a folder brings back everything that left it. Waits up to 45 seconds; call again with the same paths if some are still on their way.`,
+    schema: {
+      paths: z.array(z.string()).min(1).max(200).describe('the files or folders, written out in full or inside a project\'s folder (designs/w-…/shots)'),
+    },
+    run: async ({ paths }: { paths: string[] }) => json(await askToBringBack({ dir: path.join(account.root, '.files-cloud', 'asks'), paths, cwd: process.cwd() })),
   });
 
   if (typeof requestCloudResource === 'function') tools.push({
