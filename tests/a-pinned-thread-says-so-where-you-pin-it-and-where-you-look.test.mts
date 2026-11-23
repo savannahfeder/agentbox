@@ -79,7 +79,7 @@ async function open() {
 
 // Whether the pin is drawn inside what its row shows, not cut off past an ellipsis.
 const pinSeen = (page, row) => row.evaluate((r) => {
-  const pin = r.querySelector('[aria-label="Pinned"]');
+  const pin = r.querySelector('[aria-label="Pinned"], svg.th-pin');
   if (!pin) return 'none';
   const box = pin.getBoundingClientRect();
   let clip = r.getBoundingClientRect();
@@ -112,7 +112,7 @@ describe.skipIf(!browserAvailable)('a pinned thread wears its pin where you look
     const page = await open();
     const ink = await page.evaluate(() => {
       const probe = (v) => { const d = document.createElement('i'); d.style.color = `var(${v})`; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; };
-      const pins = [...document.querySelectorAll('[aria-label="Pinned"]')].map((p) => getComputedStyle(p).color);
+      const pins = [...document.querySelectorAll('[aria-label="Pinned"], svg.th-pin')].map((p) => getComputedStyle(p).color);
       return { pins, faint: probe('--text-faint'), dim: probe('--text-dim') };
     });
     expect(ink.pins.length).toBe(4);
