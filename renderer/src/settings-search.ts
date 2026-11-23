@@ -43,8 +43,9 @@ export function pagesOn({ team, cloud, rooms }: { team: boolean; cloud: boolean;
 const pageLabel = (id: SettingsPageId) => SETTINGS_PAGES.find((p) => p.id === id)?.label ?? id;
 
 /** One thing the search can land on. `anchor` is the group it scrolls to on
- *  that page; `words` are what a person might type that is not in the name. */
-type Entry = { page: SettingsPageId; label: string; anchor?: string; words?: string };
+ *  that page; `words` are what a person might type that is not in the name;
+ *  `say` is its name in ⌘K, where no page around it says what "Usage" is of. */
+type Entry = { page: SettingsPageId; label: string; anchor?: string; words?: string; say?: string };
 
 const ENTRIES: Entry[] = [
   { page: 'general', label: 'Your account', anchor: 'account', words: 'signed in sign out log out logout email' },
@@ -71,22 +72,22 @@ const ENTRIES: Entry[] = [
   { page: 'rooms', label: 'What you are working on', anchor: 'rooms-card', words: 'card thread private wall' },
   { page: 'rooms', label: 'Your activity on your page', anchor: 'rooms-card', words: 'activity board inbox profile page hide' },
   { page: 'rooms', label: 'Go invisible', anchor: 'rooms-invisible', words: 'hide hidden away offline ghost' },
-  { page: 'claude', label: 'Usage', anchor: 'usage', words: 'claude code limits plan left remaining quota' },
-  { page: 'claude', label: 'Signed in', anchor: 'usage', words: 'claude code account accounts login subscription add email this computer local' },
-  { page: 'claude', label: 'Cloud accounts', anchor: 'cloud-accounts', words: 'claude code cloud remote accounts limit' },
+  { page: 'claude', label: 'Usage', say: 'Claude Code usage', anchor: 'usage', words: 'claude code limits plan left remaining quota' },
+  { page: 'claude', label: 'Signed in', say: 'Claude Code accounts', anchor: 'usage', words: 'claude code account accounts login subscription add email this computer local' },
+  { page: 'claude', label: 'Cloud accounts', say: 'Claude Code cloud accounts', anchor: 'cloud-accounts', words: 'claude code cloud remote accounts limit' },
   { page: 'claude', label: 'Keys for cloud threads', anchor: 'cloud-keys', words: 'keys key token tokens secret secrets api saved replace remove supabase stripe vercel sentry expo aws github' },
-  { page: 'claude', label: 'Permission mode', anchor: 'permissions', words: 'claude code permissions bypass ask allow plan accept edits' },
-  { page: 'codex', label: 'Usage', anchor: 'usage', words: 'codex limits plan left remaining quota' },
-  { page: 'codex', label: 'Signed in', anchor: 'usage', words: 'codex account accounts login subscription add email this computer local' },
-  { page: 'codex', label: 'Cloud accounts', anchor: 'cloud-accounts', words: 'codex cloud remote accounts limit' },
-  { page: 'codex', label: 'Permission mode', anchor: 'permissions', words: 'codex permissions sandbox read only full access' },
+  { page: 'claude', label: 'Permission mode', say: 'Claude Code permission mode', anchor: 'permissions', words: 'claude code permissions bypass ask allow plan accept edits' },
+  { page: 'codex', label: 'Usage', say: 'Codex usage', anchor: 'usage', words: 'codex limits plan left remaining quota' },
+  { page: 'codex', label: 'Signed in', say: 'Codex accounts', anchor: 'usage', words: 'codex account accounts login subscription add email this computer local' },
+  { page: 'codex', label: 'Cloud accounts', say: 'Codex cloud accounts', anchor: 'cloud-accounts', words: 'codex cloud remote accounts limit' },
+  { page: 'codex', label: 'Permission mode', say: 'Codex permission mode', anchor: 'permissions', words: 'codex permissions sandbox read only full access' },
   // The Memory group folded into the Agents card (w-e5225b62ba), so these three
   // land on `at-once` together. An anchor naming a group that no longer exists
   // is a search result that scrolls nowhere.
   { page: 'files', label: 'Keep files in the cloud', anchor: 'files-cloud', words: 'storage disk space full upload backup films videos pictures images' },
   { page: 'files', label: 'Take big files off this computer', anchor: 'files-cloud', words: 'mac days free space disk storage old films videos pictures' },
   { page: 'cloud', label: 'Your plan', anchor: 'cloud-billing', words: 'agentbox cloud billing stripe payment invoices invoice receipts card cancel subscription manage plan account' },
-  { page: 'cloud', label: 'This month', anchor: 'cloud-use', words: 'cloud usage hours agents running used left' },
+  { page: 'cloud', label: 'This month', say: 'Cloud use this month', anchor: 'cloud-use', words: 'cloud usage hours agents running used left' },
   { page: 'cloud', label: 'Change plan', anchor: 'cloud-plans', words: 'agentbox cloud plan plans pro plus max slots upgrade downgrade switch price pay subscription' },
   { page: 'running', label: 'How many run at once', anchor: 'at-once', words: 'agents concurrent parallel sessions limit queue capacity automatic' },
   { page: 'running', label: 'Hold heavy work when memory is short', anchor: 'at-once', words: 'ram tests builds slow memory' },
@@ -102,7 +103,7 @@ const ENTRIES: Entry[] = [
 /** A search result: the page to open, the name drawn in the result, the page's
  *  name drawn under it, and the group to scroll to. A project's page is
  *  `project:<slug>`. */
-export type SettingsHit = { page: SettingsPageId | `project:${string}`; label: string; pageLabel: string; anchor?: string };
+export type SettingsHit = { page: SettingsPageId | `project:${string}`; label: string; pageLabel: string; anchor?: string; say?: string };
 
 const words = (s: string) => s.toLowerCase().split(/[^a-z0-9.]+/).filter(Boolean);
 
@@ -125,7 +126,7 @@ export function searchSettings(query: string, { pages, projects = [], rows }: {
     if (!open.has(e.page)) continue;
     if (drawn && !drawn.has(`${e.page}/${e.label}`)) continue;
     const page = pageLabel(e.page);
-    const hit = { page: e.page, label: e.label, pageLabel: page, anchor: e.anchor };
+    const hit = { page: e.page, label: e.label, pageLabel: page, anchor: e.anchor, say: e.say };
     // The name, with the page's own name, so "codex permission" finds the Codex
     // row and not Claude Code's.
     if (covers(words(`${e.label} ${page}`), want)) named.push(hit);

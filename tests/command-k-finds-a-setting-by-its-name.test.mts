@@ -6,6 +6,10 @@
 // ⌘K only knew the one "Settings…" row, so a switch was two screens and a
 // second search away. Now ⌘K reads the same index: a setting it names comes
 // first and opens Settings on that page, lit where the switch is.
+//
+// Then "Signed in" in ⌘K meant nothing to her: on its page it sits under
+// Claude Code or Codex, in ⌘K it stood alone. A row named for its page says
+// so in ⌘K.
 
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -39,18 +43,36 @@ describe('a setting in ⌘K', () => {
     expect(labels.get(1)).toBe('Threads');
   });
 
+  it('says which agent a row is for, where its page alone said it', () => {
+    expect(rows('signed in').map((r) => r.label).slice(0, 2)).toEqual(['Claude Code accounts', 'Codex accounts']);
+    expect(rows('signed in').map((r) => r.hint).slice(0, 2)).toEqual(['Settings', 'Settings']);
+    expect(rows('codex').map((r) => r.label)).toEqual(['Codex usage', 'Codex accounts', 'Codex cloud accounts']);
+    expect(rows('permission').map((r) => r.label)).toEqual(['Claude Code permission mode', 'Codex permission mode']);
+    expect(rows('this month').map((r) => r.label)).toEqual(['Cloud use this month']);
+  });
+
+  it('is found by the name ⌘K shows', () => {
+    expect(rows('codex accounts').map((r) => r.label)).toContain('Codex accounts');
+    expect(rows('claude permission').map((r) => r.label)).toEqual(['Claude Code permission mode']);
+  });
+
   it('goes under the threads when the words only name its page', () => {
     // "codex" is a word people type to find threads; the Codex page's rows must not push them down.
     const { rows: drawn, labels } = order('codex', [thread('Codex stalls on a long run')]);
     expect(drawn[0].label).toBe('Codex stalls on a long run');
     expect(labels.get(1)).toBe('Commands');
-    expect(drawn.slice(1).every((c) => c.hint === 'Settings · Codex')).toBe(true);
+    expect(drawn.slice(1).map((c) => c.label)).toEqual(['Codex usage', 'Codex accounts', 'Codex cloud accounts']);
+  });
+
+  it('goes above the threads once the words name more than its page', () => {
+    const { rows: drawn } = order('codex accounts', [thread('Codex accounts ran out')]);
+    expect(drawn[0].label).toBe('Codex accounts');
   });
 
   it('comes after the commands the words find', () => {
     const cmd: Command = { id: 'usage', label: 'Usage and limits', keywords: 'codex', run: () => {} };
     const { rows: drawn, labels } = order('codex', [thread('Codex stalls')], [cmd]);
-    expect(drawn.map((c) => c.label).slice(0, 3)).toEqual(['Codex stalls', 'Usage and limits', 'Usage']);
+    expect(drawn.map((c) => c.label).slice(0, 3)).toEqual(['Codex stalls', 'Usage and limits', 'Codex usage']);
     expect(labels.get(1)).toBe('Commands');
     expect(labels.has(2)).toBe(false);
   });

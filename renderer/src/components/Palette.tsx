@@ -40,6 +40,8 @@ export interface Command {
   found?: { text: string; file?: string; who: string; at: number; where: string };
   /** A thread's place before its title is weighed (../search SearchHit.lead). */
   lead?: number;
+  /** The Settings page a setting's row is on: words that name only it do not put the row above the threads. */
+  place?: string;
 }
 
 /** What was found inside things, a labelled group of rows each (renderer/src/found-inside.ts). */
@@ -474,7 +476,7 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
   };
   // Ahead of the threads only when the words start words of its name: "sum up"
   // is not "reSUMe interrUPted agents". A name it had before a rename counts.
-  const named = (c: Command) => namesIt(query, c.label) || (c.oldNames ?? []).some((n) => namesIt(query, n));
+  const named = (c: Command) => (namesIt(query, c.label) && !(c.place && namesIt(query, c.place))) || (c.oldNames ?? []).some((n) => namesIt(query, n));
   // A group or teammate under People and groups is not listed again as a command.
   const listed = new Set(people.map((c) => c.id.replace(/^chat-/, '')));
   const matched = all.filter((c) => !listed.has(c.id) && (!ASKED_FOR_BY_NAME.has(c.id) || !query.trim() || named(c)));
