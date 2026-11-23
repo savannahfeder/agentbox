@@ -1,7 +1,6 @@
 // Takes her to the window a session she started is running in: its app, and on
 // a Mac the very tab (Terminal, iTerm) or tmux pane, found by the terminal
-// device the session's process holds. Telling her where to answer was half of
-// it; the founder asked for it to bring her there (w-34f79ab66e, 2026-11-23).
+// device the session's process holds.
 
 import { execFile } from 'node:child_process';
 import path from 'node:path';

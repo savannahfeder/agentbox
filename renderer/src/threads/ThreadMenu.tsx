@@ -248,7 +248,6 @@ function FollowMark() {
   return <svg {...mark}><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5h4" /></svg>;
 }
 /** An arrow turning off the line: carry it on from here. */
-/** An inbox tray. */
 function InboxMark() {
   return <svg {...mark}><path d="M3 13.5h5l1.5 2.5h5l1.5-2.5h5" /><path d="M5.5 5h13L21 13.5V19H3v-5.5z" /></svg>;
 }

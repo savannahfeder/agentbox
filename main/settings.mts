@@ -175,11 +175,9 @@ export interface SettingsDeps {
 //
 // A SESSION YOU STARTED YOURSELF IS IN THE INBOX UNLESS YOU TURN IT OFF.
 //
-// It was `off` from 2026-08-27, when every Claude Code session on the
-// founder's Mac got a row in Needs you, busy or not. Since w-34f79ab66e a
-// session working on what she typed is In progress instead and Codex is read
-// too, and she asked for it on by default with an easy way to turn it off
-// (2026-11-23). Off, a session is still on its project's rail (`onTheRail`).
+// It was off while every session got a row in Needs you, busy or not. A
+// session working on what she typed is In progress now, so on is safe to
+// default to. Off, a session is still on its project's rail (`onTheRail`).
 //
 // A setting actually chosen still wins over this line.
 export function outsideAgentsMode(config?: SettingsConfig | null) {
