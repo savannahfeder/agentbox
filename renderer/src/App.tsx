@@ -138,7 +138,10 @@ import { HintPlate } from './components/HintPlate';
 import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, wornSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
 // one attribute, and the whole file goes when she picks.
-import { WorkspaceNavigation } from './components/WorkspaceNavigation';
+import { WorkspaceNavigation, type RecentRow } from './components/WorkspaceNavigation';
+import { recentThreads } from './recent-threads';
+import { HarnessMark } from './components/EngineLogos';
+import { TeammateMark } from './teammates/TeammatesRail';
 import { useRooms } from './team/rooms/useRooms';
 import { useTeammates } from './teammates/useTeammates';
 import { ThreadQuestions } from './teammates/TeammatesPage';
@@ -7458,6 +7461,29 @@ export default function App() {
   const inboxHere = !homeShown && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focused && !focusedRepeat
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
   const engineFacts = { running: snap?.supervisor?.running, engines: snap?.engines };
+  // The sidebar's Recent, which a phone has no sidebar to draw in. A chat with
+  // a person is named for them and opens as their chat; a chat this window
+  // cannot open that way is left out.
+  const waitingIds = new Set(inbox.map((i) => i.id));
+  const recentRows: RecentRow[] = !narrowSidebar ? [] : recentThreads(items.filter((i) => !directSlugs.has(i.product) || directs.some((d) => d.item.id === i.id)), seenAt).map((i) => {
+    const direct = directs.find((d) => d.item.id === i.id) ?? null;
+    const sent = !direct && team ? sentFrom(i, team.products.get(i.product), team.me) : null;
+    const mateId = teammateIdOf(i);
+    const mate = !direct && !sent && mateId ? teammatesUi.list.find((t) => t.id === mateId) ?? null : null;
+    const person = direct ? team?.byId.get(direct.people[0]) ?? null : sent && !sent.agent ? team?.byId.get(sent.from) ?? null : null;
+    return {
+      key: `${i.product}/${i.id}`,
+      mark: mate ? <TeammateMark t={mate} /> : person ? <Face person={person} size={18} /> : <HarnessMark engine={rowEngine(i, engineFacts)} />,
+      title: direct ? direct.name : rowTitle(i),
+      waits: waitingIds.has(i.id) && i.id !== focused?.id,
+      onOpen: () => {
+        if (direct && direct.people.length === 1 && homeLayout === 'chats') { openChatsPlace(`person:${direct.people[0]}`); return; }
+        openView('inbox');
+        if (direct) setChatsDirect(i.id);
+        setFocused(i); markSeen(i);
+      },
+    };
+  });
   const homeNeeds: NeedsRow[] = homeShown ? homeNeedsRows(needsList, {
     nameOf: (id) => team?.byId.get(id)?.name ?? '',
     item: (i) => {
@@ -7752,6 +7778,7 @@ export default function App() {
           `onInvite` is still handed in, for the account menu. */}
       <WorkspaceNavigation
         onPalette={() => setModal('palette')}
+        recent={recentRows}
         update={announcesUpdate(snap?.update, { closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS

@@ -34,13 +34,13 @@ describe('the sidebar opens ⌘K', () => {
   // Above Threads since w-5988eed6f3 (search-sits-above-the-inbox-and-is-not-a-tab).
   it('has a Search row above Inbox, with the keys on it', () => {
     const html = nav({ onPalette: () => {} });
-    expect(labels(html)).toEqual(['Search', 'Inbox', 'Feedback', 'Settings']);
+    expect(labels(html)).toEqual(['New thread', 'Search', 'Inbox', 'Feedback', 'Settings']);
     expect(html).toMatch(/aria-label="Search"[^>]*title="Search · ⌘K"/);
     expect(html).toContain('>⌘K</small>');
   });
 
   it('draws no Search row where nothing opens ⌘K', () => {
-    expect(labels(nav())).toEqual(['Inbox', 'Feedback', 'Settings']);
+    expect(labels(nav())).toEqual(['New thread', 'Inbox', 'Feedback', 'Settings']);
   });
 
   it('is wired to ⌘K itself in the app', () => {

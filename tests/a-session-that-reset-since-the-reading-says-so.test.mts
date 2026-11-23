@@ -56,19 +56,20 @@ describe('a five hour window that ended since the reading', () => {
 describe('the sidebar row', () => {
   it('shows no figure rather than the week’s', () => {
     const html = row(RELAUNCH);
-    expect(html).not.toContain('>30%<');
-    expect(html).not.toContain('>0%<');
+    // The sidebar's figure is a bar's length since 2026-11-23, so no figure is an empty bar.
+    expect(html).not.toContain('width:30%');
+    expect(html).toContain('width:0%');
     expect(html).toContain('Codex');
   });
 
   it('shows the session once a run reads it again', () => {
     const after = { engine: 'codex', at: NOW, limits: [limit({ resetsAt: NOW + 4 * HOUR + 57 * 60_000 }), week({ percent: 31 })] };
-    expect(row(after)).toContain('>2%<');
+    expect(row(after)).toContain('width:2%');
   });
 
   it('still shows the week on a plan that has no five hour window', () => {
     const weekOnly = { engine: 'codex', at: NOW, limits: [week()] };
-    expect(row(weekOnly)).toContain('>30%<');
+    expect(row(weekOnly)).toContain('width:30%');
   });
 
   it('still draws nothing when every window in the reading has ended', () => {
