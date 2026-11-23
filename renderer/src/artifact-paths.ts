@@ -54,8 +54,27 @@ export function isMediaPath(path: string | undefined | null): boolean {
 // /Users/…/astral/designs/w-3a/latest.html, 61 of them pages. They are linked
 // only when they land inside the product's own folder, which the pane passes as
 // `dir`, and then as the short path every other door in the app resolves.
+// A picture or a page elsewhere in the account's documents is meant to be seen
+// too, its project folder left out or mistyped (accountFilePath).
 // Anywhere else, /tmp or the app's own source, is our machinery and stays text.
 const FULL = new RegExp(String.raw`(?<![\w./:@~-])(?:~|/)/?[\w./-]*\.(?:${EXT})\b`, 'gi');
+
+const MEANT = /\.(?:png|jpe?g|gif|webp|svg|html?)$/i;
+
+/**
+ * A picture or a page written out in full into the account's documents, as its
+ * whole path, or null. Drawn as written, it is asked of the app's finder, which
+ * retries it under the project's own folders: so it draws, or says it is missing.
+ */
+export function accountFilePath(full: string, dir: string | null | undefined): string | null {
+  // Every project's folder sits in its account's (accountRoot, main/config.mts).
+  const account = String(dir ?? '').replace(/\/+$/, '').match(/^(\/.+\/accounts\/[^/]+)\/[^/]+$/)?.[1];
+  if (!account || !MEANT.test(full)) return null;
+  const home = account.match(/^\/(?:Users|home)\/[^/]+/)?.[0];
+  const abs = full.startsWith('~/') ? (home ? home + full.slice(1) : null) : full;
+  if (!abs || abs.split('/').includes('..')) return null;
+  return abs.startsWith(`${account}/`) ? abs : null;
+}
 
 // A LOCAL ADDRESS WITH NO http:// IN FRONT. remark-gfm links a url only when
 // it carries its scheme, and 18 of those messages wrote `localhost:3000`
@@ -145,7 +164,7 @@ function pieces(text: string, dir: string, anyFull = false, folder: string | nul
     quoted.push({ start: at, end: at + name.length });
     if (!/^(?:~\/|\/|\.?\/?[\w-])[\w ./()-]*$/u.test(name)) continue;
     const full = /^(?:~\/|\/)/.test(name);
-    let url = full ? shortPath(name, dir, folder) : name;
+    let url = full ? shortPath(name, dir, folder) ?? accountFilePath(name, dir) : name;
     // "Downloads as <quoted filename>" explicitly names its folder. Do not
     // add Downloads to the general filename search or infer it across sentences.
     const home = dir.match(/^\/(?:Users|home)\/[^/]+/)?.[0];
@@ -161,7 +180,7 @@ function pieces(text: string, dir: string, anyFull = false, folder: string | nul
   if (dir || folder) {
     for (const m of text.matchAll(FULL)) {
       if (inQuote(m.index!)) continue;
-      const rel = shortPath(m[0], dir, folder) ?? (anyFull && m[0].startsWith('/') ? m[0] : null);
+      const rel = shortPath(m[0], dir, folder) ?? (anyFull && m[0].startsWith('/') ? m[0] : null) ?? accountFilePath(m[0], dir);
       if (rel) hits.push({ at: m.index ?? 0, text: m[0], url: rel });
     }
     for (const m of text.matchAll(FOLDER_LINE)) {

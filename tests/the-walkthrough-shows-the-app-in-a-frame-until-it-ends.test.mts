@@ -6,9 +6,9 @@
 // setup showed the app as a window inside its own page; the walkthrough then
 // dropped it to the window's full size, so nothing said the practice was
 // still practice. While the walkthrough runs the app now sits inset in the
-// setup's own ground, with a slim bar above it: the setup's step dashes, how
-// far through the walkthrough you are, and Skip. It goes when the walkthrough
-// ends or is skipped.
+// setup's own ground, beside a narrow column (it was a slim bar above until
+// 2026-11-22, which a newcomer did not see: tests/a-newcomer-can-tell-they-are-in-the-walkthrough).
+// It goes when the walkthrough ends or is skipped.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { walkPlace } from '../renderer/src/setup-split.ts';
@@ -34,18 +34,18 @@ describe('the frame', () => {
     expect(app).toMatch(/const tourFramed = !fresh && homeOn && \(tourLive\(tour\) \|\| tourFinishing\(tour\)\);/);
     expect(app).toMatch(/if \(tourFramed\) root\.dataset\.tourFrame = ''; else delete root\.dataset\.tourFrame;/);
   });
-  it('insets the app on the setup’s ground, rounded, with room above for its bar', () => {
-    expect(css).toMatch(/:root\[data-tour-frame\] #root \{[^}]*position: fixed; top: 52px; left: 16px; right: 16px; bottom: 16px;[^}]*border-radius: 14px;/);
-    expect(css).toMatch(/:root\[data-tour-frame\]\[data-theme="light"\] \{ --tf-ground: #fff; \}/);
+  it('insets the app on the setup’s ground, rounded, with room beside it for its column', () => {
+    expect(css).toMatch(/:root\[data-tour-frame\] #root \{[^}]*position: fixed; top: 12px; left: calc\(var\(--tf-w\) \+ 12px\); right: 12px; bottom: 12px;[^}]*border-radius: 14px;/);
+    expect(css).toMatch(/:root\[data-tour-frame\]\[data-theme="light"\] \{ --tf-ground: /);
     // A light sky paints the whole body its frame colour (home/home.css); the frame's white wins over it.
     expect(css).toMatch(/html:root\[data-tour-frame\]\[data-theme="light"\] body \{ background: var\(--tf-ground\) !important; \}/);
   });
-  it('draws its bar outside the app, where the window can still be dragged', () => {
+  it('draws its column outside the app, where the window can still be dragged', () => {
     expect(app).toMatch(/\{tourFramed && createPortal\(<TourFrame /);
     expect(css).toMatch(/\.tour-frame \{[^}]*-webkit-app-region: drag;/);
     expect(css).toMatch(/\.tour-frame button \{[^}]*-webkit-app-region: no-drag;/);
   });
-  it('lets you skip the walkthrough from the bar', () => {
+  it('lets you skip the walkthrough from the column', () => {
     expect(frame).toMatch(/<button type="button" className="tf-skip" onClick=\{onSkip\}>\{finished \? <>Close <kbd className="tf-key">↵<\/kbd><\/> : 'Skip walkthrough'\}<\/button>/);
     expect(app).toMatch(/onSkip=\{\(\) => setTour\(finishing \? closeFinish\(tour!\) : skipTour\(tour!\)\)\}/);
   });

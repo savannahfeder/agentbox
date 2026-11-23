@@ -38,8 +38,9 @@ export interface CloudAccount {
   ready: boolean;
   // 'broken' (stopped working), 'renew' / 'stale' (a Codex login being
   // renewed), 'limited' (at its usage limit until it resets), 'duplicate'
-  // (the same Claude account as an earlier one), 'ready'.
-  state?: 'broken' | 'renew' | 'stale' | 'limited' | 'duplicate' | 'ready';
+  // (the same Claude account as an earlier one), 'refused' (Claude refuses its
+  // subscription), 'ready'.
+  state?: 'broken' | 'renew' | 'stale' | 'limited' | 'refused' | 'duplicate' | 'ready';
   savedAt?: number | null;
   limitedUntil?: number | null;
   /** The earlier account this one is the same Claude account as (state 'duplicate'). */
@@ -90,8 +91,8 @@ export interface CloudStatus {
   movable?: string[];
   /** The keys saved for cloud runs, by name only (main/cloud/keys.mts). */
   keys?: { name: string; savedAt: number | null; label?: string | null }[];
-  /** The app moved off a Claude account at its limit (supervisor `_moveOffALimitedAccount`). */
-  switched?: { from: string; to: string; until: number } | null;
+  /** The app moved off a Claude account at its limit, or refused (supervisor `_moveOffALimitedAccount`). */
+  switched?: { from: string; to: string; until: number; why?: 'refused' } | null;
 }
 
 const agentName = (engine: 'claude' | 'codex') => (engine === 'codex' ? 'Codex' : 'Claude Code');
@@ -204,6 +205,7 @@ export function cloudFootLine(cloud: CloudStatus, now = Date.now()): string {
   // account in use is out, however many others are signed in.
   const moved = cloud.switched;
   if (cloudIsOn(cloud) && moved && moved.until > now) {
+    if (moved.why === 'refused') return `Claude is refusing ${moved.from}, so threads run on ${moved.to}.`;
     return `${moved.from} is at its limit until ${dayAndHour(moved.until, now)}, so threads run on ${moved.to}.`;
   }
   const inUse = cloudAccountInUse(cloud.accounts || [], 'claude');

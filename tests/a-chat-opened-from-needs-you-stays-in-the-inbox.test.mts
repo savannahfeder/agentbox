@@ -112,7 +112,8 @@ describe.skipIf(!browserAvailable)('a chat pressed in Needs you', () => {
     const d = await drawn();
     expect(d).toMatchObject({ openId: 'r-maya', inInbox: true, teamList: false, teamTitle: false, people: false, rows: 0 });
     expect(d.chat).toContain('Sam, can you check the refund copy before 5?');
-    expect(d.chat).toContain('Maya Chen is waiting on you here');
+    // Done is in the bar and on E there, as on a thread (a-chat-opened-from-needs-you-answers-keys-like-a-thread).
+    expect(d.chat).not.toContain('is waiting on you here');
     expect(d.crumb).toBe('Inbox/Maya Chen');
     expect(d.back).toBe('Back to Inbox (esc)');
   });

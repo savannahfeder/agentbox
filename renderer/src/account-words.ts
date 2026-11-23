@@ -62,6 +62,7 @@ export function cloudAccountState(a: CloudAccount, now = Date.now()): string {
   if (state === 'limited' || (a.limitedUntil && a.limitedUntil > now)) {
     return a.limitedUntil ? `At its limit, back at ${hourWords(a.limitedUntil)}` : 'At its limit';
   }
+  if (state === 'refused') return 'Claude is refusing it';
   if (state === 'broken') return 'Stopped working. Sign in again from the cloud menu.';
   if (state === 'renew') return 'Renewing its sign-in';
   return 'Ready';

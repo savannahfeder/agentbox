@@ -67,7 +67,7 @@ import { CLIENT_INFO } from '../codex-app-server.mts';
 import { appendCloudUsage } from './usage.mts';
 import { docsFolderFor, docsToSend, tarDocs, layDocs } from './docs.mts';
 import type { LaidFile } from './docs.mts';
-import { troubleCause, limitResetMoment } from '../../shared/spawn-trouble.mts';
+import { troubleCause, limitResetMoment, accountRefused } from '../../shared/spawn-trouble.mts';
 import { HAND_BACK } from '../../shared/cloud-hand-back.mts';
 import { clock } from './logins.mts';
 import { NEED, SERVICES } from '../../shared/cloud-needs.mts';
@@ -288,6 +288,7 @@ export interface CloudRunOptions {
   keys?: { name: string; key: string }[];
   onLoginTrouble?: (trouble: { state: string; id: string | null }) => void;
   onLimit?: (limit: { until: number }) => void;
+  onRefused?: (refusal: { until: number }) => void;
   stdin?: Readable;
   stdout?: Writable;
   stderr?: Writable;
@@ -332,6 +333,10 @@ export function howLongWords(ms: number) {
 // subagents 45 minutes of work each and its machine was gone in 13.
 const howLongNote = (limitMs: number) => `This run is stopped ${howLongWords(limitMs)} after it starts, a quarter of an hour before the cloud session's own 8-hour limit, so that its work can be saved; the machine can also be reclaimed before that without warning. Size the work to finish inside that, and leave your answer before the limit rather than at it.`;
 const COMMIT_NOTE = 'Your commits on this task\'s branch are sent back to their computer every five minutes, and they are the only thing that outlives the machine: uncommitted files, commits on any other branch, and the conversation itself do not come back. So commit on this branch as you go rather than at the end, and when you hand work to a subagent, have it commit on this branch too.';
+// The side view opens a localhost address on their computer, and the machine
+// is stopped once the run's work is home (`letGo`), so a live preview is the
+// computer's to run (tests/a-live-preview-runs-where-the-side-view-can-open-it).
+const LIVE_NOTE = `Nothing you start here outlives this run: the machine is stopped once its work is back on their computer, and a server or program you leave running goes with it. Nor can their computer reach this machine: a localhost address you name opens on their computer, where nothing of yours is listening. So when they want something running live to see or use (a dev server, a port, a live preview), do not start it here and do not put it on a public tunnel such as cloudflared or ngrok, which shows their work to anyone with the link and ends with this run. End your turn with the one line \`${HAND_BACK} a live preview\` (as below), and the app runs the request there, where a server left running stays up while the thread is open and its localhost address opens beside your message. A page they only need to look at still goes from here, as a picture or one self-contained html file in this thread's designs folder.`;
 
 // WHAT A CLOUD RUN IS TOLD ABOUT WHERE IT IS. Without it an agent there found
 // its film's files, ffmpeg and a key missing, and asked the person to move the
@@ -399,6 +404,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null, 
       'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB of memory with no swap, and about 5 GB of free disk: delete large renders and downloads once you are done with them, because a full disk can stop the run\'s work coming back) that is yours for this run and thrown away after it. It has: the project\'s documents folder, which is the folder you work in, at the same path as on their computer, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB), every file attached to this thread (up to 1 GB each, at its own path in attachments/), and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); what you write there goes back to their computer as you work. There is no git repository here. It also has the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder; its Chromium is Debian\'s patched build with the sandbox on, so when a project\'s own Playwright asks for a different browser, launch it with `executablePath: \'/opt/agentbox/chromium.sh\'` rather than downloading one).',
       'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`).',
       'It does not have: any other file from their computer (documents over 256 KB, other threads\' design folders, large media, files under the home folder, /tmp from an earlier turn); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins).',
+      LIVE_NOTE,
       howLongNote(limitMs),
       ...codexPart,
       handBackNote(keys),
@@ -409,6 +415,7 @@ export function cloudNote({ plain = false, limitMs = RUN_LIMIT_MS, keys = null, 
     'This turn runs in a Linux cloud sandbox (Debian, 2 cores, 8 GB of memory with no swap, and about 5 GB of free disk: delete large renders and downloads once you are done with them, because a full disk can stop the run\'s work coming back) that is yours for this run and thrown away after it. It has: this task folder (its git branch and main, at the same path as on their computer); the project\'s documents folder at its usual path, but only its small files (up to 256 KB each), plus this thread\'s own designs folder (its newest files, up to 50 MB), every file attached to this thread (up to 1 GB each, at its own path in attachments/), and any file or folder the request names under the account\'s documents (up to 25 MB a file, 100 MB a folder); the store tools (look_at_page excepted); git, node, npm, python3 and pip, make, g++, curl, wget, unzip; and Playwright with Chromium already installed (`require(\'playwright\')` works from any folder; its Chromium is Debian\'s patched build with the sandbox on, so when a project\'s own Playwright asks for a different browser, launch it with `executablePath: \'/opt/agentbox/chromium.sh\'` rather than downloading one).',
     'Install whatever else the work needs: you have sudo (`sudo apt-get update && sudo apt-get install -y <package>`, `pip install --user`, `npm install`). When you install a program the project will need again, add the same lines to `.agentbox/cloud-setup.sh` in the task folder and commit it: that script runs before every cloud run of this project, and its output from this run is in /tmp/agentbox-cloud-setup.log.',
     'It does not have: the project\'s other branches (only this task\'s branch and main came up); any other file from their computer (other threads\' design folders, large media, files under the home folder); files an earlier turn left outside git (node_modules, gitignored folders such as scripts/scratch, /tmp); API keys, key files or tokens kept on their computer; their computer\'s apps (Xcode, a simulator, their browser and its sign-ins). Run `npm ci --ignore-scripts` before anything that needs node_modules. Open files are capped at 1024 here (the cloud fixes that ceiling), so a test runner that watches the whole project (`vitest related`, `npm run test:changed`) fails with EMFILE: run the test files you changed and the ones that import them by name with `npx vitest run <files>`.',
+    LIVE_NOTE,
     `Only this task's own branch comes back to their computer. A commit, merge or reset on main or any other branch stays in this sandbox and is thrown away with it, so a merge done here has not happened. To ship, when your brief has a section on How this task ships, do what it says from here: commit on this branch and add the label \`ship\`. The app ships the branch on their computer once it comes home, so a ship never needs the hand-back line. When your brief has no section on how this task ships and the request includes merging into main, or whenever it includes changing any branch but this task's, do the rest of the work and commit it on this branch, then end your turn with the one line \`${HAND_BACK} merging into main\` (as below): the app merges on their computer.`,
     `${howLongNote(limitMs)} ${COMMIT_NOTE}`,
     ...codexPart,
@@ -456,6 +463,17 @@ export function limitInResultLine(line: string, now: number = Date.now()) {
   const text = String(msg.result ?? '');
   if (troubleCause(text) !== 'at-limit') return null;
   return limitResetMoment(text, now) ?? now + LIMIT_REST_MS;
+}
+
+// How long a cloud account Claude refused sits out before one run tries it again.
+export const REFUSED_REST_MS = 30 * 60_000;
+
+// The same for a failed result that says Claude refuses the account itself.
+export function refusedInResultLine(line: string, now: number = Date.now()) {
+  let msg: { type?: string; is_error?: boolean; result?: unknown } | null;
+  try { msg = JSON.parse(line); } catch { return null; }
+  if (msg?.type !== 'result' || msg.is_error !== true) return null;
+  return accountRefused(troubleCause(String(msg.result ?? ''))) ? now + REFUSED_REST_MS : null;
 }
 
 // The same for a Codex turn relayed from the cloud: its code goes in front, as
@@ -1010,6 +1028,8 @@ export async function cloudRun({
   onLoginTrouble = () => {},
   // Told the moment the account's limit resets, when a run ends on it.
   onLimit = () => {},
+  // Told when the run's account is refused: until when it sits out.
+  onRefused = () => {},
   stdin = process.stdin, stdout = process.stdout, stderr = process.stderr,
   remoteCommand = 'claude',
   homeDir = os.homedir(),
@@ -1762,6 +1782,8 @@ export async function cloudRun({
       if (!line.includes('"result"')) continue;
       const until = limitInResultLine(line);
       if (until) { try { onLimit({ until }); } catch { /* noted elsewhere */ } }
+      const refused = refusedInResultLine(line);
+      if (refused) { try { onRefused({ until: refused }); } catch { /* noted elsewhere */ } }
     }
   }
   let codexLine = '';

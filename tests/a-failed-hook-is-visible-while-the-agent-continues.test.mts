@@ -3,7 +3,7 @@
 // both the live tail and saved conversation without changing the task result.
 import { expect, it } from 'vitest';
 import { readersFor } from '../main/supervisor.mts';
-import { traceLines } from '../renderer/src/terminal.ts';
+import { traceLines } from '../shared/trace-lines.mts';
 const readers = readersFor('claude');
 const failure = { type: 'system', subtype: 'hook_response', hook_name: 'SessionStart:resume', hook_event: 'SessionStart', exit_code: 1, outcome: 'error', stderr: 'HOOK-WARNING-824: startup failed.', output: 'HOOK-WARNING-824: startup failed.' };
 it('keeps a nonblocking hook failure in both existing output surfaces', () => {

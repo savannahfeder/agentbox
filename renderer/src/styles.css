@@ -2815,7 +2815,7 @@ body {
 .approval-actions button {
   font: inherit; font-size: 13px; font-weight: 600; border-radius: var(--radius);
   height: 30px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px;
-  cursor: pointer;
+  flex: none; white-space: nowrap; cursor: pointer;
 }
 /* Neutral, high-contrast: the green wash read as barely-there. Allow is the
    one solid-light button in the app, unmistakable on the dark card. */
