@@ -1061,7 +1061,7 @@ export const api = {
     return window.zero.teamThreadWork(p);
   },
   // Lines, files and comments inside threads (main/everything-found.mts).
-  async findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number } }): Promise<FoundInThreads> {
+  async findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number }; opened?: Record<string, number> }): Promise<FoundInThreads> {
     const none: FoundInThreads = { lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } };
     if (!window.zero?.findInThreads) return none;
     const got = await window.zero.findInThreads(p).catch(() => none);

@@ -145,8 +145,8 @@ describe('a teammate\'s page', () => {
   // The first build offered "Direct", a person's direct-message record, as a
   // project to work in.
   it('offers projects to work in, never a chat with a person', () => {
-    // Both pickers ask one rule, which leaves out a direct record and My Workspace.
-    expect(page.match(/const real = placesToWork\(products\);/g)).toHaveLength(2);
+    // Every picker (setup, About, the settings line) asks one rule, which leaves out a direct record and My Workspace.
+    expect(page.match(/const real = placesToWork\(products\);/g)).toHaveLength(3);
     const rule = page.match(/function placesToWork\([^]*?\n\}/)?.[0] ?? '';
     expect(rule).toMatch(/!p\.team\?\.direct/);
     expect(rule).toMatch(/!p\.personal/);

@@ -96,7 +96,7 @@ import { fileNewsFor, shownName, type ThreadLine } from '../../../shared/artifac
 import { whereAFileOpens } from '../artifact-layout';
 import { carryLine, type CarryState } from '../../../shared/carried-files.mts';
 import { watchScrollGutter } from '../scroll-gutter';
-import { CODE_PATH, artifactUrlTransform, isMediaPath, remarkArtifactPaths, shortPath } from '../remark-artifact-paths';
+import { CODE_PATH, accountFilePath, artifactUrlTransform, isMediaPath, remarkArtifactPaths, shortPath } from '../remark-artifact-paths';
 import { api } from '../api';
 import { draftKey, readDraft, saveDraft, clearDraft, readDraftAttachments, saveDraftAttachments, readDraftPick, saveDraftPick, readDraftWhen, saveDraftWhen, type SentDraft } from '../drafts';
 import { ReplyLater } from './ReplyLater';
@@ -344,7 +344,9 @@ export function ArtifactImg({ src, alt, roots, onOpen, find }: {
     const file = whole;
     if (found) return door(found, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={pictureUrl(found)} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" />);
     if (broken && direct) return <CarriedNote src={file} always />;
-    if (broken) return <button type="button" className="missing-artifact" title="Look for it again" onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {file}</button>;
+    // The finder may know where it really is (a project folder left out of the path).
+    if (broken && found === undefined && find) return <span className="inline-image arriving" aria-hidden="true" />;
+    if (broken) return <button type="button" className="missing-artifact" title={`${file} could not be found. Press to look again.`} onClick={() => { setTries(tries + 1); setBroken(false); }}>missing image: {shownName(file)}</button>;
     return door(file, <FittedImg maxHeight={maxHeight} minWidth={minWidth} src={again(pictureUrl(file))} alt={alt ?? ''} className="inline-image" crossOrigin="anonymous" onError={() => setBroken(true)} />);
   }
   const rel = src.replace(/^\.\//, '');
@@ -1417,6 +1419,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
     const resolveSrc = (src?: string) => {
       if (!src) return src;
       if (/^(https?|file|data):/.test(src)) return src;
+      if (src.startsWith('/')) return `file://${src}`;
       if (!productDir) return src;
       return `file://${productDir}/${src.replace(/^\.\//, '')}`;
     };
@@ -1525,8 +1528,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         // Written out in full into this product's folder, or the thread's own,
         // counts as the short path it names, as a full path in a sentence does.
         const shown = value.trim();
-        const path = (!className && shortPath(shown, productDir, taskFolder(repoDir, item.id))) || shown;
-        if (!className && (PATH_RE.test(path) || (conversing && path.startsWith('/') && PATH_RE.test(path.slice(1))))) {
+        const meant = className ? null : accountFilePath(shown, productDir);
+        const path = (!className && shortPath(shown, productDir, taskFolder(repoDir, item.id))) || meant || shown;
+        if (!className && (PATH_RE.test(path) || path === meant || (conversing && path.startsWith('/') && PATH_RE.test(path.slice(1))))) {
           if (/\.(png|jpe?g|gif|webp)$/i.test(path)) {
             return <ArtifactImg key={path} src={path} alt={shown} roots={roots} onOpen={openHref} find={find} />;
           }

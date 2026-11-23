@@ -76,7 +76,7 @@ describe('where the last tip sits on a list', () => {
 describe('what stays as it was', () => {
   it('in the open practice thread the tips are the thread\'s', () => {
     const opened = finishLesson(sent, 'open');
-    expect(tourStep(opened, screen({ thread: true, practice: false }))).toBe('reply');
+    expect(tourStep(opened, screen({ thread: true, practiceThread: true, practice: false }))).toBe('reply');
   });
   it('a tour with no practice thread still points at the first row that needs you', () => {
     expect(tourStep(noteSent(startTour()), screen({ view: 'inbox', rows: 2 }))).toBe('open');

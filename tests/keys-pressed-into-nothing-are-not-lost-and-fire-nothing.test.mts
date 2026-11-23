@@ -88,9 +88,11 @@ describe('search does not keep the keyboard behind a closed thing', () => {
 describe('a group chat with no box focused', () => {
   it('gives the key to its box, and R does not type itself', () => {
     const app = read('renderer/src/App.tsx');
-    const at = app.indexOf("querySelector<HTMLElement>('.rm-compose-input .ProseMirror')");
+    // The last is the Team page's; one opened from Needs you takes a thread's keys first.
+    const at = app.lastIndexOf("querySelector<HTMLElement>('.rm-compose-input .ProseMirror')");
     expect(at).toBeGreaterThan(-1);
     expect(app.slice(at - 200, at)).toContain("e.key === 'r'");
+    expect(app).toContain("else if (k === 'r') { e.preventDefault(); document.querySelector<HTMLElement>('.rm-compose-input .ProseMirror')?.focus(); }");
   });
 });
 

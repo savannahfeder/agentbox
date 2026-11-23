@@ -1497,6 +1497,12 @@ if (!app.requestSingleInstanceLock()) {
     for (const scheme of DOC_SCHEMES) protocol.handle(scheme, async (request) => {
       const file = docPath(request.url);
       if (!file || !docGrants.allows(file)) return new Response('Not available.', { status: 403 });
+      // A page's own pictures and films, which no thread names, may be in the cloud too.
+      if (comeBackAt && !fs.existsSync(file)) {
+        let timer: NodeJS.Timeout | undefined;
+        await Promise.race([comeBackAt(file).catch(() => false), new Promise((r) => { timer = setTimeout(r, COME_BACK_WAIT_MS); })]);
+        clearTimeout(timer);
+      }
       try {
         // The file is streamed exactly as it is on disk, pictures and all.
         // Nothing is injected into a page any more; see doc-scheme.mts for the

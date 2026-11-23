@@ -16,6 +16,7 @@
 // panel says little (the fix for that is briefs/worker.md, not this file).
 
 import { SERVER_BUSY } from '../../shared/spawn-trouble.mts';
+import { momentOf, type TraceSession } from '../../shared/trace-lines.mts';
 
 export interface Step {
   // Wall-clock, as the trace recorded it: "5:16pm".
@@ -53,7 +54,7 @@ export interface Notes {
   raw: string;
 }
 
-export interface TraceSession { startedAt: number; text: string }
+export { momentOf, type TraceSession };
 
 const LINE = /^(\d\d):(\d\d):(\d\d) {2}(.*)$/;
 const EXIT = /^# exited \((-?\d+)\)(?:\s+(\S+))?/;
@@ -63,25 +64,6 @@ function clock(h: number, m: number): string {
   const suffix = h < 12 ? 'am' : 'pm';
   const hour = h % 12 === 0 ? 12 : h % 12;
   return `${hour}:${String(m).padStart(2, '0')}${suffix}`;
-}
-
-// THE TRACE'S CLOCK IS UTC AND CARRIES NO DATE. The supervisor stamps every
-// line with `new Date.toISOString.slice(11, 19)` (supervisor.mts), so a step
-// she watched at 10:01pm is written "05:01:32", and printing those digits
-// straight out put her own evening seven hours into the morning: the fold on
-// read 5:01am, 6:39am, 12:15am, 4:29am for one continuous run. The session's
-// own startedAt supplies the missing date, and the moment comes back as a real
-// one; the day rolls forward when a run crosses midnight UTC.
-//
-// AGAINST THE START'S WHOLE SECOND, because the stamp has none smaller. A run
-// spawned at 18:30:28.097 whose only line read "18:30:28" was 97ms "before"
-// it began, so that line was put on the next day, and a message from tomorrow
-// sat under everything the next run wrote (2026-10-04). The store's practice
-// traces floored their start for the same reason; this is the reader's copy.
-export function momentOf(startedAt: number, h: number, m: number, s: number): number {
-  const began = new Date(startedAt);
-  const at = Date.UTC(began.getUTCFullYear(), began.getUTCMonth(), began.getUTCDate(), h, m, s);
-  return at < Math.floor(startedAt / 1000) * 1000 ? at + 86_400_000 : at;
 }
 
 // The same moment, in the time zone she is sitting in.

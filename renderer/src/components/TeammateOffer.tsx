@@ -22,7 +22,7 @@ function Sky() {
     const canvas = ref.current;
     if (!canvas) return;
     const dark = document.documentElement.dataset.theme !== 'light';
-    const art = (skyTheme(worn) ?? skyTheme(dark ? 'ember' : 'sage'))!.art;
+    const art = (skyTheme(worn) ?? skyTheme(dark ? 'ember' : 'mountains'))!.art;
     const paint = () => drawSky(canvas, art, { from: 0, span: 6, dpr: Math.min(2, window.devicePixelRatio || 1) });
     paint();
     let width = canvas.clientWidth;

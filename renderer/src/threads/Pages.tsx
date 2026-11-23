@@ -17,7 +17,7 @@ import { Face, TeamContext, dueWords, firstName, personOf } from '../team/people
 import { handedBy, taskWords } from '../team/company';
 import { agentSaidLast } from '../team/answers-in-the-chat';
 import { PriorityIcon } from '../components/Priority';
-import { asideBesides, notStarted, rowTitle, waitCameBack } from '../list-rules';
+import { asideBesides, messageOnRow, notStarted, rowTitle, waitCameBack } from '../list-rules';
 import { deadlineOf, dueSaid } from '../../../shared/team-tasks.mts';
 import { waitWords } from '../../../shared/thread-waits.mts';
 import { askedOutWord, asksOnThread, backWord, handedBackBy } from '../../../shared/thread-asks.mts';
@@ -836,7 +836,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
     const text = fileNews ?? (agent ? `${agent.who}: ${agent.text}` : said.text);
     const subject = item.label || (isWorkThread(item) ? item.title : null);
     const from: Who = { face: <Face person={team?.byId.get(said.people[0] ?? '') ?? null} />, name: said.people.map((id) => (said.people.length > 1 ? nameFirst(id) : fullName(team?.byId.get(id) ?? null))).join(', ') };
-    return <RowCells status={status} who={from} title={subject ?? (!fileNews && !agent && said.fromMe ? `You: ${text}` : text)} aside={subject ? text : due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
+    return <RowCells status={status} who={from} title={subject ?? messageOnRow(!fileNews && !agent && said.fromMe ? `You: ${text}` : text)} aside={subject ? text : due?.word} late={!!due?.late} pinned={!!item.pinned && item.status !== 'done'} where="" person={person}
       priority={messagePriority(item)} updatedAt={when} when={back} now={now} action={action} />;
   }
   // ONLY THE UNUSUAL CASE WEARS A MARK (2026-10-02). Shared with the team is
