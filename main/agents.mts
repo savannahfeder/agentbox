@@ -17,6 +17,8 @@ import { foldHistoryOffThread } from './chat-reader.mts';
 import {
   WORK_CHARS, agentKey, changedFile, commandWork, fullSubject, isBookkeeping, saidCount, sameInstant, threadWindow, workSubject, workVerb,
 } from '../shared/agents.mts';
+import type { ToolQuestion } from '../shared/session-layout.mts';
+import { bringToFront } from './bring-to-front.mts';
 
 const run = promisify(execFile);
 
@@ -49,6 +51,9 @@ export interface Facts {
   lastAsked: string;
   touched: string[];
   asked: AskedTurn[];
+  /** Claude Code's own question tool, when the session is stopped on it. */
+  question: ToolQuestion[];
+  questionId: string;
 }
 
 type HistoryEntry = Facts & { file: string; size: number; mtimeMs: number; offset: number };
@@ -71,10 +76,15 @@ export interface Agent {
   lastAsked: string;
   touched: string[];
   asked: AskedTurn[];
+  question: ToolQuestion[];
   transcript: string | null;
   product: string | null;
   productName: string | null;
   startedByZero: boolean;
+  engine: 'claude' | 'codex';
+  app?: string | null;
+  /** A command the session is waiting on permission to run, in its own words. */
+  approval?: { command: string; reason: string } | null;
 }
 
 export interface RefreshOptions {
@@ -246,7 +256,22 @@ const TOUCH_TOOLS = new Set<string | undefined>(['Edit', 'Write', 'NotebookEdit'
 
 const transcriptPath = (sessionId: string, cwd: string | undefined) => findTranscript(PROJECTS_DIR(), sessionId, cwd);
 
-const NOTHING: Facts = { lastActiveAt: 0, lastSaid: '', saidAt: 0, saidOpen: false, about: '', lastAsked: '', touched: [], asked: [] };
+const NOTHING: Facts = { lastActiveAt: 0, lastSaid: '', saidAt: 0, saidOpen: false, about: '', lastAsked: '', touched: [], asked: [], question: [], questionId: '' };
+
+/** The questions an AskUserQuestion call carries, each with its choices' labels. */
+function toolQuestions(input: unknown): ToolQuestion[] {
+  const qs = (input as { questions?: unknown } | null)?.questions;
+  if (!Array.isArray(qs)) return [];
+  return qs.flatMap((q) => {
+    const question = String((q as { question?: unknown })?.question ?? '').trim();
+    if (!question) return [];
+    const opts = (q as { options?: unknown })?.options;
+    const options = (Array.isArray(opts) ? opts : [])
+      .map((o) => String((typeof o === 'string' ? o : (o as { label?: unknown })?.label) ?? '').trim())
+      .filter(Boolean);
+    return [{ question, options }];
+  });
+}
 
 // The card quotes the end of the last reply, so this bounds the accumulator,
 // not what the user reads.
@@ -317,6 +342,18 @@ function remember(acc: Facts, line: string) {
   // Claude Code writes one answer as a new line each time it stops for a tool,
   // so the blocks of one reply are joined until the next thing arrives.
   if (arrived(obj)) acc.saidOpen = false;
+  if (mine) { acc.question = []; acc.questionId = ''; }
+  const answer = acc.questionId && obj.type === 'user' && Array.isArray(obj.message?.content)
+    ? obj.message.content.find((c) => c.type === 'tool_result' && c.tool_use_id === acc.questionId) : null;
+  if (answer) {
+    // Her pick in the terminal is her answer, which is what moves the row to In progress.
+    const picked = typeof answer.content === 'string' ? answer.content : (answer.content ?? []).map((c) => c.text ?? '').join(' ');
+    acc.asked.push({ at: Date.parse((obj.timestamp ?? 0) as string) || 0, text: picked.replace(/\s+/g, ' ').trim() || 'Answered its question' });
+    if (acc.asked.length > KEEP_TURNS) acc.asked.splice(1, 1);
+    acc.question = []; acc.questionId = '';
+    // What it says after her pick answers the pick, so it does not join the words before the question.
+    acc.saidOpen = false;
+  }
   if (obj.type === 'assistant' && Array.isArray(obj.message?.content)) {
     const said = obj.message.content.filter((c) => c.type === 'text').map((c) => c.text).join('\n').trim();
     if (said) {
@@ -333,6 +370,12 @@ function remember(acc: Facts, line: string) {
       if (at && !open) acc.saidAt = at;
     }
     for (const c of obj.message.content) {
+      if (c.type === 'tool_use' && c.name === 'AskUserQuestion') {
+        const qs = toolQuestions(c.input);
+        // Only what it said in this same answer leads into the question.
+        acc.question = qs.length && acc.saidOpen && acc.lastSaid ? [{ ...qs[0], lead: acc.lastSaid }, ...qs.slice(1)] : qs;
+        acc.questionId = String(c.id ?? '');
+      }
       if (c.type !== 'tool_use' || !TOUCH_TOOLS.has(c.name)) continue;
       const p = c.input?.file_path ?? c.input?.notebook_path;
       if (!p) continue;
@@ -381,7 +424,7 @@ export function foldHistory({ file, size, from, first, acc }: HistoryFold): { of
   if (first && size > FIRST_HEAD_BYTES + FIRST_TAIL_BYTES) {
     fold(file, acc, 0, FIRST_HEAD_BYTES);
     // What the end says is the session now; a reply or a file from the start is not.
-    Object.assign(acc, { lastSaid: '', saidAt: 0, saidOpen: false, touched: [] });
+    Object.assign(acc, { lastSaid: '', saidAt: 0, saidOpen: false, touched: [], question: [], questionId: '' });
     from = size - FIRST_TAIL_BYTES;
   }
   return { offset: fold(file, acc, from, size), acc };
@@ -416,8 +459,10 @@ function historyAsk(sessionId: string, cwd: string | undefined): { known: Histor
       lastAsked: hit.lastAsked,
       touched: [...hit.touched],
       asked: [...hit.asked],
+      question: [...(hit.question ?? [])],
+      questionId: hit.questionId ?? '',
     }
-    : { ...NOTHING, touched: [], asked: [] };
+    : { ...NOTHING, touched: [], asked: [], question: [], questionId: '' };
   return { stat, ask: { file, size: stat.size, from: resume ? hit.offset : 0, first: !resume, acc } };
 }
 
@@ -459,6 +504,9 @@ const TTL_MS = 4000;
 
 // Called only when the list changes, so a ticking `lastActiveAt` does not
 // re-render the window.
+/** Whether a real reading has been taken yet. Until then `listAgents` answers []. */
+export const measured = () => cache.at > 0;
+
 export let onChange: (() => void) | null = null;
 export function setOnChange(fn: (() => void) | null) { onChange = fn; }
 
@@ -558,7 +606,7 @@ async function measure({ zeroPid, sessionIds, products, claudeBin }: Required<Re
     ? readHistoryOffThread(rec.sessionId, rec.cwd)
     : { ...NOTHING, transcript: null })));
   for (const [i, rec] of records.entries()) {
-    const { lastActiveAt, lastSaid, saidAt, about, lastAsked, touched, asked, transcript } = histories[i];
+    const { lastActiveAt, lastSaid, saidAt, about, lastAsked, touched, asked, question, transcript } = histories[i];
     const owner = owners.get(path.resolve(rec.cwd ?? '/')) ?? null;
     agents.push({
       pid: rec.pid!,
@@ -583,11 +631,13 @@ async function measure({ zeroPid, sessionIds, products, claudeBin }: Required<Re
       touched,
       // No model reads any of it.
       asked,
+      question: question ?? [],
       transcript,
       product: owner?.slug ?? null,
       productName: owner?.name ?? null,
       // The dedupe key for the app's own workers.
       startedByZero: rec.ppid === zeroPid || (!!rec.sessionId && zeroSessionIds.has(rec.sessionId)),
+      engine: 'claude',
     });
   }
   return agents;
@@ -819,14 +869,10 @@ export async function owningApp(pid: number) {
   return null;
 }
 
-export async function reveal(pid: number) {
-  const app = await owningApp(pid);
-  if (!app) return { ok: false, reason: `${Name} cannot tell which window it is running in.` };
-  return new Promise<RevealResult>((resolve) => {
-    execFile('/usr/bin/open', ['-a', app.path], (err) => {
-      resolve(err ? { ok: false, reason: `${app.name} would not come to the front.` } : { ok: true, name: app.name });
-    });
-  });
+export async function reveal(pid: number): Promise<RevealResult> {
+  // The very tab where the app can be told which (main/bring-to-front.mts).
+  const out = await bringToFront(pid);
+  return out.ok ? out : { ok: false, reason: out.reason.replace(/^It cannot tell/, `${Name} cannot tell`) };
 }
 
 // The conversation: what both sides said, read only when the user asks for it.

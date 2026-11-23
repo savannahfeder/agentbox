@@ -84,6 +84,8 @@
 .th-pop .lab { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 /* Beside chips that wrap, the label belongs to the first row, not the middle of them all. */
 .th-pop .line:has(> .opts) > .lab { align-self: start; line-height: 26px; }
+/* A label too long for the column takes two lines, as tall together as a chip. */
+.th-pop .line:has(> .opts) > .lab.lab-two { line-height: 13px; }
 .th-pop .opts { display: flex; flex-wrap: wrap; gap: 5px; }
 .th-pop .opts > button { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; }
 .th-pop .opts > button.on { background: rgba(255,255,255,.09); border-color: var(--text-faint); color: var(--text); }

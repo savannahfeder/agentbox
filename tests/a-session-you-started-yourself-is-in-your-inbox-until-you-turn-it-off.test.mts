@@ -1,19 +1,16 @@
-// A SESSION SOMEBODY STARTED IN A TERMINAL IS NOT IN THEIR INBOX.
+// A SESSION YOU STARTED YOURSELF IS IN YOUR INBOX UNTIL YOU TURN IT OFF.
 //
-// WHAT THIS FILE USED TO SAY, so the deletion is legible. Two defaults pulling
-// opposite ways, and a pin in saveConfig to stop a stranger being flipped from
-// one to the other by saving something unrelated. There is one default now,
-// `off`, so both halves of that machinery are gone rather than adjusted.
+// The default was `off` from 2026-08-27, when every Claude Code session on the
+// founder's Mac got a row in Needs you, busy or not. Since w-34f79ab66e a
+// session working on what she typed is In progress instead, Codex sessions are
+// read too, and the founder asked on 2026-11-23: "This should automatically be
+// enabled and we need an easy entry point to configure that or turn that off."
+// So the one default is `all`, nothing is written on anybody's behalf, and a
+// choice actually made still wins. The ways to change it are in the session's
+// own menu, the inbox's View and filters, ⌘K and Settings.
 //
-// AND IT IS THE DEFAULT THAT REACHED HER, which is why this is the fix and not
-// the setting she could have flipped herself. Measured 2026-08-27: her running
-// app reads ~/Desktop/dev/zero/zero.config.json (dev build, so appDir rather
-// than userData), the file exists, and it has no `outsideAgents` key in it. It
-// resolved `all`, and every Claude Code session on the machine got a row.
-//
-// SEPARATED IS NOT DELETED. `listed` and `onTheRail` do not take a mode, so an
-// outside session is still on its project's rail and still one click from her.
-// The only thing this decides is the inbox.
+// SEPARATED IS NOT DELETED. `listed` and `onTheRail` do not take a mode, so with
+// it off an outside session is still on its project's rail.
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -32,42 +29,42 @@ afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 const write = (obj) => fs.writeFileSync(path.join(dir, 'zero.config.json'), JSON.stringify(obj, null, 2));
 const onDisk = () => JSON.parse(fs.readFileSync(path.join(dir, 'zero.config.json'), 'utf8'));
 
-describe('nobody gets a row for a session they started themselves', () => {
-  it(`is off on a Mac that has never run ${NAME}`, () => {
+describe('a session you started yourself gets a row unless you said otherwise', () => {
+  it(`is on on a Mac that has never run ${NAME}`, () => {
     expect(loadConfig(dir).freshInstall).toBe(true);
-    expect(outsideAgentsMode(loadConfig(dir))).toBe('off');
+    expect(outsideAgentsMode(loadConfig(dir))).toBe('all');
   });
 
   // HER OWN FILE, as measured: it exists and it does not mention the setting.
-  it('is off on an install whose config never mentioned the setting', () => {
+  it('is on on an install whose config never mentioned the setting', () => {
     write({ posthogKey: 'x', storeRoot: '/tmp/d', maxConcurrentSessions: 3 });
     const config = loadConfig(dir);
     expect(config.freshInstall).toBe(false);
-    expect(outsideAgentsMode(config)).toBe('off');
+    expect(outsideAgentsMode(config)).toBe('all');
   });
 
-  it('is off on an empty config file too', () => {
+  it('is on on an empty config file too', () => {
     write({});
-    expect(outsideAgentsMode(loadConfig(dir))).toBe('off');
+    expect(outsideAgentsMode(loadConfig(dir))).toBe('all');
   });
 
   it('does not depend on whether the install is new, because nothing does now', () => {
-    expect(outsideAgentsMode({ freshInstall: true })).toBe('off');
-    expect(outsideAgentsMode({ freshInstall: false })).toBe('off');
+    expect(outsideAgentsMode({ freshInstall: true })).toBe('all');
+    expect(outsideAgentsMode({ freshInstall: false })).toBe('all');
   });
 });
 
 describe('a setting somebody actually chose still wins', () => {
   it('on a new install and an old one alike', () => {
-    expect(outsideAgentsMode({ freshInstall: true, outsideAgents: 'all' })).toBe('all');
+    expect(outsideAgentsMode({ freshInstall: true, outsideAgents: 'off' })).toBe('off');
     expect(outsideAgentsMode({ freshInstall: false, outsideAgents: 'waiting' })).toBe('waiting');
-    write({ outsideAgents: 'all' });
-    expect(outsideAgentsMode(loadConfig(dir))).toBe('all');
+    write({ outsideAgents: 'off' });
+    expect(outsideAgentsMode(loadConfig(dir))).toBe('off');
   });
 
   it('is ignored when it is not one of the three', () => {
-    expect(outsideAgentsMode({ freshInstall: true, outsideAgents: 'nonsense' })).toBe('off');
-    expect(outsideAgentsMode({ freshInstall: false, outsideAgents: 'nonsense' })).toBe('off');
+    expect(outsideAgentsMode({ freshInstall: true, outsideAgents: 'nonsense' })).toBe('all');
+    expect(outsideAgentsMode({ freshInstall: false, outsideAgents: 'nonsense' })).toBe('all');
   });
 });
 
@@ -82,7 +79,7 @@ describe('saving a setting writes nothing else', () => {
     saveConfig(config, { driveEnabled: true });
     expect('outsideAgents' in onDisk()).toBe(false);
     expect(onDisk().driveEnabled).toBe(true);
-    expect(outsideAgentsMode(loadConfig(dir))).toBe('off');
+    expect(outsideAgentsMode(loadConfig(dir))).toBe('all');
   });
 
   it('writes it when that is the setting being saved, and only then', () => {
@@ -96,13 +93,12 @@ describe('saving a setting writes nothing else', () => {
     const config = loadConfig(dir);
     saveConfig(config, { driveEnabled: true });
     expect('outsideAgents' in onDisk()).toBe(false);
-    expect(outsideAgentsMode(loadConfig(dir))).toBe('off');
+    expect(outsideAgentsMode(loadConfig(dir))).toBe('all');
   });
 });
 
-// WHERE THEY ARE INSTEAD, because "separated" has to mean somewhere rather than
-// nowhere. Neither of these rules takes a mode, so the default above cannot
-// reach them.
+// WHERE THEY ARE WHEN IT IS OFF, because off has to mean somewhere rather than
+// nowhere. Neither of these rules takes a mode, so the setting cannot reach them.
 describe('an outside session is still on its project rail', () => {
   const terminal = {
     pid: 53352,
@@ -116,8 +112,9 @@ describe('an outside session is still on its project rail', () => {
   };
   const now = Date.parse('2026-08-27T17:00:00Z');
 
-  it('is out of the inbox on the default', () => {
-    expect(reachesInbox(terminal, now, outsideAgentsMode({}))).toBe(false);
+  it('is in the inbox on the default, and out of it when turned off', () => {
+    expect(reachesInbox(terminal, now, outsideAgentsMode({}))).toBe(true);
+    expect(reachesInbox(terminal, now, outsideAgentsMode({ outsideAgents: 'off' }))).toBe(false);
   });
 
   it('and still listed, and still on the rail, where she can open it', () => {
